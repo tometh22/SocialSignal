@@ -1565,8 +1565,8 @@ export default function ProjectDetailsRedesigned() {
               value="details" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:shadow-sm"
             >
-              <Calendar className="h-4 w-4" />
-              Análisis Detallado
+              <DollarSign className="h-4 w-4" />
+              Análisis Financiero
             </TabsTrigger>
           </TabsList>
 
@@ -2738,481 +2738,372 @@ export default function ProjectDetailsRedesigned() {
             </Card>
           </TabsContent>
 
-          {/* ANÁLISIS DETALLADO - VISUALIZACIONES DIVERSAS */}
-          <TabsContent value="details" className="space-y-8">
-            <div className="space-y-8">
-              {/* Hero Section con Gráfico de Performance */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6 border border-blue-200">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Gráfico Circular de Health Score */}
-                  <div className="lg:col-span-1">
-                    <Card className="h-full bg-white/80 backdrop-blur">
-                      <CardContent className="p-6">
-                        <div className="text-center">
-                          <h3 className="text-lg font-bold text-gray-800 mb-4">Health Score General</h3>
-                          {(() => {
-                            const markup = quotationData?.totalAmount && costSummary?.totalCost 
-                              ? quotationData.totalAmount / costSummary.totalCost 
-                              : 2.72;
-                            const healthScore = Math.min(100, (markup / 2.5) * 100);
-                            const circumference = 2 * Math.PI * 45;
-                            const strokeDasharray = circumference;
-                            const strokeDashoffset = circumference - (healthScore / 100) * circumference;
-                            
-                            return (
-                              <div className="relative mx-auto w-32 h-32">
-                                <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 100 100">
-                                  <circle
-                                    cx="50"
-                                    cy="50"
-                                    r="45"
-                                    stroke="currentColor"
-                                    strokeWidth="8"
-                                    fill="transparent"
-                                    className="text-gray-200"
-                                  />
-                                  <circle
-                                    cx="50"
-                                    cy="50"
-                                    r="45"
-                                    stroke="currentColor"
-                                    strokeWidth="8"
-                                    fill="transparent"
-                                    strokeDasharray={strokeDasharray}
-                                    strokeDashoffset={strokeDashoffset}
-                                    className={healthScore >= 80 ? "text-green-500" : healthScore >= 60 ? "text-yellow-500" : "text-red-500"}
-                                    style={{ transition: 'stroke-dashoffset 0.5s ease-in-out' }}
-                                  />
-                                </svg>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="text-2xl font-bold text-gray-800">{healthScore.toFixed(0)}</div>
-                                    <div className="text-xs text-gray-500">Score</div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                          <div className="mt-4">
-                            <Badge className={`px-3 py-1 ${
-                              quotationData?.totalAmount && costSummary?.totalCost && (quotationData.totalAmount / costSummary.totalCost) >= 2.5 ? 'bg-green-100 text-green-800' :
-                              quotationData?.totalAmount && costSummary?.totalCost && (quotationData.totalAmount / costSummary.totalCost) >= 1.8 ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {quotationData?.totalAmount && costSummary?.totalCost && (quotationData.totalAmount / costSummary.totalCost) >= 2.5 ? '🏆 Excelente' :
-                               quotationData?.totalAmount && costSummary?.totalCost && (quotationData.totalAmount / costSummary.totalCost) >= 1.8 ? '✅ Bueno' :
-                               '🔴 Crítico'}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  
-                  {/* Métricas Principales en Cards Modernas */}
-                  <div className="lg:col-span-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Progreso de Horas */}
-                      <Card className="bg-white/80 backdrop-blur border-l-4 border-l-blue-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Clock className="h-5 w-5 text-blue-600" />
-                            <span className="text-xs font-medium text-blue-700">PROGRESO</span>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-2xl font-bold text-gray-800">
-                              {unifiedData?.efficiency ? `${unifiedData.efficiency.toFixed(1)}%` : 'N/A'}
-                            </div>
-                            <Progress 
-                              value={unifiedData?.efficiency || 0} 
-                              className="h-2"
-                            />
-                            <div className="text-xs text-gray-600">
-                              {unifiedData?.workedHours?.toFixed(0) || 0}h / {unifiedData?.estimatedHours?.toFixed(0) || 0}h
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      {/* Rentabilidad */}
-                      <Card className="bg-white/80 backdrop-blur border-l-4 border-l-emerald-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <TrendingUp className="h-5 w-5 text-emerald-600" />
-                            <span className="text-xs font-medium text-emerald-700">MARKUP</span>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-2xl font-bold text-gray-800">
-                              {unifiedData?.markup ? `${unifiedData.markup.toFixed(2)}x` : 'N/A'}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              ${quotationData?.totalAmount?.toLocaleString() || 0} / ${costSummary?.totalCost?.toLocaleString() || 0}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      {/* Uso de Presupuesto */}
-                      <Card className="bg-white/80 backdrop-blur border-l-4 border-l-purple-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Target className="h-5 w-5 text-purple-600" />
-                            <span className="text-xs font-medium text-purple-700">BUDGET</span>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-2xl font-bold text-gray-800">
-                              {costSummary?.budget && costSummary?.totalCost ? 
-                                `${((costSummary.totalCost / costSummary.budget) * 100).toFixed(0)}%` : 'N/A'}
-                            </div>
-                            <Progress 
-                              value={costSummary?.budget && costSummary?.totalCost ? 
-                                Math.min(100, (costSummary.totalCost / costSummary.budget) * 100) : 0} 
-                              className="h-2"
-                            />
-                            <div className="text-xs text-gray-600">
-                              ${costSummary?.totalCost?.toLocaleString() || 0} / ${costSummary?.budget?.toLocaleString() || 0}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      {/* Estado del Proyecto */}
-                      <Card className="bg-white/80 backdrop-blur border-l-4 border-l-orange-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Activity className="h-5 w-5 text-orange-600" />
-                            <span className="text-xs font-medium text-orange-700">ESTADO</span>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="text-lg font-bold text-gray-800">
-                              {project?.status === 'active' ? 'Activo' : 
-                               project?.status === 'completed' ? 'Completado' : 'En Progreso'}
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              Filtro: {timeFilterForHook}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </div>
+          {/* ANÁLISIS FINANCIERO Y ECONÓMICO */}
+          <TabsContent value="details" className="space-y-6">
+            {/* Header Section - Financial Overview */}
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-indigo-600 p-2 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-indigo-900">Análisis Financiero y Económico</h2>
+                  <p className="text-indigo-700">Indicadores de rentabilidad, ROI y eficiencia económica</p>
                 </div>
               </div>
+            </div>
 
-              {/* Sección de Análisis Inteligente */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Optimizador de Presupuesto - Estilo Dashboard Moderno */}
-                <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-3 text-green-800">
-                      <div className="p-2 bg-green-200 rounded-lg">
-                        <Lightbulb className="h-5 w-5 text-green-700" />
-                      </div>
-                      Optimizador de Presupuesto
-                    </CardTitle>
-                    <CardDescription className="text-green-700">
-                      Recomendaciones inteligentes para optimizar el presupuesto del proyecto
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {(() => {
-                      const presupuestoRestante = (quotationData?.totalAmount || 0) - (costSummary?.totalCost || 0);
-                      const horasRestantes = (unifiedData?.estimatedHours || 0) - (unifiedData?.workedHours || 0);
-                      
-                      return (
-                        <div className="space-y-4">
-                          {/* Gráfico de Barras Simple para Presupuesto */}
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <div className="flex justify-between items-center mb-3">
-                              <span className="text-sm font-medium text-gray-700">Presupuesto Disponible</span>
-                              <span className="text-lg font-bold text-green-600">
-                                ${presupuestoRestante.toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-3">
-                              <div 
-                                className="bg-gradient-to-r from-green-400 to-green-600 h-3 rounded-full transition-all duration-500"
-                                style={{ width: `${Math.max(0, Math.min(100, (presupuestoRestante / (quotationData?.totalAmount || 1)) * 100))}%` }}
-                              ></div>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {((presupuestoRestante / (quotationData?.totalAmount || 1)) * 100).toFixed(1)}% del presupuesto total disponible
-                            </div>
-                          </div>
-                          
-                          {/* Recomendaciones */}
-                          <div className="space-y-3">
-                            <h4 className="font-semibold text-green-800 flex items-center gap-2">
-                              <Star className="h-4 w-4" />
-                              Recomendaciones:
-                            </h4>
-                            
-                            {presupuestoRestante > 500 && (
-                              <div className="flex items-start gap-3 p-3 bg-green-100 rounded-lg border border-green-200">
-                                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-                                <div className="text-sm text-green-800">
-                                  <div className="font-medium">Reasignar tareas complejas</div>
-                                  <div className="text-green-700">
-                                    Considera invertir ${Math.min(500, presupuestoRestante).toLocaleString()} en tareas de mayor valor para el cliente
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {horasRestantes > 50 && (
-                              <div className="flex items-start gap-3 p-3 bg-blue-100 rounded-lg border border-blue-200">
-                                <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-                                <div className="text-sm text-blue-800">
-                                  <div className="font-medium">Optimizar distribución</div>
-                                  <div className="text-blue-700">
-                                    Quedan {horasRestantes.toFixed(0)}h disponibles - considera redistribuir para maximizar entregables
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {presupuestoRestante < 100 && (
-                              <div className="flex items-start gap-3 p-3 bg-yellow-100 rounded-lg border border-yellow-200">
-                                <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                                <div className="text-sm text-yellow-800">
-                                  <div className="font-medium">Mantener calidad actual</div>
-                                  <div className="text-yellow-700">
-                                    Score de calidad {((Math.random() * 30) + 70).toFixed(0)}/100 - continúa con estándares actuales para mantener margen
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-
-                {/* Proyecciones Predictivas - Estilo Analítico */}
-                <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-3 text-purple-800">
-                      <div className="p-2 bg-purple-200 rounded-lg">
-                        <TrendingUp className="h-5 w-5 text-purple-700" />
-                      </div>
-                      Proyecciones Predictivas
-                    </CardTitle>
-                    <CardDescription className="text-purple-700">
-                      Análisis predictivo basado en tendencias actuales del proyecto
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {(() => {
-                      const currentProgress = (unifiedData?.workedHours || 0) / (unifiedData?.estimatedHours || 1);
-                      const projectedCompletion = new Date();
-                      projectedCompletion.setDate(projectedCompletion.getDate() + Math.ceil((1 - currentProgress) * 30));
-                      
-                      return (
-                        <div className="space-y-4">
-                          {/* Fecha Proyectada */}
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Fecha Proyectada</span>
-                              <span className="text-lg font-bold text-purple-600">
-                                {projectedCompletion.toLocaleDateString('es-ES', { 
-                                  month: 'short', 
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              Basado en velocidad actual del equipo {(currentProgress * 100).toFixed(1)}% completado
-                            </div>
-                          </div>
-                          
-                          {/* Métricas de Tendencia */}
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-white rounded-lg p-3 shadow-sm">
-                              <div className="text-xs text-gray-600 mb-1">Sobrecosto Proyectado</div>
-                              <div className="text-lg font-bold text-purple-800">
-                                {currentProgress > 0.8 ? '+0%' : '+' + ((1 - currentProgress) * 15).toFixed(0) + '%'}
-                              </div>
-                            </div>
-                            <div className="bg-white rounded-lg p-3 shadow-sm">
-                              <div className="text-xs text-gray-600 mb-1">Costo Final Est.</div>
-                              <div className="text-lg font-bold text-purple-800">
-                                ${((costSummary?.totalCost || 0) * (1 + (currentProgress > 0.8 ? 0 : (1 - currentProgress) * 0.15))).toLocaleString()}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Alertas Predictivas */}
-                          <div className="space-y-2">
-                            <h4 className="font-semibold text-purple-800 flex items-center gap-2">
-                              <Flame className="h-4 w-4" />
-                              Alertas Predictivas:
-                            </h4>
-                            
-                            {currentProgress < 0.3 && (
-                              <div className="flex items-center gap-2 p-2 bg-red-100 rounded-lg">
-                                <AlertCircle className="h-4 w-4 text-red-600" />
-                                <span className="text-sm text-red-800">Velocidad del equipo por debajo del objetivo</span>
-                              </div>
-                            )}
-                            
-                            {currentProgress > 0.8 && (
-                              <div className="flex items-center gap-2 p-2 bg-green-100 rounded-lg">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                <span className="text-sm text-green-800">Progreso excelente - entrega anticipada probable</span>
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-2 p-2 bg-blue-100 rounded-lg">
-                              <Info className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm text-blue-800">
-                                Progreso actual: {(currentProgress * 100).toFixed(1)}% - Ritmo {currentProgress > 0.8 ? 'excelente' : currentProgress > 0.6 ? 'bueno' : 'lento'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Centro de Alertas y Riesgos - Diseño de Monitoreo */}
-              <Card className="bg-gradient-to-br from-red-50 to-rose-100 border-red-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-red-800">
-                    <div className="p-2 bg-red-200 rounded-lg">
-                      <Shield className="h-5 w-5 text-red-700" />
+            {/* Financial KPIs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* ROI Card */}
+              <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-emerald-600 p-2 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-white" />
                     </div>
-                    Centro de Alertas y Riesgos
-                  </CardTitle>
-                  <CardDescription className="text-red-700">
-                    Monitoreo automático de riesgos y alertas del proyecto en tiempo real
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    const markup = quotationData?.totalAmount && costSummary?.totalCost 
-                      ? quotationData.totalAmount / costSummary.totalCost 
-                      : 2.72;
-                    const budgetUsage = costSummary?.budget && costSummary?.totalCost 
-                      ? (costSummary.totalCost / costSummary.budget) * 100
-                      : 63;
-                    
-                    const alerts = [];
-                    
-                    // Generar alertas basadas en métricas reales
-                    if (markup < 1.5) {
-                      alerts.push({
-                        type: 'critical',
-                        title: 'Markup Crítico',
-                        message: `Markup actual ${markup.toFixed(2)}x está por debajo del mínimo recomendado (1.5x)`,
-                        action: 'Revisar costos y optimizar recursos inmediatamente',
-                        icon: AlertTriangle,
-                        color: 'red'
-                      });
-                    }
-                    
-                    if (budgetUsage > 85) {
-                      alerts.push({
-                        type: 'warning',
-                        title: 'Uso Alto de Presupuesto',
-                        message: `Se ha utilizado ${budgetUsage.toFixed(0)}% del presupuesto disponible`,
-                        action: 'Monitorear gastos adicionales cuidadosamente',
-                        icon: AlertCircle,
-                        color: 'yellow'
-                      });
-                    }
-                    
-                    if (markup > 2.5) {
-                      alerts.push({
-                        type: 'success',
-                        title: 'Rentabilidad Excelente',
-                        message: `Markup de ${markup.toFixed(2)}x supera objetivos de rentabilidad`,
-                        action: 'Mantener calidad de servicio actual',
-                        icon: CheckCircle,
-                        color: 'green'
-                      });
-                    }
-                    
-                    // Si no hay alertas, mostrar estado normal
-                    if (alerts.length === 0) {
-                      alerts.push({
-                        type: 'info',
-                        title: 'Proyecto en Estado Normal',
-                        message: 'Todas las métricas están dentro de rangos esperados',
-                        action: 'Continuar con el plan actual del proyecto',
-                        icon: Info,
-                        color: 'blue'
-                      });
-                    }
-                    
-                    return (
-                      <div className="grid gap-4">
-                        {alerts.map((alert, index) => {
-                          const Icon = alert.icon;
-                          return (
-                            <div key={index} className={`
-                              flex items-start gap-4 p-4 rounded-lg border-l-4 bg-white shadow-sm
-                              ${alert.color === 'red' ? 'border-l-red-500 bg-red-50' : 
-                                alert.color === 'yellow' ? 'border-l-yellow-500 bg-yellow-50' :
-                                alert.color === 'green' ? 'border-l-green-500 bg-green-50' :
-                                'border-l-blue-500 bg-blue-50'}
-                            `}>
-                              <div className={`
-                                p-2 rounded-full
-                                ${alert.color === 'red' ? 'bg-red-200' : 
-                                  alert.color === 'yellow' ? 'bg-yellow-200' :
-                                  alert.color === 'green' ? 'bg-green-200' :
-                                  'bg-blue-200'}
-                              `}>
-                                <Icon className={`h-4 w-4 ${
-                                  alert.color === 'red' ? 'text-red-700' : 
-                                  alert.color === 'yellow' ? 'text-yellow-700' :
-                                  alert.color === 'green' ? 'text-green-700' :
-                                  'text-blue-700'
-                                }`} />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-semibold ${
-                                  alert.color === 'red' ? 'text-red-800' : 
-                                  alert.color === 'yellow' ? 'text-yellow-800' :
-                                  alert.color === 'green' ? 'text-green-800' :
-                                  'text-blue-800'
-                                }`}>
-                                  {alert.title}
-                                </h4>
-                                <p className={`text-sm mt-1 ${
-                                  alert.color === 'red' ? 'text-red-700' : 
-                                  alert.color === 'yellow' ? 'text-yellow-700' :
-                                  alert.color === 'green' ? 'text-green-700' :
-                                  'text-blue-700'
-                                }`}>
-                                  {alert.message}
-                                </p>
-                                <div className={`text-xs mt-2 font-medium ${
-                                  alert.color === 'red' ? 'text-red-600' : 
-                                  alert.color === 'yellow' ? 'text-yellow-600' :
-                                  alert.color === 'green' ? 'text-green-600' :
-                                  'text-blue-600'
-                                }`}>
-                                  💡 Acción recomendada: {alert.action}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                      ROI
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-emerald-900">
+                      {unifiedData?.metrics?.markup ? 
+                        `${((unifiedData.metrics.markup - 1) * 100).toFixed(1)}%` : 
+                        '0.0%'
+                      }
+                    </h3>
+                    <p className="text-xs text-emerald-700">Retorno sobre inversión</p>
+                    <div className="w-full bg-emerald-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, ((unifiedData?.metrics?.markup || 1) - 1) * 50))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profit Margin Card */}
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                      <Percent className="h-5 w-5 text-white" />
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                      Margen
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-blue-900">
+                      {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                        `${(((unifiedData.quotation.totalAmount - unifiedData.actuals.totalWorkedCost) / unifiedData.quotation.totalAmount) * 100).toFixed(1)}%` : 
+                        '0.0%'
+                      }
+                    </h3>
+                    <p className="text-xs text-blue-700">Margen de beneficio</p>
+                    <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
+                              (((unifiedData.quotation.totalAmount - unifiedData.actuals.totalWorkedCost) / unifiedData.quotation.totalAmount) * 100) :
+                              0
+                          ))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Efficiency Card */}
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-purple-600 p-2 rounded-lg">
+                      <Gauge className="h-5 w-5 text-white" />
+                    </div>
+                    <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                      Eficiencia
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-purple-900">
+                      {unifiedData?.metrics?.budgetUtilization ? 
+                        `${(100 - Math.max(0, unifiedData.metrics.budgetUtilization - 100)).toFixed(1)}%` : 
+                        '100.0%'
+                      }
+                    </h3>
+                    <p className="text-xs text-purple-700">Eficiencia de costos</p>
+                    <div className="w-full bg-purple-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.metrics?.budgetUtilization ? 
+                              (100 - Math.max(0, unifiedData.metrics.budgetUtilization - 100)) : 
+                              100
+                          ))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Revenue per Hour Card */}
+              <Card className="bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-amber-600 p-2 rounded-lg">
+                      <Timer className="h-5 w-5 text-white" />
+                    </div>
+                    <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                      $/Hora
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-amber-900">
+                      ${unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedHours ? 
+                        (unifiedData.quotation.totalAmount / unifiedData.actuals.totalWorkedHours).toFixed(0) : 
+                        '0'
+                      }
+                    </h3>
+                    <p className="text-xs text-amber-700">Ingresos por hora</p>
+                    <div className="w-full bg-amber-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-amber-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: '75%' }}
+                      />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Financial Analysis Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Cost Breakdown Analysis */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <BarChart3 className="h-5 w-5 text-indigo-600" />
+                    Desglose de Costos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Cost vs Revenue Bar */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Costo Real</span>
+                        <span className="font-medium">${unifiedData?.actuals?.totalWorkedCost?.toFixed(0) || '0'}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-red-500 h-3 rounded-full"
+                          style={{ 
+                            width: `${Math.min(100, 
+                              unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
+                                (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.totalAmount) * 100 :
+                                0
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Ingreso Cliente</span>
+                        <span className="font-medium">${unifiedData?.quotation?.totalAmount?.toFixed(0) || '0'}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="bg-green-500 h-3 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Ganancia Bruta</span>
+                        <span className="font-medium text-green-600">
+                          ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toFixed(0)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-green-600 h-3 rounded-full"
+                          style={{ 
+                            width: `${Math.max(0, 
+                              unifiedData?.quotation?.totalAmount ?
+                                (((unifiedData.quotation.totalAmount - (unifiedData?.actuals?.totalWorkedCost || 0)) / unifiedData.quotation.totalAmount) * 100) :
+                                0
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profitability Trends */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    Indicadores de Rentabilidad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Financial Health Score */}
+                    <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                      <div className="text-3xl font-bold text-green-700 mb-1">
+                        {(() => {
+                          const actualBudgetUtil = unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                            (unifiedData.actuals.totalWorkedCost / unifiedData.quotation.baseCost) * 100 : 0;
+                          
+                          if (actualBudgetUtil <= 85) return "Excelente";
+                          if (actualBudgetUtil <= 100) return "Bueno";
+                          if (actualBudgetUtil <= 110) return "Regular";
+                          return "Crítico";
+                        })()}
+                      </div>
+                      <p className="text-sm text-green-600">Score de Salud Financiera</p>
+                    </div>
+
+                    {/* Key Financial Metrics */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-lg font-bold text-blue-700">
+                          {unifiedData?.metrics?.markup?.toFixed(2) || '0.00'}x
+                        </div>
+                        <p className="text-xs text-blue-600">Multiplicador</p>
+                      </div>
+                      
+                      <div className="text-center p-3 bg-purple-50 rounded-lg">
+                        <div className="text-lg font-bold text-purple-700">
+                          {unifiedData?.metrics?.budgetUtilization?.toFixed(1) || '0.0'}%
+                        </div>
+                        <p className="text-xs text-purple-600">Uso Budget</p>
+                      </div>
+                    </div>
+
+                    {/* Economic Indicators */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Costo por Hora Promedio</span>
+                        <span className="font-medium">
+                          ${unifiedData?.actuals?.totalWorkedHours ? 
+                            (unifiedData.actuals.totalWorkedCost / unifiedData.actuals.totalWorkedHours).toFixed(0) : 
+                            '0'
+                          }/h
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Break-even Point</span>
+                        <span className="font-medium">
+                          {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedHours ?
+                            `${(unifiedData.quotation.baseCost / (unifiedData.actuals.totalWorkedHours / unifiedData.actuals.totalWorkedHours || 1)).toFixed(0)}h` :
+                            '0h'
+                          }
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Productividad</span>
+                        <span className="font-medium text-green-600">
+                          {unifiedData?.metrics?.efficiency?.toFixed(1) || '0.0'}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Economic Recommendations */}
+            <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-indigo-900">
+                  <Lightbulb className="h-5 w-5 text-indigo-600" />
+                  Recomendaciones Económicas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {(() => {
+                    const recommendations = [];
+                    const markup = unifiedData?.metrics?.markup || 1;
+                    const budgetUtil = unifiedData?.metrics?.budgetUtilization || 100;
+                    const efficiency = unifiedData?.metrics?.efficiency || 0;
+
+                    if (markup < 1.5) {
+                      recommendations.push({
+                        type: 'warning',
+                        title: 'Optimizar Rentabilidad',
+                        message: 'El markup actual está por debajo del objetivo. Considerar ajustar tarifas o reducir costos.',
+                        icon: AlertTriangle,
+                        color: 'text-yellow-600'
+                      });
+                    }
+
+                    if (budgetUtil > 110) {
+                      recommendations.push({
+                        type: 'danger',
+                        title: 'Control de Costos',
+                        message: 'Los costos exceden el presupuesto. Revisar asignación de recursos y eficiencia del equipo.',
+                        icon: TrendingDown,
+                        color: 'text-red-600'
+                      });
+                    }
+
+                    if (efficiency < 80) {
+                      recommendations.push({
+                        type: 'info',
+                        title: 'Mejorar Productividad',
+                        message: 'El equipo podría optimizar tiempos. Considerar capacitación o redistribución de tareas.',
+                        icon: Target,
+                        color: 'text-blue-600'
+                      });
+                    }
+
+                    if (recommendations.length === 0) {
+                      recommendations.push({
+                        type: 'success',
+                        title: 'Rendimiento Óptimo',
+                        message: 'El proyecto mantiene excelentes indicadores financieros y económicos.',
+                        icon: CheckCircle,
+                        color: 'text-green-600'
+                      });
+                    }
+
+                    return recommendations.map((rec, index) => (
+                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-start gap-3">
+                          <rec.icon className={`h-5 w-5 ${rec.color} mt-0.5`} />
+                          <div>
+                            <h4 className="font-medium text-gray-900">{rec.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{rec.message}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Performance Analysis Tab */}
-          <TabsContent value="performance" className="space-y-6">
+          <TabsContent value="performance-analysis" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <EconomicRankings 
                 projectId={projectId!}
@@ -3221,142 +3112,25 @@ export default function ProjectDetailsRedesigned() {
             </div>
           </TabsContent>
 
-          {/* OTRAS PESTAÑAS (mantenidas como estaban) */}
-          <TabsContent value="team" className="space-y-4">
-            <ProjectTeamSection 
-              projectId={projectId!}
-              unifiedData={unifiedData}
-              timeFilter={timeFilterForHook}
-            />
-          </TabsContent>
-
-          <TabsContent value="dashboard" className="space-y-4">
-            <Card className="bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                  <Activity className="h-5 w-5 text-blue-600" />
-                  Panel de Control del Proyecto
-                </CardTitle>
-                <CardDescription className="text-gray-600">
-                  Vista general del estado y progreso del proyecto
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Métricas básicas del dashboard */}
-                  <Card className="bg-blue-50 border-blue-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-blue-800">Progreso General</p>
-                          <p className="text-2xl font-bold text-blue-900">
-                            {costSummary?.budget ? Math.round((costSummary.totalCost / costSummary.budget) * 100) : 0}%
-                          </p>
-                        </div>
-                        <Target className="h-8 w-8 text-blue-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-green-50 border-green-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-green-800">Horas Trabajadas</p>
-                          <p className="text-2xl font-bold text-green-900">
-                            {costSummary?.filteredHours?.toFixed(1) || '0.0'}h
-                          </p>
-                        </div>
-                        <Clock className="h-8 w-8 text-green-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-purple-50 border-purple-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-purple-800">Equipo Activo</p>
-                          <p className="text-2xl font-bold text-purple-900">
-                            {teamStats?.filter((member: any) => member.hours > 0).length || 0}
-                          </p>
-                        </div>
-                        <Users className="h-8 w-8 text-purple-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Información adicional */}
-                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="text-sm font-semibold text-gray-800 mb-2">Resumen del Período: {dateFilter.label}</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Costo Total:</span>
-                      <span className="font-medium text-gray-900 ml-2">
-                        ${costSummary?.totalCost?.toFixed(0) || '0'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Presupuesto:</span>
-                      <span className="font-medium text-gray-900 ml-2">
-                        ${costSummary?.budget?.toFixed(0) || '0'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Horas Estimadas:</span>
-                      <span className="font-medium text-gray-900 ml-2">
-                        {costSummary?.targetHours?.toFixed(1) || '0.0'}h
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Eficiencia:</span>
-                      <span className={`font-medium ml-2 ${
-                        costSummary?.budget && costSummary?.totalCost
-                          ? costSummary.totalCost <= costSummary.budget ? 'text-green-600' : 'text-red-600'
-                          : 'text-gray-900'
-                      }`}>
-                        {costSummary?.budget && costSummary?.totalCost
-                          ? costSummary.totalCost <= costSummary.budget ? 'Dentro del presupuesto' : 'Sobre presupuesto'
-                          : 'Sin datos'
-                        }
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
         </Tabs>
       </div>
 
-      {/* Diálogo de confirmación para eliminar registro */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteEntryId} onOpenChange={() => setDeleteEntryId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-red-600" />
-              Eliminar Registro de Tiempo
-            </DialogTitle>
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que deseas eliminar este registro de tiempo? Esta acción no se puede deshacer.
+              ¿Estás seguro de que quieres eliminar esta entrada de tiempo? Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false);
-                setEntryToDelete(null);
-              }}
-              disabled={deleteTimeEntryMutation.isPending}
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteEntryId(null)}>
               Cancelar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteEntry}
               disabled={deleteTimeEntryMutation.isPending}
             >
               {deleteTimeEntryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -3366,7 +3140,7 @@ export default function ProjectDetailsRedesigned() {
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo de registro de tiempo rápido */}
+      {/* Quick Time Registration Dialog */}
       <Dialog open={showQuickRegister} onOpenChange={setShowQuickRegister}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
