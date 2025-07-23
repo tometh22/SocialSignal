@@ -613,30 +613,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
       
-      // Preparar datos del equipo para rankings
-      const teamRankingData = Object.values(teamBreakdown).map(member => {
-        // NO ESCALAR las horas estimadas individuales - mantener valores base de cotización
-        const baseEstimatedHours = member.estimatedHours || 0;
-        const baseEstimatedCost = baseEstimatedHours * (member.rate || 0);
-        
-        return {
-          personnelId: member.personnelId,
-          name: member.name || `Miembro ${member.personnelId}`,
-          personnelName: member.name || `Miembro ${member.personnelId}`,
-          estimatedHours: baseEstimatedHours, // HORAS BASE SIN ESCALAMIENTO
-          actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
-          estimatedCost: baseEstimatedCost, // COSTO BASE SIN ESCALAMIENTO
-          actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
-        };
-      });
+      // Preparar datos del equipo para rankings - SOLO MIEMBROS CON TIME ENTRIES
+      const teamRankingData = Object.values(teamBreakdown)
+        .filter(member => (member.hours || 0) > 0) // Solo incluir miembros con horas trabajadas
+        .map(member => {
+          // NO ESCALAR las horas estimadas individuales - mantener valores base de cotización
+          const baseEstimatedHours = member.estimatedHours || 0;
+          const baseEstimatedCost = baseEstimatedHours * (member.rate || 0);
+          
+          return {
+            personnelId: member.personnelId,
+            name: member.name || `Miembro ${member.personnelId}`,
+            personnelName: member.name || `Miembro ${member.personnelId}`,
+            estimatedHours: baseEstimatedHours, // HORAS BASE SIN ESCALAMIENTO
+            actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
+            estimatedCost: baseEstimatedCost, // COSTO BASE SIN ESCALAMIENTO
+            actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
+          };
+        });
 
       // Debug: Ver datos que van al cálculo de rankings
       console.log(`📊 Team ranking data prepared:`, teamRankingData.slice(0, 2)); // Solo mostrar primeros 2 para debug
+      console.log(`📊 Filtered team for rankings: ${teamRankingData.length} members with actual hours`);
       
-      // Calcular rankings con datos reales del proyecto
-      const economicRankings = calculateTeamRankings(teamRankingData, adjustedTotalAmount);
+      // Calcular rankings con datos reales del proyecto - solo si hay miembros con horas
+      const economicRankings = teamRankingData.length > 0 ? calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
 
       console.log(`📊 Economic rankings calculated for ${economicRankings.length} team members`);
+      
+      if (economicRankings.length === 0) {
+        console.log(`📊 No rankings generated - no team members with actual time entries for filter: ${timeFilter}`);
+      }
 
       // 5. Crear el objeto consolidado (FUENTE ÚNICA DE VERDAD)
       const completeData = {
