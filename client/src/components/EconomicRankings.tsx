@@ -191,7 +191,7 @@ export function EconomicRankings({
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {member.actualHours.toFixed(0)}h / {(member.estimatedHours * getTimeMultiplier()).toFixed(0)}h
+                      {member.actualHours.toFixed(0)}h / {member.estimatedHours.toFixed(0)}h
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
