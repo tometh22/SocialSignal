@@ -2308,8 +2308,8 @@ export default function ProjectDetailsRedesigned() {
                           </div>
                         </div>
                         
-                        {/* Heat Map Grid - Ultra compact version */}
-                        <div className="grid grid-cols-8 gap-1.5 max-w-3xl mx-auto">
+                        {/* Heat Map Grid - Full width version */}
+                        <div className="grid grid-cols-8 gap-3">
                           {displayMembers.map((member: any, index: number) => {
                             const name = member.name || member.personnelName || `Miembro ${index + 1}`;
                             const hourlyRate = member.hourlyRate || member.rate || 10;
@@ -2354,14 +2354,14 @@ export default function ProjectDetailsRedesigned() {
                             return (
                               <div 
                                 key={member.personnelId || index}
-                                className={`relative h-12 w-full ${bgColor} rounded p-1 hover:scale-105 transition-transform cursor-pointer group`}
+                                className={`relative h-20 w-full ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
                                 style={{ opacity: intensity / 100 }}
                                 title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
                               >
-                                <div className="text-white text-xs font-semibold text-center leading-none truncate">
-                                  {name.length > 8 ? name.substring(0, 8) + '...' : name}
+                                <div className="text-white text-sm font-semibold text-center leading-tight truncate">
+                                  {name.length > 10 ? name.substring(0, 10) + '...' : name}
                                 </div>
-                                <div className="text-white text-xs text-center mt-0.5">
+                                <div className="text-white text-sm text-center mt-1">
                                   {Hr.toFixed(0)}h
                                 </div>
                                 
