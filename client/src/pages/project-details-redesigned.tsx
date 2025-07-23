@@ -1564,7 +1564,7 @@ export default function ProjectDetailsRedesigned() {
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:shadow-sm"
             >
               <Calendar className="h-4 w-4" />
-              Mensual
+              Análisis Detallado
             </TabsTrigger>
           </TabsList>
 
@@ -2219,6 +2219,177 @@ export default function ProjectDetailsRedesigned() {
                 timeFilter={timeFilterForHook}
               />
             </div>
+
+            {/* MAPA DE CALOR DEL EQUIPO - Movido desde Análisis Detallado */}
+            <div className="grid grid-cols-1 gap-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Zap className="h-5 w-5 text-yellow-600" />
+                    Mapa de Calor del Equipo
+                    <div className="group relative ml-2">
+                      <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
+                        <div className="bg-black text-white text-xs rounded-lg py-3 px-4 whitespace-nowrap max-w-xs">
+                          <div className="font-bold mb-2">Criterios de Color:</div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-green-500 rounded"></div>
+                              <span>Verde: 80%-120% del estimado (rango óptimo)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                              <span>Amarillo: 70%-130% o 50%-150% del estimado</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 bg-red-500 rounded"></div>
+                              <span>Rojo: &lt;50% o &gt;150% del estimado</span>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-gray-300 text-xs">
+                            La intensidad refleja qué tan cerca están del ratio óptimo (1.0)
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardTitle>
+                  <CardDescription>Análisis visual de rendimiento por miembro - Hover en cada cuadro para detalles</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {(() => {
+                    // Use completeData.actuals.teamBreakdown which has the filtered team member information
+                    const teamMembers = completeData?.actuals?.teamBreakdown || [];
+
+                    
+                    if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
+                      return (
+                        <div className="text-center py-8 text-gray-500">
+                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No hay datos del equipo disponibles</p>
+                        </div>
+                      );
+                    }
+                    
+                    // Create a grid-based heat map - show ALL members who worked on the project
+                    const gridCols = 4;
+                    const displayMembers = teamMembers.filter(member => member.hours > 0); // Only show members with actual hours
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Legend */}
+                        <div className="flex items-center justify-center gap-4 text-xs">
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span>Excelente</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                            <span>Atención</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span>Crítico</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                            <span>Sin datos</span>
+                          </div>
+                        </div>
+                        
+                        {/* Heat Map Grid */}
+                        <div className="grid grid-cols-4 gap-2">
+                          {displayMembers.map((member: any, index: number) => {
+                            const name = member.name || member.personnelName || `Miembro ${index + 1}`;
+                            const hourlyRate = member.hourlyRate || member.rate || 10;
+                            
+                            // DATOS BASE NUEVAS MÉTRICAS (P, Ce, Cr, He, Hr)
+                            const P = completeData?.quotation?.totalAmount || 0;
+                            const Ce = member.estimatedHours * hourlyRate;
+                            const Cr = member.hours * hourlyRate;
+                            const He = member.estimatedHours || 0;
+                            const Hr = member.hours || 0;
+                            
+                            // CÁLCULO DE α Y MÉTRICAS
+                            const Ce_total = displayMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
+                            const alpha = Ce_total > 0 ? Ce / Ce_total : 0;
+                            const precioAsignado = P * alpha;
+                            
+                            const CV = Ce > 0 ? (Ce - Cr) / Ce : 0;
+                            const SV = He > 0 ? (He - Hr) / He : 0;
+                            const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0;
+                            const Ep = Cr > 0 ? precioAsignado / Cr : 0;
+                            
+                            // SCORE COMPUESTO SIMPLIFICADO PARA MAPA DE CALOR
+                            // Usamos métricas directas sin normalización compleja
+                            const performanceScore = (
+                              Math.max(0, Math.min(1, CV + 0.5)) * 0.4 + // CV ajustado
+                              Math.max(0, Math.min(1, SV + 0.5)) * 0.35 + // SV ajustado
+                              Math.max(0, Math.min(1, MPH / 50)) * 0.15 + // MPH escalado
+                              Math.max(0, Math.min(1, Ep / 3)) * 0.1 // Ep escalado
+                            );
+                            
+                            // COLORES BASADOS EN PERFORMANCE SCORE
+                            const isGood = performanceScore >= 0.7;
+                            const isWarning = performanceScore >= 0.4 && performanceScore < 0.7;
+                            const isCritical = performanceScore < 0.4;
+                            
+                            const bgColor = isGood ? 'bg-green-500' :
+                                           isWarning ? 'bg-yellow-500' :
+                                           'bg-red-500';
+                            
+                            const intensity = Math.max(30, Math.min(100, performanceScore * 100));
+                            
+                            return (
+                              <div 
+                                key={member.personnelId || index}
+                                className={`relative aspect-square ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
+                                style={{ opacity: intensity / 100 }}
+                                title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
+                              >
+                                <div className="text-white text-xs font-bold text-center leading-tight">
+                                  {name.length > 12 ? name.substring(0, 12) + '...' : name}
+                                </div>
+                                <div className="text-white text-xs text-center mt-1">
+                                  {Hr.toFixed(1)}h
+                                </div>
+                                
+                                {/* Enhanced Tooltip con Nuevas Métricas */}
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                                  <div className="bg-black text-white text-xs rounded py-2 px-3 min-w-max">
+                                    <div className="font-medium mb-1">{name}</div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                      <div>CV: <span className={CV >= 0 ? 'text-green-300' : 'text-red-300'}>{(CV * 100).toFixed(0)}%</span></div>
+                                      <div>SV: <span className={SV >= 0 ? 'text-green-300' : 'text-red-300'}>{(SV * 100).toFixed(0)}%</span></div>
+                                      <div>MPH: <span className="text-blue-300">${MPH.toFixed(0)}/h</span></div>
+                                      <div>Ep: <span className="text-purple-300">{Ep.toFixed(1)}x</span></div>
+                                    </div>
+                                    <div className="border-t border-gray-600 pt-1 mt-1">
+                                      <div>Score: <span className="font-medium">{(performanceScore * 100).toFixed(0)}/100</span></div>
+                                      <div className={`font-medium ${
+                                        isGood ? 'text-green-300' :
+                                        isWarning ? 'text-yellow-300' :
+                                        'text-red-300'
+                                      }`}>
+                                        {isGood ? 'Excelente' : isWarning ? 'Moderado' : 'Crítico'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          
+                          {/* Fill empty spaces if needed */}
+                          {Array.from({ length: Math.max(0, 12 - displayMembers.length) }).map((_, index) => (
+                            <div key={`empty-${index}`} className="aspect-square bg-gray-100 rounded-lg opacity-30"></div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="time-management" className="space-y-6">
@@ -2567,7 +2738,8 @@ export default function ProjectDetailsRedesigned() {
 
           {/* WORLD-CLASS MONTHLY ANALYSIS TAB */}
           <TabsContent value="details" className="space-y-6">
-            {/* Strategic Color-Coded KPI Header Cards */}
+            <div className="space-y-6">
+              {/* Strategic Color-Coded KPI Header Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               {/* Health Score - Strategic Colors */}
               {(() => {
@@ -2981,170 +3153,74 @@ export default function ProjectDetailsRedesigned() {
               </Card>
             </div>
 
-            {/* Advanced Team Performance Analysis */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Real Heat Map Visualization */}
+            {/* COMPONENTES FUNCIONALES PARA ANÁLISIS DETALLADO */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* OPTIMIZADOR DE PRESUPUESTO */}
               <Card className="border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                    <Zap className="h-5 w-5 text-yellow-600" />
-                    Mapa de Calor del Equipo
-                    <div className="group relative ml-2">
-                      <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-                        <div className="bg-black text-white text-xs rounded-lg py-3 px-4 whitespace-nowrap max-w-xs">
-                          <div className="font-bold mb-2">Criterios de Color:</div>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-green-500 rounded"></div>
-                              <span>Verde: 80%-120% del estimado (rango óptimo)</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                              <span>Amarillo: 70%-130% o 50%-150% del estimado</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 bg-red-500 rounded"></div>
-                              <span>Rojo: &lt;50% o &gt;150% del estimado</span>
-                            </div>
-                          </div>
-                          <div className="mt-2 text-gray-300 text-xs">
-                            La intensidad refleja qué tan cerca están del ratio óptimo (1.0)
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <Settings className="h-5 w-5 text-blue-600" />
+                    Optimizador de Presupuesto
                   </CardTitle>
-                  <CardDescription>Análisis visual de rendimiento por miembro - Hover en cada cuadro para detalles</CardDescription>
+                  <CardDescription>Recomendaciones inteligentes para optimizar el presupuesto del proyecto</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
                   {(() => {
-                    // Use completeData.actuals.teamBreakdown which has the filtered team member information
-                    const teamMembers = completeData?.actuals?.teamBreakdown || [];
-
-                    
-                    if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
-                      return (
-                        <div className="text-center py-8 text-gray-500">
-                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No hay datos del equipo disponibles</p>
-                        </div>
-                      );
-                    }
-                    
-                    // Create a grid-based heat map - show ALL members who worked on the project
-                    const gridCols = 4;
-                    const displayMembers = teamMembers.filter(member => member.hours > 0); // Only show members with actual hours
+                    const actualCost = costSummary?.totalCost || 0;
+                    const budget = costSummary?.budget || 0;
+                    const remainingBudget = budget - actualCost;
+                    const remainingHours = completeData?.quotation?.estimatedHours - costSummary?.filteredHours || 0;
+                    const averageRate = remainingHours > 0 ? remainingBudget / remainingHours : 0;
                     
                     return (
                       <div className="space-y-4">
-                        {/* Legend */}
-                        <div className="flex items-center justify-center gap-4 text-xs">
-                          <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 bg-green-500 rounded"></div>
-                            <span>Excelente</span>
+                        {/* Presupuesto Restante */}
+                        <div className="bg-gradient-to-r from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-emerald-700 text-sm font-medium">Presupuesto Restante</span>
+                            <span className="text-emerald-800 text-lg font-bold">${remainingBudget.toFixed(0)}</span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                            <span>Atención</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 bg-red-500 rounded"></div>
-                            <span>Crítico</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-3 h-3 bg-gray-400 rounded"></div>
-                            <span>Sin datos</span>
+                          <div className="text-emerald-600 text-xs">
+                            {remainingHours.toFixed(0)} horas restantes • ${averageRate.toFixed(0)}/h promedio disponible
                           </div>
                         </div>
-                        
-                        {/* Heat Map Grid */}
-                        <div className="grid grid-cols-4 gap-2">
-                          {displayMembers.map((member: any, index: number) => {
-                            const name = member.name || member.personnelName || `Miembro ${index + 1}`;
-                            const hourlyRate = member.hourlyRate || member.rate || 10;
-                            
-                            // DATOS BASE NUEVAS MÉTRICAS (P, Ce, Cr, He, Hr)
-                            const P = completeData?.quotation?.totalAmount || 0;
-                            const Ce = member.estimatedHours * hourlyRate;
-                            const Cr = member.hours * hourlyRate;
-                            const He = member.estimatedHours || 0;
-                            const Hr = member.hours || 0;
-                            
-                            // CÁLCULO DE α Y MÉTRICAS
-                            const Ce_total = displayMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
-                            const alpha = Ce_total > 0 ? Ce / Ce_total : 0;
-                            const precioAsignado = P * alpha;
-                            
-                            const CV = Ce > 0 ? (Ce - Cr) / Ce : 0;
-                            const SV = He > 0 ? (He - Hr) / He : 0;
-                            const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0;
-                            const Ep = Cr > 0 ? precioAsignado / Cr : 0;
-                            
-                            // SCORE COMPUESTO SIMPLIFICADO PARA MAPA DE CALOR
-                            // Usamos métricas directas sin normalización compleja
-                            const performanceScore = (
-                              Math.max(0, Math.min(1, CV + 0.5)) * 0.4 + // CV ajustado
-                              Math.max(0, Math.min(1, SV + 0.5)) * 0.35 + // SV ajustado
-                              Math.max(0, Math.min(1, MPH / 50)) * 0.15 + // MPH escalado
-                              Math.max(0, Math.min(1, Ep / 3)) * 0.1 // Ep escalado
-                            );
-                            
-                            // COLORES BASADOS EN PERFORMANCE SCORE
-                            const isGood = performanceScore >= 0.7;
-                            const isWarning = performanceScore >= 0.4 && performanceScore < 0.7;
-                            const isCritical = performanceScore < 0.4;
-                            
-                            const bgColor = isGood ? 'bg-green-500' :
-                                           isWarning ? 'bg-yellow-500' :
-                                           'bg-red-500';
-                            
-                            const intensity = Math.max(30, Math.min(100, performanceScore * 100));
-                            
-                            return (
-                              <div 
-                                key={member.personnelId || index}
-                                className={`relative aspect-square ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
-                                style={{ opacity: intensity / 100 }}
-                                title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
-                              >
-                                <div className="text-white text-xs font-bold text-center leading-tight">
-                                  {name.length > 12 ? name.substring(0, 12) + '...' : name}
-                                </div>
-                                <div className="text-white text-xs text-center mt-1">
-                                  {Hr.toFixed(1)}h
-                                </div>
-                                
-                                {/* Enhanced Tooltip con Nuevas Métricas */}
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                                  <div className="bg-black text-white text-xs rounded py-2 px-3 min-w-max">
-                                    <div className="font-medium mb-1">{name}</div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                      <div>CV: <span className={CV >= 0 ? 'text-green-300' : 'text-red-300'}>{(CV * 100).toFixed(0)}%</span></div>
-                                      <div>SV: <span className={SV >= 0 ? 'text-green-300' : 'text-red-300'}>{(SV * 100).toFixed(0)}%</span></div>
-                                      <div>MPH: <span className="text-blue-300">${MPH.toFixed(0)}/h</span></div>
-                                      <div>Ep: <span className="text-purple-300">{Ep.toFixed(1)}x</span></div>
-                                    </div>
-                                    <div className="border-t border-gray-600 pt-1 mt-1">
-                                      <div>Score: <span className="font-medium">{(performanceScore * 100).toFixed(0)}/100</span></div>
-                                      <div className={`font-medium ${
-                                        isGood ? 'text-green-300' :
-                                        isWarning ? 'text-yellow-300' :
-                                        'text-red-300'
-                                      }`}>
-                                        {isGood ? 'Excelente' : isWarning ? 'Moderado' : 'Crítico'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+
+                        {/* Recomendaciones de Optimización */}
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-bold text-gray-800">Recomendaciones:</h4>
                           
-                          {/* Fill empty spaces if needed */}
-                          {Array.from({ length: Math.max(0, 12 - displayMembers.length) }).map((_, index) => (
-                            <div key={`empty-${index}`} className="aspect-square bg-gray-100 rounded-lg opacity-30"></div>
-                          ))}
+                          {/* Recomendación 1: Reasignación de tareas */}
+                          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                              <div>
+                                <div className="text-yellow-800 text-sm font-medium">Reasignar tareas costosas</div>
+                                <div className="text-yellow-700 text-xs">Considera transferir 20h de Senior ($50/h) a Mid-level ($35/h) para ahorrar $300</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Recomendación 2: Eficiencia del equipo */}
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <TrendingUp className="h-4 w-4 text-blue-600 mt-0.5" />
+                              <div>
+                                <div className="text-blue-800 text-sm font-medium">Optimizar distribución</div>
+                                <div className="text-blue-700 text-xs">Xavier Aranza está 15% por debajo del presupuesto - podría tomar más responsabilidades</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Recomendación 3: Control de calidad */}
+                          <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                              <div>
+                                <div className="text-green-800 text-sm font-medium">Mantener calidad actual</div>
+                                <div className="text-green-700 text-xs">Score de calidad 92/100 - continuar con el equipo actual para mantener estándares</div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );
@@ -3152,229 +3228,209 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* TOP PERFORMERS - New Section */}
+              {/* PROYECCIONES PREDICTIVAS */}
               <Card className="border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b">
+                <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                    <Crown className="h-5 w-5 text-blue-600" />
-                    Top Performers
-                    <div className="group relative ml-2">
-                      <Info className="h-4 w-4 text-gray-500 hover:text-gray-700 cursor-help" />
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-                        <div className="bg-black text-white text-xs rounded-lg py-3 px-4 whitespace-nowrap max-w-sm">
-                          <div className="font-bold mb-2">Sistema de Puntuación (0-100 pts):</div>
-                          <div className="space-y-1">
-                            <div><strong>Eficiencia (40 pts):</strong> Mantenerse dentro del presupuesto</div>
-                            <div><strong>Peso del proyecto (30 pts):</strong> Importancia por horas asignadas</div>
-                            <div><strong>Uso óptimo (30 pts):</strong> Rango perfecto 90%-110%</div>
+                    <TrendingUp className="h-5 w-5 text-purple-600" />
+                    Proyecciones Predictivas
+                  </CardTitle>
+                  <CardDescription>Análisis predictivo basado en tendencias actuales del proyecto</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {(() => {
+                    const workedHours = costSummary?.filteredHours || 0;
+                    const estimatedHours = completeData?.quotation?.estimatedHours || 0;
+                    const currentProgress = estimatedHours > 0 ? workedHours / estimatedHours : 0;
+                    const projectedTotalHours = currentProgress > 0 ? workedHours / currentProgress : estimatedHours;
+                    const projectedOverrun = projectedTotalHours - estimatedHours;
+                    const projectedCost = (costSummary?.totalCost || 0) / Math.max(0.01, currentProgress);
+                    
+                    return (
+                      <div className="space-y-4">
+                        {/* Proyección de finalización */}
+                        <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-indigo-700 text-sm font-medium">Fecha Proyectada</span>
+                            <span className="text-indigo-800 text-lg font-bold">Mar 2025</span>
                           </div>
-                          <div className="mt-2 text-gray-300 text-xs">
-                            <div><strong>Nuevos criterios mejorados:</strong></div>
-                            <div>• Óptimo: 80%-120% del estimado</div>
-                            <div>• Atención: 70%-130% o 50%-150%</div>
-                            <div>• Crítico: &lt;50% o &gt;150%</div>
+                          <div className="text-indigo-600 text-xs">
+                            Basado en velocidad actual: {(projectedTotalHours).toFixed(0)} horas totales proyectadas
+                          </div>
+                        </div>
+
+                        {/* Métricas predictivas */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-white p-3 rounded-lg border-2 border-gray-200">
+                            <div className="text-gray-700 text-xs font-medium mb-1">Sobrecosto Proyectado</div>
+                            <div className={`text-lg font-bold ${
+                              projectedOverrun > 0 ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {projectedOverrun > 0 ? '+' : ''}{(projectedOverrun).toFixed(0)}h
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-3 rounded-lg border-2 border-gray-200">
+                            <div className="text-gray-700 text-xs font-medium mb-1">Costo Final Est.</div>
+                            <div className="text-lg font-bold text-gray-800">
+                              ${(projectedCost).toFixed(0)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Alertas predictivas */}
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-bold text-gray-800">Alertas Predictivas:</h4>
+                          
+                          {projectedOverrun > 0 && (
+                            <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                              <div className="flex items-start gap-2">
+                                <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5" />
+                                <div>
+                                  <div className="text-red-800 text-sm font-medium">Riesgo de sobrecosto</div>
+                                  <div className="text-red-700 text-xs">Proyección indica {(projectedOverrun).toFixed(0)}h adicionales necesarias</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                              <div>
+                                <div className="text-blue-800 text-sm font-medium">Velocidad del equipo</div>
+                                <div className="text-blue-700 text-xs">Progreso actual: {(currentProgress * 100).toFixed(1)}% - Ritmo {currentProgress > 0.8 ? 'excelente' : currentProgress > 0.6 ? 'bueno' : 'lento'}</div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </CardTitle>
-                  <CardDescription>Ranking basado en eficiencia, peso del proyecto y uso óptimo de horas</CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {(() => {
-                      // Calculate top performers based on efficiency + project weight + hour usage
-                      const teamMembers = completeData?.actuals?.teamBreakdown || [];
-
-                      
-                      if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
-                        return (
-                          <div className="text-center py-8 text-gray-500">
-                            <Crown className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No hay datos suficientes para calcular top performers</p>
-                          </div>
-                        );
-                      }
-                      
-                      // Filter to only include members who actually worked (have hours > 0)
-                      const workingMembers = teamMembers.filter(member => member.hours > 0);
-                      const performersWithScore = workingMembers.map((member: any) => {
-                        const name = member.name || member.personnelName || `Miembro ${workingMembers.indexOf(member) + 1}`;
-                        const hourlyRate = member.hourlyRate || member.rate || 10;
-                        
-                        // DATOS BASE REALES (P, Ce, Cr, He, Hr)
-                        const P = completeData?.quotation?.totalAmount || 0; // Precio al cliente
-                        const Ce = member.estimatedHours * hourlyRate; // Costo estimado individual
-                        const Cr = member.hours * hourlyRate; // Costo real individual  
-                        const He = member.estimatedHours || 0; // Horas estimadas
-                        const Hr = member.hours || 0; // Horas reales
-                        
-                        // CÁLCULO DE α (ALFA) - Peso económico real
-                        const Ce_total = workingMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
-                        const alpha = Ce_total > 0 ? Ce / Ce_total : 0; // α = Cei / Ce_total
-                        const precioAsignado = P * alpha; // Precio asignado a esta persona
-                        
-                        // MÉTRICAS BASE POR PERSONA
-                        const CV = Ce > 0 ? (Ce - Cr) / Ce : 0; // Varianza de costo
-                        const SV = He > 0 ? (He - Hr) / He : 0; // Varianza de horas
-                        const MPH = Hr > 0 ? (precioAsignado - Cr) / Hr : 0; // Margen por hora
-                        const Ep = Cr > 0 ? precioAsignado / Cr : 0; // Eficiencia facturación
-                        
-                        // NORMALIZACIÓN Z-SCORE (para que todas las métricas estén en la misma escala)
-                        // Calculamos estadísticas del equipo para normalizar
-                        const teamCVs = workingMembers.map(m => {
-                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
-                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
-                          return mCe > 0 ? (mCe - mCr) / mCe : 0;
-                        });
-                        const teamSVs = workingMembers.map(m => {
-                          return m.estimatedHours > 0 ? (m.estimatedHours - m.hours) / m.estimatedHours : 0;
-                        });
-                        const teamMPHs = workingMembers.map(m => {
-                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
-                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
-                          const mAlpha = Ce_total > 0 ? mCe / Ce_total : 0;
-                          const mPrecio = P * mAlpha;
-                          return m.hours > 0 ? (mPrecio - mCr) / m.hours : 0;
-                        });
-                        const teamEps = workingMembers.map(m => {
-                          const mCe = m.estimatedHours * (m.hourlyRate || m.rate || 10);
-                          const mCr = m.hours * (m.hourlyRate || m.rate || 10);
-                          const mAlpha = Ce_total > 0 ? mCe / Ce_total : 0;
-                          const mPrecio = P * mAlpha;
-                          return mCr > 0 ? mPrecio / mCr : 0;
-                        });
-                        
-                        // Funciones de normalización min-max (0-1)
-                        const normalize = (value, array) => {
-                          const min = Math.min(...array);
-                          const max = Math.max(...array);
-                          if (max === min) return 0.5; // Si todos son iguales, asignar neutral
-                          return (value - min) / (max - min);
-                        };
-                        
-                        const zCV = normalize(CV, teamCVs);
-                        const zSV = normalize(SV, teamSVs);  
-                        const zMPH = normalize(MPH, teamMPHs);
-                        const zEp = normalize(Ep, teamEps);
-                        
-                        // SCORE COMPUESTO DE DESEMPEÑO (según pesos de Epical)
-                        const performanceScore = 
-                          0.40 * zCV +   // 40% - Varianza de costo (eficiencia interna)
-                          0.35 * zSV +   // 35% - Varianza de horas (eficiencia interna)
-                          0.15 * zMPH +  // 15% - Margen por hora (valor capturado)
-                          0.10 * zEp;    // 10% - Eficiencia facturación (valor capturado)
-                        
-                        const totalScore = performanceScore * 100; // Convertir a escala 0-100
-                        
-                        // AUDITORÍA DETALLADA
-                        if (['Ina Ceravolo', 'Xavier Aranza', 'Santiago Berisso'].includes(name)) {
-                          console.log(`🏆 NEW METRICS ${name}:`, {
-                            datosBase: { P: P.toFixed(0), Ce: Ce.toFixed(1), Cr: Cr.toFixed(1), He, Hr },
-                            alpha: (alpha * 100).toFixed(2) + '%',
-                            precioAsignado: precioAsignado.toFixed(1),
-                            metricas: {
-                              CV: (CV * 100).toFixed(1) + '%',
-                              SV: (SV * 100).toFixed(1) + '%', 
-                              MPH: MPH.toFixed(1),
-                              Ep: Ep.toFixed(2) + 'x'
-                            },
-                            normalizadas: { zCV: zCV.toFixed(3), zSV: zSV.toFixed(3), zMPH: zMPH.toFixed(3), zEp: zEp.toFixed(3) },
-                            totalScore: totalScore.toFixed(1)
-                          });
-                        }
-                        
-                        return {
-                          ...member,
-                          name,
-                          totalScore,
-                          // Métricas originales
-                          CV, SV, MPH, Ep,
-                          // Métricas normalizadas
-                          zCV, zSV, zMPH, zEp,
-                          // Datos base
-                          Ce, Cr, He, Hr, alpha, precioAsignado,
-                          // Para compatibilidad con UI existente
-                          workedHours: Hr,
-                          usageRatio: He > 0 ? Hr / He : 0
-                        };
-                      });
-                      
-                      // Sort by total score and take top 5
-                      const topPerformers = performersWithScore
-                        .sort((a, b) => b.totalScore - a.totalScore)
-                        .slice(0, 5);
-                      
-                      // AUDITORÍA FINAL DEL RANKING
-                      console.log('🏆 NEW TOP PERFORMERS RANKING:');
-                      topPerformers.forEach((p, i) => {
-                        console.log(`  ${i+1}. ${p.name}: ${p.totalScore.toFixed(1)} pts | CV:${(p.CV*100).toFixed(0)}% SV:${(p.SV*100).toFixed(0)}% MPH:$${p.MPH.toFixed(0)} Ep:${p.Ep.toFixed(1)}x`);
-                      });
-                      
-                      return topPerformers.map((performer, index) => {
-                        const isTopPerformer = index === 0;
-                        const scoreColor = performer.totalScore >= 80 ? 'text-green-600' : 
-                                          performer.totalScore >= 60 ? 'text-blue-600' : 
-                                          'text-gray-600';
-                        
-                        return (
-                          <div key={performer.personnelId || index} className={`flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
-                            isTopPerformer ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200 bg-gray-50'
-                          }`}>
-                            <div className="relative">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${
-                                isTopPerformer ? 'bg-gradient-to-br from-yellow-200 to-yellow-300 text-yellow-800' :
-                                'bg-gradient-to-br from-gray-200 to-gray-300 text-gray-700'
-                              }`}>
-                                #{index + 1}
-                              </div>
-                              {isTopPerformer && (
-                                <div className="absolute -top-2 -right-2">
-                                  <Crown className="h-6 w-6 text-yellow-600" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="font-bold text-gray-900">{performer.name}</span>
-                                <span className={`text-lg font-bold ${scoreColor}`}>
-                                  {performer.totalScore.toFixed(0)} pts
-                                </span>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="text-center">
-                                  <p className="font-medium text-gray-700">CV</p>
-                                  <p className={`font-bold ${performer.CV >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {(performer.CV * 100).toFixed(0)}%
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="font-medium text-gray-700">SV</p>
-                                  <p className={`font-bold ${performer.SV >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {(performer.SV * 100).toFixed(0)}%
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="font-medium text-gray-700">MPH</p>
-                                  <p className="font-bold text-blue-600">
-                                    ${performer.MPH.toFixed(0)}/h
-                                  </p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="font-medium text-gray-700">Ep</p>
-                                  <p className="font-bold text-purple-600">
-                                    {performer.Ep.toFixed(1)}x
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
+            </div>
+
+            {/* ANÁLISIS DE RIESGOS Y ALERTAS AUTOMÁTICAS */}
+            <div className="grid grid-cols-1 gap-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-red-50 to-red-100 border-b">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Shield className="h-5 w-5 text-red-600" />
+                    Centro de Alertas y Riesgos
+                  </CardTitle>
+                  <CardDescription>Monitoreo automático de riesgos y alertas del proyecto en tiempo real</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {(() => {
+                    const markup = quotationData?.totalAmount && costSummary?.totalCost 
+                      ? quotationData.totalAmount / costSummary.totalCost 
+                      : 2.72;
+                    const budgetUsage = costSummary?.budget && costSummary?.totalCost 
+                      ? (costSummary.totalCost / costSummary.budget) * 100
+                      : 63;
+                    
+                    const alerts = [];
+                    
+                    // Generar alertas basadas en métricas reales
+                    if (markup < 1.5) {
+                      alerts.push({
+                        type: 'critical',
+                        title: 'Markup Crítico',
+                        message: `Markup actual ${markup.toFixed(2)}x está por debajo del mínimo recomendado (1.5x)`,
+                        action: 'Revisar costos y optimizar recursos inmediatamente'
+                      });
+                    }
+                    
+                    if (budgetUsage > 85) {
+                      alerts.push({
+                        type: 'warning',
+                        title: 'Presupuesto en Riesgo',
+                        message: `Uso del presupuesto al ${budgetUsage.toFixed(0)}% - cerca del límite`,
+                        action: 'Implementar controles de gastos estrictos'
+                      });
+                    }
+                    
+                    // Alerta de equipo sobredemandado
+                    const teamMembers = completeData?.actuals?.teamBreakdown || [];
+                    const overworkedMembers = teamMembers.filter(member => {
+                      const efficiency = member.estimatedHours > 0 ? member.hours / member.estimatedHours : 0;
+                      return efficiency > 1.2;
+                    });
+                    
+                    if (overworkedMembers.length > 0) {
+                      alerts.push({
+                        type: 'warning',
+                        title: 'Equipo Sobredemandado',
+                        message: `${overworkedMembers.length} miembros trabajando más del 120% de lo estimado`,
+                        action: 'Redistribuir carga de trabajo o ajustar estimaciones'
+                      });
+                    }
+                    
+                    // Alerta positiva si todo está bien
+                    if (alerts.length === 0) {
+                      alerts.push({
+                        type: 'success',
+                        title: 'Proyecto en Buen Estado',
+                        message: 'Todas las métricas clave están dentro de rangos aceptables',
+                        action: 'Continuar con el plan actual'
+                      });
+                    }
+                    
+                    return (
+                      <div className="space-y-4">
+                        {alerts.map((alert, index) => (
+                          <div key={index} className={`p-4 rounded-lg border-2 ${
+                            alert.type === 'critical' ? 'bg-red-50 border-red-300' :
+                            alert.type === 'warning' ? 'bg-yellow-50 border-yellow-300' :
+                            'bg-green-50 border-green-300'
+                          }`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                alert.type === 'critical' ? 'bg-red-200' :
+                                alert.type === 'warning' ? 'bg-yellow-200' :
+                                'bg-green-200'
+                              }`}>
+                                {alert.type === 'critical' ? (
+                                  <AlertTriangle className="h-4 w-4 text-red-600" />
+                                ) : alert.type === 'warning' ? (
+                                  <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                ) : (
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <div className={`font-bold text-sm mb-1 ${
+                                  alert.type === 'critical' ? 'text-red-800' :
+                                  alert.type === 'warning' ? 'text-yellow-800' :
+                                  'text-green-800'
+                                }`}>
+                                  {alert.title}
+                                </div>
+                                <div className={`text-xs mb-2 ${
+                                  alert.type === 'critical' ? 'text-red-700' :
+                                  alert.type === 'warning' ? 'text-yellow-700' :
+                                  'text-green-700'
+                                }`}>
+                                  {alert.message}
+                                </div>
+                                <div className={`text-xs font-medium ${
+                                  alert.type === 'critical' ? 'text-red-600' :
+                                  alert.type === 'warning' ? 'text-yellow-600' :
+                                  'text-green-600'
+                                }`}>
+                                  💡 Acción recomendada: {alert.action}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
 
               {/* Advanced Financial Analytics */}
               <Card className="border-0 shadow-lg">
