@@ -217,7 +217,7 @@ export default function ProjectSettings() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setLocation(`/project-details/${projectId}`)}
+                onClick={() => setLocation(`/active-projects/${projectId}`)}
                 className="hover:bg-gray-100 h-8"
               >
                 <ArrowLeft className="h-3 w-3 mr-1" />
