@@ -5326,8 +5326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Predicciones
-      const velocityData = await calculateProjectVelocity(projectId);
+      // Predicciones con filtro temporal
+      const velocityData = await calculateProjectVelocity(projectId, startDate as string, endDate as string);
       
       const predictions = {
         estimatedCompletionDate: velocityData.estimatedCompletion,
@@ -5472,10 +5472,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Funciones auxiliares para cálculos avanzados
-  async function calculateProjectVelocity(projectId: number) {
+  async function calculateProjectVelocity(projectId: number, startDate?: string, endDate?: string) {
+    // Obtener registros con filtro de fechas si está presente
+    const whereConditions = [eq(timeEntries.projectId, projectId)];
+    if (startDate && endDate) {
+      whereConditions.push(
+        gte(timeEntries.date, startDate),
+        lte(timeEntries.date, endDate)
+      );
+    }
+
     const projectEntries = await db.select()
       .from(timeEntries)
-      .where(eq(timeEntries.projectId, projectId))
+      .where(and(...whereConditions))
       .orderBy(asc(timeEntries.date));
 
     if (projectEntries.length < 2) {
@@ -5487,27 +5496,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
     }
 
-    // Calcular velocidad promedio (horas por día)
+    // Calcular velocidad promedio (horas por semana)
     const first = new Date(projectEntries[0].date);
     const last = new Date(projectEntries[projectEntries.length - 1].date);
-    const daysDiff = (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24);
+    const weeksDiff = Math.max(1, (last.getTime() - first.getTime()) / (1000 * 60 * 60 * 24 * 7));
     const totalHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
-    const velocity = daysDiff > 0 ? totalHours / daysDiff : 0;
+    const totalCost = projectEntries.reduce((sum, entry) => sum + entry.totalCost, 0);
+    const velocityPerWeek = totalHours / weeksDiff;
 
     const project = await storage.getActiveProject(projectId);
     const quotation = project ? await storage.getQuotation(project.quotationId) : null;
     const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
+    const targetCost = quotation?.baseCost || 0;
     
     const remainingHours = Math.max(0, targetHours - totalHours);
-    const daysToComplete = velocity > 0 ? remainingHours / velocity : null;
+    const weeksToComplete = velocityPerWeek > 0 ? remainingHours / velocityPerWeek : null;
     
-    const estimatedCompletion = daysToComplete ? 
-      new Date(Date.now() + daysToComplete * 24 * 60 * 60 * 1000) : null;
+    const estimatedCompletion = weeksToComplete ? 
+      new Date(Date.now() + weeksToComplete * 7 * 24 * 60 * 60 * 1000) : null;
+
+    // Proyectar costo final basado en tendencia actual
+    const costPerHour = totalHours > 0 ? totalCost / totalHours : 0;
+    const projectedFinalCost = totalCost + (remainingHours * costPerHour);
+    
+    // Calcular markup proyectado con el costo proyectado
+    const projectedMarkup = quotation && projectedFinalCost > 0 ? 
+      (quotation.totalAmount / projectedFinalCost) : 0;
 
     return {
       estimatedCompletion,
-      projectedCost: quotation?.baseCost || 0,
-      projectedMarkup: quotation ? (quotation.totalAmount / (quotation.baseCost || 1)) : 0,
+      projectedCost: projectedFinalCost || targetCost,
+      projectedMarkup,
       confidence: projectEntries.length > 10 ? 'high' : projectEntries.length > 5 ? 'medium' : 'low'
     };
   }
