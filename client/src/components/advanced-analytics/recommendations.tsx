@@ -241,7 +241,8 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                     <div>
                       <span className="text-gray-600">Punto de Equilibrio:</span>
                       <p className="font-bold text-gray-800">
-                        {recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
+                        {recommendationsData.predictions.businessMetrics.breakEvenPoint === 'achieved' ? 'Alcanzado' : 
+                       recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
                       </p>
                     </div>
                     <div>

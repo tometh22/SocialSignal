@@ -6040,9 +6040,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low',
         businessMetrics: {
           monthlyBurnRate: totalActualCost / (filterEndDate && filterStartDate ? 
-            Math.max(1, (new Date(filterEndDate).getMonth() - new Date(filterStartDate).getMonth() + 1)) : 1),
-          projectedAnnualRevenue: quotation ? quotation.totalAmount * 12 / (quotation.projectType === 'fee-mensual' ? 1 : 12) : 0,
-          breakEvenPoint: currentMarkup >= 1 ? 'achieved' : `${((1 - currentMarkup) * totalActualCost).toFixed(0)} adicionales requeridos`,
+            Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30))) : 1),
+          projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+            (quotation.totalAmount * 12) : 
+            (totalActualCost * currentMarkup * 12 / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))),
+          breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
           clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low'
         }
       };
