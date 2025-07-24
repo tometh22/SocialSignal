@@ -2784,8 +2784,9 @@ export default function ProjectDetailsRedesigned() {
                         <TooltipContent className="max-w-xs p-3">
                           <div className="space-y-2 text-sm">
                             <div className="font-semibold">Retorno sobre Inversión (ROI)</div>
-                            <div>Mide la rentabilidad del proyecto comparando las ganancias con los costos reales.</div>
+                            <div>Mide la rentabilidad del proyecto calculando las ganancias netas obtenidas por cada peso invertido.</div>
                             <div className="text-xs text-gray-600">
+                              Fórmula: (Precio Cliente - Costo Real) ÷ Costo Real × 100<br/>
                               • Verde (&gt;150%): Excelente rentabilidad<br/>
                               • Amarillo (100-150%): Buena rentabilidad<br/>
                               • Rojo (&lt;100%): Pérdidas o baja rentabilidad
