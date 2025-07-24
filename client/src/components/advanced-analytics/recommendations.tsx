@@ -32,15 +32,31 @@ interface Recommendation {
 }
 
 interface Predictions {
-  estimatedCompletionDate: string | null;
-  projectedFinalCost: number;
-  projectedFinalMarkup: number;
+  estimatedCompletionDate?: string | null;
+  projectedFinalCost?: number;
+  projectedFinalMarkup?: number;
+  periodAnalysis?: boolean;
+  actualCost?: number;
+  actualMarkup?: number;
   confidenceLevel: 'high' | 'medium' | 'low';
   businessMetrics?: {
     monthlyBurnRate: number;
     projectedAnnualRevenue: number;
     breakEvenPoint: string;
     clientSatisfactionRisk: 'high' | 'medium' | 'low';
+    nextQuarterProjection?: {
+      label: string;
+      estimatedCost: number;
+      estimatedRevenue: number;
+      estimatedProfit: number;
+    };
+    currentQuarterProjection?: {
+      label: string;
+      monthsRemaining: number;
+      estimatedCost: number;
+      estimatedRevenue: number;
+      estimatedProfit: number;
+    };
   };
 }
 
@@ -186,44 +202,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
           {recommendationsData?.predictions ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {recommendationsData.predictions.periodAnalysis ? (
-                  <>
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-800">Período Analizado</span>
-                      </div>
-                      <p className="text-lg font-bold text-blue-600">
-                        {timeFilter === 'last_month' ? 'Mes pasado' : 
-                         timeFilter === 'last_quarter' ? 'Trimestre pasado' :
-                         timeFilter === 'last_semester' ? 'Semestre pasado' : 'Período completado'}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Análisis retrospectivo
-                      </p>
-                    </div>
-
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-800">Costo Real del Período</span>
-                      </div>
-                      <p className="text-lg font-bold text-green-600">
-                        ${(recommendationsData?.predictions?.actualCost || 0).toLocaleString()}
-                      </p>
-                    </div>
-
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp className="h-4 w-4 text-purple-600" />
-                        <span className="text-sm font-medium text-purple-800">Markup Logrado</span>
-                      </div>
-                      <p className="text-lg font-bold text-purple-600">
-                        {(recommendationsData?.predictions?.actualMarkup || 0).toFixed(2)}x
-                      </p>
-                    </div>
-                  </>
-                ) : (
+                {!recommendationsData.predictions.periodAnalysis ? (
                   <>
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                       <div className="flex items-center gap-2 mb-2">
@@ -263,7 +242,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                       </p>
                     </div>
                   </>
-                )}
+                ) : null}
               </div>
               
               {recommendationsData?.predictions?.businessMetrics && (
@@ -307,31 +286,42 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   </div>
                   
                   {/* Proyecciones futuras para períodos pasados */}
-                  {recommendationsData.predictions.businessMetrics.nextQuarterProjection && (
+                  {(recommendationsData.predictions.businessMetrics.nextQuarterProjection || 
+                    recommendationsData.predictions.businessMetrics.currentQuarterProjection) && (
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <h5 className="text-sm font-semibold text-blue-800 mb-2">
-                        Proyección Próximo Trimestre
+                        {recommendationsData.predictions.businessMetrics.nextQuarterProjection?.label || 
+                         recommendationsData.predictions.businessMetrics.currentQuarterProjection?.label || 
+                         'Proyección Próximo Período'}
                       </h5>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-blue-600">Costo Est.:</span>
                           <p className="font-bold text-blue-800">
-                            ${recommendationsData.predictions.businessMetrics.nextQuarterProjection.estimatedCost.toLocaleString()}
+                            ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedCost || 
+                               recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedCost || 0).toLocaleString()}
                           </p>
                         </div>
                         <div>
                           <span className="text-blue-600">Revenue Est.:</span>
                           <p className="font-bold text-blue-800">
-                            ${recommendationsData.predictions.businessMetrics.nextQuarterProjection.estimatedRevenue.toLocaleString()}
+                            ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedRevenue || 
+                               recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedRevenue || 0).toLocaleString()}
                           </p>
                         </div>
                         <div>
                           <span className="text-blue-600">Ganancia Est.:</span>
                           <p className="font-bold text-green-800">
-                            ${recommendationsData.predictions.businessMetrics.nextQuarterProjection.estimatedProfit.toLocaleString()}
+                            ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedProfit || 
+                               recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedProfit || 0).toLocaleString()}
                           </p>
                         </div>
                       </div>
+                      {recommendationsData.predictions.businessMetrics.currentQuarterProjection?.monthsRemaining && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          Basado en {recommendationsData.predictions.businessMetrics.currentQuarterProjection.monthsRemaining} meses restantes del trimestre
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

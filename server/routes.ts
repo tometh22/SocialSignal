@@ -6040,24 +6040,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Para períodos pasados, mostrar análisis retrospectivo
         const monthlyAvg = totalActualCost / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)));
         
-        predictions = {
-          periodAnalysis: true,
-          actualCost: totalActualCost,
-          actualMarkup: currentMarkup,
-          confidenceLevel: 'high' as const,
-          businessMetrics: {
-            monthlyBurnRate: monthlyAvg,
-            projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
-            breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
-            clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
-            // Proyecciones para el próximo trimestre basadas en datos históricos
-            nextQuarterProjection: {
-              estimatedCost: monthlyAvg * 3,
-              estimatedRevenue: monthlyAvg * currentMarkup * 3,
-              estimatedProfit: (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
+        // Determinar el trimestre actual y el período analizado
+        const now = new Date();
+        const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+        const currentYear = now.getFullYear();
+        
+        const analyzedDate = new Date(filterEndDate);
+        const analyzedQuarter = Math.floor(analyzedDate.getMonth() / 3) + 1;
+        const analyzedYear = analyzedDate.getFullYear();
+        
+        // Determinar si proyectamos para el Q actual o el siguiente
+        let projectionQuarter = currentQuarter;
+        let projectionYear = currentYear;
+        let projectionLabel = `Q${currentQuarter} ${currentYear}`;
+        
+        if (analyzedYear === currentYear && analyzedQuarter === currentQuarter) {
+          // Si analizamos un mes del Q actual, proyectamos para el resto del Q
+          const monthsRemainingInQuarter = 3 - (now.getMonth() % 3);
+          predictions = {
+            periodAnalysis: true,
+            actualCost: totalActualCost,
+            actualMarkup: currentMarkup,
+            confidenceLevel: 'high' as const,
+            businessMetrics: {
+              monthlyBurnRate: monthlyAvg,
+              projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
+              breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+              clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
+              currentQuarterProjection: {
+                label: `Resto de ${projectionLabel}`,
+                monthsRemaining: monthsRemainingInQuarter,
+                estimatedCost: monthlyAvg * monthsRemainingInQuarter,
+                estimatedRevenue: monthlyAvg * currentMarkup * monthsRemainingInQuarter,
+                estimatedProfit: (monthlyAvg * currentMarkup * monthsRemainingInQuarter) - (monthlyAvg * monthsRemainingInQuarter)
+              }
             }
-          }
-        };
+          };
+        } else {
+          // Si analizamos un Q pasado, proyectamos para el Q actual completo
+          predictions = {
+            periodAnalysis: true,
+            actualCost: totalActualCost,
+            actualMarkup: currentMarkup,
+            confidenceLevel: 'high' as const,
+            businessMetrics: {
+              monthlyBurnRate: monthlyAvg,
+              projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
+              breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+              clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
+              nextQuarterProjection: {
+                label: projectionLabel,
+                estimatedCost: monthlyAvg * 3,
+                estimatedRevenue: monthlyAvg * currentMarkup * 3,
+                estimatedProfit: (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
+              }
+            }
+          };
+        }
       } else {
         // Para períodos actuales/futuros, usar proyecciones normales
         const velocity = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
