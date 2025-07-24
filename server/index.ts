@@ -53,8 +53,26 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         return entryDate >= start && entryDate <= end;
       });
     }
+    
+    // Apply temporal scaling for Always-On and Fee-Monthly projects (same logic as complete-data endpoint)
+    let scaledTeamMembers = teamMembers;
+    if ((quotation.projectType === 'always-on' || quotation.projectType === 'fee-mensual') && startDate && endDate) {
+      // Calculate months in the filter period
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+      const monthsInPeriod = Math.max(1, monthsDiff);
+      
+      // Scale the team member costs for the period (same logic as complete-data)
+      scaledTeamMembers = teamMembers.map(member => ({
+        ...member,
+        cost: (member.cost || 0) * monthsInPeriod
+      }));
+      
+      console.log(`📊 Applied temporal scaling for ${monthsInPeriod} months (${quotation.projectType}) to ${scaledTeamMembers.length} team members`);
+    }
 
-    console.log(`📊 Project: ${project.quotation.projectName}, Team: ${teamMembers.length}, Time entries: ${filteredTimeEntries.length}`);
+    console.log(`📊 Project: ${project.quotation.projectName}, Team: ${scaledTeamMembers.length}, Time entries: ${filteredTimeEntries.length}`);
     if (filteredTimeEntries.length > 0) {
       console.log(`📊 Sample time entry:`, filteredTimeEntries[0]);
     }
@@ -82,14 +100,17 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     // Calculate deviations
     const deviationByRole = [];
     const majorDeviations = [];
-    let totalVariance = 0;
     let membersOverBudget = 0;
     let membersUnderBudget = 0;
+    
+    // Calculate total costs first for proper variance calculation
+    let totalActualCost = 0;
+    let totalBudgetedCost = 0;
 
     // Create personnel map for hourly rates
     const personnelMap = new Map(personnel.map(p => [p.id, p]));
 
-    for (const member of teamMembers) {
+    for (const member of scaledTeamMembers) {
       const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === member.personnelId);
       const actualHours = memberTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
       
@@ -108,14 +129,13 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       const budgetedHours = member.hours || 0;
       const budgetedCost = member.cost || 0;
       
+      // Add to totals for overall variance calculation
+      totalActualCost += actualCost;
+      totalBudgetedCost += budgetedCost;
+      
       const hourDeviation = actualHours - budgetedHours;
       const costDeviation = actualCost - budgetedCost;
       const deviationPercentage = budgetedCost > 0 ? (costDeviation / budgetedCost) * 100 : 0;
-      
-      // Only add valid cost deviations to total variance
-      if (!isNaN(costDeviation) && isFinite(costDeviation)) {
-        totalVariance += Math.abs(costDeviation);
-      }
       
       if (deviationPercentage > 5) {
         membersOverBudget++;
@@ -170,6 +190,9 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         });
       }
     }
+    
+    // Calculate total variance using the same logic as complete-data endpoint
+    const totalVariance = totalActualCost - totalBudgetedCost;
 
     // Generate analysis in Spanish
     const analysis = [];
