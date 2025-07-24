@@ -1582,160 +1582,88 @@ export default function ProjectDetailsRedesigned() {
 
           <TabsContent value="dashboard" className="space-y-6">
             
-            {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional Mejorado */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
+            {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
               
-              {/* Markup Card - Métrica más importante con gráfico mini */}
-              <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-blue-50 via-blue-25 to-white hover:shadow-2xl transition-all duration-300 group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/5 rounded-full transform translate-x-10 -translate-y-10"></div>
-                <CardContent className="p-6 relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
-                        <Percent className="h-5 w-5 text-white" />
+              {/* Markup Card - Métrica más importante */}
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Percent className="h-4 w-4 text-blue-600" />
                       </div>
-                      <div>
-                        <span className="text-sm font-semibold text-blue-800">Markup</span>
-                        <div className="text-xs text-blue-600 opacity-75">Rentabilidad</div>
-                      </div>
+                      <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
-                    <div className="text-right">
-                      <Badge variant={(() => {
+                    <Badge variant={(() => {
+                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const clientPrice = quotationData?.totalAmount || 0;
+                      const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                      if (markup >= 2.5) return 'default';
+                      if (markup >= 1.8) return 'secondary';
+                      if (markup >= 1.2) return 'outline';
+                      return 'destructive';
+                    })()} className="text-xs">
+                      {(() => {
                         const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
                         const clientPrice = quotationData?.totalAmount || 0;
                         const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                        if (markup >= 2.5) return 'default';
-                        if (markup >= 1.8) return 'secondary';
-                        if (markup >= 1.2) return 'outline';
-                        return 'destructive';
-                      })()} className="text-xs font-medium px-2 py-1">
-                        {(() => {
-                          const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const clientPrice = quotationData?.totalAmount || 0;
-                          const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
-                          if (markup >= 2.5) return 'Excelente';
-                          if (markup >= 1.8) return 'Bueno';
-                          if (markup >= 1.2) return 'Aceptable';
-                          return 'Crítico';
-                        })()}
-                      </Badge>
-                    </div>
+                        if (markup >= 2.5) return 'Excelente';
+                        if (markup >= 1.8) return 'Bueno';
+                        if (markup >= 1.2) return 'Aceptable';
+                        return 'Crítico';
+                      })()}
+                    </Badge>
                   </div>
-                  <div className="space-y-3">
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-3xl font-bold text-gray-900">
-                        {(() => {
-                          if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
-                            const markup = (unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost;
-                            return `${markup.toFixed(1)}x`;
-                          }
-                          return '0.0x';
-                        })()}
-                      </p>
-                      <div className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full ${
-                        unifiedData?.metrics?.markup >= 2.0 ? 'bg-green-100 text-green-700' :
-                        unifiedData?.metrics?.markup >= 1.5 ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {unifiedData?.metrics?.markup >= 2.0 ? '↗' : unifiedData?.metrics?.markup >= 1.5 ? '→' : '↘'}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-600">Cliente: ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}</span>
-                      <span className="text-gray-600">Costo: ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}</span>
-                    </div>
-                    {/* Mini progreso visual */}
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
-                        className={`h-1.5 rounded-full transition-all duration-500 ${
-                          unifiedData?.metrics?.markup >= 2.5 ? 'bg-green-500' :
-                          unifiedData?.metrics?.markup >= 1.8 ? 'bg-blue-500' :
-                          unifiedData?.metrics?.markup >= 1.2 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
-                        style={{ width: `${Math.min((unifiedData?.metrics?.markup || 0) * 20, 100)}%` }}
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
+                          const markup = (unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost;
+                          return `${markup.toFixed(1)}x`;
+                        }
+                        return '0.0x';
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Precio cliente / Costo real
+                    </p>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Progreso de Horas - Mejorado con gráfico circular */}
-              <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-emerald-50 via-emerald-25 to-white hover:shadow-2xl transition-all duration-300 group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-600/5 rounded-full transform translate-x-10 -translate-y-10"></div>
-                <CardContent className="p-6 relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-3 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl shadow-lg group-hover:shadow-xl transition-shadow">
-                        <Clock className="h-5 w-5 text-white" />
+              {/* Progreso de Horas */}
+              <Card className="border-l-4 border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-green-600" />
                       </div>
-                      <div>
-                        <span className="text-sm font-semibold text-emerald-800">Progreso</span>
-                        <div className="text-xs text-emerald-600 opacity-75">Horas trabajadas</div>
-                      </div>
+                      <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-600 font-medium">
-                        {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
-                      </div>
-                    </div>
+                    <Badge variant="secondary" className="text-xs h-6 min-w-0 flex items-center">
+                      {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
+                    </Badge>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-3xl font-bold text-gray-900">
-                          {(() => {
-                            if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
-                              return (((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours) * 100).toFixed(1);
-                            }
-                            return '0.0';
-                          })()}%
-                        </p>
-                        <div className={`inline-flex items-center text-xs font-medium px-2 py-1 rounded-full ${
-                          unifiedData?.metrics?.efficiency >= 90 ? 'bg-green-100 text-green-700' :
-                          unifiedData?.metrics?.efficiency >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          <Activity className="h-3 w-3 mr-1" />
-                          {unifiedData?.metrics?.efficiency >= 90 ? 'En objetivo' :
-                           unifiedData?.metrics?.efficiency >= 60 ? 'Moderado' : 'Bajo'}
-                        </div>
-                      </div>
-                      {/* Mini gráfico circular */}
-                      <div className="relative w-16 h-16">
-                        <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 32 32">
-                          <circle cx="16" cy="16" r="14" fill="none" stroke="#e5e7eb" strokeWidth="3"/>
-                          <circle 
-                            cx="16" cy="16" r="14" fill="none" 
-                            stroke="#10b981" strokeWidth="3"
-                            strokeDasharray={`${((unifiedData?.actuals?.totalWorkedHours || 0) / (unifiedData?.quotation?.estimatedHours || 1)) * 87.92} 87.92`}
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-xs font-bold text-emerald-600">
-                            {Math.round(((unifiedData?.actuals?.totalWorkedHours || 0) / (unifiedData?.quotation?.estimatedHours || 1)) * 100)}%
-                          </span>
-                        </div>
-                      </div>
+                  <div className="space-y-2">
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
+                          return (((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours) * 100).toFixed(1);
+                        }
+                        return '0.0';
+                      })()}%
+                    </p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>de {unifiedData?.quotation?.estimatedHours || 0}h estimadas</span>
                     </div>
-                    {/* Barra de progreso mejorada */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Realizado: {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h</span>
-                        <span>Objetivo: {unifiedData?.quotation?.estimatedHours || 0}h</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 relative overflow-hidden">
-                        <div 
-                          className="h-2 bg-gradient-to-r from-emerald-400 to-green-500 rounded-full transition-all duration-1000 relative"
-                          style={{ 
-                            width: `${Math.min(((unifiedData?.actuals?.totalWorkedHours || 0) / (unifiedData?.quotation?.estimatedHours || 1)) * 100, 100)}%` 
-                          }}
-                        >
-                          <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                        </div>
-                      </div>
-                    </div>
+                    <Progress value={(() => {
+                      if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
+                        return ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours) * 100;
+                      }
+                      return 0;
+                    })()} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
