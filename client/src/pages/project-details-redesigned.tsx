@@ -2783,13 +2783,13 @@ export default function ProjectDetailsRedesigned() {
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs p-3">
                           <div className="space-y-2 text-sm">
-                            <div className="font-semibold">Retorno sobre Inversión (ROI)</div>
-                            <div>Mide la rentabilidad del proyecto calculando las ganancias netas obtenidas por cada peso invertido.</div>
+                            <div className="font-semibold">Margen de Ganancia</div>
+                            <div>Porcentaje del precio de venta que representa ganancia neta después de cubrir todos los costos operativos.</div>
                             <div className="text-xs text-gray-600">
-                              Fórmula: (Precio Cliente - Costo Real) ÷ Costo Real × 100<br/>
-                              • Verde (&gt;150%): Excelente rentabilidad<br/>
-                              • Amarillo (100-150%): Buena rentabilidad<br/>
-                              • Rojo (&lt;100%): Pérdidas o baja rentabilidad
+                              Fórmula: (Precio Cliente - Costo Real) ÷ Precio Cliente × 100<br/>
+                              • Verde (&gt;40%): Margen excelente<br/>
+                              • Amarillo (20-40%): Margen saludable<br/>
+                              • Rojo (&lt;20%): Margen bajo o pérdidas
                             </div>
                           </div>
                         </TooltipContent>
@@ -2798,17 +2798,21 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-emerald-900">
-                      {unifiedData?.metrics?.markup ? 
-                        `${(((unifiedData as any).metrics.markup - 1) * 100).toFixed(1)}%` : 
+                      {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                        `${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100).toFixed(1)}%` : 
                         '0.0%'
                       }
                     </h3>
-                    <p className="text-xs text-emerald-700">Retorno sobre inversión</p>
+                    <p className="text-xs text-emerald-700">Margen de ganancia</p>
                     <div className="w-full bg-emerald-200 rounded-full h-2 mt-2">
                       <div 
                         className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
                         style={{ 
-                          width: `${Math.min(100, Math.max(0, ((unifiedData?.metrics?.markup || 1) - 1) * 50))}%` 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
+                              ((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100) :
+                              0
+                          ))}%` 
                         }}
                       />
                     </div>
@@ -3186,13 +3190,14 @@ export default function ProjectDetailsRedesigned() {
                     <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                       <div className="text-3xl font-bold text-green-700 mb-1">
                         {(() => {
-                          // Evaluar salud financiera basada en ROI (markup)
-                          const markup = unifiedData?.metrics?.markup || 1;
-                          const roi = ((markup - 1) * 100);
+                          // Evaluar salud financiera basada en margen de ganancia empresarial
+                          const totalAmount = unifiedData?.quotation?.totalAmount || 0;
+                          const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const margin = totalAmount > 0 ? ((totalAmount - workedCost) / totalAmount) * 100 : 0;
                           
-                          if (roi >= 150) return "Excelente";
-                          if (roi >= 100) return "Bueno";
-                          if (roi >= 50) return "Regular";
+                          if (margin >= 60) return "Excelente";
+                          if (margin >= 40) return "Bueno";
+                          if (margin >= 20) return "Regular";
                           return "Crítico";
                         })()}
                       </div>
