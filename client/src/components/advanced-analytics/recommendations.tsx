@@ -194,8 +194,8 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                 </h3>
                 <p className="text-sm text-blue-100 mt-1">
                   {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
-                    'Métricas reales del período analizado y proyecciones futuras' :
-                    'Proyecciones basadas en el rendimiento actual'}
+                    'Métricas reales del período analizado y proyección si continúa la tendencia actual' :
+                    'Proyección de cómo continuará el proyecto si mantenemos el ritmo actual'}
                 </p>
               </div>
             </div>
@@ -207,6 +207,28 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
         <CardContent>
           {recommendationsData?.predictions ? (
             <>
+              {/* Explicación contextual */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-100 rounded-full p-2 mt-0.5">
+                    <AlertTriangle className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <p className="font-semibold mb-1">¿Qué significan estas proyecciones?</p>
+                    <p className="text-gray-600">
+                      {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
+                        'Estamos analizando lo que pasó en junio y proyectando cómo continuaría Q3 2025 si mantenemos el mismo ritmo de trabajo y gastos. Es una predicción de lo que pasaría si NO tomamos ninguna acción correctiva.' :
+                        'Estas son proyecciones basadas en el ritmo actual de trabajo. Muestran cómo terminaría el proyecto si continuamos con la tendencia actual sin cambios.'}
+                    </p>
+                    {(timeFilter?.includes('last') || timeFilter?.includes('pasado')) && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Nota: La facturación anual proyectada es menor porque el proyecto comenzó en mayo, no en enero.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {!recommendationsData.predictions.periodAnalysis ? (
                   <>
@@ -276,6 +298,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                       <p className="text-lg font-bold text-gray-900">
                         ${recommendationsData.predictions.businessMetrics.projectedAnnualRevenue?.toLocaleString() || '0'}
                       </p>
+                      <p className="text-xs text-gray-500 mt-1">Si continúa el ritmo actual</p>
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
