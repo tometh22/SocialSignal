@@ -2772,9 +2772,27 @@ export default function ProjectDetailsRedesigned() {
                     <div className="bg-emerald-600 p-2 rounded-lg">
                       <TrendingUp className="h-5 w-5 text-white" />
                     </div>
-                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
-                      ROI
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                        ROI
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-emerald-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Retorno sobre Inversión (ROI)</div>
+                            <div>Mide la rentabilidad del proyecto comparando las ganancias con los costos reales.</div>
+                            <div className="text-xs text-gray-600">
+                              • Verde (&gt;150%): Excelente rentabilidad<br/>
+                              • Amarillo (100-150%): Buena rentabilidad<br/>
+                              • Rojo (&lt;100%): Pérdidas o baja rentabilidad
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-emerald-900">
@@ -2803,9 +2821,28 @@ export default function ProjectDetailsRedesigned() {
                     <div className="bg-blue-600 p-2 rounded-lg">
                       <Percent className="h-5 w-5 text-white" />
                     </div>
-                    <Badge className="bg-blue-100 text-blue-700 border-blue-300">
-                      Margen
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                        Margen
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-blue-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Margen de Beneficio</div>
+                            <div>Porcentaje de ganancia obtenido después de descontar todos los costos del precio de venta.</div>
+                            <div className="text-xs text-gray-600">
+                              Fórmula: (Precio - Costo Real) ÷ Precio × 100<br/>
+                              • &gt;60%: Margen excelente<br/>
+                              • 30-60%: Margen saludable<br/>
+                              • &lt;30%: Margen bajo
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-blue-900">
@@ -2838,9 +2875,28 @@ export default function ProjectDetailsRedesigned() {
                     <div className="bg-purple-600 p-2 rounded-lg">
                       <Gauge className="h-5 w-5 text-white" />
                     </div>
-                    <Badge className="bg-purple-100 text-purple-700 border-purple-300">
-                      Eficiencia
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                        Eficiencia
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-purple-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Eficiencia de Costos</div>
+                            <div>Mide qué tan bien se están controlando los gastos respecto al presupuesto estimado.</div>
+                            <div className="text-xs text-gray-600">
+                              • &gt;95%: Excelente control de costos<br/>
+                              • 85-95%: Buen control<br/>
+                              • 70-85%: Control regular<br/>
+                              • &lt;70%: Sobrecostos críticos
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-purple-900">
@@ -2873,9 +2929,26 @@ export default function ProjectDetailsRedesigned() {
                     <div className="bg-amber-600 p-2 rounded-lg">
                       <Timer className="h-5 w-5 text-white" />
                     </div>
-                    <Badge className="bg-amber-100 text-amber-700 border-amber-300">
-                      $/Hora
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                        $/Hora
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-amber-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Ingresos por Hora</div>
+                            <div>Valor promedio que genera cada hora trabajada en el proyecto, calculado dividiendo el precio total entre las horas reales trabajadas.</div>
+                            <div className="text-xs text-gray-600">
+                              Fórmula: Precio Total ÷ Horas Trabajadas<br/>
+                              Útil para evaluar la productividad y valor del tiempo invertido en el proyecto.
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-amber-900">
