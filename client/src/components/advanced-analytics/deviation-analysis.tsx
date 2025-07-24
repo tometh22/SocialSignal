@@ -527,10 +527,22 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
             
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 mb-1">
-                <div className="text-2xl font-bold text-gray-800">
+                <div className="text-xl font-bold text-red-600">
                   {(() => {
-                    const peopleWithZeroHours = deviationData.deviationByRole.filter(d => d.actualHours === 0 && d.budgetedHours > 0).length;
-                    return peopleWithZeroHours;
+                    // Encontrar la persona con mayor sobrecosto crítico
+                    const criticalPeople = deviationData.deviationByRole
+                      .filter(d => {
+                        const absDeviation = Math.abs(d.deviationPercentage);
+                        const minHoursThreshold = d.budgetedHours * 0.3;
+                        return absDeviation > 50 && d.actualHours > minHoursThreshold && d.costDeviation > 0;
+                      })
+                      .sort((a, b) => b.costDeviation - a.costDeviation);
+                    
+                    if (criticalPeople.length > 0) {
+                      const mostCritical = criticalPeople[0];
+                      return mostCritical.personnelName;
+                    }
+                    return 'Sin casos críticos';
                   })()}
                 </div>
                 <TooltipProvider>
@@ -538,19 +550,30 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
                     <TooltipTrigger>
                       <Info className="h-3 w-3 text-gray-400" />
                     </TooltipTrigger>
-                    <TooltipContent>
+                    <TooltipContent className="max-w-xs">
                       <p className="text-sm">
-                        Personas asignadas al proyecto que no han registrado horas en este período
+                        Persona con el mayor sobrecosto en términos absolutos que requiere atención inmediata
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <div className="text-sm text-gray-600">Sin Actividad</div>
-              <div className="mt-2 text-xs text-gray-500">
+              <div className="text-sm text-gray-600">Caso Más Crítico</div>
+              <div className="mt-2 text-xs text-red-500">
                 {(() => {
-                  const peopleWithZeroHours = deviationData.deviationByRole.filter(d => d.actualHours === 0 && d.budgetedHours > 0).length;
-                  return peopleWithZeroHours > 0 ? 'Requieren seguimiento' : 'Todos activos';
+                  const criticalPeople = deviationData.deviationByRole
+                    .filter(d => {
+                      const absDeviation = Math.abs(d.deviationPercentage);
+                      const minHoursThreshold = d.budgetedHours * 0.3;
+                      return absDeviation > 50 && d.actualHours > minHoursThreshold && d.costDeviation > 0;
+                    })
+                    .sort((a, b) => b.costDeviation - a.costDeviation);
+                  
+                  if (criticalPeople.length > 0) {
+                    const mostCritical = criticalPeople[0];
+                    return `+$${Math.round(mostCritical.costDeviation).toLocaleString()} de sobrecosto`;
+                  }
+                  return 'Equipo bajo control';
                 })()}
               </div>
             </div>
