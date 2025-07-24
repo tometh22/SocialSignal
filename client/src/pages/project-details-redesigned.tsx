@@ -47,7 +47,8 @@ import {
   Lightbulb,
   Info,
   Star,
-  Flame
+  Flame,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1598,86 +1599,133 @@ export default function ProjectDetailsRedesigned() {
               
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Revenue Metric */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                  {/* Revenue Metric - Enhanced */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-3">
-                      <DollarSign className="h-6 w-6 text-green-600" />
-                      <Badge className="bg-green-100 text-green-800 text-xs">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-6 w-6 text-green-600" />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">
+                                <strong>Ingresos del Proyecto:</strong> Monto total que el cliente paga por este proyecto.
+                                El margen muestra la ganancia después de restar los costos reales del equipo.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800 text-xs font-medium">
                         +{unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
                           (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).actuals.totalWorkedCost * 100).toFixed(0) : 
                           '0'}% ROI
                       </Badge>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-2xl font-bold text-gray-900">
-                        ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-gray-500">Facturación Mensual</p>
-                      <div className="text-xs text-green-600">
-                        Margen: {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
-                          (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount * 100).toFixed(1) : 
-                          '0.0'}%
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">
+                          ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600 font-medium">💰 Ingresos del Cliente</p>
+                      </div>
+                      <div className="flex items-center justify-between text-xs bg-green-50 p-2 rounded">
+                        <span className="text-green-700 font-medium">Ganancia Neta:</span>
+                        <span className="font-bold text-green-800">
+                          {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                            (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount * 100).toFixed(1) : 
+                            '0.0'}%
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Performance Gauge */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                  {/* Budget Control - Enhanced */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-3">
-                      <Target className="h-6 w-6 text-blue-600" />
-                      <Badge className="bg-blue-100 text-blue-800 text-xs">
-                        Eficiencia
+                      <div className="flex items-center gap-2">
+                        <Target className="h-6 w-6 text-blue-600" />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">
+                                <strong>Control de Presupuesto:</strong> Muestra qué tan bien estamos manejando los costos.
+                                Valores positivos = gastando menos de lo estimado. Valores negativos = sobrecosto.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <Badge className={`text-xs font-medium ${
+                        unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                          ((unifiedData as any).actuals.totalWorkedCost <= (unifiedData as any).quotation.baseCost) ?
+                            'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                          ((unifiedData as any).actuals.totalWorkedCost <= (unifiedData as any).quotation.baseCost) ?
+                            '✅ En Presupuesto' : '⚠️ Sobrecosto'
+                        : 'Sin Datos'}
                       </Badge>
                     </div>
                     <div className="space-y-3">
                       <div>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className={`text-2xl font-bold ${
+                          unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                            ((unifiedData as any).actuals.totalWorkedCost <= (unifiedData as any).quotation.baseCost) ?
+                              'text-green-700' : 'text-red-700'
+                          : 'text-gray-900'
+                        }`}>
                           {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
-                            `${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100).toFixed(1)}%` : 
+                            `${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100) >= 0 ? '+' : ''}${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100).toFixed(1)}%` : 
                             '0.0%'
                           }
                         </p>
-                        <p className="text-xs text-gray-500">Control de Costos</p>
+                        <p className="text-sm text-gray-600 font-medium">📊 Control de Presupuesto</p>
                       </div>
-                      {/* Mini Progress Ring */}
-                      <div className="relative w-12 h-12 mx-auto">
-                        <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
-                          <path
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none"
-                            stroke="#e5e7eb"
-                            strokeWidth="3"
-                          />
-                          <path
-                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            fill="none"
-                            stroke="#3b82f6"
-                            strokeWidth="3"
-                            strokeDasharray={`${Math.min(100, 
-                              unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
-                                (100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100) : 
-                                0
-                            )}, 100`}
-                          />
-                        </svg>
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-xs font-bold text-blue-600">
-                            {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
-                              `${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100).toFixed(0)}%` : 
-                              '0%'
-                            }
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between text-xs bg-blue-50 p-2 rounded">
+                        <span className="text-blue-700">Estado:</span>
+                        <span className={`font-bold ${
+                          unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                            ((unifiedData as any).actuals.totalWorkedCost <= (unifiedData as any).quotation.baseCost) ?
+                              'text-green-700' : 'text-red-700'
+                          : 'text-gray-700'
+                        }`}>
+                          {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
+                            ((unifiedData as any).actuals.totalWorkedCost <= (unifiedData as any).quotation.baseCost) ?
+                              'Bajo Control' : 'Requiere Atención'
+                          : 'Evaluando...'}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Team Activity */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                  {/* Team Productivity - Enhanced */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-3">
-                      <Users className="h-6 w-6 text-purple-600" />
-                      <Badge className="bg-purple-100 text-purple-800 text-xs">
-                        {teamStats?.filter(member => member.hours > 0).length || 0} Activos
+                      <div className="flex items-center gap-2">
+                        <Users className="h-6 w-6 text-purple-600" />
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">
+                                <strong>Actividad del Equipo:</strong> Total de horas trabajadas por el equipo en este período.
+                                Las barras muestran los 3 colaboradores más activos.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <Badge className="bg-purple-100 text-purple-800 text-xs font-medium">
+                        👥 {teamStats?.filter(member => member.hours > 0).length || 0} Colaboradores
                       </Badge>
                     </div>
                     <div className="space-y-3">
@@ -1685,26 +1733,28 @@ export default function ProjectDetailsRedesigned() {
                         <p className="text-2xl font-bold text-gray-900">
                           {unifiedData?.actuals?.totalWorkedHours?.toFixed(0) || '0'}h
                         </p>
-                        <p className="text-xs text-gray-500">Horas Ejecutadas</p>
+                        <p className="text-sm text-gray-600 font-medium">⏱️ Tiempo Invertido</p>
                       </div>
-                      {/* Mini Team Activity Bars */}
-                      <div className="space-y-1">
-                        {teamStats?.slice(0, 3).map((member, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></div>
-                            <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className="bg-purple-400 h-1.5 rounded-full transition-all duration-500"
-                                style={{ 
-                                  width: `${Math.min(100, (member.hours / Math.max(...(teamStats?.map(m => m.hours) || [1]))) * 100)}%` 
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-600 w-10 text-right">
-                              {member.hours?.toFixed(0)}h
-                            </span>
-                          </div>
-                        ))}
+                      {/* Team Progress Indicator */}
+                      <div className="bg-purple-50 p-2 rounded">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-purple-700 font-medium">Progreso vs Estimado:</span>
+                          <span className="font-bold text-purple-800">
+                            {unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours ?
+                              `${((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours * 100).toFixed(0)}%`
+                              : '0%'}
+                          </span>
+                        </div>
+                        <div className="w-full bg-purple-200 rounded-full h-2">
+                          <div 
+                            className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${Math.min(100, unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours ?
+                                ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours * 100)
+                                : 0)}%` 
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1715,14 +1765,29 @@ export default function ProjectDetailsRedesigned() {
             {/* Multi-Format Analytics Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               
-              {/* Interactive Progress Dashboard */}
+              {/* Project Progress - Enhanced */}
               <Card className="bg-white shadow-lg border-0">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
                       <BarChart3 className="h-5 w-5 text-white" />
                     </div>
-                    Progreso del Proyecto
+                    <div className="flex items-center gap-2">
+                      📊 Avance del Proyecto
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">
+                              <strong>Progreso General:</strong> Muestra qué porcentaje del trabajo estimado ya se ha completado.
+                              Se calcula comparando las horas trabajadas vs las horas estimadas en la cotización.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1769,41 +1834,73 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   
-                  {/* Progress Details */}
+                  {/* Progress Details - Enhanced */}
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm font-medium text-blue-700">Horas Trabajadas</span>
-                      <span className="text-lg font-bold text-blue-900">
-                        {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h
-                      </span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <p className="text-lg font-bold text-blue-800">
+                          {unifiedData?.actuals?.totalWorkedHours?.toFixed(0) || '0'}h
+                        </p>
+                        <p className="text-xs text-blue-600 font-medium">⏱️ Horas Trabajadas</p>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <p className="text-lg font-bold text-gray-800">
+                          {unifiedData?.quotation?.estimatedHours?.toFixed(0) || '0'}h
+                        </p>
+                        <p className="text-xs text-gray-600 font-medium">📋 Horas Estimadas</p>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm font-medium text-gray-700">Horas Estimadas</span>
-                      <span className="text-lg font-bold text-gray-900">
-                        {unifiedData?.quotation?.estimatedHours?.toFixed(0) || '0'}h
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                      <span className="text-sm font-medium text-purple-700">Tiempo Restante</span>
-                      <span className="text-lg font-bold text-purple-900">
-                        {(() => {
-                          const remaining = (unifiedData?.quotation?.estimatedHours || 0) - (unifiedData?.actuals?.totalWorkedHours || 0);
-                          return remaining > 0 ? `${remaining.toFixed(0)}h` : '0h';
-                        })()}
-                      </span>
+                    
+                    <div className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-gray-700">Estado del Proyecto:</span>
+                        <Badge className={`text-xs font-medium ${
+                          unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours ?
+                            ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours * 100) <= 100 ?
+                              'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                          : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours ?
+                            ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours * 100) <= 100 ?
+                              '✅ En Tiempo' : '⏰ Requiere Atención'
+                          : 'Evaluando...'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        {unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours ?
+                          ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours * 100) <= 100 ?
+                            'El proyecto está progresando dentro del tiempo estimado.' 
+                            : 'El proyecto ha excedido las horas estimadas y requiere seguimiento.'
+                        : 'Calculando estado del proyecto...'}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Advanced Financial Analysis */}
+              {/* Financial Analysis - Enhanced */}
               <Card className="bg-white shadow-lg border-0">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg">
                       <DollarSign className="h-5 w-5 text-white" />
                     </div>
-                    Análisis Financiero
+                    <div className="flex items-center gap-2">
+                      💰 Análisis Financiero
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">
+                              <strong>Análisis de Rentabilidad:</strong> Compara los ingresos del cliente vs los costos reales del proyecto.
+                              El markup (margen) muestra qué tan rentable es el proyecto.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -1849,62 +1946,54 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
 
-                  {/* Financial Metrics Grid */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-green-50 rounded-lg p-4 text-center">
-                      <div className="text-lg font-bold text-green-700">
-                        ${unifiedData?.quotation?.totalAmount?.toLocaleString() || '0'}
+                  {/* Financial Breakdown - Enhanced */}
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-green-50 rounded-lg p-3 text-center">
+                        <div className="text-lg font-bold text-green-700">
+                          ${unifiedData?.quotation?.totalAmount?.toLocaleString() || '0'}
+                        </div>
+                        <div className="text-xs text-green-600 font-medium">💵 Ingresos</div>
                       </div>
-                      <div className="text-xs text-green-600">Precio Cliente</div>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-4 text-center">
-                      <div className="text-lg font-bold text-red-700">
-                        ${unifiedData?.actuals?.totalWorkedCost?.toLocaleString() || '0'}
+                      <div className="bg-red-50 rounded-lg p-3 text-center">
+                        <div className="text-lg font-bold text-red-700">
+                          ${unifiedData?.actuals?.totalWorkedCost?.toLocaleString() || '0'}
+                        </div>
+                        <div className="text-xs text-red-600 font-medium">💸 Costos</div>
                       </div>
-                      <div className="text-xs text-red-600">Costo Real</div>
-                    </div>
-                  </div>
-
-                  {/* Profit Visualization */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">Utilidad Neta</span>
-                      <span className="text-lg font-bold text-green-600">
-                        ${(() => {
-                          const profit = (unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0);
-                          return profit.toLocaleString();
-                        })()}
-                      </span>
                     </div>
                     
-                    {/* Profit Margin Bar */}
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-gradient-to-r from-green-400 to-emerald-500 h-3 rounded-full transition-all duration-500"
-                        style={{ 
-                          width: `${Math.min(100, (() => {
-                            if (unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost) {
-                              const margin = (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100;
-                              return Math.max(0, margin);
-                            }
-                            return 0;
-                          })())}%` 
-                        }}
-                      />
-                    </div>
-                    
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>0%</span>
-                      <span className="font-medium">
-                        {(() => {
-                          if (unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost) {
-                            const margin = (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100;
-                            return `${margin.toFixed(1)}% Margen`;
-                          }
-                          return '0% Margen';
-                        })()}
-                      </span>
-                      <span>100%</span>
+                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 p-3 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Rentabilidad del Proyecto:</span>
+                        <Badge className={`text-xs font-medium ${
+                          unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount ?
+                            ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost) >= 1.8 ?
+                              'bg-green-100 text-green-800' : 
+                              ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost) >= 1.2 ?
+                                'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount ?
+                            ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost) >= 1.8 ?
+                              '🏆 Excelente' : 
+                              ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost) >= 1.2 ?
+                                '✅ Buena' : '⚠️ Baja Rentabilidad'
+                          : 'Calculando...'}
+                        </Badge>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-2xl font-bold text-emerald-700">
+                          {unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount ?
+                            `${((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost).toFixed(1)}x`
+                            : '0.0x'}
+                        </div>
+                        <p className="text-xs text-emerald-600 mt-1">
+                          {unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount ?
+                            `Ganancia: $${((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost).toLocaleString()}`
+                            : 'Calculando ganancia...'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
