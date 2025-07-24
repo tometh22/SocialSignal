@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign } from "lucide-react";
+import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign, Target, Zap, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface DeviationAnalysisProps {
   projectId: number;
@@ -222,143 +222,287 @@ export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: De
       </CardHeader>
       <CardContent className="space-y-6">
         
-        {/* Resumen General Mejorado */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-blue-200 p-2 rounded-lg">
-                <DollarSign className="h-4 w-4 text-blue-700" />
+        {/* Métricas Claras y Comprensibles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Sobrecosto Total */}
+          <div className={`p-5 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 ${
+            deviationData.totalVariance.variance > 0 
+              ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
+              : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <div className={`p-2 rounded-lg ${
+                deviationData.totalVariance.variance > 0 ? 'bg-red-200' : 'bg-green-200'
+              }`}>
+                {deviationData.totalVariance.variance > 0 ? (
+                  <AlertCircle className="h-5 w-5 text-red-700" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-green-700" />
+                )}
               </div>
-              <span className="text-xs text-blue-600 font-semibold uppercase tracking-wide">
-                Diferencia vs Presupuesto
-              </span>
+              <Badge 
+                variant={deviationData.totalVariance.variance > 0 ? "destructive" : "secondary"}
+                className={`text-xs ${
+                  deviationData.totalVariance.variance > 0 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-green-500 text-white'
+                }`}
+              >
+                {deviationData.totalVariance.variance > 0 ? 'Sobrecosto' : 'Ahorro'}
+              </Badge>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-800 mb-1">
+            <div>
+              <h3 className={`text-sm font-medium mb-1 ${
+                deviationData.totalVariance.variance > 0 ? 'text-red-800' : 'text-green-800'
+              }`}>
+                {deviationData.totalVariance.variance > 0 ? 'Sobrecosto Total' : 'Ahorro Total'}
+              </h3>
+              <p className={`text-2xl font-bold mb-1 ${
+                deviationData.totalVariance.variance > 0 ? 'text-red-900' : 'text-green-900'
+              }`}>
                 ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
               </p>
-              <p className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
-                {deviationData.totalVariance.variance > 0 ? "Por encima del presupuesto" : "Por debajo del presupuesto"}
+              <p className={`text-xs ${
+                deviationData.totalVariance.variance > 0 ? 'text-red-600' : 'text-green-600'
+              }`}>
+                vs. presupuesto planificado
               </p>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-xl border border-red-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-red-200 p-2 rounded-lg">
-                <TrendingUp className="h-4 w-4 text-red-700" />
+          {/* Miembros con Sobrecosto */}
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-orange-200 p-2 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-orange-700" />
               </div>
-              <span className="text-xs text-red-600 font-semibold uppercase tracking-wide">
-                Exceden Presupuesto
-              </span>
+              <Badge variant="outline" className="bg-orange-500 text-white text-xs">
+                Riesgo
+              </Badge>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-red-800 mb-1">
+            <div>
+              <h3 className="text-sm font-medium text-orange-800 mb-1">
+                Miembros con Sobrecosto
+              </h3>
+              <p className="text-2xl font-bold text-orange-900 mb-1">
                 {deviationData.summary.membersOverBudget}
               </p>
-              <p className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
-                miembros del equipo
+              <p className="text-xs text-orange-600">
+                de {deviationData.deviationByRole.length} miembros totales
               </p>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-green-200 p-2 rounded-lg">
-                <TrendingDown className="h-4 w-4 text-green-700" />
+          {/* Miembros Eficientes */}
+          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-5 rounded-xl border border-emerald-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-emerald-200 p-2 rounded-lg">
+                <Zap className="h-5 w-5 text-emerald-700" />
               </div>
-              <span className="text-xs text-green-600 font-semibold uppercase tracking-wide">
-                Bajo Presupuesto
-              </span>
+              <Badge variant="secondary" className="bg-emerald-500 text-white text-xs">
+                Eficiente
+              </Badge>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-800 mb-1">
+            <div>
+              <h3 className="text-sm font-medium text-emerald-800 mb-1">
+                Miembros Eficientes
+              </h3>
+              <p className="text-2xl font-bold text-emerald-900 mb-1">
                 {deviationData.summary.membersUnderBudget}
               </p>
-              <p className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                miembros del equipo
+              <p className="text-xs text-emerald-600">
+                por debajo del presupuesto
               </p>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 shadow-sm hover:shadow-md transition-shadow h-32 flex flex-col justify-between">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="bg-purple-200 p-2 rounded-lg">
-                <Users className="h-4 w-4 text-purple-700" />
+          {/* Críticos que Requieren Atención */}
+          <div className="bg-gradient-to-br from-red-50 to-red-100 p-5 rounded-xl border border-red-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between mb-3">
+              <div className="bg-red-200 p-2 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-red-700" />
               </div>
-              <span className="text-xs text-purple-600 font-semibold uppercase tracking-wide">
-                Total Miembros
-              </span>
+              <Badge variant="destructive" className="bg-red-600 text-white text-xs">
+                Urgente
+              </Badge>
             </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-800 mb-1">
-                {deviationData.deviationByRole.length}
+            <div>
+              <h3 className="text-sm font-medium text-red-800 mb-1">
+                Casos Críticos
+              </h3>
+              <p className="text-2xl font-bold text-red-900 mb-1">
+                {(() => {
+                  const criticalCount = deviationData.deviationByRole.filter(d => {
+                    const absDeviation = Math.abs(d.deviationPercentage);
+                    const minHoursThreshold = d.budgetedHours * 0.3;
+                    return absDeviation > 50 && d.actualHours > minHoursThreshold;
+                  }).length;
+                  return criticalCount;
+                })()}
               </p>
-              <p className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
-                analizados
+              <p className="text-xs text-red-600">
+                requieren acción inmediata
               </p>
             </div>
           </div>
         </div>
 
-        {/* Análisis Automático */}
+        {/* Indicador de Salud del Proyecto */}
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Target className="h-6 w-6 text-gray-600" />
+              <h3 className="text-lg font-semibold text-gray-800">Estado General del Proyecto</h3>
+            </div>
+            {(() => {
+              const efficiency = ((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100);
+              const criticalCount = deviationData.deviationByRole.filter(d => {
+                const absDeviation = Math.abs(d.deviationPercentage);
+                const minHoursThreshold = d.budgetedHours * 0.3;
+                return absDeviation > 50 && d.actualHours > minHoursThreshold;
+              }).length;
+              
+              let status = 'Saludable';
+              let statusColor = 'bg-green-500';
+              let textColor = 'text-green-800';
+              
+              if (criticalCount > 2 || deviationData.totalVariance.variance > 5000) {
+                status = 'Crítico';
+                statusColor = 'bg-red-500';
+                textColor = 'text-red-800';
+              } else if (criticalCount > 0 || deviationData.summary.membersOverBudget > deviationData.summary.membersUnderBudget) {
+                status = 'Requiere Atención';
+                statusColor = 'bg-yellow-500';
+                textColor = 'text-yellow-800';
+              }
+              
+              return (
+                <Badge className={`${statusColor} text-white px-3 py-1 text-sm font-medium`}>
+                  {status}
+                </Badge>
+              );
+            })()}
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-800 mb-1">
+                {Math.round((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100)}%
+              </div>
+              <div className="text-sm text-gray-600">Eficiencia del Equipo</div>
+              <Progress 
+                value={(deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100} 
+                className="mt-2 h-2"
+              />
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-800 mb-1">
+                {deviationData.deviationByRole.filter(d => d.actualHours > 0).length}
+              </div>
+              <div className="text-sm text-gray-600">Miembros Activos</div>
+              <Progress 
+                value={(deviationData.deviationByRole.filter(d => d.actualHours > 0).length / deviationData.deviationByRole.length) * 100} 
+                className="mt-2 h-2"
+              />
+            </div>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-gray-800 mb-1">
+                {Math.round(Math.abs(deviationData.totalVariance.variance / 1000))}K
+              </div>
+              <div className="text-sm text-gray-600">Variación Total (USD)</div>
+              <div className={`mt-2 h-2 rounded-full ${
+                deviationData.totalVariance.variance > 0 ? 'bg-red-200' : 'bg-green-200'
+              }`}>
+                <div className={`h-full rounded-full ${
+                  deviationData.totalVariance.variance > 0 ? 'bg-red-500' : 'bg-green-500'
+                } w-full`}></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Recomendaciones y Análisis Inteligente */}
         {deviationData.analysis && deviationData.analysis.length > 0 && (
-          <div>
-            <h4 className="font-semibold text-sm mb-3 text-gray-700">Análisis Automático del Sistema</h4>
-            <div className="space-y-2">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-blue-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800">Recomendaciones del Sistema</h3>
+            </div>
+            
+            <div className="space-y-3">
               {deviationData.analysis
                 .sort((a, b) => {
-                  const severityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
-                  return severityOrder[b.severity] - severityOrder[a.severity];
+                  const severityOrder: Record<string, number> = { 'high': 3, 'medium': 2, 'low': 1 };
+                  return (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0);
                 })
                 .map((item, index) => (
                 <div 
                   key={index} 
-                  className={`p-3 rounded-lg border transition-all duration-200 hover:shadow-md cursor-pointer hover:scale-[1.02] ${
-                    item.severity === 'high' ? 'bg-gradient-to-r from-red-50 to-red-100 border-red-300 shadow-md hover:border-red-400' : 
-                    item.severity === 'medium' ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-300 hover:border-yellow-400' :
-                    'bg-gradient-to-r from-green-50 to-green-100 border-green-300 hover:border-green-400'
+                  className={`p-4 rounded-xl border-l-4 transition-all duration-200 hover:shadow-md cursor-pointer ${
+                    item.severity === 'high' 
+                      ? 'bg-red-50 border-l-red-500 hover:bg-red-100' 
+                      : item.severity === 'medium' 
+                      ? 'bg-yellow-50 border-l-yellow-500 hover:bg-yellow-100'
+                      : 'bg-green-50 border-l-green-500 hover:bg-green-100'
                   }`}
                   onClick={() => handleAlertClick(item.type)}
-                  title="Haz clic para navegar a la sección relevante"
+                  title="Haz clic para ver más detalles"
                 >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                      item.severity === 'high' ? 'bg-red-600' : 
-                      item.severity === 'medium' ? 'bg-yellow-600' : 'bg-green-600'
-                    }`}>
-                      {index + 1}
-                    </div>
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <span className={`font-semibold text-sm ${
-                        item.severity === 'high' ? 'text-red-800' : 
-                        item.severity === 'medium' ? 'text-yellow-800' : 'text-green-800'
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${
+                          item.severity === 'high' ? 'bg-red-500' : 
+                          item.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`}>
+                          {item.severity === 'high' ? '!' : item.severity === 'medium' ? '⚠' : '✓'}
+                        </div>
+                        <h4 className={`font-semibold ${
+                          item.severity === 'high' ? 'text-red-800' : 
+                          item.severity === 'medium' ? 'text-yellow-800' : 'text-green-800'
+                        }`}>
+                          {item.type === 'budget_overrun' ? 'Sobrecosto Detectado' : 
+                           item.type === 'team_efficiency' ? 'Revisar Eficiencia del Equipo' : 
+                           item.type === 'critical_deviations' ? 'Miembros Requieren Atención Urgente' :
+                           item.type === 'efficiency_opportunity' ? 'Oportunidad de Optimización' :
+                           item.type === 'high_variance' ? 'Variabilidad Alta en Costos' :
+                           item.type === 'scope_change' ? 'Posible Cambio de Alcance' : 'Análisis'}
+                        </h4>
+                      </div>
+                      <p className={`text-sm leading-relaxed ${
+                        item.severity === 'high' ? 'text-red-700' : 
+                        item.severity === 'medium' ? 'text-yellow-700' : 'text-green-700'
                       }`}>
-                        {item.type === 'budget_overrun' ? 'Sobrecosto del Proyecto' : 
-                         item.type === 'team_efficiency' ? 'Eficiencia del Equipo' : 
-                         item.type === 'critical_deviations' ? 'Desviaciones Críticas' :
-                         item.type === 'efficiency_opportunity' ? 'Oportunidad de Eficiencia' :
-                         item.type === 'high_variance' ? 'Alta Variabilidad' :
-                         item.type === 'scope_change' ? 'Cambio de Alcance' : item.type}
-                      </span>
+                        {item.message}
+                      </p>
+                      <div className="mt-2 text-xs text-gray-600">
+                        <span>💡 Haz clic para navegar a los detalles</span>
+                      </div>
                     </div>
-                    <Badge variant={item.severity === 'high' ? 'destructive' : item.severity === 'medium' ? 'outline' : 'secondary'} 
-                           className={`text-xs px-2 py-1 ${
-                             item.severity === 'high' ? 'bg-red-600 text-white border-red-700' : 
-                             item.severity === 'medium' ? 'bg-yellow-500 text-white border-yellow-600' : 
-                             'bg-green-500 text-white border-green-600'
-                           }`}>
-                      {item.severity === 'high' ? 'Alto' : item.severity === 'medium' ? 'Medio' : 'Bajo'}
+                    <Badge 
+                      variant={item.severity === 'high' ? 'destructive' : item.severity === 'medium' ? 'outline' : 'secondary'} 
+                      className={`text-xs px-3 py-1 font-medium ${
+                        item.severity === 'high' ? 'bg-red-500 text-white' : 
+                        item.severity === 'medium' ? 'bg-yellow-500 text-white' : 
+                        'bg-green-500 text-white'
+                      }`}
+                    >
+                      {item.severity === 'high' ? 'Urgente' : item.severity === 'medium' ? 'Importante' : 'Informativo'}
                     </Badge>
                   </div>
-                  <p className={`text-xs leading-relaxed ${
-                    item.severity === 'high' ? 'text-red-700' : 
-                    item.severity === 'medium' ? 'text-yellow-700' : 'text-green-700'
-                  }`}>
-                    {item.message}
-                  </p>
                 </div>
               ))}
+            </div>
+            
+            {/* Resumen de acciones */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <strong>Siguiente paso recomendado:</strong> Revisar los casos críticos en la pestaña de análisis de equipo para tomar acciones correctivas.
+              </p>
             </div>
           </div>
         )}
