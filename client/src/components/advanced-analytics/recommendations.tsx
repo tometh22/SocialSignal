@@ -36,6 +36,12 @@ interface Predictions {
   projectedFinalCost: number;
   projectedFinalMarkup: number;
   confidenceLevel: 'high' | 'medium' | 'low';
+  businessMetrics?: {
+    monthlyBurnRate: number;
+    projectedAnnualRevenue: number;
+    breakEvenPoint: string;
+    clientSatisfactionRisk: 'high' | 'medium' | 'low';
+  };
 }
 
 interface RecommendationsData {
@@ -175,45 +181,84 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
         </CardHeader>
         <CardContent>
           {recommendationsData?.predictions?.projectedFinalCost > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">Fecha Estimada</span>
-                </div>
-                <p className="text-lg font-bold text-blue-600">
-                  {recommendationsData?.predictions?.estimatedCompletionDate 
-                    ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
-                    : 'Proyecto en ejecución'
-                  }
-                </p>
-                {!recommendationsData?.predictions?.estimatedCompletionDate && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    Basado en velocidad actual
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-800">Fecha Estimada</span>
+                  </div>
+                  <p className="text-lg font-bold text-blue-600">
+                    {recommendationsData?.predictions?.estimatedCompletionDate 
+                      ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
+                      : 'Proyecto en ejecución'
+                    }
                   </p>
-                )}
-              </div>
-
-              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">Costo Final Proyectado</span>
+                  {!recommendationsData?.predictions?.estimatedCompletionDate && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Basado en velocidad actual
+                    </p>
+                  )}
                 </div>
-                <p className="text-lg font-bold text-green-600">
-                  ${(recommendationsData?.predictions?.projectedFinalCost || 0).toLocaleString()}
-                </p>
-              </div>
 
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-purple-600" />
-                  <span className="text-sm font-medium text-purple-800">Markup Final Proyectado</span>
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">Costo Final Proyectado</span>
+                  </div>
+                  <p className="text-lg font-bold text-green-600">
+                    ${(recommendationsData?.predictions?.projectedFinalCost || 0).toLocaleString()}
+                  </p>
                 </div>
-                <p className="text-lg font-bold text-purple-600">
-                  {(recommendationsData?.predictions?.projectedFinalMarkup || 0).toFixed(2)}x
-                </p>
+
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-800">Markup Final Proyectado</span>
+                  </div>
+                  <p className="text-lg font-bold text-purple-600">
+                    {(recommendationsData?.predictions?.projectedFinalMarkup || 0).toFixed(2)}x
+                  </p>
+                </div>
               </div>
-            </div>
+              
+              {recommendationsData?.predictions?.businessMetrics && (
+                <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Métricas de Inteligencia de Negocio</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Burn Rate Mensual:</span>
+                      <p className="font-bold text-gray-800">
+                        ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toFixed(0) || '0'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Revenue Anual Proyectado:</span>
+                      <p className="font-bold text-gray-800">
+                        ${recommendationsData.predictions.businessMetrics.projectedAnnualRevenue?.toFixed(0) || '0'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Punto de Equilibrio:</span>
+                      <p className="font-bold text-gray-800">
+                        {recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Riesgo de Satisfacción:</span>
+                      <p className={`font-bold ${
+                        recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'text-red-600' :
+                        recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'text-yellow-600' :
+                        'text-green-600'
+                      }`}>
+                        {recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'Alto' :
+                         recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'Medio' : 'Bajo'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-8">
               <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-3" />

@@ -5862,83 +5862,189 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const recommendations = [];
-
-      // Recomendación de control de costos
-      if (totalActualCost > totalEstimatedCost * 1.2) {
+      
+      // Análisis de tendencia de costos
+      const costDeviation = ((totalActualCost - totalEstimatedCost) / totalEstimatedCost) * 100;
+      const hourDeviation = ((totalActualHours - totalEstimatedHours) / totalEstimatedHours) * 100;
+      const currentMarkup = quotation ? (quotation.totalAmount / totalActualCost) : 0;
+      
+      // INTELIGENCIA DE NEGOCIO: Análisis predictivo de riesgos
+      if (costDeviation > 10) {
+        const monthlyBurn = totalActualCost / (filterEndDate ? 
+          (new Date(filterEndDate).getMonth() - new Date(filterStartDate).getMonth() + 1) : 1);
+        const projectedOverrun = monthlyBurn * 12 - quotation?.baseCost;
+        
         recommendations.push({
-          type: 'cost_control',
+          type: 'financial_risk',
           priority: 'high',
-          title: 'Control de Costos Urgente',
-          description: 'El proyecto excede el presupuesto estimado en más del 20%',
+          title: 'Riesgo Financiero Detectado',
+          description: `Tendencia de sobrecosto del ${costDeviation.toFixed(1)}%. De continuar así, el proyecto podría exceder el presupuesto anual en $${projectedOverrun.toFixed(0)}`,
           actions: [
-            'Revisar asignaciones de recursos',
-            'Optimizar procesos actuales',
-            'Considerar renegociar alcance con el cliente'
+            `Reducir asignación de recursos senior en un ${(costDeviation/2).toFixed(0)}%`,
+            'Implementar revisión semanal de costos con el equipo',
+            'Evaluar automatización de tareas que consumen >20h/mes',
+            'Presentar propuesta de ajuste de precio al cliente (+15%)'
           ],
           impact: 'financial'
         });
       }
 
-      // Recomendación de eficiencia
-      if (totalActualHours > totalEstimatedHours * 1.1) {
-        recommendations.push({
-          type: 'efficiency',
-          priority: 'medium',
-          title: 'Mejora de Eficiencia',
-          description: 'Se están utilizando más horas de las estimadas',
-          actions: [
-            'Implementar metodologías ágiles',
-            'Automatizar tareas repetitivas',
-            'Proporcionar capacitación adicional al equipo'
-          ],
-          impact: 'productivity'
-        });
+      // INTELIGENCIA DE NEGOCIO: Análisis de eficiencia operativa
+      if (hourDeviation > 0) {
+        // Identificar personas con mayor desviación
+        const teamAnalysis = projectEntries.reduce((acc, entry) => {
+          const person = teamMembers.find(m => m.personnelId === entry.personnelId);
+          if (!acc[entry.personnelId]) {
+            acc[entry.personnelId] = { 
+              name: person?.personnelName || 'Unknown',
+              actual: 0, 
+              estimated: person?.hours || 0,
+              cost: 0
+            };
+          }
+          acc[entry.personnelId].actual += entry.hours;
+          acc[entry.personnelId].cost += entry.hours * (entry.hourlyRateAtTime || 100);
+          return acc;
+        }, {});
+        
+        const inefficientMembers = Object.values(teamAnalysis)
+          .filter(m => m.actual > m.estimated * 1.2)
+          .sort((a, b) => (b.actual - b.estimated) - (a.actual - a.estimated))
+          .slice(0, 3);
+        
+        if (inefficientMembers.length > 0) {
+          recommendations.push({
+            type: 'operational_efficiency',
+            priority: 'medium',
+            title: 'Optimización Operativa Requerida',
+            description: `${inefficientMembers.length} miembros exceden significativamente sus horas estimadas`,
+            actions: [
+              `Reasignar tareas de ${inefficientMembers[0].name} (${((inefficientMembers[0].actual - inefficientMembers[0].estimated) / inefficientMembers[0].estimated * 100).toFixed(0)}% excedido)`,
+              'Evaluar carga de trabajo y redistribuir responsabilidades',
+              'Implementar pair programming para acelerar entregables',
+              'Considerar contratar junior para tareas operativas repetitivas'
+            ],
+            impact: 'productivity'
+          });
+        }
       }
       
-      // Recomendación específica cuando se superan las horas estimadas
-      if (totalActualHours > totalEstimatedHours) {
-        const hoursExceeded = totalActualHours - totalEstimatedHours;
-        const percentageExceeded = ((hoursExceeded / totalEstimatedHours) * 100).toFixed(1);
+      // INTELIGENCIA DE NEGOCIO: Análisis de rentabilidad y oportunidades
+      if (currentMarkup < 2.5) {
+        const markupGap = 2.5 - currentMarkup;
+        const revenueOpportunity = totalActualCost * markupGap;
         
         recommendations.push({
-          type: 'hours_exceeded',
+          type: 'profitability_opportunity',
           priority: 'high',
-          title: 'Horas Estimadas Superadas',
-          description: `El proyecto ha utilizado ${totalActualHours.toFixed(1)} horas de ${totalEstimatedHours} estimadas (${percentageExceeded}% adicional)`,
+          title: 'Oportunidad de Mejora de Rentabilidad',
+          description: `Markup actual de ${currentMarkup.toFixed(2)}x está ${((markupGap/2.5)*100).toFixed(0)}% por debajo del objetivo. Oportunidad de revenue adicional: $${revenueOpportunity.toFixed(0)}`,
           actions: [
-            'Evaluar si se necesitan recursos adicionales',
-            'Revisar el alcance restante del proyecto',
-            'Comunicar el estado actual al cliente',
-            'Considerar ajustes en la estimación'
-          ],
-          impact: 'timeline'
-        });
-      }
-
-      // Recomendación de rentabilidad
-      const markup = quotation ? (quotation.totalAmount / totalActualCost) : 0;
-      if (markup < 1.5) {
-        recommendations.push({
-          type: 'profitability',
-          priority: 'high',
-          title: 'Mejora de Rentabilidad',
-          description: 'El markup actual está por debajo del objetivo mínimo',
-          actions: [
-            'Reducir costos operativos',
-            'Optimizar tiempos de entrega',
-            'Evaluar ajustes en precios futuros'
+            'Identificar y priorizar entregables de alto valor para el cliente',
+            `Proponer servicios adicionales por valor de $${(revenueOpportunity * 0.3).toFixed(0)}/mes`,
+            'Renegociar contrato incluyendo inflación y ajuste de scope',
+            'Implementar modelo de pricing basado en valor, no en horas'
           ],
           impact: 'profitability'
         });
       }
 
-      // Predicciones
+      // INTELIGENCIA DE NEGOCIO: Análisis predictivo basado en tendencias
+      if (projectEntries.length >= 3) {
+        // Análisis de tendencia mensual
+        const monthlyData = projectEntries.reduce((acc, entry) => {
+          const month = new Date(entry.date).toISOString().slice(0, 7);
+          if (!acc[month]) acc[month] = { hours: 0, cost: 0 };
+          acc[month].hours += entry.hours;
+          acc[month].cost += entry.hours * (entry.hourlyRateAtTime || 100);
+          return acc;
+        }, {});
+        
+        const months = Object.keys(monthlyData).sort();
+        if (months.length >= 2) {
+          const lastMonth = monthlyData[months[months.length - 1]];
+          const prevMonth = monthlyData[months[months.length - 2]];
+          const costTrend = ((lastMonth.cost - prevMonth.cost) / prevMonth.cost) * 100;
+          
+          if (Math.abs(costTrend) > 20) {
+            recommendations.push({
+              type: 'trend_alert',
+              priority: 'medium',
+              title: costTrend > 0 ? 'Tendencia de Costos al Alza' : 'Reducción de Actividad Detectada',
+              description: costTrend > 0 
+                ? `Incremento del ${costTrend.toFixed(0)}% en costos mensuales detectado`
+                : `Reducción del ${Math.abs(costTrend).toFixed(0)}% en actividad mensual`,
+              actions: costTrend > 0 ? [
+                'Revisar si hay scope creep no documentado',
+                'Validar que el incremento esté alineado con entregables',
+                'Preparar justificación para el cliente'
+              ] : [
+                'Verificar si el equipo está sub-utilizado',
+                'Identificar bloqueos o dependencias externas',
+                'Considerar reasignar recursos a otros proyectos'
+              ],
+              impact: 'timeline'
+            });
+          }
+        }
+      }
+
+      // INTELIGENCIA DE NEGOCIO: Recomendación basada en patrones de equipo
+      const teamPerformance = teamMembers.map(member => {
+        const memberEntries = projectEntries.filter(e => e.personnelId === member.personnelId);
+        const actualHours = memberEntries.reduce((sum, e) => sum + e.hours, 0);
+        const efficiency = member.hours > 0 ? actualHours / member.hours : 0;
+        return { ...member, actualHours, efficiency };
+      }).filter(m => m.actualHours > 0);
+      
+      const overperformers = teamPerformance.filter(m => m.efficiency > 1.5);
+      const underperformers = teamPerformance.filter(m => m.efficiency < 0.5 && m.hours > 20);
+      
+      if (overperformers.length > 0) {
+        recommendations.push({
+          type: 'team_optimization',
+          priority: 'medium',
+          title: 'Optimización de Asignación de Equipo',
+          description: `${overperformers.length} roles están trabajando 50%+ más de lo estimado`,
+          actions: [
+            `Redistribuir carga de ${overperformers[0].personnelName} (${overperformers[0].actualHours.toFixed(0)}h vs ${overperformers[0].hours}h estimadas)`,
+            'Evaluar si el rol requiere apoyo adicional permanente',
+            'Documentar tareas no previstas que están consumiendo tiempo',
+            'Considerar ajuste de estimación para próximos períodos'
+          ],
+          impact: 'productivity'
+        });
+      }
+      
+      if (underperformers.length > 0) {
+        recommendations.push({
+          type: 'resource_utilization',
+          priority: 'low',
+          title: 'Recursos Sub-utilizados Detectados',
+          description: `${underperformers.length} roles están utilizando menos del 50% de sus horas asignadas`,
+          actions: [
+            `Reasignar ${underperformers[0].personnelName} a otros proyectos (solo ${underperformers[0].actualHours.toFixed(0)}h de ${underperformers[0].hours}h)`,
+            'Evaluar si el rol sigue siendo necesario',
+            'Aprovechar capacidad disponible para nuevas iniciativas'
+          ],
+          impact: 'financial'
+        });
+      }
+
+      // Predicciones mejoradas con inteligencia de negocio
       const velocity = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
       const predictions = {
         estimatedCompletionDate: velocity.estimatedCompletion?.toISOString() || null,
         projectedFinalCost: velocity.projectedCost,
         projectedFinalMarkup: velocity.projectedMarkup,
-        confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low'
+        confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low',
+        businessMetrics: {
+          monthlyBurnRate: totalActualCost / (filterEndDate && filterStartDate ? 
+            Math.max(1, (new Date(filterEndDate).getMonth() - new Date(filterStartDate).getMonth() + 1)) : 1),
+          projectedAnnualRevenue: quotation ? quotation.totalAmount * 12 / (quotation.projectType === 'fee-mensual' ? 1 : 12) : 0,
+          breakEvenPoint: currentMarkup >= 1 ? 'achieved' : `${((1 - currentMarkup) * totalActualCost).toFixed(0)} adicionales requeridos`,
+          clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low'
+        }
       };
 
       res.json({
