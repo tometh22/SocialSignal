@@ -5517,11 +5517,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const project = await storage.getActiveProject(projectId);
     const quotation = project ? await storage.getQuotation(project.quotationId) : null;
-    const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
-    const targetCost = quotation?.baseCost || 0;
+    let targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
+    let targetCost = quotation?.baseCost || 0;
+    
+    // Ajustar horas objetivo para contratos mensuales con filtro temporal
+    if (quotation?.projectType === 'fee-mensual' && startDate && endDate) {
+      const filterStart = new Date(startDate);
+      const filterEnd = new Date(endDate);
+      const monthsDiff = Math.max(1, 
+        (filterEnd.getFullYear() - filterStart.getFullYear()) * 12 + 
+        (filterEnd.getMonth() - filterStart.getMonth()) + 1
+      );
+      console.log(`📊 Monthly contract adjustment: ${monthsDiff} months, original hours: ${targetHours}`);
+      targetHours = targetHours * monthsDiff;
+      targetCost = targetCost * monthsDiff;
+    }
     
     const remainingHours = Math.max(0, targetHours - totalHours);
     const weeksToComplete = velocityPerWeek > 0 ? remainingHours / velocityPerWeek : null;
+    
+    console.log(`📊 Velocity calculation: targetHours=${targetHours}, totalHours=${totalHours}, remainingHours=${remainingHours}, velocityPerWeek=${velocityPerWeek}, weeksToComplete=${weeksToComplete}`);
     
     const estimatedCompletion = weeksToComplete ? 
       new Date(Date.now() + weeksToComplete * 7 * 24 * 60 * 60 * 1000) : null;
