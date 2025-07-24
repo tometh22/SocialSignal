@@ -5327,7 +5327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Predicciones con filtro temporal
-      const velocityData = await calculateProjectVelocity(projectId, startDate as string, endDate as string);
+      const velocityData = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
       
       const predictions = {
         estimatedCompletionDate: velocityData.estimatedCompletion,
@@ -5734,9 +5734,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const { startDate, endDate } = req.query;
+      const { startDate, endDate, timeFilter } = req.query;
       
-      console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
       
       const project = await storage.getActiveProject(projectId);
       if (!project) {
@@ -5749,10 +5749,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Construir condiciones de filtro
       const whereConditions = [eq(timeEntries.projectId, projectId)];
       
-      if (startDate && endDate) {
+      // Procesar timeFilter o usar startDate/endDate
+      let filterStartDate: string | undefined;
+      let filterEndDate: string | undefined;
+      
+      if (timeFilter) {
+        const filterDates = applyTimeFilter(timeFilter as string);
+        filterStartDate = filterDates.startDate.toISOString().split('T')[0];
+        filterEndDate = filterDates.endDate.toISOString().split('T')[0];
+      } else if (startDate && endDate) {
+        filterStartDate = startDate as string;
+        filterEndDate = endDate as string;
+      }
+      
+      if (filterStartDate && filterEndDate) {
         whereConditions.push(
-          gte(timeEntries.date, startDate as string),
-          lte(timeEntries.date, endDate as string)
+          gte(timeEntries.date, filterStartDate),
+          lte(timeEntries.date, filterEndDate)
         );
       }
 
@@ -5762,14 +5775,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`🔍 Recommendations - Found ${projectEntries.length} time entries after filtering`);
 
-      // Si no hay registros de tiempo filtrados, devolver estructura vacía
+      // Si no hay registros de tiempo filtrados, devolver estructura vacía pero con recomendaciones estáticas
       if (projectEntries.length === 0) {
-        console.log(`🔍 Recommendations - No time entries found for the filtered period, returning empty data`);
+        console.log(`🔍 Recommendations - No time entries found for the filtered period`);
+        
+        // Aún sin datos podemos dar recomendaciones básicas
+        const basicRecommendations = [];
+        
+        // Recomendación de inicio
+        basicRecommendations.push({
+          type: 'no_activity',
+          priority: 'high',
+          title: 'Sin actividad registrada',
+          description: 'No se encontraron registros de tiempo en el período seleccionado',
+          actions: [
+            'Verificar que el equipo esté registrando sus horas',
+            'Revisar el filtro temporal seleccionado',
+            'Confirmar que el proyecto esté activo en este período'
+          ],
+          impact: 'timeline'
+        });
+        
         return res.json({
-          recommendations: [],
+          projectId,
+          projectName: quotation?.projectName || 'Unknown Project',
+          recommendations: basicRecommendations,
           predictions: {
             projectedFinalCost: 0,
             projectedCompletionDate: null,
+            projectedFinalMarkup: 0,
             confidenceLevel: 'low'
           },
           generatedAt: new Date().toISOString()

@@ -79,8 +79,8 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
     );
   }
 
-  // Verificar si no hay datos o si las recomendaciones están vacías  
-  if (!recommendationsData || !recommendationsData.recommendations || recommendationsData.recommendations.length === 0) {
+  // Verificar si no hay datos  
+  if (!recommendationsData) {
     return (
       <div className="space-y-6">
         {/* Estado vacío para predicciones */}
@@ -171,40 +171,50 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Fecha Estimada</span>
+          {recommendationsData.predictions.projectedFinalCost > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">Fecha Estimada</span>
+                </div>
+                <p className="text-lg font-bold text-blue-600">
+                  {recommendationsData.predictions.estimatedCompletionDate 
+                    ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
+                    : 'No estimada'
+                  }
+                </p>
               </div>
-              <p className="text-lg font-bold text-blue-600">
-                {recommendationsData.predictions.estimatedCompletionDate 
-                  ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
-                  : 'No estimada'
-                }
-              </p>
-            </div>
 
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">Costo Final Proyectado</span>
+              <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-800">Costo Final Proyectado</span>
+                </div>
+                <p className="text-lg font-bold text-green-600">
+                  ${recommendationsData.predictions.projectedFinalCost.toLocaleString()}
+                </p>
               </div>
-              <p className="text-lg font-bold text-green-600">
-                ${recommendationsData.predictions.projectedFinalCost.toLocaleString()}
-              </p>
-            </div>
 
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-800">Markup Final Proyectado</span>
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  <span className="text-sm font-medium text-purple-800">Markup Final Proyectado</span>
+                </div>
+                <p className="text-lg font-bold text-purple-600">
+                  {recommendationsData.predictions.projectedFinalMarkup.toFixed(2)}x
+                </p>
               </div>
-              <p className="text-lg font-bold text-purple-600">
-                {recommendationsData.predictions.projectedFinalMarkup.toFixed(2)}x
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <p className="text-gray-500">No hay datos suficientes para generar predicciones</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Las predicciones aparecerán cuando haya registros de tiempo en el período seleccionado
               </p>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
