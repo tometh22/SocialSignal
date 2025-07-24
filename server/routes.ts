@@ -5189,7 +5189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });*/
 
-  // Punto 3: Recomendaciones automáticas
+  /* Punto 3: Recomendaciones automáticas - COMENTADO, VER ENDPOINT ACTUALIZADO MÁS ABAJO
   app.get("/api/projects/:id/recommendations", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
@@ -5200,6 +5200,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Handle temporal filter
+      const timeFilter = req.query.timeFilter as string;
+      let filterStartDate: Date | undefined;
+      let filterEndDate: Date | undefined;
+      
+      if (timeFilter) {
+        const { startDate, endDate } = getDateRangeForFilter(timeFilter);
+        filterStartDate = startDate;
+        filterEndDate = endDate;
       }
 
       const costSummary = await storage.getProjectCostSummary(projectId);
@@ -5347,7 +5358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ message: "Failed to generate recommendations" });
     }
-  });
+  });*/
 
   // Punto 4: Datos para gráficos de tendencias
   app.get("/api/projects/:id/trend-data", requireAuth, async (req, res) => {
@@ -5754,7 +5765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let filterEndDate: string | undefined;
       
       if (timeFilter) {
-        const filterDates = applyTimeFilter(timeFilter as string);
+        const filterDates = getDateRangeForFilter(timeFilter as string);
         filterStartDate = filterDates.startDate.toISOString().split('T')[0];
         filterEndDate = filterDates.endDate.toISOString().split('T')[0];
       } else if (startDate && endDate) {
@@ -5764,8 +5775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (filterStartDate && filterEndDate) {
         whereConditions.push(
-          gte(timeEntries.date, filterStartDate),
-          lte(timeEntries.date, filterEndDate)
+          gte(timeEntries.date, new Date(filterStartDate)),
+          lte(timeEntries.date, new Date(filterEndDate))
         );
       }
 

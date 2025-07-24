@@ -152,8 +152,8 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
     }
   };
 
-  const highPriorityRecs = recommendationsData.recommendations.filter(r => r.priority === 'high');
-  const mediumPriorityRecs = recommendationsData.recommendations.filter(r => r.priority === 'medium');
+  const highPriorityRecs = recommendationsData?.recommendations?.filter(r => r.priority === 'high') || [];
+  const mediumPriorityRecs = recommendationsData?.recommendations?.filter(r => r.priority === 'medium') || [];
 
   return (
     <div className="space-y-6">
@@ -165,13 +165,13 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
               <TrendingUp className="h-5 w-5 text-blue-600" />
               Predicciones del Proyecto
             </div>
-            <Badge variant={getConfidenceBadge(recommendationsData.predictions.confidenceLevel).variant}>
-              {getConfidenceBadge(recommendationsData.predictions.confidenceLevel).label}
+            <Badge variant={getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').variant}>
+              {getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').label}
             </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {recommendationsData.predictions.projectedFinalCost > 0 ? (
+          {recommendationsData?.predictions?.projectedFinalCost > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div className="flex items-center gap-2 mb-2">
@@ -179,7 +179,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   <span className="text-sm font-medium text-blue-800">Fecha Estimada</span>
                 </div>
                 <p className="text-lg font-bold text-blue-600">
-                  {recommendationsData.predictions.estimatedCompletionDate 
+                  {recommendationsData?.predictions?.estimatedCompletionDate 
                     ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
                     : 'No estimada'
                   }
@@ -192,7 +192,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   <span className="text-sm font-medium text-green-800">Costo Final Proyectado</span>
                 </div>
                 <p className="text-lg font-bold text-green-600">
-                  ${recommendationsData.predictions.projectedFinalCost.toLocaleString()}
+                  ${(recommendationsData?.predictions?.projectedFinalCost || 0).toLocaleString()}
                 </p>
               </div>
 
@@ -202,7 +202,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   <span className="text-sm font-medium text-purple-800">Markup Final Proyectado</span>
                 </div>
                 <p className="text-lg font-bold text-purple-600">
-                  {recommendationsData.predictions.projectedFinalMarkup.toFixed(2)}x
+                  {(recommendationsData?.predictions?.projectedFinalMarkup || 0).toFixed(2)}x
                 </p>
               </div>
             </div>
@@ -227,7 +227,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
               Recomendaciones Automáticas
             </div>
             <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-              {recommendationsData.recommendations.length} Recomendaciones
+              {recommendationsData?.recommendations?.length || 0} Recomendaciones
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -300,7 +300,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
           )}
 
           {/* Estado Saludable */}
-          {recommendationsData.recommendations.length === 0 && (
+          {recommendationsData?.recommendations?.length === 0 && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-3" />
               <h3 className="font-semibold text-green-800 mb-2">Proyecto en Estado Óptimo</h3>
@@ -313,7 +313,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
 
           {/* Información de generación */}
           <div className="text-xs text-gray-500 border-t pt-3">
-            <p>Análisis generado: {new Date(recommendationsData.generatedAt).toLocaleString('es-ES')}</p>
+            <p>Análisis generado: {recommendationsData?.generatedAt ? new Date(recommendationsData.generatedAt).toLocaleString('es-ES') : 'Ahora'}</p>
             <p>Las recomendaciones se actualizan automáticamente basándose en el progreso del proyecto.</p>
           </div>
 
