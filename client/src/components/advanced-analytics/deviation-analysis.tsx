@@ -451,7 +451,11 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 mb-1">
                 <div className="text-2xl font-bold text-gray-800">
-                  {Math.round((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100)}%
+                  {(() => {
+                    const totalBudgetedHours = deviationData.deviationByRole.reduce((sum, d) => sum + d.budgetedHours, 0);
+                    const totalActualHours = deviationData.deviationByRole.reduce((sum, d) => sum + d.actualHours, 0);
+                    return totalBudgetedHours > 0 ? Math.round((totalActualHours / totalBudgetedHours) * 100) : 0;
+                  })()}%
                 </div>
                 <TooltipProvider>
                   <Tooltip>
@@ -460,15 +464,19 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="text-sm">
-                        Porcentaje de miembros que están trabajando dentro o por debajo del presupuesto asignado
+                        Porcentaje de horas trabajadas vs horas presupuestadas totales del equipo
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <div className="text-sm text-gray-600">Eficiencia del Equipo</div>
+              <div className="text-sm text-gray-600">Avance en Horas</div>
               <Progress 
-                value={(deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100} 
+                value={(() => {
+                  const totalBudgetedHours = deviationData.deviationByRole.reduce((sum, d) => sum + d.budgetedHours, 0);
+                  const totalActualHours = deviationData.deviationByRole.reduce((sum, d) => sum + d.actualHours, 0);
+                  return totalBudgetedHours > 0 ? (totalActualHours / totalBudgetedHours) * 100 : 0;
+                })()} 
                 className="mt-2 h-2"
               />
             </div>
@@ -476,7 +484,13 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 mb-1">
                 <div className="text-2xl font-bold text-gray-800">
-                  {deviationData.deviationByRole.filter(d => d.actualHours > 0).length}
+                  {(() => {
+                    const avgDeviation = deviationData.deviationByRole
+                      .filter(d => d.actualHours > 0)
+                      .reduce((sum, d) => sum + Math.abs(d.deviationPercentage), 0) / 
+                      deviationData.deviationByRole.filter(d => d.actualHours > 0).length;
+                    return Math.round(avgDeviation) || 0;
+                  })()}%
                 </div>
                 <TooltipProvider>
                   <Tooltip>
@@ -485,47 +499,59 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="text-sm">
-                        Personas del equipo que registraron tiempo en este período
+                        Promedio de desviación del presupuesto por persona (sin importar si es positiva o negativa)
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <div className="text-sm text-gray-600">Personas con Actividad</div>
-              <Progress 
-                value={(deviationData.deviationByRole.filter(d => d.actualHours > 0).length / deviationData.deviationByRole.length) * 100} 
-                className="mt-2 h-2"
-              />
-            </div>
-            
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1 mb-1">
-                <div className="text-2xl font-bold text-gray-800">
-                  ${Math.abs(deviationData.totalVariance.variance).toLocaleString('es-AR', { 
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0
-                  })}
-                </div>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-3 w-3 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-sm">
-                        Diferencia entre el costo real ($10,634) y el presupuesto ($10,113)
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <div className="text-sm text-gray-600">Sobrecosto Total</div>
-              <div className={`mt-2 h-2 rounded-full ${
-                deviationData.totalVariance.variance > 0 ? 'bg-red-200' : 'bg-green-200'
-              }`}>
+              <div className="text-sm text-gray-600">Desviación Promedio</div>
+              <div className={`mt-2 h-2 rounded-full bg-gray-200`}>
                 <div className={`h-full rounded-full ${
-                  deviationData.totalVariance.variance > 0 ? 'bg-red-500' : 'bg-green-500'
-                } w-full`}></div>
+                  (() => {
+                    const avgDev = deviationData.deviationByRole
+                      .filter(d => d.actualHours > 0)
+                      .reduce((sum, d) => sum + Math.abs(d.deviationPercentage), 0) / 
+                      deviationData.deviationByRole.filter(d => d.actualHours > 0).length;
+                    return avgDev < 25 ? 'bg-green-500' : avgDev < 50 ? 'bg-yellow-500' : 'bg-red-500';
+                  })()
+                }`} style={{width: `${Math.min(100, (() => {
+                  const avgDev = deviationData.deviationByRole
+                    .filter(d => d.actualHours > 0)
+                    .reduce((sum, d) => sum + Math.abs(d.deviationPercentage), 0) / 
+                    deviationData.deviationByRole.filter(d => d.actualHours > 0).length;
+                  return avgDev || 0;
+                })())}%`}}></div>
+              </div>
+            </div>
+            
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <div className="text-2xl font-bold text-gray-800">
+                  {(() => {
+                    const peopleWithZeroHours = deviationData.deviationByRole.filter(d => d.actualHours === 0 && d.budgetedHours > 0).length;
+                    return peopleWithZeroHours;
+                  })()}
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-sm">
+                        Personas asignadas al proyecto que no han registrado horas en este período
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <div className="text-sm text-gray-600">Sin Actividad</div>
+              <div className="mt-2 text-xs text-gray-500">
+                {(() => {
+                  const peopleWithZeroHours = deviationData.deviationByRole.filter(d => d.actualHours === 0 && d.budgetedHours > 0).length;
+                  return peopleWithZeroHours > 0 ? 'Requieren seguimiento' : 'Todos activos';
+                })()}
               </div>
             </div>
           </div>
