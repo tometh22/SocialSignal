@@ -152,25 +152,43 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
 
     // Create personnel map for hourly rates
     const personnelMap = new Map(personnel.map(p => [p.id, p]));
-
-    for (const member of teamMembers) {
-      const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === member.personnelId);
+    
+    // Primero, encontrar todo el personal que registró tiempo (cotizado o no)
+    const allPersonnelWithTime = new Set<number>();
+    filteredTimeEntries.forEach(entry => {
+      allPersonnelWithTime.add(entry.personnelId);
+    });
+    
+    // Agregar personal no cotizado al análisis
+    const teamMembersMap = new Map(teamMembers.map(m => [m.personnelId, m]));
+    
+    // Procesar todo el personal con tiempo registrado
+    for (const personnelId of allPersonnelWithTime) {
+      const member = teamMembersMap.get(personnelId);
+      const isQuoted = member !== undefined;
+      const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === personnelId);
       const actualHours = memberTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
       
-      // Calculate actual cost: use entry.totalCost if available, otherwise calculate from personnel hourly rate
+      // Calculate actual cost: ALWAYS use entry.totalCost (which is the source of truth)
+      // This ensures consistency with the complete-data endpoint
       let actualCost = 0;
       for (const entry of memberTimeEntries) {
-        if (entry.totalCost && entry.totalCost > 0) {
-          actualCost += entry.totalCost;
-        } else {
-          // Use historical hourly rate if available, otherwise current personnel hourly rate
-          const hourlyRate = entry.hourlyRateAtTime || personnelMap.get(entry.personnelId)?.hourlyRate || 0;
-          actualCost += entry.hours * hourlyRate;
-        }
+        // totalCost is pre-calculated in the time entry and includes the correct hourly rate
+        actualCost += entry.totalCost || 0;
       }
       
-      const budgetedHours = member.hours || 0;
-      const budgetedCost = member.cost || 0;
+      // Get personnel name
+      const personnelInfo = personnelMap.get(personnelId);
+      const personnelName = personnelInfo?.name || `Personal ${personnelId}`;
+      
+      // Debug logging para verificar cálculos
+      if (memberTimeEntries.length > 0) {
+        console.log(`👤 ${personnelName}: ${memberTimeEntries.length} entries, total cost: $${actualCost.toFixed(2)}, quoted: ${isQuoted}`);
+      }
+      
+      // Para personal no cotizado, usar 0 como presupuesto
+      const budgetedHours = isQuoted ? (member.hours || 0) : 0;
+      const budgetedCost = isQuoted ? (member.cost || 0) : 0;
       
       // Add to totals for overall variance calculation
       totalActualCost += actualCost;
@@ -186,12 +204,8 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         membersUnderBudget++;
       }
 
-      // Get personnel name
-      const personnelInfo = personnelMap.get(member.personnelId);
-      const personnelName = personnelInfo?.name || `Personal ${member.personnelId}`;
-
       const deviation = {
-        personnelId: member.personnelId,
+        personnelId: personnelId,
         personnelName,
         budgetedHours,
         actualHours,
@@ -199,7 +213,8 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         actualCost,
         hourDeviation,
         costDeviation,
-        deviationPercentage
+        deviationPercentage,
+        isQuoted
       };
 
       deviationByRole.push(deviation);
@@ -232,7 +247,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
           severity
         });
       }
-    }
+    } // Cierre del bucle for
     
     // Calculate total variance using the same logic as complete-data endpoint
     // Use adjustedBaseCost (with temporal scaling) instead of sum of individual member costs
@@ -246,6 +261,13 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     console.log(`   Variance (Actual - Adjusted Base): $${totalVariance.toFixed(2)}`);
     console.log(`   Expected: ${totalActualCost > adjustedBaseCost ? 'SOBRECOSTO (positive)' : 'AHORRO (negative)'}`);
     console.log(`   Is positive (sobrecosto)? ${totalVariance > 0}`);
+    
+    // Debug: Compare with complete-data endpoint
+    const completeDataTotalCost = filteredTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+    console.log(`💰 COMPLETE-DATA COMPARISON:`);
+    console.log(`   Deviation-Analysis Total: $${totalActualCost.toFixed(2)}`);
+    console.log(`   Complete-Data Total: $${completeDataTotalCost.toFixed(2)}`);
+    console.log(`   Difference: $${(completeDataTotalCost - totalActualCost).toFixed(2)}`);
     
     // If there's a mismatch, add temporal scaling debug
     if (quotation.projectType === 'fee-mensual' || quotation.projectType === 'always-on') {
