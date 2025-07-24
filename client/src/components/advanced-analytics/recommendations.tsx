@@ -169,6 +169,9 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
               {getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').label}
             </Badge>
           </CardTitle>
+          <p className="text-sm text-gray-600 mt-2">
+            Proyecciones basadas en el rendimiento del período seleccionado aplicado al proyecto completo
+          </p>
         </CardHeader>
         <CardContent>
           {recommendationsData?.predictions?.projectedFinalCost > 0 ? (
@@ -186,7 +189,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                 </p>
                 {!recommendationsData?.predictions?.estimatedCompletionDate && (
                   <p className="text-xs text-blue-600 mt-1">
-                    El proyecto ya superó las horas estimadas
+                    Basado en velocidad actual
                   </p>
                 )}
               </div>
