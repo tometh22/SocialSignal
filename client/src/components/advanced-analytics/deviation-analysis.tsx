@@ -398,12 +398,24 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
           </div>
         </div>
 
-        {/* Indicador de Salud del Proyecto */}
+        {/* Métricas de Desempeño del Equipo */}
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Target className="h-6 w-6 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-800">Estado General del Proyecto</h3>
+              <h3 className="text-lg font-semibold text-gray-800">Métricas de Desempeño del Equipo</h3>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="h-4 w-4 text-gray-400" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      Resumen del rendimiento del equipo basado en el uso del presupuesto y las desviaciones detectadas.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {(() => {
               const efficiency = ((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100);
@@ -437,8 +449,22 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-800 mb-1">
-                {Math.round((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100)}%
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <div className="text-2xl font-bold text-gray-800">
+                  {Math.round((deviationData.summary.membersUnderBudget / deviationData.deviationByRole.length) * 100)}%
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-sm">
+                        Porcentaje de miembros que están trabajando dentro o por debajo del presupuesto asignado
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <div className="text-sm text-gray-600">Eficiencia del Equipo</div>
               <Progress 
@@ -448,10 +474,24 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
             </div>
             
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-800 mb-1">
-                {deviationData.deviationByRole.filter(d => d.actualHours > 0).length}
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <div className="text-2xl font-bold text-gray-800">
+                  {deviationData.deviationByRole.filter(d => d.actualHours > 0).length}
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-sm">
+                        Personas del equipo que registraron tiempo en este período
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <div className="text-sm text-gray-600">Miembros Activos</div>
+              <div className="text-sm text-gray-600">Personas con Actividad</div>
               <Progress 
                 value={(deviationData.deviationByRole.filter(d => d.actualHours > 0).length / deviationData.deviationByRole.length) * 100} 
                 className="mt-2 h-2"
@@ -459,10 +499,27 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
             </div>
             
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-800 mb-1">
-                {Math.round(Math.abs(deviationData.totalVariance.variance / 1000))}K
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <div className="text-2xl font-bold text-gray-800">
+                  ${Math.abs(deviationData.totalVariance.variance).toLocaleString('es-AR', { 
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  })}
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-sm">
+                        Diferencia entre el costo real ($10,634) y el presupuesto ($10,113)
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <div className="text-sm text-gray-600">Variación Total (USD)</div>
+              <div className="text-sm text-gray-600">Sobrecosto Total</div>
               <div className={`mt-2 h-2 rounded-full ${
                 deviationData.totalVariance.variance > 0 ? 'bg-red-200' : 'bg-green-200'
               }`}>
