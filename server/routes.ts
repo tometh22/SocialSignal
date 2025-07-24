@@ -6073,8 +6073,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 label: `Resto de ${projectionLabel}`,
                 monthsRemaining: monthsRemainingInQuarter,
                 estimatedCost: monthlyAvg * monthsRemainingInQuarter,
-                estimatedRevenue: monthlyAvg * currentMarkup * monthsRemainingInQuarter,
-                estimatedProfit: (monthlyAvg * currentMarkup * monthsRemainingInQuarter) - (monthlyAvg * monthsRemainingInQuarter)
+                estimatedRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+                  (quotation.totalAmount * monthsRemainingInQuarter) : 
+                  (monthlyAvg * currentMarkup * monthsRemainingInQuarter),
+                estimatedProfit: quotation && quotation.projectType === 'fee-mensual' ?
+                  (quotation.totalAmount * monthsRemainingInQuarter) - (monthlyAvg * monthsRemainingInQuarter) :
+                  (monthlyAvg * currentMarkup * monthsRemainingInQuarter) - (monthlyAvg * monthsRemainingInQuarter)
               }
             }
           };
@@ -6095,8 +6099,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nextQuarterProjection: {
                 label: projectionLabel,
                 estimatedCost: monthlyAvg * 3,
-                estimatedRevenue: monthlyAvg * currentMarkup * 3,
-                estimatedProfit: (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
+                estimatedRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+                  (quotation.totalAmount * 3) : // Para fee-mensual, usar el precio del contrato * 3 meses
+                  (monthlyAvg * currentMarkup * 3),
+                estimatedProfit: quotation && quotation.projectType === 'fee-mensual' ?
+                  (quotation.totalAmount * 3) - (monthlyAvg * 3) : // Precio contrato - costo real
+                  (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
               }
             }
           };
