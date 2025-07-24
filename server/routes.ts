@@ -6032,22 +6032,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Predicciones mejoradas con inteligencia de negocio
-      const velocity = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
-      const predictions = {
-        estimatedCompletionDate: velocity.estimatedCompletion?.toISOString() || null,
-        projectedFinalCost: velocity.projectedCost,
-        projectedFinalMarkup: velocity.projectedMarkup,
-        confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low',
-        businessMetrics: {
-          monthlyBurnRate: totalActualCost / (filterEndDate && filterStartDate ? 
-            Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30))) : 1),
-          projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
-            (quotation.totalAmount * 12) : 
-            (totalActualCost * currentMarkup * 12 / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))),
-          breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
-          clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low'
-        }
-      };
+      const isPastPeriod = req.query.timeFilter && 
+        (req.query.timeFilter.includes('last') || req.query.timeFilter.includes('pasado'));
+      
+      let predictions;
+      if (isPastPeriod) {
+        // Para períodos pasados, mostrar análisis retrospectivo
+        const monthlyAvg = totalActualCost / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)));
+        
+        predictions = {
+          periodAnalysis: true,
+          actualCost: totalActualCost,
+          actualMarkup: currentMarkup,
+          confidenceLevel: 'high' as const,
+          businessMetrics: {
+            monthlyBurnRate: monthlyAvg,
+            projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
+            breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+            clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
+            // Proyecciones para el próximo trimestre basadas en datos históricos
+            nextQuarterProjection: {
+              estimatedCost: monthlyAvg * 3,
+              estimatedRevenue: monthlyAvg * currentMarkup * 3,
+              estimatedProfit: (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
+            }
+          }
+        };
+      } else {
+        // Para períodos actuales/futuros, usar proyecciones normales
+        const velocity = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
+        predictions = {
+          estimatedCompletionDate: velocity.estimatedCompletion?.toISOString() || null,
+          projectedFinalCost: velocity.projectedCost,
+          projectedFinalMarkup: velocity.projectedMarkup,
+          confidenceLevel: velocity.confidence as 'high' | 'medium' | 'low',
+          businessMetrics: {
+            monthlyBurnRate: totalActualCost / (filterEndDate && filterStartDate ? 
+              Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30))) : 1),
+            projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+              (quotation.totalAmount * 12) : 
+              (totalActualCost * currentMarkup * 12 / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)))),
+            breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+            clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low'
+          }
+        };
+      }
 
       res.json({
         projectId,
