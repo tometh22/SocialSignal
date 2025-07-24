@@ -10,6 +10,7 @@ interface DeviationAnalysisProps {
     startDate: string;
     endDate: string;
   };
+  timeFilter?: string;
   onNavigateToTab?: (tabValue: string) => void;
 }
 
@@ -42,16 +43,19 @@ interface DeviationAnalysisData {
   }>;
 }
 
-export function DeviationAnalysis({ projectId, dateFilter, onNavigateToTab }: DeviationAnalysisProps) {
+export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigateToTab }: DeviationAnalysisProps) {
   
-  const queryParams = dateFilter 
+  // Preferir timeFilter sobre dateFilter para consistencia con el sistema
+  const queryParams = timeFilter 
+    ? `?timeFilter=${timeFilter}`
+    : dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
 
-  console.log(`🔍🔍🔍 DeviationAnalysis - ProjectId: ${projectId}, DateFilter:`, dateFilter, `URL: /api/projects/${projectId}/deviation-analysis${queryParams}`);
+  console.log(`🔍🔍🔍 DeviationAnalysis - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, DateFilter:`, dateFilter, `URL: /api/projects/${projectId}/deviation-analysis${queryParams}`);
     
   const { data: deviationData, isLoading, error } = useQuery<DeviationAnalysisData>({
-    queryKey: [`/api/projects/${projectId}/deviation-analysis`, dateFilter],
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilter || dateFilter],
     queryFn: async () => {
       console.log(`🌐 Making request to: /api/projects/${projectId}/deviation-analysis${queryParams}`);
       const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);

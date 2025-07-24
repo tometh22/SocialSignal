@@ -1923,7 +1923,8 @@ export default function ProjectDetailsRedesigned() {
               {/* Análisis de Desviaciones */}
               <div className="space-y-4">
                 <DeviationAnalysis 
-                  projectId={projectId!} 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
                   dateFilter={{
                     startDate: dateFilter.startDate.toISOString(),
                     endDate: dateFilter.endDate.toISOString()
@@ -2102,7 +2103,8 @@ export default function ProjectDetailsRedesigned() {
                 </CardHeader>
                 <CardContent>
                   <TeamDeviationAnalysis 
-                    projectId={projectId!} 
+                    projectId={parseInt(projectId!)} 
+                    timeFilter={timeFilterForHook}
                     dateFilter={{
                       startDate: dateFilter.startDate.toISOString(),
                       endDate: dateFilter.endDate.toISOString()

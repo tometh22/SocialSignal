@@ -13,6 +13,7 @@ interface TeamDeviationAnalysisProps {
     startDate: string;
     endDate: string;
   };
+  timeFilter?: string;
 }
 
 interface Deviation {
@@ -48,15 +49,19 @@ interface DeviationAnalysisData {
 type SortField = 'deviation' | 'cost' | 'hours';
 type SortDirection = 'asc' | 'desc';
 
-export function TeamDeviationAnalysis({ projectId, dateFilter }: TeamDeviationAnalysisProps) {
+export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: TeamDeviationAnalysisProps) {
   const [sortField, setSortField] = useState<SortField>('deviation');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const queryParams = dateFilter 
+  
+  // Preferir timeFilter sobre dateFilter para consistencia con el sistema
+  const queryParams = timeFilter 
+    ? `?timeFilter=${timeFilter}`
+    : dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
 
   const { data: deviationData, isLoading, error } = useQuery<DeviationAnalysisData>({
-    queryKey: [`/api/projects/${projectId}/deviation-analysis`, dateFilter],
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilter || dateFilter],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
       const data = await response.json();

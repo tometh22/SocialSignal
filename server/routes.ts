@@ -65,6 +65,135 @@ function nullToUndefined(obj: any): any {
   }
   return obj;
 }
+
+// Exported temporal filtering functions for consistency across endpoints
+export function getDateRangeForFilter(filter: string) {
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date = now;
+
+  switch (filter) {
+    case 'current_month':
+    case 'this-month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      break;
+    case 'last_month':
+    case 'last-month':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+      break;
+    case 'may_2025':
+      startDate = new Date(2025, 4, 1); // Mayo 2025
+      endDate = new Date(2025, 4, 31);
+      break;
+    case 'june_2025':
+      startDate = new Date(2025, 5, 1); // Junio 2025
+      endDate = new Date(2025, 5, 30);
+      break;
+    case 'july_2025':
+      startDate = new Date(2025, 6, 1); // Julio 2025
+      endDate = new Date(2025, 6, 31);
+      break;
+    case 'current_quarter':
+    case 'this-quarter':
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+      endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+      break;
+    case 'last_quarter':
+    case 'last-quarter':
+      const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+      const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+      startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
+      endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
+      break;
+    case 'current_semester':
+    case 'this-semester':
+      const currentSemester = Math.floor(now.getMonth() / 6);
+      startDate = new Date(now.getFullYear(), currentSemester * 6, 1);
+      endDate = new Date(now.getFullYear(), (currentSemester + 1) * 6, 0);
+      break;
+    case 'last_semester':
+    case 'last-semester':
+      const lastSemester = Math.floor(now.getMonth() / 6) - 1;
+      const semesterYear = lastSemester < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const adjustedSemester = lastSemester < 0 ? 1 : lastSemester;
+      startDate = new Date(semesterYear, adjustedSemester * 6, 1);
+      endDate = new Date(semesterYear, (adjustedSemester + 1) * 6, 0);
+      break;
+    case 'current_year':
+    case 'this-year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 11, 31);
+      break;
+    case 'q1':
+    case 'q1_2025':
+      startDate = new Date(now.getFullYear(), 0, 1); // Q1: Enero-Marzo del año actual
+      endDate = new Date(now.getFullYear(), 2, 31);
+      break;
+    case 'q2':
+    case 'q2_2025':
+      startDate = new Date(now.getFullYear(), 3, 1); // Q2: Abril-Junio del año actual
+      endDate = new Date(now.getFullYear(), 5, 30);
+      break;
+    case 'q3':
+    case 'q3_2025':
+      startDate = new Date(now.getFullYear(), 6, 1); // Q3: Julio-Septiembre del año actual
+      endDate = new Date(now.getFullYear(), 8, 30);
+      break;
+    case 'q4':
+    case 'q4_2025':
+      startDate = new Date(now.getFullYear(), 9, 1); // Q4: Octubre-Diciembre del año actual
+      endDate = new Date(now.getFullYear(), 11, 31);
+      break;
+    case 'all':
+      return null; // Sin filtro temporal - mostrar todo
+    default:
+      // Para filtros personalizados o no reconocidos
+      return null;
+  }
+
+  console.log(`📅 Date range for filter ${filter}:`, startDate.toISOString(), 'to', endDate.toISOString());
+  return { startDate, endDate };
+}
+
+export function getMonthsInFilter(filter: string): number {
+  switch (filter) {
+    case 'current_month':
+    case 'last_month':
+    case 'this-month':
+    case 'last-month':
+    case 'may_2025':
+    case 'june_2025':
+    case 'july_2025':
+      return 1;
+    case 'current_quarter':
+    case 'last_quarter':
+    case 'this-quarter':
+    case 'last-quarter':
+    case 'q1':
+    case 'q2':
+    case 'q3':
+    case 'q4':
+    case 'q1_2025':
+    case 'q2_2025':
+    case 'q3_2025':
+    case 'q4_2025':
+      return 3;
+    case 'current_semester':
+    case 'last_semester':
+    case 'this-semester':
+    case 'last-semester':
+      return 6;
+    case 'current_year':
+    case 'this-year':
+      return 12;
+    default:
+      return 1;
+  }
+}
 import { upload, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import path from 'path';
@@ -180,7 +309,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // 3. Función para aplicar filtros temporales
-      const getDateRangeForFilter = (filter: string) => {
+      // NOTA: Esta función ahora está exportada al principio del archivo
+      const getDateRangeForFilterLocal = (filter: string) => {
         const now = new Date();
         let startDate: Date;
         let endDate: Date = now;
@@ -377,7 +507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 4. Obtener tiempo trabajado real con filtros
       let timeEntries = await storage.getTimeEntriesByProject(id);
       
-      // Aplicar filtro temporal si está especificado
+      // Aplicar filtro temporal si está especificado (usando la función exportada)
       const dateRange = getDateRangeForFilter(timeFilter);
       if (dateRange) {
         timeEntries = timeEntries.filter(entry => {
@@ -568,8 +698,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const actualMonthsWithData = calculateActualMonthsWithData(timeEntries, dateRange);
         const theoreticalMonths = getMonthsInFilter(timeFilter);
         
-        // Usar el menor entre meses teóricos y meses con datos reales
-        const monthsToUse = Math.min(actualMonthsWithData, theoreticalMonths) || theoreticalMonths;
+        // IMPORTANTE: Usar SOLO los meses con datos reales, no los teóricos
+        const monthsToUse = actualMonthsWithData > 0 ? actualMonthsWithData : theoreticalMonths;
         
         if (monthsToUse > 0) {
           // SOLO escalar costos y montos para contratos de fee mensual, NO las horas
