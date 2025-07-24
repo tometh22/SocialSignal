@@ -1582,83 +1582,77 @@ export default function ProjectDetailsRedesigned() {
 
           <TabsContent value="dashboard" className="space-y-8">
             
-            {/* Hero Analytics Section */}
-            <div className="relative bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 rounded-2xl p-8 text-white overflow-hidden">
-              <div className="absolute inset-0 bg-black/20 backdrop-blur-sm"></div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
-                    <TrendingUp className="h-8 w-8 text-white" />
+            {/* Executive Control Panel - Clean & Compact Design */}
+            <Card className="bg-gradient-to-r from-gray-50 to-slate-50 border shadow-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-bold">Panel de Control Ejecutivo</h2>
-                    <p className="text-white/80">Métricas de rendimiento en tiempo real</p>
+                    <h3 className="text-lg font-semibold text-gray-900">Panel de Control Ejecutivo</h3>
+                    <p className="text-sm text-gray-600">Métricas clave de rendimiento</p>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {/* Revenue Metrics */}
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                    <div className="flex items-center justify-between mb-4">
-                      <DollarSign className="h-8 w-8 text-green-400" />
-                      <span className="text-sm bg-green-500/20 text-green-300 px-3 py-1 rounded-full">
-                        {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
-                          `+${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).actuals.totalWorkedCost) * 100).toFixed(0)}%` : 
-                          '+0%'
-                        } ROI
-                      </span>
+                </CardTitle>
+              </CardHeader>
+              
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Revenue Metric */}
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <DollarSign className="h-6 w-6 text-green-600" />
+                      <Badge className="bg-green-100 text-green-800 text-xs">
+                        +{unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                          (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).actuals.totalWorkedCost * 100).toFixed(0) : 
+                          '0'}% ROI
+                      </Badge>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-4xl font-bold text-green-400">
-                          ${unifiedData?.quotation?.totalAmount?.toLocaleString() || '0'}
-                        </p>
-                        <p className="text-white/60">Facturación Mensual</p>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-green-300">
-                          Margen: {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
-                            `${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100).toFixed(1)}%` : 
-                            '0%'
-                          }
-                        </span>
+                    <div className="space-y-1">
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">Facturación Mensual</p>
+                      <div className="text-xs text-green-600">
+                        Margen: {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                          (((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount * 100).toFixed(1) : 
+                          '0.0'}%
                       </div>
                     </div>
                   </div>
 
                   {/* Performance Gauge */}
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                    <div className="flex items-center justify-between mb-4">
-                      <Target className="h-8 w-8 text-blue-400" />
-                      <span className="text-sm bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <Target className="h-6 w-6 text-blue-600" />
+                      <Badge className="bg-blue-100 text-blue-800 text-xs">
                         Eficiencia
-                      </span>
+                      </Badge>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div>
-                        <p className="text-4xl font-bold text-blue-400">
+                        <p className="text-2xl font-bold text-gray-900">
                           {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
                             `${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100).toFixed(1)}%` : 
                             '0.0%'
                           }
                         </p>
-                        <p className="text-white/60">Control de Costos</p>
+                        <p className="text-xs text-gray-500">Control de Costos</p>
                       </div>
-                      {/* Circular Progress */}
-                      <div className="relative w-20 h-20 mx-auto">
-                        <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
+                      {/* Mini Progress Ring */}
+                      <div className="relative w-12 h-12 mx-auto">
+                        <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
                           <path
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
-                            stroke="rgba(255,255,255,0.2)"
-                            strokeWidth="2"
+                            stroke="#e5e7eb"
+                            strokeWidth="3"
                           />
                           <path
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             fill="none"
-                            stroke="rgb(96, 165, 250)"
-                            strokeWidth="2"
+                            stroke="#3b82f6"
+                            strokeWidth="3"
                             strokeDasharray={`${Math.min(100, 
                               unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
                                 (100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100) : 
@@ -1667,7 +1661,7 @@ export default function ProjectDetailsRedesigned() {
                           />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-sm font-bold text-blue-400">
+                          <span className="text-xs font-bold text-blue-600">
                             {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ? 
                               `${(100 - ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100).toFixed(0)}%` : 
                               '0%'
@@ -1679,34 +1673,34 @@ export default function ProjectDetailsRedesigned() {
                   </div>
 
                   {/* Team Activity */}
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                    <div className="flex items-center justify-between mb-4">
-                      <Users className="h-8 w-8 text-purple-400" />
-                      <span className="text-sm bg-purple-500/20 text-purple-300 px-3 py-1 rounded-full">
+                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <Users className="h-6 w-6 text-purple-600" />
+                      <Badge className="bg-purple-100 text-purple-800 text-xs">
                         {teamStats?.filter(member => member.hours > 0).length || 0} Activos
-                      </span>
+                      </Badge>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <div>
-                        <p className="text-4xl font-bold text-purple-400">
+                        <p className="text-2xl font-bold text-gray-900">
                           {unifiedData?.actuals?.totalWorkedHours?.toFixed(0) || '0'}h
                         </p>
-                        <p className="text-white/60">Horas Ejecutadas</p>
+                        <p className="text-xs text-gray-500">Horas Ejecutadas</p>
                       </div>
-                      {/* Team Activity Bars */}
-                      <div className="space-y-2">
+                      {/* Mini Team Activity Bars */}
+                      <div className="space-y-1">
                         {teamStats?.slice(0, 3).map((member, index) => (
-                          <div key={index} className="flex items-center gap-3">
-                            <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></div>
-                            <div className="flex-1 bg-white/10 rounded-full h-2">
+                          <div key={index} className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"></div>
+                            <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                               <div 
-                                className="bg-purple-400 h-2 rounded-full transition-all duration-500"
+                                className="bg-purple-400 h-1.5 rounded-full transition-all duration-500"
                                 style={{ 
                                   width: `${Math.min(100, (member.hours / Math.max(...(teamStats?.map(m => m.hours) || [1]))) * 100)}%` 
                                 }}
                               />
                             </div>
-                            <span className="text-xs text-white/60 w-16 text-right">
+                            <span className="text-xs text-gray-600 w-10 text-right">
                               {member.hours?.toFixed(0)}h
                             </span>
                           </div>
@@ -1715,8 +1709,8 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Multi-Format Analytics Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -1732,10 +1726,10 @@ export default function ProjectDetailsRedesigned() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Hours Progress Ring */}
+                  {/* Hours Progress Ring - Compact */}
                   <div className="flex items-center justify-center">
-                    <div className="relative w-32 h-32">
-                      <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-20 h-20 transform -rotate-90" viewBox="0 0 36 36">
                         <path
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                           fill="none"
@@ -1762,7 +1756,7 @@ export default function ProjectDetailsRedesigned() {
                         </defs>
                       </svg>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-2xl font-bold text-gray-900">
+                        <span className="text-lg font-bold text-gray-900">
                           {(() => {
                             if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
                               return (((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours) * 100).toFixed(0);
@@ -2996,7 +2990,7 @@ export default function ProjectDetailsRedesigned() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-96">
+                  <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -3020,7 +3014,7 @@ export default function ProjectDetailsRedesigned() {
                           })()}
                           cx="50%"
                           cy="50%"
-                          outerRadius={120}
+                          outerRadius={80}
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
                           labelLine={{ stroke: "#666", strokeWidth: 1 }}
@@ -3063,7 +3057,7 @@ export default function ProjectDetailsRedesigned() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-96">
+                  <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -3084,7 +3078,7 @@ export default function ProjectDetailsRedesigned() {
                           })()}
                           cx="50%"
                           cy="50%"
-                          outerRadius={120}
+                          outerRadius={80}
                           dataKey="value"
                           label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
                           labelLine={{ stroke: "#666", strokeWidth: 1 }}
