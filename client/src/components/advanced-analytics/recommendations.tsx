@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Lightbulb, 
   AlertTriangle, 
@@ -12,7 +13,8 @@ import {
   Users, 
   CheckCircle2,
   ArrowRight,
-  X
+  X,
+  Info
 } from "lucide-react";
 
 interface RecommendationsProps {
@@ -319,19 +321,38 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-gray-600">Burn Rate Mensual</span>
-                        <div className="flex items-center gap-1">
-                          <TrendingUp className="h-3 w-3 text-red-500" />
-                          <span className="text-xs text-red-500">+8%</span>
+                    <TooltipProvider>
+                      <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-600">Burn Rate Mensual</span>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs p-3">
+                                <p className="text-sm font-semibold mb-1">¿Qué es el Burn Rate?</p>
+                                <p className="text-xs text-gray-600">
+                                  Es la velocidad a la que el proyecto consume su presupuesto mensualmente. 
+                                  Se calcula dividiendo el costo total entre los meses con actividad real.
+                                </p>
+                                <p className="text-xs text-gray-600 mt-2">
+                                  <strong>Ejemplo:</strong> Si gastaste $22,065 en 2 meses, tu burn rate es $11,032/mes.
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3 text-red-500" />
+                            <span className="text-xs text-red-500">+8%</span>
+                          </div>
                         </div>
+                        <p className="text-xl font-bold text-gray-900">
+                          ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toLocaleString() || '0'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">vs $9,827 mayo</p>
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
-                        ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toLocaleString() || '0'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">vs $9,827 mayo</p>
-                    </div>
+                    </TooltipProvider>
                     <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs text-gray-600">Facturación Proyectada</span>
