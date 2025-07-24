@@ -208,7 +208,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
             </Badge>
           </div>
         </div>
-        <CardContent>
+        <CardContent className="pt-6">
           {recommendationsData?.predictions ? (
             <>
               {/* Explicación contextual con botón de cierre */}
@@ -464,15 +464,15 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
 
       {/* Recomendaciones */}
       <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white">
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-3 rounded-lg">
-                <Lightbulb className="h-6 w-6 text-white" />
+              <div className="bg-white/20 p-2.5 rounded-lg">
+                <Lightbulb className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold">Recomendaciones Automáticas</h3>
-                <p className="text-sm text-purple-100 mt-1">
+                <h3 className="text-lg font-semibold">Recomendaciones Automáticas</h3>
+                <p className="text-xs text-purple-100 mt-0.5">
                   {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
                     'Acciones sugeridas basadas en el período analizado' :
                     'Acciones sugeridas basadas en el análisis actual'}
@@ -484,7 +484,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
             </Badge>
           </div>
         </div>
-        <CardContent className="space-y-4">
+        <CardContent className="pt-6 space-y-4">
 
           {/* Recomendaciones de Alta Prioridad */}
           {highPriorityRecs.length > 0 && (
