@@ -15,7 +15,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
   
   try {
     const projectId = parseInt(req.params.id);
-    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    const { startDate, endDate, timeFilter } = req.query as { startDate?: string; endDate?: string; timeFilter?: string };
     
     // Get project data
     const project = await storage.getActiveProject(projectId);
@@ -54,25 +54,47 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       });
     }
     
-    // Apply temporal scaling for Always-On and Fee-Monthly projects (same logic as complete-data endpoint)
-    let scaledTeamMembers = teamMembers;
-    if ((quotation.projectType === 'always-on' || quotation.projectType === 'fee-mensual') && startDate && endDate) {
-      // Calculate months in the filter period
+    // Use the exact same temporal scaling logic from complete-data endpoint
+    const { getDateRangeForFilter, getMonthsInFilter } = await import('./routes');
+    
+    let adjustedBaseCost = quotation.baseCost || 0;
+    let dateRange = null;
+    
+    // If we have a timeFilter, use the complete-data logic
+    if (timeFilter) {
+      dateRange = getDateRangeForFilter(timeFilter);
+      if (dateRange) {
+        filteredTimeEntries = filteredTimeEntries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+        });
+      }
+    } else if (startDate && endDate) {
+      // Fallback to direct date filtering
       const start = new Date(startDate);
       const end = new Date(endDate);
-      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
-      const monthsInPeriod = Math.max(1, monthsDiff);
+      dateRange = { startDate: start, endDate: end };
+    }
+    
+    // Apply temporal scaling exactly like complete-data endpoint
+    if ((quotation.projectType === 'always-on' || quotation.projectType === 'fee-mensual') && dateRange && timeFilter !== 'all') {
+      const theoreticalMonths = timeFilter ? getMonthsInFilter(timeFilter) : 
+        Math.max(1, (dateRange.endDate.getFullYear() - dateRange.startDate.getFullYear()) * 12 + 
+                   (dateRange.endDate.getMonth() - dateRange.startDate.getMonth()) + 1);
       
-      // Scale the team member costs for the period (same logic as complete-data)
-      scaledTeamMembers = teamMembers.map(member => ({
-        ...member,
-        cost: (member.cost || 0) * monthsInPeriod
-      }));
-      
-      console.log(`📊 Applied temporal scaling for ${monthsInPeriod} months (${quotation.projectType}) to ${scaledTeamMembers.length} team members`);
+      if (theoreticalMonths > 0) {
+        adjustedBaseCost = (quotation.baseCost || 0) * theoreticalMonths;
+        
+        console.log(`📊 Applied temporal scaling for ${theoreticalMonths} months (${quotation.projectType}):`, {
+          timeFilter: timeFilter || 'date-range',
+          originalBaseCost: quotation.baseCost,
+          adjustedBaseCost: adjustedBaseCost,
+          monthsInPeriod: theoreticalMonths
+        });
+      }
     }
 
-    console.log(`📊 Project: ${project.quotation.projectName}, Team: ${scaledTeamMembers.length}, Time entries: ${filteredTimeEntries.length}`);
+    console.log(`📊 Project: ${project.quotation.projectName}, Team: ${teamMembers.length}, Time entries: ${filteredTimeEntries.length}`);
     if (filteredTimeEntries.length > 0) {
       console.log(`📊 Sample time entry:`, filteredTimeEntries[0]);
     }
@@ -110,7 +132,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     // Create personnel map for hourly rates
     const personnelMap = new Map(personnel.map(p => [p.id, p]));
 
-    for (const member of scaledTeamMembers) {
+    for (const member of teamMembers) {
       const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === member.personnelId);
       const actualHours = memberTimeEntries.reduce((sum, entry) => sum + entry.hours, 0);
       
@@ -192,7 +214,26 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     }
     
     // Calculate total variance using the same logic as complete-data endpoint
-    const totalVariance = totalActualCost - totalBudgetedCost;
+    // Use adjustedBaseCost (with temporal scaling) instead of sum of individual member costs
+    const totalVariance = totalActualCost - adjustedBaseCost;
+    
+    // Debug: Log calculation details
+    console.log(`💰 VARIANCE CALCULATION DEBUG:`);
+    console.log(`   Total Actual Cost: $${totalActualCost.toFixed(2)}`);
+    console.log(`   Adjusted Base Cost (with temporal scaling): $${adjustedBaseCost.toFixed(2)}`);
+    console.log(`   Sum of Individual Member Costs: $${totalBudgetedCost.toFixed(2)}`);
+    console.log(`   Variance (Actual - Adjusted Base): $${totalVariance.toFixed(2)}`);
+    console.log(`   Expected: ${totalActualCost > adjustedBaseCost ? 'SOBRECOSTO (positive)' : 'AHORRO (negative)'}`);
+    console.log(`   Is positive (sobrecosto)? ${totalVariance > 0}`);
+    
+    // If there's a mismatch, add temporal scaling debug
+    if (quotation.projectType === 'fee-mensual' || quotation.projectType === 'always-on') {
+      console.log(`💰 TEMPORAL SCALING DEBUG:`);
+      console.log(`   Project Type: ${quotation.projectType}`);
+      console.log(`   Original Base Cost: $${quotation.baseCost}`);
+      console.log(`   Adjusted Base Cost: $${adjustedBaseCost}`);
+      console.log(`   Difference explains variance calculation change`);
+    }
 
     // Generate analysis in Spanish
     const analysis = [];
