@@ -230,68 +230,96 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
         {/* Métricas Claras y Comprensibles */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Sobrecosto Total */}
-          <div className={`p-5 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 ${
-            deviationData.totalVariance.variance > 0 
-              ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200' 
-              : 'bg-gradient-to-br from-green-50 to-green-100 border-green-200'
-          }`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2 rounded-lg ${
-                deviationData.totalVariance.variance > 0 ? 'bg-red-200' : 'bg-green-200'
-              }`}>
-                {deviationData.totalVariance.variance > 0 ? (
-                  <AlertCircle className="h-5 w-5 text-red-700" />
-                ) : (
-                  <CheckCircle2 className="h-5 w-5 text-green-700" />
-                )}
+          {(() => {
+            // Calcular el porcentaje de desviación para determinar severidad
+            const variancePercentage = deviationData.totalVariance.adjustedBudget > 0 
+              ? (deviationData.totalVariance.variance / deviationData.totalVariance.adjustedBudget) * 100
+              : 0;
+            
+            // Usar los mismos umbrales que el dashboard principal
+            let bgColor = 'bg-gradient-to-br from-green-50 to-green-100 border-green-200';
+            let iconBgColor = 'bg-green-200';
+            let iconColor = 'text-green-700';
+            let textColor = 'text-green-800';
+            let badgeClass = 'bg-green-500 text-white';
+            let statusText = 'Ahorro';
+            
+            if (deviationData.totalVariance.variance > 0) {
+              // Es sobrecosto - evaluar severidad según porcentaje
+              if (variancePercentage <= 10) {
+                // Regular (≤10% sobrecosto)
+                bgColor = 'bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200';
+                iconBgColor = 'bg-yellow-200';
+                iconColor = 'text-yellow-700';
+                textColor = 'text-yellow-800';
+                badgeClass = 'bg-yellow-500 text-white';
+                statusText = 'Regular';
+              } else {
+                // Crítico (>10% sobrecosto)
+                bgColor = 'bg-gradient-to-br from-red-50 to-red-100 border-red-200';
+                iconBgColor = 'bg-red-200';
+                iconColor = 'text-red-700';
+                textColor = 'text-red-800';
+                badgeClass = 'bg-red-500 text-white';
+                statusText = 'Crítico';
+              }
+            }
+            
+            return (
+              <div className={`p-5 rounded-xl border shadow-sm hover:shadow-md transition-all duration-200 ${bgColor}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`p-2 rounded-lg ${iconBgColor}`}>
+                    {deviationData.totalVariance.variance > 0 ? (
+                      <AlertCircle className={`h-5 w-5 ${iconColor}`} />
+                    ) : (
+                      <CheckCircle2 className={`h-5 w-5 ${iconColor}`} />
+                    )}
+                  </div>
+                  <Badge className={`text-xs ${badgeClass}`}>
+                    {statusText}
+                  </Badge>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className={`text-sm font-medium ${textColor}`}>
+                      {deviationData.totalVariance.variance > 0 ? 'Sobrecosto Total' : 'Ahorro Total'}
+                    </h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-3 w-3 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <div className="space-y-2">
+                            <p className="text-sm">
+                              La varianza es la diferencia entre el costo real y el presupuesto estimado.
+                            </p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• <span className="text-green-600">Negativo: Ahorro</span></p>
+                              <p>• <span className="text-yellow-600">0-10%: Regular</span></p>
+                              <p>• <span className="text-red-600">&gt;10%: Crítico</span></p>
+                            </div>
+                            <p className="text-xs text-gray-500 pt-1">
+                              Varianza actual: {variancePercentage.toFixed(1)}%
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <p className={`text-2xl font-bold mb-1 ${textColor}`}>
+                    ${Math.abs(deviationData.totalVariance.variance).toLocaleString('es-AR', { 
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    })}
+                  </p>
+                  <p className={`text-xs ${textColor.replace('800', '600')}`}>
+                    vs. presupuesto planificado ({variancePercentage > 0 ? '+' : ''}{variancePercentage.toFixed(1)}%)
+                  </p>
+                </div>
               </div>
-              <Badge 
-                variant={deviationData.totalVariance.variance > 0 ? "destructive" : "secondary"}
-                className={`text-xs ${
-                  deviationData.totalVariance.variance > 0 
-                    ? 'bg-red-500 text-white' 
-                    : 'bg-green-500 text-white'
-                }`}
-              >
-                {deviationData.totalVariance.variance > 0 ? 'Sobrecosto' : 'Ahorro'}
-              </Badge>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className={`text-sm font-medium ${
-                  deviationData.totalVariance.variance > 0 ? 'text-red-800' : 'text-green-800'
-                }`}>
-                  {deviationData.totalVariance.variance > 0 ? 'Sobrecosto Total' : 'Ahorro Total'}
-                </h3>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-3 w-3 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-sm">
-                        La varianza es la diferencia entre el costo real y el presupuesto estimado. 
-                        Un valor positivo indica sobrecosto, mientras que un valor negativo indica ahorro.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-              <p className={`text-2xl font-bold mb-1 ${
-                deviationData.totalVariance.variance > 0 ? 'text-red-900' : 'text-green-900'
-              }`}>
-                ${Math.abs(deviationData.totalVariance.variance).toLocaleString('es-AR', { 
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0
-                })}
-              </p>
-              <p className={`text-xs ${
-                deviationData.totalVariance.variance > 0 ? 'text-red-600' : 'text-green-600'
-              }`}>
-                vs. presupuesto planificado
-              </p>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Miembros con Sobrecosto */}
           <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-5 rounded-xl border border-orange-200 shadow-sm hover:shadow-md transition-all duration-200">
