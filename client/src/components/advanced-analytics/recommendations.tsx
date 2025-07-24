@@ -180,24 +180,30 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
   return (
     <div className="space-y-6">
       {/* Predicciones del Proyecto */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-blue-600" />
-              {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
-                'Análisis del Período' : 'Predicciones del Proyecto'}
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-3 rounded-lg">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">
+                  {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
+                    'Análisis del Período' : 'Predicciones del Proyecto'}
+                </h3>
+                <p className="text-sm text-blue-100 mt-1">
+                  {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
+                    'Métricas reales del período analizado y proyecciones futuras' :
+                    'Proyecciones basadas en el rendimiento actual'}
+                </p>
+              </div>
             </div>
-            <Badge variant={getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').variant}>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0">
               {getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').label}
             </Badge>
-          </CardTitle>
-          <p className="text-sm text-gray-600 mt-2">
-            {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
-              'Métricas reales del período analizado y proyecciones para el futuro' :
-              'Proyecciones basadas en el rendimiento actual del proyecto'}
-          </p>
-        </CardHeader>
+          </div>
+        </div>
         <CardContent>
           {recommendationsData?.predictions ? (
             <>
@@ -246,35 +252,50 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
               </div>
               
               {recommendationsData?.predictions?.businessMetrics && (
-                <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-4">
                     {recommendationsData.predictions.periodAnalysis ? 
                       'Métricas del Período y Proyecciones' : 
                       'Métricas de Inteligencia de Negocio'}
                   </h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Burn Rate Mensual:</span>
-                      <p className="font-bold text-gray-800">
-                        ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toFixed(0) || '0'}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span className="text-xs text-gray-600">Burn Rate Mensual:</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">
+                        ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toLocaleString() || '0'}
                       </p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Revenue Anual Proyectado:</span>
-                      <p className="font-bold text-gray-800">
-                        ${recommendationsData.predictions.businessMetrics.projectedAnnualRevenue?.toFixed(0) || '0'}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-xs text-gray-600">Facturación Anual Proyectada:</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">
+                        ${recommendationsData.predictions.businessMetrics.projectedAnnualRevenue?.toLocaleString() || '0'}
                       </p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Punto de Equilibrio:</span>
-                      <p className="font-bold text-gray-800">
-                        {recommendationsData.predictions.businessMetrics.breakEvenPoint === 'achieved' ? 'Alcanzado' : 
-                       recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span className="text-xs text-gray-600">Punto de Equilibrio:</span>
+                      </div>
+                      <p className="text-lg font-bold text-gray-900">
+                        {recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
                       </p>
                     </div>
-                    <div>
-                      <span className="text-gray-600">Riesgo de Satisfacción:</span>
-                      <p className={`font-bold ${
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'bg-red-500' :
+                          recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`}></div>
+                        <span className="text-xs text-gray-600">Riesgo de Satisfacción:</span>
+                      </div>
+                      <p className={`text-lg font-bold ${
                         recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'text-red-600' :
                         recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'text-yellow-600' :
                         'text-green-600'
@@ -288,37 +309,43 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                   {/* Proyecciones futuras para períodos pasados */}
                   {(recommendationsData.predictions.businessMetrics.nextQuarterProjection || 
                     recommendationsData.predictions.businessMetrics.currentQuarterProjection) && (
-                    <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <h5 className="text-sm font-semibold text-blue-800 mb-2">
-                        {recommendationsData.predictions.businessMetrics.nextQuarterProjection?.label || 
-                         recommendationsData.predictions.businessMetrics.currentQuarterProjection?.label || 
-                         'Proyección Próximo Período'}
-                      </h5>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-blue-600">Costo Est.:</span>
-                          <p className="font-bold text-blue-800">
+                    <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl border border-blue-200">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                          <ArrowRight className="h-4 w-4 text-white" />
+                        </div>
+                        <h5 className="text-base font-semibold text-gray-900">
+                          {recommendationsData.predictions.businessMetrics.nextQuarterProjection?.label || 
+                           recommendationsData.predictions.businessMetrics.currentQuarterProjection?.label || 
+                           'Proyección Próximo Período'}
+                        </h5>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-white p-3 rounded-lg">
+                          <span className="text-xs text-gray-600">Costo Est.:</span>
+                          <p className="text-lg font-bold text-gray-900 mt-1">
                             ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedCost || 
                                recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedCost || 0).toLocaleString()}
                           </p>
                         </div>
-                        <div>
-                          <span className="text-blue-600">Revenue Est.:</span>
-                          <p className="font-bold text-blue-800">
+                        <div className="bg-white p-3 rounded-lg">
+                          <span className="text-xs text-gray-600">Revenue Est.:</span>
+                          <p className="text-lg font-bold text-gray-900 mt-1">
                             ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedRevenue || 
                                recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedRevenue || 0).toLocaleString()}
                           </p>
                         </div>
-                        <div>
-                          <span className="text-blue-600">Ganancia Est.:</span>
-                          <p className="font-bold text-green-800">
+                        <div className="bg-white p-3 rounded-lg">
+                          <span className="text-xs text-gray-600">Ganancia Est.:</span>
+                          <p className="text-lg font-bold text-green-600 mt-1">
                             ${(recommendationsData.predictions.businessMetrics.nextQuarterProjection?.estimatedProfit || 
                                recommendationsData.predictions.businessMetrics.currentQuarterProjection?.estimatedProfit || 0).toLocaleString()}
                           </p>
                         </div>
                       </div>
                       {recommendationsData.predictions.businessMetrics.currentQuarterProjection?.monthsRemaining && (
-                        <p className="text-xs text-blue-600 mt-2">
+                        <p className="text-xs text-gray-600 mt-3 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
                           Basado en {recommendationsData.predictions.businessMetrics.currentQuarterProjection.monthsRemaining} meses restantes del trimestre
                         </p>
                       )}
@@ -340,18 +367,27 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
       </Card>
 
       {/* Recomendaciones */}
-      <Card className="border-l-4 border-l-green-500">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-green-600" />
-              Recomendaciones Automáticas
+      <Card className="overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-3 rounded-lg">
+                <Lightbulb className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">Recomendaciones Automáticas</h3>
+                <p className="text-sm text-purple-100 mt-1">
+                  {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
+                    'Acciones sugeridas basadas en el período analizado' :
+                    'Acciones sugeridas basadas en el análisis actual'}
+                </p>
+              </div>
             </div>
-            <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
+            <Badge variant="secondary" className="bg-white/20 text-white border-0">
               {recommendationsData?.recommendations?.length || 0} Recomendaciones
             </Badge>
-          </CardTitle>
-        </CardHeader>
+          </div>
+        </div>
         <CardContent className="space-y-4">
 
           {/* Recomendaciones de Alta Prioridad */}

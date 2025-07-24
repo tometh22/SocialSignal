@@ -6064,8 +6064,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             confidenceLevel: 'high' as const,
             businessMetrics: {
               monthlyBurnRate: monthlyAvg,
-              projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
-              breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+              projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+                (quotation.totalAmount * 12) : 
+                (monthlyAvg * currentMarkup * 12),
+              breakEvenPoint: currentMarkup >= 1.2 ? 'Alcanzado' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
               clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
               currentQuarterProjection: {
                 label: `Resto de ${projectionLabel}`,
@@ -6085,8 +6087,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             confidenceLevel: 'high' as const,
             businessMetrics: {
               monthlyBurnRate: monthlyAvg,
-              projectedAnnualRevenue: monthlyAvg * currentMarkup * 12,
-              breakEvenPoint: currentMarkup >= 1.2 ? 'achieved' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
+              projectedAnnualRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
+                (quotation.totalAmount * 12) : 
+                (monthlyAvg * currentMarkup * 12),
+              breakEvenPoint: currentMarkup >= 1.2 ? 'Alcanzado' : `${((1.2 - currentMarkup) * 100).toFixed(0)}% para alcanzar`,
               clientSatisfactionRisk: hourDeviation > 20 ? 'high' : hourDeviation > 10 ? 'medium' : 'low',
               nextQuarterProjection: {
                 label: projectionLabel,
