@@ -76,20 +76,41 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       dateRange = { startDate: start, endDate: end };
     }
     
-    // Apply temporal scaling exactly like complete-data endpoint
+    // Apply temporal scaling based on ACTUAL months with data
     if ((quotation.projectType === 'always-on' || quotation.projectType === 'fee-mensual') && dateRange && timeFilter !== 'all') {
-      const theoreticalMonths = timeFilter ? getMonthsInFilter(timeFilter) : 
-        Math.max(1, (dateRange.endDate.getFullYear() - dateRange.startDate.getFullYear()) * 12 + 
-                   (dateRange.endDate.getMonth() - dateRange.startDate.getMonth()) + 1);
+      // First, check which months actually have data
+      const monthsWithData = new Set<string>();
       
-      if (theoreticalMonths > 0) {
-        adjustedBaseCost = (quotation.baseCost || 0) * theoreticalMonths;
+      filteredTimeEntries.forEach(entry => {
+        const entryDate = new Date(entry.date);
+        const monthKey = `${entryDate.getFullYear()}-${entryDate.getMonth() + 1}`;
+        monthsWithData.add(monthKey);
+      });
+      
+      const actualMonthsWithData = monthsWithData.size;
+      
+      // Use actual months with data instead of theoretical months
+      if (actualMonthsWithData > 0) {
+        adjustedBaseCost = (quotation.baseCost || 0) * actualMonthsWithData;
         
-        console.log(`📊 Applied temporal scaling for ${theoreticalMonths} months (${quotation.projectType}):`, {
+        console.log(`📊 Applied temporal scaling based on ACTUAL data months:`, {
           timeFilter: timeFilter || 'date-range',
           originalBaseCost: quotation.baseCost,
           adjustedBaseCost: adjustedBaseCost,
-          monthsInPeriod: theoreticalMonths
+          actualMonthsWithData: actualMonthsWithData,
+          monthsDetected: Array.from(monthsWithData).sort()
+        });
+      } else {
+        // If no data, use theoretical months
+        const theoreticalMonths = timeFilter ? getMonthsInFilter(timeFilter) : 
+          Math.max(1, (dateRange.endDate.getFullYear() - dateRange.startDate.getFullYear()) * 12 + 
+                     (dateRange.endDate.getMonth() - dateRange.startDate.getMonth()) + 1);
+        
+        adjustedBaseCost = (quotation.baseCost || 0) * theoreticalMonths;
+        
+        console.log(`📊 No data found, using theoretical months:`, {
+          timeFilter: timeFilter || 'date-range',
+          theoreticalMonths: theoreticalMonths
         });
       }
     }
