@@ -2750,21 +2750,22 @@ export default function ProjectDetailsRedesigned() {
 
           {/* ANÁLISIS FINANCIERO Y ECONÓMICO */}
           <TabsContent value="details" className="space-y-6">
-            {/* Header Section - Financial Overview */}
-            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-indigo-600 p-2 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-indigo-900">Análisis Financiero y Económico</h2>
-                  <p className="text-indigo-700">Indicadores de rentabilidad, ROI y eficiencia económica</p>
+            <TooltipProvider>
+              {/* Header Section - Financial Overview */}
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-indigo-600 p-2 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-indigo-900">Análisis Financiero y Económico</h2>
+                    <p className="text-indigo-700">Indicadores de rentabilidad, ROI y eficiencia económica</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Financial KPIs Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Financial KPIs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* ROI Card */}
               <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
                 <CardContent className="p-6">
@@ -3318,6 +3319,7 @@ export default function ProjectDetailsRedesigned() {
                 </div>
               </CardContent>
             </Card>
+            </TooltipProvider>
           </TabsContent>
 
           {/* Performance Analysis Tab */}
