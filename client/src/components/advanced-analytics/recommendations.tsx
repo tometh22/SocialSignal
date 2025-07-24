@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,8 @@ import {
   TrendingUp, 
   Users, 
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  X
 } from "lucide-react";
 
 interface RecommendationsProps {
@@ -69,6 +71,8 @@ interface RecommendationsData {
 }
 
 export function Recommendations({ projectId, dateFilter, timeFilter }: RecommendationsProps) {
+  const [showExplanation, setShowExplanation] = useState(true);
+  
   // Preferir timeFilter sobre dateFilter para consistencia
   const queryParams = timeFilter 
     ? `?timeFilter=${timeFilter}`
@@ -181,25 +185,25 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
     <div className="space-y-6">
       {/* Predicciones del Proyecto */}
       <Card className="overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white">
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-white/20 p-3 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-white" />
+              <div className="bg-white/20 p-2.5 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-semibold">
+                <h3 className="text-lg font-semibold">
                   {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
                     'Análisis del Período' : 'Predicciones del Proyecto'}
                 </h3>
-                <p className="text-sm text-blue-100 mt-1">
+                <p className="text-xs text-blue-100 mt-0.5">
                   {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
                     'Métricas reales del período analizado y proyección si continúa la tendencia actual' :
                     'Proyección de cómo continuará el proyecto si mantenemos el ritmo actual'}
                 </p>
               </div>
             </div>
-            <Badge variant="secondary" className="bg-white/20 text-white border-0">
+            <Badge variant="secondary" className="bg-white/20 text-white border-0 text-xs">
               {getConfidenceBadge(recommendationsData?.predictions?.confidenceLevel || 'low').label}
             </Badge>
           </div>
@@ -207,27 +211,36 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
         <CardContent>
           {recommendationsData?.predictions ? (
             <>
-              {/* Explicación contextual */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <div className="bg-blue-100 rounded-full p-2 mt-0.5">
-                    <AlertTriangle className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    <p className="font-semibold mb-1">¿Qué significan estas proyecciones?</p>
-                    <p className="text-gray-600">
-                      {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
-                        'Estamos analizando lo que pasó en junio y proyectando cómo continuaría Q3 2025 si mantenemos el mismo ritmo de trabajo y gastos. Es una predicción de lo que pasaría si NO tomamos ninguna acción correctiva.' :
-                        'Estas son proyecciones basadas en el ritmo actual de trabajo. Muestran cómo terminaría el proyecto si continuamos con la tendencia actual sin cambios.'}
-                    </p>
-                    {(timeFilter?.includes('last') || timeFilter?.includes('pasado')) && (
-                      <p className="text-xs text-blue-600 mt-2">
-                        Nota: La facturación anual proyectada es menor porque el proyecto comenzó en mayo, no en enero.
+              {/* Explicación contextual con botón de cierre */}
+              {showExplanation && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 relative">
+                  <button
+                    onClick={() => setShowExplanation(false)}
+                    className="absolute top-2 right-2 p-1 hover:bg-blue-200 rounded-full transition-colors"
+                    aria-label="Cerrar explicación"
+                  >
+                    <X className="h-4 w-4 text-blue-700" />
+                  </button>
+                  <div className="flex items-start gap-3 pr-6">
+                    <div className="bg-blue-100 rounded-full p-2 mt-0.5">
+                      <AlertTriangle className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <p className="font-semibold mb-1">¿Qué significan estas proyecciones?</p>
+                      <p className="text-gray-600">
+                        {timeFilter?.includes('last') || timeFilter?.includes('pasado') ? 
+                          'Estamos analizando lo que pasó en junio y proyectando cómo continuaría Q3 2025 si mantenemos el mismo ritmo de trabajo y gastos. Es una predicción de lo que pasaría si NO tomamos ninguna acción correctiva.' :
+                          'Estas son proyecciones basadas en el ritmo actual de trabajo. Muestran cómo terminaría el proyecto si continuamos con la tendencia actual sin cambios.'}
                       </p>
-                    )}
+                      {(timeFilter?.includes('last') || timeFilter?.includes('pasado')) && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          Nota: La facturación anual proyectada es menor porque el proyecto comenzó en mayo, no en enero.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {!recommendationsData.predictions.periodAnalysis ? (
