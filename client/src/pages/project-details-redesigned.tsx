@@ -3186,12 +3186,13 @@ export default function ProjectDetailsRedesigned() {
                     <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
                       <div className="text-3xl font-bold text-green-700 mb-1">
                         {(() => {
-                          const actualBudgetUtil = unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedCost ?
-                            ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100 : 0;
+                          // Evaluar salud financiera basada en ROI (markup)
+                          const markup = unifiedData?.metrics?.markup || 1;
+                          const roi = ((markup - 1) * 100);
                           
-                          if (actualBudgetUtil <= 85) return "Excelente";
-                          if (actualBudgetUtil <= 100) return "Bueno";
-                          if (actualBudgetUtil <= 110) return "Regular";
+                          if (roi >= 150) return "Excelente";
+                          if (roi >= 100) return "Bueno";
+                          if (roi >= 50) return "Regular";
                           return "Crítico";
                         })()}
                       </div>
