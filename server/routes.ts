@@ -6074,13 +6074,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 monthsRemaining: monthsRemainingInQuarter,
                 // Para proyectos fee-mensual, usar costo base del contrato para proyecciones futuras
                 estimatedCost: quotation && quotation.projectType === 'fee-mensual' ? 
-                  ((quotation.baseCost / 12) * monthsRemainingInQuarter) : // Usar costo base mensual (anual/12) del contrato
+                  (quotation.baseCost * monthsRemainingInQuarter) : // baseCost ya es mensual
                   (monthlyAvg * monthsRemainingInQuarter),
                 estimatedRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
                   (quotation.totalAmount * monthsRemainingInQuarter) : 
                   (monthlyAvg * currentMarkup * monthsRemainingInQuarter),
                 estimatedProfit: quotation && quotation.projectType === 'fee-mensual' ?
-                  (quotation.totalAmount * monthsRemainingInQuarter) - ((quotation.baseCost / 12) * monthsRemainingInQuarter) :
+                  (quotation.totalAmount * monthsRemainingInQuarter) - (quotation.baseCost * monthsRemainingInQuarter) :
                   (monthlyAvg * currentMarkup * monthsRemainingInQuarter) - (monthlyAvg * monthsRemainingInQuarter)
               }
             }
@@ -6103,13 +6103,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 label: projectionLabel,
                 // Para proyectos fee-mensual, usar costo base del contrato para proyecciones futuras
                 estimatedCost: quotation && quotation.projectType === 'fee-mensual' ? 
-                  ((quotation.baseCost / 12) * 3) : // Usar costo base mensual (anual/12) * 3 meses
+                  (quotation.baseCost * 3) : // baseCost ya es mensual
                   (monthlyAvg * 3),
                 estimatedRevenue: quotation && quotation.projectType === 'fee-mensual' ? 
                   (quotation.totalAmount * 3) : // Para fee-mensual, usar el precio del contrato * 3 meses
                   (monthlyAvg * currentMarkup * 3),
                 estimatedProfit: quotation && quotation.projectType === 'fee-mensual' ?
-                  (quotation.totalAmount * 3) - ((quotation.baseCost / 12) * 3) :
+                  (quotation.totalAmount * 3) - (quotation.baseCost * 3) :
                   (monthlyAvg * currentMarkup * 3) - (monthlyAvg * 3)
               }
             }
