@@ -5488,8 +5488,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const whereConditions = [eq(timeEntries.projectId, projectId)];
     if (startDate && endDate) {
       whereConditions.push(
-        gte(timeEntries.date, startDate),
-        lte(timeEntries.date, endDate)
+        gte(timeEntries.date, new Date(startDate)),
+        lte(timeEntries.date, new Date(endDate))
       );
     }
 
@@ -5879,7 +5879,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Predicciones
-      const velocity = await calculateProjectVelocity(projectId);
+      const velocity = await calculateProjectVelocity(projectId, filterStartDate, filterEndDate);
       const predictions = {
         estimatedCompletionDate: velocity.estimatedCompletion?.toISOString() || null,
         projectedFinalCost: velocity.projectedCost,
