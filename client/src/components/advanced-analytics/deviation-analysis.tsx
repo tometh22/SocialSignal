@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign, Target, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, TrendingUp, TrendingDown, Users, DollarSign, Target, Zap, CheckCircle2, AlertCircle, Info } from "lucide-react";
 
 interface DeviationAnalysisProps {
   projectId: number;
@@ -256,15 +257,33 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
               </Badge>
             </div>
             <div>
-              <h3 className={`text-sm font-medium mb-1 ${
-                deviationData.totalVariance.variance > 0 ? 'text-red-800' : 'text-green-800'
-              }`}>
-                {deviationData.totalVariance.variance > 0 ? 'Sobrecosto Total' : 'Ahorro Total'}
-              </h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className={`text-sm font-medium ${
+                  deviationData.totalVariance.variance > 0 ? 'text-red-800' : 'text-green-800'
+                }`}>
+                  {deviationData.totalVariance.variance > 0 ? 'Sobrecosto Total' : 'Ahorro Total'}
+                </h3>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-gray-400" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        La varianza es la diferencia entre el costo real y el presupuesto estimado. 
+                        Un valor positivo indica sobrecosto, mientras que un valor negativo indica ahorro.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <p className={`text-2xl font-bold mb-1 ${
                 deviationData.totalVariance.variance > 0 ? 'text-red-900' : 'text-green-900'
               }`}>
-                ${Math.abs(deviationData.totalVariance.variance).toLocaleString()}
+                ${Math.abs(deviationData.totalVariance.variance).toLocaleString('es-AR', { 
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0
+                })}
               </p>
               <p className={`text-xs ${
                 deviationData.totalVariance.variance > 0 ? 'text-red-600' : 'text-green-600'

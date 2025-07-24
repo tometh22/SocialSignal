@@ -19,6 +19,7 @@ interface RecommendationsProps {
     startDate: string;
     endDate: string;
   };
+  timeFilter?: string;
 }
 
 interface Recommendation {
@@ -45,13 +46,16 @@ interface RecommendationsData {
   generatedAt: string;
 }
 
-export function Recommendations({ projectId, dateFilter }: RecommendationsProps) {
-  const queryParams = dateFilter 
+export function Recommendations({ projectId, dateFilter, timeFilter }: RecommendationsProps) {
+  // Preferir timeFilter sobre dateFilter para consistencia
+  const queryParams = timeFilter 
+    ? `?timeFilter=${timeFilter}`
+    : dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
     
   const { data: recommendationsData, isLoading } = useQuery<RecommendationsData>({
-    queryKey: [`/api/projects/${projectId}/recommendations`, dateFilter],
+    queryKey: [`/api/projects/${projectId}/recommendations`, timeFilter || dateFilter],
     queryFn: () => fetch(`/api/projects/${projectId}/recommendations${queryParams}`).then(res => res.json()),
     enabled: !!projectId
   });

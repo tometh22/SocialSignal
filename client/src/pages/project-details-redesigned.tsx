@@ -1248,7 +1248,13 @@ export default function ProjectDetailsRedesigned() {
           console.log('🚨 CARD ESTADO RESULT:', { actualBudgetUtil, resultado });
           return resultado;
         })(),
-        subtitle: `Semáforo de salud`,
+        subtitle: (() => {
+          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          if (actualBudgetUtil <= 85) return "🏆 Salud financiera excelente";
+          if (actualBudgetUtil <= 100) return "✅ Salud financiera buena";
+          if (actualBudgetUtil <= 110) return "🟡 Requiere atención";
+          return "🔴 Estado crítico";
+        })(),
         icon: (() => {
           const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
           if (actualBudgetUtil <= 85) return Crown;
@@ -1583,16 +1589,33 @@ export default function ProjectDetailsRedesigned() {
           <TabsContent value="dashboard" className="space-y-6">
             
             {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+            <TooltipProvider>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
               
               {/* Markup Card - Métrica más importante */}
               <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Percent className="h-4 w-4 text-blue-600" />
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-2 bg-blue-100 rounded-lg cursor-help">
+                            <Percent className="h-4 w-4 text-blue-600" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">¿Qué es el Markup?</p>
+                            <p className="text-xs">El markup indica la rentabilidad del proyecto dividiendo el precio facturado al cliente entre el costo real operativo.</p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• <span className="text-emerald-600">≥ 2.5x: Excelente</span> - Alta rentabilidad</p>
+                              <p>• <span className="text-green-600">≥ 1.8x: Bueno</span> - Rentabilidad saludable</p>
+                              <p>• <span className="text-yellow-600">≥ 1.2x: Aceptable</span> - Rentabilidad mínima</p>
+                              <p>• <span className="text-red-600">&lt; 1.2x: Crítico</span> - Pérdida o riesgo</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                       <span className="text-sm font-medium text-blue-700">Markup</span>
                     </div>
                     <Badge variant={(() => {
@@ -1637,9 +1660,24 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <Clock className="h-4 w-4 text-green-600" />
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-2 bg-green-100 rounded-lg cursor-help">
+                            <Clock className="h-4 w-4 text-green-600" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Avance de Horas</p>
+                            <p className="text-xs">Porcentaje de horas trabajadas respecto a las horas estimadas en la cotización para el período seleccionado.</p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• <span className="text-green-600">0-80%:</span> Progreso normal</p>
+                              <p>• <span className="text-yellow-600">80-100%:</span> Acercándose al límite</p>
+                              <p>• <span className="text-red-600">&gt;100%:</span> Excedido en horas</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                       <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
                     <Badge variant="secondary" className="text-xs h-6 min-w-0 flex items-center">
@@ -1683,18 +1721,20 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          if (percentage <= 90) return 'bg-green-100';
-                          if (percentage <= 100) return 'bg-gray-100';
-                          if (percentage <= 110) return 'bg-yellow-100';
-                          if (percentage <= 120) return 'bg-orange-100';
-                          return 'bg-red-100';
-                        }
-                        return 'bg-orange-100';
-                      })()}`}>
-                        <DollarSign className={`h-4 w-4 ${(() => {
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`p-2 rounded-lg cursor-help ${(() => {
+                            if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                              const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
+                              if (percentage <= 90) return 'bg-green-100';
+                              if (percentage <= 100) return 'bg-gray-100';
+                              if (percentage <= 110) return 'bg-yellow-100';
+                              if (percentage <= 120) return 'bg-orange-100';
+                              return 'bg-red-100';
+                            }
+                            return 'bg-orange-100';
+                          })()}`}>
+                            <DollarSign className={`h-4 w-4 ${(() => {
                           if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                             const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
                             if (percentage <= 90) return 'text-green-600';
@@ -1705,7 +1745,22 @@ export default function ProjectDetailsRedesigned() {
                           }
                           return 'text-orange-600';
                         })()}`} />
-                      </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Costo Real vs Estimado</p>
+                            <p className="text-xs">Comparación entre el costo real operativo y el costo estimado en la cotización.</p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• <span className="text-green-600">≤90%:</span> Excelente control de costos</p>
+                              <p>• <span className="text-gray-600">≤100%:</span> Dentro del presupuesto</p>
+                              <p>• <span className="text-yellow-600">≤110%:</span> Alerta temprana (+10%)</p>
+                              <p>• <span className="text-orange-600">≤120%:</span> Sobrecosto crítico (+20%)</p>
+                              <p>• <span className="text-red-600">&gt;120%:</span> Crisis de costos</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
@@ -1789,17 +1844,19 @@ export default function ProjectDetailsRedesigned() {
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          if (budgetUtil <= 85) return 'bg-emerald-100';
-                          if (budgetUtil <= 100) return 'bg-green-100';
-                          if (budgetUtil <= 110) return 'bg-yellow-100';
-                          return 'bg-red-100';
-                        }
-                        return 'bg-purple-100';
-                      })()}`}>
-                        {(() => {
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className={`p-2 rounded-lg cursor-help ${(() => {
+                            if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
+                              const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
+                              if (budgetUtil <= 85) return 'bg-emerald-100';
+                              if (budgetUtil <= 100) return 'bg-green-100';
+                              if (budgetUtil <= 110) return 'bg-yellow-100';
+                              return 'bg-red-100';
+                            }
+                            return 'bg-purple-100';
+                          })()}`}>
+                            {(() => {
                           if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                             const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
                             if (budgetUtil <= 85) return <Crown className="h-4 w-4 text-emerald-600" />;
@@ -1809,7 +1866,21 @@ export default function ProjectDetailsRedesigned() {
                           }
                           return <Gauge className="h-4 w-4 text-purple-600" />;
                         })()}
-                      </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Estado de Salud del Proyecto</p>
+                            <p className="text-xs">Evaluación integral basada en el control de costos comparando el costo real vs el estimado.</p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• <span className="text-emerald-600">≤85%: Excelente</span> - Eficiencia destacada 🏆</p>
+                              <p>• <span className="text-green-600">≤100%: Bueno</span> - Bajo control ✅</p>
+                              <p>• <span className="text-yellow-600">≤110%: Regular</span> - Requiere atención 🟡</p>
+                              <p>• <span className="text-red-600">&gt;110%: Crítico</span> - Acción inmediata 🔴</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
@@ -1916,6 +1987,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
             </div>
+            </TooltipProvider>
 
             {/* SECCIÓN 2: Análisis Avanzado - Grid Profesional 2x2 */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -1936,7 +2008,8 @@ export default function ProjectDetailsRedesigned() {
               {/* Recomendaciones Automáticas */}
               <div className="space-y-4">
                 <Recommendations 
-                  projectId={projectId!} 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
                   dateFilter={{
                     startDate: dateFilter.startDate.toISOString(),
                     endDate: dateFilter.endDate.toISOString()
