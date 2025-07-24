@@ -6038,7 +6038,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let predictions;
       if (isPastPeriod) {
         // Para períodos pasados, mostrar análisis retrospectivo
-        const monthlyAvg = totalActualCost / Math.max(1, Math.round((new Date(filterEndDate).getTime() - new Date(filterStartDate).getTime()) / (1000 * 60 * 60 * 24 * 30)));
+        // Calcular meses reales con datos para un cálculo más preciso del burn rate
+        const monthsSet = new Set<string>();
+        projectEntries.forEach(entry => {
+          const entryDate = new Date(entry.date);
+          const monthKey = `${entryDate.getFullYear()}-${entryDate.getMonth() + 1}`;
+          monthsSet.add(monthKey);
+        });
+        const actualMonthsWithData = monthsSet.size || 1;
+        
+        const monthlyAvg = totalActualCost / actualMonthsWithData;
         
         // Determinar el trimestre actual y el período analizado
         const now = new Date();
