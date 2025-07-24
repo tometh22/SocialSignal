@@ -5850,9 +5850,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Ajustar horas estimadas para contratos mensuales con filtro temporal
       if (quotation?.projectType === 'fee-mensual' && filterStartDate && filterEndDate) {
+        const startDate = new Date(filterStartDate);
+        const endDate = new Date(filterEndDate);
         const monthsDiff = Math.max(1, 
-          (filterEndDate.getFullYear() - filterStartDate.getFullYear()) * 12 + 
-          (filterEndDate.getMonth() - filterStartDate.getMonth()) + 1
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+          (endDate.getMonth() - startDate.getMonth()) + 1
         );
         console.log(`📊 Monthly contract adjustment for recommendations: ${monthsDiff} months`);
         totalEstimatedHours = totalEstimatedHours * monthsDiff;
