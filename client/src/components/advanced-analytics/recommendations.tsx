@@ -181,9 +181,14 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                 <p className="text-lg font-bold text-blue-600">
                   {recommendationsData?.predictions?.estimatedCompletionDate 
                     ? new Date(recommendationsData.predictions.estimatedCompletionDate).toLocaleDateString('es-ES')
-                    : 'No estimada'
+                    : 'Proyecto en ejecución'
                   }
                 </p>
+                {!recommendationsData?.predictions?.estimatedCompletionDate && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    El proyecto ya superó las horas estimadas
+                  </p>
+                )}
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">

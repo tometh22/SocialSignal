@@ -5534,12 +5534,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const remainingHours = Math.max(0, targetHours - totalHours);
-    const weeksToComplete = velocityPerWeek > 0 ? remainingHours / velocityPerWeek : null;
+    const weeksToComplete = velocityPerWeek > 0 && remainingHours > 0 ? remainingHours / velocityPerWeek : null;
     
     console.log(`📊 Velocity calculation: targetHours=${targetHours}, totalHours=${totalHours}, remainingHours=${remainingHours}, velocityPerWeek=${velocityPerWeek}, weeksToComplete=${weeksToComplete}`);
     
-    const estimatedCompletion = weeksToComplete ? 
-      new Date(Date.now() + weeksToComplete * 7 * 24 * 60 * 60 * 1000) : null;
+    // Si el proyecto ya superó las horas, estimar fecha basada en velocidad actual para completar el scope total
+    let estimatedCompletion = null;
+    if (weeksToComplete) {
+      estimatedCompletion = new Date(Date.now() + weeksToComplete * 7 * 24 * 60 * 60 * 1000);
+    } else if (totalHours >= targetHours && project?.expectedEndDate) {
+      // Si ya se superaron las horas, usar la fecha esperada del proyecto
+      estimatedCompletion = new Date(project.expectedEndDate);
+    }
 
     // Proyectar costo final basado en tendencia actual
     const costPerHour = totalHours > 0 ? totalCost / totalHours : 0;
@@ -5838,9 +5844,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const totalActualCost = projectEntries.reduce((sum, entry) => 
         sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
-      const totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
+      let totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
       const totalActualHours = projectEntries.reduce((sum, entry) => sum + entry.hours, 0);
-      const totalEstimatedHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+      let totalEstimatedHours = teamMembers.reduce((sum, member) => sum + member.hours, 0);
+      
+      // Ajustar horas estimadas para contratos mensuales con filtro temporal
+      if (quotation?.projectType === 'fee-mensual' && filterStartDate && filterEndDate) {
+        const monthsDiff = Math.max(1, 
+          (filterEndDate.getFullYear() - filterStartDate.getFullYear()) * 12 + 
+          (filterEndDate.getMonth() - filterStartDate.getMonth()) + 1
+        );
+        console.log(`📊 Monthly contract adjustment for recommendations: ${monthsDiff} months`);
+        totalEstimatedHours = totalEstimatedHours * monthsDiff;
+        totalEstimatedCost = totalEstimatedCost * monthsDiff;
+      }
 
       const recommendations = [];
 
@@ -5873,6 +5890,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'Proporcionar capacitación adicional al equipo'
           ],
           impact: 'productivity'
+        });
+      }
+      
+      // Recomendación específica cuando se superan las horas estimadas
+      if (totalActualHours > totalEstimatedHours) {
+        const hoursExceeded = totalActualHours - totalEstimatedHours;
+        const percentageExceeded = ((hoursExceeded / totalEstimatedHours) * 100).toFixed(1);
+        
+        recommendations.push({
+          type: 'hours_exceeded',
+          priority: 'high',
+          title: 'Horas Estimadas Superadas',
+          description: `El proyecto ha utilizado ${totalActualHours.toFixed(1)} horas de ${totalEstimatedHours} estimadas (${percentageExceeded}% adicional)`,
+          actions: [
+            'Evaluar si se necesitan recursos adicionales',
+            'Revisar el alcance restante del proyecto',
+            'Comunicar el estado actual al cliente',
+            'Considerar ajustes en la estimación'
+          ],
+          impact: 'timeline'
         });
       }
 
