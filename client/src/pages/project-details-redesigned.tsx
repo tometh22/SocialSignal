@@ -1639,7 +1639,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
                           const markup = (unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost;
@@ -1685,7 +1685,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedHours && unifiedData?.quotation?.estimatedHours) {
                           return (((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).quotation.estimatedHours) * 100).toFixed(1);
@@ -1811,7 +1811,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
                     </p>
                     <div className="flex items-center justify-between text-xs text-gray-500">
@@ -1920,7 +1920,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
@@ -1949,7 +1949,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">
@@ -1974,7 +1974,7 @@ export default function ProjectDetailsRedesigned() {
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-lg font-bold text-gray-900">
                       ${(unifiedData?.quotation?.baseCost || 0).toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">
