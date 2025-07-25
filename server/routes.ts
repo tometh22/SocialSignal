@@ -5866,7 +5866,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Análisis de tendencia de costos
       const costDeviation = ((totalActualCost - totalEstimatedCost) / totalEstimatedCost) * 100;
       const hourDeviation = ((totalActualHours - totalEstimatedHours) / totalEstimatedHours) * 100;
-      const currentMarkup = quotation ? (quotation.totalAmount / totalActualCost) : 0;
+      
+      // Ajustar el totalAmount basado en el filtro temporal para coherencia con complete-data
+      let adjustedTotalAmount = quotation?.totalAmount || 0;
+      if (quotation?.projectType === 'fee-mensual' && filterStartDate && filterEndDate) {
+        // Para coherencia con complete-data, usar meses reales con datos, no teóricos
+        const monthsSet = new Set<string>();
+        projectEntries.forEach(entry => {
+          const entryDate = new Date(entry.date);
+          const monthKey = `${entryDate.getFullYear()}-${entryDate.getMonth() + 1}`;
+          monthsSet.add(monthKey);
+        });
+        const actualMonthsWithData = monthsSet.size || 1;
+        
+        // Para fee-mensual, totalAmount ya es mensual, no anual
+        adjustedTotalAmount = quotation.totalAmount * actualMonthsWithData; // Multiplicar precio mensual por meses con datos reales
+        
+        console.log(`📊 Markup adjustment: ${quotation.totalAmount} × ${actualMonthsWithData} months = ${adjustedTotalAmount}`);
+      }
+      
+      const currentMarkup = totalActualCost > 0 ? adjustedTotalAmount / totalActualCost : 0;
       
       // INTELIGENCIA DE NEGOCIO: Análisis predictivo de riesgos
       if (costDeviation > 10) {
