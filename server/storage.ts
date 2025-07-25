@@ -32,7 +32,7 @@ import {
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments
 } from "@shared/schema";
 import { db, pool } from "./db";
-import { eq, ne, and, sql, inArray, desc } from "drizzle-orm";
+import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
@@ -545,7 +545,9 @@ export class DatabaseStorage implements IStorage {
 
   // Role operations
   async getRoles(): Promise<Role[]> {
-    return await db.select().from(roles);
+    // Order roles by ID to ensure consistent ordering
+    // This prevents Operations Lead (id=16) from always being first
+    return await db.select().from(roles).orderBy(asc(roles.id));
   }
 
   async getRole(id: number): Promise<Role | undefined> {
