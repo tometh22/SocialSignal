@@ -307,7 +307,7 @@ function TimeRangeFilter({
           label: "Diciembre"
         };
       default:
-        return { startDate: null, endDate: null, label: "Todos los períodos" };
+        return { startDate: new Date(2025, 0, 1), endDate: new Date(2025, 11, 31), label: "Todos los períodos" };
     }
   };
 
@@ -936,6 +936,9 @@ export default function ProjectDetailsRedesigned() {
   // Variables faltantes para compatibilidad con componentes existentes
   const completeData = unifiedData as any;
   const baseTeam = (unifiedData as any)?.team || [];
+  
+  // Obtener los registros de tiempo recientes desde unifiedData
+  const recentTimeEntries = (unifiedData as any)?.timeEntries || [];
 
   // FUNCIÓN PARA CALCULAR MULTIPLICADOR DE COTIZACIÓN SEGÚN PERÍODO TEMPORAL
   const getQuotationMultiplier = useCallback(() => {
@@ -2019,7 +2022,7 @@ export default function ProjectDetailsRedesigned() {
             {/* SECCIÓN 3: Gráficos de Tendencias - Full Width */}
             <div className="w-full">
               <TrendCharts 
-                projectId={projectId!} 
+                projectId={parseInt(projectId!)} 
                 dateFilter={{
                   startDate: dateFilter.startDate.toISOString(),
                   endDate: dateFilter.endDate.toISOString()
@@ -3404,9 +3407,11 @@ export default function ProjectDetailsRedesigned() {
 
           {/* Performance Analysis Tab */}
           <TabsContent value="performance-analysis" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="w-full">
               <EconomicRankings 
-                projectId={projectId!}
+                rankings={(unifiedData as any)?.rankings?.economicMetrics || []}
+                loading={dataLoading}
+                projectTotalPrice={(unifiedData as any)?.quotation?.totalAmount || 0}
                 timeFilter={timeFilterForHook}
               />
             </div>
