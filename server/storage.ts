@@ -718,6 +718,7 @@ export class DatabaseStorage implements IStorage {
       rate: member.rate,
       cost: member.cost
     });
+    console.log('🔍 DEBUG - roleId type:', typeof member.roleId, 'value:', member.roleId);
 
     // Validar que los datos mínimos estén presentes
     if (!member.quotationId) {
