@@ -483,7 +483,16 @@ const SimpleTeamConfig: React.FC = () => {
                 </thead>
                 <tbody>
                   {quotationData.teamMembers.map(member => {
+                    console.log('🔍 DEBUG - Team member:', { 
+                      memberId: member.id, 
+                      roleId: member.roleId, 
+                      personnelId: member.personnelId 
+                    });
+                    console.log('🔍 DEBUG - Available roles:', availableRoles?.map(r => ({ id: r.id, name: r.name })));
+                    
                     const role = availableRoles?.find(r => r.id === member.roleId);
+                    console.log('🔍 DEBUG - Found role:', role);
+                    
                     const person = availablePersonnel?.find(p => p.id === member.personnelId);
                     const memberId = String(member.id);
                     const isCurrentlyEditing = isEditing[memberId];
