@@ -914,6 +914,14 @@ export default function ProjectDetailsRedesigned() {
 
   // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
   const timeFilterForHook = getTimeFilterForHook(dateFilter);
+  console.log('🔍 FILTER DEBUG:', { 
+    dateFilterLabel: dateFilter.label, 
+    mappedTimeFilter: timeFilterForHook,
+    dateFilterDates: {
+      start: dateFilter.startDate?.toISOString(),
+      end: dateFilter.endDate?.toISOString()
+    }
+  });
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
     timeFilterForHook
