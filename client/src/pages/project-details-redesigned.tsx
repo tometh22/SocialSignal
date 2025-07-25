@@ -2912,13 +2912,14 @@ export default function ProjectDetailsRedesigned() {
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs p-3">
                           <div className="space-y-2 text-sm">
-                            <div className="font-semibold">Margen de Beneficio</div>
-                            <div>Porcentaje de ganancia obtenido después de descontar todos los costos del precio de venta.</div>
+                            <div className="font-semibold">Markup (Multiplicador)</div>
+                            <div>Relación entre el precio de venta y el costo operativo. Indica cuántas veces el costo se multiplica para obtener el precio.</div>
                             <div className="text-xs text-gray-600">
-                              Fórmula: (Precio - Costo Real) ÷ Precio × 100<br/>
-                              • &gt;60%: Margen excelente<br/>
-                              • 30-60%: Margen saludable<br/>
-                              • &lt;30%: Margen bajo
+                              Fórmula: Precio Cliente ÷ Costo Real<br/>
+                              • &gt;250%: Markup excelente<br/>
+                              • 180-250%: Markup muy bueno<br/>
+                              • 120-180%: Markup aceptable<br/>
+                              • &lt;120%: Markup crítico
                             </div>
                           </div>
                         </TooltipContent>
@@ -2927,19 +2928,19 @@ export default function ProjectDetailsRedesigned() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="font-semibold text-blue-900">
-                      {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
-                        `${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100).toFixed(1)}%` : 
-                        '0.0%'
+                      {unifiedData?.metrics?.markup ? 
+                        `${(unifiedData.metrics.markup * 100).toFixed(0)}%` : 
+                        '0%'
                       }
                     </h3>
-                    <p className="text-xs text-blue-700">Margen de beneficio</p>
+                    <p className="text-xs text-blue-700">Markup (Precio/Costo)</p>
                     <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
                       <div 
                         className="bg-blue-600 h-2 rounded-full transition-all duration-500"
                         style={{ 
                           width: `${Math.min(100, Math.max(0, 
-                            unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
-                              ((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100) :
+                            unifiedData?.metrics?.markup ?
+                              (unifiedData.metrics.markup / 3) * 100 : // Dividido por 3 para escalar (3x = 100%)
                               0
                           ))}%` 
                         }}
