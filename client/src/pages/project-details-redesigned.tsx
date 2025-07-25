@@ -2916,10 +2916,10 @@ export default function ProjectDetailsRedesigned() {
                             <div>Relación entre el precio de venta y el costo operativo. Indica cuántas veces el costo se multiplica para obtener el precio.</div>
                             <div className="text-xs text-gray-600">
                               Fórmula: Precio Cliente ÷ Costo Real<br/>
-                              • &gt;250%: Markup excelente<br/>
-                              • 180-250%: Markup muy bueno<br/>
-                              • 120-180%: Markup aceptable<br/>
-                              • &lt;120%: Markup crítico
+                              • &gt;2.5x: Markup excelente<br/>
+                              • 1.8x-2.5x: Markup muy bueno<br/>
+                              • 1.2x-1.8x: Markup aceptable<br/>
+                              • &lt;1.2x: Markup crítico
                             </div>
                           </div>
                         </TooltipContent>
@@ -2929,8 +2929,8 @@ export default function ProjectDetailsRedesigned() {
                   <div className="space-y-1">
                     <h3 className="font-semibold text-blue-900">
                       {unifiedData?.metrics?.markup ? 
-                        `${(unifiedData.metrics.markup * 100).toFixed(0)}%` : 
-                        '0%'
+                        `${unifiedData.metrics.markup.toFixed(1)}x` : 
+                        '0.0x'
                       }
                     </h3>
                     <p className="text-xs text-blue-700">Markup (Precio/Costo)</p>
