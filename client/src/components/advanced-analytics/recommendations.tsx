@@ -347,10 +347,10 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                             <span className="text-xs text-red-500">+8%</span>
                           </div>
                         </div>
-                        <p className="text-xl font-bold text-gray-900">
+                        <p className="text-lg font-bold text-gray-900">
                           ${recommendationsData.predictions.businessMetrics.monthlyBurnRate?.toLocaleString() || '0'}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">vs $9,827 mayo</p>
+                        <p className="text-xs text-gray-500 mt-1">vs Mayo</p>
                       </div>
                     </TooltipProvider>
                     <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm">
@@ -358,7 +358,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                         <span className="text-xs text-gray-600">Facturación Proyectada</span>
                         <Clock className="h-3 w-3 text-gray-400" />
                       </div>
-                      <p className="text-xl font-bold text-gray-900">
+                      <p className="text-lg font-bold text-gray-900">
                         ${recommendationsData.predictions.businessMetrics.projectedAnnualRevenue?.toLocaleString() || '0'}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Anual (May-Dic)</p>
@@ -368,7 +368,7 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                         <span className="text-xs text-gray-600">Punto Equilibrio</span>
                         <CheckCircle2 className="h-3 w-3 text-green-500" />
                       </div>
-                      <p className="text-xl font-bold text-green-600">
+                      <p className="text-lg font-bold text-green-600">
                         {recommendationsData.predictions.businessMetrics.breakEvenPoint || 'No alcanzado'}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Meta: 1.2x</p>
@@ -382,12 +382,12 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
                           'bg-green-500'
                         }`}></div>
                       </div>
-                      <p className={`text-xl font-bold ${
+                      <p className={`text-lg font-bold ${
                         recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'text-red-600' :
                         recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'text-yellow-600' :
                         'text-green-600'
                       }`}>
-                        {recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'Alto Riesgo' :
+                        {recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'high' ? 'Alto' :
                          recommendationsData.predictions.businessMetrics.clientSatisfactionRisk === 'medium' ? 'Medio' : 'Bajo'}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Basado en desvíos</p>

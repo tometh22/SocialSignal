@@ -1590,7 +1590,7 @@ export default function ProjectDetailsRedesigned() {
             
             {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
             <TooltipProvider>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
               
               {/* Markup Card - Métrica más importante */}
               <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
@@ -1680,8 +1680,8 @@ export default function ProjectDetailsRedesigned() {
                       </Tooltip>
                       <span className="text-sm font-medium text-green-700">Avance de Horas</span>
                     </div>
-                    <Badge variant="secondary" className="text-xs h-6 min-w-0 flex items-center">
-                      {unifiedData?.actuals?.totalWorkedHours?.toFixed(1) || '0.0'}h / {unifiedData?.quotation?.estimatedHours || 0}h
+                    <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                      {Math.round(((unifiedData?.actuals?.totalWorkedHours || 0) / (unifiedData?.quotation?.estimatedHours || 1)) * 100)}%
                     </Badge>
                   </div>
                   <div className="space-y-2">
@@ -1783,7 +1783,7 @@ export default function ProjectDetailsRedesigned() {
                         return 'destructive'; // Rojo: Crisis
                       }
                       return 'outline';
-                    })()} className={`text-xs h-6 min-w-0 flex items-center ${(() => {
+                    })()} className={`text-xs px-2 py-0.5 ${(() => {
                       if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                         const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
                         if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
@@ -1800,11 +1800,11 @@ export default function ProjectDetailsRedesigned() {
                           const estimatedCost = (unifiedData as any).quotation.baseCost;
                           const percentage = (realCost / estimatedCost) * 100;
                           
-                          if (percentage <= 90) return `✓ ${Math.abs(percentage - 100).toFixed(0)}% bajo budget`;
-                          if (percentage <= 100) return `${Math.abs(percentage - 100).toFixed(0)}% del budget`;
-                          if (percentage <= 110) return `⚠ +${(percentage - 100).toFixed(0)}% del budget`;
-                          if (percentage <= 120) return `🔥 +${(percentage - 100).toFixed(0)}% del budget`;
-                          return `🚨 +${(percentage - 100).toFixed(0)}% del budget`;
+                          if (percentage <= 90) return `${percentage.toFixed(0)}%`;
+                          if (percentage <= 100) return `${percentage.toFixed(0)}%`;
+                          if (percentage <= 110) return `${percentage.toFixed(0)}%`;
+                          if (percentage <= 120) return `${percentage.toFixed(0)}%`;
+                          return `${percentage.toFixed(0)}%`;
                         }
                         return '0%';
                       })()}
@@ -1892,7 +1892,7 @@ export default function ProjectDetailsRedesigned() {
                         return 'text-purple-700';
                       })()}`}>Estado</span>
                     </div>
-                    <Badge className={`text-xs ${(() => {
+                    <Badge className={`text-xs px-2 py-0.5 ${(() => {
                       if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                         const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
                         if (budgetUtil <= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
@@ -1910,29 +1910,26 @@ export default function ProjectDetailsRedesigned() {
                             baseCost: (unifiedData as any).quotation.baseCost,
                             budgetUtil 
                           });
-                          if (budgetUtil <= 85) return '🏆 Excelente';
-                          if (budgetUtil <= 100) return '✅ Bueno';
-                          if (budgetUtil <= 110) return '🟡 Regular';
-                          return '🔴 Crítico';
+                          if (budgetUtil <= 85) return 'Excelente';
+                          if (budgetUtil <= 100) return 'Bueno';
+                          if (budgetUtil <= 110) return 'Regular';
+                          return 'Crítico';
                         }
                         return 'Sin datos';
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-lg font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-gray-900">
                       {(() => {
                         if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
                           const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          if (budgetUtil <= 85) return '🏆 Excelente';
-                          if (budgetUtil <= 100) return '✅ Bueno';
-                          if (budgetUtil <= 110) return '🟡 Regular';
-                          return '🔴 Crítico';
+                          return `${budgetUtil.toFixed(0)}%`;
                         }
-                        return 'Sin datos';
+                        return '0%';
                       })()}
                     </p>
-                    <p className="text-xs text-gray-500">Semáforo de salud financiera</p>
+                    <p className="text-xs text-gray-500">Uso del presupuesto</p>
                   </div>
                 </CardContent>
               </Card>
@@ -2872,7 +2869,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-semibold text-emerald-900">
+                    <h3 className="text-xl font-bold text-emerald-900">
                       {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
                         `${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100).toFixed(1)}%` : 
                         '0.0%'
@@ -2927,7 +2924,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-semibold text-blue-900">
+                    <h3 className="text-xl font-bold text-blue-900">
                       {unifiedData?.metrics?.markup ? 
                         `${unifiedData.metrics.markup.toFixed(1)}x` : 
                         '0.0x'
@@ -2981,7 +2978,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-semibold text-purple-900">
+                    <h3 className="text-xl font-bold text-purple-900">
                       {unifiedData?.metrics?.budgetUtilization ? 
                         `${(100 - Math.max(0, (unifiedData as any).metrics.budgetUtilization - 100)).toFixed(1)}%` : 
                         '100.0%'
@@ -3033,7 +3030,7 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <h3 className="font-semibold text-amber-900">
+                    <h3 className="text-xl font-bold text-amber-900">
                       ${unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedHours ? 
                         ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedHours).toFixed(0) : 
                         '0'
