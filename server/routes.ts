@@ -1796,9 +1796,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamMemberData = {
         ...req.body,
         personnelId: personnelId,
+        roleId: req.body.roleId, // CRITICAL: Explicitly preserve the roleId from request
         cost: req.body.cost || (req.body.hours * req.body.rate) || 0
       };
 
+      console.log('🔍 CRITICAL DEBUG - Request roleId:', req.body.roleId);
+      console.log('🔍 CRITICAL DEBUG - TeamMemberData roleId:', teamMemberData.roleId);
       console.log('📝 Final team member data:', teamMemberData);
 
       try {

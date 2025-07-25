@@ -917,6 +917,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       console.log('👥 Saving team members:', quotationData.teamMembers);
 
       for (const member of quotationData.teamMembers) {
+        // CRITICAL DEBUG - Track roleId through the process
+        console.log('🚨 CRITICAL DEBUG - Processing member:', {
+          memberId: member.id,
+          originalRoleId: member.roleId,
+          personnelId: member.personnelId,
+          fullMember: member
+        });
+
         const teamMemberPayload = {
           quotationId: savedQuotation.id,
           roleId: member.roleId,
@@ -929,6 +937,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         console.log('👤 Saving team member:', teamMemberPayload);
         console.log('🔍 DEBUG - Original member object:', member);
         console.log('🔍 DEBUG - Member roleId type:', typeof member.roleId, 'value:', member.roleId);
+        console.log('🚨 CRITICAL - Payload roleId:', teamMemberPayload.roleId);
 
         try {
           await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);

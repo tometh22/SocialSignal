@@ -728,7 +728,26 @@ export class DatabaseStorage implements IStorage {
     // FIXED: personnelId es opcional - se puede asignar automáticamente en routes
     // La validación restrictiva estaba causando que falleara el guardado de equipos
     
+    console.log('🔍 CRITICAL DEBUG - About to insert into DB:', {
+      quotationId: member.quotationId,
+      personnelId: member.personnelId,
+      roleId: member.roleId,
+      roleIdType: typeof member.roleId,
+      hours: member.hours,
+      rate: member.rate,
+      cost: member.cost
+    });
+    
     const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
+    
+    console.log('🔍 CRITICAL DEBUG - DB returned:', {
+      id: newMember.id,
+      quotationId: newMember.quotationId,
+      personnelId: newMember.personnelId,
+      roleId: newMember.roleId,
+      roleIdType: typeof newMember.roleId
+    });
+    
     console.log('✅ Miembro del equipo creado exitosamente:', newMember);
     return newMember;
   }
