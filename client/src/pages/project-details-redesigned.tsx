@@ -2041,14 +2041,14 @@ export default function ProjectDetailsRedesigned() {
                     </div>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    {unifiedData?.actuals?.totalEntries || 0} registros
+                    {recentTimeEntries?.length || 0} registros
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
-                  {unifiedData?.actuals?.totalEntries > 0 ? (
-                    [].slice(0, 12).map((entry, index) => (
+                  {recentTimeEntries && recentTimeEntries.length > 0 ? (
+                    recentTimeEntries.slice(0, 12).map((entry, index) => (
                       <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
                         <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                           <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
@@ -2057,7 +2057,7 @@ export default function ProjectDetailsRedesigned() {
                         </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm text-gray-900 truncate">{entry.personnelName}</p>
-                          <p className="text-xs text-gray-500 truncate">{entry.roleName}</p>
+                          <p className="text-xs text-gray-500 truncate">{entry.roleName || 'Sin rol'}</p>
                           <p className="text-xs text-gray-400">
                             {new Date(entry.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
                           </p>
