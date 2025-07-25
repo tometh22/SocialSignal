@@ -927,6 +927,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         };
 
         console.log('👤 Saving team member:', teamMemberPayload);
+        console.log('🔍 DEBUG - Original member object:', member);
+        console.log('🔍 DEBUG - Member roleId type:', typeof member.roleId, 'value:', member.roleId);
 
         try {
           await apiRequest('/api/quotation-team', 'POST', teamMemberPayload);

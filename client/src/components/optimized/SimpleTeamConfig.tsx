@@ -110,12 +110,14 @@ const SimpleTeamConfig: React.FC = () => {
     const hours = newMember.hours;
     const cost = hours * rate;
 
-    console.log('Adding member with:', { 
+    console.log('🎯 Adding member with:', { 
       roleId: newMember.roleId, 
       personnelId: newMember.personnelId, 
       hours, 
       rate, 
-      cost 
+      cost,
+      selectedRole: selectedRole?.name,
+      selectedPersonnel: selectedPersonnel?.name
     });
 
     addTeamMember({
