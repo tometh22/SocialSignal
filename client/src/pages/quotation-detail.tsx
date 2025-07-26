@@ -652,6 +652,7 @@ const QuotationDetail: React.FC = () => {
                 variant="default"
                 size="sm"
                 className="flex-1 flex justify-center items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white h-8 text-xs"
+                onClick={() => setLocation(`/optimized-quote/${quotationId}`)}
               >
                 <Edit className="h-3.5 w-3.5" />
                 Editar

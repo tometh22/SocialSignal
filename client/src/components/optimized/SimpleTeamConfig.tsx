@@ -504,7 +504,7 @@ const SimpleTeamConfig: React.FC = () => {
                     });
                     console.log('🔍 DEBUG - Found role:', role);
                     
-                    const person = availablePersonnel?.find(p => p.id === member.personnelId);
+                    const person = availablePersonnel?.find(p => Number(p.id) === Number(member.personnelId));
                     const memberId = String(member.id);
                     const isCurrentlyEditing = isEditing[memberId];
 
