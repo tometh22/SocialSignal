@@ -874,7 +874,9 @@ export default function FinancialReviewFinal() {
                         <div className="space-y-2 text-xs">
                           <div className="flex justify-between items-center text-blue-700">
                             <span>Costo base + herramientas:</span>
-                            <span className="font-mono font-medium">${subtotalWithPlatformAndToolsUSD.toFixed(2)}</span>
+                            <span className="font-mono font-medium">
+                              ${(subtotalWithPlatformUSD + toolsCostUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
                           </div>
                           <div className="flex justify-between items-center text-blue-700">
                             <span>Markup calculado:</span>
@@ -888,7 +890,7 @@ export default function FinancialReviewFinal() {
                             <span>Ganancia proyectada:</span>
                             <span className="font-mono text-green-700">
                               ${quotationData.financials.manualPrice 
-                                ? (quotationData.financials.manualPrice - subtotalWithPlatformAndToolsUSD).toFixed(2)
+                                ? Math.max(0, quotationData.financials.manualPrice - (subtotalWithPlatformUSD + toolsCostUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                 : '0.00'}
                             </span>
                           </div>
