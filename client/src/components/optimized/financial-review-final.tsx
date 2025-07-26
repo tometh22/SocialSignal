@@ -17,6 +17,7 @@ import { InflationAdjustmentCard } from "@/components/optimized/inflation-adjust
 import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Users, 
   Calculator, 
@@ -813,40 +814,92 @@ export default function FinancialReviewFinal() {
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Calculator className="h-4 w-4" />
-                    Modo de Cálculo
+                    Modo de Cálculo de Precio
                   </Label>
                   <div className="flex items-center space-x-2">
                     <Button
                       variant={quotationData.financials.priceMode === 'auto' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => updateFinancials({ priceMode: 'auto' })}
+                      onClick={() => {
+                        updateFinancials({ priceMode: 'auto' });
+                        // Limpiar precio manual al cambiar a automático
+                        updateFinancials({ manualPrice: undefined });
+                      }}
                       className="flex-1"
                     >
+                      <Zap className="h-4 w-4 mr-1" />
                       Automático
                     </Button>
                     <Button
                       variant={quotationData.financials.priceMode === 'manual' ? 'default' : 'outline'}
                       size="sm"
-                      onClick={() => updateFinancials({ priceMode: 'manual' })}
+                      onClick={() => {
+                        updateFinancials({ priceMode: 'manual' });
+                        // Si no hay precio manual, usar el precio actual como punto de partida
+                        if (!quotationData.financials.manualPrice) {
+                          updateFinancials({ manualPrice: finalTotalUSD });
+                        }
+                      }}
                       className="flex-1"
                     >
+                      <FileText className="h-4 w-4 mr-1" />
                       Manual
                     </Button>
                   </div>
                   
                   {quotationData.financials.priceMode === 'manual' && (
-                    <div className="space-y-2">
-                      <Label className="text-sm text-gray-600">Precio Final Manual (USD)</Label>
-                      <Input
-                        type="number"
-                        placeholder="0.00"
-                        value={quotationData.financials.manualPrice || 0}
-                        onChange={(e) => updateFinancials({ manualPrice: Number(e.target.value) || 0 })}
-                        className="text-right font-mono"
-                      />
-                      <p className="text-xs text-gray-500">
-                        El sistema calculará automáticamente el markup necesario
-                      </p>
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium text-blue-900">Precio Final Manual</Label>
+                          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                            USD
+                          </Badge>
+                        </div>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-600" />
+                          <Input
+                            type="number"
+                            placeholder="0.00"
+                            value={quotationData.financials.manualPrice || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              updateFinancials({ manualPrice: isNaN(value) ? 0 : value });
+                            }}
+                            className="text-right font-mono text-lg pl-10 pr-3 border-blue-300 focus:border-blue-500"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between items-center text-blue-700">
+                            <span>Costo base + herramientas:</span>
+                            <span className="font-mono font-medium">${subtotalWithPlatformAndToolsUSD.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-blue-700">
+                            <span>Markup calculado:</span>
+                            <span className="font-mono font-medium">
+                              {quotationData.financials.manualPrice 
+                                ? `${(((quotationData.financials.manualPrice - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
+                                : '0.00x'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-blue-700 font-medium pt-1 border-t border-blue-200">
+                            <span>Ganancia proyectada:</span>
+                            <span className="font-mono text-green-700">
+                              ${quotationData.financials.manualPrice 
+                                ? (quotationData.financials.manualPrice - subtotalWithPlatformAndToolsUSD).toFixed(2)
+                                : '0.00'}
+                            </span>
+                          </div>
+                        </div>
+                        <Alert className="bg-blue-100 border-blue-300">
+                          <Info className="h-4 w-4 text-blue-600" />
+                          <AlertDescription className="text-xs text-blue-800">
+                            Al ingresar un precio manual, el sistema calculará automáticamente el markup necesario para alcanzar ese precio objetivo.
+                          </AlertDescription>
+                        </Alert>
+                      </div>
                     </div>
                   )}
                 </div>
