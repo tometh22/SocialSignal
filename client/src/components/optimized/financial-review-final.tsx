@@ -181,28 +181,35 @@ export default function FinancialReviewFinal() {
     finalBaseAfterInflationUSD = subtotalWithComplexityUSD;
   }
 
-  // Platform cost and tools cost - keep in USD
+  // Platform cost - keep in USD (tools will be added AFTER markup)
   const platformCostUSD = quotationData.financials.platformCost || 0;
   const toolsCostUSD = quotationData.financials.toolsCost || 0;
-  const subtotalWithPlatformAndToolsUSD = finalBaseAfterInflationUSD + platformCostUSD + toolsCostUSD;
+  const subtotalWithPlatformUSD = finalBaseAfterInflationUSD + platformCostUSD;
 
   // Check if we're in manual pricing mode
-  let finalTotalUSD, marginAmountUSD, discountAmountUSD, subtotalWithMarginUSD;
+  let finalTotalUSD, marginAmountUSD, discountAmountUSD, subtotalWithMarginUSD, subtotalWithPlatformAndToolsUSD;
   
   if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
     // Manual pricing mode - work backwards from final price
-    // The manual price is the final price AFTER discount
+    // The manual price is the final price AFTER discount and tools
     finalTotalUSD = quotationData.financials.manualPrice;
+    // Subtract tools to get the price before tools
+    const priceBeforeToolsUSD = finalTotalUSD - toolsCostUSD;
     // Calculate subtotal before discount: final / (1 - discount_rate)
-    subtotalWithMarginUSD = finalTotalUSD / (1 - (discountPercentage / 100));
-    discountAmountUSD = subtotalWithMarginUSD - finalTotalUSD;
-    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformAndToolsUSD;
+    subtotalWithMarginUSD = priceBeforeToolsUSD / (1 - (discountPercentage / 100));
+    discountAmountUSD = subtotalWithMarginUSD - priceBeforeToolsUSD;
+    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+    // Add tools back at the end
+    subtotalWithPlatformAndToolsUSD = subtotalWithMarginUSD + toolsCostUSD;
   } else {
     // Automatic pricing mode - work forwards from costs
-    subtotalWithMarginUSD = subtotalWithPlatformAndToolsUSD * markupMultiplier;
-    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformAndToolsUSD;
-    discountAmountUSD = subtotalWithMarginUSD * (discountPercentage / 100);
-    finalTotalUSD = subtotalWithMarginUSD - discountAmountUSD;
+    // Apply markup BEFORE adding tools
+    subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
+    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+    // Add tools AFTER markup
+    subtotalWithPlatformAndToolsUSD = subtotalWithMarginUSD + toolsCostUSD;
+    discountAmountUSD = subtotalWithPlatformAndToolsUSD * (discountPercentage / 100);
+    finalTotalUSD = subtotalWithPlatformAndToolsUSD - discountAmountUSD;
   }
 
   // Convert final amounts to display currency (for UI display only)
@@ -212,6 +219,7 @@ export default function FinancialReviewFinal() {
   const platformCostDisplay = convertToDisplayCurrency(platformCostUSD);
   const toolsCostDisplay = convertToDisplayCurrency(toolsCostUSD);
   const finalBaseAfterInflationDisplay = convertToDisplayCurrency(finalBaseAfterInflationUSD);
+  const subtotalWithPlatformDisplay = convertToDisplayCurrency(subtotalWithPlatformUSD);
   const subtotalWithPlatformAndToolsDisplay = convertToDisplayCurrency(subtotalWithPlatformAndToolsUSD);
   const subtotalWithMarginDisplay = convertToDisplayCurrency(subtotalWithMarginUSD);
   const marginAmountDisplay = convertToDisplayCurrency(marginAmountUSD);
@@ -670,7 +678,7 @@ export default function FinancialReviewFinal() {
                   </Label>
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x calc.`
+                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
                       : `${markupMultiplier}x`}
                   </Badge>
                 </div>
@@ -679,7 +687,7 @@ export default function FinancialReviewFinal() {
                     {(() => {
                       const isManualMode = quotationData.financials.priceMode === 'manual' && Boolean(quotationData.financials.manualPrice);
                       const currentMarkup = isManualMode 
-                        ? (subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1
+                        ? (subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1
                         : markupMultiplier;
                       
                       return (
@@ -730,9 +738,9 @@ export default function FinancialReviewFinal() {
                     </div>
                     <p className="text-xs text-green-700 mt-1">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice ? (
-                        `Markup calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
+                        `Markup calculado: ${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x (${formatFinalCurrency(subtotalWithPlatformDisplay)} → ${formatFinalCurrency(subtotalWithMarginDisplay)})`
                       ) : (
-                        `Base: ${formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)} × ${markupMultiplier} = ${formatFinalCurrency(subtotalWithMarginDisplay)}`
+                        `Base: ${formatFinalCurrency(subtotalWithPlatformDisplay)} × ${markupMultiplier} = ${formatFinalCurrency(subtotalWithMarginDisplay)}`
                       )}
                     </p>
                   </div>
@@ -1083,6 +1091,24 @@ export default function FinancialReviewFinal() {
                 </div>
               )}
 
+              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-900">Subtotal (Base Total)</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformDisplay)}</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-green-900">
+                    5. + Margen ({quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
+                      : `${markupMultiplier}x`})
+                  </span>
+                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
+                </div>
+              </div>
+
               {toolsCostDisplay > 0 && (
                 <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-200">
                   <div className="flex justify-between items-center">
@@ -1094,26 +1120,8 @@ export default function FinancialReviewFinal() {
 
               <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-900">Subtotal (Base Total)</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)}</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-green-900">
-                    5. + Margen ({quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1).toFixed(2)}x calc.`
-                      : `${markupMultiplier}x`})
-                  </span>
-                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
-                <div className="flex justify-between items-center">
                   <span className="text-sm font-semibold text-gray-900">Subtotal con Margen</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithMarginDisplay)}</span>
+                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)}</span>
                 </div>
               </div>
 
