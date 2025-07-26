@@ -436,11 +436,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
     console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity}`);
 
-    // Add tools cost
-    const toolsCost = quotationData.financials.toolsCost || 0;
-    const subtotalWithTools = subtotalWithComplexity + toolsCost;
-    console.log(`🔧 Tools cost: $${toolsCost}, Subtotal with tools: $${subtotalWithTools}`);
-
     // Declare variables for calculated values
     let calculatedMarkup = 0;
     let subtotalWithMarkup = 0;
@@ -449,10 +444,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
       console.log(`✏️ Manual pricing mode: Target price $${quotationData.financials.manualPrice}`);
 
-      // Calculate what margin would be needed to reach the manual price
+      // Calculate what margin would be needed to reach the manual price (before tools)
       const manualPrice = quotationData.financials.manualPrice;
-      calculatedMarkup = manualPrice - subtotalWithTools;
-      const marginFactor = subtotalWithTools > 0 ? (manualPrice / subtotalWithTools) : 1;
+      const toolsCost = quotationData.financials.toolsCost || 0;
+      // Manual price includes tools, so we need to subtract tools to get the base for markup calculation
+      const priceBeforeTools = manualPrice - toolsCost;
+      calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
+      const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
 
       console.log(`✏️ Manual price markup: $${calculatedMarkup}, Effective margin: ${marginFactor}x`);
       setMarkupAmount(calculatedMarkup);
@@ -469,18 +467,26 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         financials: updatedFinancials 
       }));
 
-      subtotalWithMarkup = manualPrice;
-      console.log(`📈 Manual subtotal with markup: $${subtotalWithMarkup}`);
+      subtotalWithMarkup = priceBeforeTools;
+      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup}`);
     } else {
       // Calculate markup (margin) normally
       const marginFactor = quotationData.financials.marginFactor || 2.0;
-      calculatedMarkup = subtotalWithTools * (marginFactor - 1);
-      console.log(`💰 Auto markup: $${subtotalWithTools} × ${marginFactor - 1} = $${calculatedMarkup}`);
+      calculatedMarkup = subtotalWithComplexity * (marginFactor - 1);
+      console.log(`💰 Auto markup: $${subtotalWithComplexity} × ${marginFactor - 1} = $${calculatedMarkup}`);
       setMarkupAmount(calculatedMarkup);
 
-      subtotalWithMarkup = subtotalWithTools + calculatedMarkup;
+      subtotalWithMarkup = subtotalWithComplexity + calculatedMarkup;
       console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup}`);
     }
+
+    // Add tools cost AFTER markup
+    const toolsCost = quotationData.financials.toolsCost || 0;
+    const subtotalWithTools = subtotalWithMarkup + toolsCost;
+    console.log(`🔧 Tools cost (added after markup): $${toolsCost}, Subtotal with tools: $${subtotalWithTools}`);
+
+    // Update the variable name for consistency
+    subtotalWithMarkup = subtotalWithTools;
 
     // Add platform cost
     const platformCost = quotationData.financials.platformCost || 0;

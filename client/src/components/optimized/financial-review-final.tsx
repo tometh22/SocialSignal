@@ -675,24 +675,49 @@ export default function FinancialReviewFinal() {
                   </Badge>
                 </div>
                 <div className="space-y-3">
-                  {(() => {
-                    const isManualMode = quotationData.financials.priceMode === 'manual' && Boolean(quotationData.financials.manualPrice);
-                    const currentMarkup = isManualMode 
-                      ? (subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1
-                      : markupMultiplier;
-                    
-                    return (
-                      <Slider
-                        value={[currentMarkup]}
-                        onValueChange={(value) => setMarkupMultiplier(value[0])}
-                        min={1.0}
-                        max={6.0}
-                        step={0.1}
-                        className="w-full"
-                        disabled={isManualMode}
-                      />
-                    );
-                  })()}
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const isManualMode = quotationData.financials.priceMode === 'manual' && Boolean(quotationData.financials.manualPrice);
+                      const currentMarkup = isManualMode 
+                        ? (subtotalWithMarginUSD / subtotalWithPlatformAndToolsUSD) || 1
+                        : markupMultiplier;
+                      
+                      return (
+                        <>
+                          <div className="flex-1">
+                            <Slider
+                              value={[currentMarkup]}
+                              onValueChange={(value) => setMarkupMultiplier(value[0])}
+                              min={1.0}
+                              max={6.0}
+                              step={0.1}
+                              className="w-full"
+                              disabled={isManualMode}
+                            />
+                          </div>
+                          <div className="w-24">
+                            <Input
+                              type="number"
+                              value={currentMarkup.toFixed(1)}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value);
+                                if (!isNaN(value) && value >= 1.0 && value <= 6.0) {
+                                  setMarkupMultiplier(value);
+                                }
+                              }}
+                              min="1.0"
+                              max="6.0"
+                              step="0.1"
+                              disabled={isManualMode}
+                              className="text-center font-mono text-sm"
+                              placeholder="2.0"
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-gray-600">x</span>
+                        </>
+                      );
+                    })()}
+                  </div>
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>1.0x (Sin ganancia)</span>
                     <span>3.5x</span>
