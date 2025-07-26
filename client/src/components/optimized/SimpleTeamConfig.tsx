@@ -486,11 +486,22 @@ const SimpleTeamConfig: React.FC = () => {
                     console.log('🔍 DEBUG - Team member:', { 
                       memberId: member.id, 
                       roleId: member.roleId, 
-                      personnelId: member.personnelId 
+                      personnelId: member.personnelId,
+                      memberType: typeof member.roleId
                     });
-                    console.log('🔍 DEBUG - Available roles:', availableRoles?.map(r => ({ id: r.id, name: r.name })));
+                    console.log('🔍 DEBUG - Available roles:', availableRoles?.map(r => ({ 
+                      id: r.id, 
+                      name: r.name,
+                      idType: typeof r.id 
+                    })));
                     
-                    const role = availableRoles?.find(r => r.id === member.roleId);
+                    const role = availableRoles?.find(r => {
+                      const roleIdNum = Number(r.id);
+                      const memberRoleIdNum = Number(member.roleId);
+                      const match = roleIdNum === memberRoleIdNum;
+                      console.log(`🔍 DEBUG - Comparing role ${r.id} (${typeof r.id}) → ${roleIdNum} with member.roleId ${member.roleId} (${typeof member.roleId}) → ${memberRoleIdNum}: ${match}`);
+                      return match;
+                    });
                     console.log('🔍 DEBUG - Found role:', role);
                     
                     const person = availablePersonnel?.find(p => p.id === member.personnelId);

@@ -398,6 +398,7 @@ const QuotationDetail: React.FC = () => {
             variant="default" 
             size="sm" 
             className="h-8 px-2 bg-indigo-500 hover:bg-indigo-600 text-white"
+            onClick={() => setLocation(`/optimized-quote/${quotation.id}`)}
           >
             <Edit className="h-4 w-4" />
           </Button>

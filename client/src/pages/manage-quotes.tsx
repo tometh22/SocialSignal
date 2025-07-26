@@ -48,24 +48,37 @@ export default function ManageQuotes() {
   console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
 
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
-    queryKey: ["/api/quotations"],
-    onSuccess: (data) => {
-      console.log(`[QUOTES] ✅ Cotizaciones cargadas exitosamente: ${data.length} elementos`);
-    },
-    onError: (error) => {
-      console.error(`[QUOTES] ❌ Error al cargar cotizaciones:`, error);
-    }
+    queryKey: ["/api/quotations"]
   });
 
   const { data: clients = [], error: clientsError } = useQuery<Client[]>({
-    queryKey: ["/api/clients"],
-    onSuccess: (data) => {
-      console.log(`[QUOTES] ✅ Clientes cargados exitosamente: ${data.length} elementos`);
-    },
-    onError: (error) => {
-      console.error(`[QUOTES] ❌ Error al cargar clientes:`, error);
-    }
+    queryKey: ["/api/clients"]
   });
+
+  // Log success/error after data is loaded
+  useEffect(() => {
+    if (quotations) {
+      console.log(`[QUOTES] ✅ Cotizaciones cargadas exitosamente: ${quotations.length} elementos`);
+    }
+  }, [quotations]);
+
+  useEffect(() => {
+    if (quotationsError) {
+      console.error(`[QUOTES] ❌ Error al cargar cotizaciones:`, quotationsError);
+    }
+  }, [quotationsError]);
+
+  useEffect(() => {
+    if (clients.length > 0) {
+      console.log(`[QUOTES] ✅ Clientes cargados exitosamente: ${clients.length} elementos`);
+    }
+  }, [clients]);
+
+  useEffect(() => {
+    if (clientsError) {
+      console.error(`[QUOTES] ❌ Error al cargar clientes:`, clientsError);
+    }
+  }, [clientsError]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
