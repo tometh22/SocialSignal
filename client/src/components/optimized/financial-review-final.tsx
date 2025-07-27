@@ -18,6 +18,7 @@ import ToolsAndPricing from "@/components/optimized/tools-and-pricing";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Users, 
   Calculator, 
@@ -39,7 +40,10 @@ import {
   Zap,
   Shield,
   Loader2,
-  Percent
+  Percent,
+  HelpCircle,
+  AlertCircle,
+  Edit
 } from "lucide-react";
 
 export default function FinancialReviewFinal() {
@@ -433,67 +437,113 @@ export default function FinancialReviewFinal() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-6 p-4 lg:p-6">
-      {/* Level 1: Compact Success Header */}
-      <div className="bg-gradient-to-r from-emerald-50 via-blue-50 to-indigo-50 rounded-2xl p-6 border border-emerald-200 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <CheckCircle className="h-6 w-6 text-emerald-600" />
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+      {/* Modern Sticky Header */}
+      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate("/quotations")}
+                className="hover:bg-gray-100"
+                size="sm"
+              >
+                ← Volver
+              </Button>
+              <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">Editar Cotización</h1>
+                  <p className="text-xs text-gray-500">
+                    Crea y gestiona cotizaciones de manera optimizada
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Cotización Finalizada</h1>
-              <p className="text-sm text-gray-600">Lista para presentar al cliente</p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft}
+                className="border-gray-200 hover:bg-gray-50"
+                size="sm"
+              >
+                {isSavingDraft ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Guardar
+              </Button>
+              <Button
+                onClick={handleFinalizeQuotation}
+                disabled={isFinalizing}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                size="sm"
+              >
+                {isFinalizing ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                )}
+                Finalizar Cotización
+              </Button>
             </div>
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 ml-4">
-              <Sparkles className="h-3 w-3 mr-1" />
-              Completa
-            </Badge>
-          </div>
-
-          <div className="text-right">
-            <p className="text-sm text-gray-600 mb-1">Total Proyecto</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {formatFinalCurrency(finalTotalDisplay)}
-            </p>
-            <p className="text-xs text-gray-500">
-              {quotationData.inflation.quotationCurrency} • {quotationData.client?.name}
-            </p>
           </div>
         </div>
       </div>
 
-      {/* Level 2: Executive Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-200 flex items-center justify-center">
-                <Users className="h-4 w-4 text-blue-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-blue-800">Equipo</p>
-                <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
-                <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
+        {/* Executive Summary Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 cursor-help">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-200 flex items-center justify-center">
+                    <Users className="h-4 w-4 text-blue-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-blue-800">Equipo</p>
+                    <p className="text-lg font-bold text-blue-900">{quotationData.teamMembers.length} miembros</p>
+                    <p className="text-xs text-blue-600">{formatFinalCurrency(teamBaseCostDisplay)} base</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">Costo base del equipo sin ajustes por complejidad o markup. Este es el costo directo de las horas de trabajo.</p>
+          </TooltipContent>
+        </Tooltip>
 
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center">
-                <Target className="h-4 w-4 text-amber-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-amber-800">Complejidad</p>
-                <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
-                <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100 cursor-help">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-200 flex items-center justify-center">
+                    <Target className="h-4 w-4 text-amber-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-amber-800">Complejidad</p>
+                    <p className="text-lg font-bold text-amber-900">+{getComplexityPercentage()}%</p>
+                    <p className="text-xs text-amber-600">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">Ajuste por complejidad del proyecto basado en tipo de análisis, volumen de menciones, países cubiertos y compromiso del cliente.</p>
+          </TooltipContent>
+        </Tooltip>
 
         <Card className={`border-0 shadow-sm ${
           quotationData.inflation.applyInflationAdjustment 
@@ -538,35 +588,53 @@ export default function FinancialReviewFinal() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center">
-                <TrendingUp className="h-4 w-4 text-green-700" />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-green-800">Markup</p>
-                <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
-                <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 cursor-help">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-green-200 flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 text-green-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-green-800">Markup</p>
+                    <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
+                    <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="max-w-xs">Multiplicador de ganancia aplicado al costo base. El markup {markupMultiplier}x significa que el precio es {markupMultiplier} veces el costo.</p>
+          </TooltipContent>
+        </Tooltip>
+        </div>
 
-      {/* Level 3: Main Content - Responsive Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+        {/* Main Content - Responsive Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
 
         {/* Left: Team Breakdown */}
         <div className="space-y-4 lg:space-y-6">
-          <Card className="shadow-sm border-0 bg-white">
-            <CardHeader className="pb-4 border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-600" />
-                Composición del Equipo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
+          {/* Team Composition - Collapsible */}
+          <Collapsible defaultOpen={true}>
+            <Card className="shadow-sm border-0 bg-white overflow-hidden">
+              <CollapsibleTrigger className="w-full">
+                <CardHeader className="pb-4 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="h-5 w-5 text-blue-600" />
+                      Composición del Equipo
+                      <Badge variant="secondary" className="ml-2">
+                        {quotationData.teamMembers.length} miembros
+                      </Badge>
+                    </CardTitle>
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="p-0">
               <div className="divide-y divide-gray-50">
                 {quotationData.teamMembers.map((member, index) => (
                   <div key={member.id || index} className="p-4 hover:bg-gray-25 transition-colors">
@@ -606,21 +674,30 @@ export default function FinancialReviewFinal() {
                   <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay, quotationData.inflation.quotationCurrency)}</span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-          {/* Complexity Factors */}
-          <Card className="shadow-sm border-0 bg-white">
-            <CardHeader className="pb-4 border-b border-gray-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calculator className="h-5 w-5 text-amber-600" />
-                Factores de Complejidad
-                <Badge variant="outline" className="ml-auto text-amber-700 border-amber-200">
-                  +{getComplexityPercentage()}%
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4">
+          {/* Complexity Factors - Collapsible */}
+          <Collapsible defaultOpen={false}>
+            <Card className="shadow-sm border-0 bg-white overflow-hidden">
+              <CollapsibleTrigger className="w-full">
+                <CardHeader className="pb-4 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Calculator className="h-5 w-5 text-amber-600" />
+                      Factores de Complejidad
+                      <Badge variant="outline" className="ml-auto text-amber-700 border-amber-200">
+                        +{getComplexityPercentage()}%
+                      </Badge>
+                    </CardTitle>
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="p-4">
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100">
                   <span className="text-sm font-medium text-amber-900">Tipo de Análisis</span>
@@ -654,8 +731,10 @@ export default function FinancialReviewFinal() {
                 <span className="font-semibold text-amber-900">Total Ajuste Complejidad</span>
                 <span className="text-lg font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
               </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
 
         {/* Center: Controls and Inflation */}
@@ -849,58 +928,63 @@ export default function FinancialReviewFinal() {
                   
                   {quotationData.financials.priceMode === 'manual' && (
                     <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium text-blue-900">Precio Final Manual</Label>
-                          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                            USD
-                          </Badge>
-                        </div>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-600" />
-                          <Input
-                            type="number"
-                            placeholder="0.00"
-                            value={quotationData.financials.manualPrice || ''}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value);
-                              updateFinancials({ manualPrice: isNaN(value) ? 0 : value });
-                            }}
-                            className="text-right font-mono text-lg pl-10 pr-3 border-blue-300 focus:border-blue-500"
-                            min="0"
-                            step="0.01"
-                          />
-                        </div>
-                        <div className="space-y-2 text-xs">
-                          <div className="flex justify-between items-center text-blue-700">
-                            <span>Costo base + herramientas:</span>
-                            <span className="font-mono font-medium">
-                              ${(subtotalWithPlatformUSD + toolsCostUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-sm font-medium text-blue-900">
+                              Precio objetivo (USD)
+                            </Label>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-blue-400 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <p>Ingrese el precio que desea cobrar al cliente. El sistema calculará automáticamente el markup necesario.</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </div>
-                          <div className="flex justify-between items-center text-blue-700">
-                            <span>Markup calculado:</span>
-                            <span className="font-mono font-medium">
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-500" />
+                            <Input
+                              type="number"
+                              placeholder="0.00"
+                              value={quotationData.financials.manualPrice || ''}
+                              onChange={(e) => {
+                                const value = parseFloat(e.target.value);
+                                updateFinancials({ manualPrice: isNaN(value) ? 0 : value });
+                              }}
+                              className="text-right font-mono text-xl pl-10 pr-3 h-12 border-blue-200 focus:border-blue-400 bg-blue-50/50"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Métricas calculadas */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-gray-50 rounded-lg p-2 text-center">
+                            <p className="text-xs text-gray-600">Costo Base</p>
+                            <p className="font-mono text-sm font-semibold text-gray-900">
+                              ${(subtotalWithPlatformUSD + toolsCostUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-2 text-center">
+                            <p className="text-xs text-blue-600">Markup</p>
+                            <p className="font-mono text-sm font-semibold text-blue-900">
                               {quotationData.financials.manualPrice 
                                 ? `${(((quotationData.financials.manualPrice - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
                                 : '0.00x'}
-                            </span>
+                            </p>
                           </div>
-                          <div className="flex justify-between items-center text-blue-700 font-medium pt-1 border-t border-blue-200">
-                            <span>Ganancia proyectada:</span>
-                            <span className="font-mono text-green-700">
+                          <div className="bg-green-50 rounded-lg p-2 text-center">
+                            <p className="text-xs text-green-600">Ganancia</p>
+                            <p className="font-mono text-sm font-semibold text-green-900">
                               ${quotationData.financials.manualPrice 
-                                ? Math.max(0, quotationData.financials.manualPrice - (subtotalWithPlatformUSD + toolsCostUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                : '0.00'}
-                            </span>
+                                ? Math.max(0, quotationData.financials.manualPrice - (subtotalWithPlatformUSD + toolsCostUSD)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                                : '0'}
+                            </p>
                           </div>
                         </div>
-                        <Alert className="bg-blue-100 border-blue-300">
-                          <Info className="h-4 w-4 text-blue-600" />
-                          <AlertDescription className="text-xs text-blue-800">
-                            Al ingresar un precio manual, el sistema calculará automáticamente el markup necesario para alcanzar ese precio objetivo.
-                          </AlertDescription>
-                        </Alert>
                       </div>
                     </div>
                   )}
@@ -1095,103 +1179,124 @@ export default function FinancialReviewFinal() {
         <div className="space-y-4 lg:space-y-6">
           <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-emerald-50/30 h-fit">
             <CardHeader className="pb-4 border-b border-emerald-100">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-emerald-600" />
-                Desglose Financiero
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-emerald-600" />
+                  Resumen de Cálculo
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p>Este desglose muestra cómo se calcula el precio final paso a paso, desde el costo base hasta el precio final al cliente.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="p-4 space-y-2">
 
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-900">1. Costo Base Equipo</span>
-                  <span className="font-bold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
+              {/* Sección 1: Costo Base */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs">1</div>
+                  Costo Base
                 </div>
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-amber-900">2. + Complejidad ({getComplexityPercentage()}%)</span>
-                  <span className="font-bold text-amber-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-900">Subtotal (Base + Complejidad)</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithComplexityDisplay)}</span>
-                </div>
-              </div>
-
-              {quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 && (
-                <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
                   <div className="flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-orange-900">3. + Protección Inflacionaria</span>
-                      <span className="text-xs text-orange-700">
-                        {totalInflationPercentage.toFixed(2)}% en {monthsToProject} meses
+                    <span className="text-sm text-blue-800">Equipo</span>
+                    <span className="font-semibold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
+                  </div>
+                  {teamComplexityAdjustmentDisplay > 0 && (
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-blue-100">
+                      <span className="text-sm text-blue-800">+ Complejidad ({getComplexityPercentage()}%)</span>
+                      <span className="font-semibold text-blue-900">+{formatFinalCurrency(teamComplexityAdjustmentDisplay)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sección 2: Ajustes */}
+              {(quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0) || platformCostDisplay > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 text-xs">2</div>
+                    Ajustes
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
+                    {quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 && (
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm text-orange-800">Protección Inflacionaria</span>
+                          <span className="text-xs text-orange-600">
+                            {totalInflationPercentage.toFixed(2)}% en {monthsToProject} meses
+                          </span>
+                        </div>
+                        <span className="font-semibold text-orange-900">+{formatFinalCurrency(inflationAdjustmentDisplay)}</span>
+                      </div>
+                    )}
+                    {platformCostDisplay > 0 && (
+                      <div className={`flex justify-between items-center ${quotationData.inflation.applyInflationAdjustment && inflationAdjustmentUSD > 0 ? 'mt-2 pt-2 border-t border-orange-100' : ''}`}>
+                        <span className="text-sm text-orange-800">Costos de Plataforma</span>
+                        <span className="font-semibold text-orange-900">+{formatFinalCurrency(platformCostDisplay)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Sección 3: Margen y Herramientas */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs">3</div>
+                  Precio de Venta
+                </div>
+                <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                  <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm text-green-800">Margen de Ganancia</span>
+                      <span className="text-xs text-green-600">
+                        Markup {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                          ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
+                          : `${markupMultiplier}x`}
                       </span>
                     </div>
-                    <span className="font-bold text-orange-900">+{formatFinalCurrency(inflationAdjustmentDisplay)}</span>
+                    <span className="font-semibold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
                   </div>
-                </div>
-              )}
-
-              {platformCostDisplay > 0 && (
-                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-purple-900">4. + Costos de Plataforma</span>
-                    <span className="font-bold text-purple-900">+{formatFinalCurrency(platformCostDisplay)}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-900">Subtotal (Base Total)</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformDisplay)}</span>
+                  {toolsCostDisplay > 0 && (
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-green-100">
+                      <span className="text-sm text-green-800">Costos de Herramientas</span>
+                      <span className="font-semibold text-green-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-green-900">
-                    5. + Margen ({quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                      ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(2)}x calc.`
-                      : `${markupMultiplier}x`})
-                  </span>
-                  <span className="font-bold text-green-900">+{formatFinalCurrency(marginAmountDisplay)}</span>
-                </div>
-              </div>
-
-              {toolsCostDisplay > 0 && (
-                <div className="p-3 bg-cyan-50 rounded-lg border border-cyan-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-cyan-900">+ Costos de Herramientas</span>
-                    <span className="font-bold text-cyan-900">+{formatFinalCurrency(toolsCostDisplay)}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-gray-900">Subtotal con Margen</span>
-                  <span className="font-bold text-gray-900">{formatFinalCurrency(subtotalWithPlatformAndToolsDisplay)}</span>
-                </div>
-              </div>
-
+              {/* Sección 4: Descuento (si aplica) */}
               {discountPercentage > 0 && (
-                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-red-900">6. - Descuento ({discountPercentage}%)</span>
-                    <span className="font-bold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center text-red-700 text-xs">4</div>
+                    Descuento
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 border border-red-100">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-red-800">Descuento ({discountPercentage}%)</span>
+                      <span className="font-semibold text-red-900">-{formatFinalCurrency(discountAmountDisplay)}</span>
+                    </div>
                   </div>
                 </div>
               )}
 
-              <Separator className="my-4" />
+              {/* Separador visual */}
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+              </div>
 
-              <div className="p-4 bg-gradient-to-r from-emerald-100 to-green-100 rounded-xl border-2 border-emerald-300">
+              {/* Total Final */}
+              <div className="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border-2 border-emerald-200 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5 text-emerald-700" />
@@ -1256,8 +1361,8 @@ export default function FinancialReviewFinal() {
           </div>
         </div>
       </div>
-
-
     </div>
+    </div>
+    </TooltipProvider>
   );
 }
