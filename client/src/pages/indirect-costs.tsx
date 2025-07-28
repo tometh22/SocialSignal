@@ -81,58 +81,38 @@ export function IndirectCosts() {
         method: 'POST',
         body: data
       }),
-    onMutate: async (newCategory) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['/api/indirect-cost-categories'] });
+    onSuccess: async (data) => {
+      // Close dialog immediately
+      setIsAddingCategory(false);
+      setFormData({});
       
-      // Snapshot the previous value
-      const previousCategories = queryClient.getQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories']);
+      // Get current categories from cache
+      const currentCategories = queryClient.getQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories']) || [];
       
-      // Optimistically update to the new value
-      const optimisticCategory: IndirectCostCategory = {
-        id: Date.now(),
-        name: newCategory.name,
-        description: newCategory.description || null,
-        type: newCategory.type,
-        isActive: newCategory.isActive ?? true,
-        createdAt: new Date()
-      };
+      // Check if this category already exists (avoid duplicates)
+      const exists = currentCategories.some(c => c.id === data.id);
       
-      queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], old => [
-        ...(old || []),
-        optimisticCategory
-      ]);
-      
-      // Return context with the previous categories
-      return { previousCategories };
-    },
-    onError: (err, newCategory, context: any) => {
-      // If the mutation fails, use the context to roll back
-      if (context?.previousCategories) {
-        queryClient.setQueryData(['/api/indirect-cost-categories'], context.previousCategories);
+      if (!exists) {
+        // Add the new category to the list immediately
+        queryClient.setQueryData(['/api/indirect-cost-categories'], [...currentCategories, data]);
       }
+      
+      toast({
+        title: "Categoría creada",
+        description: "La categoría se creó exitosamente"
+      });
+      
+      // Invalidate in background to ensure consistency
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
+      }, 100);
+    },
+    onError: (err) => {
       console.error('Error creating category:', err);
       toast({
         title: "Error",
         description: "No se pudo crear la categoría. Por favor intenta de nuevo.",
         variant: "destructive"
-      });
-    },
-    onSuccess: async (data) => {
-      // Simply invalidate and let React Query refetch
-      // This ensures we get the proper data from the server
-      setIsAddingCategory(false);
-      setFormData({});
-      
-      // Force an immediate refetch
-      await queryClient.refetchQueries({ 
-        queryKey: ['/api/indirect-cost-categories'],
-        exact: true 
-      });
-      
-      toast({
-        title: "Categoría creada",
-        description: "La categoría se creó exitosamente"
       });
     }
   });
