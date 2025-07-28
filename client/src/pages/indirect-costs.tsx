@@ -50,7 +50,16 @@ export function IndirectCosts() {
     { categoryId: '', name: '', amount: '', period: 'monthly', description: '' }
   ]);
   const [quickHours, setQuickHours] = useState<any[]>([
-    { personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }
+    { 
+      personnelId: '', 
+      categoryId: '', 
+      hours: '', 
+      dateType: 'single', // 'single' or 'range'
+      date: new Date(), 
+      startDate: new Date(),
+      endDate: new Date(),
+      description: '' 
+    }
   ]);
 
   // Only load categories initially (they're needed for all tabs)
@@ -66,7 +75,7 @@ export function IndirectCosts() {
 
   // Load hours only when needed
   const { data: hours = [], isLoading: loadingHours } = useQuery<NonBillableHours[]>({
-    queryKey: ['/api/indirect-costs/hours'],
+    queryKey: ['/api/non-billable-hours'],
     enabled: selectedTab === 'overview' || selectedTab === 'hours'
   });
 
@@ -227,12 +236,12 @@ export function IndirectCosts() {
 
   const createHoursMutation = useMutation({
     mutationFn: (data: InsertNonBillableHours) => 
-      apiRequest('/api/indirect-costs/hours', {
+      apiRequest('/api/non-billable-hours', {
         method: 'POST',
         body: data
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/hours'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/non-billable-hours'] });
       setFormData({});
       toast({
         title: "Horas registradas",
@@ -717,7 +726,16 @@ export function IndirectCosts() {
               <div className="flex gap-2">
                 <Button 
                   variant="outline"
-                  onClick={() => setQuickHours([...quickHours, { personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }])}
+                  onClick={() => setQuickHours([...quickHours, { 
+                    personnelId: '', 
+                    categoryId: '', 
+                    hours: '', 
+                    dateType: 'single',
+                    date: new Date(), 
+                    startDate: new Date(),
+                    endDate: new Date(),
+                    description: '' 
+                  }])}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Agregar Línea
@@ -731,21 +749,47 @@ export function IndirectCosts() {
                     }
                     
                     for (const hour of validHours) {
-                      await apiRequest('/api/indirect-costs/hours', {
-                        method: 'POST',
-                        body: {
-                          personnelId: parseInt(hour.personnelId),
-                          categoryId: parseInt(hour.categoryId),
-                          date: hour.date,
-                          hours: hour.hours.toString(),
-                          description: hour.description || null,
-                          createdBy: user?.id
-                        }
-                      });
+                      if (hour.dateType === 'single') {
+                        // Single date entry
+                        await apiRequest('/api/non-billable-hours', {
+                          method: 'POST',
+                          body: {
+                            personnelId: parseInt(hour.personnelId),
+                            categoryId: parseInt(hour.categoryId),
+                            date: hour.date,
+                            hours: hour.hours.toString(),
+                            description: hour.description || null,
+                            createdBy: user?.id
+                          }
+                        });
+                      } else {
+                        // Date range - create entry for the range
+                        await apiRequest('/api/non-billable-hours', {
+                          method: 'POST',
+                          body: {
+                            personnelId: parseInt(hour.personnelId),
+                            categoryId: parseInt(hour.categoryId),
+                            date: hour.startDate, // Use start date as the reference
+                            endDate: hour.endDate, // Include end date
+                            hours: hour.hours.toString(),
+                            description: hour.description || null,
+                            createdBy: user?.id
+                          }
+                        });
+                      }
                     }
                     
-                    queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/hours'] });
-                    setQuickHours([{ personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }]);
+                    queryClient.invalidateQueries({ queryKey: ['/api/non-billable-hours'] });
+                    setQuickHours([{ 
+                      personnelId: '', 
+                      categoryId: '', 
+                      hours: '', 
+                      dateType: 'single',
+                      date: new Date(), 
+                      startDate: new Date(),
+                      endDate: new Date(),
+                      description: '' 
+                    }]);
                     toast({ title: "Éxito", description: `${validHours.length} registros de horas guardados` });
                   }}
                   disabled={!quickHours.some(h => h.personnelId && h.categoryId && h.hours)}
@@ -765,7 +809,8 @@ export function IndirectCosts() {
                       <th className="text-left p-3 font-medium text-sm">Persona</th>
                       <th className="text-left p-3 font-medium text-sm">Categoría</th>
                       <th className="text-left p-3 font-medium text-sm">Horas</th>
-                      <th className="text-left p-3 font-medium text-sm">Fecha</th>
+                      <th className="text-left p-3 font-medium text-sm">Tipo</th>
+                      <th className="text-left p-3 font-medium text-sm">Período</th>
                       <th className="text-left p-3 font-medium text-sm">Descripción</th>
                       <th className="text-left p-3 font-medium text-sm">Costo</th>
                       <th className="w-10"></th>
@@ -835,28 +880,94 @@ export function IndirectCosts() {
                             />
                           </td>
                           <td className="p-2">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" className="h-9 w-32 justify-start text-left font-normal">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(hour.date, 'dd/MM', { locale: es })}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={hour.date}
-                                  onSelect={(date) => {
-                                    if (date) {
-                                      const newHours = [...quickHours];
-                                      newHours[index].date = date;
-                                      setQuickHours(newHours);
-                                    }
-                                  }}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            <Select 
+                              value={hour.dateType}
+                              onValueChange={(value) => {
+                                const newHours = [...quickHours];
+                                newHours[index].dateType = value;
+                                setQuickHours(newHours);
+                              }}
+                            >
+                              <SelectTrigger className="h-9 w-28">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="single">Fecha única</SelectItem>
+                                <SelectItem value="range">Rango</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-2">
+                            {hour.dateType === 'single' ? (
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" className="h-9 w-32 justify-start text-left font-normal">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {format(hour.date, 'dd/MM/yyyy', { locale: es })}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar
+                                    mode="single"
+                                    selected={hour.date}
+                                    onSelect={(date) => {
+                                      if (date) {
+                                        const newHours = [...quickHours];
+                                        newHours[index].date = date;
+                                        setQuickHours(newHours);
+                                      }
+                                    }}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            ) : (
+                              <div className="flex gap-1 items-center">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" className="h-9 w-24 justify-start text-left font-normal text-xs">
+                                      {format(hour.startDate, 'dd/MM', { locale: es })}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                      mode="single"
+                                      selected={hour.startDate}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          const newHours = [...quickHours];
+                                          newHours[index].startDate = date;
+                                          setQuickHours(newHours);
+                                        }
+                                      }}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                <span className="text-slate-500">-</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" className="h-9 w-24 justify-start text-left font-normal text-xs">
+                                      {format(hour.endDate, 'dd/MM', { locale: es })}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                      mode="single"
+                                      selected={hour.endDate}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          const newHours = [...quickHours];
+                                          newHours[index].endDate = date;
+                                          setQuickHours(newHours);
+                                        }
+                                      }}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            )}
                           </td>
                           <td className="p-2">
                             <Input
@@ -881,7 +992,16 @@ export function IndirectCosts() {
                               size="sm"
                               onClick={() => {
                                 const newHours = quickHours.filter((_, i) => i !== index);
-                                setQuickHours(newHours.length > 0 ? newHours : [{ personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }]);
+                                setQuickHours(newHours.length > 0 ? newHours : [{ 
+                                  personnelId: '', 
+                                  categoryId: '', 
+                                  hours: '', 
+                                  dateType: 'single',
+                                  date: new Date(), 
+                                  startDate: new Date(),
+                                  endDate: new Date(),
+                                  description: '' 
+                                }]);
                               }}
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />

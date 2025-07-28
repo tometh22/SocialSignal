@@ -91,6 +91,7 @@ export const nonBillableHours = pgTable("non_billable_hours", {
   personnelId: integer("personnel_id").notNull().references(() => personnel.id),
   categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id),
   date: timestamp("date").notNull(),
+  endDate: timestamp("end_date"), // Optional end date for date ranges
   hours: numeric("hours", { precision: 5, scale: 2 }).notNull(),
   description: text("description"),
   createdBy: integer("created_by").notNull().references(() => users.id),
