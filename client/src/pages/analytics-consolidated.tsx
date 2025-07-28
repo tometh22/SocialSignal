@@ -338,6 +338,52 @@ export default function AnalyticsConsolidated() {
       });
     }
 
+    // Calculate filtered revenue based on the selected period
+    let filteredRevenue = 0;
+    
+    if (dateRange) {
+      // For Always-On projects, calculate based on months with activity in the period
+      alwaysOnProjects.forEach(project => {
+        const projectEntries = periodEntries.filter((e: any) => e.projectId === project.id);
+        if (projectEntries.length > 0) {
+          const monthlyRate = project.quotation?.totalAmount || project.macroMonthlyBudget || 0;
+          
+          // Count unique months with activity in the filtered period
+          const monthsWithActivity = new Set();
+          projectEntries.forEach((entry: any) => {
+            const date = new Date(entry.date);
+            monthsWithActivity.add(`${date.getFullYear()}-${date.getMonth()}`);
+          });
+          
+          filteredRevenue += monthlyRate * monthsWithActivity.size;
+        }
+      });
+      
+      // For unique projects, include proportional revenue if they have activity in the period
+      uniqueProjects.forEach(project => {
+        const projectEntries = periodEntries.filter((e: any) => e.projectId === project.id);
+        if (projectEntries.length > 0) {
+          const totalProjectHours = timeEntries.filter((e: any) => e.projectId === project.id)
+            .reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+          const periodProjectHours = projectEntries.reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+          
+          if (totalProjectHours > 0) {
+            const proportion = periodProjectHours / totalProjectHours;
+            filteredRevenue += (project.quotation?.totalAmount || 0) * proportion;
+          }
+        }
+      });
+    } else {
+      // For "all" filter, calculate full potential revenue
+      const totalMonthsWithData = new Set();
+      timeEntries.forEach((entry: any) => {
+        const date = new Date(entry.date);
+        totalMonthsWithData.add(`${date.getFullYear()}-${date.getMonth()}`);
+      });
+      
+      filteredRevenue = monthlyRevenue * totalMonthsWithData.size + totalRevenue;
+    }
+
     return {
       // Métricas básicas
       alwaysOnProjects: alwaysOnProjects.length,
@@ -346,7 +392,7 @@ export default function AnalyticsConsolidated() {
       activeClients: clients.length,
       monthlyRevenue,
       totalRevenue,
-      combinedRevenue: monthlyRevenue + totalRevenue,
+      combinedRevenue: filteredRevenue,
       
       // Métricas de tiempo y costos
       totalHours,
