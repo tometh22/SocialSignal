@@ -93,7 +93,7 @@ export function IndirectCosts() {
         name: newCategory.name,
         description: newCategory.description || null,
         type: newCategory.type,
-        isActive: newCategory.isActive,
+        isActive: newCategory.isActive ?? true,
         createdAt: new Date()
       };
       
@@ -105,11 +105,17 @@ export function IndirectCosts() {
       // Return context with the previous categories
       return { previousCategories };
     },
-    onError: (err, newCategory, context) => {
+    onError: (err, newCategory, context: any) => {
       // If the mutation fails, use the context to roll back
       if (context?.previousCategories) {
         queryClient.setQueryData(['/api/indirect-cost-categories'], context.previousCategories);
       }
+      console.error('Error creating category:', err);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la categoría. Por favor intenta de nuevo.",
+        variant: "destructive"
+      });
     },
     onSuccess: async (data) => {
       // Replace optimistic update with actual data
@@ -908,8 +914,9 @@ export function IndirectCosts() {
                     });
                   }
                 }}
+                disabled={createCategoryMutation.isPending || !formData.name || !formData.type}
               >
-                Crear Categoría
+                {createCategoryMutation.isPending ? 'Creando...' : 'Crear Categoría'}
               </Button>
             </DialogFooter>
           </DialogContent>
