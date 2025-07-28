@@ -88,12 +88,19 @@ export function IndirectCosts() {
       const previousCategories = queryClient.getQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories']);
       
       // Optimistically update to the new value
-      if (previousCategories) {
-        queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], old => [
-          ...(old || []),
-          { ...newCategory, id: Date.now(), createdAt: new Date() } as IndirectCostCategory
-        ]);
-      }
+      const optimisticCategory: IndirectCostCategory = {
+        id: Date.now(),
+        name: newCategory.name,
+        description: newCategory.description || null,
+        type: newCategory.type,
+        isActive: newCategory.isActive,
+        createdAt: new Date()
+      };
+      
+      queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], old => [
+        ...(old || []),
+        optimisticCategory
+      ]);
       
       // Return context with the previous categories
       return { previousCategories };
