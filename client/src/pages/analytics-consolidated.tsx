@@ -85,7 +85,9 @@ export default function AnalyticsConsolidated() {
       p.isAlwaysOnMacro || 
       p.quotation?.projectName?.toLowerCase().includes('always-on') ||
       p.quotation?.projectName?.toLowerCase().includes('modo') ||
-      p.macroMonthlyBudget
+      p.quotation?.projectName?.toLowerCase().includes('contrato') || // Contratos son Always-On
+      p.macroMonthlyBudget > 0 ||
+      p.quotation?.projectType === 'always-on'
     );
 
     const uniqueProjects = projects.filter(p => !alwaysOnProjects.includes(p));
@@ -130,13 +132,49 @@ export default function AnalyticsConsolidated() {
       const projectEntries = periodEntries.filter((e: any) => e.projectId === project.id);
       const hours = projectEntries.reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
       const cost = projectEntries.reduce((sum: number, e: any) => sum + (e.totalCost || 0), 0);
-      const budget = project.macroMonthlyBudget || project.quotation?.totalAmount || 0;
       
-      // Calcular eficiencia: qué porcentaje del presupuesto se ha usado
-      const efficiency = budget > 0 && cost > 0 ? (cost / budget) * 100 : 0;
+      // Determinar si es Always-On
+      const isAlwaysOn = alwaysOnProjects.includes(project);
+      
+      // Para Always-On, el budget es mensual. Para únicos, es el total
+      let budget = 0;
+      let periodBudget = 0;
+      
+      if (isAlwaysOn) {
+        // Para Always-On, usar presupuesto mensual
+        const monthlyBudget = project.macroMonthlyBudget || project.quotation?.totalAmount || 0;
+        
+        // Calcular cuántos meses abarca el período seleccionado
+        if (selectedPeriod === 'current-month') {
+          periodBudget = monthlyBudget;
+        } else if (selectedPeriod === 'current-quarter') {
+          periodBudget = monthlyBudget * 3;
+        } else if (selectedPeriod === 'current-semester') {
+          periodBudget = monthlyBudget * 6;
+        } else if (selectedPeriod === 'current-year') {
+          periodBudget = monthlyBudget * 12;
+        } else {
+          // Para histórico completo, usar el total de meses con datos
+          const uniqueMonths = new Set(
+            projectEntries.map((e: any) => {
+              const date = new Date(e.date);
+              return `${date.getFullYear()}-${date.getMonth()}`;
+            })
+          );
+          periodBudget = monthlyBudget * uniqueMonths.size;
+        }
+        budget = periodBudget;
+      } else {
+        // Para proyectos únicos, usar el presupuesto total
+        budget = project.quotation?.totalAmount || 0;
+        periodBudget = budget;
+      }
+      
+      // Calcular eficiencia: qué porcentaje del presupuesto del período se ha usado
+      const efficiency = periodBudget > 0 && cost > 0 ? (cost / periodBudget) * 100 : 0;
       
       // Calcular rentabilidad: margen de ganancia sobre el costo
-      const revenue = budget; // El presupuesto es lo que cobra el cliente
+      const revenue = periodBudget; // Lo que se cobra al cliente en el período
       const profitMargin = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
       
       return {
@@ -147,7 +185,7 @@ export default function AnalyticsConsolidated() {
         budget,
         efficiency: Math.min(100, efficiency), // Limitar a 100% máximo
         profitMargin: profitMargin,
-        type: project.isAlwaysOnMacro ? 'always-on' : 'unique'
+        type: alwaysOnProjects.includes(project) ? 'always-on' : 'unique'
       };
     });
 
