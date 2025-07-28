@@ -52,7 +52,7 @@ export function IndirectCosts() {
   ]);
 
   // Only load categories initially (they're needed for all tabs)
-  const { data: categories = [], isLoading: loadingCategories } = useQuery<IndirectCostCategory[]>({
+  const { data: categories = [], isLoading: loadingCategories, refetch: refetchCategories } = useQuery<IndirectCostCategory[]>({
     queryKey: ['/api/indirect-cost-categories']
   });
 
@@ -81,31 +81,31 @@ export function IndirectCosts() {
         method: 'POST',
         body: data
       }),
-    onSuccess: async (data) => {
+    onSuccess: async (newCategory) => {
       // Close dialog immediately
       setIsAddingCategory(false);
       setFormData({});
       
-      // Get current categories from cache
-      const currentCategories = queryClient.getQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories']) || [];
-      
-      // Check if this category already exists (avoid duplicates)
-      const exists = currentCategories.some(c => c.id === data.id);
-      
-      if (!exists) {
-        // Add the new category to the list immediately
-        queryClient.setQueryData(['/api/indirect-cost-categories'], [...currentCategories, data]);
-      }
-      
+      // Show success message
       toast({
         title: "Categoría creada",
         description: "La categoría se creó exitosamente"
       });
       
-      // Invalidate in background to ensure consistency
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
-      }, 100);
+      // Force immediate update by modifying the query data
+      queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], (oldData) => {
+        if (!oldData) return [newCategory];
+        
+        // Check if already exists to avoid duplicates
+        const exists = oldData.some(cat => cat.id === newCategory.id);
+        if (exists) return oldData;
+        
+        // Add new category and return updated array
+        return [...oldData, newCategory];
+      });
+      
+      // Force immediate refetch to ensure UI updates
+      refetchCategories();
     },
     onError: (err) => {
       console.error('Error creating category:', err);
