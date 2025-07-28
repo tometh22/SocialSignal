@@ -488,10 +488,10 @@ export default function AnalyticsConsolidated() {
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
-                  {analytics.avgEfficiency.toFixed(1)}%
+                  {analytics.totalCost > 0 ? ((analytics.combinedRevenue / analytics.totalCost) * 100).toFixed(1) : '0'}%
                 </div>
                 <Progress 
-                  value={analytics.avgEfficiency} 
+                  value={Math.min(100, analytics.totalCost > 0 ? ((analytics.combinedRevenue / analytics.totalCost) * 100) : 0)} 
                   className="mt-2"
                 />
               </CardContent>
@@ -505,10 +505,10 @@ export default function AnalyticsConsolidated() {
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
-                  {analytics.avgProfitMargin.toFixed(1)}%
+                  {analytics.totalCost > 0 ? (((analytics.combinedRevenue - analytics.totalCost) / analytics.totalCost) * 100).toFixed(1) : '0'}%
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  ${analytics.revenuePerHour.toFixed(0)}/hora
+                  ${analytics.totalHours > 0 ? (analytics.combinedRevenue / analytics.totalHours).toFixed(0) : '0'}/hora
                 </div>
               </CardContent>
             </Card>
