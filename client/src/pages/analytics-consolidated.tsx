@@ -437,95 +437,160 @@ export default function AnalyticsConsolidated() {
         <div className="space-y-6">
           {/* Header con métricas clave */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/10" />
-              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Cash Flow Operativo</CardTitle>
-                <DollarSign className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold">
-                  ${analytics.combinedRevenue.toLocaleString()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Liquidez: ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card className="relative overflow-hidden cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/10" />
+                  <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Cash Flow Operativo</CardTitle>
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold">
+                      ${analytics.combinedRevenue.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Liquidez: ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">Cash Flow Operativo</p>
+                <p className="text-sm">Es el dinero real que entra menos el que sale en el período. La liquidez muestra tu capacidad de pagar obligaciones inmediatas.</p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Bueno:</span> Positivo y creciente<br/>
+                  <span className="font-medium">Alerta:</span> Cercano a cero o negativo
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10" />
-              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">EBITDA</CardTitle>
-                <TrendingUp className="h-4 w-4 text-emerald-600" />
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold">
-                  ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Margen EBITDA: {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1) : '0'}%
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card className="relative overflow-hidden cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10" />
+                  <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">EBITDA</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-emerald-600" />
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold">
+                      ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Margen EBITDA: {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1) : '0'}%
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">EBITDA (Ganancia Operativa)</p>
+                <p className="text-sm">Ganancia antes de impuestos, intereses y amortizaciones. Muestra la rentabilidad real de tu operación.</p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Excelente:</span> Margen &gt;40%<br/>
+                  <span className="font-medium">Bueno:</span> Margen 20-40%<br/>
+                  <span className="font-medium">Alerta:</span> Margen &lt;20%
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-green-600/10" />
-              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Burn Rate</CardTitle>
-                <Activity className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold">
-                  ${(analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Gasto mensual promedio
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card className="relative overflow-hidden cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-green-600/10" />
+                  <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Burn Rate</CardTitle>
+                    <Activity className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold">
+                      ${(analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Gasto mensual promedio
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">Burn Rate (Velocidad de Gasto)</p>
+                <p className="text-sm">Es cuánto dinero gastas por mes en promedio. Indica cuánto tiempo puedes operar con tus recursos actuales.</p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Óptimo:</span> &lt;$15,000/mes<br/>
+                  <span className="font-medium">Controlado:</span> $15-25,000/mes<br/>
+                  <span className="font-medium">Alto:</span> &gt;$25,000/mes
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-purple-600/10" />
-              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold">
-                  ${(analytics.pendingQuotations * 30000).toLocaleString()}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {analytics.pendingQuotations} cotizaciones activas
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card className="relative overflow-hidden cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-purple-600/10" />
+                  <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-purple-600" />
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold">
+                      ${(analytics.pendingQuotations * 30000).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {analytics.pendingQuotations} cotizaciones activas
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">Pipeline Value (Valor de Oportunidades)</p>
+                <p className="text-sm">Valor total estimado de las cotizaciones pendientes. Indica el potencial de ingresos futuros si cierras todas las ventas.</p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Excelente:</span> 5+ cotizaciones<br/>
+                  <span className="font-medium">Bueno:</span> 3-5 cotizaciones<br/>
+                  <span className="font-medium">Bajo:</span> &lt;3 cotizaciones
+                </p>
+              </TooltipContent>
+            </Tooltip>
 
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/10" />
-              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Utilización</CardTitle>
-                <Clock className="h-4 w-4 text-amber-600" />
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="text-2xl font-bold">
-                  {analytics.totalProjects > 0 ? ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1))) * 100).toFixed(0) : '0'}%
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {analytics.totalHours.toFixed(0)}h de capacidad utilizada
-                </div>
-              </CardContent>
-            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Card className="relative overflow-hidden cursor-help">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/10" />
+                  <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Utilización</CardTitle>
+                    <Clock className="h-4 w-4 text-amber-600" />
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <div className="text-2xl font-bold">
+                      {analytics.totalProjects > 0 ? ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1))) * 100).toFixed(0) : '0'}%
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {analytics.totalHours.toFixed(0)}h de capacidad utilizada
+                    </div>
+                  </CardContent>
+                </Card>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="font-semibold mb-1">Utilización del Equipo</p>
+                <p className="text-sm">Porcentaje de horas trabajadas vs capacidad total disponible. Muestra qué tan ocupado está tu equipo.</p>
+                <p className="text-sm mt-1">
+                  <span className="font-medium">Óptimo:</span> 70-85%<br/>
+                  <span className="font-medium">Aceptable:</span> 50-70%<br/>
+                  <span className="font-medium">Bajo:</span> &lt;50% (capacidad ociosa)
+                </p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Filtro temporal único */}
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-4">
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-64 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                  <CalendarIconLucide className="mr-2 h-4 w-4 text-gray-400" />
-                  <SelectValue placeholder="Seleccionar período" />
-                </SelectTrigger>
+              <div className="flex items-center gap-2">
+                <Select value={dateFilter} onValueChange={setDateFilter}>
+                  <SelectTrigger className="w-64 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <CalendarIconLucide className="mr-2 h-4 w-4 text-gray-400" />
+                    <SelectValue placeholder="Seleccionar período" />
+                  </SelectTrigger>
                 <SelectContent>
                   {/* Agrupar opciones por categoría */}
                   {["General", "Trimestres", "Meses"].map(group => (
@@ -543,7 +608,17 @@ export default function AnalyticsConsolidated() {
                     </div>
                   ))}
                 </SelectContent>
-              </Select>
+                </Select>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">Filtro de Período</p>
+                    <p className="text-sm">Filtra todas las métricas del dashboard por el período seleccionado. Los datos se ajustan automáticamente para mostrar información relevante del tiempo elegido.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               
               <Select value={selectedClient} onValueChange={setSelectedClient}>
                 <SelectTrigger className="w-48">
@@ -585,7 +660,18 @@ export default function AnalyticsConsolidated() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Distribución de Portfolio</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      Distribución de Portfolio
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-semibold mb-1">Distribución de Portfolio</p>
+                          <p className="text-sm">Muestra cómo se dividen tus proyectos entre contratos recurrentes (Always-On) y proyectos únicos. Los Always-On generan ingresos mensuales estables.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
                     <PieChart className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </CardHeader>
@@ -639,7 +725,18 @@ export default function AnalyticsConsolidated() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Tendencia de Ingresos (6 meses)</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      Tendencia de Ingresos (6 meses)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-semibold mb-1">Tendencia de Ingresos</p>
+                          <p className="text-sm">Evolución histórica de ingresos (línea azul) vs costos (línea roja). El área entre ambas líneas representa tu ganancia operativa mensual.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
                     <LineChart className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </CardHeader>
@@ -689,7 +786,18 @@ export default function AnalyticsConsolidated() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Análisis de Eficiencia por Proyecto</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      Análisis de Eficiencia por Proyecto
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="font-semibold mb-1">Análisis de Eficiencia</p>
+                          <p className="text-sm">Compara el presupuesto cotizado (barra azul) vs el costo real ejecutado (barra roja) de cada proyecto. Si la barra roja es más alta, el proyecto está perdiendo dinero.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
                     <CardDescription>
                       Comparación de presupuesto vs costo real para proyectos activos
                     </CardDescription>
@@ -1097,81 +1205,133 @@ export default function AnalyticsConsolidated() {
           <TabsContent value="insights" className="space-y-6">
             {/* Health Indicators */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className={cn(
-                "border-l-4",
-                analytics.combinedRevenue > analytics.totalCost * 2 ? "border-l-green-500" : 
-                analytics.combinedRevenue > analytics.totalCost * 1.5 ? "border-l-yellow-500" : "border-l-red-500"
-              )}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Salud Financiera</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {analytics.combinedRevenue > analytics.totalCost * 2 ? "Excelente" : 
-                     analytics.combinedRevenue > analytics.totalCost * 1.5 ? "Buena" : "Atención"}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Ratio ingresos/costos: {(analytics.combinedRevenue / analytics.totalCost).toFixed(1)}x
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className={cn(
+                    "border-l-4 cursor-help",
+                    analytics.combinedRevenue > analytics.totalCost * 2 ? "border-l-green-500" : 
+                    analytics.combinedRevenue > analytics.totalCost * 1.5 ? "border-l-yellow-500" : "border-l-red-500"
+                  )}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Salud Financiera</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {analytics.combinedRevenue > analytics.totalCost * 2 ? "Excelente" : 
+                         analytics.combinedRevenue > analytics.totalCost * 1.5 ? "Buena" : "Atención"}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Ratio ingresos/costos: {(analytics.combinedRevenue / analytics.totalCost).toFixed(1)}x
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Salud Financiera</p>
+                  <p className="text-sm">Evalúa qué tan sólida es tu situación financiera comparando ingresos vs costos.</p>
+                  <p className="text-sm mt-1">
+                    <span className="font-medium">Excelente:</span> Ingresos &gt; 2x costos<br/>
+                    <span className="font-medium">Buena:</span> Ingresos &gt; 1.5x costos<br/>
+                    <span className="font-medium">Atención:</span> Ingresos &lt; 1.5x costos
                   </p>
-                </CardContent>
-              </Card>
+                </TooltipContent>
+              </Tooltip>
 
-              <Card className={cn(
-                "border-l-4",
-                analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "border-l-green-500" : 
-                analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "border-l-yellow-500" : "border-l-red-500"
-              )}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Control de Gastos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "Óptimo" : 
-                     analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "Moderado" : "Alto"}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Burn rate mensual controlado
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className={cn(
+                    "border-l-4 cursor-help",
+                    analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "border-l-green-500" : 
+                    analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "border-l-yellow-500" : "border-l-red-500"
+                  )}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Control de Gastos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "Óptimo" : 
+                         analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "Moderado" : "Alto"}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Burn rate mensual controlado
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Control de Gastos</p>
+                  <p className="text-sm">Mide qué tan bien controlas el gasto mensual de la empresa (burn rate).</p>
+                  <p className="text-sm mt-1">
+                    <span className="font-medium">Óptimo:</span> &lt; $15,000/mes<br/>
+                    <span className="font-medium">Moderado:</span> $15-25,000/mes<br/>
+                    <span className="font-medium">Alto:</span> &gt; $25,000/mes
                   </p>
-                </CardContent>
-              </Card>
+                </TooltipContent>
+              </Tooltip>
 
-              <Card className={cn(
-                "border-l-4",
-                analytics.pendingQuotations > 5 ? "border-l-green-500" : 
-                analytics.pendingQuotations > 2 ? "border-l-yellow-500" : "border-l-red-500"
-              )}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Pipeline Comercial</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {analytics.pendingQuotations > 5 ? "Robusto" : 
-                     analytics.pendingQuotations > 2 ? "Moderado" : "Débil"}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {analytics.pendingQuotations} oportunidades activas
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className={cn(
+                    "border-l-4 cursor-help",
+                    analytics.pendingQuotations > 5 ? "border-l-green-500" : 
+                    analytics.pendingQuotations > 2 ? "border-l-yellow-500" : "border-l-red-500"
+                  )}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Pipeline Comercial</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {analytics.pendingQuotations > 5 ? "Robusto" : 
+                         analytics.pendingQuotations > 2 ? "Moderado" : "Débil"}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {analytics.pendingQuotations} oportunidades activas
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Pipeline Comercial</p>
+                  <p className="text-sm">Indica la salud de tu proceso de ventas según las cotizaciones pendientes.</p>
+                  <p className="text-sm mt-1">
+                    <span className="font-medium">Robusto:</span> &gt;5 cotizaciones<br/>
+                    <span className="font-medium">Moderado:</span> 3-5 cotizaciones<br/>
+                    <span className="font-medium">Débil:</span> &lt;3 cotizaciones
                   </p>
-                </CardContent>
-              </Card>
+                </TooltipContent>
+              </Tooltip>
 
-              <Card className={cn(
-                "border-l-4",
-                ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "border-l-green-500" : 
-                ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "border-l-yellow-500" : "border-l-red-500"
-              )}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Productividad</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "Alta" : 
-                     ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "Media" : "Baja"}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Utilización del equipo
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Card className={cn(
+                    "border-l-4 cursor-help",
+                    ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "border-l-green-500" : 
+                    ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "border-l-yellow-500" : "border-l-red-500"
+                  )}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">Productividad</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">
+                        {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "Alta" : 
+                         ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "Media" : "Baja"}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Utilización del equipo
+                      </p>
+                    </CardContent>
+                  </Card>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Productividad del Equipo</p>
+                  <p className="text-sm">Mide qué tan ocupado está tu equipo vs su capacidad total disponible.</p>
+                  <p className="text-sm mt-1">
+                    <span className="font-medium">Alta:</span> &gt;70% utilización<br/>
+                    <span className="font-medium">Media:</span> 50-70% utilización<br/>
+                    <span className="font-medium">Baja:</span> &lt;50% (capacidad ociosa)
                   </p>
-                </CardContent>
-              </Card>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
             {/* Actionable Insights */}
