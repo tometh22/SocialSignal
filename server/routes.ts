@@ -1737,7 +1737,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         changeType,
         clientFeedback,
         internalNotes,
-        negotiationReason
+        negotiationReason,
+        proposalLink
       } = req.body;
 
       // Calculate adjustment percentage
@@ -1755,6 +1756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         clientFeedback,
         internalNotes,
         negotiationReason,
+        proposalLink,
         adjustmentPercentage,
         createdBy: req.user?.id
       });

@@ -207,6 +207,7 @@ export const negotiationHistory = pgTable("negotiation_history", {
   internalNotes: text("internal_notes"), // Internal team notes about the negotiation
   negotiationReason: text("negotiation_reason"), // Why the client is negotiating
   adjustmentPercentage: doublePrecision("adjustment_percentage"), // Percentage change in price
+  proposalLink: text("proposal_link"), // Link to the new proposal document
   createdAt: timestamp("created_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
 });

@@ -26,6 +26,7 @@ interface NegotiationHistoryEntry {
   internalNotes?: string;
   negotiationReason?: string;
   adjustmentPercentage?: number;
+  proposalLink?: string;
   createdAt: string;
   createdBy?: number;
 }
@@ -317,6 +318,21 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus,
                         <span className="text-sm font-medium">Notas internas:</span>
                       </div>
                       <p className="text-sm text-gray-600">{entry.internalNotes}</p>
+                    </div>
+                  )}
+
+                  {entry.proposalLink && (
+                    <div className="mb-3">
+                      <a
+                        href={entry.proposalLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span className="text-sm font-medium">Ver propuesta adjunta</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
                     </div>
                   )}
 

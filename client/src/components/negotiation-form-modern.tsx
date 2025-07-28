@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { DollarSign, Users, FileText, AlertCircle, Plus, Trash2, TrendingUp, TrendingDown, Handshake, ChevronRight, MessageSquare } from 'lucide-react';
+import { DollarSign, Users, FileText, AlertCircle, Plus, Trash2, TrendingUp, TrendingDown, Handshake, ChevronRight, MessageSquare, Link } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { Personnel, Role } from '@shared/schema';
@@ -49,6 +49,7 @@ export function NegotiationFormModern({
   // Common form state
   const [clientFeedback, setClientFeedback] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [proposalLink, setProposalLink] = useState('');
   
   // Query personnel and roles
   const { data: personnel = [] } = useQuery<Personnel[]>({
@@ -124,6 +125,7 @@ export function NegotiationFormModern({
       changeType,
       clientFeedback,
       internalNotes,
+      proposalLink,
       negotiationReason: includeTeamChanges ? `${priceChangeReason}\n\nCambios en equipo: ${teamChangeReason}` : priceChangeReason,
       previousTeam: includeTeamChanges ? JSON.stringify(currentTeam) : null,
       newTeam: includeTeamChanges ? JSON.stringify(modifiedTeam) : null
@@ -377,6 +379,24 @@ export function NegotiationFormModern({
                     placeholder="Notas internas sobre la negociación, estrategia, o lecciones aprendidas..."
                     className="mt-2 min-h-[120px]"
                   />
+                </div>
+
+                <div>
+                  <Label htmlFor="proposalLink" className="text-sm font-medium flex items-center gap-2">
+                    <Link className="h-4 w-4 text-green-500" />
+                    Link a la Nueva Propuesta
+                  </Label>
+                  <Input
+                    id="proposalLink"
+                    type="url"
+                    value={proposalLink}
+                    onChange={(e) => setProposalLink(e.target.value)}
+                    placeholder="https://drive.google.com/... o cualquier link a la propuesta"
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Adjunta el link al documento de la nueva propuesta para facilitar el acceso
+                  </p>
                 </div>
               </div>
             </TabsContent>
