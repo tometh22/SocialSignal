@@ -23,13 +23,15 @@ import {
   type QuickTimeEntryDetail, type InsertQuickTimeEntryDetail,
   type UnquotedPersonnel, type InsertUnquotedPersonnel,
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
+  type NegotiationHistory, type InsertNegotiationHistory,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
-  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments
+  projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
+  negotiationHistory
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -72,6 +74,11 @@ export interface IStorage {
   createQuotation(quotation: InsertQuotation): Promise<Quotation>;
   updateQuotation(id: number, quotation: Partial<InsertQuotation>): Promise<Quotation | undefined>;
   deleteQuotation(id: number): Promise<boolean>;
+
+  // Negotiation history operations
+  getNegotiationHistory(quotationId: number): Promise<NegotiationHistory[]>;
+  createNegotiationHistory(history: InsertNegotiationHistory): Promise<NegotiationHistory>;
+  getLatestNegotiation(quotationId: number): Promise<NegotiationHistory | undefined>;
 
   // Quotation team member operations
   getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
@@ -675,6 +682,28 @@ export class DatabaseStorage implements IStorage {
     await db.delete(quotations).where(eq(quotations.id, id));
     const quotation = await db.select().from(quotations).where(eq(quotations.id, id));
     return quotation.length === 0;
+  }
+
+  // Negotiation history operations
+  async getNegotiationHistory(quotationId: number): Promise<NegotiationHistory[]> {
+    return await db.select()
+      .from(negotiationHistory)
+      .where(eq(negotiationHistory.quotationId, quotationId))
+      .orderBy(desc(negotiationHistory.createdAt));
+  }
+
+  async createNegotiationHistory(history: InsertNegotiationHistory): Promise<NegotiationHistory> {
+    const [newHistory] = await db.insert(negotiationHistory).values(history).returning();
+    return newHistory;
+  }
+
+  async getLatestNegotiation(quotationId: number): Promise<NegotiationHistory | undefined> {
+    const [latest] = await db.select()
+      .from(negotiationHistory)
+      .where(eq(negotiationHistory.quotationId, quotationId))
+      .orderBy(desc(negotiationHistory.createdAt))
+      .limit(1);
+    return latest;
   }
 
   // Quotation team member operations

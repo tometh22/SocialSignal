@@ -191,6 +191,32 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
   ]).optional(),
 });
 
+// ==================== HISTORIAL DE NEGOCIACIONES ====================
+// Negotiation history table to track all price changes and scope adjustments
+export const negotiationHistory = pgTable("negotiation_history", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  previousPrice: doublePrecision("previous_price").notNull(),
+  newPrice: doublePrecision("new_price").notNull(),
+  previousScope: text("previous_scope"), // JSON string with previous scope details
+  newScope: text("new_scope"), // JSON string with new scope details
+  changeType: text("change_type").notNull(), // 'price_reduction', 'price_increase', 'scope_reduction', 'scope_expansion', 'mixed'
+  clientFeedback: text("client_feedback"), // What the client said about the previous version
+  internalNotes: text("internal_notes"), // Internal team notes about the negotiation
+  negotiationReason: text("negotiation_reason"), // Why the client is negotiating
+  adjustmentPercentage: doublePrecision("adjustment_percentage"), // Percentage change in price
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const insertNegotiationHistorySchema = createInsertSchema(negotiationHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type NegotiationHistory = typeof negotiationHistory.$inferSelect;
+export type InsertNegotiationHistory = z.infer<typeof insertNegotiationHistorySchema>;
+
 // ==================== ASIGNACIÓN DE MIEMBROS DE EQUIPO ====================
 // Quotation team members junction table
 export const quotationTeamMembers = pgTable("quotation_team_members", {

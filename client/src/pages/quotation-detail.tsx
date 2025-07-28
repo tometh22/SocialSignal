@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { NegotiationHistory } from '@/components/negotiation-history';
 
 // Interfaces
 interface TeamMember {
@@ -578,6 +579,13 @@ const QuotationDetail: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Historial de Negociación */}
+          <NegotiationHistory 
+            quotationId={quotation.id} 
+            currentPrice={quotation.totalAmount}
+            quotationStatus={quotation.status}
+          />
         </div>
 
         {/* Columna derecha - Resumen financiero */}

@@ -1,0 +1,343 @@
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+interface NegotiationHistoryEntry {
+  id: number;
+  quotationId: number;
+  previousPrice: number;
+  newPrice: number;
+  previousScope?: string;
+  newScope?: string;
+  changeType: string;
+  clientFeedback?: string;
+  internalNotes?: string;
+  negotiationReason?: string;
+  adjustmentPercentage?: number;
+  createdAt: string;
+  createdBy?: number;
+}
+
+interface NegotiationHistoryProps {
+  quotationId: number;
+  currentPrice: number;
+  quotationStatus: string;
+}
+
+export function NegotiationHistory({ quotationId, currentPrice, quotationStatus }: NegotiationHistoryProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    newPrice: currentPrice,
+    changeType: 'price_reduction',
+    clientFeedback: '',
+    internalNotes: '',
+    negotiationReason: '',
+    previousScope: '',
+    newScope: ''
+  });
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: history, isLoading } = useQuery<NegotiationHistoryEntry[]>({
+    queryKey: [`/api/quotations/${quotationId}/negotiation-history`],
+    enabled: quotationStatus === 'in-negotiation'
+  });
+
+  const createNegotiationMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      return await apiRequest(`/api/quotations/${quotationId}/negotiation-history`, 'POST', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Negociación registrada",
+        description: "El historial de negociación se ha guardado correctamente."
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/quotations/${quotationId}/negotiation-history`] });
+      setDialogOpen(false);
+      resetForm();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el historial de negociación.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const resetForm = () => {
+    setFormData({
+      newPrice: currentPrice,
+      changeType: 'price_reduction',
+      clientFeedback: '',
+      internalNotes: '',
+      negotiationReason: '',
+      previousScope: '',
+      newScope: ''
+    });
+  };
+
+  const handleSubmit = () => {
+    createNegotiationMutation.mutate(formData);
+  };
+
+  const getChangeTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'price_reduction': 'Reducción de precio',
+      'price_increase': 'Aumento de precio',
+      'scope_reduction': 'Reducción de alcance',
+      'scope_expansion': 'Expansión de alcance',
+      'mixed': 'Cambios mixtos'
+    };
+    return labels[type] || type;
+  };
+
+  const getChangeTypeColor = (type: string) => {
+    const colors: Record<string, string> = {
+      'price_reduction': 'destructive',
+      'price_increase': 'default',
+      'scope_reduction': 'secondary',
+      'scope_expansion': 'default',
+      'mixed': 'outline'
+    };
+    return colors[type] || 'default';
+  };
+
+  if (quotationStatus !== 'in-negotiation') {
+    return null;
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-5 w-5" />
+          Historial de Negociación
+        </CardTitle>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline">
+              <Plus className="h-4 w-4 mr-1" />
+              Registrar Negociación
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Registrar Nueva Negociación</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Precio Anterior</Label>
+                  <Input value={`$${currentPrice.toLocaleString()}`} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nuevo Precio</Label>
+                  <Input
+                    type="number"
+                    value={formData.newPrice}
+                    onChange={(e) => setFormData({ ...formData, newPrice: parseFloat(e.target.value) || 0 })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Cambio</Label>
+                <Select value={formData.changeType} onValueChange={(value) => setFormData({ ...formData, changeType: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="price_reduction">Reducción de precio</SelectItem>
+                    <SelectItem value="price_increase">Aumento de precio</SelectItem>
+                    <SelectItem value="scope_reduction">Reducción de alcance</SelectItem>
+                    <SelectItem value="scope_expansion">Expansión de alcance</SelectItem>
+                    <SelectItem value="mixed">Cambios mixtos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Razón de la Negociación</Label>
+                <Textarea
+                  placeholder="¿Por qué el cliente está negociando?"
+                  value={formData.negotiationReason}
+                  onChange={(e) => setFormData({ ...formData, negotiationReason: e.target.value })}
+                  rows={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Feedback del Cliente</Label>
+                <Textarea
+                  placeholder="¿Qué dijo el cliente sobre la propuesta anterior?"
+                  value={formData.clientFeedback}
+                  onChange={(e) => setFormData({ ...formData, clientFeedback: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notas Internas</Label>
+                <Textarea
+                  placeholder="Notas del equipo sobre esta negociación"
+                  value={formData.internalNotes}
+                  onChange={(e) => setFormData({ ...formData, internalNotes: e.target.value })}
+                  rows={3}
+                />
+              </div>
+
+              {(formData.changeType === 'scope_reduction' || formData.changeType === 'scope_expansion' || formData.changeType === 'mixed') && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Alcance Anterior</Label>
+                    <Textarea
+                      placeholder="Describe el alcance anterior"
+                      value={formData.previousScope}
+                      onChange={(e) => setFormData({ ...formData, previousScope: e.target.value })}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nuevo Alcance</Label>
+                    <Textarea
+                      placeholder="Describe el nuevo alcance"
+                      value={formData.newScope}
+                      onChange={(e) => setFormData({ ...formData, newScope: e.target.value })}
+                      rows={2}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmit} disabled={createNegotiationMutation.isPending}>
+                  {createNegotiationMutation.isPending ? 'Guardando...' : 'Guardar Negociación'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-4">Cargando historial...</div>
+        ) : history && history.length > 0 ? (
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-4">
+              {history.map((entry) => (
+                <Card key={entry.id} className="p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getChangeTypeColor(entry.changeType) as any}>
+                        {getChangeTypeLabel(entry.changeType)}
+                      </Badge>
+                      <span className="text-sm text-gray-500">
+                        {format(new Date(entry.createdAt), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
+                      </span>
+                    </div>
+                    {entry.adjustmentPercentage && (
+                      <div className="flex items-center gap-1">
+                        {entry.adjustmentPercentage > 0 ? (
+                          <TrendingUp className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-green-500" />
+                        )}
+                        <span className={`text-sm font-medium ${entry.adjustmentPercentage > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          {Math.abs(entry.adjustmentPercentage).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <span className="text-sm text-gray-500">Precio anterior:</span>
+                      <p className="font-medium">${entry.previousPrice.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-500">Nuevo precio:</span>
+                      <p className="font-medium">${entry.newPrice.toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  {entry.negotiationReason && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        <span className="text-sm font-medium">Razón de negociación:</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{entry.negotiationReason}</p>
+                    </div>
+                  )}
+
+                  {entry.clientFeedback && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <MessageSquare className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium">Feedback del cliente:</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{entry.clientFeedback}</p>
+                    </div>
+                  )}
+
+                  {entry.internalNotes && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-1 mb-1">
+                        <FileText className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm font-medium">Notas internas:</span>
+                      </div>
+                      <p className="text-sm text-gray-600">{entry.internalNotes}</p>
+                    </div>
+                  )}
+
+                  {(entry.previousScope || entry.newScope) && (
+                    <div className="border-t pt-3 mt-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        {entry.previousScope && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Alcance anterior:</span>
+                            <p className="text-sm mt-1">{entry.previousScope}</p>
+                          </div>
+                        )}
+                        {entry.newScope && (
+                          <div>
+                            <span className="text-sm font-medium text-gray-500">Nuevo alcance:</span>
+                            <p className="text-sm mt-1">{entry.newScope}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <History className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <p>No hay historial de negociación aún</p>
+            <p className="text-sm mt-1">Registra los cambios y ajustes durante la negociación</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -1673,6 +1673,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== NEGOTIATION HISTORY ROUTES ====================
+  
+  // Get negotiation history for a quotation
+  app.get("/api/quotations/:id/negotiation-history", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.id);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const history = await storage.getNegotiationHistory(quotationId);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching negotiation history:", error);
+      res.status(500).json({ message: "Failed to fetch negotiation history" });
+    }
+  });
+
+  // Create new negotiation history entry
+  app.post("/api/quotations/:id/negotiation-history", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.id);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const quotation = await storage.getQuotation(quotationId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      const {
+        newPrice,
+        previousScope,
+        newScope,
+        changeType,
+        clientFeedback,
+        internalNotes,
+        negotiationReason
+      } = req.body;
+
+      // Calculate adjustment percentage
+      const adjustmentPercentage = ((newPrice - quotation.totalAmount) / quotation.totalAmount) * 100;
+
+      const negotiationEntry = await storage.createNegotiationHistory({
+        quotationId,
+        previousPrice: quotation.totalAmount,
+        newPrice,
+        previousScope,
+        newScope,
+        changeType,
+        clientFeedback,
+        internalNotes,
+        negotiationReason,
+        adjustmentPercentage,
+        createdBy: req.user?.id
+      });
+
+      res.status(201).json(negotiationEntry);
+    } catch (error) {
+      console.error("Error creating negotiation history:", error);
+      res.status(500).json({ message: "Failed to create negotiation history" });
+    }
+  });
+
+  // Get latest negotiation for a quotation
+  app.get("/api/quotations/:id/latest-negotiation", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.id);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const latest = await storage.getLatestNegotiation(quotationId);
+      res.json(latest || null);
+    } catch (error) {
+      console.error("Error fetching latest negotiation:", error);
+      res.status(500).json({ message: "Failed to fetch latest negotiation" });
+    }
+  });
+
   // Asignar cliente a un proyecto específico
   app.patch("/api/active-projects/:id/assign-client", requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.id);
