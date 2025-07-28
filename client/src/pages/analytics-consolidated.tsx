@@ -903,8 +903,33 @@ export default function AnalyticsConsolidated() {
                       <tr className="border-b">
                         <th className="text-left p-2">Proyecto</th>
                         <th className="text-center p-2">Tipo</th>
-                        <th className="text-center p-2">Eficiencia</th>
-                        <th className="text-center p-2">Rentabilidad</th>
+                        <th className="text-center p-2">
+                          <Tooltip>
+                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
+                              Eficiencia
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold mb-1">Eficiencia Presupuestaria</p>
+                              <p className="text-sm">Porcentaje del presupuesto utilizado hasta ahora.</p>
+                              <p className="text-sm mt-1">Ej: Si tienes 75%, has usado el 75% del presupuesto asignado.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="text-center p-2">
+                          <Tooltip>
+                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
+                              Rentabilidad
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold mb-1">Margen de Ganancia</p>
+                              <p className="text-sm">Porcentaje de ganancia sobre el costo.</p>
+                              <p className="text-sm mt-1">Fórmula: (Precio Cliente - Costo) / Costo × 100</p>
+                              <p className="text-sm mt-1">Ej: Si cobras $100 y gastas $75, tu rentabilidad es 33%.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
                         <th className="text-center p-2">Estado</th>
                       </tr>
                     </thead>
@@ -914,7 +939,7 @@ export default function AnalyticsConsolidated() {
                           <td className="p-2 font-medium text-sm">{project.name}</td>
                           <td className="p-2 text-center">
                             <Badge variant={project.type === 'always-on' ? 'default' : 'secondary'} className="text-xs">
-                              {project.type === 'always-on' ? 'AO' : 'UN'}
+                              {project.type === 'always-on' ? 'Always-On' : 'Único'}
                             </Badge>
                           </td>
                           <td className="p-2 text-center">
