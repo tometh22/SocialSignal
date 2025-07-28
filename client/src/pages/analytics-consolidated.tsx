@@ -132,14 +132,21 @@ export default function AnalyticsConsolidated() {
       const cost = projectEntries.reduce((sum: number, e: any) => sum + (e.totalCost || 0), 0);
       const budget = project.macroMonthlyBudget || project.quotation?.totalAmount || 0;
       
+      // Calcular eficiencia: qué porcentaje del presupuesto se ha usado
+      const efficiency = budget > 0 && cost > 0 ? (cost / budget) * 100 : 0;
+      
+      // Calcular rentabilidad: margen de ganancia sobre el costo
+      const revenue = budget; // El presupuesto es lo que cobra el cliente
+      const profitMargin = cost > 0 ? ((revenue - cost) / cost) * 100 : 0;
+      
       return {
         id: project.id,
         name: project.quotation?.projectName || `Proyecto ${project.id}`,
         hours,
         cost,
         budget,
-        efficiency: budget > 0 ? ((budget - cost) / budget) * 100 : 0,
-        profitMargin: budget > 0 ? ((budget - cost) / budget) * 100 : 0,
+        efficiency: Math.min(100, efficiency), // Limitar a 100% máximo
+        profitMargin: profitMargin,
         type: project.isAlwaysOnMacro ? 'always-on' : 'unique'
       };
     });
@@ -185,8 +192,12 @@ export default function AnalyticsConsolidated() {
       revenuePerHour: totalHours > 0 ? (monthlyRevenue + totalRevenue) / totalHours : 0,
       
       // Métricas de eficiencia
-      avgEfficiency: projectMetrics.reduce((sum, p) => sum + p.efficiency, 0) / projectMetrics.length,
-      avgProfitMargin: projectMetrics.reduce((sum, p) => sum + p.profitMargin, 0) / projectMetrics.length,
+      avgEfficiency: projectMetrics.length > 0 
+        ? projectMetrics.reduce((sum, p) => sum + p.efficiency, 0) / projectMetrics.length 
+        : 0,
+      avgProfitMargin: projectMetrics.length > 0 
+        ? projectMetrics.reduce((sum, p) => sum + p.profitMargin, 0) / projectMetrics.length 
+        : 0,
       
       // Estados
       completedDeliverables: deliverables.filter((d: any) => d.status === 'completed').length,
