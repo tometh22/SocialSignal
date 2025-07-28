@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -50,21 +50,27 @@ export function IndirectCosts() {
     { personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }
   ]);
 
-  // Queries
+  // Only load categories initially (they're needed for all tabs)
   const { data: categories = [], isLoading: loadingCategories } = useQuery<IndirectCostCategory[]>({
     queryKey: ['/api/indirect-cost-categories']
   });
 
+  // Load costs only when needed
   const { data: costs = [], isLoading: loadingCosts } = useQuery<IndirectCost[]>({
-    queryKey: ['/api/indirect-costs']
+    queryKey: ['/api/indirect-costs'],
+    enabled: selectedTab === 'overview' || selectedTab === 'costs'
   });
 
+  // Load hours only when needed
   const { data: hours = [], isLoading: loadingHours } = useQuery<NonBillableHours[]>({
-    queryKey: ['/api/indirect-costs/hours']
+    queryKey: ['/api/indirect-costs/hours'],
+    enabled: selectedTab === 'overview' || selectedTab === 'hours'
   });
 
+  // Load personnel only when needed
   const { data: personnel = [] } = useQuery<Personnel[]>({
-    queryKey: ['/api/personnel']
+    queryKey: ['/api/personnel'],
+    enabled: selectedTab === 'hours'
   });
 
   // Mutations
@@ -117,24 +123,62 @@ export function IndirectCosts() {
     }
   });
 
-  // Calculations
-  const totalMonthlyCosts = costs
-    .filter(c => c.period === 'monthly')
-    .reduce((sum, cost) => sum + parseFloat(cost.amount), 0);
+  // Optimized calculations with memoization to avoid re-computation
+  const totalMonthlyCosts = React.useMemo(() => 
+    costs
+      .filter(c => c.period === 'monthly')
+      .reduce((sum, cost) => sum + parseFloat(cost.amount), 0),
+    [costs]
+  );
 
-  const totalNonBillableHours = hours
-    .reduce((sum, h) => sum + parseFloat(h.hours), 0);
+  const totalNonBillableHours = React.useMemo(() =>
+    hours.reduce((sum, h) => sum + parseFloat(h.hours), 0),
+    [hours]
+  );
 
-  const totalNonBillableCost = hours
-    .reduce((sum, h) => {
+  const totalNonBillableCost = React.useMemo(() =>
+    hours.reduce((sum, h) => {
       const person = personnel.find(p => p.id === h.personnelId);
       return sum + (parseFloat(h.hours) * (person?.hourlyRate || 0));
-    }, 0);
+    }, 0),
+    [hours, personnel]
+  );
 
-  if (loadingCategories || loadingCosts || loadingHours) {
+  // Show optimized loading state only when essential data is loading
+  if (loadingCategories) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+        <div className="container mx-auto p-6 space-y-8">
+          {/* Header Skeleton */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+            <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                <div className="h-10 w-96 bg-slate-200 rounded-lg animate-pulse" />
+                <div className="h-6 w-72 bg-slate-100 rounded animate-pulse" />
+              </div>
+              <div className="hidden md:block">
+                <div className="h-20 w-20 bg-slate-100 rounded-2xl animate-pulse" />
+              </div>
+            </div>
+          </div>
+          
+          {/* KPI Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-xl shadow-lg p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="h-12 w-12 bg-slate-100 rounded-xl animate-pulse" />
+                  <div className="h-6 w-20 bg-slate-100 rounded animate-pulse" />
+                </div>
+                <div className="h-6 w-32 bg-slate-100 rounded animate-pulse" />
+                <div className="space-y-2">
+                  <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-slate-100 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
