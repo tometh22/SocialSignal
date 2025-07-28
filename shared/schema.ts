@@ -170,6 +170,9 @@ export const personnel = pgTable("personnel", {
   email: text("email"), // Email opcional
   roleId: integer("role_id").notNull(),
   hourlyRate: doublePrecision("hourly_rate").notNull(),
+  contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
+  monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
+  includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
 });
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
@@ -177,6 +180,9 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   email: true,
   roleId: true,
   hourlyRate: true,
+  contractType: true,
+  monthlyFixedSalary: true,
+  includeInRealCosts: true,
 });
 
 // ==================== PLANTILLAS DE REPORTES ====================

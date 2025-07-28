@@ -1135,9 +1135,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const personnel = await db.select({
         id: sql`personnel.id`,
         name: sql`personnel.name`,
+        email: sql`personnel.email`,
         roleId: sql`personnel.role_id`,
         hourlyRate: sql`personnel.hourly_rate`,
-        roleName: sql`roles.name`
+        roleName: sql`roles.name`,
+        contractType: sql`personnel.contract_type`,
+        monthlyFixedSalary: sql`personnel.monthly_fixed_salary`,
+        includeInRealCosts: sql`personnel.include_in_real_costs`
       })
       .from(sql`personnel`)
       .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)

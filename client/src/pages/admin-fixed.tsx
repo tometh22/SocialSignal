@@ -101,7 +101,11 @@ const roleSchema = z.object({
 const personnelSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   roleId: z.coerce.number().min(1, "Debe seleccionar un rol"),
-  hourlyRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0")
+  hourlyRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0"),
+  email: z.string().email().optional().or(z.literal("")),
+  contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time"),
+  monthlyFixedSalary: z.coerce.number().min(0).optional(),
+  includeInRealCosts: z.boolean().default(true)
 });
 
 // Schema para el formulario de plantillas
@@ -240,7 +244,11 @@ export default function Admin() {
     resolver: zodResolver(personnelSchema),
     defaultValues: {
       name: "",
-      hourlyRate: 0
+      email: "",
+      hourlyRate: 0,
+      contractType: "full-time",
+      monthlyFixedSalary: 0,
+      includeInRealCosts: true
     }
   });
 
@@ -706,8 +714,12 @@ export default function Admin() {
   const openNewPersonnelDialog = () => {
     personnelForm.reset({
       name: "",
+      email: "",
       roleId: 0,
-      hourlyRate: 0
+      hourlyRate: 0,
+      contractType: "full-time",
+      monthlyFixedSalary: 0,
+      includeInRealCosts: true
     });
     setCurrentPersonnel(null);
     setIsEditing(false);
@@ -717,8 +729,12 @@ export default function Admin() {
   const openEditPersonnelDialog = (personnel: Personnel) => {
     personnelForm.reset({
       name: personnel.name,
+      email: personnel.email || "",
       roleId: personnel.roleId,
-      hourlyRate: personnel.hourlyRate
+      hourlyRate: personnel.hourlyRate,
+      contractType: personnel.contractType || "full-time",
+      monthlyFixedSalary: personnel.monthlyFixedSalary || 0,
+      includeInRealCosts: personnel.includeInRealCosts ?? true
     });
     setCurrentPersonnel(personnel);
     setIsEditing(true);
@@ -1001,7 +1017,10 @@ export default function Admin() {
                         <TableHead>Nombre</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Rol</TableHead>
-                        <TableHead>Tarifa por Defecto</TableHead>
+                        <TableHead>Tipo Contrato</TableHead>
+                        <TableHead>Tarifa/Hora</TableHead>
+                        <TableHead>Sueldo Mensual</TableHead>
+                        <TableHead>Incluir en Costos</TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1015,7 +1034,10 @@ export default function Admin() {
                             email: person.email || '',
                             roleId: person.roleId,
                             roleName: getRoleName(person.roleId),
-                            hourlyRate: person.hourlyRate
+                            hourlyRate: person.hourlyRate,
+                            contractType: person.contractType,
+                            monthlyFixedSalary: person.monthlyFixedSalary,
+                            includeInRealCosts: person.includeInRealCosts
                           }} 
                           roles={roles || []} 
                         />
@@ -1457,6 +1479,20 @@ export default function Admin() {
 
               <FormField
                 control={personnelForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="email@ejemplo.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={personnelForm.control}
                 name="roleId"
                 render={({ field }) => (
                   <FormItem>
@@ -1485,6 +1521,32 @@ export default function Admin() {
 
               <FormField
                 control={personnelForm.control}
+                name="contractType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Contrato</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecciona tipo de contrato" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="full-time">Full-time</SelectItem>
+                        <SelectItem value="part-time">Part-time</SelectItem>
+                        <SelectItem value="freelance">Freelance</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={personnelForm.control}
                 name="hourlyRate"
                 render={({ field }) => (
                   <FormItem>
@@ -1501,6 +1563,54 @@ export default function Admin() {
                       Puede ser diferente a la tarifa por defecto del rol.
                     </FormDescription>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={personnelForm.control}
+                name="monthlyFixedSalary"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Sueldo Mensual Fijo (USD)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="5000.00" 
+                        {...field}
+                        disabled={personnelForm.watch("contractType") !== "full-time"}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Solo aplica para empleados full-time.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={personnelForm.control}
+                name="includeInRealCosts"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Incluir en Costos Reales
+                      </FormLabel>
+                      <FormDescription>
+                        Si está marcado, las horas de este personal se incluirán en los costos reales del proyecto.
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />

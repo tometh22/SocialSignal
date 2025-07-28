@@ -16,6 +16,9 @@ interface InlineEditPersonnelProps {
     roleId: number;
     roleName: string;
     hourlyRate: number;
+    contractType?: string;
+    monthlyFixedSalary?: number;
+    includeInRealCosts?: boolean;
   };
   roles: any[];
 }
@@ -27,12 +30,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedEmail, setEditedEmail] = useState(person.email);
   const [editedRoleId, setEditedRoleId] = useState(person.roleId.toString());
   const [editedHourlyRate, setEditedHourlyRate] = useState(person.hourlyRate.toString());
+  const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
+  const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
+  const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const updatePersonnelMutation = useMutation({
-    mutationFn: async (data: { name: string; email: string; roleId: number; hourlyRate: number }) => {
+    mutationFn: async (data: { 
+      name: string; 
+      email: string; 
+      roleId: number; 
+      hourlyRate: number;
+      contractType: string;
+      monthlyFixedSalary?: number;
+      includeInRealCosts: boolean;
+    }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
     },
     onSuccess: (updatedPerson) => {
@@ -135,7 +149,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       name: editedName.trim(),
       email: editedEmail.trim(),
       roleId: roleId,
-      hourlyRate: hourlyRate
+      hourlyRate: hourlyRate,
+      contractType: editedContractType,
+      monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
+      includeInRealCosts: editedIncludeInRealCosts
     });
   };
 
@@ -144,6 +161,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedEmail(person.email);
     setEditedRoleId(person.roleId.toString());
     setEditedHourlyRate(person.hourlyRate.toString());
+    setEditedContractType(person.contractType || 'full-time');
+    setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
+    setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setIsEditing(false);
   };
 
@@ -188,6 +208,22 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           </Select>
         </td>
         <td className="px-6 py-4">
+          <Select
+            value={editedContractType}
+            onValueChange={setEditedContractType}
+            disabled={updatePersonnelMutation.isPending}
+          >
+            <SelectTrigger className="h-9 border-blue-200 focus:border-blue-400">
+              <SelectValue placeholder="Tipo contrato" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="full-time">Full-time</SelectItem>
+              <SelectItem value="part-time">Part-time</SelectItem>
+              <SelectItem value="freelance">Freelance</SelectItem>
+            </SelectContent>
+          </Select>
+        </td>
+        <td className="px-6 py-4">
           <div className="flex items-center gap-1">
             <span className="text-sm font-medium text-gray-600">$</span>
             <Input
@@ -201,6 +237,32 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               placeholder="0.0"
             />
             <span className="text-sm text-muted-foreground">/hr</span>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-medium text-gray-600">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={editedMonthlyFixedSalary}
+              onChange={(e) => setEditedMonthlyFixedSalary(e.target.value)}
+              className="h-9 w-28 border-blue-200 focus:border-blue-400"
+              disabled={updatePersonnelMutation.isPending || editedContractType !== 'full-time'}
+              placeholder="0.00"
+            />
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={editedIncludeInRealCosts}
+              onChange={(e) => setEditedIncludeInRealCosts(e.target.checked)}
+              disabled={updatePersonnelMutation.isPending}
+              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
           </div>
         </td>
         <td className="px-6 py-4">
@@ -247,9 +309,37 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </span>
       </td>
       <td className="px-6 py-4">
+        <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded-full font-medium">
+          {person.contractType === 'full-time' ? 'Full-time' : 
+           person.contractType === 'part-time' ? 'Part-time' : 
+           person.contractType === 'freelance' ? 'Freelance' : 'Full-time'}
+        </span>
+      </td>
+      <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-green-700">${person.hourlyRate.toFixed(1)}</span>
           <span className="text-xs text-muted-foreground">/hr</span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1">
+          {person.contractType === 'full-time' && person.monthlyFixedSalary ? (
+            <>
+              <span className="text-sm font-semibold text-blue-700">${person.monthlyFixedSalary.toFixed(2)}</span>
+              <span className="text-xs text-muted-foreground">/mes</span>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400">-</span>
+          )}
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center justify-center">
+          {person.includeInRealCosts !== false ? (
+            <Check className="h-4 w-4 text-green-600" />
+          ) : (
+            <X className="h-4 w-4 text-red-600" />
+          )}
         </div>
       </td>
       <td className="px-6 py-4">
