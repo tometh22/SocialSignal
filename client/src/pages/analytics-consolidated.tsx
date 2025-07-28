@@ -121,9 +121,17 @@ export default function AnalyticsConsolidated() {
 
     const uniqueProjects = projects.filter(p => !alwaysOnProjects.includes(p));
 
-    // Calcular ingresos mensuales vs totales
-    const monthlyRevenue = alwaysOnProjects.reduce((sum, p) => sum + (p.macroMonthlyBudget || 0), 0);
-    const totalRevenue = uniqueProjects.reduce((sum, p) => sum + (p.quotation?.totalAmount || 0), 0);
+    // Calcular ingresos mensuales vs totales (precio al cliente)
+    const monthlyRevenue = alwaysOnProjects.reduce((sum, p) => {
+      // Para Always-On usar el precio mensual del cliente
+      const clientPrice = p.quotation?.totalAmount || p.macroMonthlyBudget || 0;
+      return sum + clientPrice;
+    }, 0);
+    
+    const totalRevenue = uniqueProjects.reduce((sum, p) => {
+      // Para únicos usar el precio total del cliente
+      return sum + (p.quotation?.totalAmount || 0);
+    }, 0);
 
     // Function to get date range based on filter
     const getDateRange = (filter: string) => {
@@ -295,11 +303,38 @@ export default function AnalyticsConsolidated() {
       const hours = monthEntries.reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
       const cost = monthEntries.reduce((sum: number, e: any) => sum + (e.totalCost || 0), 0);
       
+      // Calcular revenue del mes (facturación)
+      let monthRevenue = 0;
+      
+      // Para proyectos Always-On, sumar el precio mensual si tienen actividad en el mes
+      alwaysOnProjects.forEach(project => {
+        const hasActivity = monthEntries.some((entry: any) => entry.projectId === project.id);
+        if (hasActivity) {
+          monthRevenue += project.quotation?.totalAmount || project.macroMonthlyBudget || 0;
+        }
+      });
+      
+      // Para proyectos únicos, prorratearlo si tienen actividad en el mes
+      uniqueProjects.forEach(project => {
+        const projectEntries = monthEntries.filter((entry: any) => entry.projectId === project.id);
+        if (projectEntries.length > 0) {
+          // Si el proyecto tiene actividad, incluir parte proporcional del revenue
+          const totalProjectHours = timeEntries.filter((e: any) => e.projectId === project.id)
+            .reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+          const monthProjectHours = projectEntries.reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
+          
+          if (totalProjectHours > 0) {
+            const proportion = monthProjectHours / totalProjectHours;
+            monthRevenue += (project.quotation?.totalAmount || 0) * proportion;
+          }
+        }
+      });
+      
       monthlyTrends.push({
         month: format(date, 'MMM', { locale: es }),
         hours,
         cost,
-        revenue: monthlyRevenue // Simplificado para el ejemplo
+        revenue: monthRevenue
       });
     }
 
@@ -355,11 +390,11 @@ export default function AnalyticsConsolidated() {
       <TooltipProvider>
         <div className="space-y-6">
           {/* Header con métricas clave */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Revenue Total</CardTitle>
+                <CardTitle className="text-sm font-medium">Facturación Total</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent className="relative">
@@ -379,6 +414,22 @@ export default function AnalyticsConsolidated() {
                     {Math.abs(analytics.revenueGrowth)}%
                   </span>
                   <span className="text-muted-foreground ml-1">vs período anterior</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10" />
+              <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Ganancia Neta</CardTitle>
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold">
+                  ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Margen: {((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1)}%
                 </div>
               </CardContent>
             </Card>
