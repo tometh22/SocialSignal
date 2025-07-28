@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake } from "lucide-react";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import {
@@ -53,6 +53,38 @@ export default function ManageQuotes() {
 
   const { data: clients = [], error: clientsError } = useQuery<Client[]>({
     queryKey: ["/api/clients"]
+  });
+
+  // Query to check which quotations have negotiation history
+  const { data: negotiationData = {} } = useQuery<Record<number, boolean>>({
+    queryKey: ["/api/quotations/negotiation-status"],
+    enabled: !!quotations && quotations.length > 0,
+    queryFn: async () => {
+      if (!quotations) return {};
+      
+      // For each quotation that was approved, check if it has negotiation history
+      const negotiationStatus: Record<number, boolean> = {};
+      
+      const approvedQuotations = quotations.filter(q => q.status === 'approved');
+      
+      await Promise.all(
+        approvedQuotations.map(async (quotation) => {
+          try {
+            const response = await fetch(`/api/quotations/${quotation.id}/negotiation-history`, {
+              credentials: 'include'
+            });
+            if (response.ok) {
+              const history = await response.json();
+              negotiationStatus[quotation.id] = history && history.length > 0;
+            }
+          } catch (error) {
+            console.error(`Error fetching negotiation history for quotation ${quotation.id}:`, error);
+          }
+        })
+      );
+      
+      return negotiationStatus;
+    }
   });
 
   // Log success/error after data is loaded
@@ -636,8 +668,18 @@ export default function ManageQuotes() {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex-shrink-0">
+                              <div className="flex-shrink-0 flex flex-col items-end gap-2">
                                 {getStatusBadge(quote.status)}
+                                {negotiationData[quote.id] && quote.status === 'approved' && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-purple-50 text-purple-700 border-purple-200 text-xs flex items-center gap-1"
+                                    title="Esta cotización fue negociada antes de aprobarse"
+                                  >
+                                    <Handshake className="h-3 w-3" />
+                                    Negociada
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>

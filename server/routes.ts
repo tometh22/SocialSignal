@@ -1574,7 +1574,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!status) return res.status(400).json({ message: "Status is required" });
 
-      const updatedQuotation = await storage.updateQuotation(id, { status });
+      // Get the current quotation to check its status
+      const currentQuotation = await storage.getQuotation(id);
+      if (!currentQuotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+
+      // Check if status is changing from "in-negotiation" to "approved"
+      let updateData: any = { status };
+      
+      if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
+        // Get the last negotiation entry
+        const negotiationHistory = await storage.getQuotationNegotiationHistory(id);
+        
+        if (negotiationHistory && negotiationHistory.length > 0) {
+          // Get the most recent negotiation (first in the array since it's ordered by createdAt DESC)
+          const lastNegotiation = negotiationHistory[0];
+          
+          // Update the quotation with the last negotiated price
+          updateData.totalAmount = lastNegotiation.newPrice;
+          
+          // Also update the markup amount to maintain the correct calculation
+          const operationalSubtotal = currentQuotation.baseCost + currentQuotation.complexityAdjustment;
+          updateData.markupAmount = lastNegotiation.newPrice - operationalSubtotal;
+          
+          console.log(`[API] Updating quotation ${id} from negotiated price: ${currentQuotation.totalAmount} → ${lastNegotiation.newPrice}`);
+        }
+      }
+
+      const updatedQuotation = await storage.updateQuotation(id, updateData);
 
       if (!updatedQuotation) {
         return res.status(404).json({ message: "Quotation not found" });
