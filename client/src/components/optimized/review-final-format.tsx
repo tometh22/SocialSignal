@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ExternalLink } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 const ReviewFinalFormat: React.FC = () => {
@@ -284,14 +285,39 @@ const ReviewFinalFormat: React.FC = () => {
       </div>
 
       <div className="mb-6">
-        <h4 className="text-lg font-medium text-neutral-800 mb-4">Notas Adicionales</h4>
-        <Textarea
-          value={additionalNotes}
-          onChange={(e) => setAdditionalNotes(e.target.value)}
-          placeholder="Notas adicionales para incluir en la cotización..."
-          className="w-full"
-          rows={4}
-        />
+        <h4 className="text-lg font-medium text-neutral-800 mb-4">Documentación y Notas</h4>
+        <div className="space-y-4">
+          <div>
+            <Label className="block text-sm font-medium text-neutral-700 mb-1">
+              Link a la Propuesta Original
+              <span className="ml-1 text-neutral-500 font-normal">(Google Drive, Dropbox, etc.)</span>
+            </Label>
+            <div className="flex items-center space-x-2">
+              <ExternalLink className="h-5 w-5 text-neutral-500" />
+              <Input
+                type="url"
+                value={quotationData.proposalLink || ''}
+                onChange={(e) => updateQuotationData({ proposalLink: e.target.value })}
+                placeholder="https://drive.google.com/file/d/..."
+                className="flex-1"
+              />
+            </div>
+            <p className="text-xs text-neutral-500 mt-1">
+              Adjunta el enlace al documento de propuesta comercial enviado al cliente
+            </p>
+          </div>
+          
+          <div>
+            <Label className="block text-sm font-medium text-neutral-700 mb-1">Notas Adicionales</Label>
+            <Textarea
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
+              placeholder="Notas adicionales para incluir en la cotización..."
+              className="w-full"
+              rows={4}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between items-center pt-4 border-t border-neutral-200">

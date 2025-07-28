@@ -169,6 +169,7 @@ export const quotations = pgTable("quotations", {
   projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
   usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
+  proposalLink: text("proposal_link"), // Link to the proposal document
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
@@ -189,6 +190,7 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
     z.undefined(),
     z.null().transform(() => undefined)
   ]).optional(),
+  proposalLink: z.string().optional(),
 });
 
 // ==================== HISTORIAL DE NEGOCIACIONES ====================

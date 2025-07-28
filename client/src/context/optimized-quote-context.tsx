@@ -59,6 +59,7 @@ export interface QuotationData {
     projectStartDate: string;
     quotationCurrency: string;
   };
+  proposalLink?: string; // Link a la propuesta original
 }
 
 interface OptimizedQuoteContextType {
@@ -117,6 +118,9 @@ interface OptimizedQuoteContextType {
   updateDeliverable: (index: number, deliverable: any) => void;
   removeDeliverable: (index: number) => void;
   updateAdditionalDeliverableCost: (cost: number) => void;
+  
+  // General update function
+  updateQuotationData: (data: Partial<QuotationData>) => void;
 }
 
 const OptimizedQuoteContext = createContext<OptimizedQuoteContextType | undefined>(undefined);
@@ -803,7 +807,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           manualInflationRate: Number(quotation.manualInflationRate || 0),
           projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
           quotationCurrency: quotation.quotationCurrency || "USD"
-        }
+        },
+        proposalLink: quotation.proposalLink || undefined
       };
 
       console.log('📊 Final quotation data to set:', loadedQuotationData);
@@ -862,6 +867,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
+        proposalLink: quotationData.proposalLink || null,
         status: status
       };
 
@@ -1073,6 +1079,19 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
   }, [queryClient]);
 
+  // General update function for any quotation data field
+  const updateQuotationData = useCallback((data: Partial<QuotationData>) => {
+    console.log('📝 Updating quotation data:', data);
+    setQuotationData(prev => ({ ...prev, ...data }));
+    // Only recalculate if financial-related fields are updated
+    const needsRecalc = data.teamMembers || data.financials || data.inflation || 
+                       data.complexity || data.analysisType || data.mentionsVolume || 
+                       data.countriesCovered || data.clientEngagement;
+    if (needsRecalc) {
+      forceRecalculate();
+    }
+  }, [forceRecalculate]);
+
   const value = {
     quotationData,
     baseCost,
@@ -1119,7 +1138,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Nuevas funciones para herramientas y pricing manual
     updateToolsCost,
     updatePriceMode,
-    updateManualPrice
+    updateManualPrice,
+    // General update function
+    updateQuotationData
   };
 
   return (
