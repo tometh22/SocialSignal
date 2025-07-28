@@ -72,7 +72,7 @@ export function IndirectCosts() {
     mutationFn: (data: InsertIndirectCostCategory) => 
       apiRequest('/api/indirect-cost-categories', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: data
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
@@ -89,7 +89,7 @@ export function IndirectCosts() {
     mutationFn: (data: InsertIndirectCost) => 
       apiRequest('/api/indirect-costs', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: data
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs'] });
@@ -105,7 +105,7 @@ export function IndirectCosts() {
     mutationFn: (data: InsertNonBillableHours) => 
       apiRequest('/api/indirect-costs/hours', {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: data
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/hours'] });
@@ -329,7 +329,7 @@ export function IndirectCosts() {
                     for (const cost of validCosts) {
                       await apiRequest('/api/indirect-costs', {
                         method: 'POST',
-                        body: JSON.stringify({
+                        body: {
                           categoryId: parseInt(cost.categoryId),
                           name: cost.name,
                           description: cost.description || null,
@@ -338,7 +338,7 @@ export function IndirectCosts() {
                           startDate: new Date(),
                           endDate: null,
                           createdBy: user?.id
-                        })
+                        }
                       });
                     }
                     
@@ -538,14 +538,14 @@ export function IndirectCosts() {
                     for (const hour of validHours) {
                       await apiRequest('/api/indirect-costs/hours', {
                         method: 'POST',
-                        body: JSON.stringify({
+                        body: {
                           personnelId: parseInt(hour.personnelId),
                           categoryId: parseInt(hour.categoryId),
                           date: hour.date,
                           hours: hour.hours.toString(),
                           description: hour.description || null,
                           createdBy: user?.id
-                        })
+                        }
                       });
                     }
                     
