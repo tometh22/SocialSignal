@@ -24,6 +24,9 @@ import {
   type UnquotedPersonnel, type InsertUnquotedPersonnel,
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
+  type IndirectCostCategory, type InsertIndirectCostCategory,
+  type IndirectCost, type InsertIndirectCost,
+  type NonBillableHours, type InsertNonBillableHours,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
@@ -31,7 +34,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  negotiationHistory
+  negotiationHistory, indirectCostCategories, indirectCosts, nonBillableHours
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -260,6 +263,29 @@ export interface IStorage {
   createMonthlyHourAdjustment(adjustment: any): Promise<any>;
   updateMonthlyHourAdjustment(id: number, adjustment: any): Promise<any | undefined>;
   deleteMonthlyHourAdjustment(id: number): Promise<boolean>;
+
+  // Indirect Cost Category operations
+  getIndirectCostCategories(): Promise<IndirectCostCategory[]>;
+  getIndirectCostCategory(id: number): Promise<IndirectCostCategory | undefined>;
+  createIndirectCostCategory(category: InsertIndirectCostCategory): Promise<IndirectCostCategory>;
+  updateIndirectCostCategory(id: number, category: Partial<InsertIndirectCostCategory>): Promise<IndirectCostCategory | undefined>;
+  deleteIndirectCostCategory(id: number): Promise<boolean>;
+
+  // Indirect Cost operations
+  getIndirectCosts(): Promise<IndirectCost[]>;
+  getIndirectCostsByCategory(categoryId: number): Promise<IndirectCost[]>;
+  getIndirectCost(id: number): Promise<IndirectCost | undefined>;
+  createIndirectCost(cost: InsertIndirectCost): Promise<IndirectCost>;
+  updateIndirectCost(id: number, cost: Partial<InsertIndirectCost>): Promise<IndirectCost | undefined>;
+  deleteIndirectCost(id: number): Promise<boolean>;
+  
+  // Non-Billable Hours operations
+  getNonBillableHours(): Promise<NonBillableHours[]>;
+  getNonBillableHoursByPersonnel(personnelId: number): Promise<NonBillableHours[]>;
+  getNonBillableHoursByCategory(categoryId: number): Promise<NonBillableHours[]>;
+  createNonBillableHours(hours: InsertNonBillableHours): Promise<NonBillableHours>;
+  updateNonBillableHours(id: number, hours: Partial<InsertNonBillableHours>): Promise<NonBillableHours | undefined>;
+  deleteNonBillableHours(id: number): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -2717,6 +2743,157 @@ export class DatabaseStorage implements IStorage {
       return true;
     } catch (error) {
       console.error("Error deleting monthly hour adjustment:", error);
+      return false;
+    }
+  }
+
+  // ==================== INDIRECT COST CATEGORY OPERATIONS ====================
+
+  async getIndirectCostCategories(): Promise<IndirectCostCategory[]> {
+    return db.select().from(indirectCostCategories)
+      .where(eq(indirectCostCategories.isActive, true))
+      .orderBy(asc(indirectCostCategories.name));
+  }
+
+  async getIndirectCostCategory(id: number): Promise<IndirectCostCategory | undefined> {
+    const [category] = await db.select().from(indirectCostCategories)
+      .where(eq(indirectCostCategories.id, id));
+    return category || undefined;
+  }
+
+  async createIndirectCostCategory(category: InsertIndirectCostCategory): Promise<IndirectCostCategory> {
+    const [created] = await db.insert(indirectCostCategories)
+      .values(category)
+      .returning();
+    return created;
+  }
+
+  async updateIndirectCostCategory(id: number, category: Partial<InsertIndirectCostCategory>): Promise<IndirectCostCategory | undefined> {
+    try {
+      const [updated] = await db.update(indirectCostCategories)
+        .set(category)
+        .where(eq(indirectCostCategories.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating indirect cost category:", error);
+      return undefined;
+    }
+  }
+
+  async deleteIndirectCostCategory(id: number): Promise<boolean> {
+    try {
+      await db.update(indirectCostCategories)
+        .set({ isActive: false })
+        .where(eq(indirectCostCategories.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting indirect cost category:", error);
+      return false;
+    }
+  }
+
+  // ==================== INDIRECT COST OPERATIONS ====================
+
+  async getIndirectCosts(): Promise<IndirectCost[]> {
+    return db.select().from(indirectCosts)
+      .where(eq(indirectCosts.isActive, true))
+      .orderBy(desc(indirectCosts.startDate));
+  }
+
+  async getIndirectCostsByCategory(categoryId: number): Promise<IndirectCost[]> {
+    return db.select().from(indirectCosts)
+      .where(and(
+        eq(indirectCosts.categoryId, categoryId),
+        eq(indirectCosts.isActive, true)
+      ))
+      .orderBy(desc(indirectCosts.startDate));
+  }
+
+  async getIndirectCost(id: number): Promise<IndirectCost | undefined> {
+    const [cost] = await db.select().from(indirectCosts)
+      .where(eq(indirectCosts.id, id));
+    return cost || undefined;
+  }
+
+  async createIndirectCost(cost: InsertIndirectCost): Promise<IndirectCost> {
+    const [created] = await db.insert(indirectCosts)
+      .values(cost)
+      .returning();
+    return created;
+  }
+
+  async updateIndirectCost(id: number, cost: Partial<InsertIndirectCost>): Promise<IndirectCost | undefined> {
+    try {
+      const [updated] = await db.update(indirectCosts)
+        .set(cost)
+        .where(eq(indirectCosts.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating indirect cost:", error);
+      return undefined;
+    }
+  }
+
+  async deleteIndirectCost(id: number): Promise<boolean> {
+    try {
+      await db.update(indirectCosts)
+        .set({ isActive: false })
+        .where(eq(indirectCosts.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting indirect cost:", error);
+      return false;
+    }
+  }
+
+  // ==================== NON-BILLABLE HOURS OPERATIONS ====================
+
+  async getNonBillableHours(): Promise<NonBillableHours[]> {
+    return db.select().from(nonBillableHours)
+      .orderBy(desc(nonBillableHours.date));
+  }
+
+  async getNonBillableHoursByPersonnel(personnelId: number): Promise<NonBillableHours[]> {
+    return db.select().from(nonBillableHours)
+      .where(eq(nonBillableHours.personnelId, personnelId))
+      .orderBy(desc(nonBillableHours.date));
+  }
+
+  async getNonBillableHoursByCategory(categoryId: number): Promise<NonBillableHours[]> {
+    return db.select().from(nonBillableHours)
+      .where(eq(nonBillableHours.categoryId, categoryId))
+      .orderBy(desc(nonBillableHours.date));
+  }
+
+  async createNonBillableHours(hours: InsertNonBillableHours): Promise<NonBillableHours> {
+    const [created] = await db.insert(nonBillableHours)
+      .values(hours)
+      .returning();
+    return created;
+  }
+
+  async updateNonBillableHours(id: number, hours: Partial<InsertNonBillableHours>): Promise<NonBillableHours | undefined> {
+    try {
+      const [updated] = await db.update(nonBillableHours)
+        .set(hours)
+        .where(eq(nonBillableHours.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating non-billable hours:", error);
+      return undefined;
+    }
+  }
+
+  async deleteNonBillableHours(id: number): Promise<boolean> {
+    try {
+      await db.delete(nonBillableHours)
+        .where(eq(nonBillableHours.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting non-billable hours:", error);
       return false;
     }
   }

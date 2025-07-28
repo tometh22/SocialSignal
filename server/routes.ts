@@ -26,6 +26,9 @@ import {
   insertMonthlyInflationSchema,
   insertSystemConfigSchema,
   insertMonthlyHourAdjustmentSchema,
+  insertIndirectCostCategorySchema,
+  insertIndirectCostSchema,
+  insertNonBillableHoursSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   exchangeRateHistory,
@@ -45,7 +48,10 @@ import {
   quickTimeEntries,
   quickTimeEntryDetails,
   monthlyInflation,
-  systemConfig
+  systemConfig,
+  indirectCostCategories,
+  indirectCosts,
+  nonBillableHours
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -6285,6 +6291,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ message: "Failed to generate recommendations" });
+    }
+  });
+
+  // ==================== INDIRECT COSTS ROUTES ====================
+
+  // Indirect Cost Categories
+  app.get("/api/indirect-cost-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getIndirectCostCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching indirect cost categories:", error);
+      res.status(500).json({ message: "Failed to fetch indirect cost categories" });
+    }
+  });
+
+  app.get("/api/indirect-cost-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const category = await storage.getIndirectCostCategory(id);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      console.error("Error fetching indirect cost category:", error);
+      res.status(500).json({ message: "Failed to fetch indirect cost category" });
+    }
+  });
+
+  app.post("/api/indirect-cost-categories", requireAuth, async (req, res) => {
+    try {
+      const categoryData = insertIndirectCostCategorySchema.parse(req.body);
+      const category = await storage.createIndirectCostCategory(categoryData);
+      res.status(201).json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating indirect cost category:", error);
+      res.status(500).json({ message: "Failed to create indirect cost category" });
+    }
+  });
+
+  app.patch("/api/indirect-cost-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const categoryData = insertIndirectCostCategorySchema.partial().parse(req.body);
+      const category = await storage.updateIndirectCostCategory(id, categoryData);
+      
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating indirect cost category:", error);
+      res.status(500).json({ message: "Failed to update indirect cost category" });
+    }
+  });
+
+  app.delete("/api/indirect-cost-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const success = await storage.deleteIndirectCostCategory(id);
+      if (!success) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting indirect cost category:", error);
+      res.status(500).json({ message: "Failed to delete indirect cost category" });
+    }
+  });
+
+  // Indirect Costs
+  app.get("/api/indirect-costs", requireAuth, async (req, res) => {
+    try {
+      const costs = await storage.getIndirectCosts();
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching indirect costs:", error);
+      res.status(500).json({ message: "Failed to fetch indirect costs" });
+    }
+  });
+
+  app.get("/api/indirect-costs/category/:categoryId", requireAuth, async (req, res) => {
+    try {
+      const categoryId = parseInt(req.params.categoryId);
+      if (isNaN(categoryId)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
+      const costs = await storage.getIndirectCostsByCategory(categoryId);
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching indirect costs by category:", error);
+      res.status(500).json({ message: "Failed to fetch indirect costs" });
+    }
+  });
+
+  app.get("/api/indirect-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+
+      const cost = await storage.getIndirectCost(id);
+      if (!cost) {
+        return res.status(404).json({ message: "Cost not found" });
+      }
+
+      res.json(cost);
+    } catch (error) {
+      console.error("Error fetching indirect cost:", error);
+      res.status(500).json({ message: "Failed to fetch indirect cost" });
+    }
+  });
+
+  app.post("/api/indirect-costs", requireAuth, async (req, res) => {
+    try {
+      const costData = insertIndirectCostSchema.parse({
+        ...req.body,
+        createdBy: req.user?.id || 1
+      });
+      const cost = await storage.createIndirectCost(costData);
+      res.status(201).json(cost);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating indirect cost:", error);
+      res.status(500).json({ message: "Failed to create indirect cost" });
+    }
+  });
+
+  app.patch("/api/indirect-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+
+      const costData = insertIndirectCostSchema.partial().parse(req.body);
+      const cost = await storage.updateIndirectCost(id, costData);
+      
+      if (!cost) {
+        return res.status(404).json({ message: "Cost not found" });
+      }
+
+      res.json(cost);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating indirect cost:", error);
+      res.status(500).json({ message: "Failed to update indirect cost" });
+    }
+  });
+
+  app.delete("/api/indirect-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+
+      const success = await storage.deleteIndirectCost(id);
+      if (!success) {
+        return res.status(404).json({ message: "Cost not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting indirect cost:", error);
+      res.status(500).json({ message: "Failed to delete indirect cost" });
+    }
+  });
+
+  // Non-Billable Hours
+  app.get("/api/non-billable-hours", requireAuth, async (req, res) => {
+    try {
+      const hours = await storage.getNonBillableHours();
+      res.json(hours);
+    } catch (error) {
+      console.error("Error fetching non-billable hours:", error);
+      res.status(500).json({ message: "Failed to fetch non-billable hours" });
+    }
+  });
+
+  app.get("/api/non-billable-hours/personnel/:personnelId", requireAuth, async (req, res) => {
+    try {
+      const personnelId = parseInt(req.params.personnelId);
+      if (isNaN(personnelId)) {
+        return res.status(400).json({ message: "Invalid personnel ID" });
+      }
+
+      const hours = await storage.getNonBillableHoursByPersonnel(personnelId);
+      res.json(hours);
+    } catch (error) {
+      console.error("Error fetching non-billable hours by personnel:", error);
+      res.status(500).json({ message: "Failed to fetch non-billable hours" });
+    }
+  });
+
+  app.post("/api/non-billable-hours", requireAuth, async (req, res) => {
+    try {
+      const hoursData = insertNonBillableHoursSchema.parse({
+        ...req.body,
+        createdBy: req.user?.id || 1
+      });
+      const hours = await storage.createNonBillableHours(hoursData);
+      res.status(201).json(hours);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating non-billable hours:", error);
+      res.status(500).json({ message: "Failed to create non-billable hours" });
+    }
+  });
+
+  app.patch("/api/non-billable-hours/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid hours ID" });
+      }
+
+      const hoursData = insertNonBillableHoursSchema.partial().parse(req.body);
+      const hours = await storage.updateNonBillableHours(id, hoursData);
+      
+      if (!hours) {
+        return res.status(404).json({ message: "Hours entry not found" });
+      }
+
+      res.json(hours);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating non-billable hours:", error);
+      res.status(500).json({ message: "Failed to update non-billable hours" });
+    }
+  });
+
+  app.delete("/api/non-billable-hours/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid hours ID" });
+      }
+
+      const success = await storage.deleteNonBillableHours(id);
+      if (!success) {
+        return res.status(404).json({ message: "Hours entry not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting non-billable hours:", error);
+      res.status(500).json({ message: "Failed to delete non-billable hours" });
     }
   });
 

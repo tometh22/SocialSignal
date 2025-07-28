@@ -27,6 +27,7 @@ import {
   Calendar,
   Plus,
   Layers,
+  Receipt,
 } from "lucide-react";
 
 // Tipo para elementos de navegación
@@ -80,6 +81,7 @@ export default function SidebarFixed() {
     { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Gestión de proyectos en curso" },
     { href: "/clients", title: "Clientes", icon: Building2, description: "Información de clientes" },
     { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
+    { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos indirectos" },
     { href: "/admin", title: "Configuración", icon: Settings, description: "Admin del sistema" },
   ];
 

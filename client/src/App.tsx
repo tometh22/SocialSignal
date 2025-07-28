@@ -26,6 +26,7 @@ import ProjectAnalyticsView from "@/pages/project-analytics-view";
 import ClientSummaryCompact from "@/pages/client-summary-compact";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
+import { IndirectCosts } from "@/pages/indirect-costs";
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -139,6 +140,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/clients" component={Clients} />
                   <ProtectedRoute path="/admin" component={Admin} />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
+                  <ProtectedRoute path="/indirect-costs" component={IndirectCosts} />
                   
                   {/* Specialized Tools */}
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />

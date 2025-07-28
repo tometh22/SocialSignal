@@ -56,6 +56,75 @@ export const resetPasswordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+// ==================== COSTOS INDIRECTOS ====================
+// Tabla de categorías de costos indirectos
+export const indirectCostCategories = pgTable("indirect_cost_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 50 }).notNull(), // 'fixed', 'variable', 'executive', 'tax', 'subscription'
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Tabla de costos indirectos
+export const indirectCosts = pgTable("indirect_costs", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default('USD'),
+  period: varchar("period", { length: 20 }).notNull(), // 'monthly', 'quarterly', 'annual', 'one-time'
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Tabla de horas no asignables (reuniones internas, presentaciones comerciales, etc)
+export const nonBillableHours = pgTable("non_billable_hours", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  categoryId: integer("category_id").notNull().references(() => indirectCostCategories.id),
+  date: timestamp("date").notNull(),
+  hours: numeric("hours", { precision: 5, scale: 2 }).notNull(),
+  description: text("description"),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Esquemas de inserción
+export const insertIndirectCostCategorySchema = createInsertSchema(indirectCostCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertIndirectCostSchema = createInsertSchema(indirectCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertNonBillableHoursSchema = createInsertSchema(nonBillableHours).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Tipos
+export type IndirectCostCategory = typeof indirectCostCategories.$inferSelect;
+export type InsertIndirectCostCategory = z.infer<typeof insertIndirectCostCategorySchema>;
+export type IndirectCost = typeof indirectCosts.$inferSelect;
+export type InsertIndirectCost = z.infer<typeof insertIndirectCostSchema>;
+export type NonBillableHours = typeof nonBillableHours.$inferSelect;
+export type InsertNonBillableHours = z.infer<typeof insertNonBillableHoursSchema>;
+
 // ==================== CLIENTES ====================
 // Clients table
 export const clients = pgTable("clients", {
@@ -1135,4 +1204,21 @@ export type InsertExchangeRateHistory = z.infer<typeof insertExchangeRateHistory
 
 export const exchangeRateHistoryRelations = relations(exchangeRateHistory, ({ one }) => ({
   creator: one(users, { fields: [exchangeRateHistory.createdBy], references: [users.id] }),
+}));
+
+// Relaciones para costos indirectos
+export const indirectCostCategoriesRelations = relations(indirectCostCategories, ({ many }) => ({
+  indirectCosts: many(indirectCosts),
+  nonBillableHours: many(nonBillableHours),
+}));
+
+export const indirectCostsRelations = relations(indirectCosts, ({ one }) => ({
+  category: one(indirectCostCategories, { fields: [indirectCosts.categoryId], references: [indirectCostCategories.id] }),
+  creator: one(users, { fields: [indirectCosts.createdBy], references: [users.id] }),
+}));
+
+export const nonBillableHoursRelations = relations(nonBillableHours, ({ one }) => ({
+  personnel: one(personnel, { fields: [nonBillableHours.personnelId], references: [personnel.id] }),
+  category: one(indirectCostCategories, { fields: [nonBillableHours.categoryId], references: [indirectCostCategories.id] }),
+  creator: one(users, { fields: [nonBillableHours.createdBy], references: [users.id] }),
 }));
