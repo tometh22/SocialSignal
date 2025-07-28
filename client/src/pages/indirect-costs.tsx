@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -118,10 +119,17 @@ export function IndirectCosts() {
       });
     },
     onSuccess: async (data) => {
-      // Replace optimistic update with actual data
-      await queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
+      // Simply invalidate and let React Query refetch
+      // This ensures we get the proper data from the server
       setIsAddingCategory(false);
       setFormData({});
+      
+      // Force an immediate refetch
+      await queryClient.refetchQueries({ 
+        queryKey: ['/api/indirect-cost-categories'],
+        exact: true 
+      });
+      
       toast({
         title: "Categoría creada",
         description: "La categoría se creó exitosamente"
@@ -365,26 +373,37 @@ export function IndirectCosts() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories.map(category => (
-                <Card key={category.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{category.name}</CardTitle>
-                    {category.description && (
-                      <CardDescription>{category.description}</CardDescription>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <Badge variant={category.isActive ? "default" : "secondary"}>
-                        {category.isActive ? "Activa" : "Inactiva"}
-                      </Badge>
-                      <span className="text-sm text-slate-500">
-                        {costs.filter(c => c.categoryId === category.id).length} costos
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              <AnimatePresence mode="popLayout">
+                {categories.filter(c => c.isActive).map(category => (
+                  <motion.div
+                    key={category.id}
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    layout
+                  >
+                    <Card className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="text-lg">{category.name}</CardTitle>
+                        {category.description && (
+                          <CardDescription>{category.description}</CardDescription>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <Badge variant={category.isActive ? "default" : "secondary"}>
+                            {category.isActive ? "Activa" : "Inactiva"}
+                          </Badge>
+                          <span className="text-sm text-slate-500">
+                            {costs.filter(c => c.categoryId === category.id).length} costos
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </TabsContent>
 
