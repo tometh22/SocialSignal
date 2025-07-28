@@ -10,7 +10,8 @@ import {
   BarChart3, TrendingUp, Users, DollarSign, Clock, Building2, Target, Calendar,
   ArrowUpRight, ArrowDownRight, Activity, Briefcase, FileText, AlertCircle,
   ChevronRight, Download, Filter, PieChart, LineChart, Zap, Shield,
-  TrendingDown, CheckCircle2, XCircle, Info, Globe, Layers
+  TrendingDown, CheckCircle2, XCircle, Info, Globe, Layers,
+  Calendar as CalendarIconLucide
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -62,8 +63,36 @@ const CHART_COLORS = {
   teal: "#14b8a6"
 };
 
+// Date filter options similar to other sections
+const dateFilterOptions = [
+  { value: "all", label: "Todos los períodos", group: "General" },
+  { value: "this-month", label: "Este mes", group: "General" },
+  { value: "last-month", label: "Mes pasado", group: "General" },
+  { value: "this-quarter", label: "Este trimestre", group: "General" },
+  { value: "last-quarter", label: "Trimestre pasado", group: "General" },
+  { value: "this-semester", label: "Este semestre", group: "General" },
+  { value: "last-semester", label: "Semestre pasado", group: "General" },
+  { value: "this-year", label: "Este año", group: "General" },
+  { value: "q1", label: "Q1 (Ene-Mar)", group: "Trimestres" },
+  { value: "q2", label: "Q2 (Abr-Jun)", group: "Trimestres" },
+  { value: "q3", label: "Q3 (Jul-Sep)", group: "Trimestres" },
+  { value: "q4", label: "Q4 (Oct-Dic)", group: "Trimestres" },
+  { value: "january", label: "Enero", group: "Meses" },
+  { value: "february", label: "Febrero", group: "Meses" },
+  { value: "march", label: "Marzo", group: "Meses" },
+  { value: "april", label: "Abril", group: "Meses" },
+  { value: "may", label: "Mayo", group: "Meses" },
+  { value: "june", label: "Junio", group: "Meses" },
+  { value: "july", label: "Julio", group: "Meses" },
+  { value: "august", label: "Agosto", group: "Meses" },
+  { value: "september", label: "Septiembre", group: "Meses" },
+  { value: "october", label: "Octubre", group: "Meses" },
+  { value: "november", label: "Noviembre", group: "Meses" },
+  { value: "december", label: "Diciembre", group: "Meses" }
+];
+
 export default function AnalyticsConsolidated() {
-  const [selectedPeriod, setSelectedPeriod] = useState("current-month");
+  const [dateFilter, setDateFilter] = useState("this-month");
   const [selectedClient, setSelectedClient] = useState("all");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
 
@@ -96,32 +125,90 @@ export default function AnalyticsConsolidated() {
     const monthlyRevenue = alwaysOnProjects.reduce((sum, p) => sum + (p.macroMonthlyBudget || 0), 0);
     const totalRevenue = uniqueProjects.reduce((sum, p) => sum + (p.quotation?.totalAmount || 0), 0);
 
-    // Filtrar time entries por período
-    const periodEntries = timeEntries.filter((entry: any) => {
-      const entryDate = new Date(entry.date);
-      const project = projects.find(p => p.id === entry.projectId);
-      const isAlwaysOn = alwaysOnProjects.includes(project);
-      
-      switch (selectedPeriod) {
-        case 'current-month':
-          if (isAlwaysOn) {
-            return entryDate.getFullYear() === currentYear && entryDate.getMonth() === currentMonth;
-          }
-          return true;
+    // Function to get date range based on filter
+    const getDateRange = (filter: string) => {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth();
+      let startDate = new Date();
+      let endDate = new Date();
+
+      switch (filter) {
+        case 'all':
+          return null; // No filtering
+        case 'this-month':
+          startDate = new Date(currentYear, currentMonth, 1);
+          endDate = new Date(currentYear, currentMonth + 1, 0);
+          break;
         case 'last-month':
-          const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-          const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-          return entryDate.getFullYear() === lastMonthYear && entryDate.getMonth() === lastMonth;
-        case 'quarter':
+          startDate = new Date(currentYear, currentMonth - 1, 1);
+          endDate = new Date(currentYear, currentMonth, 0);
+          break;
+        case 'this-quarter':
           const currentQuarter = Math.floor(currentMonth / 3);
-          const entryQuarter = Math.floor(entryDate.getMonth() / 3);
-          return entryDate.getFullYear() === currentYear && entryQuarter === currentQuarter;
-        case 'year':
-          return entryDate.getFullYear() === currentYear;
+          startDate = new Date(currentYear, currentQuarter * 3, 1);
+          endDate = new Date(currentYear, currentQuarter * 3 + 3, 0);
+          break;
+        case 'last-quarter':
+          const lastQuarter = Math.floor(currentMonth / 3) - 1;
+          const qYear = lastQuarter < 0 ? currentYear - 1 : currentYear;
+          const qNum = lastQuarter < 0 ? 3 : lastQuarter;
+          startDate = new Date(qYear, qNum * 3, 1);
+          endDate = new Date(qYear, qNum * 3 + 3, 0);
+          break;
+        case 'this-semester':
+          const currentSemester = currentMonth < 6 ? 0 : 1;
+          startDate = new Date(currentYear, currentSemester * 6, 1);
+          endDate = new Date(currentYear, currentSemester * 6 + 6, 0);
+          break;
+        case 'last-semester':
+          const lastSemester = currentMonth < 6 ? 1 : 0;
+          const sYear = lastSemester === 1 && currentMonth < 6 ? currentYear - 1 : currentYear;
+          startDate = new Date(sYear, lastSemester * 6, 1);
+          endDate = new Date(sYear, lastSemester * 6 + 6, 0);
+          break;
+        case 'this-year':
+          startDate = new Date(currentYear, 0, 1);
+          endDate = new Date(currentYear, 11, 31);
+          break;
+        case 'q1':
+          startDate = new Date(currentYear, 0, 1);
+          endDate = new Date(currentYear, 2, 31);
+          break;
+        case 'q2':
+          startDate = new Date(currentYear, 3, 1);
+          endDate = new Date(currentYear, 5, 30);
+          break;
+        case 'q3':
+          startDate = new Date(currentYear, 6, 1);
+          endDate = new Date(currentYear, 8, 30);
+          break;
+        case 'q4':
+          startDate = new Date(currentYear, 9, 1);
+          endDate = new Date(currentYear, 11, 31);
+          break;
         default:
-          return true;
+          // Handle month names
+          const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                            'july', 'august', 'september', 'october', 'november', 'december'];
+          const monthIndex = monthNames.indexOf(filter);
+          if (monthIndex !== -1) {
+            startDate = new Date(currentYear, monthIndex, 1);
+            endDate = new Date(currentYear, monthIndex + 1, 0);
+          }
       }
-    });
+
+      return { startDate, endDate };
+    };
+
+    // Filtrar time entries por período
+    const dateRange = getDateRange(dateFilter);
+    const periodEntries = dateRange 
+      ? timeEntries.filter((entry: any) => {
+          const entryDate = new Date(entry.date);
+          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+        })
+      : timeEntries;
 
     // Métricas de tiempo y costos
     const totalHours = periodEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
@@ -145,13 +232,16 @@ export default function AnalyticsConsolidated() {
         const monthlyBudget = project.macroMonthlyBudget || project.quotation?.totalAmount || 0;
         
         // Calcular cuántos meses abarca el período seleccionado
-        if (selectedPeriod === 'current-month') {
+        if (dateFilter === 'this-month' || dateFilter === 'last-month' || 
+            ['january', 'february', 'march', 'april', 'may', 'june', 
+             'july', 'august', 'september', 'october', 'november', 'december'].includes(dateFilter)) {
           periodBudget = monthlyBudget;
-        } else if (selectedPeriod === 'current-quarter') {
+        } else if (dateFilter === 'this-quarter' || dateFilter === 'last-quarter' ||
+                   dateFilter === 'q1' || dateFilter === 'q2' || dateFilter === 'q3' || dateFilter === 'q4') {
           periodBudget = monthlyBudget * 3;
-        } else if (selectedPeriod === 'current-semester') {
+        } else if (dateFilter === 'this-semester' || dateFilter === 'last-semester') {
           periodBudget = monthlyBudget * 6;
-        } else if (selectedPeriod === 'current-year') {
+        } else if (dateFilter === 'this-year') {
           periodBudget = monthlyBudget * 12;
         } else {
           // Para histórico completo, usar el total de meses con datos
@@ -161,7 +251,7 @@ export default function AnalyticsConsolidated() {
               return `${date.getFullYear()}-${date.getMonth()}`;
             })
           );
-          periodBudget = monthlyBudget * uniqueMonths.size;
+          periodBudget = monthlyBudget * (uniqueMonths.size || 1);
         }
         budget = periodBudget;
       } else {
@@ -252,7 +342,7 @@ export default function AnalyticsConsolidated() {
       hoursGrowth: -5.2, // Ejemplo, calcular real
       costReduction: 8.3 // Ejemplo, calcular real
     };
-  }, [projects, clients, timeEntries, quotations, deliverables, selectedPeriod]);
+  }, [projects, clients, timeEntries, quotations, deliverables, dateFilter]);
 
   return (
     <PageLayout
@@ -354,141 +444,54 @@ export default function AnalyticsConsolidated() {
             </Card>
           </div>
 
-          {/* Panel de Control Avanzado */}
-          <Card className="border-2">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl flex items-center gap-2">
-                    <Layers className="h-5 w-5" />
-                    Centro de Control Analítico
-                  </CardTitle>
-                  <CardDescription>
-                    Configuración avanzada de filtros y parámetros de análisis
-                  </CardDescription>
-                </div>
-                <Button variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar Reporte
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Período de Análisis
-                  </label>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="current-month">Mes Actual</SelectItem>
-                      <SelectItem value="last-month">Mes Anterior</SelectItem>
-                      <SelectItem value="quarter">Trimestre Actual</SelectItem>
-                      <SelectItem value="year">Año Fiscal</SelectItem>
-                      <SelectItem value="all-time">Histórico Completo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    Cliente
-                  </label>
-                  <Select value={selectedClient} onValueChange={setSelectedClient}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los Clientes</SelectItem>
-                      {clients.map((client: any) => (
-                        <SelectItem key={client.id} value={client.id.toString()}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-                    <PieChart className="h-3 w-3" />
-                    Métrica Principal
-                  </label>
-                  <Select value={selectedMetric} onValueChange={setSelectedMetric}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="revenue">Ingresos</SelectItem>
-                      <SelectItem value="profitability">Rentabilidad</SelectItem>
-                      <SelectItem value="efficiency">Eficiencia</SelectItem>
-                      <SelectItem value="productivity">Productividad</SelectItem>
-                      <SelectItem value="growth">Crecimiento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium mb-2 block flex items-center gap-1">
-                    <Filter className="h-3 w-3" />
-                    Tipo de Proyecto
-                  </label>
-                  <Select defaultValue="all">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="always-on">Always-On</SelectItem>
-                      <SelectItem value="unique">Únicos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Quick Insights */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="h-4 w-4 text-blue-600" />
-                    <span className="font-medium text-sm">Insight Clave</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Los proyectos Always-On representan el {((analytics.alwaysOnProjects / analytics.totalProjects) * 100).toFixed(0)}% 
-                    del portfolio pero generan el {((analytics.monthlyRevenue / analytics.combinedRevenue) * 100).toFixed(0)}% 
-                    de los ingresos recurrentes.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="h-4 w-4 text-green-600" />
-                    <span className="font-medium text-sm">Estado de Salud</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {analytics.projectMetrics.filter(p => p.efficiency > 80).length} de {analytics.totalProjects} proyectos 
-                    operan con eficiencia superior al 80%. Margen promedio: {analytics.avgProfitMargin.toFixed(1)}%.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                    <span className="font-medium text-sm">Acción Requerida</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {analytics.projectMetrics.filter(p => p.efficiency < 50).length} proyectos requieren 
-                    atención inmediata por eficiencia inferior al 50%.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Filtro temporal único */}
+          <div className="flex justify-between items-center mb-6">
+            <div className="flex items-center gap-4">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-64 h-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <CalendarIconLucide className="mr-2 h-4 w-4 text-gray-400" />
+                  <SelectValue placeholder="Seleccionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Agrupar opciones por categoría */}
+                  {["General", "Trimestres", "Meses"].map(group => (
+                    <div key={group}>
+                      <div className="px-2 py-1.5 text-xs font-medium text-gray-500 bg-gray-50">
+                        {group}
+                      </div>
+                      {dateFilterOptions
+                        .filter(option => option.group === group)
+                        .map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </div>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedClient} onValueChange={setSelectedClient}>
+                <SelectTrigger className="w-48">
+                  <Building2 className="mr-2 h-4 w-4 text-gray-400" />
+                  <SelectValue placeholder="Todos los clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los Clientes</SelectItem>
+                  {clients.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id.toString()}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar Reporte
+            </Button>
+          </div>
 
 
 
