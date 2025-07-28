@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle, Users, Handshake } from 'lucide-react';
+import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle, Users, Handshake, UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { NegotiationFormModern } from './negotiation-form-modern';
@@ -19,6 +19,8 @@ interface NegotiationHistoryEntry {
   newPrice: number;
   previousScope?: string;
   newScope?: string;
+  previousTeam?: string;
+  newTeam?: string;
   changeType: string;
   clientFeedback?: string;
   internalNotes?: string;
@@ -46,6 +48,10 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus,
     enabled: quotationStatus === 'in-negotiation'
   });
 
+  const { data: personnel } = useQuery<any[]>({
+    queryKey: ['/api/personnel']
+  });
+
   const createNegotiationMutation = useMutation({
     mutationFn: async (data: any) => {
       return await apiRequest(`/api/quotations/${quotationId}/negotiation-history`, 'POST', data);
@@ -69,6 +75,124 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus,
 
   const handleSubmit = (data: any) => {
     createNegotiationMutation.mutate(data);
+  };
+
+  // Function to parse and compare team changes
+  const renderTeamChanges = (previousTeam?: string, newTeam?: string) => {
+    if (!previousTeam && !newTeam) return null;
+
+    try {
+      const prevTeam = previousTeam ? JSON.parse(previousTeam) : [];
+      const currTeam = newTeam ? JSON.parse(newTeam) : [];
+
+      // Find added, removed, and modified members
+      const added: any[] = [];
+      const removed: any[] = [];
+      const modified: any[] = [];
+
+      // Check for removed and modified members
+      prevTeam.forEach((prevMember: any) => {
+        const currentMember = currTeam.find((m: any) => m.personnelId === prevMember.personnelId);
+        if (!currentMember) {
+          removed.push(prevMember);
+        } else if (
+          currentMember.estimatedHours !== prevMember.estimatedHours ||
+          currentMember.hourlyRate !== prevMember.hourlyRate
+        ) {
+          modified.push({
+            ...currentMember,
+            previousHours: prevMember.estimatedHours,
+            previousRate: prevMember.hourlyRate
+          });
+        }
+      });
+
+      // Check for added members
+      currTeam.forEach((currMember: any) => {
+        const prevMember = prevTeam.find((m: any) => m.personnelId === currMember.personnelId);
+        if (!prevMember) {
+          added.push(currMember);
+        }
+      });
+
+      if (added.length === 0 && removed.length === 0 && modified.length === 0) {
+        return null;
+      }
+
+      // Helper function to get personnel name
+      const getPersonnelName = (personnelId: number) => {
+        const person = personnel?.find(p => p.id === personnelId);
+        return person ? person.name : `Personal ID ${personnelId}`;
+      };
+
+      return (
+        <div className="border-t pt-3 mt-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Users className="h-4 w-4 text-indigo-500" />
+            <span className="text-sm font-medium">Cambios en el equipo:</span>
+          </div>
+          
+          <div className="space-y-2">
+            {added.length > 0 && (
+              <div className="bg-green-50 p-3 rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserPlus className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-medium text-green-700">Miembros agregados:</span>
+                </div>
+                <div className="space-y-1">
+                  {added.map((member: any, idx: number) => (
+                    <div key={idx} className="text-sm text-green-600">
+                      • {getPersonnelName(member.personnelId)}: {member.estimatedHours}h a ${member.hourlyRate}/h
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {removed.length > 0 && (
+              <div className="bg-red-50 p-3 rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserMinus className="h-4 w-4 text-red-600" />
+                  <span className="text-sm font-medium text-red-700">Miembros eliminados:</span>
+                </div>
+                <div className="space-y-1">
+                  {removed.map((member: any, idx: number) => (
+                    <div key={idx} className="text-sm text-red-600">
+                      • {getPersonnelName(member.personnelId)}: {member.estimatedHours}h a ${member.hourlyRate}/h
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {modified.length > 0 && (
+              <div className="bg-amber-50 p-3 rounded-md">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserCheck className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-700">Miembros modificados:</span>
+                </div>
+                <div className="space-y-1">
+                  {modified.map((member: any, idx: number) => (
+                    <div key={idx} className="text-sm text-amber-600">
+                      • {getPersonnelName(member.personnelId)}: 
+                      {member.previousHours !== member.estimatedHours && (
+                        <span> {member.previousHours}h → {member.estimatedHours}h</span>
+                      )}
+                      {member.previousRate !== member.hourlyRate && (
+                        <span> (${member.previousRate} → ${member.hourlyRate}/h)</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('Error parsing team changes:', error);
+      return null;
+    }
   };
 
   const getChangeTypeLabel = (type: string) => {
@@ -214,6 +338,8 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus,
                       </div>
                     </div>
                   )}
+
+                  {renderTeamChanges(entry.previousTeam, entry.newTeam)}
                 </Card>
               ))}
             </div>
