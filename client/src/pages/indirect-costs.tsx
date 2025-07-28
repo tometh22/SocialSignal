@@ -39,10 +39,16 @@ export function IndirectCosts() {
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [isAddingCost, setIsAddingCost] = useState(false);
-  const [isAddingHours, setIsAddingHours] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [formData, setFormData] = useState<any>({});
+  
+  // Quick entry forms state
+  const [quickCosts, setQuickCosts] = useState<any[]>([
+    { categoryId: '', name: '', amount: '', period: 'monthly', description: '' }
+  ]);
+  const [quickHours, setQuickHours] = useState<any[]>([
+    { personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }
+  ]);
 
   // Queries
   const { data: categories = [], isLoading: loadingCategories } = useQuery<IndirectCostCategory[]>({
@@ -302,101 +308,467 @@ export function IndirectCosts() {
             </div>
           </TabsContent>
 
-          {/* Costs Tab */}
+          {/* Costs Tab - Quick Entry Style */}
           <TabsContent value="costs" className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Costos Fijos Registrados</h2>
-              <Button onClick={() => setIsAddingCost(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Registrar Costo
-              </Button>
+              <h2 className="text-2xl font-bold">Registro Rápido de Costos</h2>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setQuickCosts([...quickCosts, { categoryId: '', name: '', amount: '', period: 'monthly', description: '' }])}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Línea
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    const validCosts = quickCosts.filter(c => c.categoryId && c.name && c.amount);
+                    if (validCosts.length === 0) {
+                      toast({ title: "Error", description: "Completa al menos una línea", variant: "destructive" });
+                      return;
+                    }
+                    
+                    for (const cost of validCosts) {
+                      await apiRequest('/api/indirect-costs', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          categoryId: parseInt(cost.categoryId),
+                          name: cost.name,
+                          description: cost.description || null,
+                          amount: cost.amount.toString(),
+                          period: cost.period,
+                          startDate: new Date(),
+                          endDate: null,
+                          createdBy: user?.id
+                        })
+                      });
+                    }
+                    
+                    queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs'] });
+                    setQuickCosts([{ categoryId: '', name: '', amount: '', period: 'monthly', description: '' }]);
+                    toast({ title: "Éxito", description: `${validCosts.length} costos registrados` });
+                  }}
+                  disabled={!quickCosts.some(c => c.categoryId && c.name && c.amount)}
+                >
+                  <Calculator className="h-4 w-4 mr-2" />
+                  Guardar Todos ({quickCosts.filter(c => c.categoryId && c.name && c.amount).length})
+                </Button>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {costs.map(cost => {
-                const category = categories.find(c => c.id === cost.categoryId);
-                return (
-                  <Card key={cost.id} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold text-lg">{cost.name}</h3>
-                          {cost.description && (
-                            <p className="text-sm text-slate-600">{cost.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 text-sm">
-                            <Badge variant="outline">{category?.name}</Badge>
-                            <span className="text-slate-500">
+            {/* Quick Entry Table */}
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-sm">Categoría</th>
+                      <th className="text-left p-3 font-medium text-sm">Nombre del Costo</th>
+                      <th className="text-left p-3 font-medium text-sm">Monto</th>
+                      <th className="text-left p-3 font-medium text-sm">Frecuencia</th>
+                      <th className="text-left p-3 font-medium text-sm">Descripción</th>
+                      <th className="w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quickCosts.map((cost, index) => (
+                      <tr key={index} className="border-b hover:bg-slate-50">
+                        <td className="p-2">
+                          <Select 
+                            value={cost.categoryId}
+                            onValueChange={(value) => {
+                              const newCosts = [...quickCosts];
+                              newCosts[index].categoryId = value;
+                              setQuickCosts(newCosts);
+                            }}
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.filter(c => c.isActive).map(category => (
+                                <SelectItem key={category.id} value={category.id.toString()}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            value={cost.name}
+                            onChange={(e) => {
+                              const newCosts = [...quickCosts];
+                              newCosts[index].name = e.target.value;
+                              setQuickCosts(newCosts);
+                            }}
+                            placeholder="Ej: Slack Premium"
+                            className="h-9"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            type="number"
+                            value={cost.amount}
+                            onChange={(e) => {
+                              const newCosts = [...quickCosts];
+                              newCosts[index].amount = e.target.value;
+                              setQuickCosts(newCosts);
+                            }}
+                            placeholder="0.00"
+                            className="h-9 w-32"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Select 
+                            value={cost.period}
+                            onValueChange={(value) => {
+                              const newCosts = [...quickCosts];
+                              newCosts[index].period = value;
+                              setQuickCosts(newCosts);
+                            }}
+                          >
+                            <SelectTrigger className="h-9 w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monthly">Mensual</SelectItem>
+                              <SelectItem value="quarterly">Trimestral</SelectItem>
+                              <SelectItem value="yearly">Anual</SelectItem>
+                              <SelectItem value="once">Una vez</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-2">
+                          <Input
+                            value={cost.description}
+                            onChange={(e) => {
+                              const newCosts = [...quickCosts];
+                              newCosts[index].description = e.target.value;
+                              setQuickCosts(newCosts);
+                            }}
+                            placeholder="Opcional"
+                            className="h-9"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const newCosts = quickCosts.filter((_, i) => i !== index);
+                              setQuickCosts(newCosts.length > 0 ? newCosts : [{ categoryId: '', name: '', amount: '', period: 'monthly', description: '' }]);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-blue-700">Total a Registrar</span>
+                    <span className="text-xl font-bold text-blue-900">
+                      ${quickCosts.filter(c => c.amount).reduce((sum, c) => sum + parseFloat(c.amount || 0), 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Existing Costs List */}
+            {costs.length > 0 && (
+              <>
+                <h3 className="text-lg font-semibold mt-8">Costos Registrados</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {costs.map(cost => {
+                    const category = categories.find(c => c.id === cost.categoryId);
+                    return (
+                      <Card key={cost.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium text-sm">{cost.name}</h4>
+                            <Badge variant="outline" className="text-xs">{category?.name}</Badge>
+                          </div>
+                          <div className="flex justify-between items-end">
+                            <span className="text-xs text-slate-500">
                               {cost.period === 'monthly' ? 'Mensual' : 
                                cost.period === 'quarterly' ? 'Trimestral' : 
                                cost.period === 'yearly' ? 'Anual' : 'Una vez'}
                             </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">
-                            ${parseFloat(cost.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </div>
-                          <p className="text-sm text-slate-500">
-                            {format(new Date(cost.startDate), 'dd MMM yyyy', { locale: es })}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-
-          {/* Hours Tab */}
-          <TabsContent value="hours" className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Horas No Facturables</h2>
-              <Button onClick={() => setIsAddingHours(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Registrar Horas
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              {hours.map(hour => {
-                const person = personnel.find(p => p.id === hour.personnelId);
-                const category = categories.find(c => c.id === hour.categoryId);
-                const cost = parseFloat(hour.hours) * (person?.hourlyRate || 0);
-
-                return (
-                  <Card key={hour.id} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <h3 className="font-semibold text-lg">{person?.name}</h3>
-                          {hour.description && (
-                            <p className="text-sm text-slate-600">{hour.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 text-sm">
-                            <Badge variant="outline">{category?.name}</Badge>
-                            <span className="text-slate-500">
-                              {format(new Date(hour.date), 'dd MMM yyyy', { locale: es })}
+                            <span className="font-bold text-lg">
+                              ${parseFloat(cost.amount).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Hours Tab - Quick Entry Style */}
+          <TabsContent value="hours" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Registro Rápido de Horas No Facturables</h2>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setQuickHours([...quickHours, { personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }])}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Línea
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    const validHours = quickHours.filter(h => h.personnelId && h.categoryId && h.hours);
+                    if (validHours.length === 0) {
+                      toast({ title: "Error", description: "Completa al menos una línea", variant: "destructive" });
+                      return;
+                    }
+                    
+                    for (const hour of validHours) {
+                      await apiRequest('/api/indirect-costs/hours', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          personnelId: parseInt(hour.personnelId),
+                          categoryId: parseInt(hour.categoryId),
+                          date: hour.date,
+                          hours: hour.hours.toString(),
+                          description: hour.description || null,
+                          createdBy: user?.id
+                        })
+                      });
+                    }
+                    
+                    queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/hours'] });
+                    setQuickHours([{ personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }]);
+                    toast({ title: "Éxito", description: `${validHours.length} registros de horas guardados` });
+                  }}
+                  disabled={!quickHours.some(h => h.personnelId && h.categoryId && h.hours)}
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Guardar Todos ({quickHours.filter(h => h.personnelId && h.categoryId && h.hours).length})
+                </Button>
+              </div>
+            </div>
+
+            {/* Quick Entry Table */}
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b">
+                    <tr>
+                      <th className="text-left p-3 font-medium text-sm">Persona</th>
+                      <th className="text-left p-3 font-medium text-sm">Categoría</th>
+                      <th className="text-left p-3 font-medium text-sm">Horas</th>
+                      <th className="text-left p-3 font-medium text-sm">Fecha</th>
+                      <th className="text-left p-3 font-medium text-sm">Descripción</th>
+                      <th className="text-left p-3 font-medium text-sm">Costo</th>
+                      <th className="w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quickHours.map((hour, index) => {
+                      const person = personnel.find(p => p.id === parseInt(hour.personnelId));
+                      const hourCost = parseFloat(hour.hours || '0') * (person?.hourlyRate || 0);
+                      
+                      return (
+                        <tr key={index} className="border-b hover:bg-slate-50">
+                          <td className="p-2">
+                            <Select 
+                              value={hour.personnelId}
+                              onValueChange={(value) => {
+                                const newHours = [...quickHours];
+                                newHours[index].personnelId = value;
+                                setQuickHours(newHours);
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Seleccionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {personnel.map(person => (
+                                  <SelectItem key={person.id} value={person.id.toString()}>
+                                    {person.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-2">
+                            <Select 
+                              value={hour.categoryId}
+                              onValueChange={(value) => {
+                                const newHours = [...quickHours];
+                                newHours[index].categoryId = value;
+                                setQuickHours(newHours);
+                              }}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Seleccionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.filter(c => c.isActive).map(category => (
+                                  <SelectItem key={category.id} value={category.id.toString()}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              value={hour.hours}
+                              onChange={(e) => {
+                                const newHours = [...quickHours];
+                                newHours[index].hours = e.target.value;
+                                setQuickHours(newHours);
+                              }}
+                              placeholder="0.0"
+                              className="h-9 w-20"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" className="h-9 w-32 justify-start text-left font-normal">
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {format(hour.date, 'dd/MM', { locale: es })}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={hour.date}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const newHours = [...quickHours];
+                                      newHours[index].date = date;
+                                      setQuickHours(newHours);
+                                    }
+                                  }}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              value={hour.description}
+                              onChange={(e) => {
+                                const newHours = [...quickHours];
+                                newHours[index].description = e.target.value;
+                                setQuickHours(newHours);
+                              }}
+                              placeholder="Actividad realizada"
+                              className="h-9"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <span className="font-medium text-sm">
+                              ${hourCost.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </td>
+                          <td className="p-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newHours = quickHours.filter((_, i) => i !== index);
+                                setQuickHours(newHours.length > 0 ? newHours : [{ personnelId: '', categoryId: '', hours: '', date: new Date(), description: '' }]);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-orange-50 border-orange-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-orange-700">Total Horas</span>
+                    <span className="text-xl font-bold text-orange-900">
+                      {quickHours.filter(h => h.hours).reduce((sum, h) => sum + parseFloat(h.hours || 0), 0).toFixed(1)}h
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-purple-50 border-purple-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-purple-700">Costo Total</span>
+                    <span className="text-xl font-bold text-purple-900">
+                      ${quickHours.reduce((sum, h) => {
+                        const person = personnel.find(p => p.id === parseInt(h.personnelId));
+                        return sum + (parseFloat(h.hours || '0') * (person?.hourlyRate || 0));
+                      }, 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Existing Hours List */}
+            {hours.length > 0 && (
+              <>
+                <h3 className="text-lg font-semibold mt-8">Horas Registradas</h3>
+                <div className="space-y-2">
+                  {hours.slice(0, 10).map(hour => {
+                    const person = personnel.find(p => p.id === hour.personnelId);
+                    const category = categories.find(c => c.id === hour.categoryId);
+                    const cost = parseFloat(hour.hours) * (person?.hourlyRate || 0);
+
+                    return (
+                      <div key={hour.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <span className="font-medium text-sm">{person?.name}</span>
+                            <span className="text-xs text-slate-500 ml-2">{category?.name}</span>
+                          </div>
+                          {hour.description && (
+                            <span className="text-sm text-slate-600">{hour.description}</span>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold">{parseFloat(hour.hours).toFixed(1)}h</div>
-                          <p className="text-sm text-slate-500">
+                        <div className="flex items-center gap-6">
+                          <span className="text-sm text-slate-500">
+                            {format(new Date(hour.date), 'dd MMM', { locale: es })}
+                          </span>
+                          <span className="font-medium">{parseFloat(hour.hours).toFixed(1)}h</span>
+                          <span className="font-bold text-sm">
                             ${cost.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </p>
+                          </span>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
-        {/* Add Category Dialog */}
+        {/* Add Category Dialog - Keep this one for now */}
         <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
           <DialogContent>
             <DialogHeader>
@@ -464,257 +836,6 @@ export function IndirectCosts() {
                 }}
               >
                 Crear Categoría
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Cost Dialog */}
-        <Dialog open={isAddingCost} onOpenChange={setIsAddingCost}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Costo Fijo</DialogTitle>
-              <DialogDescription>
-                Registra un nuevo costo fijo o recurrente
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="cost-category">Categoría</Label>
-                <Select 
-                  value={formData.categoryId || ''}
-                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                >
-                  <SelectTrigger id="cost-category">
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.filter(c => c.isActive).map(category => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="cost-name">Nombre del Costo</Label>
-                <Input
-                  id="cost-name"
-                  value={formData.name || ''}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej: Slack Premium"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="cost-amount">Monto</Label>
-                <Input
-                  id="cost-amount"
-                  type="number"
-                  value={formData.amount || ''}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="cost-period">Frecuencia</Label>
-                <Select 
-                  value={formData.period || 'monthly'}
-                  onValueChange={(value) => setFormData({ ...formData, period: value })}
-                >
-                  <SelectTrigger id="cost-period">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="monthly">Mensual</SelectItem>
-                    <SelectItem value="quarterly">Trimestral</SelectItem>
-                    <SelectItem value="yearly">Anual</SelectItem>
-                    <SelectItem value="once">Una vez</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="col-span-2">
-                <Label htmlFor="cost-description">Descripción</Label>
-                <Textarea
-                  id="cost-description"
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe este costo..."
-                />
-              </div>
-
-              <div>
-                <Label>Fecha de Inicio</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, 'PPP', { locale: es }) : 'Selecciona fecha'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddingCost(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => {
-                  if (formData.categoryId && formData.name && formData.amount && user) {
-                    createCostMutation.mutate({
-                      categoryId: parseInt(formData.categoryId),
-                      name: formData.name,
-                      description: formData.description || null,
-                      amount: formData.amount.toString(),
-                      period: formData.period || 'monthly',
-                      startDate: selectedDate || new Date(),
-                      endDate: null,
-                      createdBy: user.id
-                    });
-                  }
-                }}
-              >
-                Registrar Costo
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Hours Dialog */}
-        <Dialog open={isAddingHours} onOpenChange={setIsAddingHours}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Registrar Horas No Facturables</DialogTitle>
-              <DialogDescription>
-                Registra tiempo dedicado a actividades no facturables
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="hours-person">Persona</Label>
-                <Select 
-                  value={formData.personnelId || ''}
-                  onValueChange={(value) => setFormData({ ...formData, personnelId: value })}
-                >
-                  <SelectTrigger id="hours-person">
-                    <SelectValue placeholder="Selecciona una persona" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {personnel.map(person => (
-                      <SelectItem key={person.id} value={person.id.toString()}>
-                        {person.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="hours-category">Categoría</Label>
-                <Select 
-                  value={formData.categoryId || ''}
-                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-                >
-                  <SelectTrigger id="hours-category">
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.filter(c => c.isActive).map(category => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="hours-amount">Horas</Label>
-                <Input
-                  id="hours-amount"
-                  type="number"
-                  step="0.5"
-                  value={formData.hours || ''}
-                  onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                  placeholder="0.0"
-                />
-              </div>
-
-              <div>
-                <Label>Fecha</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, 'PPP', { locale: es }) : 'Selecciona fecha'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div>
-                <Label htmlFor="hours-description">Descripción</Label>
-                <Textarea
-                  id="hours-description"
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe la actividad..."
-                />
-              </div>
-
-              {formData.personnelId && formData.hours && (
-                <div className="p-3 bg-slate-100 rounded-lg">
-                  <p className="text-sm font-medium">Costo estimado</p>
-                  <p className="text-2xl font-bold">
-                    ${(parseFloat(formData.hours || '0') * (personnel.find(p => p.id === parseInt(formData.personnelId))?.hourlyRate || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddingHours(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => {
-                  if (formData.personnelId && formData.categoryId && formData.hours && user) {
-                    createHoursMutation.mutate({
-                      personnelId: parseInt(formData.personnelId),
-                      categoryId: parseInt(formData.categoryId),
-                      date: selectedDate || new Date(),
-                      hours: formData.hours.toString(),
-                      description: formData.description || null,
-                      createdBy: user.id
-                    });
-                  }
-                }}
-              >
-                Registrar Horas
               </Button>
             </DialogFooter>
           </DialogContent>
