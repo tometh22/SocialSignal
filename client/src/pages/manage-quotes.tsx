@@ -599,9 +599,9 @@ export default function ManageQuotes() {
                       <Card key={quote.id} className="group relative bg-white border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 rounded-xl overflow-hidden">
                         <CardContent className="p-0">
                           {/* Header con gradiente */}
-                          <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 border-b border-gray-100">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-center space-x-3">
+                          <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-5 border-b border-gray-100">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start space-x-3 flex-1 min-w-0">
                                 {client?.logoUrl ? (
                                   <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-gray-200 overflow-hidden flex-shrink-0">
                                     <img 
@@ -627,32 +627,32 @@ export default function ManageQuotes() {
                                   </div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+                                  <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-tight">
                                     {quote.projectName}
                                   </h3>
-                                  <p className="text-sm text-gray-600 flex items-center">
+                                  <p className="text-sm text-gray-600 flex items-center mt-1">
                                     <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
                                     <span className="truncate">{getClientName(quote.clientId)}</span>
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex flex-col items-end">
+                              <div className="flex-shrink-0">
                                 {getStatusBadge(quote.status)}
                               </div>
                             </div>
                           </div>
 
                           {/* Contenido principal */}
-                          <div className="p-4 space-y-4">
+                          <div className="p-5 space-y-4">
                             {/* Información financiera */}
-                            <div className="bg-gray-50 rounded-lg p-3">
+                            <div className="bg-gray-50 rounded-lg p-4">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium text-gray-600">Valor Total</span>
                                 <span className="text-xl font-bold text-gray-900">
                                   ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                                 </span>
                               </div>
-                              <div className="flex items-center justify-between mt-1">
+                              <div className="flex items-center justify-between mt-2">
                                 <span className="text-xs text-gray-500">Costo Base</span>
                                 <span className="text-sm text-gray-600">
                                   ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
@@ -690,12 +690,12 @@ export default function ManageQuotes() {
 
                           {/* Acciones */}
                           <div className="bg-gray-50 p-4 border-t border-gray-100">
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-wrap gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openStatusDialog(quote)}
-                                className="w-full justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
+                                className="flex-1 justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
                               >
                                 <Edit className="h-3 w-3 mr-1" />
                                 Estado
@@ -705,7 +705,7 @@ export default function ManageQuotes() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
-                                className="w-full justify-center text-xs hover:bg-green-50 hover:border-green-300"
+                                className="flex-1 justify-center text-xs hover:bg-green-50 hover:border-green-300"
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Ver
@@ -716,7 +716,7 @@ export default function ManageQuotes() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleEditQuotation(quote)}
-                                  className="w-full justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
+                                  className="flex-1 justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
                                 >
                                   <PenLine className="h-3 w-3 mr-1" />
                                   Editar
@@ -728,7 +728,7 @@ export default function ManageQuotes() {
                                 size="sm"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
-                                className="w-full justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                                className="flex-1 justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
                               >
                                 {deletingQuoteId === quote.id ? (
                                   <>
