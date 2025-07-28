@@ -585,6 +585,12 @@ const QuotationDetail: React.FC = () => {
             quotationId={quotation.id} 
             currentPrice={quotation.totalAmount}
             quotationStatus={quotation.status}
+            currentTeam={teamMembers.map(member => ({
+              personnelId: member.personnelId,
+              roleId: personnel.find(p => p.id === member.personnelId)?.roleId || 0,
+              estimatedHours: member.hours,
+              hourlyRate: member.rate
+            }))}
           />
         </div>
 

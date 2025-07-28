@@ -2,18 +2,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle } from 'lucide-react';
+import { Plus, History, TrendingUp, TrendingDown, FileText, MessageSquare, AlertCircle, Users, Handshake } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { NegotiationFormModern } from './negotiation-form-modern';
 
 interface NegotiationHistoryEntry {
   id: number;
@@ -35,19 +32,11 @@ interface NegotiationHistoryProps {
   quotationId: number;
   currentPrice: number;
   quotationStatus: string;
+  currentTeam?: any[];
 }
 
-export function NegotiationHistory({ quotationId, currentPrice, quotationStatus }: NegotiationHistoryProps) {
+export function NegotiationHistory({ quotationId, currentPrice, quotationStatus, currentTeam = [] }: NegotiationHistoryProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    newPrice: currentPrice,
-    changeType: 'price_reduction',
-    clientFeedback: '',
-    internalNotes: '',
-    negotiationReason: '',
-    previousScope: '',
-    newScope: ''
-  });
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -58,7 +47,7 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
   });
 
   const createNegotiationMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
+    mutationFn: async (data: any) => {
       return await apiRequest(`/api/quotations/${quotationId}/negotiation-history`, 'POST', data);
     },
     onSuccess: () => {
@@ -68,7 +57,6 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
       });
       queryClient.invalidateQueries({ queryKey: [`/api/quotations/${quotationId}/negotiation-history`] });
       setDialogOpen(false);
-      resetForm();
     },
     onError: () => {
       toast({
@@ -79,20 +67,8 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
     }
   });
 
-  const resetForm = () => {
-    setFormData({
-      newPrice: currentPrice,
-      changeType: 'price_reduction',
-      clientFeedback: '',
-      internalNotes: '',
-      negotiationReason: '',
-      previousScope: '',
-      newScope: ''
-    });
-  };
-
-  const handleSubmit = () => {
-    createNegotiationMutation.mutate(formData);
+  const handleSubmit = (data: any) => {
+    createNegotiationMutation.mutate(data);
   };
 
   const getChangeTypeLabel = (type: string) => {
@@ -101,6 +77,7 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
       'price_increase': 'Aumento de precio',
       'scope_reduction': 'Reducción de alcance',
       'scope_expansion': 'Expansión de alcance',
+      'team_adjustment': 'Ajuste de equipo',
       'mixed': 'Cambios mixtos'
     };
     return labels[type] || type;
@@ -112,6 +89,7 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
       'price_increase': 'default',
       'scope_reduction': 'secondary',
       'scope_expansion': 'default',
+      'team_adjustment': 'secondary',
       'mixed': 'outline'
     };
     return colors[type] || 'default';
@@ -135,104 +113,14 @@ export function NegotiationHistory({ quotationId, currentPrice, quotationStatus 
               Registrar Negociación
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Registrar Nueva Negociación</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Precio Anterior</Label>
-                  <Input value={`$${currentPrice.toLocaleString()}`} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nuevo Precio</Label>
-                  <Input
-                    type="number"
-                    value={formData.newPrice}
-                    onChange={(e) => setFormData({ ...formData, newPrice: parseFloat(e.target.value) || 0 })}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Tipo de Cambio</Label>
-                <Select value={formData.changeType} onValueChange={(value) => setFormData({ ...formData, changeType: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="price_reduction">Reducción de precio</SelectItem>
-                    <SelectItem value="price_increase">Aumento de precio</SelectItem>
-                    <SelectItem value="scope_reduction">Reducción de alcance</SelectItem>
-                    <SelectItem value="scope_expansion">Expansión de alcance</SelectItem>
-                    <SelectItem value="mixed">Cambios mixtos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Razón de la Negociación</Label>
-                <Textarea
-                  placeholder="¿Por qué el cliente está negociando?"
-                  value={formData.negotiationReason}
-                  onChange={(e) => setFormData({ ...formData, negotiationReason: e.target.value })}
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Feedback del Cliente</Label>
-                <Textarea
-                  placeholder="¿Qué dijo el cliente sobre la propuesta anterior?"
-                  value={formData.clientFeedback}
-                  onChange={(e) => setFormData({ ...formData, clientFeedback: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notas Internas</Label>
-                <Textarea
-                  placeholder="Notas del equipo sobre esta negociación"
-                  value={formData.internalNotes}
-                  onChange={(e) => setFormData({ ...formData, internalNotes: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              {(formData.changeType === 'scope_reduction' || formData.changeType === 'scope_expansion' || formData.changeType === 'mixed') && (
-                <>
-                  <div className="space-y-2">
-                    <Label>Alcance Anterior</Label>
-                    <Textarea
-                      placeholder="Describe el alcance anterior"
-                      value={formData.previousScope}
-                      onChange={(e) => setFormData({ ...formData, previousScope: e.target.value })}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Nuevo Alcance</Label>
-                    <Textarea
-                      placeholder="Describe el nuevo alcance"
-                      value={formData.newScope}
-                      onChange={(e) => setFormData({ ...formData, newScope: e.target.value })}
-                      rows={2}
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSubmit} disabled={createNegotiationMutation.isPending}>
-                  {createNegotiationMutation.isPending ? 'Guardando...' : 'Guardar Negociación'}
-                </Button>
-              </div>
-            </div>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <NegotiationFormModern
+              quotationId={quotationId}
+              currentPrice={currentPrice}
+              currentTeam={currentTeam}
+              onSubmit={handleSubmit}
+              onCancel={() => setDialogOpen(false)}
+            />
           </DialogContent>
         </Dialog>
       </CardHeader>

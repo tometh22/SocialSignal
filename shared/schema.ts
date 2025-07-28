@@ -200,7 +200,9 @@ export const negotiationHistory = pgTable("negotiation_history", {
   newPrice: doublePrecision("new_price").notNull(),
   previousScope: text("previous_scope"), // JSON string with previous scope details
   newScope: text("new_scope"), // JSON string with new scope details
-  changeType: text("change_type").notNull(), // 'price_reduction', 'price_increase', 'scope_reduction', 'scope_expansion', 'mixed'
+  previousTeam: text("previous_team"), // JSON string with previous team composition
+  newTeam: text("new_team"), // JSON string with new team composition
+  changeType: text("change_type").notNull(), // 'price_reduction', 'price_increase', 'scope_reduction', 'scope_expansion', 'team_adjustment', 'mixed'
   clientFeedback: text("client_feedback"), // What the client said about the previous version
   internalNotes: text("internal_notes"), // Internal team notes about the negotiation
   negotiationReason: text("negotiation_reason"), // Why the client is negotiating
