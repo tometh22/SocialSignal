@@ -11,7 +11,7 @@ import {
   ArrowUpRight, ArrowDownRight, Activity, Briefcase, FileText, AlertCircle,
   ChevronRight, Download, Filter, PieChart, LineChart, Zap, Shield,
   TrendingDown, CheckCircle2, XCircle, Info, Globe, Layers,
-  Calendar as CalendarIconLucide
+  Calendar as CalendarIconLucide, CheckCircle, AlertTriangle
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
