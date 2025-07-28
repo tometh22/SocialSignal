@@ -105,12 +105,20 @@ export default function ManageQuotes() {
   };
 
   // Filter quotations based on search term and status
+  // Then sort by creation date (most recent first)
   const filteredQuotations = quotations
-    ? quotations.filter((quote) => {
-        const matchesSearch = quote.projectName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
-        return matchesSearch && matchesStatus;
-      })
+    ? quotations
+        .filter((quote) => {
+          const matchesSearch = quote.projectName.toLowerCase().includes(searchTerm.toLowerCase());
+          const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
+          return matchesSearch && matchesStatus;
+        })
+        .sort((a, b) => {
+          // Sort by createdAt date in descending order (most recent first)
+          const dateA = new Date(a.createdAt || 0).getTime();
+          const dateB = new Date(b.createdAt || 0).getTime();
+          return dateB - dateA;
+        })
     : [];
 
   const handleStatusChange = async () => {
