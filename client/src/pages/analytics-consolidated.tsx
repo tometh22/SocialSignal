@@ -440,26 +440,15 @@ export default function AnalyticsConsolidated() {
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Facturación Total</CardTitle>
+                <CardTitle className="text-sm font-medium">Cash Flow Operativo</CardTitle>
                 <DollarSign className="h-4 w-4 text-blue-600" />
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
                   ${analytics.combinedRevenue.toLocaleString()}
                 </div>
-                <div className="flex items-center text-xs mt-2">
-                  {analytics.revenueGrowth > 0 ? (
-                    <ArrowUpRight className="h-3 w-3 text-green-600 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="h-3 w-3 text-red-600 mr-1" />
-                  )}
-                  <span className={cn(
-                    "font-medium",
-                    analytics.revenueGrowth > 0 ? "text-green-600" : "text-red-600"
-                  )}>
-                    {Math.abs(analytics.revenueGrowth)}%
-                  </span>
-                  <span className="text-muted-foreground ml-1">vs período anterior</span>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Liquidez: ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
                 </div>
               </CardContent>
             </Card>
@@ -467,7 +456,7 @@ export default function AnalyticsConsolidated() {
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ganancia Neta</CardTitle>
+                <CardTitle className="text-sm font-medium">EBITDA</CardTitle>
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent className="relative">
@@ -475,7 +464,7 @@ export default function AnalyticsConsolidated() {
                   ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Margen: {((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1)}%
+                  Margen EBITDA: {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1) : '0'}%
                 </div>
               </CardContent>
             </Card>
@@ -483,32 +472,31 @@ export default function AnalyticsConsolidated() {
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-green-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Eficiencia Promedio</CardTitle>
+                <CardTitle className="text-sm font-medium">Burn Rate</CardTitle>
                 <Activity className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
-                  {analytics.totalCost > 0 ? ((analytics.combinedRevenue / analytics.totalCost) * 100).toFixed(1) : '0'}%
+                  ${(analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
                 </div>
-                <Progress 
-                  value={Math.min(100, analytics.totalCost > 0 ? ((analytics.combinedRevenue / analytics.totalCost) * 100) : 0)} 
-                  className="mt-2"
-                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Gasto mensual promedio
+                </div>
               </CardContent>
             </Card>
 
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-purple-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Margen de Ganancia</CardTitle>
+                <CardTitle className="text-sm font-medium">Pipeline Value</CardTitle>
                 <TrendingUp className="h-4 w-4 text-purple-600" />
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
-                  {analytics.totalCost > 0 ? (((analytics.combinedRevenue - analytics.totalCost) / analytics.totalCost) * 100).toFixed(1) : '0'}%
+                  ${(analytics.pendingQuotations * 30000).toLocaleString()}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  ${analytics.totalHours > 0 ? (analytics.combinedRevenue / analytics.totalHours).toFixed(0) : '0'}/hora
+                  {analytics.pendingQuotations} cotizaciones activas
                 </div>
               </CardContent>
             </Card>
@@ -516,26 +504,15 @@ export default function AnalyticsConsolidated() {
             <Card className="relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/10" />
               <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Horas Totales</CardTitle>
+                <CardTitle className="text-sm font-medium">Utilización</CardTitle>
                 <Clock className="h-4 w-4 text-amber-600" />
               </CardHeader>
               <CardContent className="relative">
                 <div className="text-2xl font-bold">
-                  {analytics.totalHours.toLocaleString()}h
+                  {analytics.totalProjects > 0 ? ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1))) * 100).toFixed(0) : '0'}%
                 </div>
-                <div className="flex items-center text-xs mt-2">
-                  {analytics.hoursGrowth < 0 ? (
-                    <ArrowDownRight className="h-3 w-3 text-green-600 mr-1" />
-                  ) : (
-                    <ArrowUpRight className="h-3 w-3 text-red-600 mr-1" />
-                  )}
-                  <span className={cn(
-                    "font-medium",
-                    analytics.hoursGrowth < 0 ? "text-green-600" : "text-red-600"
-                  )}>
-                    {Math.abs(analytics.hoursGrowth)}%
-                  </span>
-                  <span className="text-muted-foreground ml-1">optimización</span>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {analytics.totalHours.toFixed(0)}h de capacidad utilizada
                 </div>
               </CardContent>
             </Card>
@@ -599,6 +576,7 @@ export default function AnalyticsConsolidated() {
             <TabsTrigger value="projects">Análisis de Proyectos</TabsTrigger>
             <TabsTrigger value="clients">Análisis de Clientes</TabsTrigger>
             <TabsTrigger value="performance">Rendimiento</TabsTrigger>
+            <TabsTrigger value="insights">Salud Corporativa</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -1111,6 +1089,218 @@ export default function AnalyticsConsolidated() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="insights" className="space-y-6">
+            {/* Health Indicators */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className={cn(
+                "border-l-4",
+                analytics.combinedRevenue > analytics.totalCost * 2 ? "border-l-green-500" : 
+                analytics.combinedRevenue > analytics.totalCost * 1.5 ? "border-l-yellow-500" : "border-l-red-500"
+              )}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Salud Financiera</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics.combinedRevenue > analytics.totalCost * 2 ? "Excelente" : 
+                     analytics.combinedRevenue > analytics.totalCost * 1.5 ? "Buena" : "Atención"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ratio ingresos/costos: {(analytics.combinedRevenue / analytics.totalCost).toFixed(1)}x
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(
+                "border-l-4",
+                analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "border-l-green-500" : 
+                analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "border-l-yellow-500" : "border-l-red-500"
+              )}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Control de Gastos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "Óptimo" : 
+                     analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "Moderado" : "Alto"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Burn rate mensual controlado
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(
+                "border-l-4",
+                analytics.pendingQuotations > 5 ? "border-l-green-500" : 
+                analytics.pendingQuotations > 2 ? "border-l-yellow-500" : "border-l-red-500"
+              )}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Pipeline Comercial</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {analytics.pendingQuotations > 5 ? "Robusto" : 
+                     analytics.pendingQuotations > 2 ? "Moderado" : "Débil"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {analytics.pendingQuotations} oportunidades activas
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className={cn(
+                "border-l-4",
+                ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "border-l-green-500" : 
+                ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "border-l-yellow-500" : "border-l-red-500"
+              )}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Productividad</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "Alta" : 
+                     ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "Media" : "Baja"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Utilización del equipo
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Actionable Insights */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    Fortalezas del Negocio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {analytics.combinedRevenue > analytics.totalCost * 2 && (
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Márgenes Saludables</p>
+                        <p className="text-muted-foreground">ROI del {((analytics.combinedRevenue / analytics.totalCost - 1) * 100).toFixed(0)}% supera el objetivo del 100%</p>
+                      </div>
+                    </div>
+                  )}
+                  {analytics.monthlyRevenue > 20000 && (
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Ingresos Recurrentes Estables</p>
+                        <p className="text-muted-foreground">${analytics.monthlyRevenue.toLocaleString()}/mes garantizados</p>
+                      </div>
+                    </div>
+                  )}
+                  {analytics.activeClients > 3 && (
+                    <div className="flex items-start gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Diversificación de Clientes</p>
+                        <p className="text-muted-foreground">{analytics.activeClients} clientes activos reducen riesgo</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                    Áreas de Mejora
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {analytics.pendingQuotations < 3 && (
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Pipeline Comercial Débil</p>
+                        <p className="text-muted-foreground">Solo {analytics.pendingQuotations} cotizaciones activas. Meta: 5+</p>
+                      </div>
+                    </div>
+                  )}
+                  {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) < 60 && (
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Capacidad Subutilizada</p>
+                        <p className="text-muted-foreground">Solo {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100).toFixed(0)}% de utilización</p>
+                      </div>
+                    </div>
+                  )}
+                  {analytics.uniqueProjects > analytics.alwaysOnProjects * 2 && (
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <div className="text-sm">
+                        <p className="font-medium">Dependencia de Proyectos Únicos</p>
+                        <p className="text-muted-foreground">Aumentar contratos recurrentes para estabilidad</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cash Flow Projection */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Proyección de Cash Flow (90 días)</CardTitle>
+                <CardDescription>
+                  Basado en contratos actuales y pipeline comercial
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Ingresos Garantizados</span>
+                    <p className="text-2xl font-bold text-green-600">
+                      ${(analytics.monthlyRevenue * 3).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Contratos recurrentes</p>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Ingresos Potenciales</span>
+                    <p className="text-2xl font-bold text-blue-600">
+                      ${(analytics.pendingQuotations * 30000 * 0.3).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">30% conversión pipeline</p>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Costos Operativos</span>
+                    <p className="text-2xl font-bold text-red-600">
+                      ${(analytics.totalCost * 3 / (dateFilter === 'trimestre-pasado' ? 2 : 1)).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Basado en burn rate actual</p>
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-sm text-muted-foreground">Cash Flow Neto</span>
+                    <p className="text-2xl font-bold">
+                      ${((analytics.monthlyRevenue * 3 + analytics.pendingQuotations * 30000 * 0.3) - (analytics.totalCost * 3 / (dateFilter === 'trimestre-pasado' ? 2 : 1))).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Proyección conservadora</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                  <h4 className="font-medium text-sm mb-2">Recomendaciones Estratégicas</h4>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    <li>• Mantener burn rate mensual bajo ${(analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) * 1.1).toLocaleString()}</li>
+                    <li>• Incrementar pipeline a 8+ cotizaciones activas</li>
+                    <li>• Convertir {Math.max(1, Math.floor(analytics.uniqueProjects * 0.3))} proyecto{Math.floor(analytics.uniqueProjects * 0.3) > 1 ? 's' : ''} único{Math.floor(analytics.uniqueProjects * 0.3) > 1 ? 's' : ''} a contrato recurrente</li>
+                    <li>• Optimizar utilización del equipo al 75%+</li>
+                  </ul>
                 </div>
               </CardContent>
             </Card>
