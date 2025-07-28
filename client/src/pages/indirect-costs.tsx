@@ -52,7 +52,7 @@ export function IndirectCosts() {
 
   // Queries
   const { data: categories = [], isLoading: loadingCategories } = useQuery<IndirectCostCategory[]>({
-    queryKey: ['/api/indirect-costs/categories']
+    queryKey: ['/api/indirect-cost-categories']
   });
 
   const { data: costs = [], isLoading: loadingCosts } = useQuery<IndirectCost[]>({
@@ -70,12 +70,12 @@ export function IndirectCosts() {
   // Mutations
   const createCategoryMutation = useMutation({
     mutationFn: (data: InsertIndirectCostCategory) => 
-      apiRequest('/api/indirect-costs/categories', {
+      apiRequest('/api/indirect-cost-categories', {
         method: 'POST',
         body: JSON.stringify(data)
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/categories'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
       setIsAddingCategory(false);
       setFormData({});
       toast({
@@ -93,7 +93,6 @@ export function IndirectCosts() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs'] });
-      setIsAddingCost(false);
       setFormData({});
       toast({
         title: "Costo registrado",
@@ -110,7 +109,6 @@ export function IndirectCosts() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/indirect-costs/hours'] });
-      setIsAddingHours(false);
       setFormData({});
       toast({
         title: "Horas registradas",
