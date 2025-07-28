@@ -40,6 +40,8 @@ export function IndirectCosts() {
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
   const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<IndirectCostCategory | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [formData, setFormData] = useState<any>({});
   
@@ -116,6 +118,96 @@ export function IndirectCosts() {
       });
     }
   });
+
+  const updateCategoryMutation = useMutation<IndirectCostCategory, Error, { id: number; data: Partial<InsertIndirectCostCategory> }>({
+    mutationFn: ({ id, data }) => 
+      apiRequest(`/api/indirect-cost-categories/${id}`, {
+        method: 'PATCH',
+        body: data
+      }),
+    onSuccess: async (updatedCategory) => {
+      setEditingCategory(null);
+      setFormData({});
+      
+      toast({
+        title: "Categoría actualizada",
+        description: "La categoría se actualizó exitosamente"
+      });
+      
+      // Update cache immediately
+      queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], (oldData) => {
+        if (!oldData) return [updatedCategory];
+        return oldData.map(cat => cat.id === updatedCategory.id ? updatedCategory : cat);
+      });
+      
+      refetchCategories();
+    },
+    onError: (err) => {
+      console.error('Error updating category:', err);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la categoría.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const deleteCategoryMutation = useMutation<void, Error, number>({
+    mutationFn: (id) => 
+      apiRequest(`/api/indirect-cost-categories/${id}`, {
+        method: 'DELETE'
+      }),
+    onSuccess: async (_, deletedId) => {
+      setDeletingCategoryId(null);
+      
+      toast({
+        title: "Categoría eliminada",
+        description: "La categoría se eliminó exitosamente"
+      });
+      
+      // Update cache immediately
+      queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], (oldData) => {
+        if (!oldData) return [];
+        return oldData.filter(cat => cat.id !== deletedId);
+      });
+      
+      refetchCategories();
+    },
+    onError: (err) => {
+      console.error('Error deleting category:', err);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la categoría. Puede que tenga costos asociados.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Handler functions
+  const handleEditCategory = (category: IndirectCostCategory) => {
+    setEditingCategory(category);
+    setFormData({
+      name: category.name,
+      description: category.description || '',
+      type: category.type,
+      isActive: category.isActive
+    });
+  };
+
+  const handleDeleteCategory = (categoryId: number) => {
+    setDeletingCategoryId(categoryId);
+  };
+
+  const handleSaveCategory = () => {
+    if (editingCategory) {
+      updateCategoryMutation.mutate({
+        id: editingCategory.id,
+        data: formData
+      });
+    } else {
+      createCategoryMutation.mutate(formData);
+    }
+  };
 
   const createCostMutation = useMutation({
     mutationFn: (data: InsertIndirectCost) => 
@@ -363,12 +455,34 @@ export function IndirectCosts() {
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     layout
                   >
-                    <Card className="hover:shadow-lg transition-shadow">
+                    <Card className="hover:shadow-lg transition-shadow relative group">
                       <CardHeader>
-                        <CardTitle className="text-lg">{category.name}</CardTitle>
-                        {category.description && (
-                          <CardDescription>{category.description}</CardDescription>
-                        )}
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg">{category.name}</CardTitle>
+                            {category.description && (
+                              <CardDescription>{category.description}</CardDescription>
+                            )}
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8"
+                              onClick={() => handleEditCategory(category)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteCategory(category.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
                       </CardHeader>
                       <CardContent>
                         <div className="flex items-center justify-between">
@@ -847,13 +961,19 @@ export function IndirectCosts() {
           </TabsContent>
         </Tabs>
 
-        {/* Add Category Dialog - Keep this one for now */}
-        <Dialog open={isAddingCategory} onOpenChange={setIsAddingCategory}>
+        {/* Add/Edit Category Dialog */}
+        <Dialog open={isAddingCategory || !!editingCategory} onOpenChange={(open) => {
+          if (!open) {
+            setIsAddingCategory(false);
+            setEditingCategory(null);
+            setFormData({});
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Nueva Categoría</DialogTitle>
+              <DialogTitle>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
               <DialogDescription>
-                Crea una nueva categoría para organizar tus costos indirectos
+                {editingCategory ? 'Modifica los detalles de la categoría' : 'Crea una nueva categoría para organizar tus costos indirectos'}
               </DialogDescription>
             </DialogHeader>
             
@@ -896,26 +1016,66 @@ export function IndirectCosts() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="category-active"
+                  checked={formData.isActive !== false}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="category-active">Categoría activa</Label>
+              </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddingCategory(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsAddingCategory(false);
+                setEditingCategory(null);
+                setFormData({});
+              }}>
                 Cancelar
               </Button>
               <Button 
                 onClick={() => {
                   if (formData.name && formData.type) {
-                    createCategoryMutation.mutate({
-                      name: formData.name,
-                      description: formData.description || null,
-                      type: formData.type,
-                      isActive: true
-                    });
+                    handleSaveCategory();
                   }
                 }}
-                disabled={createCategoryMutation.isPending || !formData.name || !formData.type}
+                disabled={(createCategoryMutation.isPending || updateCategoryMutation.isPending) || !formData.name || !formData.type}
               >
-                {createCategoryMutation.isPending ? 'Creando...' : 'Crear Categoría'}
+                {createCategoryMutation.isPending || updateCategoryMutation.isPending ? 'Guardando...' : (editingCategory ? 'Actualizar' : 'Crear Categoría')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!deletingCategoryId} onOpenChange={(open) => {
+          if (!open) setDeletingCategoryId(null);
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar Eliminación</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas eliminar esta categoría? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeletingCategoryId(null)}>
+                Cancelar
+              </Button>
+              <Button 
+                variant="destructive"
+                onClick={() => {
+                  if (deletingCategoryId) {
+                    deleteCategoryMutation.mutate(deletingCategoryId);
+                  }
+                }}
+                disabled={deleteCategoryMutation.isPending}
+              >
+                {deleteCategoryMutation.isPending ? 'Eliminando...' : 'Eliminar'}
               </Button>
             </DialogFooter>
           </DialogContent>
