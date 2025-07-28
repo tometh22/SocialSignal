@@ -74,14 +74,39 @@ export function IndirectCosts() {
   });
 
   // Mutations
-  const createCategoryMutation = useMutation({
+  const createCategoryMutation = useMutation<IndirectCostCategory, Error, InsertIndirectCostCategory>({
     mutationFn: (data: InsertIndirectCostCategory) => 
       apiRequest('/api/indirect-cost-categories', {
         method: 'POST',
         body: data
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
+    onMutate: async (newCategory) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['/api/indirect-cost-categories'] });
+      
+      // Snapshot the previous value
+      const previousCategories = queryClient.getQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories']);
+      
+      // Optimistically update to the new value
+      if (previousCategories) {
+        queryClient.setQueryData<IndirectCostCategory[]>(['/api/indirect-cost-categories'], old => [
+          ...(old || []),
+          { ...newCategory, id: Date.now(), createdAt: new Date() } as IndirectCostCategory
+        ]);
+      }
+      
+      // Return context with the previous categories
+      return { previousCategories };
+    },
+    onError: (err, newCategory, context) => {
+      // If the mutation fails, use the context to roll back
+      if (context?.previousCategories) {
+        queryClient.setQueryData(['/api/indirect-cost-categories'], context.previousCategories);
+      }
+    },
+    onSuccess: async (data) => {
+      // Replace optimistic update with actual data
+      await queryClient.invalidateQueries({ queryKey: ['/api/indirect-cost-categories'] });
       setIsAddingCategory(false);
       setFormData({});
       toast({
