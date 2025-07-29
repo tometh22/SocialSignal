@@ -266,7 +266,7 @@ export const insertQuotationSchema = baseInsertQuotationSchema.extend({
     z.undefined(),
     z.null().transform(() => undefined)
   ]).optional(),
-  proposalLink: z.string().optional(),
+  proposalLink: z.string().nullable().optional(),
 });
 
 // ==================== HISTORIAL DE NEGOCIACIONES ====================
