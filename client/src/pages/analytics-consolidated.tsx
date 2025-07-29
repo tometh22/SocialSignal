@@ -191,9 +191,13 @@ export default function AnalyticsConsolidated() {
     const partTimePersonnel = personnel.filter((p: any) => p.contractType === 'part-time' || p.contractType === 'freelance');
     
     // Fixed monthly costs (full-time salaries)
-    const fixedMonthlyCosts = fullTimePersonnel.reduce((sum: number, p: any) => 
-      sum + (p.monthlyFixedSalary || 0), 0
-    );
+    const fixedMonthlyCosts = fullTimePersonnel.reduce((sum: number, p: any) => {
+      // La columna en la DB es monthly_fixed_salary, que se convierte a camelCase
+      const salary = p.monthlyFixedSalary || p.monthly_fixed_salary || 0;
+      console.log(`💰 Personal ${p.name}: ${p.contractType}, salario mensual: $${salary}`);
+      return sum + salary;
+    }, 0);
+    console.log('💵 Total costos fijos mensuales:', fixedMonthlyCosts);
     
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
