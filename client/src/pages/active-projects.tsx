@@ -130,16 +130,12 @@ function ProjectCard({
                 <Badge 
                   variant="outline" 
                   className={`text-xs ${
-                    project.quotation.projectType === 'always-on' 
+                    project.quotation.projectType === 'fee-mensual' 
                       ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                      : project.quotation.projectType === 'monitoring'
-                      ? 'bg-orange-50 text-orange-700 border-orange-200'
                       : 'bg-blue-50 text-blue-700 border-blue-200'
                   }`}
                 >
-                  {project.quotation.projectType === 'always-on' ? 'Always-On' : 
-                   project.quotation.projectType === 'monitoring' ? 'Monitoring' :
-                   'One-Shot'}
+                  {project.quotation.projectType === 'fee-mensual' ? 'Fee Mensual' : 'On Demand'}
                 </Badge>
               )}
             </div>
