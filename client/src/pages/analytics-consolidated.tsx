@@ -12,7 +12,7 @@ import {
   ChevronRight, Download, Filter, PieChart, LineChart, Zap, Shield,
   TrendingDown, CheckCircle2, XCircle, Info, Globe, Layers,
   Calendar as CalendarIconLucide, CheckCircle, AlertTriangle,
-  LayoutDashboard, Lightbulb
+  LayoutDashboard, Lightbulb, Wallet
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -535,6 +535,8 @@ export default function AnalyticsConsolidated() {
       // Datos para gráficos
       projectMetrics,
       monthlyTrends,
+      alwaysOnProjectsArray: alwaysOnProjects, // Los arrays completos
+      uniqueProjectsArray: uniqueProjects,     // Los arrays completos
       
       // Comparaciones período anterior
       previousPeriodRevenue: 0, // Implementar según lógica de período
@@ -985,7 +987,7 @@ export default function AnalyticsConsolidated() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Proyectos Activos</span>
-                        <span className="font-semibold">{analytics.activeProjects}</span>
+                        <span className="font-semibold">{analytics.totalProjects}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">Horas Facturables</span>
@@ -1085,7 +1087,7 @@ export default function AnalyticsConsolidated() {
                             { 
                               name: 'Contratos Recurrentes', 
                               value: analytics.monthlyRevenue || 0,
-                              count: alwaysOnProjects.length,
+                              count: analytics.alwaysOnProjects,
                               percentage: analytics.monthlyRevenue + analytics.totalRevenue > 0 
                                 ? (analytics.monthlyRevenue / (analytics.monthlyRevenue + analytics.totalRevenue) * 100).toFixed(1)
                                 : 0
@@ -1093,7 +1095,7 @@ export default function AnalyticsConsolidated() {
                             { 
                               name: 'Proyectos Únicos', 
                               value: analytics.totalRevenue || 0,
-                              count: uniqueProjects.length,
+                              count: analytics.uniqueProjects,
                               percentage: analytics.monthlyRevenue + analytics.totalRevenue > 0 
                                 ? (analytics.totalRevenue / (analytics.monthlyRevenue + analytics.totalRevenue) * 100).toFixed(1)
                                 : 0
@@ -1127,7 +1129,7 @@ export default function AnalyticsConsolidated() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold">${analytics.monthlyRevenue.toLocaleString()}/mes</p>
-                        <p className="text-xs text-muted-foreground">{alwaysOnProjects.length} contratos activos</p>
+                        <p className="text-xs text-muted-foreground">{analytics.alwaysOnProjects} contratos activos</p>
                       </div>
                     </div>
                     <div className="flex justify-between items-center p-2 bg-green-50 rounded">
@@ -1137,7 +1139,7 @@ export default function AnalyticsConsolidated() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold">${analytics.totalRevenue.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">{uniqueProjects.length} proyectos en curso</p>
+                        <p className="text-xs text-muted-foreground">{analytics.uniqueProjects} proyectos en curso</p>
                       </div>
                     </div>
                   </div>
@@ -1311,28 +1313,28 @@ export default function AnalyticsConsolidated() {
                   {/* Capacidad del Equipo */}
                   <div className={cn(
                     "p-4 rounded-lg border-2 text-center",
-                    analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.7
+                    analytics.totalProjects > 0 && (analytics.totalHours / (analytics.totalProjects * 160)) < 0.7
                       ? "border-blue-200 bg-blue-50"
-                      : analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.9
+                      : analytics.totalProjects > 0 && (analytics.totalHours / (analytics.totalProjects * 160)) < 0.9
                       ? "border-green-200 bg-green-50"
                       : "border-orange-200 bg-orange-50"
                   )}>
                     <Users className={cn(
                       "h-8 w-8 mx-auto mb-2",
-                      analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.7
+                      analytics.totalProjects > 0 && (analytics.totalHours / (analytics.totalProjects * 160)) < 0.7
                         ? "text-blue-600"
-                        : analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.9
+                        : analytics.totalProjects > 0 && (analytics.totalHours / (analytics.totalProjects * 160)) < 0.9
                         ? "text-green-600"
                         : "text-orange-600"
                     )} />
                     <p className="text-sm font-medium">Capacidad Utilizada</p>
                     <p className="text-2xl font-bold">
-                      {analytics.activeProjects > 0 
-                        ? `${((analytics.totalHours / (analytics.activeProjects * 160)) * 100).toFixed(0)}%`
+                      {analytics.totalProjects > 0 
+                        ? `${((analytics.totalHours / (analytics.totalProjects * 160)) * 100).toFixed(0)}%`
                         : '0%'}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {analytics.totalHours.toFixed(0)}h de {analytics.activeProjects * 160}h
+                      {analytics.totalHours.toFixed(0)}h de {analytics.totalProjects * 160}h
                     </p>
                   </div>
                 </div>
