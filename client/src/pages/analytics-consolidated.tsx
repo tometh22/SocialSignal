@@ -722,7 +722,15 @@ export default function AnalyticsConsolidated() {
                         
                         // Capacidad teórica = personas × 160h/mes × meses
                         const theoreticalCapacity = personnel.length * 160 * monthsInPeriod;
-                        return ((analytics.totalHours / theoreticalCapacity) * 100).toFixed(0);
+                        const utilization = (analytics.totalHours / theoreticalCapacity) * 100;
+                        console.log('📊 Utilización:', {
+                          totalHours: analytics.totalHours,
+                          personnel: personnel.length,
+                          monthsInPeriod,
+                          theoreticalCapacity,
+                          utilization: utilization.toFixed(1) + '%'
+                        });
+                        return utilization.toFixed(0);
                       })()}%
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
