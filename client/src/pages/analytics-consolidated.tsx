@@ -234,6 +234,16 @@ export default function AnalyticsConsolidated() {
     // Filtrar time entries por período y cliente
     const dateRange = getDateRangeForFilter(periodFilter);
     console.log('📅 Date range para filtro', periodFilter, ':', dateRange);
+    
+    // Debug: verificar todos los time entries
+    const mayEntries = timeEntries.filter((e: any) => new Date(e.date).getMonth() === 4);
+    const juneEntries = timeEntries.filter((e: any) => new Date(e.date).getMonth() === 5);
+    console.log('📊 Time entries por mes:', {
+      mayo: mayEntries.length,
+      junio: juneEntries.length,
+      total: timeEntries.length
+    });
+    
     const periodEntries = dateRange 
       ? timeEntries.filter((entry: any) => {
           const entryDate = new Date(entry.date);
@@ -250,6 +260,8 @@ export default function AnalyticsConsolidated() {
           const project = projects.find(p => p.id === entry.projectId);
           return project && project.clientId === parseInt(selectedClient);
         });
+    
+    console.log('📊 Entries filtradas por período:', periodEntries.length);
 
     // Métricas de tiempo y costos
     const totalHours = periodEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
@@ -392,7 +404,8 @@ export default function AnalyticsConsolidated() {
           });
           
           const projectRevenue = monthlyRate * monthsWithActivity.size;
-          console.log(`💰 Always-On ${project.name}: $${monthlyRate}/mes × ${monthsWithActivity.size} meses = $${projectRevenue}`);
+          console.log(`💰 Always-On ${project.quotation?.projectName || project.id}: $${monthlyRate}/mes × ${monthsWithActivity.size} meses = $${projectRevenue}`);
+          console.log('   Meses con actividad:', Array.from(monthsWithActivity));
           filteredRevenue += projectRevenue;
         }
       });
@@ -568,7 +581,10 @@ export default function AnalyticsConsolidated() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
-                      ${analytics.combinedRevenue.toLocaleString()}
+                      ${(() => {
+                        console.log('💵 Cash Flow Operativo:', analytics.combinedRevenue);
+                        return analytics.combinedRevenue.toLocaleString();
+                      })()}
                     </div>
                     {compareMode && comparisonAnalytics && (
                       <div className="flex items-center gap-1 mt-1">
@@ -643,14 +659,23 @@ export default function AnalyticsConsolidated() {
                     <div className="text-2xl font-bold">
                       ${(() => {
                         const totalCosts = analytics.fixedMonthlyCosts + analytics.variableCosts;
-                        // Para burn rate, usar meses reales con datos
-                        const dateRange = getDateRangeForFilter(dateFilter);
-                        if (!dateRange) return totalCosts.toLocaleString();
+                        // Para burn rate, contar meses reales con datos en el período
+                        if (dateFilter === 'all') return totalCosts.toLocaleString();
                         
-                        const monthsInPeriod = Math.max(1, 
-                          Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
-                        );
-                        return (totalCosts / monthsInPeriod).toLocaleString();
+                        // Contar meses únicos con datos en el período filtrado
+                        const uniqueMonths = new Set();
+                        const dateRange = getDateRangeForFilter(dateFilter);
+                        
+                        timeEntries.forEach((entry: any) => {
+                          const entryDate = new Date(entry.date);
+                          if (dateRange && entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                            uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                          }
+                        });
+                        
+                        const monthsWithData = Math.max(1, uniqueMonths.size);
+                        console.log(`💰 Burn Rate: $${totalCosts} / ${monthsWithData} meses = $${(totalCosts / monthsWithData).toLocaleString()}`);
+                        return (totalCosts / monthsWithData).toLocaleString();
                       })()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -1522,16 +1547,44 @@ export default function AnalyticsConsolidated() {
                 <TooltipTrigger asChild>
                   <Card className={cn(
                     "border-l-4 cursor-help",
-                    analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "border-l-green-500" : 
-                    analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "border-l-yellow-500" : "border-l-red-500"
+                    (() => {
+                      const uniqueMonths = new Set();
+                      const dateRange = getDateRangeForFilter(dateFilter);
+                      if (dateRange) {
+                        timeEntries.forEach((entry: any) => {
+                          const entryDate = new Date(entry.date);
+                          if (entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                            uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                          }
+                        });
+                      }
+                      const monthsWithData = Math.max(1, uniqueMonths.size);
+                      const monthlyBurnRate = analytics.totalCost / monthsWithData;
+                      return monthlyBurnRate < 15000 ? "border-l-green-500" : 
+                             monthlyBurnRate < 25000 ? "border-l-yellow-500" : "border-l-red-500";
+                    })()
                   )}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Control de Gastos</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 15000 ? "Óptimo" : 
-                         analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : 1) < 25000 ? "Moderado" : "Alto"}
+                        {(() => {
+                          const uniqueMonths = new Set();
+                          const dateRange = getDateRangeForFilter(dateFilter);
+                          if (dateRange) {
+                            timeEntries.forEach((entry: any) => {
+                              const entryDate = new Date(entry.date);
+                              if (entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                                uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                              }
+                            });
+                          }
+                          const monthsWithData = Math.max(1, uniqueMonths.size);
+                          const monthlyBurnRate = analytics.totalCost / monthsWithData;
+                          return monthlyBurnRate < 15000 ? "Óptimo" : 
+                                 monthlyBurnRate < 25000 ? "Moderado" : "Alto";
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Burn rate mensual controlado
@@ -1586,16 +1639,44 @@ export default function AnalyticsConsolidated() {
                 <TooltipTrigger asChild>
                   <Card className={cn(
                     "border-l-4 cursor-help",
-                    ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "border-l-green-500" : 
-                    ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "border-l-yellow-500" : "border-l-red-500"
+                    (() => {
+                      const uniqueMonths = new Set();
+                      const dateRange = getDateRangeForFilter(dateFilter);
+                      if (dateRange) {
+                        timeEntries.forEach((entry: any) => {
+                          const entryDate = new Date(entry.date);
+                          if (entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                            uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                          }
+                        });
+                      }
+                      const monthsWithData = Math.max(1, uniqueMonths.size);
+                      const utilization = (analytics.totalHours / (160 * analytics.totalProjects * monthsWithData)) * 100;
+                      return utilization > 70 ? "border-l-green-500" : 
+                             utilization > 50 ? "border-l-yellow-500" : "border-l-red-500";
+                    })()
                   )}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium">Productividad</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 70 ? "Alta" : 
-                         ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : 1))) * 100) > 50 ? "Media" : "Baja"}
+                        {(() => {
+                          const uniqueMonths = new Set();
+                          const dateRange = getDateRangeForFilter(dateFilter);
+                          if (dateRange) {
+                            timeEntries.forEach((entry: any) => {
+                              const entryDate = new Date(entry.date);
+                              if (entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                                uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                              }
+                            });
+                          }
+                          const monthsWithData = Math.max(1, uniqueMonths.size);
+                          const utilization = (analytics.totalHours / (160 * analytics.totalProjects * monthsWithData)) * 100;
+                          return utilization > 70 ? "Alta" : 
+                                 utilization > 50 ? "Media" : "Baja";
+                        })()}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Utilización del equipo
