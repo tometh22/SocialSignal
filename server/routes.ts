@@ -1595,7 +1595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (currentQuotation.status === 'in-negotiation' && status === 'approved') {
         // Get the last negotiation entry
-        const negotiationHistory = await storage.getQuotationNegotiationHistory(id);
+        const negotiationHistory = await storage.getNegotiationHistory(id);
         
         if (negotiationHistory && negotiationHistory.length > 0) {
           // Get the most recent negotiation (first in the array since it's ordered by createdAt DESC)
