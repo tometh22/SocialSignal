@@ -87,6 +87,37 @@ export default function ManageQuotes() {
     }
   });
 
+  // Query to check which approved quotations already have projects
+  const { data: quotationProjects = {} } = useQuery<Record<number, boolean>>({
+    queryKey: ["/api/quotations/project-status"],
+    enabled: !!quotations && quotations.length > 0,
+    queryFn: async () => {
+      if (!quotations) return {};
+      
+      const projectStatus: Record<number, boolean> = {};
+      
+      const approvedQuotations = quotations.filter(q => q.status === 'approved');
+      
+      await Promise.all(
+        approvedQuotations.map(async (quotation) => {
+          try {
+            const response = await fetch(`/api/active-projects/quotation/${quotation.id}`, {
+              credentials: 'include'
+            });
+            if (response.ok) {
+              const projects = await response.json();
+              projectStatus[quotation.id] = projects && projects.length > 0;
+            }
+          } catch (error) {
+            console.error(`Error checking projects for quotation ${quotation.id}:`, error);
+          }
+        })
+      );
+      
+      return projectStatus;
+    }
+  });
+
   // Log success/error after data is loaded
   useEffect(() => {
     if (quotations) {
@@ -745,7 +776,11 @@ export default function ManageQuotes() {
                               <div className="text-xs text-blue-700">
                                 {quote.status === 'draft' && 'Cotización en borrador, lista para editar'}
                                 {quote.status === 'pending' && 'Esperando aprobación del cliente'}
-                                {quote.status === 'approved' && 'Aprobada - Lista para crear proyecto'}
+                                {quote.status === 'approved' && (
+                                  quotationProjects[quote.id] 
+                                    ? 'Aprobada - Proyecto ya creado' 
+                                    : 'Aprobada - Lista para crear proyecto'
+                                )}
                                 {quote.status === 'rejected' && 'Rechazada por el cliente'}
                                 {quote.status === 'in-negotiation' && 'En proceso de negociación'}
                               </div>
@@ -784,6 +819,21 @@ export default function ManageQuotes() {
                                 >
                                   <PenLine className="h-3 w-3 mr-1" />
                                   Editar
+                                </Button>
+                              )}
+
+                              {quote.status === 'approved' && !quotationProjects[quote.id] && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setApprovedQuote(quote);
+                                    setCreateProjectDialogOpen(true);
+                                  }}
+                                  className="flex-1 justify-center text-xs bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700 font-medium"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Crear Proyecto
                                 </Button>
                               )}
 
