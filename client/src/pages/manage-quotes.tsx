@@ -182,7 +182,29 @@ export default function ManageQuotes() {
       // Si la cotización fue aprobada, mostrar modal para crear proyecto
       if (newStatus === 'approved') {
         console.log(`[QUOTES] Cotización aprobada, preparando modal de creación de proyecto`);
-        setApprovedQuote(selectedQuote);
+        
+        // Obtener la cotización actualizada con el precio negociado
+        try {
+          const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
+            credentials: 'include'
+          });
+          
+          if (response.ok) {
+            const updatedQuote = await response.json();
+            console.log(`[QUOTES] Cotización actualizada obtenida:`, {
+              originalPrice: selectedQuote.totalAmount,
+              updatedPrice: updatedQuote.totalAmount
+            });
+            setApprovedQuote(updatedQuote);
+          } else {
+            // Si falla, usar la cotización original
+            setApprovedQuote(selectedQuote);
+          }
+        } catch (error) {
+          console.error(`[QUOTES] Error obteniendo cotización actualizada:`, error);
+          setApprovedQuote(selectedQuote);
+        }
+        
         setCreateProjectDialogOpen(true);
       }
 
