@@ -695,7 +695,10 @@ export default function ManageQuotes() {
                                       className="w-full h-full object-contain p-1"
                                       onError={(e) => {
                                         e.currentTarget.style.display = 'none';
-                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                        const nextElement = e.currentTarget.nextElementSibling;
+                                        if (nextElement && nextElement instanceof HTMLElement) {
+                                          nextElement.style.display = 'flex';
+                                        }
                                       }}
                                     />
                                     <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl hidden items-center justify-center">
@@ -789,12 +792,13 @@ export default function ManageQuotes() {
 
                           {/* Acciones */}
                           <div className="bg-gray-50 p-4 border-t border-gray-100">
-                            <div className="flex flex-wrap gap-2">
+                            <div className="grid grid-cols-3 gap-2">
+                              {/* Primera fila de botones */}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openStatusDialog(quote)}
-                                className="flex-1 justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
+                                className="justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
                               >
                                 <Edit className="h-3 w-3 mr-1" />
                                 Estado
@@ -804,50 +808,23 @@ export default function ManageQuotes() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
-                                className="flex-1 justify-center text-xs hover:bg-green-50 hover:border-green-300"
+                                className="justify-center text-xs hover:bg-green-50 hover:border-green-300"
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Ver
                               </Button>
-
-                              {quote.status === 'draft' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditQuotation(quote)}
-                                  className="flex-1 justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
-                                >
-                                  <PenLine className="h-3 w-3 mr-1" />
-                                  Editar
-                                </Button>
-                              )}
-
-                              {quote.status === 'approved' && !quotationProjects[quote.id] && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setApprovedQuote(quote);
-                                    setCreateProjectDialogOpen(true);
-                                  }}
-                                  className="flex-1 justify-center text-xs bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700 font-medium"
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Crear Proyecto
-                                </Button>
-                              )}
 
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
-                                className="flex-1 justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                                className="justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
                               >
                                 {deletingQuoteId === quote.id ? (
                                   <>
                                     <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    Procesando...
+                                    <span className="hidden sm:inline">Procesando...</span>
                                   </>
                                 ) : (
                                   <>
@@ -857,6 +834,38 @@ export default function ManageQuotes() {
                                 )}
                               </Button>
                             </div>
+
+                            {/* Segunda fila para botones condicionales */}
+                            {(quote.status === 'draft' || (quote.status === 'approved' && !quotationProjects[quote.id])) && (
+                              <div className="mt-2">
+                                {quote.status === 'draft' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditQuotation(quote)}
+                                    className="w-full justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
+                                  >
+                                    <PenLine className="h-3 w-3 mr-1" />
+                                    Editar
+                                  </Button>
+                                )}
+
+                                {quote.status === 'approved' && !quotationProjects[quote.id] && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setApprovedQuote(quote);
+                                      setCreateProjectDialogOpen(true);
+                                    }}
+                                    className="w-full justify-center text-xs bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700 font-medium"
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Crear Proyecto
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
