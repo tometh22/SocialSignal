@@ -681,7 +681,7 @@ export default function AnalyticsConsolidated() {
               <Activity className="h-4 w-4" />
               Análisis Operacional
             </TabsTrigger>
-            <TabsTrigger value="financial" className="flex items-center gap-2">
+            <TabsTrigger value="corporate-health" className="flex items-center gap-2">
               <Shield className="h-4 w-4" />
               Salud Financiera
             </TabsTrigger>
@@ -926,7 +926,249 @@ export default function AnalyticsConsolidated() {
 
 
           {/* PESTAÑA 3: SALUD FINANCIERA */}
-          <TabsContent value="financial" className="space-y-6">
+          <TabsContent value="corporate-health" className="space-y-6">
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Tasa de Éxito</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold">
+                      {((analytics.approvedQuotations / (analytics.approvedQuotations + analytics.pendingQuotations)) * 100).toFixed(0)}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {analytics.approvedQuotations} aprobadas
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-amber-500">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Eficiencia Operativa</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold">
+                      {analytics.avgEfficiency.toFixed(0)}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      vs presupuesto
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Análisis detallado de performance */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Top 5 Proyectos por Rentabilidad</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {analytics.projectMetrics
+                      .sort((a, b) => b.profitMargin - a.profitMargin)
+                      .slice(0, 5)
+                      .map((project, index) => (
+                        <div key={project.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {index + 1}. {project.name}
+                              </span>
+                              <Badge variant={project.type === 'always-on' ? 'default' : 'secondary'} className="text-xs">
+                                {project.type === 'always-on' ? 'Always-On' : 'Único'}
+                              </Badge>
+                            </div>
+                            <span className={cn(
+                              "text-sm font-bold",
+                              project.profitMargin > 50 ? "text-green-600" : 
+                              project.profitMargin > 20 ? "text-blue-600" : "text-amber-600"
+                            )}>
+                              {project.profitMargin.toFixed(1)}%
+                            </span>
+                          </div>
+                          <Progress 
+                            value={Math.max(0, Math.min(100, project.profitMargin))} 
+                            className="h-2"
+                          />
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle>Distribución de Horas por Tipo</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={[
+                          { 
+                            name: 'Always-On', 
+                            value: analytics.projectMetrics
+                              .filter(p => p.type === 'always-on')
+                              .reduce((sum, p) => sum + p.hours, 0)
+                          },
+                          { 
+                            name: 'Únicos', 
+                            value: analytics.projectMetrics
+                              .filter(p => p.type === 'unique')
+                              .reduce((sum, p) => sum + p.hours, 0)
+                          }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill={CHART_COLORS.indigo} />
+                        <Cell fill={CHART_COLORS.teal} />
+                      </Pie>
+                      <RechartsTooltip 
+                        formatter={(value: any) => `${Number(value).toFixed(0)}h`}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                  <div className="flex justify-center gap-6 mt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.indigo }}></div>
+                      <span className="text-sm">Always-On</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.teal }}></div>
+                      <span className="text-sm">Únicos</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Matriz de Eficiencia */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Matriz de Eficiencia vs Rentabilidad</CardTitle>
+                    <CardDescription>
+                      Análisis comparativo de todos los proyectos activos
+                    </CardDescription>
+                  </div>
+                  <Globe className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">Zona Crítica</h4>
+                    <p className="text-xs text-muted-foreground">Baja eficiencia y rentabilidad</p>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                    <h4 className="font-medium text-sm mb-1">Zona Óptima</h4>
+                    <p className="text-xs text-muted-foreground">Alta eficiencia y rentabilidad</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Proyecto</th>
+                        <th className="text-center p-2">Tipo</th>
+                        <th className="text-center p-2">
+                          <Tooltip>
+                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
+                              Eficiencia
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold mb-1">Eficiencia Presupuestaria</p>
+                              <p className="text-sm">Porcentaje del presupuesto utilizado hasta ahora.</p>
+                              <p className="text-sm mt-1">Ej: Si tienes 75%, has usado el 75% del presupuesto asignado.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="text-center p-2">
+                          <Tooltip>
+                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
+                              Rentabilidad
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="font-semibold mb-1">Margen de Ganancia</p>
+                              <p className="text-sm">Porcentaje de ganancia sobre el costo.</p>
+                              <p className="text-sm mt-1">Fórmula: (Precio Cliente - Costo) / Costo × 100</p>
+                              <p className="text-sm mt-1">Ej: Si cobras $100 y gastas $75, tu rentabilidad es 33%.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </th>
+                        <th className="text-center p-2">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.projectMetrics.slice(0, 10).map((project) => (
+                        <tr key={project.id} className="border-b">
+                          <td className="p-2 font-medium text-sm">{project.name}</td>
+                          <td className="p-2 text-center">
+                            <Badge variant={project.type === 'always-on' ? 'default' : 'secondary'} className="text-xs">
+                              {project.type === 'always-on' ? 'Always-On' : 'Único'}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className={cn(
+                              "text-sm font-medium",
+                              project.efficiency > 80 ? "text-green-600" : 
+                              project.efficiency > 50 ? "text-blue-600" : "text-red-600"
+                            )}>
+                              {project.efficiency.toFixed(0)}%
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className={cn(
+                              "text-sm font-medium",
+                              project.profitMargin > 50 ? "text-green-600" : 
+                              project.profitMargin > 20 ? "text-blue-600" : "text-red-600"
+                            )}>
+                              {project.profitMargin.toFixed(0)}%
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            {project.efficiency > 80 && project.profitMargin > 50 ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                            ) : project.efficiency < 50 || project.profitMargin < 20 ? (
+                              <XCircle className="h-4 w-4 text-red-600 mx-auto" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-amber-600 mx-auto" />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+
             {/* Personnel Cost Analysis Section */}
             <Card className="border-indigo-200 shadow-lg">
               <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
@@ -1288,208 +1530,6 @@ export default function AnalyticsConsolidated() {
                     <li>• Convertir {Math.max(1, Math.floor(analytics.uniqueProjects * 0.3))} proyecto{Math.floor(analytics.uniqueProjects * 0.3) > 1 ? 's' : ''} único{Math.floor(analytics.uniqueProjects * 0.3) > 1 ? 's' : ''} a contrato recurrente</li>
                     <li>• Optimizar utilización del equipo al 75%+</li>
                   </ul>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Análisis detallado de performance */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Top 5 Proyectos por Rentabilidad</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {analytics.projectMetrics
-                      .sort((a, b) => b.profitMargin - a.profitMargin)
-                      .slice(0, 5)
-                      .map((project, index) => (
-                        <div key={project.id} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                {index + 1}. {project.name}
-                              </span>
-                              <Badge variant={project.type === 'always-on' ? 'default' : 'secondary'} className="text-xs">
-                                {project.type === 'always-on' ? 'Always-On' : 'Único'}
-                              </Badge>
-                            </div>
-                            <span className={cn(
-                              "text-sm font-bold",
-                              project.profitMargin > 50 ? "text-green-600" : 
-                              project.profitMargin > 20 ? "text-blue-600" : "text-amber-600"
-                            )}>
-                              {project.profitMargin.toFixed(1)}%
-                            </span>
-                          </div>
-                          <Progress 
-                            value={Math.max(0, Math.min(100, project.profitMargin))} 
-                            className="h-2"
-                          />
-                        </div>
-                      ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Distribución de Horas por Tipo</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <RechartsPieChart>
-                      <Pie
-                        data={[
-                          { 
-                            name: 'Always-On', 
-                            value: analytics.projectMetrics
-                              .filter(p => p.type === 'always-on')
-                              .reduce((sum, p) => sum + p.hours, 0)
-                          },
-                          { 
-                            name: 'Únicos', 
-                            value: analytics.projectMetrics
-                              .filter(p => p.type === 'unique')
-                              .reduce((sum, p) => sum + p.hours, 0)
-                          }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        <Cell fill={CHART_COLORS.indigo} />
-                        <Cell fill={CHART_COLORS.teal} />
-                      </Pie>
-                      <RechartsTooltip 
-                        formatter={(value: any) => `${Number(value).toFixed(0)}h`}
-                      />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                  <div className="flex justify-center gap-6 mt-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.indigo }}></div>
-                      <span className="text-sm">Always-On</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.teal }}></div>
-                      <span className="text-sm">Únicos</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Matriz de Eficiencia */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Matriz de Eficiencia vs Rentabilidad</CardTitle>
-                    <CardDescription>
-                      Análisis comparativo de todos los proyectos activos
-                    </CardDescription>
-                  </div>
-                  <Globe className="h-5 w-5 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="text-center p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                    <h4 className="font-medium text-sm mb-1">Zona Crítica</h4>
-                    <p className="text-xs text-muted-foreground">Baja eficiencia y rentabilidad</p>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                    <h4 className="font-medium text-sm mb-1">Zona Óptima</h4>
-                    <p className="text-xs text-muted-foreground">Alta eficiencia y rentabilidad</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-2">Proyecto</th>
-                        <th className="text-center p-2">Tipo</th>
-                        <th className="text-center p-2">
-                          <Tooltip>
-                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
-                              Eficiencia
-                              <Info className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p className="font-semibold mb-1">Eficiencia Presupuestaria</p>
-                              <p className="text-sm">Porcentaje del presupuesto utilizado hasta ahora.</p>
-                              <p className="text-sm mt-1">Ej: Si tienes 75%, has usado el 75% del presupuesto asignado.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </th>
-                        <th className="text-center p-2">
-                          <Tooltip>
-                            <TooltipTrigger className="inline-flex items-center gap-1 cursor-help">
-                              Rentabilidad
-                              <Info className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p className="font-semibold mb-1">Margen de Ganancia</p>
-                              <p className="text-sm">Porcentaje de ganancia sobre el costo.</p>
-                              <p className="text-sm mt-1">Fórmula: (Precio Cliente - Costo) / Costo × 100</p>
-                              <p className="text-sm mt-1">Ej: Si cobras $100 y gastas $75, tu rentabilidad es 33%.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </th>
-                        <th className="text-center p-2">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analytics.projectMetrics.slice(0, 10).map((project) => (
-                        <tr key={project.id} className="border-b">
-                          <td className="p-2 font-medium text-sm">{project.name}</td>
-                          <td className="p-2 text-center">
-                            <Badge variant={project.type === 'always-on' ? 'default' : 'secondary'} className="text-xs">
-                              {project.type === 'always-on' ? 'Always-On' : 'Único'}
-                            </Badge>
-                          </td>
-                          <td className="p-2 text-center">
-                            <span className={cn(
-                              "text-sm font-medium",
-                              project.efficiency > 80 ? "text-green-600" : 
-                              project.efficiency > 50 ? "text-blue-600" : "text-red-600"
-                            )}>
-                              {project.efficiency.toFixed(0)}%
-                            </span>
-                          </td>
-                          <td className="p-2 text-center">
-                            <span className={cn(
-                              "text-sm font-medium",
-                              project.profitMargin > 50 ? "text-green-600" : 
-                              project.profitMargin > 20 ? "text-blue-600" : "text-red-600"
-                            )}>
-                              {project.profitMargin.toFixed(0)}%
-                            </span>
-                          </td>
-                          <td className="p-2 text-center">
-                            {project.efficiency > 80 && project.profitMargin > 50 ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
-                            ) : project.efficiency < 50 || project.profitMargin < 20 ? (
-                              <XCircle className="h-4 w-4 text-red-600 mx-auto" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-amber-600 mx-auto" />
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </CardContent>
             </Card>

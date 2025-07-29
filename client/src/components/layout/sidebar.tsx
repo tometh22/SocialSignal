@@ -51,7 +51,7 @@ export default function Sidebar() {
     ],
     datos: [
       { href: "/clients", label: "Clientes", icon: Users, description: "Administrar clientes" },
-      { href: "/statistics", label: "Estadísticas y Análisis", icon: PieChart, description: "Ver informes y análisis" }
+      { href: "/statistics", label: "Salud Corporativa", icon: PieChart, description: "Dashboard ejecutivo integral" }
     ],
     sistema: [
       { href: "/admin", label: "Panel Admin", icon: Cog, description: "Configuración del sistema" }
