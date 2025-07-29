@@ -56,6 +56,7 @@ import {
   Clock,
   DollarSign,
   FileText, 
+  HelpCircle,
   Info,
   LayoutGrid,
   Loader2, 
@@ -73,6 +74,7 @@ import {
   Users,
   Users2 
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { default as InlineEditRole } from "@/components/admin/inline-edit-role";
 import { default as InlineEditPersonnel } from "@/components/admin/inline-edit-personnel";
 import { RoleSummary } from "@/components/admin/role-summary";
@@ -1017,10 +1019,58 @@ export default function Admin() {
                         <TableHead>Nombre</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Rol</TableHead>
-                        <TableHead>Tipo Contrato</TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Tipo Contrato
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Define cómo se contabiliza el costo del empleado en el sistema.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
                         <TableHead>Tarifa/Hora</TableHead>
-                        <TableHead>Sueldo Mensual</TableHead>
-                        <TableHead>Incluir en Costos</TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Sueldo Mensual
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Solo para empleados Full-time. Representa el costo de oportunidad mensual.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
+                            Incluir en Costos
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Si está activo, los costos de esta persona se incluyen en EBITDA y análisis financieros.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
                         <TableHead>Acciones</TableHead>
                       </TableRow>
                     </TableHeader>

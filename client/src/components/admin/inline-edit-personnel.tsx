@@ -4,8 +4,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Check, X, Loader2, Trash2 } from "lucide-react";
+import { Edit, Check, X, Loader2, Trash2, HelpCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InlineEditPersonnelProps {
@@ -208,20 +209,36 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           </Select>
         </td>
         <td className="px-6 py-4">
-          <Select
-            value={editedContractType}
-            onValueChange={setEditedContractType}
-            disabled={updatePersonnelMutation.isPending}
-          >
-            <SelectTrigger className="h-9 border-blue-200 focus:border-blue-400">
-              <SelectValue placeholder="Tipo contrato" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="full-time">Full-time</SelectItem>
-              <SelectItem value="part-time">Part-time</SelectItem>
-              <SelectItem value="freelance">Freelance</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1">
+            <Select
+              value={editedContractType}
+              onValueChange={setEditedContractType}
+              disabled={updatePersonnelMutation.isPending}
+            >
+              <SelectTrigger className="h-9 border-blue-200 focus:border-blue-400">
+                <SelectValue placeholder="Tipo contrato" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="full-time">Full-time</SelectItem>
+                <SelectItem value="part-time">Part-time</SelectItem>
+                <SelectItem value="freelance">Freelance</SelectItem>
+              </SelectContent>
+            </Select>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Full-time:</strong> Empleado con sueldo fijo mensual (costo de oportunidad)<br/>
+                    <strong>Part-time:</strong> Empleado a tiempo parcial con costo real por hora<br/>
+                    <strong>Freelance:</strong> Colaborador externo con costo real por hora
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-1">
@@ -252,10 +269,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               disabled={updatePersonnelMutation.isPending || editedContractType !== 'full-time'}
               placeholder="0.00"
             />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    Sueldo fijo mensual para empleados full-time. Este es un costo de oportunidad 
+                    (no se resta de las ganancias reales). Solo habilitado para contratos Full-time.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-center gap-1">
             <input
               type="checkbox"
               checked={editedIncludeInRealCosts}
@@ -263,6 +293,20 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               disabled={updatePersonnelMutation.isPending}
               className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
             />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Incluir en Costos Reales:</strong> Determina si los costos de esta persona 
+                    se incluyen en cálculos financieros reales (EBITDA, análisis de costos, etc.). 
+                    Para empleados full-time, generalmente es un costo de oportunidad, no un costo real.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </td>
         <td className="px-6 py-4">
