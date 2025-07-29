@@ -836,7 +836,7 @@ export default function ManageQuotes() {
                             </div>
 
                             {/* Segunda fila para botones condicionales */}
-                            {(quote.status === 'draft' || (quote.status === 'approved' && !quotationProjects[quote.id])) && (
+                            {(quote.status === 'draft' || quote.status === 'approved') && (
                               <div className="mt-2">
                                 {quote.status === 'draft' && (
                                   <Button
@@ -863,6 +863,18 @@ export default function ManageQuotes() {
                                     <Plus className="h-3 w-3 mr-1" />
                                     Crear Proyecto
                                   </Button>
+                                )}
+
+                                {quote.status === 'approved' && quotationProjects[quote.id] && (
+                                  <div className="flex items-center justify-center gap-2 py-2">
+                                    <Badge 
+                                      variant="outline" 
+                                      className="bg-green-50 text-green-700 border-green-200 text-xs flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="h-3 w-3" />
+                                      Proyecto Activo
+                                    </Badge>
+                                  </div>
                                 )}
                               </div>
                             )}
