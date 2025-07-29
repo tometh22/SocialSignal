@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -14,7 +14,9 @@ import {
   Settings, Eye, Calendar, Users, Building2, Zap,
   Info, ChevronRight, HelpCircle, Bell, Shield,
   Gauge, Timer, AlertCircle, ExternalLink, Briefcase,
-  Star, Award, FileText, TrendingUpIcon, Percent
+  Star, Award, FileText, TrendingUpIcon, Percent,
+  FileSignature, PlayCircle, MessageSquare, Rocket,
+  Package, ListChecks, UserCheck, AlertOctagon
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,10 +26,11 @@ import {
   PieChart as RechartsPieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
 
   // Queries para datos reales
   const { data: clients = [], isLoading: clientsLoading } = useQuery({ 
@@ -440,7 +443,13 @@ export default function ExecutiveDashboard() {
     }
   };
 
-  const getAlertIcon = (type) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    // Invalidar todas las queries
+    setTimeout(() => setRefreshing(false), 2000);
+  };
+
+  const getAlertIcon = (type: string) => {
     switch(type) {
       case 'critical': return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case 'urgent': return <Clock className="h-4 w-4 text-orange-500" />;
@@ -450,27 +459,18 @@ export default function ExecutiveDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* Simplified Header */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Briefcase className="h-6 w-6 text-blue-600" />
-                Panel Ejecutivo
+              <h1 className="text-xl font-semibold text-gray-900">
+                Dashboard Ejecutivo
               </h1>
-              <p className="text-gray-600 text-sm flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Sistema Operativo
-                <Badge variant="outline" className="ml-2">
-                  <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-                  {refreshing ? 'Actualizando...' : 'Actualizado'}
-                </Badge>
-                <span className="ml-4 text-gray-500">
-                  Visión estratégica en tiempo real • {format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                </span>
-              </p>
+              <p className="text-sm text-gray-500">
+                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: es })}
+              </p> </p>
             </div>
 
             <div className="flex items-center gap-2">

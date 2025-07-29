@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 // Core Pages
-import ExecutiveDashboard from "@/pages/executive-dashboard";
+import ExecutiveDashboard from "@/pages/executive-dashboard-new";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
