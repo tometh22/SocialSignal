@@ -20,6 +20,7 @@ import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
+import EditProject from "@/pages/edit-project";
 
 // Analytics & Specialized Pages
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
@@ -123,6 +124,7 @@ function AppRoutes() {
                   {/* Project Management */}
                   <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
+                  <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
