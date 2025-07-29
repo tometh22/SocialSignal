@@ -433,6 +433,9 @@ export const activeProjects = pgTable("active_projects", {
   subprojectName: text("subproject_name"), // nombre único del subproyecto (ej: "Informe Mensual Enero")
   completionStatus: text("completion_status").default("pending"), // pending, in_progress, completed, cancelled
   completedDate: timestamp("completed_date"), // fecha de finalización real
+  
+  // Campo para presupuesto del proyecto
+  budget: doublePrecision("budget"), // presupuesto total del proyecto (puede diferir de la cotización)
 });
 
 // Esquema base generado por drizzle-zod
@@ -462,6 +465,9 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   // Nuevos campos para subproyectos únicos
   subprojectName: z.string().optional(), // nombre único del subproyecto
   completionStatus: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+  
+  // Campo para presupuesto
+  budget: z.number().optional(), // presupuesto total del proyecto
 });
 
 // ==================== PLANTILLAS DE RECURRENCIA ====================
