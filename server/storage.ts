@@ -705,9 +705,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteQuotation(id: number): Promise<boolean> {
-    await db.delete(quotations).where(eq(quotations.id, id));
-    const quotation = await db.select().from(quotations).where(eq(quotations.id, id));
-    return quotation.length === 0;
+    const result = await db.delete(quotations).where(eq(quotations.id, id)).returning();
+    return result.length > 0;
   }
 
   // Negotiation history operations

@@ -1626,7 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Eliminar una cotización
-  app.delete("/api/quotations/:id", async (req, res) => {
+  app.delete("/api/quotations/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid quotation ID" });
 
