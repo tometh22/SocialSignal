@@ -501,7 +501,15 @@ export default function ManageQuotes() {
     total: filteredQuotations.length,
     approved: filteredQuotations.filter(q => q.status === 'approved').length,
     pending: filteredQuotations.filter(q => q.status === 'pending').length,
+    rejected: filteredQuotations.filter(q => q.status === 'rejected').length,
+    inNegotiation: filteredQuotations.filter(q => q.status === 'in-negotiation').length,
     totalValue: filteredQuotations.reduce((sum, q) => sum + q.totalAmount, 0),
+    conversionRate: filteredQuotations.length > 0 
+      ? (filteredQuotations.filter(q => q.status === 'approved').length / filteredQuotations.length) * 100 
+      : 0,
+    rejectionRate: filteredQuotations.length > 0 
+      ? (filteredQuotations.filter(q => q.status === 'rejected').length / filteredQuotations.length) * 100 
+      : 0,
   };
 
     const formatCurrency = (amount: number) => {
@@ -563,7 +571,7 @@ export default function ManageQuotes() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 mb-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6 mb-6 mt-6">
             <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -617,6 +625,36 @@ export default function ManageQuotes() {
                   </div>
                   <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <DollarSign className="h-7 w-7 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Tasa de Conversión</p>
+                    <p className="text-2xl font-bold text-green-600 leading-none">{stats.conversionRate.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Aprobadas / Total</p>
+                  </div>
+                  <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <TrendingUp className="h-7 w-7 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Tasa de Rechazos</p>
+                    <p className="text-2xl font-bold text-red-600 leading-none">{stats.rejectionRate.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-500 mt-1">Rechazadas / Total</p>
+                  </div>
+                  <div className="h-14 w-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <X className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
