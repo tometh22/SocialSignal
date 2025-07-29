@@ -1153,11 +1153,11 @@ export default function ProjectDetailsRedesigned() {
         },
         {
           label: "Estado",
-          value: "Crítico",
-          subtitle: "Sin actividad en el período",
-          icon: AlertTriangle,
-          color: "text-red-700",
-          bgColor: "bg-gradient-to-br from-red-50 to-red-100",
+          value: "Sin datos",
+          subtitle: "Proyecto recién iniciado",
+          icon: AlertCircle,
+          color: "text-blue-700",
+          bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
         }
       ];
     }
