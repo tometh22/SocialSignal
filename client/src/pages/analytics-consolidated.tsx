@@ -102,9 +102,19 @@ export default function AnalyticsConsolidated() {
   const { data: timeEntries = [] } = useQuery({ queryKey: ['/api/time-entries'] });
   const { data: quotations = [] } = useQuery({ queryKey: ['/api/quotations'] });
   const { data: deliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
+  const { data: personnel = [] } = useQuery({ queryKey: ['/api/personnel'] });
 
   // Calcular métricas consolidadas avanzadas
   const analytics = useMemo(() => {
+    // Calculate personnel costs by contract type
+    const fullTimePersonnel = personnel.filter((p: any) => p.contractType === 'full-time');
+    const partTimePersonnel = personnel.filter((p: any) => p.contractType === 'part-time' || p.contractType === 'freelance');
+    
+    // Fixed monthly costs (full-time salaries)
+    const fixedMonthlyCosts = fullTimePersonnel.reduce((sum: number, p: any) => 
+      sum + (p.monthlyFixedSalary || 0), 0
+    );
+    
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
@@ -384,6 +394,15 @@ export default function AnalyticsConsolidated() {
       filteredRevenue = monthlyRevenue * totalMonthsWithData.size + totalRevenue;
     }
 
+    // Calculate variable costs for the period
+    const variableCosts = periodEntries.reduce((sum: number, entry: any) => {
+      const person = personnel.find((p: any) => p.id === entry.personnelId);
+      if (person && (person.contractType === 'part-time' || person.contractType === 'freelance')) {
+        return sum + (entry.totalCost || 0);
+      }
+      return sum;
+    }, 0);
+
     return {
       // Métricas básicas
       alwaysOnProjects: alwaysOnProjects.length,
@@ -399,6 +418,12 @@ export default function AnalyticsConsolidated() {
       totalCost,
       avgHourlyRate: totalHours > 0 ? totalCost / totalHours : 0,
       revenuePerHour: totalHours > 0 ? (monthlyRevenue + totalRevenue) / totalHours : 0,
+      
+      // Personnel costs by type
+      fixedMonthlyCosts,
+      variableCosts,
+      fullTimeCount: fullTimePersonnel.length,
+      partTimeCount: partTimePersonnel.length,
       
       // Métricas de eficiencia
       avgEfficiency: projectMetrics.length > 0 
@@ -423,7 +448,7 @@ export default function AnalyticsConsolidated() {
       hoursGrowth: -5.2, // Ejemplo, calcular real
       costReduction: 8.3 // Ejemplo, calcular real
     };
-  }, [projects, clients, timeEntries, quotations, deliverables, dateFilter]);
+  }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter]);
 
   return (
     <PageLayout
@@ -450,7 +475,7 @@ export default function AnalyticsConsolidated() {
                       ${analytics.combinedRevenue.toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Liquidez: ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                      Liquidez: ${(analytics.combinedRevenue - (analytics.fixedMonthlyCosts + analytics.variableCosts)).toLocaleString()}
                     </div>
                   </CardContent>
                 </Card>
@@ -475,10 +500,11 @@ export default function AnalyticsConsolidated() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
-                      ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                      ${(analytics.combinedRevenue - (analytics.fixedMonthlyCosts + analytics.variableCosts)).toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Margen EBITDA: {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1) : '0'}%
+                      Margen EBITDA: {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - (analytics.fixedMonthlyCosts + analytics.variableCosts)) / analytics.combinedRevenue * 100).toFixed(1) : '0'}%
+                      <span className="text-xs ml-1">(Costos reales)</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -504,10 +530,10 @@ export default function AnalyticsConsolidated() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
-                      ${(analytics.totalCost / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
+                      ${((analytics.fixedMonthlyCosts + analytics.variableCosts) / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Gasto mensual promedio
+                      Gasto mensual promedio real
                     </div>
                   </CardContent>
                 </Card>
@@ -1203,6 +1229,109 @@ export default function AnalyticsConsolidated() {
           </TabsContent>
 
           <TabsContent value="insights" className="space-y-6">
+            {/* Personnel Cost Analysis Section */}
+            <Card className="border-indigo-200 shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-indigo-900">
+                      Análisis de Costos de Personal
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-indigo-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-md">
+                          <p className="font-semibold mb-1">Sistema Dual de Análisis</p>
+                          <p className="text-sm mb-2">Este análisis considera los diferentes tipos de contratos:</p>
+                          <ul className="text-sm space-y-1">
+                            <li>• <strong>Full-time:</strong> Costo fijo mensual (sueldo) independiente de horas trabajadas</li>
+                            <li>• <strong>Part-time/Freelance:</strong> Costo variable basado en horas reales trabajadas</li>
+                          </ul>
+                          <p className="text-sm mt-2">Esto permite analizar la salud corporativa real vs la rentabilidad por proyecto.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
+                    <CardDescription className="text-indigo-700">
+                      Comparación entre costos fijos vs variables del equipo
+                    </CardDescription>
+                  </div>
+                  <Users className="h-5 w-5 text-indigo-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <Card className="border-blue-200 bg-blue-50/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-blue-900">Costos Fijos Mensuales</CardTitle>
+                      <CardDescription className="text-xs text-blue-700">Empleados Full-time</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-blue-900">
+                        ${analytics.fixedMonthlyCosts.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-blue-700 mt-1">{analytics.fullTimeCount} empleados</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="border-purple-200 bg-purple-50/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-purple-900">Costos Variables</CardTitle>
+                      <CardDescription className="text-xs text-purple-700">Part-time & Freelance</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-purple-900">
+                        ${analytics.variableCosts.toLocaleString()}
+                      </div>
+                      <p className="text-xs text-purple-700 mt-1">{analytics.partTimeCount} personas</p>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="border-emerald-200 bg-emerald-50/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-emerald-900">Eficiencia Global</CardTitle>
+                      <CardDescription className="text-xs text-emerald-700">ROI del equipo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-emerald-900">
+                        {analytics.combinedRevenue > 0 && (analytics.fixedMonthlyCosts + analytics.variableCosts) > 0 
+                          ? ((analytics.combinedRevenue / (analytics.fixedMonthlyCosts + analytics.variableCosts)) * 100).toFixed(0) 
+                          : '0'}%
+                      </div>
+                      <p className="text-xs text-emerald-700 mt-1">Retorno sobre costos reales</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium mb-1">Análisis del Período</p>
+                    <p className="text-sm text-muted-foreground">
+                      El análisis dual permite ver la salud corporativa real considerando todos los costos operativos.
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Costo Total Real</p>
+                      <p className="text-lg font-semibold">${(analytics.fixedMonthlyCosts + analytics.variableCosts).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Margen Operativo</p>
+                      <p className="text-lg font-semibold">
+                        {analytics.combinedRevenue > 0 
+                          ? `${(((analytics.combinedRevenue - (analytics.fixedMonthlyCosts + analytics.variableCosts)) / analytics.combinedRevenue) * 100).toFixed(1)}%`
+                          : '0%'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground italic">
+                    Configure los tipos de contrato en el panel de administración para una análisis más preciso.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Health Indicators */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Tooltip>
