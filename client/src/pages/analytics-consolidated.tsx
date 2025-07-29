@@ -229,6 +229,7 @@ export default function AnalyticsConsolidated() {
 
     // Filtrar time entries por período y cliente
     const dateRange = getDateRangeForFilter(periodFilter);
+    console.log('📅 Date range para filtro', periodFilter, ':', dateRange);
     const periodEntries = dateRange 
       ? timeEntries.filter((entry: any) => {
           const entryDate = new Date(entry.date);
@@ -485,7 +486,15 @@ export default function AnalyticsConsolidated() {
 
   // Calcular métricas consolidadas avanzadas
   const analytics = useMemo(() => {
-    return calculatePeriodAnalytics(dateFilter);
+    console.log('🔄 Recalculando analytics con filtro:', dateFilter, 'y cliente:', selectedClient);
+    const result = calculatePeriodAnalytics(dateFilter);
+    console.log('📊 Analytics recalculadas:', {
+      totalProjects: result.totalProjects,
+      totalHours: result.totalHours,
+      totalCost: result.totalCost,
+      combinedRevenue: result.combinedRevenue
+    });
+    return result;
   }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter, selectedClient]);
 
   // Calcular métricas del período de comparación
