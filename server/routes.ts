@@ -2693,8 +2693,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Separar projectName del resto de los datos ya que no es parte del esquema de activeProjects
       const { projectName, ...projectData } = req.body;
       
+      // Limpiar valores null antes de validar
+      const cleanedData: any = {};
+      for (const [key, value] of Object.entries(projectData)) {
+        if (value !== null) {
+          cleanedData[key] = value;
+        }
+      }
+      
+      // Convertir fechas si existen
+      if (cleanedData.startDate) {
+        cleanedData.startDate = new Date(cleanedData.startDate);
+      }
+      if (cleanedData.expectedEndDate) {
+        cleanedData.expectedEndDate = new Date(cleanedData.expectedEndDate);
+      }
+      
       // Validar solo los campos del proyecto
-      const validatedData = insertActiveProjectSchema.partial().parse(projectData);
+      const validatedData = insertActiveProjectSchema.partial().parse(cleanedData);
       const updatedProject = await storage.updateActiveProject(id, validatedData);
 
       if (!updatedProject) {
