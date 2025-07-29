@@ -391,7 +391,9 @@ export default function AnalyticsConsolidated() {
             monthsWithActivity.add(`${date.getFullYear()}-${date.getMonth()}`);
           });
           
-          filteredRevenue += monthlyRate * monthsWithActivity.size;
+          const projectRevenue = monthlyRate * monthsWithActivity.size;
+          console.log(`💰 Always-On ${project.name}: $${monthlyRate}/mes × ${monthsWithActivity.size} meses = $${projectRevenue}`);
+          filteredRevenue += projectRevenue;
         }
       });
       
@@ -639,7 +641,17 @@ export default function AnalyticsConsolidated() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
-                      ${((analytics.fixedMonthlyCosts + analytics.variableCosts) / (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1)).toLocaleString()}
+                      ${(() => {
+                        const totalCosts = analytics.fixedMonthlyCosts + analytics.variableCosts;
+                        // Para burn rate, usar meses reales con datos
+                        const dateRange = getDateRangeForFilter(dateFilter);
+                        if (!dateRange) return totalCosts.toLocaleString();
+                        
+                        const monthsInPeriod = Math.max(1, 
+                          Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                        );
+                        return (totalCosts / monthsInPeriod).toLocaleString();
+                      })()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       Gasto mensual promedio real
@@ -697,7 +709,21 @@ export default function AnalyticsConsolidated() {
                   </CardHeader>
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
-                      {analytics.totalProjects > 0 ? ((analytics.totalHours / (160 * analytics.totalProjects * (dateFilter === 'trimestre-pasado' ? 2 : dateFilter === 'semestre-pasado' ? 6 : 1))) * 100).toFixed(0) : '0'}%
+                      {(() => {
+                        if (analytics.totalProjects === 0) return '0';
+                        
+                        // Calcular utilización basada en capacidad teórica del equipo
+                        const dateRange = getDateRangeForFilter(dateFilter);
+                        if (!dateRange) return ((analytics.totalHours / (160 * personnel.length)) * 100).toFixed(0);
+                        
+                        const monthsInPeriod = Math.max(1,
+                          Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                        );
+                        
+                        // Capacidad teórica = personas × 160h/mes × meses
+                        const theoreticalCapacity = personnel.length * 160 * monthsInPeriod;
+                        return ((analytics.totalHours / theoreticalCapacity) * 100).toFixed(0);
+                      })()}%
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                       {analytics.totalHours.toFixed(0)}h de capacidad utilizada
