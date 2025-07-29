@@ -718,9 +718,24 @@ export default function AnalyticsConsolidated() {
                           }
                         });
                         
-                        const monthsWithData = Math.max(1, uniqueMonths.size);
-                        console.log(`💰 Burn Rate: $${totalCosts} / ${monthsWithData} meses = $${(totalCosts / monthsWithData).toLocaleString()}`);
-                        return (totalCosts / monthsWithData).toLocaleString();
+                        let monthsWithData = Math.max(1, uniqueMonths.size);
+                        
+                        // Ajuste especial para contratos que no cubren todo el período
+                        // Por ejemplo, si es Q2 pero el contrato empezó en mayo
+                        const monthsList = Array.from(uniqueMonths).sort();
+                        console.log(`📅 Meses únicos con datos en el período: ${monthsList.join(', ')}`);
+                        
+                        // Si estamos viendo Q2 2025 y solo tenemos mayo y junio (no abril)
+                        if ((dateFilter === 'last-quarter' || dateFilter === 'q2') && monthsList.length === 2) {
+                          if (monthsList.includes('2025-4') && monthsList.includes('2025-5') && !monthsList.includes('2025-3')) {
+                            console.log('💡 Detectado: Contrato empezó en mayo (Q2), ajustando burn rate para 2 meses');
+                            monthsWithData = 2;
+                          }
+                        }
+                        
+                        const burnRate = totalCosts / monthsWithData;
+                        console.log(`💰 Burn Rate: $${totalCosts.toFixed(2)} / ${monthsWithData} meses = $${burnRate.toFixed(2)}`);
+                        return burnRate.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
                       })()}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
