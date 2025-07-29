@@ -570,91 +570,91 @@ export default function ManageQuotes() {
     >
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6 mb-6 mt-6">
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Total Cotizaciones</p>
-                    <p className="text-2xl font-bold text-gray-900 leading-none">{stats.total}</p>
+          {/* Stats Cards - Diseño más compacto y profesional */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <FileText className="h-5 w-5 text-indigo-600" />
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <FileText className="h-7 w-7 text-white" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase">Total</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.total}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Aprobadas</p>
-                    <p className="text-2xl font-bold text-emerald-600 leading-none">{stats.approved}</p>
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <CheckCircle className="h-7 w-7 text-white" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase">Aprobadas</p>
+                    <p className="text-xl font-bold text-emerald-600">{stats.approved}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Pendientes</p>
-                    <p className="text-2xl font-bold text-amber-600 leading-none">{stats.pending}</p>
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-amber-600" />
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <Clock className="h-7 w-7 text-white" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase">Pendientes</p>
+                    <p className="text-xl font-bold text-amber-600">{stats.pending}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <DollarSign className="h-5 w-5 text-blue-600" />
+                  </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Valor Total</p>
-                    <p className="text-2xl font-bold text-blue-600 leading-none">
+                    <p className="text-xs font-medium text-gray-500 uppercase">Valor Total</p>
+                    <p className="text-lg font-bold text-blue-600">
                       ${stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </p>
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <DollarSign className="h-7 w-7 text-white" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase">Conversión</p>
+                    <p className="text-xl font-bold text-green-600">{stats.conversionRate.toFixed(1)}%</p>
+                    <p className="text-[10px] text-gray-400">Aprobadas/Total</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
+            <Card className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-10 w-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <X className="h-5 w-5 text-red-600" />
+                  </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Tasa de Conversión</p>
-                    <p className="text-2xl font-bold text-green-600 leading-none">{stats.conversionRate.toFixed(1)}%</p>
-                    <p className="text-xs text-gray-500 mt-1">Aprobadas / Total</p>
-                  </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <TrendingUp className="h-7 w-7 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg border-0 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Tasa de Rechazos</p>
-                    <p className="text-2xl font-bold text-red-600 leading-none">{stats.rejectionRate.toFixed(1)}%</p>
-                    <p className="text-xs text-gray-500 mt-1">Rechazadas / Total</p>
-                  </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <X className="h-7 w-7 text-white" />
+                    <p className="text-xs font-medium text-gray-500 uppercase">Rechazos</p>
+                    <p className="text-xl font-bold text-red-600">{stats.rejectionRate.toFixed(1)}%</p>
+                    <p className="text-[10px] text-gray-400">Rechazadas/Total</p>
                   </div>
                 </div>
               </CardContent>
@@ -709,7 +709,7 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
+                <div className="grid grid-cols-1 gap-3 p-4">
                   {filteredQuotations.map((quote, index) => {
                     const client = getClient(quote.clientId);
                     const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {
@@ -719,50 +719,54 @@ export default function ManageQuotes() {
                     });
 
                     return (
-                      <Card key={quote.id} className="group relative bg-white border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 rounded-xl overflow-hidden">
-                        <CardContent className="p-0">
-                          {/* Header con gradiente */}
-                          <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-5 border-b border-gray-100">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-start space-x-3 flex-1 min-w-0">
-                                {client?.logoUrl ? (
-                                  <div className="w-12 h-12 rounded-xl bg-white shadow-sm border border-gray-200 overflow-hidden flex-shrink-0">
-                                    <img 
-                                      src={client.logoUrl} 
-                                      alt={`${client.name} logo`} 
-                                      className="w-full h-full object-contain p-1"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                        const nextElement = e.currentTarget.nextElementSibling;
-                                        if (nextElement && nextElement instanceof HTMLElement) {
-                                          nextElement.style.display = 'flex';
-                                        }
-                                      }}
-                                    />
-                                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl hidden items-center justify-center">
-                                      <span className="text-white font-bold text-lg">
-                                        {quote.projectName.charAt(0).toUpperCase()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-                                    <span className="text-white font-bold text-lg">
+                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            {/* Left section - Logo and Info */}
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              {/* Logo compacto */}
+                              {client?.logoUrl ? (
+                                <div className="w-10 h-10 rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={client.logoUrl} 
+                                    alt={`${client.name} logo`} 
+                                    className="w-full h-full object-contain p-0.5"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const nextElement = e.currentTarget.nextElementSibling;
+                                      if (nextElement && nextElement instanceof HTMLElement) {
+                                        nextElement.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg hidden items-center justify-center">
+                                    <span className="text-white font-bold text-sm">
                                       {quote.projectName.charAt(0).toUpperCase()}
                                     </span>
                                   </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-tight">
-                                    {quote.projectName}
-                                  </h3>
-                                  <p className="text-sm text-gray-600 flex items-center mt-1">
-                                    <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                                    <span className="truncate">{getClientName(quote.clientId)}</span>
-                                  </p>
                                 </div>
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <span className="text-white font-bold text-sm">
+                                    {quote.projectName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* Project info */}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                                  {quote.projectName}
+                                </h3>
+                                <p className="text-xs text-gray-500 truncate">
+                                  {getClientName(quote.clientId)}
+                                </p>
                               </div>
-                              <div className="flex-shrink-0 flex flex-col items-end gap-2">
+                            </div>
+
+                            {/* Center section - Status and Value */}
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col items-end gap-1">
                                 {getStatusBadge(quote.status)}
                                 {negotiationData[quote.id] && quote.status === 'approved' && (
                                   <Badge 
@@ -774,148 +778,82 @@ export default function ManageQuotes() {
                                     Negociada
                                   </Badge>
                                 )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Contenido principal */}
-                          <div className="p-5 space-y-4">
-                            {/* Información financiera */}
-                            <div className="bg-gray-50 rounded-lg p-4">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-600">Valor Total</span>
-                                <span className="text-xl font-bold text-gray-900">
-                                  ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between mt-2">
-                                <span className="text-xs text-gray-500">Costo Base</span>
-                                <span className="text-sm text-gray-600">
-                                  ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Metadatos */}
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                              <div className="flex items-center">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                Creada: {createdDate}
-                              </div>
-                              <div className="flex items-center">
-                                <TrendingUp className="h-3 w-3 mr-1" />
-                                ID: #{quote.id}
-                              </div>
-                            </div>
-
-                            {/* Log de actividad reciente */}
-                            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
-                              <div className="flex items-center mb-2">
-                                <Zap className="h-3 w-3 text-blue-600 mr-1" />
-                                <span className="text-xs font-medium text-blue-800">Actividad Reciente</span>
-                              </div>
-                              <div className="text-xs text-blue-700">
-                                {quote.status === 'draft' && 'Cotización en borrador, lista para editar'}
-                                {quote.status === 'pending' && 'Esperando aprobación del cliente'}
-                                {quote.status === 'approved' && (
-                                  quotationProjects[quote.id] 
-                                    ? 'Aprobada - Proyecto ya creado' 
-                                    : 'Aprobada - Lista para crear proyecto'
+                                {quote.status === 'approved' && quotationProjects[quote.id] && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-green-50 text-green-700 border-green-200 text-xs flex items-center gap-1"
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                    Proyecto Activo
+                                  </Badge>
                                 )}
-                                {quote.status === 'rejected' && 'Rechazada por el cliente'}
-                                {quote.status === 'in-negotiation' && 'En proceso de negociación'}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-gray-900">
+                                  ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {createdDate}
+                                </p>
                               </div>
                             </div>
-                          </div>
 
-                          {/* Acciones */}
-                          <div className="bg-gray-50 p-4 border-t border-gray-100">
-                            <div className="grid grid-cols-3 gap-2">
-                              {/* Primera fila de botones */}
+                            {/* Actions */}
+                            <div className="flex items-center gap-2">
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => openStatusDialog(quote)}
-                                className="justify-center text-xs hover:bg-blue-50 hover:border-blue-300"
+                                className="h-8 px-2"
                               >
-                                <Edit className="h-3 w-3 mr-1" />
-                                Estado
+                                <Edit className="h-3 w-3" />
                               </Button>
-
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => navigate(`/quotation/${quote.id}`)}
-                                className="justify-center text-xs hover:bg-green-50 hover:border-green-300"
+                                className="h-8 px-2"
                               >
-                                <Eye className="h-3 w-3 mr-1" />
-                                Ver
+                                <Eye className="h-3 w-3" />
                               </Button>
-
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
                                 onClick={() => openDeleteDialog(quote)}
                                 disabled={deletingQuoteId === quote.id}
-                                className="justify-center text-xs hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+                                className="h-8 px-2 hover:text-red-600"
                               >
                                 {deletingQuoteId === quote.id ? (
-                                  <>
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                    <span className="hidden sm:inline">Procesando...</span>
-                                  </>
+                                  <Loader2 className="h-3 w-3 animate-spin" />
                                 ) : (
-                                  <>
-                                    <Trash2 className="h-3 w-3 mr-1" />
-                                    Eliminar
-                                  </>
+                                  <Trash2 className="h-3 w-3" />
                                 )}
                               </Button>
+                              {quote.status === 'draft' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditQuotation(quote)}
+                                  className="h-8 px-2"
+                                >
+                                  <PenLine className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {quote.status === 'approved' && !quotationProjects[quote.id] && (
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => {
+                                    setApprovedQuote(quote);
+                                    setCreateProjectDialogOpen(true);
+                                  }}
+                                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Crear Proyecto
+                                </Button>
+                              )}
                             </div>
-
-                            {/* Segunda fila para botones condicionales */}
-                            {(quote.status === 'draft' || quote.status === 'approved') && (
-                              <div className="mt-2">
-                                {quote.status === 'draft' && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditQuotation(quote)}
-                                    className="w-full justify-center text-xs hover:bg-orange-50 hover:border-orange-300"
-                                  >
-                                    <PenLine className="h-3 w-3 mr-1" />
-                                    Editar
-                                  </Button>
-                                )}
-
-                                {quote.status === 'approved' && !quotationProjects[quote.id] && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setApprovedQuote(quote);
-                                      setCreateProjectDialogOpen(true);
-                                    }}
-                                    className="w-full justify-center text-xs bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700 font-medium"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Crear Proyecto
-                                  </Button>
-                                )}
-
-                                {quote.status === 'approved' && quotationProjects[quote.id] && (
-                                  <div className="flex items-center justify-center gap-2 py-2">
-                                    <Badge 
-                                      variant="outline" 
-                                      className="bg-green-50 text-green-700 border-green-200 text-xs flex items-center gap-1"
-                                    >
-                                      <CheckCircle className="h-3 w-3" />
-                                      Proyecto Activo
-                                    </Badge>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </CardContent>
                       </Card>
