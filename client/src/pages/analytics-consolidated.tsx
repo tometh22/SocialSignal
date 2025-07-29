@@ -922,190 +922,418 @@ export default function AnalyticsConsolidated() {
 
           {/* PESTAÑA 1: VISTA GENERAL */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Gráfico de distribución de proyectos */}
+            {/* Resumen Ejecutivo Mejorado */}
+            <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Target className="h-6 w-6 text-blue-600" />
+                  Resumen Ejecutivo - {dateFilterOptions.find(opt => opt.value === dateFilter)?.label || 'Período'}
+                </CardTitle>
+                <CardDescription>
+                  Análisis integral del rendimiento empresarial con métricas accionables
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Salud Financiera */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      Salud Financiera
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Facturación</span>
+                        <span className="font-semibold text-green-600">
+                          ${analytics.combinedRevenue.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Costos Operativos</span>
+                        <span className="font-semibold text-orange-600">
+                          ${analytics.totalCost.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Utilidad Neta</span>
+                          <span className={cn(
+                            "font-bold text-lg",
+                            analytics.combinedRevenue > analytics.totalCost ? "text-green-600" : "text-red-600"
+                          )}>
+                            ${(analytics.combinedRevenue - analytics.totalCost).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="text-xs text-muted-foreground">Margen</span>
+                          <span className="text-sm font-medium">
+                            {analytics.combinedRevenue > 0 
+                              ? `${((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1)}%`
+                              : '0%'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Eficiencia Operacional */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-orange-600" />
+                      Eficiencia Operacional
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Proyectos Activos</span>
+                        <span className="font-semibold">{analytics.activeProjects}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Horas Facturables</span>
+                        <span className="font-semibold">{analytics.totalHours.toFixed(0)}h</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Productividad</span>
+                        <span className="font-semibold text-blue-600">
+                          ${analytics.totalHours > 0 
+                            ? (analytics.combinedRevenue / analytics.totalHours).toFixed(0)
+                            : '0'}/hora
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Burn Rate Mensual</span>
+                          <span className="font-bold text-lg text-orange-600">
+                            ${(() => {
+                              const totalCosts = analytics.totalCost;
+                              const uniqueMonths = new Set();
+                              const dateRange = getDateRangeForFilter(dateFilter);
+                              
+                              timeEntries.forEach((entry: any) => {
+                                const entryDate = new Date(entry.date);
+                                if (dateRange && entryDate >= dateRange.startDate && entryDate <= dateRange.endDate) {
+                                  uniqueMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                                }
+                              });
+                              
+                              const monthsWithData = Math.max(1, uniqueMonths.size);
+                              return (totalCosts / monthsWithData).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pipeline y Crecimiento */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                      Pipeline Comercial
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Oportunidades</span>
+                        <span className="font-semibold">{analytics.pendingQuotations}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Valor Pipeline</span>
+                        <span className="font-semibold text-purple-600">
+                          ${(analytics.pendingQuotations * 30000).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Tasa Conversión</span>
+                        <span className="font-semibold">
+                          {analytics.approvedQuotations + analytics.pendingQuotations > 0
+                            ? `${(analytics.approvedQuotations / (analytics.approvedQuotations + analytics.pendingQuotations) * 100).toFixed(0)}%`
+                            : '0%'}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Proyección Q3</span>
+                          <span className="font-bold text-lg text-purple-600">
+                            ${((analytics.pendingQuotations * 30000 * 0.4) + analytics.monthlyRevenue * 3).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Métricas de Rendimiento Visual */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Portfolio Breakdown con valores monetarios */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      Distribución de Portfolio
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="font-semibold mb-1">Distribución de Portfolio</p>
-                          <p className="text-sm">Muestra cómo se dividen tus proyectos entre contratos recurrentes (Always-On) y proyectos únicos. Los Always-On generan ingresos mensuales estables.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </CardTitle>
-                    <PieChart className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <PieChart className="h-5 w-5 text-blue-600" />
+                    Composición del Portfolio por Valor
+                  </CardTitle>
+                  <CardDescription>
+                    Distribución de ingresos por tipo de contrato
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <RechartsPieChart>
-                      <Pie
-                        data={[
-                          { name: 'Always-On', value: analytics.alwaysOnProjects, revenue: analytics.monthlyRevenue },
-                          { name: 'Únicos', value: analytics.uniqueProjects, revenue: analytics.totalRevenue }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        <Cell fill={CHART_COLORS.primary} />
-                        <Cell fill={CHART_COLORS.secondary} />
-                      </Pie>
-                      <RechartsTooltip 
-                        formatter={(value: any, name: any, props: any) => [
-                          `${value} proyectos`,
-                          `Revenue: $${props.payload.revenue.toLocaleString()}`
-                        ]}
-                      />
-                    </RechartsPieChart>
-                  </ResponsiveContainer>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.primary }}></div>
-                        Always-On
-                      </span>
-                      <span className="font-medium">${analytics.monthlyRevenue.toLocaleString()}/mes</span>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPieChart>
+                        <Pie
+                          data={[
+                            { 
+                              name: 'Contratos Recurrentes', 
+                              value: analytics.monthlyRevenue || 0,
+                              count: alwaysOnProjects.length,
+                              percentage: analytics.monthlyRevenue + analytics.totalRevenue > 0 
+                                ? (analytics.monthlyRevenue / (analytics.monthlyRevenue + analytics.totalRevenue) * 100).toFixed(1)
+                                : 0
+                            },
+                            { 
+                              name: 'Proyectos Únicos', 
+                              value: analytics.totalRevenue || 0,
+                              count: uniqueProjects.length,
+                              percentage: analytics.monthlyRevenue + analytics.totalRevenue > 0 
+                                ? (analytics.totalRevenue / (analytics.monthlyRevenue + analytics.totalRevenue) * 100).toFixed(1)
+                                : 0
+                            }
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ percentage }) => `${percentage}%`}
+                        >
+                          <Cell fill="#3B82F6" />
+                          <Cell fill="#10B981" />
+                        </Pie>
+                        <RechartsTooltip 
+                          formatter={(value: any, name: any, props: any) => [
+                            `$${value.toLocaleString()}`,
+                            `${name} (${props.payload.count} proyectos)`
+                          ]}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full" />
+                        <span className="text-sm font-medium">Recurrentes</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">${analytics.monthlyRevenue.toLocaleString()}/mes</p>
+                        <p className="text-xs text-muted-foreground">{alwaysOnProjects.length} contratos activos</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS.secondary }}></div>
-                        Únicos
-                      </span>
-                      <span className="font-medium">${analytics.totalRevenue.toLocaleString()} total</span>
+                    <div className="flex justify-between items-center p-2 bg-green-50 rounded">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full" />
+                        <span className="text-sm font-medium">Únicos</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">${analytics.totalRevenue.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{uniqueProjects.length} proyectos en curso</p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Historical KPI Evolution */}
+              {/* Tendencia Financiera Simplificada */}
               <Card>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Evolución Histórica de KPIs</CardTitle>
-                      <CardDescription>Tendencias de métricas clave en el tiempo</CardDescription>
-                    </div>
-                    <LineChart className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-green-600" />
+                    Tendencia Financiera
+                  </CardTitle>
+                  <CardDescription>
+                    Evolución mensual de ingresos vs costos
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RechartsLineChart data={analytics.monthlyTrends}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis yAxisId="left" />
-                      <YAxis yAxisId="right" orientation="right" />
-                      <RechartsTooltip />
-                      <Legend />
-                      <Line 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke={CHART_COLORS.primary} 
-                        name="Ingresos ($)"
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        yAxisId="left"
-                        type="monotone" 
-                        dataKey="costs" 
-                        stroke={CHART_COLORS.danger} 
-                        name="Costos ($)"
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="margin" 
-                        stroke={CHART_COLORS.secondary} 
-                        name="Margen (%)"
-                        strokeWidth={2}
-                      />
-                      <Line 
-                        yAxisId="right"
-                        type="monotone" 
-                        dataKey="efficiency" 
-                        stroke={CHART_COLORS.purple} 
-                        name="Eficiencia (%)"
-                        strokeWidth={2}
-                      />
-                    </RechartsLineChart>
-                  </ResponsiveContainer>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analytics.monthlyTrends}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <RechartsTooltip 
+                          formatter={(value: any, name: any) => [
+                            `$${value.toLocaleString()}`,
+                            name
+                          ]}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stackId="1"
+                          stroke="#3B82F6" 
+                          fill="#3B82F6" 
+                          fillOpacity={0.6}
+                          name="Ingresos" 
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="costs" 
+                          stackId="1"
+                          stroke="#EF4444" 
+                          fill="#EF4444" 
+                          fillOpacity={0.6}
+                          name="Costos" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                    <div className="p-2 bg-blue-50 rounded">
+                      <p className="text-xs text-muted-foreground">Promedio Ingresos</p>
+                      <p className="text-sm font-bold text-blue-600">
+                        ${analytics.monthlyTrends.length > 0 
+                          ? (analytics.monthlyTrends.reduce((sum, m) => sum + m.revenue, 0) / analytics.monthlyTrends.length).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                          : '0'}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-green-50 rounded">
+                      <p className="text-xs text-muted-foreground">Margen Promedio</p>
+                      <p className="text-sm font-bold text-green-600">
+                        {analytics.combinedRevenue > 0 
+                          ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(1)
+                          : '0'}%
+                      </p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Resumen de Salud Corporativa */}
+            {/* Indicadores de Acción Inmediata */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-green-600" />
-                  Resumen de Salud Corporativa
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  Panel de Control Ejecutivo
                 </CardTitle>
                 <CardDescription>
-                  Estado general del negocio en el período {dateFilter === 'all' ? 'completo' : 'seleccionado'}
+                  Indicadores clave que requieren atención inmediata
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Margen Operativo</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
-                        {analytics.combinedRevenue > 0 ? ((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100).toFixed(0) : '0'}%
-                      </span>
-                      {((analytics.combinedRevenue - analytics.totalCost) / analytics.combinedRevenue * 100) > 30 ? (
-                        <ArrowUpRight className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <ArrowDownRight className="h-4 w-4 text-red-600" />
-                      )}
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Estado de Salud General */}
+                  <div className={cn(
+                    "p-4 rounded-lg border-2 text-center",
+                    analytics.combinedRevenue > analytics.totalCost * 1.3
+                      ? "border-green-200 bg-green-50"
+                      : analytics.combinedRevenue > analytics.totalCost
+                      ? "border-yellow-200 bg-yellow-50"
+                      : "border-red-200 bg-red-50"
+                  )}>
+                    <Shield className={cn(
+                      "h-8 w-8 mx-auto mb-2",
+                      analytics.combinedRevenue > analytics.totalCost * 1.3
+                        ? "text-green-600"
+                        : analytics.combinedRevenue > analytics.totalCost
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    )} />
+                    <p className="text-sm font-medium">Estado General</p>
+                    <p className="text-lg font-bold">
+                      {analytics.combinedRevenue > analytics.totalCost * 1.3
+                        ? "Saludable"
+                        : analytics.combinedRevenue > analytics.totalCost
+                        ? "Estable"
+                        : "Crítico"}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ROI: {analytics.totalCost > 0 
+                        ? `${((analytics.combinedRevenue / analytics.totalCost - 1) * 100).toFixed(0)}%`
+                        : '0%'}
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Eficiencia Global</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
-                        {analytics.projectMetrics.length > 0 
-                          ? (analytics.projectMetrics.reduce((sum, p) => sum + p.efficiency, 0) / analytics.projectMetrics.length).toFixed(0)
-                          : '0'}%
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {analytics.projectMetrics.filter(p => p.efficiency > 80).length}/{analytics.projectMetrics.length} proyectos
-                      </Badge>
-                    </div>
+
+                  {/* Proyectos en Riesgo */}
+                  <div className={cn(
+                    "p-4 rounded-lg border-2 text-center",
+                    analytics.projectMetrics.filter((p: any) => p.efficiency < 80).length === 0
+                      ? "border-green-200 bg-green-50"
+                      : analytics.projectMetrics.filter((p: any) => p.efficiency < 80).length <= 2
+                      ? "border-yellow-200 bg-yellow-50"
+                      : "border-red-200 bg-red-50"
+                  )}>
+                    <AlertTriangle className={cn(
+                      "h-8 w-8 mx-auto mb-2",
+                      analytics.projectMetrics.filter((p: any) => p.efficiency < 80).length === 0
+                        ? "text-green-600"
+                        : analytics.projectMetrics.filter((p: any) => p.efficiency < 80).length <= 2
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    )} />
+                    <p className="text-sm font-medium">Proyectos en Riesgo</p>
+                    <p className="text-2xl font-bold">
+                      {analytics.projectMetrics.filter((p: any) => p.efficiency < 80).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      de {analytics.projectMetrics.length} totales
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Pipeline Activo</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
-                        ${(analytics.pendingQuotations * 30000).toLocaleString()}
-                      </span>
-                      <Badge variant={analytics.pendingQuotations > 5 ? "default" : "secondary"} className="text-xs">
-                        {analytics.pendingQuotations} oportunidades
-                      </Badge>
-                    </div>
+
+                  {/* Control de Gastos */}
+                  <div className={cn(
+                    "p-4 rounded-lg border-2 text-center",
+                    analytics.totalCost / Math.max(1, new Set(timeEntries.map((e: any) => `${new Date(e.date).getFullYear()}-${new Date(e.date).getMonth()}`)).size) < 10000
+                      ? "border-green-200 bg-green-50"
+                      : analytics.totalCost / Math.max(1, new Set(timeEntries.map((e: any) => `${new Date(e.date).getFullYear()}-${new Date(e.date).getMonth()}`)).size) < 15000
+                      ? "border-yellow-200 bg-yellow-50"
+                      : "border-red-200 bg-red-50"
+                  )}>
+                    <Wallet className={cn(
+                      "h-8 w-8 mx-auto mb-2",
+                      analytics.totalCost / Math.max(1, new Set(timeEntries.map((e: any) => `${new Date(e.date).getFullYear()}-${new Date(e.date).getMonth()}`)).size) < 10000
+                        ? "text-green-600"
+                        : analytics.totalCost / Math.max(1, new Set(timeEntries.map((e: any) => `${new Date(e.date).getFullYear()}-${new Date(e.date).getMonth()}`)).size) < 15000
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                    )} />
+                    <p className="text-sm font-medium">Burn Rate</p>
+                    <p className="text-lg font-bold">
+                      ${(analytics.totalCost / Math.max(1, new Set(timeEntries.map((e: any) => `${new Date(e.date).getFullYear()}-${new Date(e.date).getMonth()}`)).size)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      gasto mensual
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <span className="text-sm text-muted-foreground">Utilización</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
-                        {analytics.totalProjects > 0 ? ((analytics.totalHours / (160 * analytics.totalProjects)) * 100).toFixed(0) : '0'}%
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {analytics.totalHours.toFixed(0)}h trabajadas
-                      </span>
-                    </div>
+
+                  {/* Capacidad del Equipo */}
+                  <div className={cn(
+                    "p-4 rounded-lg border-2 text-center",
+                    analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.7
+                      ? "border-blue-200 bg-blue-50"
+                      : analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.9
+                      ? "border-green-200 bg-green-50"
+                      : "border-orange-200 bg-orange-50"
+                  )}>
+                    <Users className={cn(
+                      "h-8 w-8 mx-auto mb-2",
+                      analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.7
+                        ? "text-blue-600"
+                        : analytics.activeProjects > 0 && (analytics.totalHours / (analytics.activeProjects * 160)) < 0.9
+                        ? "text-green-600"
+                        : "text-orange-600"
+                    )} />
+                    <p className="text-sm font-medium">Capacidad Utilizada</p>
+                    <p className="text-2xl font-bold">
+                      {analytics.activeProjects > 0 
+                        ? `${((analytics.totalHours / (analytics.activeProjects * 160)) * 100).toFixed(0)}%`
+                        : '0%'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {analytics.totalHours.toFixed(0)}h de {analytics.activeProjects * 160}h
+                    </p>
                   </div>
                 </div>
               </CardContent>
