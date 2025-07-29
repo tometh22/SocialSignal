@@ -52,7 +52,6 @@ export default function EditProject() {
   const [subprojectName, setSubprojectName] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("active");
-  const [budget, setBudget] = useState("");
   const [startDate, setStartDate] = useState("");
   const [expectedEndDate, setExpectedEndDate] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
@@ -76,7 +75,7 @@ export default function EditProject() {
       setSubprojectName(project.subprojectName || "");
       setNotes(project.notes || "");
       setStatus(project.status || "active");
-      setBudget(project.budget?.toString() || "");
+
       setStartDate(project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : "");
       setExpectedEndDate(project.expectedEndDate ? new Date(project.expectedEndDate).toISOString().split('T')[0] : "");
     }
@@ -91,19 +90,27 @@ export default function EditProject() {
           projectName: data.projectName
         });
       }
-      return apiRequest(`/api/active-projects/${projectId}`, "PATCH", data);
+      // Remover projectName del data antes de enviar al backend del proyecto
+      const { projectName, ...projectData } = data;
+      return apiRequest(`/api/active-projects/${projectId}`, "PATCH", projectData);
     },
     onSuccess: () => {
       toast({
         title: "Proyecto actualizado",
         description: "Los cambios han sido guardados exitosamente."
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${projectId}`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      
+      // Invalidar queries en el orden correcto para asegurar actualización
       if (project?.quotationId) {
         queryClient.invalidateQueries({ queryKey: [`/api/quotations/${project.quotationId}`] });
       }
-      setLocation(`/active-projects/${projectId}`);
+      queryClient.invalidateQueries({ queryKey: [`/api/active-projects/${projectId}`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      
+      // Dar tiempo para que las queries se actualicen antes de redirigir
+      setTimeout(() => {
+        setLocation(`/active-projects/${projectId}`);
+      }, 100);
     },
     onError: (error) => {
       console.error("Error al actualizar proyecto:", error);
@@ -121,7 +128,6 @@ export default function EditProject() {
     const updateData: any = {
       status,
       notes: notes || null,
-      budget: budget ? parseFloat(budget) : null,
       startDate: startDate || null,
       expectedEndDate: expectedEndDate || null,
       subprojectName: subprojectName || null
@@ -372,28 +378,22 @@ export default function EditProject() {
                   </Select>
                 </div>
 
-                {/* Presupuesto */}
+                {/* Presupuesto - Solo lectura */}
                 <div className="space-y-2">
-                  <Label htmlFor="budget" className="text-sm font-medium">
+                  <Label className="text-sm font-medium">
                     Presupuesto total
                   </Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      id="budget"
-                      type="number"
-                      value={budget}
-                      onChange={(e) => setBudget(e.target.value)}
-                      placeholder="0.00"
-                      step="0.01"
-                      className="pl-10"
-                    />
-                  </div>
-                  {quotation && (
-                    <p className="text-xs text-gray-500">
-                      Cotización original: ${quotation.totalAmount.toLocaleString()}
+                  <div className="rounded-md bg-gray-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-gray-400" />
+                      <span className="text-sm font-medium text-gray-700">
+                        ${quotation?.totalAmount?.toLocaleString() || '0.00'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Este valor proviene de la cotización aprobada
                     </p>
-                  )}
+                  </div>
                 </div>
 
                 {/* Fecha de inicio */}
