@@ -118,6 +118,7 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       const cost = newMember.hours * newMember.rate;
       
       // Para propósitos de depuración
+      console.log('Añadiendo miembro:', {
         roleId: newMember.roleId,
         personnelId: newMember.personnelId,
         hours: newMember.hours,
@@ -154,9 +155,9 @@ const DirectTeamSelector: React.FC<DirectTeamSelectorProps> = ({ onAddMember, ex
       // Mensaje de confirmación
       alert('Miembro añadido al equipo correctamente');
       
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error al añadir miembro al equipo:", error);
-      alert(`Error al añadir miembro: ${error?.message || 'Error desconocido'}`);
+      alert(`Error al añadir miembro: ${(error as any)?.message || 'Error desconocido'}`);
     }
   };
 

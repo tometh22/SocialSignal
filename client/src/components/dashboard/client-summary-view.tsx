@@ -141,6 +141,7 @@ const ClientSummaryView: React.FC<ClientSummaryViewProps> = ({ clientId, clientN
   });
 
   // Log para debugging
+  console.log('Client Summary View Data:', {
     clientId,
     summaryLoading,
     deliverablesLoading, 
