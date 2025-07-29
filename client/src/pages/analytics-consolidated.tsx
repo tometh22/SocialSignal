@@ -703,9 +703,20 @@ export default function AnalyticsConsolidated() {
                   <CardContent className="relative">
                     <div className="text-2xl font-bold">
                       ${(() => {
-                        const totalCosts = analytics.fixedMonthlyCosts + analytics.variableCosts;
+                        // Para burn rate, usar el costo real del período (totalCost de los time entries)
+                        const totalCosts = analytics.totalCost;
+                        
                         // Para burn rate, contar meses reales con datos en el período
-                        if (dateFilter === 'all') return totalCosts.toLocaleString();
+                        if (dateFilter === 'all') {
+                          // Para histórico completo, contar todos los meses únicos
+                          const allMonths = new Set();
+                          timeEntries.forEach((entry: any) => {
+                            const entryDate = new Date(entry.date);
+                            allMonths.add(`${entryDate.getFullYear()}-${entryDate.getMonth()}`);
+                          });
+                          const totalMonths = Math.max(1, allMonths.size);
+                          return (totalCosts / totalMonths).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                        }
                         
                         // Contar meses únicos con datos en el período filtrado
                         const uniqueMonths = new Set();
@@ -719,19 +730,9 @@ export default function AnalyticsConsolidated() {
                         });
                         
                         let monthsWithData = Math.max(1, uniqueMonths.size);
-                        
-                        // Ajuste especial para contratos que no cubren todo el período
-                        // Por ejemplo, si es Q2 pero el contrato empezó en mayo
                         const monthsList = Array.from(uniqueMonths).sort();
-                        console.log(`📅 Meses únicos con datos en el período: ${monthsList.join(', ')}`);
-                        
-                        // Si estamos viendo Q2 2025 y solo tenemos mayo y junio (no abril)
-                        if ((dateFilter === 'last-quarter' || dateFilter === 'q2') && monthsList.length === 2) {
-                          if (monthsList.includes('2025-4') && monthsList.includes('2025-5') && !monthsList.includes('2025-3')) {
-                            console.log('💡 Detectado: Contrato empezó en mayo (Q2), ajustando burn rate para 2 meses');
-                            monthsWithData = 2;
-                          }
-                        }
+                        console.log(`📅 Meses únicos con datos en el período ${dateFilter}: ${monthsList.join(', ')}`);
+                        console.log(`💵 Total costs del período: $${totalCosts.toFixed(2)}`);
                         
                         const burnRate = totalCosts / monthsWithData;
                         console.log(`💰 Burn Rate: $${totalCosts.toFixed(2)} / ${monthsWithData} meses = $${burnRate.toFixed(2)}`);
