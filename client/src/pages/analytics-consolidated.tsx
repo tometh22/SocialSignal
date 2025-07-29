@@ -70,7 +70,7 @@ const dateFilterOptions = [
   { value: "this-month", label: "Este mes", group: "General" },
   { value: "last-month", label: "Mes pasado", group: "General" },
   { value: "this-quarter", label: "Este trimestre", group: "General" },
-  { value: "last-quarter", label: "Trimestre pasado", group: "General" },
+  { value: "trimestre-pasado", label: "Trimestre pasado", group: "General" },
   { value: "this-semester", label: "Este semestre", group: "General" },
   { value: "last-semester", label: "Semestre pasado", group: "General" },
   { value: "this-year", label: "Este año", group: "General" },
@@ -115,6 +115,7 @@ const getDateRangeForFilter = (filter: string) => {
       endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
       break;
     case 'last-quarter':
+    case 'trimestre-pasado':
       const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
       const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
       const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
@@ -194,7 +195,9 @@ export default function AnalyticsConsolidated() {
     const fixedMonthlyCosts = fullTimePersonnel.reduce((sum: number, p: any) => {
       // La columna en la DB es monthly_fixed_salary, que se convierte a camelCase
       const salary = p.monthlyFixedSalary || p.monthly_fixed_salary || 0;
-      console.log(`💰 Personal ${p.name}: ${p.contractType}, salario mensual: $${salary}`);
+      if (salary > 0) {
+        console.log(`💰 Personal ${p.name}: ${p.contractType}, salario mensual: $${salary}`);
+      }
       return sum + salary;
     }, 0);
     console.log('💵 Total costos fijos mensuales:', fixedMonthlyCosts);
@@ -209,6 +212,7 @@ export default function AnalyticsConsolidated() {
       : projects.filter(p => p.clientId === parseInt(selectedClient));
       
     const alwaysOnProjects = filteredProjects.filter(p => 
+      p.quotation?.projectType === 'fee-mensual' ||
       p.isAlwaysOnMacro || 
       p.quotation?.projectName?.toLowerCase().includes('always-on') ||
       p.quotation?.projectName?.toLowerCase().includes('modo') ||
@@ -218,6 +222,21 @@ export default function AnalyticsConsolidated() {
     );
 
     const uniqueProjects = filteredProjects.filter(p => !alwaysOnProjects.includes(p));
+    
+    console.log('🔍 Proyectos separados por tipo:', {
+      alwaysOn: alwaysOnProjects.map(p => ({
+        id: p.id,
+        name: p.quotation?.projectName,
+        type: p.quotation?.projectType,
+        amount: p.quotation?.totalAmount
+      })),
+      unique: uniqueProjects.map(p => ({
+        id: p.id,
+        name: p.quotation?.projectName,
+        type: p.quotation?.projectType,
+        amount: p.quotation?.totalAmount
+      }))
+    });
 
     // Calcular ingresos mensuales vs totales (precio al cliente)
     const monthlyRevenue = alwaysOnProjects.reduce((sum, p) => {
@@ -388,6 +407,8 @@ export default function AnalyticsConsolidated() {
 
     // Calculate filtered revenue based on the selected period
     let filteredRevenue = 0;
+    console.log('💸 Iniciando cálculo de revenue filtrado para período:', dateFilter);
+    console.log('💸 Rango de fechas:', dateRange);
     
     if (dateRange) {
       // For Always-On projects, calculate based on months with activity in the period
@@ -403,9 +424,19 @@ export default function AnalyticsConsolidated() {
             monthsWithActivity.add(`${date.getFullYear()}-${date.getMonth()}`);
           });
           
-          const projectRevenue = monthlyRate * monthsWithActivity.size;
-          console.log(`💰 Always-On ${project.quotation?.projectName || project.id}: $${monthlyRate}/mes × ${monthsWithActivity.size} meses = $${projectRevenue}`);
+          // Para el período seleccionado, calcular correctamente los meses
+          let actualMonths = monthsWithActivity.size;
+          
+          // Si estamos en Q2 2025 (trimestre pasado) y tenemos datos en mayo y junio
+          if (dateFilter === 'trimestre-pasado' || dateFilter === 'q2') {
+            // Para Q2, contar solo los meses con datos reales
+            actualMonths = monthsWithActivity.size;
+          }
+          
+          const projectRevenue = monthlyRate * actualMonths;
+          console.log(`💰 Always-On ${project.quotation?.projectName || project.id}: ID=${project.id}, $${monthlyRate}/mes × ${actualMonths} meses = $${projectRevenue}`);
           console.log('   Meses con actividad:', Array.from(monthsWithActivity));
+          console.log('   Entradas encontradas:', projectEntries.length);
           filteredRevenue += projectRevenue;
         }
       });
@@ -420,7 +451,9 @@ export default function AnalyticsConsolidated() {
           
           if (totalProjectHours > 0) {
             const proportion = periodProjectHours / totalProjectHours;
-            filteredRevenue += (project.quotation?.totalAmount || 0) * proportion;
+            const projectUniqueRevenue = (project.quotation?.totalAmount || 0) * proportion;
+            console.log(`💼 Unique Project ${project.quotation?.projectName || project.id}: ID=${project.id}, $${project.quotation?.totalAmount} × ${(proportion * 100).toFixed(1)}% = $${projectUniqueRevenue.toFixed(2)}`);
+            filteredRevenue += projectUniqueRevenue;
           }
         }
       });
@@ -444,6 +477,14 @@ export default function AnalyticsConsolidated() {
       return sum;
     }, 0);
 
+    console.log('💸 Revenue final calculado:', {
+      monthlyRevenue,
+      totalRevenue,
+      filteredRevenue,
+      combinedRevenue: filteredRevenue,
+      formula: `filteredRevenue = ${filteredRevenue.toFixed(2)}`
+    });
+    
     return {
       // Métricas básicas
       alwaysOnProjects: alwaysOnProjects.length,
@@ -511,7 +552,11 @@ export default function AnalyticsConsolidated() {
       totalProjects: result.totalProjects,
       totalHours: result.totalHours,
       totalCost: result.totalCost,
-      combinedRevenue: result.combinedRevenue
+      combinedRevenue: result.combinedRevenue,
+      fixedMonthlyCosts: result.fixedMonthlyCosts,
+      variableCosts: result.variableCosts,
+      monthlyRevenue: result.monthlyRevenue,
+      totalRevenue: result.totalRevenue
     });
     return result;
   }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter, selectedClient]);
