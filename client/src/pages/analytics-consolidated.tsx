@@ -92,6 +92,83 @@ const dateFilterOptions = [
   { value: "december", label: "Diciembre", group: "Meses" }
 ];
 
+// Helper function to get date range for filters
+const getDateRangeForFilter = (filter: string) => {
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date = now;
+
+  switch (filter) {
+    case 'all':
+      return null;
+    case 'this-month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      break;
+    case 'last-month':
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+      break;
+    case 'this-quarter':
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+      endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
+      break;
+    case 'last-quarter':
+      const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+      const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+      startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
+      endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
+      break;
+    case 'this-semester':
+      const currentSemester = Math.floor(now.getMonth() / 6);
+      startDate = new Date(now.getFullYear(), currentSemester * 6, 1);
+      endDate = new Date(now.getFullYear(), (currentSemester + 1) * 6, 0);
+      break;
+    case 'last-semester':
+      const lastSemester = Math.floor(now.getMonth() / 6) - 1;
+      const semesterYear = lastSemester < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const adjustedSemester = lastSemester < 0 ? 1 : lastSemester;
+      startDate = new Date(semesterYear, adjustedSemester * 6, 1);
+      endDate = new Date(semesterYear, (adjustedSemester + 1) * 6, 0);
+      break;
+    case 'this-year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 11, 31);
+      break;
+    case 'q1':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 2, 31);
+      break;
+    case 'q2':
+      startDate = new Date(now.getFullYear(), 3, 1);
+      endDate = new Date(now.getFullYear(), 5, 30);
+      break;
+    case 'q3':
+      startDate = new Date(now.getFullYear(), 6, 1);
+      endDate = new Date(now.getFullYear(), 8, 30);
+      break;
+    case 'q4':
+      startDate = new Date(now.getFullYear(), 9, 1);
+      endDate = new Date(now.getFullYear(), 11, 31);
+      break;
+    default:
+      // Handle month names
+      const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                        'july', 'august', 'september', 'october', 'november', 'december'];
+      const monthIndex = monthNames.indexOf(filter);
+      if (monthIndex !== -1) {
+        startDate = new Date(now.getFullYear(), monthIndex, 1);
+        endDate = new Date(now.getFullYear(), monthIndex + 1, 0);
+      } else {
+        return null;
+      }
+  }
+
+  return { startDate, endDate };
+};
+
 export default function AnalyticsConsolidated() {
   const [dateFilter, setDateFilter] = useState("this-month");
   const [compareMode, setCompareMode] = useState(false);
@@ -122,8 +199,12 @@ export default function AnalyticsConsolidated() {
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
 
-    // Filtrar Always-On vs Únicos
-    const alwaysOnProjects = projects.filter(p => 
+    // Filtrar Always-On vs Únicos con filtro de cliente
+    const filteredProjects = selectedClient === 'all' 
+      ? projects 
+      : projects.filter(p => p.clientId === parseInt(selectedClient));
+      
+    const alwaysOnProjects = filteredProjects.filter(p => 
       p.isAlwaysOnMacro || 
       p.quotation?.projectName?.toLowerCase().includes('always-on') ||
       p.quotation?.projectName?.toLowerCase().includes('modo') ||
@@ -132,7 +213,7 @@ export default function AnalyticsConsolidated() {
       p.quotation?.projectType === 'always-on'
     );
 
-    const uniqueProjects = projects.filter(p => !alwaysOnProjects.includes(p));
+    const uniqueProjects = filteredProjects.filter(p => !alwaysOnProjects.includes(p));
 
     // Calcular ingresos mensuales vs totales (precio al cliente)
     const monthlyRevenue = alwaysOnProjects.reduce((sum, p) => {
@@ -146,97 +227,31 @@ export default function AnalyticsConsolidated() {
       return sum + (p.quotation?.totalAmount || 0);
     }, 0);
 
-    // Function to get date range based on filter
-    const getDateRange = (filter: string) => {
-      const today = new Date();
-      const currentYear = today.getFullYear();
-      const currentMonth = today.getMonth();
-      let startDate = new Date();
-      let endDate = new Date();
-
-      switch (filter) {
-        case 'all':
-          return null; // No filtering
-        case 'this-month':
-          startDate = new Date(currentYear, currentMonth, 1);
-          endDate = new Date(currentYear, currentMonth + 1, 0);
-          break;
-        case 'last-month':
-          startDate = new Date(currentYear, currentMonth - 1, 1);
-          endDate = new Date(currentYear, currentMonth, 0);
-          break;
-        case 'this-quarter':
-          const currentQuarter = Math.floor(currentMonth / 3);
-          startDate = new Date(currentYear, currentQuarter * 3, 1);
-          endDate = new Date(currentYear, currentQuarter * 3 + 3, 0);
-          break;
-        case 'last-quarter':
-          const lastQuarter = Math.floor(currentMonth / 3) - 1;
-          const qYear = lastQuarter < 0 ? currentYear - 1 : currentYear;
-          const qNum = lastQuarter < 0 ? 3 : lastQuarter;
-          startDate = new Date(qYear, qNum * 3, 1);
-          endDate = new Date(qYear, qNum * 3 + 3, 0);
-          break;
-        case 'this-semester':
-          const currentSemester = currentMonth < 6 ? 0 : 1;
-          startDate = new Date(currentYear, currentSemester * 6, 1);
-          endDate = new Date(currentYear, currentSemester * 6 + 6, 0);
-          break;
-        case 'last-semester':
-          const lastSemester = currentMonth < 6 ? 1 : 0;
-          const sYear = lastSemester === 1 && currentMonth < 6 ? currentYear - 1 : currentYear;
-          startDate = new Date(sYear, lastSemester * 6, 1);
-          endDate = new Date(sYear, lastSemester * 6 + 6, 0);
-          break;
-        case 'this-year':
-          startDate = new Date(currentYear, 0, 1);
-          endDate = new Date(currentYear, 11, 31);
-          break;
-        case 'q1':
-          startDate = new Date(currentYear, 0, 1);
-          endDate = new Date(currentYear, 2, 31);
-          break;
-        case 'q2':
-          startDate = new Date(currentYear, 3, 1);
-          endDate = new Date(currentYear, 5, 30);
-          break;
-        case 'q3':
-          startDate = new Date(currentYear, 6, 1);
-          endDate = new Date(currentYear, 8, 30);
-          break;
-        case 'q4':
-          startDate = new Date(currentYear, 9, 1);
-          endDate = new Date(currentYear, 11, 31);
-          break;
-        default:
-          // Handle month names
-          const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
-                            'july', 'august', 'september', 'october', 'november', 'december'];
-          const monthIndex = monthNames.indexOf(filter);
-          if (monthIndex !== -1) {
-            startDate = new Date(currentYear, monthIndex, 1);
-            endDate = new Date(currentYear, monthIndex + 1, 0);
-          }
-      }
-
-      return { startDate, endDate };
-    };
-
-    // Filtrar time entries por período
-    const dateRange = getDateRange(dateFilter);
+    // Filtrar time entries por período y cliente
+    const dateRange = getDateRangeForFilter(periodFilter);
     const periodEntries = dateRange 
       ? timeEntries.filter((entry: any) => {
           const entryDate = new Date(entry.date);
-          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+          const dateMatch = entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+          
+          if (selectedClient === 'all') return dateMatch;
+          
+          // Filtrar por cliente si hay uno seleccionado
+          const project = projects.find(p => p.id === entry.projectId);
+          return dateMatch && project && project.clientId === parseInt(selectedClient);
         })
-      : timeEntries;
+      : timeEntries.filter((entry: any) => {
+          if (selectedClient === 'all') return true;
+          const project = projects.find(p => p.id === entry.projectId);
+          return project && project.clientId === parseInt(selectedClient);
+        });
 
     // Métricas de tiempo y costos
     const totalHours = periodEntries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0);
     const totalCost = periodEntries.reduce((sum: number, entry: any) => sum + (entry.totalCost || 0), 0);
 
     // Análisis por proyecto
-    const projectMetrics = projects.map(project => {
+    const projectMetrics = filteredProjects.map(project => {
       const projectEntries = periodEntries.filter((e: any) => e.projectId === project.id);
       const hours = projectEntries.reduce((sum: number, e: any) => sum + (e.hours || 0), 0);
       const cost = projectEntries.reduce((sum: number, e: any) => sum + (e.totalCost || 0), 0);
@@ -413,8 +428,8 @@ export default function AnalyticsConsolidated() {
       // Métricas básicas
       alwaysOnProjects: alwaysOnProjects.length,
       uniqueProjects: uniqueProjects.length,
-      totalProjects: projects.length,
-      activeClients: clients.length,
+      totalProjects: filteredProjects.length,
+      activeClients: selectedClient === 'all' ? clients.length : 1,
       monthlyRevenue,
       totalRevenue,
       combinedRevenue: filteredRevenue,
@@ -440,9 +455,21 @@ export default function AnalyticsConsolidated() {
         : 0,
       
       // Estados
-      completedDeliverables: deliverables.filter((d: any) => d.status === 'completed').length,
-      pendingQuotations: quotations.filter((q: any) => q.status === 'pending').length,
-      approvedQuotations: quotations.filter((q: any) => q.status === 'approved').length,
+      completedDeliverables: deliverables.filter((d: any) => {
+        if (selectedClient === 'all') return d.status === 'completed';
+        const project = projects.find(p => p.id === d.projectId);
+        return d.status === 'completed' && project && project.clientId === parseInt(selectedClient);
+      }).length,
+      pendingQuotations: quotations.filter((q: any) => {
+        const statusMatch = q.status === 'pending';
+        if (selectedClient === 'all') return statusMatch;
+        return statusMatch && q.clientId === parseInt(selectedClient);
+      }).length,
+      approvedQuotations: quotations.filter((q: any) => {
+        const statusMatch = q.status === 'approved';
+        if (selectedClient === 'all') return statusMatch;
+        return statusMatch && q.clientId === parseInt(selectedClient);
+      }).length,
       
       // Datos para gráficos
       projectMetrics,
@@ -459,13 +486,13 @@ export default function AnalyticsConsolidated() {
   // Calcular métricas consolidadas avanzadas
   const analytics = useMemo(() => {
     return calculatePeriodAnalytics(dateFilter);
-  }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter]);
+  }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter, selectedClient]);
 
   // Calcular métricas del período de comparación
   const comparisonAnalytics = useMemo(() => {
     if (!compareMode) return null;
     return calculatePeriodAnalytics(comparePeriod);
-  }, [projects, clients, timeEntries, quotations, deliverables, personnel, comparePeriod, compareMode]);
+  }, [projects, clients, timeEntries, quotations, deliverables, personnel, comparePeriod, compareMode, selectedClient]);
 
   return (
     <PageLayout
