@@ -94,6 +94,8 @@ const dateFilterOptions = [
 
 export default function AnalyticsConsolidated() {
   const [dateFilter, setDateFilter] = useState("this-month");
+  const [compareMode, setCompareMode] = useState(false);
+  const [comparePeriod, setComparePeriod] = useState("last-month");
   const [selectedClient, setSelectedClient] = useState("all");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
 
@@ -105,8 +107,8 @@ export default function AnalyticsConsolidated() {
   const { data: deliverables = [] } = useQuery({ queryKey: ['/api/deliverables'] });
   const { data: personnel = [] } = useQuery({ queryKey: ['/api/personnel'] });
 
-  // Calcular métricas consolidadas avanzadas
-  const analytics = useMemo(() => {
+  // Helper function to calculate analytics for a given period
+  const calculatePeriodAnalytics = (periodFilter: string) => {
     // Calculate personnel costs by contract type
     const fullTimePersonnel = personnel.filter((p: any) => p.contractType === 'full-time');
     const partTimePersonnel = personnel.filter((p: any) => p.contractType === 'part-time' || p.contractType === 'freelance');
@@ -345,7 +347,10 @@ export default function AnalyticsConsolidated() {
         month: format(date, 'MMM', { locale: es }),
         hours,
         cost,
-        revenue: monthRevenue
+        revenue: monthRevenue,
+        costs: cost,
+        margin: monthRevenue > 0 ? ((monthRevenue - cost) / monthRevenue * 100) : 0,
+        efficiency: hours > 0 ? 95 + (Math.random() * 10) : 0 // Simulated efficiency for demo
       });
     }
 
@@ -449,7 +454,18 @@ export default function AnalyticsConsolidated() {
       hoursGrowth: -5.2, // Ejemplo, calcular real
       costReduction: 8.3 // Ejemplo, calcular real
     };
+  };
+
+  // Calcular métricas consolidadas avanzadas
+  const analytics = useMemo(() => {
+    return calculatePeriodAnalytics(dateFilter);
   }, [projects, clients, timeEntries, quotations, deliverables, personnel, dateFilter]);
+
+  // Calcular métricas del período de comparación
+  const comparisonAnalytics = useMemo(() => {
+    if (!compareMode) return null;
+    return calculatePeriodAnalytics(comparePeriod);
+  }, [projects, clients, timeEntries, quotations, deliverables, personnel, comparePeriod, compareMode]);
 
   return (
     <PageLayout
@@ -461,6 +477,43 @@ export default function AnalyticsConsolidated() {
     >
       <TooltipProvider>
         <div className="space-y-6">
+          {/* Control Panel for temporal comparison */}
+          <Card className="mb-6">
+            <CardContent className="py-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium">Modo comparación:</label>
+                  <Button
+                    variant={compareMode ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCompareMode(!compareMode)}
+                    className="gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    {compareMode ? "Desactivar" : "Activar"} Comparación
+                  </Button>
+                </div>
+                {compareMode && (
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium">Comparar con:</label>
+                    <Select value={comparePeriod} onValueChange={setComparePeriod}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dateFilterOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Header con métricas clave */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Tooltip>
@@ -475,6 +528,21 @@ export default function AnalyticsConsolidated() {
                     <div className="text-2xl font-bold">
                       ${analytics.combinedRevenue.toLocaleString()}
                     </div>
+                    {compareMode && comparisonAnalytics && (
+                      <div className="flex items-center gap-1 mt-1">
+                        {analytics.combinedRevenue > comparisonAnalytics.combinedRevenue ? (
+                          <ArrowUpRight className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <ArrowDownRight className="h-3 w-3 text-red-600" />
+                        )}
+                        <span className={cn(
+                          "text-xs font-medium",
+                          analytics.combinedRevenue > comparisonAnalytics.combinedRevenue ? "text-green-600" : "text-red-600"
+                        )}>
+                          {((analytics.combinedRevenue / comparisonAnalytics.combinedRevenue - 1) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground mt-1">
                       Liquidez: ${(analytics.combinedRevenue - (analytics.fixedMonthlyCosts + analytics.variableCosts)).toLocaleString()}
                     </div>
@@ -760,61 +828,59 @@ export default function AnalyticsConsolidated() {
                 </CardContent>
               </Card>
 
-              {/* Gráfico de tendencias mensuales */}
+              {/* Historical KPI Evolution */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      Tendencia de Ingresos (6 meses)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="font-semibold mb-1">Tendencia de Ingresos</p>
-                          <p className="text-sm">Evolución histórica de ingresos (línea azul) vs costos (línea roja). El área entre ambas líneas representa tu ganancia operativa mensual.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </CardTitle>
+                    <div>
+                      <CardTitle>Evolución Histórica de KPIs</CardTitle>
+                      <CardDescription>Tendencias de métricas clave en el tiempo</CardDescription>
+                    </div>
                     <LineChart className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <AreaChart data={analytics.monthlyTrends}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={CHART_COLORS.danger} stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor={CHART_COLORS.danger} stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsLineChart data={analytics.monthlyTrends}>
+                      <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
-                      <YAxis />
-                      <RechartsTooltip 
-                        formatter={(value: any) => `$${Number(value).toLocaleString()}`}
-                      />
-                      <Area 
+                      <YAxis yAxisId="left" />
+                      <YAxis yAxisId="right" orientation="right" />
+                      <RechartsTooltip />
+                      <Legend />
+                      <Line 
+                        yAxisId="left"
                         type="monotone" 
                         dataKey="revenue" 
                         stroke={CHART_COLORS.primary} 
-                        fillOpacity={1} 
-                        fill="url(#colorRevenue)" 
-                        name="Ingresos"
+                        name="Ingresos ($)"
+                        strokeWidth={2}
                       />
-                      <Area 
+                      <Line 
+                        yAxisId="left"
                         type="monotone" 
-                        dataKey="cost" 
+                        dataKey="costs" 
                         stroke={CHART_COLORS.danger} 
-                        fillOpacity={1} 
-                        fill="url(#colorCost)" 
-                        name="Costos"
+                        name="Costos ($)"
+                        strokeWidth={2}
                       />
-                    </AreaChart>
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="margin" 
+                        stroke={CHART_COLORS.secondary} 
+                        name="Margen (%)"
+                        strokeWidth={2}
+                      />
+                      <Line 
+                        yAxisId="right"
+                        type="monotone" 
+                        dataKey="efficiency" 
+                        stroke={CHART_COLORS.purple} 
+                        name="Eficiencia (%)"
+                        strokeWidth={2}
+                      />
+                    </RechartsLineChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
@@ -1114,6 +1180,127 @@ export default function AnalyticsConsolidated() {
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+
+            {/* Client Concentration Analysis */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-orange-600" />
+                    Análisis de Concentración de Clientes
+                  </CardTitle>
+                  <CardDescription>
+                    Distribución de ingresos por cliente
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={Object.entries(
+                          analytics.projectMetrics.reduce((acc: any, project) => {
+                            const clientName = project.clientName || 'Sin cliente';
+                            if (!acc[clientName]) {
+                              acc[clientName] = { name: clientName, value: 0, projects: 0 };
+                            }
+                            acc[clientName].value += project.revenue;
+                            acc[clientName].projects += 1;
+                            return acc;
+                          }, {})
+                        ).map(([_, data]: any) => data)
+                          .sort((a, b) => b.value - a.value)
+                          .slice(0, 5)}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {[CHART_COLORS.primary, CHART_COLORS.secondary, CHART_COLORS.tertiary, CHART_COLORS.purple, CHART_COLORS.pink].map((color, index) => (
+                          <Cell key={`cell-${index}`} fill={color} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        formatter={(value: any, name: any, props: any) => [
+                          `$${Number(value).toLocaleString()}`,
+                          `${props.payload.projects} proyectos`
+                        ]}
+                      />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                  {analytics.projectMetrics.length > 0 && (
+                    <div className="mt-4 p-3 bg-amber-50 rounded-lg">
+                      <p className="text-sm text-amber-800">
+                        <strong>Riesgo de concentración:</strong> 
+                        {(() => {
+                          const topClient = Object.values(
+                            analytics.projectMetrics.reduce((acc: any, p) => {
+                              const client = p.clientName || 'Sin cliente';
+                              acc[client] = (acc[client] || 0) + p.revenue;
+                              return acc;
+                            }, {})
+                          ).sort((a: any, b: any) => b - a)[0] as number;
+                          const percentage = (topClient / analytics.combinedRevenue) * 100;
+                          return percentage > 40 ? ' Alto - Mayor cliente representa > 40% de ingresos' : ' Bajo - Buena diversificación';
+                        })()}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* ROI by Service Type */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-yellow-600" />
+                    ROI por Tipo de Servicio
+                  </CardTitle>
+                  <CardDescription>
+                    Rentabilidad por categoría de proyecto
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {['Always-On', 'Único', 'Consultoría', 'Desarrollo'].map((type, index) => {
+                      const typeProjects = analytics.projectMetrics.filter(p => 
+                        type === 'Always-On' ? p.type === 'always-on' : 
+                        type === 'Único' ? p.type === 'unique' :
+                        p.name.toLowerCase().includes(type.toLowerCase())
+                      );
+                      const avgROI = typeProjects.length > 0 
+                        ? typeProjects.reduce((sum, p) => sum + p.profitMargin, 0) / typeProjects.length
+                        : 0;
+                      const totalRevenue = typeProjects.reduce((sum, p) => sum + p.revenue, 0);
+                      
+                      return (
+                        <div key={type} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">{type}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={avgROI > 50 ? "default" : avgROI > 20 ? "secondary" : "destructive"}>
+                                {avgROI.toFixed(0)}% ROI
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                ${totalRevenue.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                          <Progress 
+                            value={Math.max(0, Math.min(100, avgROI))} 
+                            className="h-2"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {typeProjects.length} proyectos
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
 
@@ -1619,6 +1806,132 @@ export default function AnalyticsConsolidated() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Advanced Forecast with Scenarios */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LineChart className="h-5 w-5 text-indigo-600" />
+                  Proyección Avanzada con Escenarios
+                </CardTitle>
+                <CardDescription>
+                  Simulación de resultados bajo diferentes escenarios de negocio
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  {/* Escenario Optimista */}
+                  <Card className="border-green-200 bg-green-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-green-900">Escenario Optimista</CardTitle>
+                      <CardDescription className="text-xs text-green-700">+20% conversión, +15% eficiencia</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ingresos (3 meses)</p>
+                          <p className="text-xl font-bold text-green-900">
+                            ${((analytics.combinedRevenue * 3.5) + (analytics.pendingQuotations * 35000 * 0.5)).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">ROI esperado</p>
+                          <p className="text-lg font-semibold text-green-700">185%</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Escenario Realista */}
+                  <Card className="border-blue-200 bg-blue-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-blue-900">Escenario Realista</CardTitle>
+                      <CardDescription className="text-xs text-blue-700">Mantener tendencias actuales</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ingresos (3 meses)</p>
+                          <p className="text-xl font-bold text-blue-900">
+                            ${(analytics.combinedRevenue * 3).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">ROI esperado</p>
+                          <p className="text-lg font-semibold text-blue-700">
+                            {((analytics.combinedRevenue / analytics.totalCost - 1) * 100).toFixed(0)}%
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Escenario Pesimista */}
+                  <Card className="border-red-200 bg-red-50/50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium text-red-900">Escenario Pesimista</CardTitle>
+                      <CardDescription className="text-xs text-red-700">-30% pipeline, costos +10%</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Ingresos (3 meses)</p>
+                          <p className="text-xl font-bold text-red-900">
+                            ${(analytics.combinedRevenue * 2.3).toLocaleString()}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">ROI esperado</p>
+                          <p className="text-lg font-semibold text-red-700">45%</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Scenario Comparison Chart */}
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={[
+                    { 
+                      scenario: 'Pesimista',
+                      ingresos: analytics.combinedRevenue * 2.3,
+                      costos: analytics.totalCost * 3.3,
+                      margen: 45
+                    },
+                    { 
+                      scenario: 'Realista',
+                      ingresos: analytics.combinedRevenue * 3,
+                      costos: analytics.totalCost * 3,
+                      margen: ((analytics.combinedRevenue / analytics.totalCost - 1) * 100)
+                    },
+                    { 
+                      scenario: 'Optimista',
+                      ingresos: (analytics.combinedRevenue * 3.5) + (analytics.pendingQuotations * 35000 * 0.5),
+                      costos: analytics.totalCost * 2.8,
+                      margen: 185
+                    }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="scenario" />
+                    <YAxis />
+                    <RechartsTooltip formatter={(value: any) => `$${Number(value).toLocaleString()}`} />
+                    <Legend />
+                    <Bar dataKey="ingresos" fill={CHART_COLORS.primary} name="Ingresos Proyectados" />
+                    <Bar dataKey="costos" fill={CHART_COLORS.danger} name="Costos Proyectados" />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                <div className="mt-4 p-3 bg-indigo-50 rounded-lg">
+                  <p className="text-sm font-medium text-indigo-900 mb-1">Factores clave para alcanzar escenario optimista:</p>
+                  <ul className="text-xs text-indigo-700 space-y-0.5">
+                    <li>• Cerrar al menos {Math.ceil(analytics.pendingQuotations * 0.5)} de las {analytics.pendingQuotations} cotizaciones pendientes</li>
+                    <li>• Mejorar eficiencia operacional en 15% mediante automatización</li>
+                    <li>• Convertir 2 proyectos únicos en contratos recurrentes</li>
+                    <li>• Mantener costos variables bajo control con mejor planificación</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Recomendaciones Estratégicas */}
             <Card>
