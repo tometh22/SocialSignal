@@ -2688,7 +2688,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
-      const validatedData = insertActiveProjectSchema.partial().parse(req.body);
+      // Separar projectName del resto de los datos ya que no es parte del esquema de activeProjects
+      const { projectName, ...projectData } = req.body;
+      
+      // Validar solo los campos del proyecto
+      const validatedData = insertActiveProjectSchema.partial().parse(projectData);
       const updatedProject = await storage.updateActiveProject(id, validatedData);
 
       if (!updatedProject) {
