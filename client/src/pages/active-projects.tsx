@@ -125,9 +125,21 @@ function ProjectCard({
                   {projectName}
                 </h3>
               </div>
-              {isAlwaysOnProject && (
-                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
-                  Always-On
+              {/* Project Type Badge */}
+              {project.quotation?.projectType && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${
+                    project.quotation.projectType === 'always-on' 
+                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                      : project.quotation.projectType === 'monitoring'
+                      ? 'bg-orange-50 text-orange-700 border-orange-200'
+                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                  }`}
+                >
+                  {project.quotation.projectType === 'always-on' ? 'Always-On' : 
+                   project.quotation.projectType === 'monitoring' ? 'Monitoring' :
+                   'One-Shot'}
                 </Badge>
               )}
             </div>
@@ -199,13 +211,13 @@ function ProjectCard({
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  Inicio: {project.startDate ? new Date(project.startDate).toLocaleDateString('es-ES') : 'Sin fecha'}
+                  Inicio: {project.startDate ? new Date(project.startDate + 'T00:00:00').toLocaleDateString('es-ES', { timeZone: 'UTC' }) : 'Sin fecha'}
                 </span>
               </div>
               {project.expectedEndDate && (
                 <div className="flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  <span>Fin: {new Date(project.expectedEndDate).toLocaleDateString('es-ES')}</span>
+                  <span>Fin: {new Date(project.expectedEndDate + 'T00:00:00').toLocaleDateString('es-ES', { timeZone: 'UTC' })}</span>
                 </div>
               )}
             </div>
