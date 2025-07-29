@@ -2688,6 +2688,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
+      console.log("PATCH /api/active-projects/:id - Request body:", req.body);
+      
       // Separar projectName del resto de los datos ya que no es parte del esquema de activeProjects
       const { projectName, ...projectData } = req.body;
       
@@ -2702,6 +2704,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedProject);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", error.errors);
         return res.status(400).json({ message: "Invalid project data", errors: error.errors });
       }
       console.error("Error updating active project:", error);
