@@ -207,13 +207,42 @@ function ProjectCard({
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 <span>
-                  Inicio: {project.startDate ? new Date(project.startDate + 'T00:00:00').toLocaleDateString('es-ES', { timeZone: 'UTC' }) : 'Sin fecha'}
+                  Inicio: {project.startDate ? 
+                    (() => {
+                      try {
+                        const date = new Date(project.startDate);
+                        return !isNaN(date.getTime()) ? 
+                          date.toLocaleDateString('es-ES', { 
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          }) : 
+                          'Sin fecha';
+                      } catch {
+                        return 'Sin fecha';
+                      }
+                    })() : 'Sin fecha'}
                 </span>
               </div>
               {project.expectedEndDate && (
                 <div className="flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  <span>Fin: {new Date(project.expectedEndDate + 'T00:00:00').toLocaleDateString('es-ES', { timeZone: 'UTC' })}</span>
+                  <span>Fin: {
+                    (() => {
+                      try {
+                        const date = new Date(project.expectedEndDate);
+                        return !isNaN(date.getTime()) ? 
+                          date.toLocaleDateString('es-ES', { 
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          }) : 
+                          'Sin fecha';
+                      } catch {
+                        return 'Sin fecha';
+                      }
+                    })()
+                  }</span>
                 </div>
               )}
             </div>
