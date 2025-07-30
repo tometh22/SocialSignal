@@ -58,7 +58,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     const { getDateRangeForFilter, getMonthsInFilter } = await import('./routes');
     
     let adjustedBaseCost = quotation.baseCost || 0;
-    let dateRange = null;
+    let dateRange: { startDate: Date; endDate: Date } | null = null;
     
     // If we have a timeFilter, use the complete-data logic
     if (timeFilter) {
@@ -66,7 +66,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       if (dateRange) {
         filteredTimeEntries = filteredTimeEntries.filter(entry => {
           const entryDate = new Date(entry.date);
-          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+          return dateRange && entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
         });
       }
     } else if (startDate && endDate) {
@@ -163,7 +163,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
     const teamMembersMap = new Map(teamMembers.map(m => [m.personnelId, m]));
     
     // Procesar todo el personal con tiempo registrado
-    for (const personnelId of allPersonnelWithTime) {
+    for (const personnelId of Array.from(allPersonnelWithTime)) {
       const member = teamMembersMap.get(personnelId);
       const isQuoted = member !== undefined;
       const memberTimeEntries = filteredTimeEntries.filter(entry => entry.personnelId === personnelId);
