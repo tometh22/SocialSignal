@@ -226,6 +226,7 @@ export const quotations = pgTable("quotations", {
   baseCost: doublePrecision("base_cost").notNull(),
   complexityAdjustment: doublePrecision("complexity_adjustment").notNull(),
   markupAmount: doublePrecision("markup_amount").notNull(),
+  marginFactor: doublePrecision("margin_factor").default(2.0), // Multiplicador de markup (2x, 2.5x, etc)
   platformCost: doublePrecision("platform_cost").default(0), // Costo de plataforma
   deviationPercentage: doublePrecision("deviation_percentage").default(0), // Porcentaje de desviación
   discountPercentage: doublePrecision("discount_percentage").default(0), // Porcentaje de descuento

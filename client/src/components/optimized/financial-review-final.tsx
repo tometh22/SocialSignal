@@ -68,8 +68,8 @@ export default function FinancialReviewFinal() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
-  const [markupMultiplier, setMarkupMultiplier] = useState(2.0); // Default 2x markup
-  const [discountPercentage, setDiscountPercentage] = useState(0); // Default 0% discount
+  const [markupMultiplier, setMarkupMultiplier] = useState(quotationData.financials?.marginFactor || 2.0); // Use saved markup or default 2x
+  const [discountPercentage, setDiscountPercentage] = useState(quotationData.financials?.discountPercentage || 0); // Use saved discount or default 0%
 
   // Force recalculation when component mounts or data changes
   useEffect(() => {
@@ -77,6 +77,16 @@ export default function FinancialReviewFinal() {
       forceRecalculate();
     }
   }, [quotationData.teamMembers, forceRecalculate]);
+
+  // Update markup and discount when quotation data changes
+  useEffect(() => {
+    if (quotationData.financials?.marginFactor) {
+      setMarkupMultiplier(quotationData.financials.marginFactor);
+    }
+    if (quotationData.financials?.discountPercentage !== undefined) {
+      setDiscountPercentage(quotationData.financials.discountPercentage);
+    }
+  }, [quotationData.financials?.marginFactor, quotationData.financials?.discountPercentage]);
 
   // Use the enhanced currency hook
   const { 
@@ -243,6 +253,7 @@ export default function FinancialReviewFinal() {
 
   // Update discount percentage when it changes
   React.useEffect(() => {
+    console.log('💰 Updating financials with markup:', markupMultiplier, 'discount:', discountPercentage);
     updateFinancials({
       discountPercentage: discountPercentage,
       marginFactor: markupMultiplier,
@@ -609,7 +620,11 @@ export default function FinancialReviewFinal() {
                   </div>
                   <div>
                     <p className="text-xs font-medium text-green-800">Markup</p>
-                    <p className="text-lg font-bold text-green-900">{markupMultiplier}x</p>
+                    <p className="text-lg font-bold text-green-900">
+                      {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
+                        ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(1)}x`
+                        : `${markupMultiplier.toFixed(1)}x`}
+                    </p>
                     <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
                   </div>
                 </div>
@@ -786,7 +801,10 @@ export default function FinancialReviewFinal() {
                           <div className="flex-1">
                             <Slider
                               value={[currentMarkup]}
-                              onValueChange={(value) => setMarkupMultiplier(value[0])}
+                              onValueChange={(value) => {
+                                setMarkupMultiplier(value[0]);
+                                updateFinancials({ marginFactor: value[0] });
+                              }}
                               min={1.0}
                               max={6.0}
                               step={0.1}
@@ -802,6 +820,7 @@ export default function FinancialReviewFinal() {
                                 const value = parseFloat(e.target.value);
                                 if (!isNaN(value) && value >= 1.0 && value <= 6.0) {
                                   setMarkupMultiplier(value);
+                                  updateFinancials({ marginFactor: value });
                                 }
                               }}
                               min="1.0"
@@ -856,7 +875,10 @@ export default function FinancialReviewFinal() {
                 <div className="space-y-3">
                   <Slider
                     value={[discountPercentage]}
-                    onValueChange={(value) => setDiscountPercentage(value[0])}
+                    onValueChange={(value) => {
+                      setDiscountPercentage(value[0]);
+                      updateFinancials({ discountPercentage: value[0] });
+                    }}
                     min={0}
                     max={50}
                     step={1}

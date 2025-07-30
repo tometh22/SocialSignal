@@ -799,11 +799,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           platformCost: Number(quotation.platformCost || 0),
           deviationPercentage: Number(quotation.deviationPercentage || 0),
           discount: Number(quotation.discountPercentage || 0),
-          // Calculate marginFactor and marginPercentage from saved values
-          marginFactor: quotation.markupAmount && quotation.baseCost ? 
-            1 + (quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) : 2.0,
-          marginPercentage: quotation.markupAmount && quotation.baseCost ? 
-            ((quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) * 100) : 100,
+          // Use saved marginFactor or calculate from saved values
+          marginFactor: quotation.marginFactor || (quotation.markupAmount && quotation.baseCost ? 
+            1 + (quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) : 2.0),
+          marginPercentage: quotation.marginFactor ? 
+            ((quotation.marginFactor - 1) * 100) : 
+            (quotation.markupAmount && quotation.baseCost ? 
+              ((quotation.markupAmount / (quotation.baseCost + (quotation.complexityAdjustment || 0))) * 100) : 100),
           discountPercentage: Number(quotation.discountPercentage || 0),
           // Nuevos campos cargados de la base de datos
           toolsCost: Number(quotation.toolsCost || 0),
@@ -862,7 +864,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         clientEngagement: quotationData.clientEngagement || 'medium',
         templateId: quotationData.template?.id || null,
         baseCost: baseCost || 0,
-        complexityAdjustment: complexityAdjustment || 0,markupAmount: markupAmount || 0,
+        complexityAdjustment: complexityAdjustment || 0,
+        markupAmount: markupAmount || 0,
+        marginFactor: quotationData.financials.marginFactor || 2.0,
         totalAmount: totalAmount || 0,
         platformCost: quotationData.financials.platformCost || 0,
         deviationPercentage: quotationData.financials.deviationPercentage || 0,
