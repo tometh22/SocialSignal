@@ -149,7 +149,7 @@ function ProjectCard({
                 </div>
                 <div>
                   <div className="text-sm font-bold text-green-800">${totalAmount.toLocaleString()}</div>
-                  <div className="text-xs text-green-600">Presupuesto</div>
+                  <div className="text-xs text-green-600">Precio al cliente</div>
                 </div>
               </div>
               
@@ -543,7 +543,7 @@ export default function ActiveProjectsRedesigned() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-purple-900">${stats.totalBudget.toLocaleString()}</div>
-                  <div className="text-sm text-purple-700 font-medium">Presupuesto Total</div>
+                  <div className="text-sm text-purple-700 font-medium">Facturación Total</div>
                 </div>
                 <div className="p-3 bg-purple-500 rounded-full shadow-lg">
                   <DollarSign className="h-6 w-6 text-white" />
