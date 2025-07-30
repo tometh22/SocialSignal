@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase } from "lucide-react";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import {
@@ -709,7 +709,7 @@ export default function ManageQuotes() {
                 </div>
               ) : filteredQuotations.length > 0 ? (
 
-                <div className="grid grid-cols-1 gap-3 p-4">
+                <div className="grid grid-cols-1 gap-4 p-6">
                   {filteredQuotations.map((quote, index) => {
                     const client = getClient(quote.clientId);
                     const createdDate = new Date(quote.createdAt).toLocaleDateString('es-ES', {
@@ -718,144 +718,208 @@ export default function ManageQuotes() {
                       year: 'numeric'
                     });
 
+                    const clientInitials = client?.name
+                      ?.split(' ')
+                      .map(word => word[0])
+                      .join('')
+                      .toUpperCase()
+                      .slice(0, 2) || quote.projectName.slice(0, 2).toUpperCase();
+
+                    // Calculate team members from quote data
+                    let teamMembersCount = 0;
+                    try {
+                      const team = quote.team ? JSON.parse(quote.team as string) : [];
+                      if (Array.isArray(team)) {
+                        teamMembersCount = team.length;
+                      }
+                    } catch (e) {
+                      teamMembersCount = 0;
+                    }
+
                     return (
-                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all duration-200">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between gap-4">
-                            {/* Left section - Logo and Info */}
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              {/* Logo compacto */}
-                              {client?.logoUrl ? (
-                                <div className="w-10 h-10 rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden flex-shrink-0">
-                                  <img 
-                                    src={client.logoUrl} 
-                                    alt={`${client.name} logo`} 
-                                    className="w-full h-full object-contain p-0.5"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                      const nextElement = e.currentTarget.nextElementSibling;
-                                      if (nextElement && nextElement instanceof HTMLElement) {
-                                        nextElement.style.display = 'flex';
-                                      }
-                                    }}
-                                  />
-                                  <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg hidden items-center justify-center">
-                                    <span className="text-white font-bold text-sm">
-                                      {quote.projectName.charAt(0).toUpperCase()}
+                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden">
+                        <div className="flex">
+                          {/* Status color indicator */}
+                          <div className={`w-1.5 ${
+                            quote.status === 'approved' ? 'bg-gradient-to-b from-emerald-500 to-emerald-600' :
+                            quote.status === 'pending' ? 'bg-gradient-to-b from-amber-500 to-amber-600' :
+                            quote.status === 'in-negotiation' ? 'bg-gradient-to-b from-purple-500 to-purple-600' :
+                            quote.status === 'rejected' ? 'bg-gradient-to-b from-red-500 to-red-600' :
+                            'bg-gradient-to-b from-gray-400 to-gray-500'
+                          }`} />
+                          
+                          <CardContent className="flex-1 p-5">
+                            <div className="flex items-start justify-between gap-4">
+                              {/* Main content area */}
+                              <div className="flex items-start gap-4 flex-1">
+                                {/* Client Logo */}
+                                <div className="flex-shrink-0">
+                                  {client?.logoUrl ? (
+                                    <div className="w-14 h-14 rounded-xl bg-white shadow-sm border border-gray-100 overflow-hidden">
+                                      <img 
+                                        src={client.logoUrl} 
+                                        alt={`${client.name} logo`} 
+                                        className="w-full h-full object-contain p-1"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                          const nextElement = e.currentTarget.nextElementSibling;
+                                          if (nextElement && nextElement instanceof HTMLElement) {
+                                            nextElement.style.display = 'flex';
+                                          }
+                                        }}
+                                      />
+                                      <div className="w-full h-full bg-gradient-to-br from-blue-500 to-blue-600 hidden items-center justify-center">
+                                        <span className="text-white font-bold text-base">
+                                          {clientInitials}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+                                      <span className="text-white font-bold text-base">
+                                        {clientInitials}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Project Details */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <h3 className="font-bold text-base text-gray-900 line-clamp-1 mb-1 group-hover:text-blue-600 transition-colors">
+                                        {quote.projectName}
+                                      </h3>
+                                      <p className="text-sm text-gray-600">
+                                        {getClientName(quote.clientId)}
+                                      </p>
+                                    </div>
+                                    
+                                    {/* Status badges */}
+                                    <div className="flex flex-col items-end gap-2 ml-4">
+                                      {getStatusBadge(quote.status)}
+                                      {negotiationData[quote.id] && quote.status === 'approved' && (
+                                        <Badge 
+                                          variant="outline" 
+                                          className="bg-purple-50 text-purple-700 border-purple-200 text-xs"
+                                        >
+                                          <Handshake className="h-3 w-3 mr-1" />
+                                          Negociada
+                                        </Badge>
+                                      )}
+                                      {quote.status === 'approved' && quotationProjects[quote.id] && (
+                                        <Badge 
+                                          variant="success" 
+                                          className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        >
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          Proyecto Activo
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Additional info row */}
+                                  <div className="flex items-center gap-4 text-xs text-gray-500 mt-3">
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3.5 w-3.5" />
+                                      {createdDate}
                                     </span>
+                                    {quote.projectType && (
+                                      <span className="flex items-center gap-1">
+                                        <Briefcase className="h-3.5 w-3.5" />
+                                        {quote.projectType === 'always-on' ? 'Always-On' : 
+                                         quote.projectType === 'monitoring' ? 'Monitoreo' : 'One-Shot'}
+                                      </span>
+                                    )}
+                                    {teamMembersCount > 0 && (
+                                      <span className="flex items-center gap-1">
+                                        <Users className="h-3.5 w-3.5" />
+                                        {teamMembersCount} miembros
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
-                              ) : (
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                  <span className="text-white font-bold text-sm">
-                                    {quote.projectName.charAt(0).toUpperCase()}
-                                  </span>
+                              </div>
+
+                              {/* Value and actions section */}
+                              <div className="flex flex-col items-end gap-3">
+                                <div className="text-right">
+                                  <p className="text-xl font-bold text-gray-900">
+                                    ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                  </p>
+                                  <p className="text-xs text-gray-500 uppercase tracking-wide">
+                                    {quote.projectType === 'always-on' ? 'Mensual' : 'Total'}
+                                  </p>
                                 </div>
-                              )}
-                              
-                              {/* Project info */}
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
-                                  {quote.projectName}
-                                </h3>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {getClientName(quote.clientId)}
-                                </p>
-                              </div>
-                            </div>
 
-                            {/* Center section - Status and Value */}
-                            <div className="flex items-center gap-4">
-                              <div className="flex flex-col items-end gap-1">
-                                {getStatusBadge(quote.status)}
-                                {negotiationData[quote.id] && quote.status === 'approved' && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-purple-50 text-purple-700 border-purple-200 text-xs flex items-center gap-1"
-                                    title="Esta cotización fue negociada antes de aprobarse"
+                                {/* Action buttons */}
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate(`/quotation/${quote.id}`)}
+                                    className="h-8 px-3 text-xs"
                                   >
-                                    <Handshake className="h-3 w-3" />
-                                    Negociada
-                                  </Badge>
-                                )}
-                                {quote.status === 'approved' && quotationProjects[quote.id] && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-green-50 text-green-700 border-green-200 text-xs flex items-center gap-1"
-                                  >
-                                    <CheckCircle className="h-3 w-3" />
-                                    Proyecto Activo
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-bold text-gray-900">
-                                  ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {createdDate}
-                                </p>
+                                    <Eye className="h-3.5 w-3.5 mr-1" />
+                                    Ver
+                                  </Button>
+                                  
+                                  {quote.status === 'draft' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditQuotation(quote)}
+                                      className="h-8 px-3 text-xs"
+                                    >
+                                      <PenLine className="h-3.5 w-3.5 mr-1" />
+                                      Editar
+                                    </Button>
+                                  )}
+                                  
+                                  {quote.status === 'approved' && !quotationProjects[quote.id] && (
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => {
+                                        setApprovedQuote(quote);
+                                        setCreateProjectDialogOpen(true);
+                                      }}
+                                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                                    >
+                                      <Plus className="h-3.5 w-3.5 mr-1" />
+                                      Crear Proyecto
+                                    </Button>
+                                  )}
+                                  
+                                  <div className="ml-2 border-l pl-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openStatusDialog(quote)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openDeleteDialog(quote)}
+                                      disabled={deletingQuoteId === quote.id}
+                                      className="h-8 w-8 p-0 hover:text-red-600"
+                                    >
+                                      {deletingQuoteId === quote.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openStatusDialog(quote)}
-                                className="h-8 px-2"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => navigate(`/quotation/${quote.id}`)}
-                                className="h-8 px-2"
-                              >
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openDeleteDialog(quote)}
-                                disabled={deletingQuoteId === quote.id}
-                                className="h-8 px-2 hover:text-red-600"
-                              >
-                                {deletingQuoteId === quote.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-3 w-3" />
-                                )}
-                              </Button>
-                              {quote.status === 'draft' && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditQuotation(quote)}
-                                  className="h-8 px-2"
-                                >
-                                  <PenLine className="h-3 w-3" />
-                                </Button>
-                              )}
-                              {quote.status === 'approved' && !quotationProjects[quote.id] && (
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  onClick={() => {
-                                    setApprovedQuote(quote);
-                                    setCreateProjectDialogOpen(true);
-                                  }}
-                                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Crear Proyecto
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
+                          </CardContent>
+                        </div>
                       </Card>
                     );
                   })}
