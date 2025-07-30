@@ -303,6 +303,8 @@ export default function FinancialReviewFinal() {
       setIsSavingDraft(true);
       console.log('💾 Guardando borrador...');
       console.log('🔍 Current quotationData:', quotationData);
+      console.log('👥 Team members to save:', quotationData.teamMembers);
+      console.log('📊 Team members count:', quotationData.teamMembers?.length || 0);
 
       // Validaciones mínimas para borrador
       if (!quotationData.client) {

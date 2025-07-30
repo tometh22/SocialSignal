@@ -936,6 +936,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Save team members with proper validation
       console.log('👥 Saving team members:', quotationData.teamMembers);
+      console.log('📊 Total team members to save:', quotationData.teamMembers.length);
+
+      // Verificar si hay miembros para guardar
+      if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
+        console.warn('⚠️ No team members to save!');
+        return savedQuotation;
+      }
 
       for (const member of quotationData.teamMembers) {
         // CRITICAL DEBUG - Track roleId through the process
