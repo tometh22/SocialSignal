@@ -562,7 +562,7 @@ export default function ManageQuotes() {
     return (
       <Badge 
         variant={config.variant} 
-        className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border whitespace-nowrap self-end`}
+        className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border whitespace-nowrap`}
       >
         <Icon className="h-3.5 w-3.5 flex-shrink-0" />
         <span>{config.label}</span>
@@ -887,24 +887,30 @@ export default function ManageQuotes() {
                                     
                                     {/* Status badges */}
                                     <div className="flex flex-col items-end gap-2 ml-4 flex-shrink-0">
-                                      {getStatusBadge(quote.status)}
+                                      <div className="flex">
+                                        {getStatusBadge(quote.status)}
+                                      </div>
                                       {negotiationData[quote.id] && quote.status === 'approved' && (
-                                        <Badge 
-                                          variant="outline" 
-                                          className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
-                                        >
-                                          <Handshake className="h-3.5 w-3.5 flex-shrink-0" />
-                                          <span>Negociada</span>
-                                        </Badge>
+                                        <div className="flex">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
+                                          >
+                                            <Handshake className="h-3.5 w-3.5 flex-shrink-0" />
+                                            <span>Negociada</span>
+                                          </Badge>
+                                        </div>
                                       )}
                                       {quote.status === 'approved' && quotationProjects[quote.id] && (
-                                        <Badge 
-                                          variant="outline" 
-                                          className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
-                                        >
-                                          <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                          <span>Proyecto Activo</span>
-                                        </Badge>
+                                        <div className="flex">
+                                          <Badge 
+                                            variant="outline" 
+                                            className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
+                                          >
+                                            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                                            <span>Proyecto Activo</span>
+                                          </Badge>
+                                        </div>
                                       )}
                                     </div>
                                   </div>
