@@ -827,7 +827,30 @@ export default function ManageQuotes() {
                     }
 
                     return (
-                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden">
+                      <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden relative">
+                        {/* Status badges - NEW LOCATION: Top right corner */}
+                        <div className="absolute top-3 right-3 flex flex-col items-end gap-2 z-10">
+                          {getStatusBadge(quote.status)}
+                          {negotiationData[quote.id] && quote.status === 'approved' && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <Handshake className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>Negociada</span>
+                            </Badge>
+                          )}
+                          {quote.status === 'approved' && quotationProjects[quote.id] && (
+                            <Badge 
+                              variant="outline" 
+                              className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>Proyecto Activo</span>
+                            </Badge>
+                          )}
+                        </div>
+
                         <div className="flex">
                           {/* Status color indicator */}
                           <div className={`w-1.5 ${
@@ -885,34 +908,7 @@ export default function ManageQuotes() {
                                       </p>
                                     </div>
                                     
-                                    {/* Status badges */}
-                                    <div className="flex flex-col items-end gap-2 ml-4 flex-shrink-0">
-                                      <div className="flex justify-end">
-                                        {getStatusBadge(quote.status)}
-                                      </div>
-                                      {negotiationData[quote.id] && quote.status === 'approved' && (
-                                        <div className="flex justify-end">
-                                          <Badge 
-                                            variant="outline" 
-                                            className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
-                                          >
-                                            <Handshake className="h-3.5 w-3.5 flex-shrink-0" />
-                                            <span>Negociada</span>
-                                          </Badge>
-                                        </div>
-                                      )}
-                                      {quote.status === 'approved' && quotationProjects[quote.id] && (
-                                        <div className="flex justify-end">
-                                          <Badge 
-                                            variant="outline" 
-                                            className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
-                                          >
-                                            <CheckCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                                            <span>Proyecto Activo</span>
-                                          </Badge>
-                                        </div>
-                                      )}
-                                    </div>
+
                                   </div>
 
                                   {/* Additional info row */}
