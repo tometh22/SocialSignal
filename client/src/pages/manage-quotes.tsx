@@ -562,7 +562,7 @@ export default function ManageQuotes() {
     return (
       <Badge 
         variant={config.variant} 
-        className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border whitespace-nowrap`}
+        className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border whitespace-nowrap self-end`}
       >
         <Icon className="h-3.5 w-3.5 flex-shrink-0" />
         <span>{config.label}</span>
@@ -887,9 +887,7 @@ export default function ManageQuotes() {
                                     
                                     {/* Status badges */}
                                     <div className="flex flex-col items-end gap-2 ml-4 flex-shrink-0">
-                                      <div className="flex justify-end">
-                                        {getStatusBadge(quote.status)}
-                                      </div>
+                                      {getStatusBadge(quote.status)}
                                       {negotiationData[quote.id] && quote.status === 'approved' && (
                                         <Badge 
                                           variant="outline" 
