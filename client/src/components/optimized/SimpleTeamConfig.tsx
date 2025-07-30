@@ -36,6 +36,9 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Cargar roles y personal al montar el componente
   useEffect(() => {
+    console.log('🔍 SimpleTeamConfig mounted. Current team members:', quotationData.teamMembers);
+    console.log('🔍 Team members count:', quotationData.teamMembers?.length || 0);
+    
     // Cargar datos mediante llamada directa a la API
     const fetchData = async () => {
       try {

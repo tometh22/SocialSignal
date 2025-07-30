@@ -1878,7 +1878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/quotation-team", async (req, res) => {
+  app.post("/api/quotation-team", requireAuth, async (req, res) => {
     try {
       console.log('📥 Creating team member with data:', JSON.stringify(req.body, null, 2));
 
