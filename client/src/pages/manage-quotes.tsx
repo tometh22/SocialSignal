@@ -31,6 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Link } from 'wouter';
+import ProjectTeamConfiguration from '@/components/project/project-team-configuration';
 
 // Interfaces para los datos del cliente
 interface Client {
@@ -154,6 +155,8 @@ export default function ManageQuotes() {
   const [associatedProjects, setAssociatedProjects] = useState<any[]>([]);
   const [checkingProjects, setCheckingProjects] = useState(false);
   const [deletingQuoteId, setDeletingQuoteId] = useState<number | null>(null);
+  const [showTeamConfiguration, setShowTeamConfiguration] = useState(false);
+  const [teamConfigurationData, setTeamConfigurationData] = useState<any[]>([]);
   const { toast } = useToast();
 
   // Función auxiliar para obtener el nombre del cliente por ID
@@ -286,6 +289,36 @@ export default function ManageQuotes() {
   const handleCreateProject = async () => {
     if (!approvedQuote) return;
 
+    // First, check if the quotation has only role-based team members
+    try {
+      const quotationTeamResponse = await fetch(`/api/quotation-team/${approvedQuote.id}`, {
+        credentials: 'include'
+      });
+      
+      if (quotationTeamResponse.ok) {
+        const quotationTeam = await quotationTeamResponse.json();
+        const hasOnlyRoles = quotationTeam.every((member: any) => member.personnelId === null);
+        
+        if (hasOnlyRoles && quotationTeam.length > 0) {
+          // Show team configuration component
+          setShowTeamConfiguration(true);
+          setCreateProjectDialogOpen(false);
+          return;
+        }
+      }
+      
+      // If no role-only members or request failed, proceed with normal project creation
+      await createProjectWithCurrentTeam();
+    } catch (error) {
+      console.error('Error checking quotation team:', error);
+      // Fallback to normal project creation
+      await createProjectWithCurrentTeam();
+    }
+  };
+
+  const createProjectWithCurrentTeam = async () => {
+    if (!approvedQuote) return;
+
     try {
       const projectData = {
         name: approvedQuote.projectName,
@@ -325,6 +358,60 @@ export default function ManageQuotes() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleTeamConfigurationComplete = async (teamConfiguration: any[]) => {
+    if (!approvedQuote) return;
+
+    try {
+      // First, create the project
+      const projectData = {
+        name: approvedQuote.projectName,
+        clientId: approvedQuote.clientId,
+        quotationId: approvedQuote.id,
+        description: `Proyecto basado en cotización aprobada: ${approvedQuote.projectName}`,
+        budget: approvedQuote.totalAmount,
+        status: 'active',
+        startDate: new Date().toISOString().split('T')[0],
+        estimatedHours: 0
+      };
+
+      const createdProject = await apiRequest('/api/active-projects', 'POST', projectData);
+
+      // Update quotation team members with the configured personnel
+      for (const config of teamConfiguration) {
+        await apiRequest(`/api/quotation-team/${approvedQuote.id}/assign-personnel`, 'PATCH', {
+          roleId: config.roleId,
+          personnelId: config.personnelId,
+          hours: config.hours,
+          rate: config.rate
+        });
+      }
+
+      // Copy the updated team to the project
+      await apiRequest(`/api/projects/${createdProject.id}/copy-quotation-team`, 'POST');
+
+      toast({
+        title: "Proyecto creado exitosamente",
+        description: `El proyecto "${approvedQuote.projectName}" ha sido creado con el equipo configurado y está listo para comenzar.`,
+      });
+
+      setShowTeamConfiguration(false);
+      setApprovedQuote(null);
+      navigate(`/projects/${createdProject.id}`);
+    } catch (error) {
+      console.error('Error al crear proyecto con configuración de equipo:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear el proyecto. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTeamConfigurationCancel = () => {
+    setShowTeamConfiguration(false);
+    setCreateProjectDialogOpen(true);
   };
 
   const handleSkipProjectCreation = () => {
@@ -1200,6 +1287,16 @@ const baseCostTotal = approvedQuote.baseCost + (approvedQuote.complexityAdjustme
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Team Configuration Modal */}
+      {showTeamConfiguration && approvedQuote && (
+        <ProjectTeamConfiguration
+          quotationId={approvedQuote.id}
+          quotationName={approvedQuote.projectName}
+          onConfigurationComplete={handleTeamConfigurationComplete}
+          onCancel={handleTeamConfigurationCancel}
+        />
+      )}
     </>
   );
 }

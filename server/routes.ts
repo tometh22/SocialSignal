@@ -1878,6 +1878,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assign personnel to a quotation team member
+  app.patch("/api/quotation-team/:quotationId/assign-personnel", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const { roleId, personnelId, hours, rate } = req.body;
+      
+      if (!roleId || !personnelId || !hours || !rate) {
+        return res.status(400).json({ message: "roleId, personnelId, hours, and rate are required" });
+      }
+
+      console.log(`🔧 Assigning personnel ${personnelId} to role ${roleId} in quotation ${quotationId}`);
+      
+      // Find the team member with this role in the quotation
+      const teamMembers = await storage.getQuotationTeamMembers(quotationId);
+      const targetMember = teamMembers.find(member => member.roleId === roleId && member.personnelId === null);
+      
+      if (!targetMember) {
+        return res.status(404).json({ message: "Role-only team member not found" });
+      }
+
+      // Update the team member with personnel assignment
+      const updatedMember = await storage.updateQuotationTeamMember(targetMember.id, {
+        personnelId: personnelId,
+        hours: hours,
+        rate: rate,
+        cost: hours * rate
+      });
+
+      console.log(`✅ Personnel assigned successfully:`, updatedMember);
+      res.json(updatedMember);
+    } catch (error) {
+      console.error("Error assigning personnel to quotation team:", error);
+      res.status(500).json({ message: "Failed to assign personnel" });
+    }
+  });
+
   app.post("/api/quotation-team", requireAuth, async (req, res) => {
     try {
       console.log('📥 Creating team member with data:', JSON.stringify(req.body, null, 2));
