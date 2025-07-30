@@ -26,7 +26,8 @@ import {
   AlertCircle,
   Timer,
   Target,
-  TrendingUp
+  TrendingUp,
+  CalendarDays
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -378,6 +379,7 @@ export default function ActiveProjectsRedesigned() {
   const [filterClient, setFilterClient] = useState("all");
   const [sortBy, setSortBy] = useState("recent");
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
+  const [timeFilter, setTimeFilter] = useState("all");
   
   // Estados para eliminación de proyectos
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
@@ -424,9 +426,33 @@ export default function ActiveProjectsRedesigned() {
     }
   };
 
+  // Helper function to convert time filter to API parameter
+  const getTimeFilterForAPI = (filter: string) => {
+    const filterMap: Record<string, string> = {
+      'all': 'all',
+      'este_mes': 'current_month',
+      'mes_pasado': 'last_month',
+      'este_trimestre': 'current_quarter',
+      'trimestre_pasado': 'last_quarter',
+      'mayo_2025': 'may_2025',
+      'junio_2025': 'june_2025',
+      'julio_2025': 'july_2025',
+      'q1_2025': 'q1_2025',
+      'q2_2025': 'q2_2025',
+      'este_semestre': 'current_semester',
+      'semestre_pasado': 'last_semester',
+      'este_año': 'current_year'
+    };
+    return filterMap[filter] || 'all';
+  };
+
   // Datos
   const { data: projects = [], isLoading: loadingProjects } = useQuery({
-    queryKey: ["/api/active-projects"],
+    queryKey: ["/api/active-projects", timeFilter],
+    queryFn: () => {
+      const apiFilter = getTimeFilterForAPI(timeFilter);
+      return apiRequest(`/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`);
+    }
   });
 
   const { data: clients = [] } = useQuery({
@@ -434,11 +460,19 @@ export default function ActiveProjectsRedesigned() {
   });
 
   const { data: allProjects = [] } = useQuery({
-    queryKey: ["/api/active-projects?showSubprojects=true"],
+    queryKey: ["/api/active-projects?showSubprojects=true", timeFilter],
+    queryFn: () => {
+      const apiFilter = getTimeFilterForAPI(timeFilter);
+      return apiRequest(`/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`);
+    }
   });
 
   const { data: timeEntriesData = {} } = useQuery({
-    queryKey: ["/api/time-entries/all-projects"],
+    queryKey: ["/api/time-entries/all-projects", timeFilter],
+    queryFn: () => {
+      const apiFilter = getTimeFilterForAPI(timeFilter);
+      return apiRequest(`/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`);
+    }
   });
 
   // Función para obtener horas de un proyecto
@@ -550,13 +584,53 @@ export default function ActiveProjectsRedesigned() {
             </Button>
           </div>
 
+          {/* Filtro temporal */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarDays className="h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Filtrar por período:</span>
+              <Select value={timeFilter} onValueChange={setTimeFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Seleccionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo el tiempo</SelectItem>
+                  <SelectItem value="este_mes">Este mes</SelectItem>
+                  <SelectItem value="mes_pasado">Mes pasado</SelectItem>
+                  <SelectItem value="este_trimestre">Este trimestre</SelectItem>
+                  <SelectItem value="trimestre_pasado">Trimestre pasado</SelectItem>
+                  <SelectItem value="este_semestre">Este semestre</SelectItem>
+                  <SelectItem value="semestre_pasado">Semestre pasado</SelectItem>
+                  <SelectItem value="este_año">Este año</SelectItem>
+                  <SelectItem value="mayo_2025">Mayo 2025</SelectItem>
+                  <SelectItem value="junio_2025">Junio 2025</SelectItem>
+                  <SelectItem value="julio_2025">Julio 2025</SelectItem>
+                  <SelectItem value="q1_2025">Q1 2025</SelectItem>
+                  <SelectItem value="q2_2025">Q2 2025</SelectItem>
+                </SelectContent>
+              </Select>
+              {timeFilter !== "all" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTimeFilter("all")}
+                  className="h-8 px-2 text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Limpiar filtro
+                </Button>
+              )}
+            </div>
+          </div>
+
           {/* Estadísticas mejoradas */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-6"></div>
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
-                  <div className="text-sm text-blue-700 font-medium">Total Proyectos</div>
+                  <div className="text-sm text-blue-700 font-medium">
+                    {timeFilter === "all" ? "Total Proyectos" : "Proyectos (período)"}
+                  </div>
                 </div>
                 <div className="p-3 bg-blue-500 rounded-full shadow-lg">
                   <Building2 className="h-6 w-6 text-white" />
@@ -568,7 +642,9 @@ export default function ActiveProjectsRedesigned() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-green-900">{stats.active}</div>
-                  <div className="text-sm text-green-700 font-medium">Activos</div>
+                  <div className="text-sm text-green-700 font-medium">
+                    {timeFilter === "all" ? "Activos" : "Activos (período)"}
+                  </div>
                 </div>
                 <div className="p-3 bg-green-500 rounded-full shadow-lg">
                   <Play className="h-6 w-6 text-white" />
@@ -580,7 +656,9 @@ export default function ActiveProjectsRedesigned() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-purple-900">${stats.totalBudget.toLocaleString()}</div>
-                  <div className="text-sm text-purple-700 font-medium">Facturación Total</div>
+                  <div className="text-sm text-purple-700 font-medium">
+                    {timeFilter === "all" ? "Facturación Total" : "Facturación (período)"}
+                  </div>
                 </div>
                 <div className="p-3 bg-purple-500 rounded-full shadow-lg">
                   <DollarSign className="h-6 w-6 text-white" />
@@ -592,7 +670,9 @@ export default function ActiveProjectsRedesigned() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-3xl font-bold text-orange-900">{stats.totalHours.toFixed(0)}h</div>
-                  <div className="text-sm text-orange-700 font-medium">Horas Registradas</div>
+                  <div className="text-sm text-orange-700 font-medium">
+                    {timeFilter === "all" ? "Horas Registradas" : "Horas (período)"}
+                  </div>
                 </div>
                 <div className="p-3 bg-orange-500 rounded-full shadow-lg">
                   <Clock className="h-6 w-6 text-white" />
