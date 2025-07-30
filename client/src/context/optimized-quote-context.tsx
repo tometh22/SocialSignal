@@ -742,24 +742,24 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Ensure team members are properly reconstructed
       const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any, index: number) => {
-        // Detectar si el personal es genérico
-        const isGenericPersonnel = member.personnelName && member.personnelName.includes('Member');
-        
         const teamMember = {
           id: `member-${member.id || Date.now()}-${index}`,
           roleId: Number(member.roleId),
-          // Si es personal genérico, NO lo cargamos como personnel asignado
-          personnelId: (member.personnelId && !isGenericPersonnel) ? Number(member.personnelId) : null,
+          // Mantener el personnelId tal como viene de la base de datos, sin modificaciones
+          personnelId: member.personnelId ? Number(member.personnelId) : null,
           hours: Number(member.hours) || 0,
           rate: Number(member.rate) || 0,
-          cost: Number(member.hours || 0) * Number(member.rate || 0)
+          cost: Number(member.cost) || (Number(member.hours || 0) * Number(member.rate || 0))
         };
         
-        if (isGenericPersonnel) {
-          console.log('⚠️ Detected generic personnel on load, treating as role-only:', member.personnelName);
-        }
+        console.log('👤 Processing team member:', {
+          id: member.id,
+          roleId: member.roleId,
+          personnelId: member.personnelId,
+          personnelName: member.personnelName,
+          processed: teamMember
+        });
         
-        console.log('👤 Processing team member:', teamMember);
         return teamMember;
       });
 
@@ -946,14 +946,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           fullMember: member
         });
 
-        // Detectar si es personal genérico para guardarlo como null
+        // IMPORTANTE: Mantener el personnelId tal como está, incluso si es genérico
+        // No convertir a null aquí, dejar que el backend lo maneje si es necesario
         let finalPersonnelId = member.personnelId;
+        
         if (finalPersonnelId) {
-          // Buscar el personal para verificar si es genérico
           const person = personnel.find(p => p.id === finalPersonnelId);
           if (person && person.name.includes('Member')) {
-            console.log('⚠️ Detected generic personnel, saving as null:', person.name);
-            finalPersonnelId = null;
+            console.log('⚠️ Detected generic personnel, but keeping ID for storage:', person.name, finalPersonnelId);
           }
         }
         
