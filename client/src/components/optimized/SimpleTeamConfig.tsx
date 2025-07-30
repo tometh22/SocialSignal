@@ -367,6 +367,7 @@ const SimpleTeamConfig: React.FC = () => {
                   <option value="0">Seleccionar personal</option>
                   {availablePersonnel && availablePersonnel
                     .filter(person => !newMember.roleId || person.roleId === newMember.roleId)
+                    .filter(person => !person.name.includes('Member')) // Filtrar personal genérico
                     .map(person => {
                       const role = availableRoles?.find(r => r.id === person.roleId);
                       return (
@@ -513,7 +514,12 @@ const SimpleTeamConfig: React.FC = () => {
                         <td className="p-2">
                           <div className="font-medium">{role?.name || 'Rol no especificado'}</div>
                           {person ? (
-                            <div className="text-gray-500 text-xs">{person.name}</div>
+                            // No mostrar nombres genéricos como "Member"
+                            person.name.includes('Member') ? (
+                              <div className="text-amber-600 text-xs italic">Sin asignar</div>
+                            ) : (
+                              <div className="text-gray-500 text-xs">{person.name}</div>
+                            )
                           ) : (
                             <div className="text-amber-600 text-xs italic">Sin asignar</div>
                           )}
