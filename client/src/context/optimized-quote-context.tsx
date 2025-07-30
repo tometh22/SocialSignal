@@ -742,14 +742,23 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
       // Ensure team members are properly reconstructed
       const optimizedTeamMembers: OptimizedTeamMember[] = teamMembers.map((member: any, index: number) => {
+        // Detectar si el personal es genérico
+        const isGenericPersonnel = member.personnelName && member.personnelName.includes('Member');
+        
         const teamMember = {
           id: `member-${member.id || Date.now()}-${index}`,
           roleId: Number(member.roleId),
-          personnelId: member.personnelId ? Number(member.personnelId) : null,
+          // Si es personal genérico, NO lo cargamos como personnel asignado
+          personnelId: (member.personnelId && !isGenericPersonnel) ? Number(member.personnelId) : null,
           hours: Number(member.hours) || 0,
           rate: Number(member.rate) || 0,
           cost: Number(member.hours || 0) * Number(member.rate || 0)
         };
+        
+        if (isGenericPersonnel) {
+          console.log('⚠️ Detected generic personnel on load, treating as role-only:', member.personnelName);
+        }
+        
         console.log('👤 Processing team member:', teamMember);
         return teamMember;
       });
@@ -937,10 +946,21 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           fullMember: member
         });
 
+        // Detectar si es personal genérico para guardarlo como null
+        let finalPersonnelId = member.personnelId;
+        if (finalPersonnelId) {
+          // Buscar el personal para verificar si es genérico
+          const person = personnel.find(p => p.id === finalPersonnelId);
+          if (person && person.name.includes('Member')) {
+            console.log('⚠️ Detected generic personnel, saving as null:', person.name);
+            finalPersonnelId = null;
+          }
+        }
+        
         const teamMemberPayload = {
           quotationId: savedQuotation.id,
           roleId: member.roleId,
-          personnelId: member.personnelId || null, // Allow null for role-only assignments
+          personnelId: finalPersonnelId, // Use cleaned personnel ID
           hours: member.hours || 0,
           rate: member.rate || 0,
           cost: (member.hours || 0) * (member.rate || 0) // Ensure cost is calculated

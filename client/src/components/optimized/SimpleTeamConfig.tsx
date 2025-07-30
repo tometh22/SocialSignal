@@ -513,13 +513,8 @@ const SimpleTeamConfig: React.FC = () => {
                       <tr key={member.id} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="p-2">
                           <div className="font-medium">{role?.name || 'Rol no especificado'}</div>
-                          {person ? (
-                            // No mostrar nombres genéricos como "Member"
-                            person.name.includes('Member') ? (
-                              <div className="text-amber-600 text-xs italic">Sin asignar</div>
-                            ) : (
-                              <div className="text-gray-500 text-xs">{person.name}</div>
-                            )
+                          {person && !person.name.includes('Member') ? (
+                            <div className="text-gray-500 text-xs">{person.name}</div>
                           ) : (
                             <div className="text-amber-600 text-xs italic">Sin asignar</div>
                           )}
