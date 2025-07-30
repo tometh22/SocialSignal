@@ -887,7 +887,9 @@ export default function ManageQuotes() {
                                     
                                     {/* Status badges */}
                                     <div className="flex flex-col items-end gap-2 ml-4 flex-shrink-0">
-                                      {getStatusBadge(quote.status)}
+                                      <div className="flex justify-end">
+                                        {getStatusBadge(quote.status)}
+                                      </div>
                                       {negotiationData[quote.id] && quote.status === 'approved' && (
                                         <Badge 
                                           variant="outline" 
