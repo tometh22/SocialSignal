@@ -849,8 +849,26 @@ export default function ManageQuotes() {
                                     ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
                                   </p>
                                   <p className="text-xs text-gray-500 uppercase tracking-wide">
-                                    {quote.projectType === 'always-on' ? 'Mensual' : 'Total'}
+                                    {quote.projectType === 'always-on' ? 'Precio Mensual' : 'Precio Total'}
                                   </p>
+                                  
+                                  {/* Cost and Markup info */}
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs text-gray-600">
+                                      <span className="text-gray-500">Costo:</span> ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    </p>
+                                    <p className="text-xs font-medium">
+                                      <span className="text-gray-500">Markup:</span>
+                                      <span className={`ml-1 ${
+                                        (quote.totalAmount / quote.baseCost) >= 2.5 ? 'text-emerald-600' :
+                                        (quote.totalAmount / quote.baseCost) >= 2.0 ? 'text-blue-600' :
+                                        (quote.totalAmount / quote.baseCost) >= 1.5 ? 'text-amber-600' :
+                                        'text-red-600'
+                                      }`}>
+                                        {(((quote.totalAmount / quote.baseCost) - 1) * 100).toFixed(0)}% ({(quote.totalAmount / quote.baseCost).toFixed(1)}x)
+                                      </span>
+                                    </p>
+                                  </div>
                                 </div>
 
                                 {/* Action buttons */}
