@@ -110,8 +110,12 @@ export default function FinancialReviewFinal() {
   const calculateTeamBaseCost = () => {
     let cost = 0;
     quotationData.teamMembers.forEach(member => {
-      cost += member.cost;
+      // Asegurar que el costo es un número válido
+      const memberCost = Number(member.cost) || 0;
+      cost += memberCost;
+      console.log('💰 Team member cost:', member, 'cost:', memberCost);
     });
+    console.log('💰 Total team base cost:', cost);
     // Keep in USD for calculations, convert only for display
     return cost;
   };
@@ -131,7 +135,12 @@ export default function FinancialReviewFinal() {
   };
 
   // Calculate base values in USD
-  const teamBaseCostUSD = calculateTeamBaseCost();
+  // Use baseCost from context which is already calculated
+  const teamBaseCostUSD = baseCost || calculateTeamBaseCost();
+  console.log('🔍 Financial Review - baseCost from context:', baseCost);
+  console.log('🔍 Financial Review - teamBaseCostUSD calculated:', calculateTeamBaseCost());
+  console.log('🔍 Financial Review - teamMembers:', quotationData.teamMembers);
+  
   const teamComplexityAdjustmentUSD = calculateComplexityAdjustment(teamBaseCostUSD);
   const subtotalWithComplexityUSD = teamBaseCostUSD + teamComplexityAdjustmentUSD;
 
