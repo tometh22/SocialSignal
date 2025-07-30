@@ -1005,9 +1005,6 @@ export type InsertReportTemplate = z.infer<typeof insertReportTemplateSchema>;
 export type Quotation = typeof quotations.$inferSelect;
 export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
 
-export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
-export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
-
 export type TemplateRoleAssignment = typeof templateRoleAssignments.$inferSelect;
 export type InsertTemplateRoleAssignment = z.infer<typeof insertTemplateRoleAssignmentSchema>;
 

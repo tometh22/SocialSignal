@@ -14,7 +14,7 @@ export const queryClient = new QueryClient({
 });
 
 // Default query function that will be used by react-query
-export const defaultQueryFn = async ({ queryKey }: { queryKey: string | string[] }) => {
+export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
   const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
   
   const response = await fetch(url, {
@@ -50,7 +50,7 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: string | string[]
 
 // Function to get a query function with custom error handling
 export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
-  return async ({ queryKey }: { queryKey: string | string[] }) => {
+  return async ({ queryKey }: { queryKey: readonly unknown[] }) => {
     const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
     
     const response = await fetch(url, {

@@ -815,16 +815,9 @@ export default function ManageQuotes() {
                       .toUpperCase()
                       .slice(0, 2) || quote.projectName.slice(0, 2).toUpperCase();
 
-                    // Calculate team members from quote data
+                    // Calculate team members from quote data - for now, set to 0
+                    // TODO: Fetch team members from quotationTeamMembers table
                     let teamMembersCount = 0;
-                    try {
-                      const team = quote.team ? JSON.parse(quote.team as string) : [];
-                      if (Array.isArray(team)) {
-                        teamMembersCount = team.length;
-                      }
-                    } catch (e) {
-                      teamMembersCount = 0;
-                    }
 
                     return (
                       <Card key={quote.id} className="group bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden relative">

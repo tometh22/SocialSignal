@@ -451,7 +451,7 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/active-projects", timeFilter],
     queryFn: () => {
       const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`);
+      return apiRequest(`/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
 
@@ -463,7 +463,7 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/active-projects?showSubprojects=true", timeFilter],
     queryFn: () => {
       const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`);
+      return apiRequest(`/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
 
@@ -471,7 +471,7 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/time-entries/all-projects", timeFilter],
     queryFn: () => {
       const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`);
+      return apiRequest(`/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
 
@@ -623,7 +623,7 @@ export default function ActiveProjectsRedesigned() {
           </div>
 
           {/* Estadísticas mejoradas */}
-          <div className="grid grid-cols-4 gap-4 mb-6"></div>
+          <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
