@@ -439,31 +439,31 @@ export default function ManageQuotes() {
     const statusConfig = {
       'approved': {
         variant: 'default' as const,
-        className: 'bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-200',
+        className: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
         icon: CheckCircle,
         label: 'Aprobada'
       },
       'pending': {
         variant: 'secondary' as const,
-        className: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200',
+        className: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
         icon: Clock,
         label: 'Pendiente'
       },
       'rejected': {
         variant: 'destructive' as const,
-        className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200',
+        className: 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100',
         icon: X,
         label: 'Rechazada'
       },
       'in-negotiation': {
         variant: 'outline' as const,
-        className: 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200',
+        className: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
         icon: MessageCircle,
         label: 'En Negociación'
       },
       'draft': {
         variant: 'outline' as const,
-        className: 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200',
+        className: 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100',
         icon: Edit,
         label: 'Borrador'
       }
@@ -473,8 +473,8 @@ export default function ManageQuotes() {
     const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className={`${config.className} inline-flex items-center gap-1 font-medium`}>
-        <Icon className="h-3 w-3" />
+      <Badge variant={config.variant} className={`${config.className} inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border`}>
+        <Icon className="h-3.5 w-3.5" />
         {config.label}
       </Badge>
     );
@@ -801,18 +801,18 @@ export default function ManageQuotes() {
                                       {negotiationData[quote.id] && quote.status === 'approved' && (
                                         <Badge 
                                           variant="outline" 
-                                          className="bg-purple-50 text-purple-700 border-purple-200 text-xs"
+                                          className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5"
                                         >
-                                          <Handshake className="h-3 w-3 mr-1" />
+                                          <Handshake className="h-3.5 w-3.5" />
                                           Negociada
                                         </Badge>
                                       )}
                                       {quote.status === 'approved' && quotationProjects[quote.id] && (
                                         <Badge 
-                                          variant="success" 
-                                          className="bg-emerald-50 text-emerald-700 border-emerald-200"
+                                          variant="outline" 
+                                          className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5"
                                         >
-                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          <CheckCircle className="h-3.5 w-3.5" />
                                           Proyecto Activo
                                         </Badge>
                                       )}
@@ -845,21 +845,27 @@ export default function ManageQuotes() {
                               {/* Value and actions section */}
                               <div className="flex flex-col items-end gap-3">
                                 <div className="text-right">
-                                  <p className="text-xl font-bold text-gray-900">
-                                    ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
-                                  </p>
-                                  <p className="text-xs text-gray-500 uppercase tracking-wide">
-                                    {quote.projectType === 'always-on' ? 'Precio Mensual' : 'Precio Total'}
-                                  </p>
-                                  
-                                  {/* Cost and Markup info */}
-                                  <div className="mt-2 space-y-1">
-                                    <p className="text-xs text-gray-600">
-                                      <span className="text-gray-500">Costo:</span> ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                  {/* Price section with better visual hierarchy */}
+                                  <div className="mb-3">
+                                    <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">
+                                      {quote.projectType === 'always-on' ? 'Precio Mensual' : 'Precio Total'}
                                     </p>
-                                    <p className="text-xs font-medium">
+                                    <p className="text-2xl font-bold text-gray-900">
+                                      ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Cost and Markup info with better styling */}
+                                  <div className="space-y-2 border-t pt-2">
+                                    <div className="flex items-center justify-between gap-8 text-xs">
+                                      <span className="text-gray-500">Costo:</span>
+                                      <span className="font-medium text-gray-700">
+                                        ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-8 text-xs">
                                       <span className="text-gray-500">Markup:</span>
-                                      <span className={`ml-1 ${
+                                      <span className={`font-bold ${
                                         (quote.totalAmount / quote.baseCost) >= 2.5 ? 'text-emerald-600' :
                                         (quote.totalAmount / quote.baseCost) >= 2.0 ? 'text-blue-600' :
                                         (quote.totalAmount / quote.baseCost) >= 1.5 ? 'text-amber-600' :
@@ -867,7 +873,7 @@ export default function ManageQuotes() {
                                       }`}>
                                         {(((quote.totalAmount / quote.baseCost) - 1) * 100).toFixed(0)}% ({(quote.totalAmount / quote.baseCost).toFixed(1)}x)
                                       </span>
-                                    </p>
+                                    </div>
                                   </div>
                                 </div>
 
@@ -877,9 +883,9 @@ export default function ManageQuotes() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => navigate(`/quotation/${quote.id}`)}
-                                    className="h-8 px-3 text-xs"
+                                    className="h-8 px-3 text-xs text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                                   >
-                                    <Eye className="h-3.5 w-3.5 mr-1" />
+                                    <Eye className="h-3.5 w-3.5 mr-1.5" />
                                     Ver
                                   </Button>
                                   
@@ -888,9 +894,9 @@ export default function ManageQuotes() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleEditQuotation(quote)}
-                                      className="h-8 px-3 text-xs"
+                                      className="h-8 px-3 text-xs text-gray-600 hover:text-amber-600 hover:bg-amber-50"
                                     >
-                                      <PenLine className="h-3.5 w-3.5 mr-1" />
+                                      <PenLine className="h-3.5 w-3.5 mr-1.5" />
                                       Editar
                                     </Button>
                                   )}
@@ -903,19 +909,19 @@ export default function ManageQuotes() {
                                         setApprovedQuote(quote);
                                         setCreateProjectDialogOpen(true);
                                       }}
-                                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium"
                                     >
-                                      <Plus className="h-3.5 w-3.5 mr-1" />
+                                      <Plus className="h-3.5 w-3.5 mr-1.5" />
                                       Crear Proyecto
                                     </Button>
                                   )}
                                   
-                                  <div className="ml-2 border-l pl-2">
+                                  <div className="ml-2 border-l border-gray-200 pl-2">
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => openStatusDialog(quote)}
-                                      className="h-8 w-8 p-0"
+                                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
                                     >
                                       <Edit className="h-3.5 w-3.5" />
                                     </Button>
@@ -924,7 +930,7 @@ export default function ManageQuotes() {
                                       size="sm"
                                       onClick={() => openDeleteDialog(quote)}
                                       disabled={deletingQuoteId === quote.id}
-                                      className="h-8 w-8 p-0 hover:text-red-600"
+                                      className="h-8 w-8 p-0 text-gray-400 hover:text-red-600"
                                     >
                                       {deletingQuoteId === quote.id ? (
                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
