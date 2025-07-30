@@ -887,11 +887,11 @@ export default function ManageQuotes() {
                                     
                                     {/* Status badges */}
                                     <div className="flex flex-col items-end gap-2 ml-4 flex-shrink-0">
-                                      <div className="flex">
+                                      <div className="flex justify-end">
                                         {getStatusBadge(quote.status)}
                                       </div>
                                       {negotiationData[quote.id] && quote.status === 'approved' && (
-                                        <div className="flex">
+                                        <div className="flex justify-end">
                                           <Badge 
                                             variant="outline" 
                                             className="bg-purple-50 text-purple-700 border-purple-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
@@ -902,7 +902,7 @@ export default function ManageQuotes() {
                                         </div>
                                       )}
                                       {quote.status === 'approved' && quotationProjects[quote.id] && (
-                                        <div className="flex">
+                                        <div className="flex justify-end">
                                           <Badge 
                                             variant="outline" 
                                             className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap"
