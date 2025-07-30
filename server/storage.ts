@@ -742,15 +742,22 @@ export class DatabaseStorage implements IStorage {
       // Luego enriquecer con datos de personal y roles
       const enrichedMembers = await Promise.all(
         basicMembers.map(async (member) => {
-          const personnelData = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
+          // Solo buscar datos de personal si hay un personnelId
+          let personnelData = null;
+          if (member.personnelId) {
+            const personnelResult = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
+            personnelData = personnelResult[0];
+          }
+          
           const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId));
           
           return {
             ...member,
-            personnelName: personnelData[0]?.name || 'Unknown',
-            personnelEmail: personnelData[0]?.email || '',
-            personnelHourlyRate: personnelData[0]?.hourlyRate || 0,
-            personnelProfilePicture: personnelData[0]?.profilePicture || '',
+            // Si no hay personnelId, devolver valores vacíos para mantener la estructura
+            personnelName: personnelData?.name || '',
+            personnelEmail: personnelData?.email || '',
+            personnelHourlyRate: personnelData?.hourlyRate || 0,
+            personnelProfilePicture: personnelData?.profilePicture || null,
             roleName: roleData[0]?.name || 'Unknown Role',
             roleDescription: roleData[0]?.description || ''
           };

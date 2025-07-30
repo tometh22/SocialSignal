@@ -317,11 +317,14 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
 }).extend({
   personnelId: z.number().nullable().optional(),
   quotationId: z.number(),
-  roleId: z.number().nullable().optional(),
+  roleId: z.number(), // roleId es siempre requerido
   hours: z.number(),
   rate: z.number(),
   cost: z.number()
 });
+
+export type QuotationTeamMember = typeof quotationTeamMembers.$inferSelect;
+export type InsertQuotationTeamMember = z.infer<typeof insertQuotationTeamMemberSchema>;
 
 // ==================== ASIGNACIÓN DE ROLES EN PLANTILLAS ====================
 // Template Role Assignments table

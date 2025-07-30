@@ -1882,34 +1882,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('📥 Creating team member with data:', JSON.stringify(req.body, null, 2));
 
-      // Si no hay personnelId, necesitamos asignar uno automáticamente
-      let personnelId = req.body.personnelId;
-
-      if (!personnelId && req.body.roleId) {
-        console.log('🔍 No personnel assigned, looking for available personnel for role:', req.body.roleId);
-        
-        // Buscar personal disponible para este rol
-        const availablePersonnel = await storage.getPersonnelByRole(req.body.roleId);
-        
-        if (availablePersonnel.length > 0) {
-          // Usar el primer personal disponible
-          personnelId = availablePersonnel[0].id;
-          console.log('✅ Assigned personnel automatically:', availablePersonnel[0].name, 'ID:', personnelId);
-        } else {
-          // Si no hay personal para el rol, crear uno genérico
-          console.log('⚠️ No personnel found for role, creating generic personnel...');
-          
-          const role = await storage.getRole(req.body.roleId);
-          const genericPersonnel = await storage.createPersonnel({
-            name: `${role?.name || 'Generic'} Member`,
-            roleId: req.body.roleId,
-            hourlyRate: req.body.rate || role?.defaultRate || 50
-          });
-          
-          personnelId = genericPersonnel.id;
-          console.log('✅ Created generic personnel:', genericPersonnel.name, 'ID:', personnelId);
-        }
-      }
+      // CRITICAL FIX: No auto-asignar personal cuando se cotiza solo con roles
+      // Si el usuario eligió cotizar con roles, respetar esa decisión
+      let personnelId = req.body.personnelId || null;
 
       // Preparar datos asegurando que cost esté presente y personnelId sea válido
       const teamMemberData = {
