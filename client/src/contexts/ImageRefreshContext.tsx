@@ -19,7 +19,9 @@ export const ImageRefreshProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [refreshTimestamp, setRefreshTimestamp] = useState(Date.now());
 
   const forceRefresh = () => {
-    setRefreshTimestamp(Date.now());
+    const newTimestamp = Date.now();
+    console.log('🔄 Forcing image refresh with timestamp:', newTimestamp);
+    setRefreshTimestamp(newTimestamp);
   };
 
   return (
