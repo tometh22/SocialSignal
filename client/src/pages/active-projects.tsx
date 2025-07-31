@@ -121,7 +121,34 @@ function ProjectCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2">
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                {/* Logo del cliente - pequeño y elegante */}
+                {client?.logoUrl ? (
+                  <div className="relative group">
+                    <div className="h-6 w-6 rounded-md overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
+                      <img 
+                        src={client.logoUrl} 
+                        alt={`Logo de ${clientName}`}
+                        className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-200"
+                        onError={(e) => {
+                          // Fallback al icono Building2 si el logo falla
+                          const target = e.currentTarget;
+                          const container = target.parentElement;
+                          if (container) {
+                            container.innerHTML = '<svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
+                          }
+                        }}
+                      />
+                    </div>
+                    {/* Tooltip con nombre del cliente */}
+                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                      {clientName}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-6 w-6 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center">
+                    <Building2 className="h-4 w-4 text-gray-400" />
+                  </div>
+                )}
                 <h3 className="font-semibold text-gray-900 truncate text-lg">
                   {projectName}
                 </h3>
@@ -333,7 +360,11 @@ function ProjectCard({
             </div>
             
             <div className="space-y-2">
-              {subprojects.map((subproject: any) => (
+              {subprojects.map((subproject: any) => {
+                const subClient = Array.isArray(clients) ? clients.find((c: any) => c.id === subproject.clientId) : null;
+                const subClientName = subClient?.name || clientName; // Usar el cliente del proyecto padre si no tiene uno específico
+                
+                return (
                 <div 
                   key={subproject.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -353,17 +384,42 @@ function ProjectCard({
                     </div>
                   </div>
                   
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onNavigate(`/active-projects/${subproject.id}`)}
-                    className="h-7 px-2 text-xs"
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Ver
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {/* Logo del cliente en subproyectos - más pequeño */}
+                    {(subClient?.logoUrl || client?.logoUrl) ? (
+                      <div className="h-4 w-4 rounded-sm overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center opacity-70">
+                        <img 
+                          src={subClient?.logoUrl || client?.logoUrl} 
+                          alt={`Logo de ${subClientName}`}
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            const container = target.parentElement;
+                            if (container) {
+                              container.innerHTML = '<svg class="h-3 w-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-4 w-4 rounded-sm bg-gray-100 border border-gray-200 flex items-center justify-center">
+                        <Building2 className="h-3 w-3 text-gray-300" />
+                      </div>
+                    )}
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onNavigate(`/active-projects/${subproject.id}`)}
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      Ver
+                    </Button>
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </CardContent>
