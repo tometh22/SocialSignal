@@ -126,7 +126,8 @@ function ProjectCard({
                   <div className="relative group">
                     <div className="h-6 w-6 rounded-md overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
                       <img 
-                        src={client.logoUrl} 
+                        key={`logo-${client.id}-${Date.now()}`}
+                        src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${Date.now()}`}
                         alt={`Logo de ${clientName}`}
                         className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-200"
                         onError={(e) => {
@@ -389,7 +390,8 @@ function ProjectCard({
                     {(subClient?.logoUrl || client?.logoUrl) ? (
                       <div className="h-4 w-4 rounded-sm overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center opacity-70">
                         <img 
-                          src={subClient?.logoUrl || client?.logoUrl} 
+                          key={`sublogo-${subproject.id}-${Date.now()}`}
+                          src={`${subClient?.logoUrl || client?.logoUrl}${(subClient?.logoUrl || client?.logoUrl)?.includes('?') ? '&' : '?'}t=${Date.now()}`}
                           alt={`Logo de ${subClientName}`}
                           className="h-full w-full object-contain"
                           onError={(e) => {

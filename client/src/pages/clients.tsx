@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -18,6 +18,14 @@ import type { Client, InsertClient } from "@shared/schema";
 const ClientLogo = ({ client }: { client: Client }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [imageKey, setImageKey] = useState(Date.now());
+
+  // Reset error and loading state when client changes
+  React.useEffect(() => {
+    setHasError(false);
+    setIsLoading(true);
+    setImageKey(Date.now());
+  }, [client.logoUrl, client.id]);
 
   if (!client.logoUrl || hasError) {
     return (
@@ -27,6 +35,9 @@ const ClientLogo = ({ client }: { client: Client }) => {
     );
   }
 
+  // Agregar cache buster para forzar recarga
+  const logoUrlWithCacheBuster = `${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${imageKey}`;
+
   return (
     <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200/50 bg-white">
       {isLoading && (
@@ -35,7 +46,8 @@ const ClientLogo = ({ client }: { client: Client }) => {
         </div>
       )}
       <img
-        src={client.logoUrl}
+        key={imageKey}
+        src={logoUrlWithCacheBuster}
         alt={`${client.name} logo`}
         className={`w-full h-full object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
         onLoad={() => setIsLoading(false)}
@@ -80,7 +92,10 @@ export default function Clients() {
         body: JSON.stringify(client),
       }).then(res => res.json()),
     onSuccess: () => {
+      // Invalidar múltiples queries para actualización inmediata
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
       setDialogOpen(false);
       form.reset();
       toast({
@@ -106,7 +121,10 @@ export default function Clients() {
         body: JSON.stringify(client),
       }).then(res => res.json()),
     onSuccess: () => {
+      // Invalidar múltiples queries para actualización inmediata
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
       setDialogOpen(false);
       form.reset();
       setIsEditing(false);
@@ -163,7 +181,10 @@ export default function Clients() {
       return response.json();
     },
     onSuccess: () => {
+      // Invalidar múltiples queries para actualización inmediata
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
       toast({
         title: "Logo subido",
         description: "El logo ha sido subido exitosamente.",
