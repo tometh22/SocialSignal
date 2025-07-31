@@ -2229,20 +2229,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Filtrar por período temporal si se especifica
       if (timeFilter && timeFilter !== 'all') {
-        const dateRange = getDateRangeFromFilter(timeFilter);
+        const dateRange = getDateRangeForFilter(timeFilter);
         if (dateRange) {
           console.log(`🔍 Applying temporal filter:`, { 
             timeFilter, 
             dateRange: {
-              start: dateRange.start?.toISOString(),
-              end: dateRange.end?.toISOString()
+              startDate: dateRange.startDate?.toISOString(),
+              endDate: dateRange.endDate?.toISOString()
             }
           });
           
           // Para proyectos activos, filtrar por fecha de inicio o por tiempo de actividad
           projects = projects.filter(project => {
             const startDate = new Date(project.startDate);
-            const projectIsActive = startDate >= dateRange.start && startDate <= dateRange.end;
+            const projectIsActive = startDate >= dateRange.startDate && startDate <= dateRange.endDate;
             return projectIsActive;
           });
           
@@ -2920,17 +2920,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Aplicar filtro temporal si se especifica
       if (timeFilter && timeFilter !== 'all') {
-        const dateRange = getDateRangeFromFilter(timeFilter);
+        const dateRange = getDateRangeForFilter(timeFilter);
         if (dateRange) {
           console.log(`🔍 Applying temporal filter to time entries:`, { 
             timeFilter, 
             dateRange: {
-              start: dateRange.start?.toISOString(),
-              end: dateRange.end?.toISOString()
+              startDate: dateRange.startDate?.toISOString(),
+              endDate: dateRange.endDate?.toISOString()
             }
           });
           
-          query = query.where(sql`time_entries.date >= ${dateRange.start} AND time_entries.date <= ${dateRange.end}`);
+          query = query.where(sql`time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`);
         }
       }
 
