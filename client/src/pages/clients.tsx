@@ -54,6 +54,7 @@ const clientSchema = z.object({
   contactName: z.string().optional(),
   contactEmail: z.string().email("Email inválido").optional().or(z.literal("")),
   contactPhone: z.string().optional(),
+  logoUrl: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientSchema>;
@@ -185,6 +186,7 @@ export default function Clients() {
       contactName: "",
       contactEmail: "",
       contactPhone: "",
+      logoUrl: "",
     },
   });
 
@@ -203,6 +205,7 @@ export default function Clients() {
       contactName: "",
       contactEmail: "",
       contactPhone: "",
+      logoUrl: "",
     });
     setDialogOpen(true);
   };
@@ -215,6 +218,7 @@ export default function Clients() {
       contactName: client.contactName || "",
       contactEmail: client.contactEmail || "",
       contactPhone: client.contactPhone || "",
+      logoUrl: client.logoUrl || "",
     });
     setDialogOpen(true);
   };
@@ -440,6 +444,20 @@ export default function Clients() {
                     <FormLabel>Teléfono de Contacto</FormLabel>
                     <FormControl>
                       <Input placeholder="+1 234 567 8900" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="logoUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Logo URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://ejemplo.com/logo.png" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
