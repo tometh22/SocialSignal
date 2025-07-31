@@ -2201,15 +2201,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener todos los proyectos activos
   app.get("/api/active-projects", requireAuth, async (req, res) => {
     try {
-      // Obtener parámetro de consulta para filtrar subproyectos
+      // Obtener parámetros de consulta
       const showSubprojects = req.query.showSubprojects === 'true';
+      const timeFilter = req.query.timeFilter as string;
+      
+      console.log(`🔍 Active Projects API called with:`, { 
+        showSubprojects, 
+        timeFilter 
+      });
 
       // Obtener todos los proyectos
       const allProjects = await storage.getActiveProjects();
 
       // Filtrar los proyectos según el parámetro
       let projects;
-
 
       if (!showSubprojects) {
         // Modo normal - mostrar solo proyectos padres y proyectos sin padre
@@ -2220,6 +2225,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Modo completo - mostrar todos los proyectos
         projects = allProjects;
+      }
+
+      // Filtrar por período temporal si se especifica
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeFromFilter(timeFilter);
+        if (dateRange) {
+          console.log(`🔍 Applying temporal filter:`, { 
+            timeFilter, 
+            dateRange: {
+              start: dateRange.start?.toISOString(),
+              end: dateRange.end?.toISOString()
+            }
+          });
+          
+          // Para proyectos activos, filtrar por fecha de inicio o por tiempo de actividad
+          projects = projects.filter(project => {
+            const startDate = new Date(project.startDate);
+            const projectIsActive = startDate >= dateRange.start && startDate <= dateRange.end;
+            return projectIsActive;
+          });
+          
+          console.log(`🔍 Projects after temporal filtering: ${projects.length}`);
+        }
       }
 
       // Depuración para ver qué está pasando con las cotizaciones
@@ -2877,11 +2905,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener registros de horas agrupados por proyecto (para métricas rápidas)
   app.get("/api/time-entries/all-projects", async (req, res) => {
     try {
-      const entries = await db.select({
+      const timeFilter = req.query.timeFilter as string;
+      
+      console.log(`🔍 Time Entries All Projects API called with:`, { 
+        timeFilter 
+      });
+
+      let query = db.select({
         projectId: sql`time_entries.project_id`,
-        hours: sql`time_entries.hours`
+        hours: sql`time_entries.hours`,
+        date: sql`time_entries.date`
       })
       .from(sql`time_entries`);
+
+      // Aplicar filtro temporal si se especifica
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeFromFilter(timeFilter);
+        if (dateRange) {
+          console.log(`🔍 Applying temporal filter to time entries:`, { 
+            timeFilter, 
+            dateRange: {
+              start: dateRange.start?.toISOString(),
+              end: dateRange.end?.toISOString()
+            }
+          });
+          
+          query = query.where(sql`time_entries.date >= ${dateRange.start} AND time_entries.date <= ${dateRange.end}`);
+        }
+      }
+
+      const entries = await query;
 
       // Agrupar por proyecto
       const groupedByProject: Record<number, any[]> = {};
@@ -2892,6 +2945,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         groupedByProject[projectId].push(entry);
       });
+
+      console.log(`🔍 Time Entries grouped by project:`, Object.keys(groupedByProject).length, 'projects');
 
       res.json(groupedByProject);
     } catch (error) {

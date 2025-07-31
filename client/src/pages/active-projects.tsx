@@ -562,7 +562,13 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/active-projects", timeFilter],
     queryFn: () => {
       const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
+      const url = `/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`;
+      console.log(`🔍 Active Projects API call:`, { 
+        timeFilter, 
+        apiFilter, 
+        url 
+      });
+      return apiRequest(url, 'GET');
     }
   });
 
@@ -582,7 +588,13 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/time-entries/all-projects", timeFilter],
     queryFn: () => {
       const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
+      const url = `/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`;
+      console.log(`🔍 Time Entries API call:`, { 
+        timeFilter, 
+        apiFilter, 
+        url 
+      });
+      return apiRequest(url, 'GET');
     }
   });
 
