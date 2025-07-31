@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useImageRefresh } from "@/contexts/ImageRefreshContext";
 import {
   Select,
   SelectContent,
@@ -71,6 +72,7 @@ function ProjectCard({
   getProjectHours,
   onDeleteProject
 }: ProjectCardProps) {
+  const { refreshTimestamp } = useImageRefresh();
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
   const clientName = client?.name || "Cliente desconocido";
   const totalAmount = project.quotation?.totalAmount || 0;
@@ -126,8 +128,8 @@ function ProjectCard({
                   <div className="relative group">
                     <div className="h-6 w-6 rounded-md overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
                       <img 
-                        key={`logo-${client.id}-${Date.now()}`}
-                        src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${Date.now()}`}
+                        key={`logo-${client.id}-${refreshTimestamp}`}
+                        src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${refreshTimestamp}`}
                         alt={`Logo de ${clientName}`}
                         className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-200"
                         onError={(e) => {
@@ -362,7 +364,7 @@ function ProjectCard({
             
             <div className="space-y-2">
               {subprojects.map((subproject: any) => {
-                const subClient = Array.isArray(clients) ? clients.find((c: any) => c.id === subproject.clientId) : null;
+                const subClient = Array.isArray(allClients) ? allClients.find((c: any) => c.id === subproject.clientId) : null;
                 const subClientName = subClient?.name || clientName; // Usar el cliente del proyecto padre si no tiene uno específico
                 
                 return (
@@ -390,8 +392,8 @@ function ProjectCard({
                     {(subClient?.logoUrl || client?.logoUrl) ? (
                       <div className="h-4 w-4 rounded-sm overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center opacity-70">
                         <img 
-                          key={`sublogo-${subproject.id}-${Date.now()}`}
-                          src={`${subClient?.logoUrl || client?.logoUrl}${(subClient?.logoUrl || client?.logoUrl)?.includes('?') ? '&' : '?'}t=${Date.now()}`}
+                          key={`sublogo-${subproject.id}-${refreshTimestamp}`}
+                          src={`${subClient?.logoUrl || client?.logoUrl}${(subClient?.logoUrl || client?.logoUrl)?.includes('?') ? '&' : '?'}t=${refreshTimestamp}`}
                           alt={`Logo de ${subClientName}`}
                           className="h-full w-full object-contain"
                           onError={(e) => {

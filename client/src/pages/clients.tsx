@@ -12,20 +12,20 @@ import { PageLayout } from "@/components/ui/page-layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useImageRefresh } from "@/contexts/ImageRefreshContext";
 import type { Client, InsertClient } from "@shared/schema";
 
 // Componente de imagen robusto para logos
 const ClientLogo = ({ client }: { client: Client }) => {
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [imageKey, setImageKey] = useState(Date.now());
+  const { refreshTimestamp } = useImageRefresh();
 
-  // Reset error and loading state when client changes
+  // Reset error and loading state when client changes or global refresh occurs
   React.useEffect(() => {
     setHasError(false);
     setIsLoading(true);
-    setImageKey(Date.now());
-  }, [client.logoUrl, client.id]);
+  }, [client.logoUrl, client.id, refreshTimestamp]);
 
   if (!client.logoUrl || hasError) {
     return (
@@ -35,8 +35,8 @@ const ClientLogo = ({ client }: { client: Client }) => {
     );
   }
 
-  // Agregar cache buster para forzar recarga
-  const logoUrlWithCacheBuster = `${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${imageKey}`;
+  // Usar timestamp global para forzar recarga
+  const logoUrlWithCacheBuster = `${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${refreshTimestamp}`;
 
   return (
     <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200/50 bg-white">
@@ -46,7 +46,7 @@ const ClientLogo = ({ client }: { client: Client }) => {
         </div>
       )}
       <img
-        key={imageKey}
+        key={`${client.id}-${refreshTimestamp}`}
         src={logoUrlWithCacheBuster}
         alt={`${client.name} logo`}
         className={`w-full h-full object-contain transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
@@ -77,6 +77,7 @@ export default function Clients() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const { toast } = useToast();
+  const { forceRefresh } = useImageRefresh();
 
   // Query para obtener clientes
   const { data: clients = [], isLoading, error } = useQuery({
@@ -96,6 +97,8 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      // Forzar refresh de todas las imágenes
+      forceRefresh();
       setDialogOpen(false);
       form.reset();
       toast({
@@ -125,6 +128,8 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      // Forzar refresh de todas las imágenes
+      forceRefresh();
       setDialogOpen(false);
       form.reset();
       setIsEditing(false);
@@ -185,6 +190,8 @@ export default function Clients() {
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
       queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
+      // Forzar refresh de todas las imágenes
+      forceRefresh();
       toast({
         title: "Logo subido",
         description: "El logo ha sido subido exitosamente.",

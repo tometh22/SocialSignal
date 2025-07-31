@@ -40,6 +40,7 @@ import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
+import { ImageRefreshProvider } from "@/contexts/ImageRefreshContext";
 
 import { useEffect } from "react";
 
@@ -170,8 +171,10 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <ChatProvider>
-          <AppRoutes />
-          <Toaster />
+          <ImageRefreshProvider>
+            <AppRoutes />
+            <Toaster />
+          </ImageRefreshProvider>
         </ChatProvider>
       </AuthProvider>
     </ErrorBoundary>
