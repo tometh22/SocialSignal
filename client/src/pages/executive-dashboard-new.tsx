@@ -51,6 +51,11 @@ export default function ExecutiveDashboard() {
     staleTime: 5 * 60 * 1000
   });
 
+  const { data: clients = [] } = useQuery({ 
+    queryKey: ['/api/clients'],
+    staleTime: 10 * 60 * 1000
+  });
+
   // Calcular métricas del día
   const todayMetrics = useMemo(() => {
     const today = new Date();
@@ -89,11 +94,15 @@ export default function ExecutiveDashboard() {
     quotations
       .filter(q => q.createdAt && new Date(q.createdAt) > twoDaysAgo)
       .forEach(q => {
+        // Buscar el nombre del cliente usando clientId
+        const client = clients.find(c => c.id === q.clientId);
+        const clientName = client?.name || 'Cliente desconocido';
+        
         activities.push({
           id: `quote-${q.id}`,
           type: 'quotation',
           title: 'Nueva cotización creada',
-          description: `${q.projectName} - ${q.clientName}`,
+          description: `${q.projectName} - ${clientName}`,
           time: new Date(q.createdAt),
           icon: FileSignature,
           color: 'text-blue-600'
@@ -132,7 +141,7 @@ export default function ExecutiveDashboard() {
     
     // Ordenar por tiempo descendente
     return activities.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 10);
-  }, [quotations, activeProjects, deliverables]);
+  }, [quotations, activeProjects, deliverables, clients]);
 
   // Alertas inteligentes
   const alerts = useMemo(() => {
