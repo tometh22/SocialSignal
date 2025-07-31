@@ -79,9 +79,36 @@ function ProjectCard({
   const totalHours = getProjectHours(project.id);
   const isAlwaysOnProject = project.isAlwaysOnMacro || subprojects.length > 0;
   
-  // Calcular progreso basado en horas registradas vs estimadas
-  const estimatedHours = project.estimatedHours || totalAmount / 100; // Aproximación
-  const progressPercentage = estimatedHours > 0 ? Math.min((totalHours / estimatedHours) * 100, 100) : 0;
+  // Detectar tipo de proyecto para calcular progreso apropiado
+  const projectType = project.quotation?.projectType || 'one-shot';
+  const isFeeMensual = projectType === 'always-on';
+  
+  // Calcular progreso según tipo de proyecto
+  const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
+    return total + (member.estimatedHours || 0);
+  }, 0) || 0;
+  
+  let progressPercentage = 0;
+  let progressLabel = "";
+  let progressSubtitle = "";
+  
+  if (isFeeMensual) {
+    // Para proyectos fee mensual: progreso basado en tiempo calendario del mes actual
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const currentDay = now.getDate();
+    
+    progressPercentage = (currentDay / daysInMonth) * 100;
+    progressLabel = "Progreso mensual";
+    progressSubtitle = `Día ${currentDay} de ${daysInMonth}`;
+  } else {
+    // Para proyectos one-shot: progreso basado en horas
+    progressPercentage = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
+    progressLabel = "Progreso del proyecto";
+    progressSubtitle = `${totalHours.toFixed(1)}h de ${estimatedHours.toFixed(0)}h`;
+  }
 
   const getStatusConfig = (status: string) => {
     const configs = {
@@ -178,6 +205,13 @@ function ProjectCard({
                 <StatusIcon className="h-3 w-3" />
                 {statusConfig.label}
               </div>
+              {/* Badge de tipo de proyecto */}
+              {isFeeMensual && (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                  <Calendar className="h-3 w-3" />
+                  Fee Mensual
+                </div>
+              )}
             </div>
 
             {/* Métricas principales compactas */}
@@ -202,33 +236,50 @@ function ProjectCard({
                 </div>
               </div>
               
-              <div className="bg-purple-50 p-2 rounded-lg flex items-center gap-2 hover:bg-purple-100 transition-colors">
-                <div className="p-1 bg-purple-500 rounded-full">
+              <div className={`p-2 rounded-lg flex items-center gap-2 transition-colors ${
+                isFeeMensual ? 'bg-blue-50 hover:bg-blue-100' : 'bg-purple-50 hover:bg-purple-100'
+              }`}>
+                <div className={`p-1 rounded-full ${
+                  isFeeMensual ? 'bg-blue-500' : 'bg-purple-500'
+                }`}>
                   <Target className="h-3 w-3 text-white" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-purple-800">{progressPercentage.toFixed(0)}%</div>
-                  <div className="text-xs text-purple-600">Progreso</div>
+                  <div className={`text-sm font-bold ${
+                    isFeeMensual ? 'text-blue-800' : 'text-purple-800'
+                  }`}>
+                    {progressPercentage.toFixed(0)}%
+                  </div>
+                  <div className={`text-xs ${
+                    isFeeMensual ? 'text-blue-600' : 'text-purple-600'
+                  }`}>
+                    {isFeeMensual ? 'Mes' : 'Progreso'}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Barra de progreso avanzada */}
+            {/* Barra de progreso inteligente */}
             <div className="mb-3">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-700">Progreso del proyecto</span>
+                <span className="text-xs font-medium text-gray-700">{progressLabel}</span>
                 <span className="text-xs font-bold text-gray-900">{progressPercentage.toFixed(1)}%</span>
               </div>
               <div className="relative">
-                <Progress value={progressPercentage} className="h-3 bg-gray-200" />
-                {progressPercentage > 100 && (
+                <Progress 
+                  value={Math.min(progressPercentage, 100)} 
+                  className={`h-3 ${isFeeMensual ? 'bg-blue-100' : 'bg-gray-200'}`} 
+                />
+                {!isFeeMensual && progressPercentage > 100 && (
                   <div className="absolute top-0 left-0 h-3 bg-red-500 opacity-30 rounded-full" style={{width: '100%'}}></div>
                 )}
               </div>
               <div className="flex justify-between text-xs mt-1">
-                <span className="text-gray-600 font-medium">{totalHours.toFixed(1)}h trabajadas</span>
-                <span className={`font-medium ${progressPercentage > 100 ? 'text-red-600' : 'text-gray-600'}`}>
-                  {estimatedHours.toFixed(0)}h estimadas
+                <span className="text-gray-600 font-medium">
+                  {isFeeMensual ? `${totalHours.toFixed(1)}h registradas` : progressSubtitle}
+                </span>
+                <span className={`font-medium ${!isFeeMensual && progressPercentage > 100 ? 'text-red-600' : 'text-gray-600'}`}>
+                  {isFeeMensual ? progressSubtitle : `${estimatedHours.toFixed(0)}h estimadas`}
                 </span>
               </div>
             </div>
