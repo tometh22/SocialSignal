@@ -58,6 +58,9 @@ import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm"
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
+// import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
+import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
+import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
 
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
@@ -6896,7 +6899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('🔄 Iniciando sincronización con Google Sheets...');
       
-      const costosData = await googleSheetsService.getCostosDirectosIndirectos();
+      const costosData = await googleSheetsServiceAlternative.getCostosDirectosIndirectos();
       
       console.log(`📊 Datos obtenidos: ${costosData.length} registros`);
       
@@ -6924,8 +6927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('🧪 Probando conexión con Google Sheets...');
       
-      const isConnected = await googleSheetsService.testConnection();
-      const spreadsheetInfo = await googleSheetsService.getSpreadsheetInfo();
+      const isConnected = await googleSheetsServiceAlternative.testConnection();
+      const spreadsheetInfo = await googleSheetsServiceAlternative.getSpreadsheetInfo();
       
       res.json({
         connected: isConnected,
@@ -6944,12 +6947,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Obtener metadatos del spreadsheet
   app.get("/api/google-sheets/info", async (req, res) => {
     try {
-      const info = await googleSheetsService.getSpreadsheetInfo();
+      const info = await googleSheetsServiceAlternative.getSpreadsheetInfo();
       res.json(info);
     } catch (error) {
       console.error('❌ Error obteniendo info del spreadsheet:', error);
       res.status(500).json({ 
         message: "Error al obtener información del spreadsheet",
+        error: error.message 
+      });
+    }
+  });
+
+  // Probar conexión alternativa con Google Sheets
+  app.get("/api/google-sheets/test-alt", async (req, res) => {
+    try {
+      const connected = await googleSheetsServiceAlternative.testConnection();
+      if (connected) {
+        const info = await googleSheetsServiceAlternative.getSpreadsheetInfo();
+        res.json({ 
+          connected: true, 
+          message: "Conexión exitosa con Google Sheets API (método alternativo)",
+          spreadsheetInfo: info
+        });
+      } else {
+        res.json({ connected: false, error: "Failed to connect" });
+      }
+    } catch (error) {
+      console.error('❌ Error testing alternative Google Sheets connection:', error);
+      res.status(500).json({ 
+        connected: false, 
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener datos de costos usando método alternativo
+  app.get("/api/google-sheets/costos-alt", async (req, res) => {
+    try {
+      const costosData = await googleSheetsServiceAlternative.getCostosDirectosIndirectos();
+      res.json({
+        success: true,
+        data: costosData,
+        count: costosData.length
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de costos (alternativo):', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener datos de costos del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // Probar conexión con Google Sheets usando método simple
+  app.get("/api/google-sheets/test-simple", async (req, res) => {
+    try {
+      const connected = await googleSheetsSimpleService.testConnection();
+      if (connected) {
+        const info = await googleSheetsSimpleService.getSpreadsheetInfo();
+        res.json({ 
+          connected: true, 
+          message: "Conexión exitosa con Google Sheets API (método simple)",
+          spreadsheetInfo: info
+        });
+      } else {
+        res.json({ connected: false, error: "Failed to connect" });
+      }
+    } catch (error) {
+      console.error('❌ Error testing simple Google Sheets connection:', error);
+      res.status(500).json({ 
+        connected: false, 
         error: error.message 
       });
     }

@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
+import { JWT } from 'google-auth-library';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -13,8 +13,7 @@ interface CostoDirectoIndirecto {
   proyecto?: string;
 }
 
-class GoogleSheetsService {
-  private auth: GoogleAuth;
+class GoogleSheetsServiceAlternative {
   private sheets: any;
   private spreadsheetId: string;
 
@@ -23,60 +22,76 @@ class GoogleSheetsService {
     this.spreadsheetId = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
     
     try {
-      // Configurar autenticación usando las variables de entorno directamente
-      const credentials = {
-        type: 'service_account',
-        project_id: process.env.GOOGLE_PROJECT_ID,
-        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: this.formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY),
-        client_email: process.env.GOOGLE_CLIENT_EMAIL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        token_uri: 'https://oauth2.googleapis.com/token',
-        auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.GOOGLE_CLIENT_EMAIL}`,
-      };
-
-      this.auth = new GoogleAuth({
+      // Usar JWT directamente con las credenciales
+      const jwtClient = new JWT({
+        email: process.env.GOOGLE_CLIENT_EMAIL,
+        key: this.getPrivateKey(),
         scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-        credentials
       });
 
-      this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+      this.sheets = google.sheets({ version: 'v4', auth: jwtClient });
       
-      console.log('✅ Google Sheets service initialized with credentials');
+      console.log('✅ Alternative Google Sheets service initialized');
     } catch (error) {
-      console.error('❌ Error initializing Google Sheets service:', error);
+      console.error('❌ Error initializing alternative Google Sheets service:', error);
       throw error;
     }
   }
 
   /**
-   * Formatear la clave privada correctamente
+   * Obtener la clave privada desde las variables de entorno
    */
-  private formatPrivateKey(privateKey: string | undefined): string {
+  private getPrivateKey(): string {
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+    
     if (!privateKey) {
-      throw new Error('Google private key is missing');
+      throw new Error('GOOGLE_PRIVATE_KEY environment variable is not set');
     }
-    
-    // Limpiar la clave privada de caracteres de escape y comillas
-    let cleanKey = privateKey.replace(/\\n/g, '\n');
-    
-    // Eliminar comillas al inicio y final si existen
-    if (cleanKey.startsWith('"') && cleanKey.endsWith('"')) {
-      cleanKey = cleanKey.slice(1, -1);
+
+    // Limpiar la clave de caracteres de escape de JSON
+    return privateKey.replace(/\\n/g, '\n');
+  }
+
+  /**
+   * Método para probar la conexión
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+      
+      console.log('✅ Spreadsheet title:', response.data.properties.title);
+      console.log('✅ Available sheets:', response.data.sheets.map((sheet: any) => sheet.properties.title));
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Connection test failed:', error);
+      return false;
     }
-    
-    // Asegurar que tenga los headers correctos
-    if (!cleanKey.includes('-----BEGIN PRIVATE KEY-----')) {
-      throw new Error('Invalid private key format: missing BEGIN header');
+  }
+
+  /**
+   * Obtener información del spreadsheet
+   */
+  async getSpreadsheetInfo(): Promise<any> {
+    try {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+      
+      return {
+        title: response.data.properties.title,
+        sheets: response.data.sheets.map((sheet: any) => ({
+          title: sheet.properties.title,
+          sheetId: sheet.properties.sheetId,
+          index: sheet.properties.index
+        }))
+      };
+    } catch (error) {
+      console.error('❌ Error getting spreadsheet info:', error);
+      throw error;
     }
-    
-    if (!cleanKey.includes('-----END PRIVATE KEY-----')) {
-      throw new Error('Invalid private key format: missing END header');
-    }
-    
-    return cleanKey;
   }
 
   /**
@@ -194,50 +209,7 @@ class GoogleSheetsService {
     }
     return row[columnIndex]?.toString().trim() || '';
   }
-
-  /**
-   * Método para probar la conexión
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      const response = await this.sheets.spreadsheets.get({
-        spreadsheetId: this.spreadsheetId,
-      });
-      
-      console.log('Spreadsheet title:', response.data.properties.title);
-      console.log('Available sheets:', response.data.sheets.map((sheet: any) => sheet.properties.title));
-      
-      return true;
-    } catch (error) {
-      console.error('Connection test failed:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Obtener metadatos del Excel
-   */
-  async getSpreadsheetInfo(): Promise<any> {
-    try {
-      const response = await this.sheets.spreadsheets.get({
-        spreadsheetId: this.spreadsheetId,
-      });
-      
-      return {
-        title: response.data.properties.title,
-        sheets: response.data.sheets.map((sheet: any) => ({
-          title: sheet.properties.title,
-          sheetId: sheet.properties.sheetId,
-          index: sheet.properties.index
-        }))
-      };
-    } catch (error) {
-      console.error('Error getting spreadsheet info:', error);
-      throw error;
-    }
-  }
 }
 
-// Temporalmente deshabilitado debido a problemas con el formato de la clave privada
-// export const googleSheetsService = new GoogleSheetsService();
+export const googleSheetsServiceAlternative = new GoogleSheetsServiceAlternative();
 export type { CostoDirectoIndirecto };
