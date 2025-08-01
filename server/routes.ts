@@ -61,6 +61,8 @@ import { setupAuth } from "./auth";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
 import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
 import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
+import { googleSheetsFixedService } from "./services/googleSheetsFixed";
+import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
@@ -7000,6 +7002,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug de credenciales de Google
+  app.get("/api/google-sheets/debug-credentials", async (req, res) => {
+    try {
+      const credentials = {
+        hasProjectId: !!process.env.GOOGLE_PROJECT_ID,
+        hasClientEmail: !!process.env.GOOGLE_CLIENT_EMAIL,
+        hasPrivateKeyId: !!process.env.GOOGLE_PRIVATE_KEY_ID,
+        hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
+        privateKeyLength: process.env.GOOGLE_PRIVATE_KEY?.length || 0,
+        privateKeyStartsWith: process.env.GOOGLE_PRIVATE_KEY?.substring(0, 50) || '',
+        projectId: process.env.GOOGLE_PROJECT_ID,
+        clientEmail: process.env.GOOGLE_CLIENT_EMAIL
+      };
+
+      res.json({
+        success: true,
+        credentials: credentials
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        success: false,
+        error: error.message 
+      });
+    }
+  });
+
   // Probar conexión con Google Sheets usando método simple
   app.get("/api/google-sheets/test-simple", async (req, res) => {
     try {
@@ -7018,6 +7046,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Error testing simple Google Sheets connection:', error);
       res.status(500).json({ 
         connected: false, 
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener datos de costos usando el método simple
+  app.get("/api/google-sheets/costos-simple", async (req, res) => {
+    try {
+      const costosData = await googleSheetsSimpleService.getCostosDirectosIndirectos();
+      res.json({
+        success: true,
+        message: "Datos obtenidos exitosamente del Excel MAESTRO",
+        data: costosData,
+        count: costosData.length
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de costos (simple):', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener datos de costos del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // Verificar credenciales completas de Google
+  app.get("/api/google-sheets/verify-credentials", async (req, res) => {
+    try {
+      const result = googleSheetsFixedService.verifyCredentials();
+      res.json(result);
+    } catch (error) {
+      console.error('❌ Error verificando credenciales:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al verificar credenciales",
+        error: error.message 
+      });
+    }
+  });
+
+  // Probar con archivo JSON directamente
+  app.get("/api/google-sheets/test-json", async (req, res) => {
+    try {
+      const result = await googleSheetsFixedService.testWithJSONFile();
+      res.json(result);
+    } catch (error) {
+      console.error('❌ Error probando con JSON:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al probar con archivo JSON",
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener datos usando el servicio fixed (temporal con datos simulados)
+  app.get("/api/google-sheets/costos-fixed", async (req, res) => {
+    try {
+      const costosData = await googleSheetsFixedService.getCostosDirectosIndirectos();
+      res.json({
+        success: true,
+        message: "Datos obtenidos del servicio fixed",
+        data: costosData,
+        count: costosData.length,
+        note: "Usando datos simulados mientras se resuelve la conexión con Google Sheets"
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo datos de costos (fixed):', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener datos de costos",
+        error: error.message 
+      });
+    }
+  });
+
+  // Probar conexión real con Google Sheets usando archivo JSON
+  app.get("/api/google-sheets/test-working", async (req, res) => {
+    try {
+      const connected = await googleSheetsWorkingService.testConnection();
+      if (connected) {
+        const info = await googleSheetsWorkingService.getSpreadsheetInfo();
+        res.json({ 
+          connected: true, 
+          message: "Conexión exitosa usando archivo JSON",
+          spreadsheetInfo: info
+        });
+      } else {
+        res.json({ connected: false, error: "Failed to connect using JSON file" });
+      }
+    } catch (error) {
+      console.error('❌ Error testing working Google Sheets connection:', error);
+      res.status(500).json({ 
+        connected: false, 
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener datos reales del Excel MAESTRO usando archivo JSON
+  app.get("/api/google-sheets/costos-maestro", async (req, res) => {
+    try {
+      const costosData = await googleSheetsWorkingService.getCostosDirectosIndirectos();
+      res.json({
+        success: true,
+        message: "Datos obtenidos del Excel MAESTRO",
+        data: costosData,
+        count: costosData.length,
+        source: "Excel MAESTRO via Google Sheets API"
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo datos del Excel MAESTRO:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener datos del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener datos del Excel MAESTRO con límite de registros para pruebas rápidas
+  app.get("/api/google-sheets/costos-maestro-summary", async (req, res) => {
+    try {
+      const costosData = await googleSheetsWorkingService.getCostosDirectosIndirectos();
+      
+      // Resumen ejecutivo con estadísticas clave
+      const personalUnico = Array.from(new Set(costosData.map(c => c.persona)));
+      const costoTotalGeneral = costosData.reduce((sum, c) => sum + c.costoTotal, 0);
+      const costoDirectoTotal = costosData.reduce((sum, c) => sum + c.costoDirecto, 0);
+      const costoIndirectoTotal = costosData.reduce((sum, c) => sum + c.costoIndirecto, 0);
+
+      // Top 5 personas por costo
+      const topPersonal = personalUnico.map(persona => {
+        const registros = costosData.filter(c => c.persona === persona);
+        const costoTotal = registros.reduce((sum, c) => sum + c.costoTotal, 0);
+        return { persona, costoTotal, registros: registros.length };
+      }).sort((a, b) => b.costoTotal - a.costoTotal).slice(0, 5);
+
+      res.json({
+        success: true,
+        message: "Resumen ejecutivo del Excel MAESTRO",
+        summary: {
+          totalRegistros: costosData.length,
+          personalTotal: personalUnico.length,
+          costoTotalGeneral,
+          costoDirectoTotal,
+          costoIndirectoTotal,
+          topPersonal
+        },
+        source: "Excel MAESTRO via Google Sheets API",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo resumen del Excel MAESTRO:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener resumen del Excel MAESTRO",
         error: error.message 
       });
     }

@@ -20,16 +20,48 @@ class GoogleSheetsSimpleService {
   }
 
   /**
+   * Formatear correctamente la clave privada para Google API
+   */
+  private formatPrivateKey(privateKey: string | undefined): string {
+    if (!privateKey) {
+      throw new Error('Private key is missing');
+    }
+
+    // Si la clave ya tiene formato correcto, devolverla tal como está
+    if (privateKey.includes('-----BEGIN PRIVATE KEY-----') && privateKey.includes('-----END PRIVATE KEY-----')) {
+      return privateKey;
+    }
+
+    // Si es una clave sin formato, agregar headers y footers
+    const cleanKey = privateKey.replace(/\\n/g, '\n').trim();
+    
+    if (!cleanKey.startsWith('-----BEGIN')) {
+      return `-----BEGIN PRIVATE KEY-----\n${cleanKey}\n-----END PRIVATE KEY-----\n`;
+    }
+    
+    return cleanKey;
+  }
+
+  /**
    * Crear cliente de Google Sheets usando variables de entorno
    */
   private createSheetsClient() {
     try {
-      // Crear las credenciales desde las variables de entorno
-      const credentials = {
+      // Formatear la clave privada correctamente
+      const formattedPrivateKey = this.formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY);
+      
+      console.log('🔑 Private key format check:', {
+        hasBeginHeader: formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----'),
+        hasEndHeader: formattedPrivateKey.includes('-----END PRIVATE KEY-----'),
+        length: formattedPrivateKey.length
+      });
+
+      // Crear las credentials JSON
+      const credentialsJson = {
         type: 'service_account',
         project_id: process.env.GOOGLE_PROJECT_ID,
         private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: process.env.GOOGLE_PRIVATE_KEY,
+        private_key: formattedPrivateKey,
         client_email: process.env.GOOGLE_CLIENT_EMAIL,
         client_id: process.env.GOOGLE_CLIENT_ID,
         auth_uri: 'https://accounts.google.com/o/oauth2/auth',
@@ -39,8 +71,8 @@ class GoogleSheetsSimpleService {
         universe_domain: 'googleapis.com'
       };
 
-      // Usar google.auth.fromJSON para evitar problemas con el parsing de la clave
-      const auth = google.auth.fromJSON(credentials);
+      // Usar google.auth.fromJSON
+      const auth = google.auth.fromJSON(credentialsJson);
       auth.scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 
       return google.sheets({ version: 'v4', auth });
