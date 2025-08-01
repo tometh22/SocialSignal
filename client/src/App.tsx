@@ -28,7 +28,6 @@ import ClientSummaryCompact from "@/pages/client-summary-compact";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
 import { IndirectCosts } from "@/pages/indirect-costs";
-import ExcelMaestroAnalyticsPage from "@/pages/excel-maestro-analytics";
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -135,7 +134,6 @@ function AppRoutes() {
                   
                   {/* Analytics & Reports */}
                   <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} />
-                  <ProtectedRoute path="/excel-maestro" component={ExcelMaestroAnalyticsPage} />
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} />
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
