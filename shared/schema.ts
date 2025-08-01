@@ -299,11 +299,36 @@ export const insertNegotiationHistorySchema = createInsertSchema(negotiationHist
 export type NegotiationHistory = typeof negotiationHistory.$inferSelect;
 export type InsertNegotiationHistory = z.infer<typeof insertNegotiationHistorySchema>;
 
+// ==================== VARIANTES DE COTIZACIÓN ====================
+// Quotation variants table - para manejar múltiples escenarios de precios
+export const quotationVariants = pgTable("quotation_variants", {
+  id: serial("id").primaryKey(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
+  variantName: text("variant_name").notNull(), // 'Básico', 'Intermedio', 'Full', etc.
+  variantDescription: text("variant_description"), // Descripción opcional
+  variantOrder: integer("variant_order").notNull().default(1), // Orden de presentación
+  baseCost: doublePrecision("base_cost").notNull(),
+  complexityAdjustment: doublePrecision("complexity_adjustment").notNull(),
+  markupAmount: doublePrecision("markup_amount").notNull(),
+  totalAmount: doublePrecision("total_amount").notNull(),
+  isSelected: boolean("is_selected").default(false), // Variante seleccionada por el cliente
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertQuotationVariantSchema = createInsertSchema(quotationVariants).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type QuotationVariant = typeof quotationVariants.$inferSelect;
+export type InsertQuotationVariant = z.infer<typeof insertQuotationVariantSchema>;
+
 // ==================== ASIGNACIÓN DE MIEMBROS DE EQUIPO ====================
 // Quotation team members junction table
 export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
   quotationId: integer("quotation_id").notNull(),
+  variantId: integer("variant_id").references(() => quotationVariants.id), // Opcional: para asociar a una variante específica
   personnelId: integer("personnel_id"), // Permitir null para asignaciones solo por rol
   roleId: integer("role_id"), // ID del rol (puede ser diferente del rol del personnel)
   hours: doublePrecision("hours").notNull(),
@@ -318,6 +343,7 @@ export const insertQuotationTeamMemberSchema = createInsertSchema(quotationTeamM
 }).extend({
   personnelId: z.number().nullable().optional(),
   quotationId: z.number(),
+  variantId: z.number().nullable().optional(),
   roleId: z.number(), // roleId es siempre requerido
   hours: z.number(),
   rate: z.number(),

@@ -17,6 +17,7 @@ import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
 import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
+import { QuotationVariants } from '@/components/optimized/QuotationVariants';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
@@ -33,6 +34,10 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     previousStep,
     goToStep,
     quotationData,
+    baseCost,
+    complexityAdjustment,
+    markupAmount,
+    totalAmount,
     saveQuotation,
     loadQuotation,
     updateDeliverables,
@@ -210,14 +215,15 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 1, title: "Info Básica" },
       { num: 2, title: "Plantilla" },
       { num: 3, title: "Equipo" },
-      { num: 4, title: "Complejidad" },
+      { num: 4, title: "Variantes" },
+      { num: 5, title: "Complejidad" },
     ];
 
     if (quotationData.project?.type === 'fee-mensual') {
-      baseSteps.push({ num: 5, title: "Entregables" });
-      baseSteps.push({ num: 6, title: "Revisión" });
+      baseSteps.push({ num: 6, title: "Entregables" });
+      baseSteps.push({ num: 7, title: "Revisión" });
     } else {
-      baseSteps.push({ num: 5, title: "Revisión" });
+      baseSteps.push({ num: 6, title: "Revisión" });
     }
 
     return baseSteps;
@@ -323,9 +329,24 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 1 && <OptimizedBasicInfo />}
             {currentStep === 2 && <OptimizedTemplateSelection />}
             {currentStep === 3 && <EnhancedTeamConfig />}
-            {currentStep === 4 && <ComplexityFactorsCard />}
+            {currentStep === 4 && quotationData.id && (
+              <QuotationVariants 
+                quotationId={quotationData.id}
+                baseTeamMembers={quotationData.teamMembers}
+                quotationData={{
+                  baseCost,
+                  complexityAdjustment,
+                  markupAmount,
+                  totalAmount
+                }}
+                onVariantSelected={(variant) => {
+                  console.log('Variant selected:', variant);
+                }}
+              />
+            )}
+            {currentStep === 5 && <ComplexityFactorsCard />}
 
-            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
+            {currentStep === 6 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration 
                   isAlwaysOnProject={true}
@@ -338,8 +359,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
 
-            {((currentStep === 5 && quotationData.project?.type !== 'always-on') || 
-              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
+            {((currentStep === 6 && quotationData.project?.type !== 'always-on') || 
+              (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
           </div>

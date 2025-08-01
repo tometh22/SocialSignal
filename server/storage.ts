@@ -5,6 +5,7 @@ import {
   type ReportTemplate, type InsertReportTemplate,
   type Quotation, type InsertQuotation,
   type QuotationTeamMember, type InsertQuotationTeamMember,
+  type QuotationVariant, type InsertQuotationVariant,
   type TemplateRoleAssignment, type InsertTemplateRoleAssignment,
   type ActiveProject, type InsertActiveProject,
   type ProjectComponent, type InsertProjectComponent,
@@ -27,7 +28,7 @@ import {
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
   type NonBillableHours, type InsertNonBillableHours,
-  clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, templateRoleAssignments,
+  clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, quotationVariants, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
   projectStatusOptions, trackingFrequencyOptions,
@@ -85,9 +86,17 @@ export interface IStorage {
 
   // Quotation team member operations
   getQuotationTeamMembers(quotationId: number): Promise<QuotationTeamMember[]>;
+  getQuotationTeamMembersByVariant(variantId: number): Promise<QuotationTeamMember[]>;
   createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
   updateQuotationTeamMember(id: number, member: Partial<InsertQuotationTeamMember>): Promise<QuotationTeamMember | undefined>;
   deleteQuotationTeamMember(id: number): Promise<boolean>;
+
+  // Quotation variant operations
+  getQuotationVariants(quotationId: number): Promise<QuotationVariant[]>;
+  getQuotationVariant(id: number): Promise<QuotationVariant | undefined>;
+  createQuotationVariant(variant: InsertQuotationVariant): Promise<QuotationVariant>;
+  updateQuotationVariant(id: number, variant: Partial<InsertQuotationVariant>): Promise<QuotationVariant | undefined>;
+  deleteQuotationVariant(id: number): Promise<boolean>;
 
   // Template role assignment operations
   getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]>;
@@ -772,45 +781,59 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getQuotationTeamMembersByVariant(variantId: number): Promise<QuotationTeamMember[]> {
+    console.log(`📊 Storage: Getting team members for variant ${variantId}`);
+    
+    try {
+      const basicMembers = await db.select().from(quotationTeamMembers).where(eq(quotationTeamMembers.variantId, variantId));
+      
+      const enrichedMembers = await Promise.all(
+        basicMembers.map(async (member) => {
+          let personnelData = null;
+          if (member.personnelId) {
+            const personnelResult = await db.select().from(personnel).where(eq(personnel.id, member.personnelId));
+            personnelData = personnelResult[0];
+          }
+          
+          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId));
+          
+          return {
+            ...member,
+            personnelName: personnelData?.name || '',
+            personnelEmail: personnelData?.email || '',
+            personnelHourlyRate: personnelData?.hourlyRate || 0,
+            personnelProfilePicture: personnelData?.profilePicture || null,
+            roleName: roleData[0]?.name || 'Unknown Role',
+            roleDescription: roleData[0]?.description || ''
+          };
+        })
+      );
+      
+      console.log(`📊 Storage: Found ${enrichedMembers.length} team members for variant ${variantId}`);
+      return enrichedMembers;
+    } catch (error) {
+      console.error(`❌ Storage: Error getting team members for variant ${variantId}:`, error);
+      throw error;
+    }
+  }
+
   async createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember> {
     console.log('📝 Creando miembro del equipo con datos:', {
       quotationId: member.quotationId,
+      variantId: member.variantId,
       personnelId: member.personnelId,
       roleId: member.roleId,
       hours: member.hours,
       rate: member.rate,
       cost: member.cost
     });
-    console.log('🔍 DEBUG - roleId type:', typeof member.roleId, 'value:', member.roleId);
 
     // Validar que los datos mínimos estén presentes
     if (!member.quotationId) {
       throw new Error('quotation_id es requerido para crear un miembro del equipo');
     }
-
-    // FIXED: personnelId es opcional - se puede asignar automáticamente en routes
-    // La validación restrictiva estaba causando que falleara el guardado de equipos
-    
-    console.log('🔍 CRITICAL DEBUG - About to insert into DB:', {
-      quotationId: member.quotationId,
-      personnelId: member.personnelId,
-      roleId: member.roleId,
-      roleIdType: typeof member.roleId,
-      hours: member.hours,
-      rate: member.rate,
-      cost: member.cost
-    });
     
     const [newMember] = await db.insert(quotationTeamMembers).values(member).returning();
-    
-    console.log('🔍 CRITICAL DEBUG - DB returned:', {
-      id: newMember.id,
-      quotationId: newMember.quotationId,
-      personnelId: newMember.personnelId,
-      roleId: newMember.roleId,
-      roleIdType: typeof newMember.roleId
-    });
-    
     console.log('✅ Miembro del equipo creado exitosamente:', newMember);
     return newMember;
   }
@@ -885,6 +908,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTemplateRoleAssignments(templateId: number): Promise<void> {
     await db.delete(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
+  }
+
+  // Quotation variant operations
+  async getQuotationVariants(quotationId: number): Promise<QuotationVariant[]> {
+    console.log(`📊 Storage: Getting variants for quotation ${quotationId}`);
+    return await db.select()
+      .from(quotationVariants)
+      .where(eq(quotationVariants.quotationId, quotationId))
+      .orderBy(asc(quotationVariants.variantOrder));
+  }
+
+  async getQuotationVariant(id: number): Promise<QuotationVariant | undefined> {
+    const [variant] = await db.select().from(quotationVariants).where(eq(quotationVariants.id, id));
+    return variant;
+  }
+
+  async createQuotationVariant(variant: InsertQuotationVariant): Promise<QuotationVariant> {
+    console.log('📝 Creating quotation variant:', variant);
+    const [newVariant] = await db.insert(quotationVariants).values(variant).returning();
+    console.log('✅ Quotation variant created successfully:', newVariant);
+    return newVariant;
+  }
+
+  async updateQuotationVariant(id: number, variant: Partial<InsertQuotationVariant>): Promise<QuotationVariant | undefined> {
+    const [updatedVariant] = await db
+      .update(quotationVariants)
+      .set(variant)
+      .where(eq(quotationVariants.id, id))
+      .returning();
+    return updatedVariant;
+  }
+
+  async deleteQuotationVariant(id: number): Promise<boolean> {
+    // First delete all team members associated with this variant
+    await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.variantId, id));
+    
+    // Then delete the variant
+    const result = await db.delete(quotationVariants).where(eq(quotationVariants.id, id)).returning();
+    return result.length > 0;
   }
 
   // Get option lists

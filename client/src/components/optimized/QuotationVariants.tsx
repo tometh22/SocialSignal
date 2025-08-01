@@ -1,0 +1,511 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, Clock, DollarSign } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+
+interface QuotationVariant {
+  id: number;
+  quotationId: number;
+  variantName: string;
+  variantDescription?: string;
+  variantOrder: number;
+  baseCost: number;
+  complexityAdjustment: number;
+  markupAmount: number;
+  totalAmount: number;
+  isSelected: boolean;
+  createdAt: string;
+}
+
+interface TeamMember {
+  id: number;
+  roleId: number;
+  personnelId?: number;
+  hours: number;
+  rate: number;
+  cost: number;
+  roleName?: string;
+  personnelName?: string;
+}
+
+interface QuotationVariantsProps {
+  quotationId: number;
+  baseTeamMembers: TeamMember[];
+  quotationData: any;
+  onVariantSelected?: (variant: QuotationVariant) => void;
+}
+
+export function QuotationVariants({ 
+  quotationId, 
+  baseTeamMembers, 
+  quotationData, 
+  onVariantSelected 
+}: QuotationVariantsProps) {
+  const [variants, setVariants] = useState<QuotationVariant[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [newVariant, setNewVariant] = useState({
+    name: '',
+    description: '',
+    adjustmentPercentage: 0
+  });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchVariants();
+  }, [quotationId]);
+
+  const fetchVariants = async () => {
+    try {
+      setLoading(true);
+      const response = await apiRequest(`/api/quotations/${quotationId}/variants`, 'GET');
+      setVariants(response);
+      
+      // If no variants exist, create default variants
+      if (response.length === 0) {
+        await createDefaultVariants();
+      }
+    } catch (error) {
+      console.error('Error fetching variants:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las variantes",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createDefaultVariants = async () => {
+    const defaultVariants = [
+      { 
+        name: 'Básico', 
+        description: 'Versión esencial con funcionalidades básicas',
+        adjustmentPercentage: -25,
+        order: 1 
+      },
+      { 
+        name: 'Intermedio', 
+        description: 'Versión estándar con funcionalidades completas',
+        adjustmentPercentage: 0,
+        order: 2 
+      },
+      { 
+        name: 'Full', 
+        description: 'Versión premium con todas las funcionalidades',
+        adjustmentPercentage: 35,
+        order: 3 
+      }
+    ];
+
+    try {
+      for (const variant of defaultVariants) {
+        const adjustedBaseCost = quotationData.baseCost * (1 + variant.adjustmentPercentage / 100);
+        const adjustedComplexity = quotationData.complexityAdjustment * (1 + variant.adjustmentPercentage / 100);
+        const adjustedMarkup = quotationData.markupAmount * (1 + variant.adjustmentPercentage / 100);
+        const adjustedTotal = quotationData.totalAmount * (1 + variant.adjustmentPercentage / 100);
+
+        await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
+          variantName: variant.name,
+          variantDescription: variant.description,
+          variantOrder: variant.order,
+          baseCost: adjustedBaseCost,
+          complexityAdjustment: adjustedComplexity,
+          markupAmount: adjustedMarkup,
+          totalAmount: adjustedTotal,
+          isSelected: variant.name === 'Intermedio' // Select intermediate as default
+        });
+      }
+      
+      await fetchVariants();
+      toast({
+        title: "Variantes creadas",
+        description: "Se crearon las variantes por defecto"
+      });
+    } catch (error) {
+      console.error('Error creating default variants:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron crear las variantes por defecto",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createCustomVariant = async () => {
+    if (!newVariant.name.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre de la variante es requerido",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      setIsCreating(true);
+      const adjustmentFactor = 1 + (newVariant.adjustmentPercentage / 100);
+      
+      const variantData = {
+        variantName: newVariant.name,
+        variantDescription: newVariant.description,
+        variantOrder: variants.length + 1,
+        baseCost: quotationData.baseCost * adjustmentFactor,
+        complexityAdjustment: quotationData.complexityAdjustment * adjustmentFactor,
+        markupAmount: quotationData.markupAmount * adjustmentFactor,
+        totalAmount: quotationData.totalAmount * adjustmentFactor,
+        isSelected: false
+      };
+
+      await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', variantData);
+      await fetchVariants();
+      
+      setNewVariant({ name: '', description: '', adjustmentPercentage: 0 });
+      toast({
+        title: "Variante creada",
+        description: `La variante "${newVariant.name}" se creó exitosamente`
+      });
+    } catch (error) {
+      console.error('Error creating variant:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la variante",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const selectVariant = async (variantId: number) => {
+    try {
+      // Deselect all variants first
+      await Promise.all(
+        variants.map(v => 
+          apiRequest(`/api/quotation-variants/${v.id}`, 'PATCH', { isSelected: false })
+        )
+      );
+
+      // Select the chosen variant
+      await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { isSelected: true });
+      
+      setSelectedVariantId(variantId);
+      await fetchVariants();
+      
+      const selectedVariant = variants.find(v => v.id === variantId);
+      if (selectedVariant && onVariantSelected) {
+        onVariantSelected(selectedVariant);
+      }
+
+      toast({
+        title: "Variante seleccionada",
+        description: "La variante se seleccionó correctamente"
+      });
+    } catch (error) {
+      console.error('Error selecting variant:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo seleccionar la variante",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteVariant = async (variantId: number) => {
+    try {
+      await apiRequest(`/api/quotation-variants/${variantId}`, 'DELETE');
+      await fetchVariants();
+      
+      toast({
+        title: "Variante eliminada",
+        description: "La variante se eliminó exitosamente"
+      });
+    } catch (error) {
+      console.error('Error deleting variant:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la variante",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-AR', {
+      style: 'currency',
+      currency: 'ARS',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const calculateTeamHours = (variant: QuotationVariant) => {
+    // Esta función sería más compleja en una implementación real
+    // Por ahora, estimar horas basándose en el costo base
+    const avgHourlyRate = 5000; // Rate promedio
+    return Math.round(variant.baseCost / avgHourlyRate);
+  };
+
+  const calculateTeamSize = (variant: QuotationVariant) => {
+    // Estimar tamaño del equipo basándose en el nivel de complejidad
+    const baseTeamSize = baseTeamMembers.length;
+    const complexityFactor = variant.complexityAdjustment / quotationData.complexityAdjustment;
+    return Math.max(1, Math.round(baseTeamSize * complexityFactor));
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-48 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Variantes de Cotización</h2>
+          <p className="text-gray-600 mt-1">
+            Elige el escenario que mejor se adapte a las necesidades del proyecto
+          </p>
+        </div>
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Nueva Variante
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crear Nueva Variante</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Nombre</label>
+                <Input
+                  value={newVariant.name}
+                  onChange={(e) => setNewVariant({ ...newVariant, name: e.target.value })}
+                  placeholder="Ej: Premium, Económico..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Descripción</label>
+                <Textarea
+                  value={newVariant.description}
+                  onChange={(e) => setNewVariant({ ...newVariant, description: e.target.value })}
+                  placeholder="Describe las características de esta variante..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Ajuste de Precio (%)</label>
+                <Input
+                  type="number"
+                  value={newVariant.adjustmentPercentage}
+                  onChange={(e) => setNewVariant({ ...newVariant, adjustmentPercentage: parseFloat(e.target.value) || 0 })}
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Porcentaje de ajuste sobre el precio base (puede ser negativo)
+                </p>
+              </div>
+              <Button 
+                onClick={createCustomVariant} 
+                disabled={isCreating}
+                className="w-full"
+              >
+                {isCreating ? 'Creando...' : 'Crear Variante'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {variants.map((variant) => (
+          <Card 
+            key={variant.id} 
+            className={`relative cursor-pointer transition-all duration-200 hover:shadow-lg ${
+              variant.isSelected 
+                ? 'ring-2 ring-blue-500 shadow-lg' 
+                : 'hover:shadow-md'
+            }`}
+            onClick={() => selectVariant(variant.id)}
+          >
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-gray-900">
+                    {variant.variantName}
+                  </CardTitle>
+                  {variant.variantDescription && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      {variant.variantDescription}
+                    </p>
+                  )}
+                </div>
+                {variant.isSelected && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    <Check className="h-3 w-3 mr-1" />
+                    Seleccionado
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+              {/* Precio Principal */}
+              <div className="text-center py-4 bg-gray-50 rounded-lg">
+                <div className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(variant.totalAmount)}
+                </div>
+                <div className="text-sm text-gray-500">Precio Total</div>
+              </div>
+
+              {/* Métricas Clave */}
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-center text-blue-600">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-medium">{calculateTeamSize(variant)}</div>
+                  <div className="text-xs text-gray-500">Personas</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-center text-green-600">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-medium">{calculateTeamHours(variant)}h</div>
+                  <div className="text-xs text-gray-500">Horas</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-center text-purple-600">
+                    <DollarSign className="h-4 w-4" />
+                  </div>
+                  <div className="text-sm font-medium">
+                    {formatCurrency(variant.baseCost)}
+                  </div>
+                  <div className="text-xs text-gray-500">Base</div>
+                </div>
+              </div>
+
+              {/* Indicador de Diferencia */}
+              <div className="flex justify-center">
+                {variant.totalAmount > quotationData.totalAmount ? (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                  </Badge>
+                ) : variant.totalAmount < quotationData.totalAmount ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800">
+                    <TrendingDown className="h-3 w-3 mr-1" />
+                    {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-gray-100 text-gray-800">
+                    <Minus className="h-3 w-3 mr-1" />
+                    Base
+                  </Badge>
+                )}
+              </div>
+
+              {/* Botón de Acción */}
+              <Button 
+                variant={variant.isSelected ? "secondary" : "default"}
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  selectVariant(variant.id);
+                }}
+              >
+                {variant.isSelected ? 'Seleccionado' : 'Seleccionar'}
+              </Button>
+
+              {/* Botón de Eliminar (solo para variantes custom) */}
+              {!['Básico', 'Intermedio', 'Full'].includes(variant.variantName) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-red-600 hover:text-red-800 hover:bg-red-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteVariant(variant.id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Comparativa de Variantes */}
+      {variants.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Comparativa de Variantes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2">Variante</th>
+                    <th className="text-right p-2">Costo Base</th>
+                    <th className="text-right p-2">Markup</th>
+                    <th className="text-right p-2">Total</th>
+                    <th className="text-center p-2">Diferencia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map((variant) => (
+                    <tr key={variant.id} className="border-b hover:bg-gray-50">
+                      <td className="p-2 font-medium">{variant.variantName}</td>
+                      <td className="p-2 text-right">{formatCurrency(variant.baseCost)}</td>
+                      <td className="p-2 text-right">{formatCurrency(variant.markupAmount)}</td>
+                      <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
+                      <td className="p-2 text-center">
+                        {variant.totalAmount > quotationData.totalAmount ? (
+                          <span className="text-green-600">
+                            +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                          </span>
+                        ) : variant.totalAmount < quotationData.totalAmount ? (
+                          <span className="text-red-600">
+                            {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">Base</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}

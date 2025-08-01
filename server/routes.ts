@@ -10,6 +10,7 @@ import {
   insertReportTemplateSchema, 
   insertQuotationSchema,
   insertQuotationTeamMemberSchema,
+  insertQuotationVariantSchema,
   insertTemplateRoleAssignmentSchema,
   insertActiveProjectSchema,
   insertTimeEntrySchema,
@@ -2161,6 +2162,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete template role assignments" });
+    }
+  });
+
+  // ---------- RUTAS PARA VARIANTES DE COTIZACIÓN ----------
+
+  // Get all variants for a quotation
+  app.get("/api/quotations/:quotationId/variants", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      console.log(`🔍 Fetching variants for quotation ID: ${quotationId}`);
+      const variants = await storage.getQuotationVariants(quotationId);
+      console.log(`📊 Found ${variants.length} variants:`, variants);
+      res.json(variants);
+    } catch (error) {
+      console.error(`❌ Error fetching variants for quotation ${quotationId}:`, error);
+      res.status(500).json({ message: "Failed to fetch variants", error: String(error) });
+    }
+  });
+
+  // Get a specific variant
+  app.get("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
+    const variantId = parseInt(req.params.variantId);
+    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+
+    try {
+      const variant = await storage.getQuotationVariant(variantId);
+      if (!variant) {
+        return res.status(404).json({ message: "Variant not found" });
+      }
+      res.json(variant);
+    } catch (error) {
+      console.error(`❌ Error fetching variant ${variantId}:`, error);
+      res.status(500).json({ message: "Failed to fetch variant", error: String(error) });
+    }
+  });
+
+  // Create a new quotation variant
+  app.post("/api/quotations/:quotationId/variants", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+
+    try {
+      const validatedData = insertQuotationVariantSchema.parse({
+        ...req.body,
+        quotationId
+      });
+
+      console.log('📝 Creating quotation variant:', validatedData);
+      const variant = await storage.createQuotationVariant(validatedData);
+      console.log('✅ Quotation variant created:', variant);
+      res.status(201).json(variant);
+    } catch (error) {
+      console.error("❌ Error creating quotation variant:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid variant data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create quotation variant" });
+    }
+  });
+
+  // Update a quotation variant
+  app.patch("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
+    const variantId = parseInt(req.params.variantId);
+    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+
+    try {
+      const validatedData = insertQuotationVariantSchema.partial().parse(req.body);
+      const updatedVariant = await storage.updateQuotationVariant(variantId, validatedData);
+
+      if (!updatedVariant) {
+        return res.status(404).json({ message: "Variant not found" });
+      }
+
+      res.json(updatedVariant);
+    } catch (error) {
+      console.error("❌ Error updating quotation variant:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid variant data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update quotation variant" });
+    }
+  });
+
+  // Delete a quotation variant
+  app.delete("/api/quotation-variants/:variantId", requireAuth, async (req, res) => {
+    const variantId = parseInt(req.params.variantId);
+    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+
+    try {
+      const success = await storage.deleteQuotationVariant(variantId);
+      if (!success) {
+        return res.status(404).json({ message: "Variant not found" });
+      }
+      res.json({ success: true, message: "Quotation variant deleted successfully" });
+    } catch (error) {
+      console.error("❌ Error deleting quotation variant:", error);
+      res.status(500).json({ message: "Failed to delete quotation variant" });
+    }
+  });
+
+  // Get team members for a specific variant
+  app.get("/api/quotation-variants/:variantId/team", requireAuth, async (req, res) => {
+    const variantId = parseInt(req.params.variantId);
+    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+
+    try {
+      console.log(`🔍 Fetching team members for variant ID: ${variantId}`);
+      const members = await storage.getQuotationTeamMembersByVariant(variantId);
+      console.log(`👥 Found ${members.length} team members for variant:`, members);
+      res.json(members);
+    } catch (error) {
+      console.error(`❌ Error fetching team members for variant ${variantId}:`, error);
+      res.status(500).json({ message: "Failed to fetch team members", error: String(error) });
     }
   });
 
