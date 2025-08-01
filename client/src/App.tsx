@@ -29,6 +29,7 @@ import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
 import { IndirectCosts } from "@/pages/indirect-costs";
 import CurrencyDemo from "@/pages/currency-demo";
+import BulkQuotations from "@/pages/bulk-quotations";
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -152,6 +153,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
                   <ProtectedRoute path="/recurring-templates/:projectId" component={RecurringTemplatesPage} />
                   <ProtectedRoute path="/currency-demo" component={CurrencyDemo} />
+                  <ProtectedRoute path="/bulk-quotations" component={BulkQuotations} />
                   
                   {/* Legacy Redirects */}
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />

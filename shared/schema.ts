@@ -169,7 +169,8 @@ export const personnel = pgTable("personnel", {
   name: text("name").notNull(),
   email: text("email"), // Email opcional
   roleId: integer("role_id").notNull(),
-  hourlyRate: doublePrecision("hourly_rate").notNull(),
+  hourlyRate: doublePrecision("hourly_rate").notNull(), // USD per hour
+  hourlyRateARS: doublePrecision("hourly_rate_ars"), // ARS per hour for local projects
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
   monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
   includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
@@ -180,6 +181,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   email: true,
   roleId: true,
   hourlyRate: true,
+  hourlyRateARS: true,
   contractType: true,
   monthlyFixedSalary: true,
   includeInRealCosts: true,

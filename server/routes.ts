@@ -7398,6 +7398,425 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para leer cotizaciones masivas desde Excel MAESTRO
+  app.get("/api/google-sheets/cotizaciones-masivas", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Obteniendo cotizaciones masivas del Excel MAESTRO...');
+      
+      const sheetsService = googleSheetsWorkingService;
+      const spreadsheetId = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
+      
+      // Intentar leer la pestaña "Cotizaciones Masivas"
+      const sheetNames = [
+        'Cotizaciones Masivas',
+        'Cotizaciones masivas', 
+        'cotizaciones masivas',
+        'CotizacionesMasivas',
+        'Bulk Quotes',
+        'Bulk Quotations'
+      ];
+      
+      let quotationData = null;
+      let sheetUsed = '';
+      
+      for (const sheetName of sheetNames) {
+        try {
+          console.log(`🔍 Probando pestaña: "${sheetName}"`);
+          const range = `${sheetName}!A:Z`;
+          const result = await sheetsService.getSheetData(spreadsheetId, range);
+          
+          if (result && result.length > 1) { // Al menos header + 1 fila de datos
+            console.log(`✅ Pestaña encontrada: ${sheetName} con ${result.length} filas`);
+            quotationData = result;
+            sheetUsed = sheetName;
+            break;
+          }
+        } catch (error) {
+          console.log(`⚠️ Pestaña "${sheetName}" no encontrada o error:`, error.message);
+        }
+      }
+      
+      if (!quotationData) {
+        return res.status(404).json({
+          success: false,
+          message: "No se encontró la pestaña de cotizaciones masivas en el Excel MAESTRO",
+          suggestions: sheetNames,
+          source: "Excel MAESTRO"
+        });
+      }
+      
+      // Procesar datos de cotizaciones
+      const headers = quotationData[0];
+      const rows = quotationData.slice(1);
+      
+      console.log(`📊 Headers encontrados:`, headers);
+      console.log(`📋 Total de filas de datos: ${rows.length}`);
+      
+      // Mapear las columnas esperadas
+      const expectedColumns = {
+        cliente: ['Cliente', 'client', 'cliente', 'Client'],
+        proyecto: ['Proyecto', 'project', 'proyecto', 'Project'],
+        detalle: ['Detalle', 'detalle', 'Servicio', 'servicio', 'Detail', 'Service'],
+        persona: ['Persona', 'persona', 'Person', 'member', 'Miembro'],
+        rol: ['Rol', 'rol', 'Role', 'role'],
+        horas: ['Horas', 'horas', 'Hours', 'hours'],
+        tarifaARS: ['Tarifa_ARS', 'tarifa_ars', 'TarifaARS', 'HourlyRateARS', 'hourly_rate_ars'],
+        tarifaUSD: ['Tarifa_USD', 'tarifa_usd', 'TarifaUSD', 'HourlyRateUSD', 'hourly_rate_usd'],
+        moneda: ['Moneda_Cotizacion', 'moneda', 'currency', 'Currency', 'Moneda'],
+        factor: ['Factor_Complejidad', 'factor', 'complexity', 'Complexity'],
+        descuento: ['Descuento_%', 'descuento', 'discount', 'Discount'],
+        fecha: ['Fecha', 'fecha', 'Date', 'date', 'Mes', 'mes', 'Month']
+      };
+      
+      // Encontrar índices de columnas
+      const columnIndices = {};
+      Object.keys(expectedColumns).forEach(key => {
+        const possibleNames = expectedColumns[key];
+        for (let i = 0; i < headers.length; i++) {
+          if (possibleNames.some(name => 
+            headers[i] && headers[i].toString().toLowerCase().includes(name.toLowerCase())
+          )) {
+            columnIndices[key] = i;
+            break;
+          }
+        }
+      });
+      
+      console.log(`🗂️ Índices de columnas encontrados:`, columnIndices);
+      
+      // Procesar filas de datos
+      const processedQuotations = [];
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0 || !row[columnIndices.cliente]) continue;
+        
+        try {
+          const quotationRow = {
+            cliente: row[columnIndices.cliente]?.toString().trim(),
+            proyecto: row[columnIndices.proyecto]?.toString().trim(),
+            detalle: row[columnIndices.detalle]?.toString().trim() || 'Servicio general',
+            persona: row[columnIndices.persona]?.toString().trim(),
+            rol: row[columnIndices.rol]?.toString().trim(),
+            horas: parseFloat(row[columnIndices.horas]) || 0,
+            tarifaARS: columnIndices.tarifaARS !== undefined ? parseFloat(row[columnIndices.tarifaARS]) || 0 : null,
+            tarifaUSD: columnIndices.tarifaUSD !== undefined ? parseFloat(row[columnIndices.tarifaUSD]) || 0 : null,
+            monedaCotizacion: row[columnIndices.moneda]?.toString().toUpperCase() || 'USD',
+            factorComplejidad: parseFloat(row[columnIndices.factor]) || 1.0,
+            descuentoPorcentaje: parseFloat(row[columnIndices.descuento]) || 0,
+            fecha: row[columnIndices.fecha]?.toString().trim() || new Date().toISOString().split('T')[0],
+            filaOriginal: i + 2 // +2 porque empezamos desde fila 1 y saltamos header
+          };
+          
+          // Validaciones básicas
+          if (quotationRow.cliente && quotationRow.proyecto && quotationRow.persona) {
+            processedQuotations.push(quotationRow);
+          }
+        } catch (error) {
+          console.warn(`⚠️ Error procesando fila ${i + 2}:`, error.message);
+        }
+      }
+      
+      // Agrupar por cliente + proyecto
+      const groupedQuotations = {};
+      processedQuotations.forEach(row => {
+        const key = `${row.cliente}|${row.proyecto}`;
+        if (!groupedQuotations[key]) {
+          groupedQuotations[key] = {
+            cliente: row.cliente,
+            proyecto: row.proyecto,
+            detalle: row.detalle,
+            monedaCotizacion: row.monedaCotizacion,
+            fecha: row.fecha,
+            equipo: [],
+            totalFilas: 0
+          };
+        }
+        
+        groupedQuotations[key].equipo.push({
+          persona: row.persona,
+          rol: row.rol,
+          horas: row.horas,
+          tarifaARS: row.tarifaARS,
+          tarifaUSD: row.tarifaUSD,
+          factorComplejidad: row.factorComplejidad,
+          descuentoPorcentaje: row.descuentoPorcentaje,
+          filaOriginal: row.filaOriginal
+        });
+        
+        groupedQuotations[key].totalFilas++;
+      });
+      
+      const quotationsArray = Object.values(groupedQuotations);
+      
+      res.json({
+        success: true,
+        message: `Cotizaciones masivas obtenidas del Excel MAESTRO`,
+        data: quotationsArray,
+        resumen: {
+          pestañaUtilizada: sheetUsed,
+          totalFilasProcesadas: rows.length,
+          filasVálidas: processedQuotations.length,
+          cotizacionesAgrupadas: quotationsArray.length,
+          columnasDetectadas: Object.keys(columnIndices).length
+        },
+        columnIndices,
+        source: "Excel MAESTRO - Cotizaciones Masivas"
+      });
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo cotizaciones masivas:', error);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener cotizaciones masivas del Excel MAESTRO",
+        error: error.message
+      });
+    }
+  });
+
+  // Endpoint para generar cotizaciones desde datos del Excel
+  app.post("/api/bulk-create/quotations-from-excel", requireAuth, async (req, res) => {
+    try {
+      const { dryRun = true } = req.body;
+      
+      console.log(`🔄 ${dryRun ? 'Analizando' : 'Generando'} cotizaciones desde Excel MAESTRO...`);
+      
+      // Obtener datos del Excel
+      const excelResponse = await fetch(`${req.protocol}://${req.get('host')}/api/google-sheets/cotizaciones-masivas`, {
+        headers: { ...req.headers }
+      });
+      
+      if (!excelResponse.ok) {
+        return res.status(400).json({
+          success: false,
+          message: "No se pudieron obtener los datos del Excel MAESTRO"
+        });
+      }
+      
+      const excelData = await excelResponse.json();
+      
+      if (!excelData.success || !excelData.data) {
+        return res.status(400).json({
+          success: false,
+          message: "Datos inválidos en el Excel MAESTRO",
+          details: excelData.message
+        });
+      }
+      
+      const quotationsToCreate = excelData.data;
+      const createdQuotations = [];
+      const errors = [];
+      
+      for (const quotationData of quotationsToCreate) {
+        try {
+          if (dryRun) {
+            // Solo validar en modo prueba
+            const validation = await validateQuotationData(quotationData);
+            createdQuotations.push({
+              cliente: quotationData.cliente,
+              proyecto: quotationData.proyecto,
+              equipoSize: quotationData.equipo.length,
+              moneda: quotationData.monedaCotizacion,
+              validation
+            });
+          } else {
+            // Crear cotización real
+            const newQuotation = await createQuotationFromExcelData(quotationData, req.user.id);
+            createdQuotations.push(newQuotation);
+          }
+        } catch (error) {
+          errors.push({
+            cliente: quotationData.cliente,
+            proyecto: quotationData.proyecto,
+            error: error.message
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: dryRun ? 
+          `Análisis completado: ${createdQuotations.length} cotizaciones válidas, ${errors.length} errores` :
+          `${createdQuotations.length} cotizaciones creadas exitosamente`,
+        dryRun,
+        cotizaciones: createdQuotations,
+        errores: errors,
+        resumen: {
+          total: quotationsToCreate.length,
+          exitosas: createdQuotations.length,
+          errores: errors.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error en creación masiva de cotizaciones:', error);
+      res.status(500).json({
+        success: false,
+        message: "Error en la creación masiva de cotizaciones",
+        error: error.message
+      });
+    }
+  });
+
+  // ==================== FUNCIONES AUXILIARES PARA COTIZACIONES MASIVAS ====================
+  
+  // Función para validar datos de cotización desde Excel
+  async function validateQuotationData(quotationData) {
+    const errors = [];
+    const warnings = [];
+    
+    // Validar cliente
+    if (!quotationData.cliente) {
+      errors.push("Cliente es requerido");
+    } else {
+      const client = await storage.getClientByName(quotationData.cliente);
+      if (!client) {
+        warnings.push(`Cliente "${quotationData.cliente}" no existe en el sistema`);
+      }
+    }
+    
+    // Validar proyecto
+    if (!quotationData.proyecto) {
+      errors.push("Proyecto es requerido");
+    }
+    
+    // Validar equipo
+    if (!quotationData.equipo || quotationData.equipo.length === 0) {
+      errors.push("Al menos un miembro del equipo es requerido");
+    } else {
+      for (const member of quotationData.equipo) {
+        if (!member.persona) {
+          errors.push("Nombre de persona es requerido");
+        }
+        if (!member.horas || member.horas <= 0) {
+          errors.push(`Horas inválidas para ${member.persona}: ${member.horas}`);
+        }
+        if (!member.tarifaUSD && !member.tarifaARS) {
+          errors.push(`Tarifa requerida para ${member.persona}`);
+        }
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }
+  
+  // Función para crear cotización desde datos del Excel
+  async function createQuotationFromExcelData(quotationData, createdById) {
+    // Validar datos primero
+    const validation = await validateQuotationData(quotationData);
+    if (!validation.isValid) {
+      throw new Error(`Datos inválidos: ${validation.errors.join(', ')}`);
+    }
+    
+    // Buscar o crear cliente
+    let client = await storage.getClientByName(quotationData.cliente);
+    if (!client) {
+      client = await storage.createClient({
+        name: quotationData.cliente,
+        contactName: 'Contacto Principal',
+        contactEmail: '',
+        contactPhone: '',
+        logoUrl: null,
+        createdBy: createdById
+      });
+    }
+    
+    // Obtener tipo de cambio para la fecha
+    const quotationDate = new Date(quotationData.fecha);
+    const month = quotationDate.getMonth() + 1;
+    const year = quotationDate.getFullYear();
+    let exchangeRate = await storage.getExchangeRateByMonth(year, month);
+    
+    if (!exchangeRate) {
+      // Usar tipo de cambio más reciente disponible
+      const allRates = await storage.getExchangeRates();
+      exchangeRate = allRates[0]; // Asumiendo que están ordenados por fecha desc
+    }
+    
+    // Calcular costos totales
+    let totalCostUSD = 0;
+    let totalCostARS = 0;
+    
+    const teamMembers = [];
+    
+    for (const member of quotationData.equipo) {
+      let costUSD = 0;
+      let costARS = 0;
+      let hourlyRateUSD = 0;
+      let hourlyRateARS = 0;
+      
+      if (quotationData.monedaCotizacion === 'USD') {
+        hourlyRateUSD = member.tarifaUSD || (member.tarifaARS ? member.tarifaARS / exchangeRate.exchangeRate : 0);
+        costUSD = member.horas * hourlyRateUSD * member.factorComplejidad * (1 - member.descuentoPorcentaje / 100);
+        costARS = costUSD * exchangeRate.exchangeRate;
+      } else {
+        hourlyRateARS = member.tarifaARS || (member.tarifaUSD ? member.tarifaUSD * exchangeRate.exchangeRate : 0);
+        costARS = member.horas * hourlyRateARS * member.factorComplejidad * (1 - member.descuentoPorcentaje / 100);
+        costUSD = costARS / exchangeRate.exchangeRate;
+      }
+      
+      totalCostUSD += costUSD;
+      totalCostARS += costARS;
+      
+      teamMembers.push({
+        personnelId: null, // Se asignará después si existe
+        roleId: 1, // Rol genérico por defecto
+        hours: member.horas,
+        rate: hourlyRateUSD,
+        cost: costUSD,
+        dedication: Math.round((member.horas / 160) * 100), // Asumiendo 160 horas/mes
+        fte: member.horas / 160
+      });
+    }
+    
+    // Crear cotización
+    const quotation = await storage.createQuotation({
+      clientId: client.id,
+      projectName: quotationData.proyecto,
+      analysisType: 'standard',
+      projectType: 'comprehensive',
+      mentionsVolume: 'medium',
+      countriesCovered: '1',
+      clientEngagement: 'medium',
+      templateId: null,
+      templateCustomization: quotationData.detalle,
+      baseCost: totalCostUSD,
+      complexityAdjustment: 0,
+      markupAmount: 0,
+      totalAmount: totalCostUSD,
+      status: 'draft',
+      projectStartDate: quotationDate,
+      usdExchangeRate: exchangeRate.exchangeRate,
+      quotationCurrency: quotationData.monedaCotizacion,
+      projectedCostARS: totalCostARS,
+      createdBy: createdById
+    });
+    
+    // Crear miembros del equipo
+    for (const member of teamMembers) {
+      await storage.createQuotationTeamMember({
+        quotationId: quotation.id,
+        variantId: null,
+        ...member
+      });
+    }
+    
+    return {
+      id: quotation.id,
+      cliente: client.name,
+      proyecto: quotation.projectName,
+      totalUSD: totalCostUSD,
+      totalARS: totalCostARS,
+      moneda: quotationData.monedaCotizacion,
+      equipoSize: teamMembers.length,
+      tipoCambio: exchangeRate.exchangeRate
+    };
+  }
+
   // ==================== FUNCIONES AUXILIARES PARA ESTIMACIONES ====================
   
   // Función para generar estimaciones estándar basadas en el tipo de proyecto

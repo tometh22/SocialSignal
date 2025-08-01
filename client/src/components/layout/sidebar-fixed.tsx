@@ -77,6 +77,7 @@ export default function SidebarFixed() {
   const navItems = [
     { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" },
     { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
+    { href: "/bulk-quotations", title: "Cotizaciones Masivas", icon: Layers, status: 'new' as const, description: "Crear múltiples cotizaciones desde Excel" },
     { href: "/quotations", title: "Gestión de Cotizaciones", icon: FileText, description: "Ver y editar cotizaciones" },
     { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Gestión de proyectos en curso" },
     { href: "/clients", title: "Clientes", icon: Building2, description: "Información de clientes" },
