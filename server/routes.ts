@@ -7208,5 +7208,227 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Obtener proyectos confirmados y estimados del Excel MAESTRO
+  app.get("/api/google-sheets/proyectos-confirmados", async (req, res) => {
+    try {
+      const proyectosData = await googleSheetsWorkingService.getProyectosConfirmados();
+      res.json({
+        success: true,
+        message: "Proyectos confirmados obtenidos del Excel MAESTRO",
+        data: proyectosData,
+        count: proyectosData.length,
+        confirmados: proyectosData.filter(p => p.confirmado).length,
+        estimados: proyectosData.filter(p => !p.confirmado).length,
+        source: "Excel MAESTRO - Proyectos confirmados y estimados"
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo proyectos confirmados:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener proyectos confirmados del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // ==================== FUNCIONES AUXILIARES PARA ESTIMACIONES ====================
+  
+  // Función para generar estimaciones estándar basadas en el tipo de proyecto
+  function generarEstimacionesEstandar(detalle: string, tipoProyecto: string, valorUSD: number) {
+    const detalleNormalizado = detalle.toLowerCase();
+    const tipoNormalizado = tipoProyecto.toLowerCase();
+    
+    // Configuraciones por tipo de proyecto
+    const configuraciones = {
+      'fee_marketing': {
+        horasPorMes: 40,
+        tarifaPromedio: 50, // USD por hora
+        distribucionRoles: {
+          'Account Manager': { horas: 15, tarifa: 60 },
+          'Community Manager': { horas: 20, tarifa: 40 },
+          'Diseñador Gráfico': { horas: 5, tarifa: 45 }
+        }
+      },
+      'social_listening': {
+        horasPorMes: 25,
+        tarifaPromedio: 65,
+        distribucionRoles: {
+          'Data Analyst': { horas: 15, tarifa: 70 },
+          'Social Media Manager': { horas: 10, tarifa: 55 }
+        }
+      },
+      'campana_digital': {
+        horasPorMes: 60,
+        tarifaPromedio: 55,
+        distribucionRoles: {
+          'Strategist': { horas: 20, tarifa: 75 },
+          'Creative Director': { horas: 15, tarifa: 80 },
+          'Media Planner': { horas: 15, tarifa: 65 },
+          'Community Manager': { horas: 10, tarifa: 40 }
+        }
+      },
+      'default': {
+        horasPorMes: 30,
+        tarifaPromedio: 50,
+        distribucionRoles: {
+          'Project Manager': { horas: 15, tarifa: 65 },
+          'Specialist': { horas: 15, tarifa: 45 }
+        }
+      }
+    };
+    
+    // Determinar configuración según el tipo de proyecto
+    let config = configuraciones.default;
+    
+    if (tipoNormalizado.includes('fee') || detalleNormalizado.includes('marketing')) {
+      config = configuraciones.fee_marketing;
+    } else if (detalleNormalizado.includes('listening') || detalleNormalizado.includes('monitoreo')) {
+      config = configuraciones.social_listening;
+    } else if (detalleNormalizado.includes('campana') || detalleNormalizado.includes('campaign')) {
+      config = configuraciones.campana_digital;
+    }
+    
+    // Calcular estimaciones
+    const totalHoras = config.horasPorMes;
+    const costoHorasTotal = totalHoras * config.tarifaPromedio;
+    const markup = valorUSD > costoHorasTotal ? (valorUSD / costoHorasTotal) : 1.5;
+    const costoBase = valorUSD / markup;
+    const margenGanancia = valorUSD - costoBase;
+    
+    return {
+      totalHoras,
+      tarifaPromedio: config.tarifaPromedio,
+      costoBase,
+      margenGanancia,
+      markup,
+      distribucionRoles: config.distribucionRoles
+    };
+  }
+
+  // Endpoint para cargar masivamente cotizaciones aprobadas desde el Excel MAESTRO
+  app.post("/api/bulk-load/quotations-from-excel", async (req, res) => {
+    try {
+      const { dryRun = true } = req.body; // Por defecto modo de prueba
+      
+      // Obtener proyectos confirmados del Excel
+      const proyectosData = await googleSheetsWorkingService.getProyectosConfirmados();
+      const proyectosConfirmados = proyectosData.filter(p => p.confirmado);
+      
+      console.log(`📊 Procesando ${proyectosConfirmados.length} proyectos confirmados para carga masiva`);
+      
+      if (dryRun) {
+        // Modo de prueba: solo analizar sin crear
+        const clientesUnicos = Array.from(new Set(proyectosConfirmados.map(p => p.cliente)));
+        const valorTotalUSD = proyectosConfirmados.reduce((sum, p) => sum + p.monedaUSD, 0);
+        
+        const resumen = {
+          totalProyectos: proyectosConfirmados.length,
+          clientesUnicos: clientesUnicos.length, 
+          listaClientes: clientesUnicos,
+          valorTotalUSD: valorTotalUSD,
+          periodoFacturacion: {
+            desde: Math.min(...proyectosConfirmados.map(p => p.añoFacturacion)),
+            hasta: Math.max(...proyectosConfirmados.map(p => p.añoFacturacion))
+          },
+          muestra: proyectosConfirmados.slice(0, 5)
+        };
+        
+        return res.json({
+          success: true,
+          message: "Análisis de carga masiva (modo prueba)",
+          dryRun: true,
+          resumen: resumen
+        });
+      }
+      
+      // Modo real: crear cotizaciones
+      const resultados = {
+        clientesCreados: 0,
+        cotizacionesCreadas: 0,
+        errores: [],
+        procesados: []
+      };
+      
+      for (const proyecto of proyectosConfirmados) {
+        try {
+          // 1. Verificar si el cliente existe, si no, crearlo
+          let cliente = await storage.getClientByName(proyecto.cliente);
+          
+          if (!cliente) {
+            const nuevoCliente = await storage.createClient({
+              name: proyecto.cliente,
+              email: `contacto@${proyecto.cliente.toLowerCase().replace(/\s+/g, '')}.com`,
+              phone: '',
+              address: '',
+              website: '',
+              notes: `Cliente creado automáticamente desde Excel MAESTRO`
+            });
+            cliente = nuevoCliente;
+            resultados.clientesCreados++;
+            console.log(`✅ Cliente creado: ${proyecto.cliente}`);
+          }
+          
+          // 2. Generar estimaciones estándar basadas en el tipo de proyecto
+          const estimaciones = generarEstimacionesEstandar(proyecto.detalle, proyecto.proyecto, proyecto.monedaUSD);
+          
+          // 3. Crear la cotización basada en el proyecto del Excel
+          const nuevaCotizacion = await storage.createQuotation({
+            clientId: cliente.id,
+            projectName: `${proyecto.detalle}`, // Campo requerido
+            title: `${proyecto.detalle} - ${proyecto.mesFacturacion} ${proyecto.añoFacturacion}`,
+            description: `Cotización creada automáticamente desde Excel MAESTRO para ${proyecto.cliente}`,
+            currency: 'USD',
+            totalAmount: proyecto.monedaUSD,
+            validUntil: new Date(proyecto.añoFacturacion, 11, 31), // Fin del año
+            status: 'approved', // Ya está confirmado en el Excel
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            markup: estimaciones.markup,
+            templateId: null,
+            notes: `Proyecto: ${proyecto.proyecto} | Condición de pago: ${proyecto.condicionPago} días | Estimación automática`,
+            isTemplate: false,
+            customMarkup: null,
+            discountPercentage: 0,
+            totalHours: estimaciones.totalHoras,
+            hourlyRate: estimaciones.tarifaPromedio,
+            baseCost: estimaciones.costoBase,
+            complexityAdjustment: 0,
+            markupAmount: estimaciones.margenGanancia
+          });
+          
+          resultados.cotizacionesCreadas++;
+          resultados.procesados.push({
+            cliente: proyecto.cliente,
+            cotizacionId: nuevaCotizacion.id,
+            valor: proyecto.monedaUSD,
+            titulo: nuevaCotizacion.title
+          });
+          
+        } catch (error) {
+          console.error(`❌ Error procesando proyecto ${proyecto.cliente}:`, error);
+          resultados.errores.push({
+            cliente: proyecto.cliente,
+            error: error.message
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: "Carga masiva de cotizaciones completada",
+        dryRun: false,
+        resultados: resultados
+      });
+      
+    } catch (error) {
+      console.error('❌ Error en carga masiva:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error en la carga masiva de cotizaciones",
+        error: error.message 
+      });
+    }
+  });
+
   return httpServer;
 }

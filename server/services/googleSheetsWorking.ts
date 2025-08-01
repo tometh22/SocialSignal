@@ -14,6 +14,24 @@ interface CostoDirectoIndirecto {
   proyecto?: string;
 }
 
+interface ProyectoConfirmado {
+  mesFacturacion: string;
+  añoFacturacion: number;
+  mesCobre: string;
+  añoCobre: number;
+  cliente: string;
+  detalle: string;
+  proyecto: string;
+  confirmado: boolean;
+  propuestasEnviadas: number;
+  condicionPago: string;
+  ajuste: number;
+  valorBase: number;
+  monedaARS: number;
+  monedaUSD: number;
+  estado: 'confirmado' | 'estimado' | 'cancelado';
+}
+
 class GoogleSheetsWorkingService {
   private spreadsheetId: string;
 
@@ -50,8 +68,10 @@ class GoogleSheetsWorkingService {
       const credentialsJson = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
       
       // Crear la autenticación usando el archivo JSON directamente
-      const auth = google.auth.fromJSON(credentialsJson);
-      auth.scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
+      const auth = new google.auth.GoogleAuth({
+        credentials: credentialsJson,
+        scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+      });
 
       return google.sheets({ version: 'v4', auth });
     } catch (error) {
@@ -287,6 +307,129 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Obtener proyectos confirmados y estimados del Excel MAESTRO
+   */
+  async getProyectosConfirmados(): Promise<ProyectoConfirmado[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = 'Proyectos confirmados y estimados!A:Z';
+      
+      console.log('🔄 Obteniendo proyectos confirmados del Excel MAESTRO...');
+      console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
+      console.log(`📋 Range: ${range}`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ No se encontraron proyectos confirmados');
+        return [];
+      }
+
+      console.log(`📊 Procesando ${rows.length} filas de proyectos confirmados`);
+      return this.processProyectosData(rows);
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo proyectos confirmados:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Procesar los datos de proyectos confirmados
+   */
+  private processProyectosData(rows: any[][]): ProyectoConfirmado[] {
+    const result: ProyectoConfirmado[] = [];
+    
+    if (rows.length === 0) return result;
+
+    // La primera fila contiene los headers
+    const headers = rows[0];
+    console.log('📋 Headers proyectos encontrados:', headers);
+
+    // Mapear las columnas según los headers de la imagen
+    const columnMap = {
+      mesFacturacion: headers.findIndex(h => h && h.toLowerCase().includes('mes') && h.toLowerCase().includes('factura')),
+      añoFacturacion: headers.findIndex(h => h && h.toLowerCase().includes('año') && h.toLowerCase().includes('factura')),
+      mesCobre: headers.findIndex(h => h && h.toLowerCase().includes('mes') && h.toLowerCase().includes('cobre')),
+      añoCobre: headers.findIndex(h => h && h.toLowerCase().includes('año') && h.toLowerCase().includes('cobre')),
+      cliente: headers.findIndex(h => h && h.toLowerCase().includes('cliente')),
+      detalle: headers.findIndex(h => h && h.toLowerCase().includes('detalle')),
+      proyecto: headers.findIndex(h => h && h.toLowerCase().includes('proyecto')),
+      confirmado: headers.findIndex(h => h && h.toLowerCase().includes('confirmado')),
+      propuestasEnviadas: headers.findIndex(h => h && h.toLowerCase().includes('propuesta')),
+      condicionPago: headers.findIndex(h => h && h.toLowerCase().includes('condic') && h.toLowerCase().includes('pago')),
+      ajuste: headers.findIndex(h => h && h.toLowerCase().includes('ajuste')),
+      valorBase: headers.findIndex(h => h && h.toLowerCase().includes('valor') && h.toLowerCase().includes('base')),
+      monedaARS: headers.findIndex(h => h && h.toLowerCase().includes('ars')),
+      monedaUSD: headers.findIndex(h => h && h.toLowerCase().includes('usd'))
+    };
+
+    console.log('🗺️ Mapeo de columnas proyectos:', columnMap);
+
+    // Procesar cada fila de datos (omitir headers)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (!row || row.length === 0) continue;
+
+      try {
+        const cliente = this.getCellValue(row, columnMap.cliente);
+        const proyecto = this.getCellValue(row, columnMap.proyecto);
+        
+        // Debug primeras filas para entender estructura
+        if (i <= 10 && (cliente || proyecto)) {
+          console.log(`🔍 Proyecto ${i} debug:`, {
+            cliente: cliente,
+            proyecto: proyecto,
+            detalle: this.getCellValue(row, columnMap.detalle),
+            confirmado: this.getCellValue(row, columnMap.confirmado),
+            valorBase: this.getCellValue(row, columnMap.valorBase),
+            monedaUSD: this.getCellValue(row, columnMap.monedaUSD)
+          });
+        }
+        
+        // Solo procesar filas con cliente y proyecto válidos
+        if (!cliente || !proyecto) continue;
+        
+        const confirmadoStr = this.getCellValue(row, columnMap.confirmado).toLowerCase();
+        const esConfirmado = confirmadoStr.includes('si') || confirmadoStr.includes('sí') || confirmadoStr.includes('confirmado');
+
+        const proyectoData: ProyectoConfirmado = {
+          mesFacturacion: this.getCellValue(row, columnMap.mesFacturacion) || '',
+          añoFacturacion: parseInt(this.getCellValue(row, columnMap.añoFacturacion)) || new Date().getFullYear(),
+          mesCobre: this.getCellValue(row, columnMap.mesCobre) || '',
+          añoCobre: parseInt(this.getCellValue(row, columnMap.añoCobre)) || new Date().getFullYear(),
+          cliente: cliente,
+          detalle: this.getCellValue(row, columnMap.detalle) || '',
+          proyecto: proyecto,
+          confirmado: esConfirmado,
+          propuestasEnviadas: parseInt(this.getCellValue(row, columnMap.propuestasEnviadas)) || 0,
+          condicionPago: this.getCellValue(row, columnMap.condicionPago) || '',
+          ajuste: parseFloat(this.getCellValue(row, columnMap.ajuste)) || 0,
+          valorBase: this.parseMoneyValue(this.getCellValue(row, columnMap.valorBase)),
+          monedaARS: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaARS)),
+          monedaUSD: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaUSD)),
+          estado: esConfirmado ? 'confirmado' : 'estimado'
+        };
+
+        result.push(proyectoData);
+        
+      } catch (error) {
+        console.error(`❌ Error procesando fila ${i} de proyectos:`, error);
+        continue;
+      }
+    }
+
+    console.log(`✅ Procesados ${result.length} proyectos de ${rows.length - 1} filas`);
+    return result;
+  }
+
+  /**
    * Datos simulados como fallback
    */
   private getMockCostosData(): CostoDirectoIndirecto[] {
@@ -329,4 +472,4 @@ class GoogleSheetsWorkingService {
 }
 
 export const googleSheetsWorkingService = new GoogleSheetsWorkingService();
-export type { CostoDirectoIndirecto };
+export type { CostoDirectoIndirecto, ProyectoConfirmado };
