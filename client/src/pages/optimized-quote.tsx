@@ -329,9 +329,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 1 && <OptimizedBasicInfo />}
             {currentStep === 2 && <OptimizedTemplateSelection />}
             {currentStep === 3 && <EnhancedTeamConfig />}
-            {currentStep === 4 && quotationData.id && (
+            {currentStep === 4 && (
               <QuotationVariants 
-                quotationId={quotationData.id}
+                quotationId={quotationData.id || 0}
                 baseTeamMembers={quotationData.teamMembers}
                 quotationData={{
                   baseCost,

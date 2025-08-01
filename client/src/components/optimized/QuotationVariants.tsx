@@ -61,8 +61,13 @@ export function QuotationVariants({
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchVariants();
-  }, [quotationId]);
+    if (quotationId && quotationId > 0) {
+      fetchVariants();
+    } else {
+      // For new quotations, create local variants based on current data
+      createLocalVariants();
+    }
+  }, [quotationId, quotationData.baseCost, quotationData.totalAmount]);
 
   const fetchVariants = async () => {
     try {
@@ -76,14 +81,60 @@ export function QuotationVariants({
       }
     } catch (error) {
       console.error('Error fetching variants:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las variantes",
-        variant: "destructive"
-      });
+      // If quotation doesn't exist yet, fall back to local variants
+      createLocalVariants();
     } finally {
       setLoading(false);
     }
+  };
+
+  const createLocalVariants = () => {
+    setLoading(true);
+    const localVariants = [
+      { 
+        id: -1,
+        quotationId: quotationId || 0,
+        variantName: 'Básico', 
+        variantDescription: 'Versión esencial con funcionalidades básicas',
+        variantOrder: 1,
+        baseCost: quotationData.baseCost * 0.75,
+        complexityAdjustment: quotationData.complexityAdjustment * 0.75,
+        markupAmount: quotationData.markupAmount * 0.75,
+        totalAmount: quotationData.totalAmount * 0.75,
+        isSelected: false,
+        createdAt: new Date().toISOString()
+      },
+      { 
+        id: -2,
+        quotationId: quotationId || 0,
+        variantName: 'Intermedio', 
+        variantDescription: 'Versión estándar con funcionalidades completas',
+        variantOrder: 2,
+        baseCost: quotationData.baseCost,
+        complexityAdjustment: quotationData.complexityAdjustment,
+        markupAmount: quotationData.markupAmount,
+        totalAmount: quotationData.totalAmount,
+        isSelected: true,
+        createdAt: new Date().toISOString()
+      },
+      { 
+        id: -3,
+        quotationId: quotationId || 0,
+        variantName: 'Full', 
+        variantDescription: 'Versión premium con todas las funcionalidades',
+        variantOrder: 3,
+        baseCost: quotationData.baseCost * 1.35,
+        complexityAdjustment: quotationData.complexityAdjustment * 1.35,
+        markupAmount: quotationData.markupAmount * 1.35,
+        totalAmount: quotationData.totalAmount * 1.35,
+        isSelected: false,
+        createdAt: new Date().toISOString()
+      }
+    ];
+    
+    setVariants(localVariants);
+    setSelectedVariantId(-2); // Select intermediate by default
+    setLoading(false);
   };
 
   const createDefaultVariants = async () => {
@@ -157,6 +208,8 @@ export function QuotationVariants({
       const adjustmentFactor = 1 + (newVariant.adjustmentPercentage / 100);
       
       const variantData = {
+        id: -(variants.length + 1), // Use negative ID for local variants
+        quotationId: quotationId || 0,
         variantName: newVariant.name,
         variantDescription: newVariant.description,
         variantOrder: variants.length + 1,
@@ -164,11 +217,18 @@ export function QuotationVariants({
         complexityAdjustment: quotationData.complexityAdjustment * adjustmentFactor,
         markupAmount: quotationData.markupAmount * adjustmentFactor,
         totalAmount: quotationData.totalAmount * adjustmentFactor,
-        isSelected: false
+        isSelected: false,
+        createdAt: new Date().toISOString()
       };
 
-      await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', variantData);
-      await fetchVariants();
+      if (quotationId && quotationId > 0) {
+        // Save to database if quotation exists
+        await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', variantData);
+        await fetchVariants();
+      } else {
+        // Add to local variants for new quotations
+        setVariants(prev => [...prev, variantData]);
+      }
       
       setNewVariant({ name: '', description: '', adjustmentPercentage: 0 });
       toast({
@@ -189,18 +249,24 @@ export function QuotationVariants({
 
   const selectVariant = async (variantId: number) => {
     try {
-      // Deselect all variants first
-      await Promise.all(
-        variants.map(v => 
-          apiRequest(`/api/quotation-variants/${v.id}`, 'PATCH', { isSelected: false })
-        )
-      );
-
-      // Select the chosen variant
-      await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { isSelected: true });
+      if (quotationId && quotationId > 0) {
+        // Update in database for existing quotations
+        await Promise.all(
+          variants.map(v => 
+            apiRequest(`/api/quotation-variants/${v.id}`, 'PATCH', { isSelected: false })
+          )
+        );
+        await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { isSelected: true });
+        await fetchVariants();
+      } else {
+        // Update local variants for new quotations
+        setVariants(prev => prev.map(v => ({
+          ...v,
+          isSelected: v.id === variantId
+        })));
+      }
       
       setSelectedVariantId(variantId);
-      await fetchVariants();
       
       const selectedVariant = variants.find(v => v.id === variantId);
       if (selectedVariant && onVariantSelected) {
@@ -223,8 +289,14 @@ export function QuotationVariants({
 
   const deleteVariant = async (variantId: number) => {
     try {
-      await apiRequest(`/api/quotation-variants/${variantId}`, 'DELETE');
-      await fetchVariants();
+      if (quotationId && quotationId > 0) {
+        // Delete from database for existing quotations
+        await apiRequest(`/api/quotation-variants/${variantId}`, 'DELETE');
+        await fetchVariants();
+      } else {
+        // Remove from local variants for new quotations
+        setVariants(prev => prev.filter(v => v.id !== variantId));
+      }
       
       toast({
         title: "Variante eliminada",
@@ -263,7 +335,7 @@ export function QuotationVariants({
     return Math.max(1, Math.round(baseTeamSize * complexityFactor));
   };
 
-  if (loading) {
+  if (loading || !quotationData.baseCost) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
@@ -274,6 +346,13 @@ export function QuotationVariants({
             ))}
           </div>
         </div>
+        {!quotationData.baseCost && (
+          <div className="text-center mt-4">
+            <p className="text-gray-500">
+              Configura el equipo en el paso anterior para ver las variantes disponibles
+            </p>
+          </div>
+        )}
       </div>
     );
   }
