@@ -3413,18 +3413,6 @@ export default function ProjectDetailsRedesigned() {
             </TooltipProvider>
           </TabsContent>
 
-          {/* Performance Analysis Tab */}
-          <TabsContent value="performance-analysis" className="space-y-6">
-            <div className="w-full">
-              <EconomicRankings 
-                rankings={(unifiedData as any)?.rankings?.economicMetrics || []}
-                loading={dataLoading}
-                projectTotalPrice={(unifiedData as any)?.quotation?.totalAmount || 0}
-                timeFilter={timeFilterForHook}
-              />
-            </div>
-          </TabsContent>
-
         </Tabs>
       </div>
 
