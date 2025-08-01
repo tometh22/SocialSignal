@@ -167,14 +167,23 @@ export function getDateRangeForFilter(filter: string) {
 
 export function getMonthsInFilter(filter: string): number {
   switch (filter) {
+    // Filtros mensuales
+    case 'este_mes':
+    case 'mes_pasado':
     case 'current_month':
     case 'last_month':
     case 'this-month':
     case 'last-month':
     case 'may_2025':
     case 'june_2025':
-    case 'july_2025':
+    case 'julio_2025':
+    case 'mayo_2025':
+    case 'junio_2025':
       return 1;
+    
+    // Filtros trimestrales
+    case 'este_trimestre':
+    case 'trimestre_pasado':
     case 'current_quarter':
     case 'last_quarter':
     case 'this-quarter':
@@ -188,14 +197,22 @@ export function getMonthsInFilter(filter: string): number {
     case 'q3_2025':
     case 'q4_2025':
       return 3;
+    
+    // Filtros semestrales
+    case 'este_semestre':
+    case 'semestre_pasado':
     case 'current_semester':
     case 'last_semester':
     case 'this-semester':
     case 'last-semester':
       return 6;
+    
+    // Filtros anuales
+    case 'este_año':
     case 'current_year':
     case 'this-year':
       return 12;
+    
     default:
       return 1;
   }
@@ -2265,11 +2282,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(timeEntries)
               .where(sql`time_entries.project_id = ${project.id} AND time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`);
             
-            // Calcular métricas del período
-            const periodHours = periodTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-            const periodCost = periodTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
-            const billableEntries = periodTimeEntries.filter(entry => entry.billable);
-            const periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+            // Calcular métricas del período según el tipo de proyecto
+            let periodHours = periodTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+            let periodCost = periodTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+            let periodBilling = 0;
+            
+            // Determinar tipo de proyecto
+            const isAlwaysOn = project.quotation?.projectType === 'always-on' || 
+                             project.quotation?.projectType === 'fee-mensual' ||
+                             project.isAlwaysOnMacro;
+            
+            if (isAlwaysOn) {
+              // Para proyectos Always-On: Calcular cuántos meses completos abarca el filtro
+              const monthsInPeriod = getMonthsInFilter(timeFilter);
+              
+              if (monthsInPeriod > 0) {
+                // Valores mensuales base del proyecto
+                const monthlyAmount = project.quotation?.totalAmount || 0;
+                const monthlyHours = project.quotation?.totalHours || 0;
+                const monthlyCost = project.quotation?.baseCost || monthlyAmount * 0.7; // Estimación si no hay baseCost
+                
+                // Multiplicar por el número de meses del período
+                periodBilling = monthlyAmount * monthsInPeriod;
+                periodCost = monthlyCost * monthsInPeriod;
+                
+                // Para las horas, usar las registradas realmente (más preciso)
+                console.log(`📊 Always-On project ${project.id} - ${monthsInPeriod} months:`, {
+                  monthlyAmount,
+                  periodBilling,
+                  actualHours: periodHours,
+                  monthlyHours,
+                  estimatedHours: monthlyHours * monthsInPeriod
+                });
+              } else {
+                // Fallback a cálculo basado en registros reales
+                const billableEntries = periodTimeEntries.filter(entry => entry.billable);
+                periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+              }
+            } else {
+              // Para proyectos One-Shot: Solo usar registros reales del período
+              const billableEntries = periodTimeEntries.filter(entry => entry.billable);
+              periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+              
+              console.log(`📊 One-Shot project ${project.id} - actual period data:`, {
+                periodHours,
+                periodCost,
+                periodBilling
+              });
+            }
             
             // Añadir datos del período al proyecto
             projects[i] = {
