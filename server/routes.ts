@@ -2227,11 +2227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projects = allProjects;
       }
 
-      // Filtrar por período temporal si se especifica
+      // Filtrar por período temporal si se especifica - basado en ACTIVIDAD no en fecha de inicio
       if (timeFilter && timeFilter !== 'all') {
         const dateRange = getDateRangeForFilter(timeFilter);
         if (dateRange) {
-          console.log(`🔍 Applying temporal filter:`, { 
+          console.log(`🔍 Applying activity-based temporal filter:`, { 
             timeFilter, 
             dateRange: {
               startDate: dateRange.startDate?.toISOString(),
@@ -2239,14 +2239,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           });
           
-          // Para proyectos activos, filtrar por fecha de inicio o por tiempo de actividad
-          projects = projects.filter(project => {
-            const startDate = new Date(project.startDate);
-            const projectIsActive = startDate >= dateRange.startDate && startDate <= dateRange.endDate;
-            return projectIsActive;
-          });
+          // Obtener IDs de proyectos que tuvieron actividad en el período
+          const projectsWithActivity = await db
+            .select({ projectId: timeEntries.projectId })
+            .from(timeEntries)
+            .where(sql`time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`)
+            .groupBy(timeEntries.projectId);
           
-          console.log(`🔍 Projects after temporal filtering: ${projects.length}`);
+          const activeProjectIds = new Set(projectsWithActivity.map(p => p.projectId));
+          
+          console.log(`🔍 Found ${activeProjectIds.size} projects with activity in period`);
+          
+          // Filtrar proyectos para mostrar solo los que tuvieron actividad
+          projects = projects.filter(project => activeProjectIds.has(project.id));
+          
+          console.log(`🔍 Projects after activity-based filtering: ${projects.length}`);
+
+          // Enriquecer proyectos con datos calculados para el período específico
+          for (let i = 0; i < projects.length; i++) {
+            const project = projects[i];
+            
+            // Obtener time entries del período para este proyecto
+            const periodTimeEntries = await db
+              .select()
+              .from(timeEntries)
+              .where(sql`time_entries.project_id = ${project.id} AND time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`);
+            
+            // Calcular métricas del período
+            const periodHours = periodTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+            const periodCost = periodTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+            const billableEntries = periodTimeEntries.filter(entry => entry.billable);
+            const periodBilling = billableEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
+            
+            // Añadir datos del período al proyecto
+            projects[i] = {
+              ...project,
+              periodMetrics: {
+                hours: periodHours,
+                cost: periodCost,
+                billing: periodBilling,
+                entries: periodTimeEntries.length,
+                dateRange: {
+                  start: dateRange.startDate,
+                  end: dateRange.endDate
+                }
+              }
+            };
+          }
+          
+          console.log(`📊 Enriched ${projects.length} projects with period metrics`);
         }
       }
 
