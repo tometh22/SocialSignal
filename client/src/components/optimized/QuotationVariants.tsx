@@ -327,15 +327,25 @@ export function QuotationVariants({
   };
 
   const calculateTeamHours = (variant: QuotationVariant) => {
-    // Esta función sería más compleja en una implementación real
-    // Por ahora, estimar horas basándose en el costo base
-    const avgHourlyRate = 5000; // Rate promedio
-    return Math.round(variant.baseCost / avgHourlyRate);
+    // Calculate team hours based on base cost and average hourly rate
+    const avgHourlyRate = 25; // Average rate in USD equivalent
+    const estimatedHours = Math.round(variant.baseCost / avgHourlyRate);
+    
+    // Ensure we return a valid number
+    return isNaN(estimatedHours) ? 0 : Math.max(0, estimatedHours);
   };
 
   const calculateTeamSize = (variant: QuotationVariant) => {
     // Estimar tamaño del equipo basándose en el nivel de complejidad
-    const baseTeamSize = baseTeamMembers.length;
+    const baseTeamSize = baseTeamMembers?.length || 3; // Default to 3 if no team members
+    
+    // Safely handle complexity calculation
+    if (!quotationData.complexityAdjustment || quotationData.complexityAdjustment === 0) {
+      // If no complexity adjustment, use ratio based on cost
+      const costRatio = variant.totalAmount / quotationData.totalAmount;
+      return Math.max(1, Math.round(baseTeamSize * costRatio));
+    }
+    
     const complexityFactor = variant.complexityAdjustment / quotationData.complexityAdjustment;
     return Math.max(1, Math.round(baseTeamSize * complexityFactor));
   };
