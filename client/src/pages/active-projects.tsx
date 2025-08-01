@@ -79,6 +79,11 @@ function ProjectCard({
   const totalHours = getProjectHours(project.id);
   const isAlwaysOnProject = project.isAlwaysOnMacro || subprojects.length > 0;
   
+  // Verificar si tenemos datos del período específico
+  const hasPeriodMetrics = project.periodMetrics;
+  const periodCost = hasPeriodMetrics ? project.periodMetrics.cost : 0;
+  const periodBilling = hasPeriodMetrics ? project.periodMetrics.billing : 0;
+  
   // Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';
   const isFeeMensual = projectType === 'always-on';
@@ -212,6 +217,13 @@ function ProjectCard({
                   Fee Mensual
                 </div>
               )}
+              {/* Badge para indicar datos del período específico */}
+              {hasPeriodMetrics && (
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
+                  <CalendarDays className="h-3 w-3" />
+                  Período específico
+                </div>
+              )}
             </div>
 
             {/* Métricas principales compactas */}
@@ -232,7 +244,9 @@ function ProjectCard({
                 </div>
                 <div>
                   <div className="text-sm font-bold text-blue-800">{totalHours.toFixed(1)}h</div>
-                  <div className="text-xs text-blue-600">Registradas</div>
+                  <div className="text-xs text-blue-600">
+                    {hasPeriodMetrics ? 'Del período' : 'Registradas'}
+                  </div>
                 </div>
               </div>
               
@@ -401,6 +415,43 @@ function ProjectCard({
           </div>
         </div>
       </CardHeader>
+
+      {/* Métricas del período específico */}
+      {hasPeriodMetrics && (
+        <CardContent className="pt-0">
+          <div className="border-t pt-3 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CalendarDays className="h-4 w-4 text-orange-500" />
+              <span className="text-sm font-medium text-gray-700">
+                Métricas del período filtrado
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                <div className="text-sm font-bold text-orange-800">
+                  ${periodBilling.toLocaleString()}
+                </div>
+                <div className="text-xs text-orange-600">Facturación del período</div>
+              </div>
+              
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <div className="text-sm font-bold text-red-800">
+                  ${periodCost.toLocaleString()}
+                </div>
+                <div className="text-xs text-red-600">Costos del período</div>
+              </div>
+              
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="text-sm font-bold text-green-800">
+                  ${(periodBilling - periodCost).toLocaleString()}
+                </div>
+                <div className="text-xs text-green-600">Beneficio del período</div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      )}
 
       {/* Subproyectos expandibles */}
       {isAlwaysOnProject && isExpanded && subprojects.length > 0 && (
@@ -598,11 +649,36 @@ export default function ActiveProjectsRedesigned() {
     }
   });
 
-  // Función para obtener horas de un proyecto
+  // Función para obtener horas de un proyecto - usa periodMetrics si está disponible
   const getProjectHours = (projectId: number): number => {
+    // Buscar el proyecto en los datos principales para ver si tiene periodMetrics
+    const project = projects.find((p: any) => p.id === projectId);
+    if (project?.periodMetrics && timeFilter !== 'all') {
+      return project.periodMetrics.hours || 0;
+    }
+    
+    // Fallback a timeEntriesData para cálculo completo
     if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
     const entries = (timeEntriesData as any)[projectId] || [];
     return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
+  };
+
+  // Función para obtener costos del período
+  const getProjectCost = (project: any): number => {
+    if (project.periodMetrics && timeFilter !== 'all') {
+      return project.periodMetrics.cost || 0;
+    }
+    // Fallback al cálculo basado en timeEntries si no hay periodMetrics
+    return 0;
+  };
+
+  // Función para obtener facturación del período
+  const getProjectBilling = (project: any): number => {
+    if (project.periodMetrics && timeFilter !== 'all') {
+      return project.periodMetrics.billing || 0;
+    }
+    // Fallback al cálculo basado en timeEntries si no hay periodMetrics
+    return 0;
   };
 
   // Proyectos filtrados y ordenados
@@ -652,11 +728,20 @@ export default function ActiveProjectsRedesigned() {
     const totalBudget = filteredProjects.reduce((sum: number, p: any) => sum + (p.quotation?.totalAmount || 0), 0);
     const totalHours = filteredProjects.reduce((sum: number, p: any) => sum + getProjectHours(p.id), 0);
     
+    // Calcular métricas específicas del período si hay datos disponibles
+    const periodBilling = filteredProjects.reduce((sum: number, p: any) => 
+      sum + (p.periodMetrics?.billing || 0), 0);
+    const periodCost = filteredProjects.reduce((sum: number, p: any) => 
+      sum + (p.periodMetrics?.cost || 0), 0);
+    
     return {
       total: filteredProjects.length,
       active: activeProjects.length,
       totalBudget,
-      totalHours
+      totalHours,
+      periodBilling,
+      periodCost,
+      hasPeriodData: filteredProjects.some((p: any) => p.periodMetrics)
     };
   }, [filteredProjects, timeEntriesData]);
 
@@ -778,9 +863,12 @@ export default function ActiveProjectsRedesigned() {
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 hover:shadow-md transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-purple-900">${stats.totalBudget.toLocaleString()}</div>
+                  <div className="text-3xl font-bold text-purple-900">
+                    ${(stats.hasPeriodData && timeFilter !== "all" ? stats.periodBilling : stats.totalBudget).toLocaleString()}
+                  </div>
                   <div className="text-sm text-purple-700 font-medium">
-                    {timeFilter === "all" ? "Facturación Total" : "Facturación (período)"}
+                    {stats.hasPeriodData && timeFilter !== "all" ? "Facturación (período)" : 
+                     timeFilter === "all" ? "Facturación Total" : "Facturación (período)"}
                   </div>
                 </div>
                 <div className="p-3 bg-purple-500 rounded-full shadow-lg">
