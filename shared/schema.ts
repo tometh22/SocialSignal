@@ -431,6 +431,29 @@ export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
 export type SystemConfig = typeof systemConfig.$inferSelect;
 export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
 
+// ==================== TIPOS DE CAMBIO HISTÓRICOS ====================
+// Historical exchange rates for USD/ARS from BCRA
+export const exchangeRates = pgTable("exchange_rates", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  exchangeRate: doublePrecision("exchange_rate").notNull(), // Tipo de cambio USD/ARS (ej: 1220.00)
+  rateType: text("rate_type").notNull().default("official"), // 'official', 'blue', 'mep', etc.
+  source: text("source").default("BCRA"), // Fuente del dato
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+
 // ==================== PROYECTOS ACTIVOS ====================
 // Proyectos Activos
 export const activeProjects = pgTable("active_projects", {

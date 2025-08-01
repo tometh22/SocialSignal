@@ -28,6 +28,7 @@ import ClientSummaryCompact from "@/pages/client-summary-compact";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
 import { IndirectCosts } from "@/pages/indirect-costs";
+import CurrencyDemo from "@/pages/currency-demo";
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -150,6 +151,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
                   <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
                   <ProtectedRoute path="/recurring-templates/:projectId" component={RecurringTemplatesPage} />
+                  <ProtectedRoute path="/currency-demo" component={CurrencyDemo} />
                   
                   {/* Legacy Redirects */}
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />

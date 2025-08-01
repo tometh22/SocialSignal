@@ -1,30 +1,41 @@
-// Test directo de Google Sheets API sin servidor Express
-import { googleSheetsFixedService } from './server/services/googleSheetsFixed.js';
+// Script de prueba para acceder directamente al Excel MAESTRO y ver todas las pestañas
+import { GoogleSheetsWorkingService } from './server/services/googleSheetsWorking.js';
 
-async function testDirectly() {
-  console.log('🧪 Testeo directo de Google Sheets Service...');
-  
+async function testGoogleSheetsDirect() {
   try {
-    // Test de credenciales
-    console.log('\n1. Verificando credenciales...');
-    const credentialsResult = googleSheetsFixedService.verifyCredentials();
-    console.log('📋 Resultado de credenciales:', JSON.stringify(credentialsResult, null, 2));
+    console.log('🔄 Inicializando servicio de Google Sheets...');
     
-    // Test de archivo JSON
-    console.log('\n2. Probando archivo JSON...');
-    const jsonResult = await googleSheetsFixedService.testWithJSONFile();
-    console.log('📄 Resultado de JSON:', JSON.stringify(jsonResult, null, 2));
+    const service = new GoogleSheetsWorkingService();
     
-    // Test de datos simulados
-    console.log('\n3. Obteniendo datos simulados...');
-    const costosData = await googleSheetsFixedService.getCostosDirectosIndirectos();
-    console.log('💰 Datos de costos:', JSON.stringify(costosData, null, 2));
+    console.log('📋 Obteniendo nombres de pestañas...');
+    const sheetNames = await service.getSheetNames();
     
-    console.log('\n✅ Test completado exitosamente');
+    console.log(`✅ ${sheetNames.length} pestañas encontradas:`);
+    sheetNames.forEach((name, index) => {
+      console.log(`  ${index + 1}. "${name}"`);
+    });
+    
+    // Buscar pestañas que podrían contener tipos de cambio
+    const potentialExchangeSheets = sheetNames.filter(name => 
+      name.toLowerCase().includes('tipo') ||
+      name.toLowerCase().includes('cambio') ||
+      name.toLowerCase().includes('exchange') ||
+      name.toLowerCase().includes('bcra') ||
+      name.toLowerCase().includes('dolar') ||
+      name.toLowerCase().includes('cotiz') ||
+      name.toLowerCase().includes('resumen') ||
+      name.toLowerCase().includes('datos')
+    );
+    
+    console.log(`\n🎯 Pestañas potenciales para tipos de cambio (${potentialExchangeSheets.length}):`);
+    potentialExchangeSheets.forEach((name, index) => {
+      console.log(`  ${index + 1}. "${name}"`);
+    });
     
   } catch (error) {
-    console.error('❌ Error en test directo:', error);
+    console.error('❌ Error:', error);
   }
 }
 
-testDirectly();
+// Ejecutar test
+testGoogleSheetsDirect();

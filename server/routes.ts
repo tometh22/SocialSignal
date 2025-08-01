@@ -7231,6 +7231,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint para listar todas las pestañas del Excel MAESTRO  
+  app.get("/api/google-sheets/pestanas", async (req, res) => {
+    try {
+      const pestanas = await googleSheetsWorkingService.getSheetNames();
+      res.json({
+        success: true,
+        message: "Pestañas del Excel MAESTRO obtenidas",
+        data: pestanas,
+        count: pestanas.length
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo pestañas:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener pestañas del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // Endpoint para obtener tipos de cambio del Excel MAESTRO
+  app.get("/api/google-sheets/tipos-cambio", async (req, res) => {
+    try {
+      const tiposCambioData = await googleSheetsWorkingService.getTiposCambio();
+      res.json({
+        success: true,
+        message: "Tipos de cambio obtenidos del Excel MAESTRO",
+        data: tiposCambioData,
+        count: tiposCambioData.length,
+        source: "Excel MAESTRO - Tipos de cambio BCRA"
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo tipos de cambio:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener tipos de cambio del Excel MAESTRO",
+        error: error.message 
+      });
+    }
+  });
+
+  // Endpoint para cargar tipos de cambio históricos en la base de datos
+  app.post("/api/bulk-load/exchange-rates", async (req, res) => {
+    try {
+      const { dryRun = true } = req.body;
+      
+      // Obtener tipos de cambio del Excel
+      const tiposCambioData = await googleSheetsWorkingService.getTiposCambio();
+      
+      if (dryRun) {
+        return res.json({
+          success: true,
+          message: "Análisis de tipos de cambio (modo prueba)",
+          dryRun: true,
+          resumen: {
+            totalRegistros: tiposCambioData.length,
+            periodoCompleto: tiposCambioData.length > 0 ? {
+              desde: `${tiposCambioData[tiposCambioData.length - 1].mes} ${tiposCambioData[tiposCambioData.length - 1].año}`,
+              hasta: `${tiposCambioData[0].mes} ${tiposCambioData[0].año}`
+            } : null,
+            muestra: tiposCambioData.slice(0, 5),
+            rangoCambio: tiposCambioData.length > 0 ? {
+              minimo: Math.min(...tiposCambioData.map(t => t.tipoCambio)),
+              maximo: Math.max(...tiposCambioData.map(t => t.tipoCambio))
+            } : null
+          }
+        });
+      }
+
+      // Conversión de datos para insertar en base de datos
+      const exchangeRatesToInsert = tiposCambioData.map(tc => ({
+        year: tc.año || 2024,
+        month: convertirMesANumero(tc.mes),
+        exchangeRate: tc.tipoCambio,
+        rateType: "official",
+        source: tc.fuente,
+        updatedBy: null
+      }));
+
+      // Crear registros en lotes
+      const createdRates = await storage.bulkCreateExchangeRates(exchangeRatesToInsert);
+
+      res.json({
+        success: true,
+        message: "Tipos de cambio cargados exitosamente",
+        dryRun: false,
+        resultados: {
+          tiposCambioCreados: createdRates.length,
+          fuente: "Excel MAESTRO - BCRA",
+          periodo: exchangeRatesToInsert.length > 0 ? {
+            desde: `${exchangeRatesToInsert[exchangeRatesToInsert.length - 1].month}/${exchangeRatesToInsert[exchangeRatesToInsert.length - 1].year}`,
+            hasta: `${exchangeRatesToInsert[0].month}/${exchangeRatesToInsert[0].year}`
+          } : null
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ Error en carga masiva de tipos de cambio:', error);
+      res.status(500).json({
+        success: false,
+        message: "Error al cargar tipos de cambio",
+        error: error.message
+      });
+    }
+  });
+
+  // Función auxiliar para convertir mes en texto a número
+  function convertirMesANumero(mes: string): number {
+    const meses = {
+      'ene': 1, 'enero': 1,
+      'feb': 2, 'febrero': 2,
+      'mar': 3, 'marzo': 3,
+      'abr': 4, 'abril': 4,
+      'may': 5, 'mayo': 5,
+      'jun': 6, 'junio': 6,
+      'jul': 7, 'julio': 7,
+      'ago': 8, 'agosto': 8,
+      'sep': 9, 'septiembre': 9,
+      'oct': 10, 'octubre': 10,
+      'nov': 11, 'noviembre': 11,
+      'dic': 12, 'diciembre': 12
+    };
+    
+    const mesNormalizado = mes.toLowerCase().replace(/[^a-z]/g, '');
+    return meses[mesNormalizado] || 1;
+  }
+
+  // Endpoint para obtener tipos de cambio de la base de datos
+  app.get("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const exchangeRates = await storage.getExchangeRates();
+      res.json(exchangeRates);
+    } catch (error) {
+      console.error('❌ Error obteniendo tipos de cambio de la base de datos:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener tipos de cambio",
+        error: error.message 
+      });
+    }
+  });
+
+  // Endpoint para obtener tipo de cambio específico por mes/año
+  app.get("/api/exchange-rates/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      const exchangeRate = await storage.getExchangeRateByMonth(year, month);
+      if (!exchangeRate) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Tipo de cambio no encontrado para el período especificado" 
+        });
+      }
+      
+      res.json(exchangeRate);
+    } catch (error) {
+      console.error('❌ Error obteniendo tipo de cambio específico:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener tipo de cambio",
+        error: error.message 
+      });
+    }
+  });
+
   // ==================== FUNCIONES AUXILIARES PARA ESTIMACIONES ====================
   
   // Función para generar estimaciones estándar basadas en el tipo de proyecto

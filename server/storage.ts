@@ -25,6 +25,7 @@ import {
   type UnquotedPersonnel, type InsertUnquotedPersonnel,
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
+  type ExchangeRate, type InsertExchangeRate,
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
   type NonBillableHours, type InsertNonBillableHours,
@@ -35,7 +36,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  negotiationHistory, indirectCostCategories, indirectCosts, nonBillableHours
+  negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -272,6 +273,12 @@ export interface IStorage {
   getMonthlyHourAdjustment(projectId: number, personnelId: number, year: number, month: number): Promise<any | undefined>;
   createMonthlyHourAdjustment(adjustment: any): Promise<any>;
   updateMonthlyHourAdjustment(id: number, adjustment: any): Promise<any | undefined>;
+
+  // Exchange Rate operations
+  getExchangeRates(): Promise<ExchangeRate[]>;
+  getExchangeRateByMonth(year: number, month: number): Promise<ExchangeRate | undefined>;
+  createExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate>;
+  bulkCreateExchangeRates(rates: InsertExchangeRate[]): Promise<ExchangeRate[]>;
   deleteMonthlyHourAdjustment(id: number): Promise<boolean>;
 
   // Indirect Cost Category operations
@@ -2970,6 +2977,36 @@ export class DatabaseStorage implements IStorage {
       console.error("Error deleting non-billable hours:", error);
       return false;
     }
+  }
+
+  // Exchange Rate operations
+  async getExchangeRates(): Promise<ExchangeRate[]> {
+    return db.select().from(exchangeRates)
+      .orderBy(desc(exchangeRates.year), desc(exchangeRates.month));
+  }
+
+  async getExchangeRateByMonth(year: number, month: number): Promise<ExchangeRate | undefined> {
+    const [rate] = await db.select().from(exchangeRates)
+      .where(and(
+        eq(exchangeRates.year, year),
+        eq(exchangeRates.month, month)
+      ))
+      .limit(1);
+    return rate || undefined;
+  }
+
+  async createExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate> {
+    const [created] = await db.insert(exchangeRates)
+      .values(rate)
+      .returning();
+    return created;
+  }
+
+  async bulkCreateExchangeRates(rates: InsertExchangeRate[]): Promise<ExchangeRate[]> {
+    const created = await db.insert(exchangeRates)
+      .values(rates)
+      .returning();
+    return created;
   }
 
 }
