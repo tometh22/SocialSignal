@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, Clock, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -51,7 +52,7 @@ export function QuotationVariants({
 }: QuotationVariantsProps) {
   const [variants, setVariants] = useState<QuotationVariant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const [selectedVariantIds, setSelectedVariantIds] = useState<number[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [newVariant, setNewVariant] = useState({
     name: '',
@@ -114,7 +115,7 @@ export function QuotationVariants({
         complexityAdjustment: quotationData.complexityAdjustment,
         markupAmount: quotationData.markupAmount,
         totalAmount: quotationData.totalAmount,
-        isSelected: true,
+        isSelected: false,
         createdAt: new Date().toISOString()
       },
       { 
@@ -133,7 +134,7 @@ export function QuotationVariants({
     ];
     
     setVariants(localVariants);
-    setSelectedVariantId(-2); // Select intermediate by default
+    setSelectedVariantIds([-1, -2, -3]); // Select all variants by default for client presentation
     setLoading(false);
   };
 
@@ -247,41 +248,45 @@ export function QuotationVariants({
     }
   };
 
-  const selectVariant = async (variantId: number) => {
+  const toggleVariantSelection = async (variantId: number) => {
     try {
+      const isCurrentlySelected = selectedVariantIds.includes(variantId);
+      const newSelectedIds = isCurrentlySelected 
+        ? selectedVariantIds.filter(id => id !== variantId)
+        : [...selectedVariantIds, variantId];
+
       if (quotationId && quotationId > 0) {
         // Update in database for existing quotations
-        await Promise.all(
-          variants.map(v => 
-            apiRequest(`/api/quotation-variants/${v.id}`, 'PATCH', { isSelected: false })
-          )
-        );
-        await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { isSelected: true });
+        await apiRequest(`/api/quotation-variants/${variantId}`, 'PATCH', { 
+          isSelected: !isCurrentlySelected 
+        });
         await fetchVariants();
       } else {
         // Update local variants for new quotations
         setVariants(prev => prev.map(v => ({
           ...v,
-          isSelected: v.id === variantId
+          isSelected: v.id === variantId ? !isCurrentlySelected : v.isSelected
         })));
       }
       
-      setSelectedVariantId(variantId);
+      setSelectedVariantIds(newSelectedIds);
       
-      const selectedVariant = variants.find(v => v.id === variantId);
-      if (selectedVariant && onVariantSelected) {
-        onVariantSelected(selectedVariant);
+      // Notify about all selected variants
+      const selectedVariants = variants.filter(v => newSelectedIds.includes(v.id));
+      if (onVariantSelected && selectedVariants.length > 0) {
+        // Pass the first selected variant for compatibility, but ideally this would pass all
+        onVariantSelected(selectedVariants[0]);
       }
 
       toast({
-        title: "Variante seleccionada",
-        description: "La variante se seleccionó correctamente"
+        title: isCurrentlySelected ? "Variante deseleccionada" : "Variante seleccionada",
+        description: `${newSelectedIds.length} variante(s) seleccionada(s) para enviar al cliente`
       });
     } catch (error) {
-      console.error('Error selecting variant:', error);
+      console.error('Error toggling variant:', error);
       toast({
         title: "Error",
-        description: "No se pudo seleccionar la variante",
+        description: "No se pudo actualizar la selección",
         variant: "destructive"
       });
     }
@@ -363,17 +368,36 @@ export function QuotationVariants({
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Variantes de Cotización</h2>
           <p className="text-gray-600 mt-1">
-            Elige el escenario que mejor se adapte a las necesidades del proyecto
+            Selecciona las variantes que quieres enviar al cliente para su elección
           </p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nueva Variante
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              const allSelected = selectedVariantIds.length === variants.length;
+              if (allSelected) {
+                setSelectedVariantIds([]);
+                setVariants(prev => prev.map(v => ({ ...v, isSelected: false })));
+              } else {
+                const allIds = variants.map(v => v.id);
+                setSelectedVariantIds(allIds);
+                setVariants(prev => prev.map(v => ({ ...v, isSelected: true })));
+              }
+            }}
+          >
+            {selectedVariantIds.length === variants.length ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
+          </Button>
+          
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Nueva Variante
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Crear Nueva Variante</DialogTitle>
@@ -417,6 +441,7 @@ export function QuotationVariants({
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -428,24 +453,31 @@ export function QuotationVariants({
                 ? 'ring-2 ring-blue-500 shadow-lg' 
                 : 'hover:shadow-md'
             }`}
-            onClick={() => selectVariant(variant.id)}
+            onClick={() => toggleVariantSelection(variant.id)}
           >
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">
-                    {variant.variantName}
-                  </CardTitle>
-                  {variant.variantDescription && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      {variant.variantDescription}
-                    </p>
-                  )}
+                <div className="flex items-start gap-3">
+                  <Checkbox 
+                    checked={selectedVariantIds.includes(variant.id)}
+                    onCheckedChange={() => toggleVariantSelection(variant.id)}
+                    className="mt-1"
+                  />
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">
+                      {variant.variantName}
+                    </CardTitle>
+                    {variant.variantDescription && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        {variant.variantDescription}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {variant.isSelected && (
+                {selectedVariantIds.includes(variant.id) && (
                   <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                     <Check className="h-3 w-3 mr-1" />
-                    Seleccionado
+                    Para envío
                   </Badge>
                 )}
               </div>
@@ -509,14 +541,14 @@ export function QuotationVariants({
 
               {/* Botón de Acción */}
               <Button 
-                variant={variant.isSelected ? "secondary" : "default"}
+                variant={selectedVariantIds.includes(variant.id) ? "secondary" : "default"}
                 className="w-full"
                 onClick={(e) => {
                   e.stopPropagation();
-                  selectVariant(variant.id);
+                  toggleVariantSelection(variant.id);
                 }}
               >
-                {variant.isSelected ? 'Seleccionado' : 'Seleccionar'}
+                {selectedVariantIds.includes(variant.id) ? 'Para Envío' : 'Incluir'}
               </Button>
 
               {/* Botón de Eliminar (solo para variantes custom) */}
@@ -584,6 +616,20 @@ export function QuotationVariants({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Resumen de Selección */}
+      {selectedVariantIds.length > 0 && (
+        <div className="flex justify-center">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+            <p className="text-sm text-blue-800">
+              <strong>{selectedVariantIds.length}</strong> variante{selectedVariantIds.length > 1 ? 's' : ''} seleccionada{selectedVariantIds.length > 1 ? 's' : ''} para enviar al cliente
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              El cliente podrá elegir entre {selectedVariantIds.length > 1 ? 'estas opciones' : 'esta opción'}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   );
