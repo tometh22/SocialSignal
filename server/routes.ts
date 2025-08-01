@@ -6886,5 +6886,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =========== RUTAS PARA GOOGLE SHEETS INTEGRATION ===========
+  
+  // Importar el servicio después de todas las rutas
+  const { googleSheetsService } = await import('./services/googleSheetsService');
+
+  // Sincronizar datos desde Google Sheets
+  app.post("/api/google-sheets/sync", async (req, res) => {
+    try {
+      console.log('🔄 Iniciando sincronización con Google Sheets...');
+      
+      const costosData = await googleSheetsService.getCostosDirectosIndirectos();
+      
+      console.log(`📊 Datos obtenidos: ${costosData.length} registros`);
+      
+      // Aquí puedes procesar los datos y guardarlos en tu base de datos
+      // o simplemente devolverlos para verificar que la conexión funciona
+      
+      res.json({
+        success: true,
+        message: `Sincronización completada: ${costosData.length} registros obtenidos`,
+        data: costosData,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error en sincronización con Google Sheets:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al sincronizar con Google Sheets",
+        error: error.message 
+      });
+    }
+  });
+
+  // Probar conexión con Google Sheets
+  app.get("/api/google-sheets/test", async (req, res) => {
+    try {
+      console.log('🧪 Probando conexión con Google Sheets...');
+      
+      const isConnected = await googleSheetsService.testConnection();
+      const spreadsheetInfo = await googleSheetsService.getSpreadsheetInfo();
+      
+      res.json({
+        connected: isConnected,
+        spreadsheet: spreadsheetInfo,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Error probando conexión:', error);
+      res.status(500).json({ 
+        connected: false,
+        error: error.message 
+      });
+    }
+  });
+
+  // Obtener metadatos del spreadsheet
+  app.get("/api/google-sheets/info", async (req, res) => {
+    try {
+      const info = await googleSheetsService.getSpreadsheetInfo();
+      res.json(info);
+    } catch (error) {
+      console.error('❌ Error obteniendo info del spreadsheet:', error);
+      res.status(500).json({ 
+        message: "Error al obtener información del spreadsheet",
+        error: error.message 
+      });
+    }
+  });
+
   return httpServer;
 }
