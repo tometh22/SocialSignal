@@ -1048,6 +1048,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete client route
+  app.delete("/api/clients/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid client ID" });
+
+    try {
+      const client = await storage.getClient(id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const success = await storage.deleteClient(id);
+      
+      if (!success) {
+        return res.status(400).json({ 
+          message: "Cannot delete this client because it has active projects or quotations. Remove or reassign them before deleting." 
+        });
+      }
+
+      res.json({ success: true, message: "Client deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      res.status(500).json({ message: "Failed to delete client" });
+    }
+  });
+
   // Ruta para cargar logo de cliente
   app.post("/api/clients/:id/logo", requireAuth, upload.single('logo'), async (req, res) => {
     try {

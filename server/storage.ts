@@ -50,6 +50,7 @@ export interface IStorage {
   getClientByName(name: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
   updateClient(id: number, client: Partial<InsertClient>): Promise<Client | undefined>;
+  deleteClient(id: number): Promise<boolean>;
 
   // Role operations
   getRoles(): Promise<Role[]>;
@@ -595,6 +596,33 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error al actualizar cliente:", error);
       return undefined;
+    }
+  }
+
+  async deleteClient(id: number): Promise<boolean> {
+    try {
+      // Check if client has active projects or quotations
+      const activeProjects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, id));
+      const quotations = await db.select().from(quotations).where(eq(quotations.clientId, id));
+      
+      if (activeProjects.length > 0 || quotations.length > 0) {
+        console.log(`Cannot delete client ${id}: has ${activeProjects.length} active projects and ${quotations.length} quotations`);
+        return false;
+      }
+
+      // Use transaction to ensure safe deletion
+      await db.transaction(async (tx) => {
+        // Delete related records first
+        await tx.delete(clientModoComments).where(eq(clientModoComments.clientId, id));
+        
+        // Finally delete the client
+        await tx.delete(clients).where(eq(clients.id, id));
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting client:", error);
+      return false;
     }
   }
 
