@@ -15,6 +15,8 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   const queryClient = useQueryClient();
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
+  console.log("HistoricalCostsTable rendering with personnel:", personnel?.length || 0);
+
   const months = [
     { key: "jan2025", label: "Ene 2025" },
     { key: "feb2025", label: "Feb 2025" },
@@ -108,7 +110,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-6">
       <div className="bg-white rounded-lg border shadow-sm">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
@@ -116,7 +118,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
           </h3>
           <p className="text-sm text-gray-600 mt-1">
             Haga clic en las celdas para editar los costos históricos por mes. 
-            Todos los valores están en ARS.
+            Todos los valores están en ARS. ({personnel.length} personas registradas)
           </p>
         </div>
 
