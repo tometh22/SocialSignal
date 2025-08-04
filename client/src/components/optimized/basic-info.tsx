@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery } from '@tanstack/react-query';
 import { Client, projectDurationOptions } from '@shared/schema';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, Calendar, FolderOpen } from 'lucide-react';
+import { User, Calendar, FolderOpen, DollarSign } from 'lucide-react';
 
 const OptimizedBasicInfo: React.FC = () => {
   const {
@@ -14,7 +14,8 @@ const OptimizedBasicInfo: React.FC = () => {
     updateClient,
     updateProjectName,
     updateProjectType,
-    updateProjectDuration
+    updateProjectDuration,
+    updateQuotationCurrency
   } = useOptimizedQuote();
 
   // Consultar lista de clientes
@@ -118,7 +119,7 @@ const OptimizedBasicInfo: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Tipo de Proyecto */}
                 <div className="space-y-2">
                   <Label htmlFor="project-type" className="text-sm font-medium text-gray-700">Tipo de Proyecto</Label>
@@ -147,6 +148,42 @@ const OptimizedBasicInfo: React.FC = () => {
                           </SelectItem>
                         ))
                       )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Moneda de Cotización */}
+                <div className="space-y-2">
+                  <Label htmlFor="quotation-currency" className="text-sm font-medium text-gray-700 flex items-center">
+                    <DollarSign className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
+                    Moneda <span className="text-red-500 ml-1">*</span>
+                  </Label>
+                  <Select
+                    value={quotationData.quotationCurrency || 'ARS'}
+                    onValueChange={updateQuotationCurrency}
+                  >
+                    <SelectTrigger id="quotation-currency" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                      <SelectValue placeholder="Seleccionar moneda" />
+                    </SelectTrigger>
+                    <SelectContent className="border border-neutral-200 bg-white">
+                      <SelectItem value="ARS" className="hover:bg-neutral-50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇦🇷</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium">Pesos Argentinos</span>
+                            <span className="text-xs text-gray-500">ARS - Cotización local</span>
+                          </div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="USD" className="hover:bg-neutral-50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">🇺🇸</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium">Dólares</span>
+                            <span className="text-xs text-gray-500">USD - Cotización internacional</span>
+                          </div>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

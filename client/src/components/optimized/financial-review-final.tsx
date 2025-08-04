@@ -59,6 +59,7 @@ export default function FinancialReviewFinal() {
     forceRecalculate,
     updateInflation,
     updateFinancials,
+    updateQuotationCurrency,
     saveQuotation
   } = useOptimizedQuote();
 
@@ -98,12 +99,12 @@ export default function FinancialReviewFinal() {
 
   // Helper function to convert values based on selected currency
   const convertToDisplayCurrency = (usdAmount: number) => {
-    return convertFromUSD(usdAmount, quotationData.inflation.quotationCurrency);
+    return convertFromUSD(usdAmount, quotationData.quotationCurrency);
   };
 
   // Helper function to format currency with current quotation currency
   const formatFinalCurrency = (amount: number) => 
-    formatCurrency(amount, quotationData.inflation.quotationCurrency);
+    formatCurrency(amount, quotationData.quotationCurrency);
 
   // Helper function to get role name
   const getRoleName = (roleId: number) => {
@@ -697,7 +698,7 @@ export default function FinancialReviewFinal() {
               <div className="p-4 bg-blue-50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-blue-900">Subtotal Base</span>
-                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay, quotationData.inflation.quotationCurrency)}</span>
+                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay, quotationData.quotationCurrency)}</span>
                 </div>
               </div>
                 </CardContent>
@@ -1097,7 +1098,7 @@ export default function FinancialReviewFinal() {
                       </div>
                     </div>
                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay, quotationData.inflation.quotationCurrency)}` : 'Configurando...'}
+                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay, quotationData.quotationCurrency)}` : 'Configurando...'}
                     </Badge>
                   </div>
 
@@ -1116,8 +1117,11 @@ export default function FinancialReviewFinal() {
                     <div className="space-y-2">
                       <Label className="font-medium">Moneda de cotización</Label>
                       <Select 
-                        value={quotationData.inflation.quotationCurrency} 
-                        onValueChange={(value) => updateInflation({ quotationCurrency: value })}
+                        value={quotationData.quotationCurrency} 
+                        onValueChange={(value) => {
+                          console.log('💱 Currency selector changed to:', value);
+                          updateQuotationCurrency(value);
+                        }}
                       >
                         <SelectTrigger className="border-orange-200 focus:border-orange-400">
                           <SelectValue />
@@ -1185,7 +1189,7 @@ export default function FinancialReviewFinal() {
                             <strong>Inflación total:</strong> {totalInflationPercentage.toFixed(2)}%
                           </p>
                           <p className="text-green-700">
-                            <strong>Moneda:</strong> {quotationData.inflation.quotationCurrency}
+                            <strong>Moneda:</strong> {quotationData.quotationCurrency}
                           </p>
                         </div>
                       </div>
@@ -1340,7 +1344,7 @@ export default function FinancialReviewFinal() {
                   </span>
                 </div>
                 <p className="text-sm text-emerald-700 mt-1">
-                  {quotationData.inflation.quotationCurrency} • {quotationData.teamMembers.length} miembros • {quotationData.client?.name}
+                  {quotationData.quotationCurrency} • {quotationData.teamMembers.length} miembros • {quotationData.client?.name}
                 </p>
               </div>
 

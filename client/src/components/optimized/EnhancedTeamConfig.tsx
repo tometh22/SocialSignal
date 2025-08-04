@@ -67,6 +67,22 @@ const EnhancedTeamConfig: React.FC = () => {
   // Estados temporales para edición que permiten strings vacías
   const [tempEditValues, setTempEditValues] = useState<Record<string, {hours: string, rate: string}>>({});
 
+  // Función para obtener la tarifa correcta según la moneda de cotización
+  const getCorrectRate = (person: Personnel, role?: Role): number => {
+    const isARS = quotationData.quotationCurrency === 'ARS';
+    
+    if (isARS && person.hourlyRateARS && person.hourlyRateARS > 0) {
+      return person.hourlyRateARS;
+    } else if (!isARS && person.hourlyRate && person.hourlyRate > 0) {
+      return person.hourlyRate;
+    } else if (role && role.defaultRate) {
+      return role.defaultRate;
+    }
+    
+    // Fallback por defecto
+    return isARS ? 5000 : 50; // 5000 ARS o 50 USD por hora por defecto
+  };
+
   // Sincronizar con el contexto
   useEffect(() => {
     const members: DragDropTeamMember[] = quotationData.teamMembers.map(member => ({
@@ -148,7 +164,9 @@ const EnhancedTeamConfig: React.FC = () => {
       const role = getRoleInfo(roleId);
       if (role) {
         const hours = 40;
-        const rate = role.defaultRate || 50;
+        // Para roles sin personal específico, usar la tarifa por defecto del rol
+        const isARS = quotationData.quotationCurrency === 'ARS';
+        const rate = role.defaultRate || (isARS ? 5000 : 50);
         addTeamMember({
           roleId,
           personnelId: null,
@@ -185,7 +203,7 @@ const EnhancedTeamConfig: React.FC = () => {
         const defaultRole = availableRoles.find(role => role.id === 1) || availableRoles[0]; // Default to first role
         if (defaultRole) {
           const hours = 40;
-          const rate = person.hourlyRate || defaultRole.defaultRate || 50;
+          const rate = getCorrectRate(person, defaultRole);
           addTeamMember({
             roleId: defaultRole.id,
             personnelId: personnelId,
@@ -273,13 +291,15 @@ const EnhancedTeamConfig: React.FC = () => {
             <div className="flex items-center space-x-2">
               <Calculator className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">Costo total:</span>
-              <span className="font-bold text-green-600">${totalCost.toLocaleString()}</span>
+              <span className="font-bold text-green-600">
+                {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{totalCost.toLocaleString()} {quotationData.quotationCurrency}
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-medium">Promedio/hora:</span>
               <span className="font-bold text-purple-600">
-                ${totalHours > 0 ? (totalCost / totalHours).toFixed(0) : 0}
+                {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{totalHours > 0 ? (totalCost / totalHours).toFixed(0) : 0} {quotationData.quotationCurrency}
               </span>
             </div>
           </div>

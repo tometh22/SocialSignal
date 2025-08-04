@@ -52,12 +52,12 @@ export interface QuotationData {
   deliverables: any[];
   additionalDeliverableCost: number;
   financials: QuotationFinancials;
+  quotationCurrency: string; // Moneda de cotización ('ARS' | 'USD')
   inflation: {
     applyInflationAdjustment: boolean;
     inflationMethod: string;
     manualInflationRate: number;
     projectStartDate: string;
-    quotationCurrency: string;
   };
   proposalLink?: string; // Link a la propuesta original
 }
@@ -85,6 +85,7 @@ interface OptimizedQuoteContextType {
   updateProjectName: (name: string) => void;
   updateProjectType: (type: string) => void;
   updateProjectDuration: (duration: string) => void;
+  updateQuotationCurrency: (currency: string) => void;
   updateAnalysisType: (type: string) => void;
   updateMentionsVolume: (volume: string) => void;
   updateCountriesCovered: (countries: string) => void;
@@ -153,12 +154,12 @@ const initialQuotationData: QuotationData = {
     priceMode: 'auto' as const,
     manualPrice: undefined
   },
+  quotationCurrency: "ARS", // Moneda por defecto
   inflation: {
     applyInflationAdjustment: false,
     inflationMethod: "manual",
     manualInflationRate: 25,
-    projectStartDate: "",
-    quotationCurrency: "USD"
+    projectStartDate: ""
   }
 };
 
@@ -613,6 +614,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }));
   }, []);
 
+  const updateQuotationCurrency = useCallback((currency: string) => {
+    console.log('💱 Updating quotation currency:', currency);
+    setQuotationData(prev => ({ ...prev, quotationCurrency: currency }));
+    forceRecalculate();
+  }, [forceRecalculate]);
+
   const updateAnalysisType = useCallback((analysisType: string) => {
     console.log('📝 Updating analysis type:', analysisType);
     setQuotationData(prev => ({ ...prev, analysisType }));
@@ -879,7 +886,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         inflationMethod: quotationData.inflation.inflationMethod || 'manual',
         manualInflationRate: quotationData.inflation.manualInflationRate || 0,
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
-        quotationCurrency: quotationData.inflation.quotationCurrency || 'USD',
+        quotationCurrency: quotationData.quotationCurrency || 'ARS',
         proposalLink: quotationData.proposalLink || null,
         status: status
       };
@@ -1143,6 +1150,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     updateProjectName,
     updateProjectType,
     updateProjectDuration,
+    updateQuotationCurrency,
     updateAnalysisType,
     updateMentionsVolume,
     updateCountriesCovered,
