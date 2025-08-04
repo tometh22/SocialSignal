@@ -80,6 +80,7 @@ import { default as InlineEditPersonnel } from "@/components/admin/inline-edit-p
 import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
+import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 
 import { 
   InsertPersonnel, 
@@ -909,7 +910,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -925,6 +926,10 @@ export default function Admin() {
           <TabsTrigger value="multipliers" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Multiplicadores
+          </TabsTrigger>
+          <TabsTrigger value="exchange-rates" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Tipos de Cambio
           </TabsTrigger>
           <TabsTrigger value="inflation" className="flex items-center gap-2">
             <BadgeDollarSign className="h-4 w-4" />
@@ -1241,6 +1246,12 @@ export default function Admin() {
               <CostMultipliersManager />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="exchange-rates">
+          <div className="mt-6">
+            <ExchangeRateManager />
+          </div>
         </TabsContent>
 
         <TabsContent value="inflation">

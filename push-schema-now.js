@@ -8,17 +8,12 @@ const child = spawn('npm', ['run', 'db:push'], {
 });
 
 // Auto-answer the first question (create column)
-setTimeout(() => {
-  child.stdin.write('+\n');
-}, 1000);
+child.stdin.write('+\n');
 
 // Auto-answer any other questions with default choices
-setTimeout(() => {
-  child.stdin.write('\n');
-  child.stdin.write('\n');
-  child.stdin.write('\n');
-  child.stdin.end();
-}, 2000);
+child.stdin.write('\n');
+child.stdin.write('\n');
+child.stdin.write('\n');
 
 child.stdout.on('data', (data) => {
   console.log(data.toString());
@@ -32,3 +27,8 @@ child.on('close', (code) => {
   console.log(`Schema push completed with code ${code}`);
   process.exit(code);
 });
+
+// Close stdin after a delay to ensure all questions are answered
+setTimeout(() => {
+  child.stdin.end();
+}, 3000);

@@ -3009,6 +3009,47 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async getExchangeRatesByYear(year: number): Promise<ExchangeRate[]> {
+    return db.select().from(exchangeRates)
+      .where(eq(exchangeRates.year, year))
+      .orderBy(exchangeRates.month);
+  }
+
+  async updateExchangeRate(id: number, exchangeRate: Partial<InsertExchangeRate>): Promise<ExchangeRate | undefined> {
+    try {
+      const [updated] = await db.update(exchangeRates)
+        .set({
+          ...exchangeRate,
+          updatedAt: new Date(),
+        })
+        .where(eq(exchangeRates.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating exchange rate:", error);
+      return undefined;
+    }
+  }
+
+  async deleteExchangeRate(id: number): Promise<boolean> {
+    try {
+      await db.delete(exchangeRates)
+        .where(eq(exchangeRates.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting exchange rate:", error);
+      return false;
+    }
+  }
+
+  async getLatestExchangeRate(): Promise<ExchangeRate | undefined> {
+    const [rate] = await db.select().from(exchangeRates)
+      .where(eq(exchangeRates.isActive, true))
+      .orderBy(desc(exchangeRates.year), desc(exchangeRates.month))
+      .limit(1);
+    return rate || undefined;
+  }
+
 }
 
 // Exportar solo la implementación de base de datos

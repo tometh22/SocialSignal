@@ -30,6 +30,7 @@ import {
   insertIndirectCostCategorySchema,
   insertIndirectCostSchema,
   insertNonBillableHoursSchema,
+  insertExchangeRateSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   exchangeRateHistory,
@@ -7596,6 +7597,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Error en la carga masiva de cotizaciones",
         error: error.message 
       });
+    }
+  });
+
+  // ==================== RUTAS PARA TIPOS DE CAMBIO ====================
+
+  // Obtener todos los tipos de cambio
+  app.get("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      
+      let rates;
+      if (year) {
+        rates = await storage.getExchangeRatesByYear(year);
+      } else {
+        rates = await storage.getExchangeRates();
+      }
+      
+      res.json(rates);
+    } catch (error) {
+      console.error("Error fetching exchange rates:", error);
+      res.status(500).json({ message: "Failed to fetch exchange rates" });
+    }
+  });
+
+  // Obtener tipo de cambio por mes específico
+  app.get("/api/exchange-rates/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      
+      if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Invalid year or month" });
+      }
+      
+      const rate = await storage.getExchangeRateByMonth(year, month);
+      
+      if (!rate) {
+        return res.status(404).json({ message: "Exchange rate not found for this period" });
+      }
+      
+      res.json(rate);
+    } catch (error) {
+      console.error("Error fetching exchange rate:", error);
+      res.status(500).json({ message: "Failed to fetch exchange rate" });
+    }
+  });
+
+  // Crear nuevo tipo de cambio
+  app.post("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const validatedData = insertExchangeRateSchema.parse({
+        ...req.body,
+        createdBy: (req as any).userId
+      });
+      
+      // Verificar si ya existe un tipo de cambio para este período
+      const existing = await storage.getExchangeRateByMonth(validatedData.year, validatedData.month);
+      if (existing) {
+        return res.status(409).json({ 
+          message: "Exchange rate already exists for this period",
+          existingRate: existing
+        });
+      }
+      
+      const rate = await storage.createExchangeRate(validatedData);
+      res.status(201).json(rate);
+    } catch (error) {
+      console.error("Error creating exchange rate:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid exchange rate data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create exchange rate" });
+    }
+  });
+
+  // Actualizar tipo de cambio existente
+  app.patch("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid exchange rate ID" });
+      }
+      
+      const validatedData = insertExchangeRateSchema.partial().parse({
+        ...req.body,
+        updatedBy: (req as any).userId
+      });
+      
+      const updatedRate = await storage.updateExchangeRate(id, validatedData);
+      
+      if (!updatedRate) {
+        return res.status(404).json({ message: "Exchange rate not found" });
+      }
+      
+      res.json(updatedRate);
+    } catch (error) {
+      console.error("Error updating exchange rate:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid exchange rate data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update exchange rate" });
+    }
+  });
+
+  // Eliminar tipo de cambio
+  app.delete("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid exchange rate ID" });
+      }
+      
+      const success = await storage.deleteExchangeRate(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Exchange rate not found" });
+      }
+      
+      res.json({ success: true, message: "Exchange rate deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting exchange rate:", error);
+      res.status(500).json({ message: "Failed to delete exchange rate" });
+    }
+  });
+
+  // Obtener el tipo de cambio más reciente
+  app.get("/api/exchange-rates/latest", requireAuth, async (req, res) => {
+    try {
+      const latestRate = await storage.getLatestExchangeRate();
+      
+      if (!latestRate) {
+        return res.status(404).json({ message: "No exchange rates found" });
+      }
+      
+      res.json(latestRate);
+    } catch (error) {
+      console.error("Error fetching latest exchange rate:", error);
+      res.status(500).json({ message: "Failed to fetch latest exchange rate" });
     }
   });
 

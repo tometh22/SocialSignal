@@ -248,6 +248,7 @@ export const quotations = pgTable("quotations", {
   projectedCostARS: doublePrecision("projected_cost_ars"), // Costo proyectado en pesos argentinos
   usdExchangeRate: doublePrecision("usd_exchange_rate"), // Tipo de cambio USD/ARS al momento de cotización
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
+  exchangeRateAtQuote: numeric("exchange_rate_at_quote", { precision: 10, scale: 4 }), // Tipo de cambio al momento de cotizar
   proposalLink: text("proposal_link"), // Link to the proposal document
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -434,16 +435,20 @@ export type SystemConfig = typeof systemConfig.$inferSelect;
 export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
 
 // ==================== TIPOS DE CAMBIO HISTÓRICOS ====================
-// Historical exchange rates for USD/ARS from BCRA
+// Historical exchange rates for USD/ARS - Manual configuration for month-end rates
 export const exchangeRates = pgTable("exchange_rates", {
   id: serial("id").primaryKey(),
   year: integer("year").notNull(),
   month: integer("month").notNull(), // 1-12
-  exchangeRate: doublePrecision("exchange_rate").notNull(), // Tipo de cambio USD/ARS (ej: 1220.00)
-  rateType: text("rate_type").notNull().default("official"), // 'official', 'blue', 'mep', etc.
-  source: text("source").default("BCRA"), // Fuente del dato
+  rate: numeric("rate", { precision: 10, scale: 4 }).notNull(), // Tipo de cambio ARS por 1 USD (ej: 1220.5000)
+  rateType: varchar("rate_type", { length: 20 }).notNull().default("end_of_month"), // end_of_month, daily, average
+  specificDate: timestamp("specific_date"), // Para tipos de cambio de fechas específicas (opcional)
+  notes: text("notes"), // Notas adicionales sobre el tipo de cambio
+  source: text("source").default("Manual"), // Fuente del dato (Manual, BCRA, etc.)
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
   updatedBy: integer("updated_by").references(() => users.id),
 });
 
@@ -451,6 +456,8 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  specificDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
@@ -709,6 +716,7 @@ export const timeEntries = pgTable("time_entries", {
   // Nuevos campos para manejo de costos
   totalCost: doublePrecision("total_cost").notNull(), // Costo total calculado o ingresado
   hourlyRateAtTime: doublePrecision("hourly_rate_at_time").notNull(), // Valor hora al momento del registro (histórico)
+  exchangeRateId: integer("exchange_rate_id").references(() => exchangeRates.id), // Referencia al tipo de cambio del mes
   entryType: varchar("entry_type", { length: 20 }).notNull().default("hours"), // "hours" o "cost"
   description: text("description"),
   // Nuevos campos para manejar períodos de tiempo
