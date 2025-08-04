@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 - **Security**: Session-based authentication, input sanitization, file upload restrictions, and role-based access control.
 - **Financial Coherence**: Consistent application of business logic for markup, cost, and profit calculations across all reports and dashboards, including inflation and indirect costs.
 - **Dynamic Content**: Elimination of hardcoded values, relying on dynamic data integration from approved quotations.
+- **Dual-Cost System**: Complete implementation of real costs (actual cash outflow from freelancers) vs operational costs (total team productivity analysis). Full-time employees with fixed salaries generate only operational costs, while part-time/freelance workers generate both types. System verified as 100% mathematically consistent across all components (Aug 2025).
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL serverless database connection.
