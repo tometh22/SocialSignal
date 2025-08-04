@@ -77,6 +77,7 @@ export default function Clients() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [deletingClients, setDeletingClients] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const { forceRefresh } = useImageRefresh();
 
@@ -164,7 +165,14 @@ export default function Clients() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      // Remove from deleting state
+      setDeletingClients(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      
       // Invalidate multiple queries to ensure all data is refreshed
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       queryClient.refetchQueries({ queryKey: ['/api/clients'] });
@@ -174,7 +182,14 @@ export default function Clients() {
         description: "El cliente ha sido eliminado exitosamente.",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, id) => {
+      // Remove from deleting state on error
+      setDeletingClients(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      
       toast({
         title: "Error al eliminar cliente",
         description: error.message || "No se pudo eliminar el cliente. Puede que tenga proyectos o cotizaciones activos.",
@@ -234,11 +249,13 @@ export default function Clients() {
     },
   });
 
-  // Filtrar clientes según término de búsqueda
+  // Filtrar clientes según término de búsqueda y excluir los que se están eliminando
   const filteredClients = Array.isArray(clients) ? clients.filter((client: Client) =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
+    !deletingClients.has(client.id) && (
+      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
   ) : [];
 
   const openNewClientDialog = () => {
@@ -284,6 +301,10 @@ export default function Clients() {
 
   const handleDeleteClient = (client: Client) => {
     if (confirm(`¿Estás seguro de que quieres eliminar el cliente ${client.name}?`)) {
+      // Add to deleting state immediately for instant UI feedback
+      setDeletingClients(prev => new Set([...prev, client.id]));
+      
+      // Then perform the actual deletion
       deleteMutation.mutate(client.id);
     }
   };
