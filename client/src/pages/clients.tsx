@@ -165,29 +165,41 @@ export default function Clients() {
       
       return response.json();
     },
-    onSuccess: (_, id) => {
-      // Immediately update cache to remove the client
-      queryClient.setQueryData(['/api/clients'], (oldData: Client[] | undefined) => {
-        if (!oldData) return oldData;
-        return oldData.filter(client => client.id !== id);
+    onMutate: async (id: number) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey: ['/api/clients'] });
+
+      // Snapshot the previous value
+      const previousClients = queryClient.getQueryData(['/api/clients']);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(['/api/clients'], (old: Client[] | undefined) => {
+        if (!old) return old;
+        return old.filter(client => client.id !== id);
       });
-      
-      // Remove from deleting state since it's now permanently gone
+
+      // Return a context object with the snapshotted value
+      return { previousClients };
+    },
+    onSuccess: (_, id) => {
+      // Remove from deleting state since deletion was successful
       setDeletingClients(prev => {
         const newSet = new Set(prev);
         newSet.delete(id);
         return newSet;
       });
       
-      // Background refresh to sync with server (but don't wait for it)
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      
       toast({
         title: "Cliente eliminado",
         description: "El cliente ha sido eliminado exitosamente.",
       });
     },
-    onError: (error: Error, id) => {
+    onError: (error: Error, id, context) => {
+      // Rollback to previous state on error
+      if (context?.previousClients) {
+        queryClient.setQueryData(['/api/clients'], context.previousClients);
+      }
+      
       // Remove from deleting state on error
       setDeletingClients(prev => {
         const newSet = new Set(prev);
@@ -200,6 +212,13 @@ export default function Clients() {
         description: error.message || "No se pudo eliminar el cliente. Puede que tenga proyectos o cotizaciones activos.",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to sync with server
+      // But do it after a small delay to avoid race conditions
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      }, 1000);
     },
   });
 
