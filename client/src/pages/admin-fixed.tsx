@@ -1286,37 +1286,7 @@ export default function Admin() {
 
           <div className="grid gap-6 md:grid-cols-2">
             {/* Configuración del tipo de cambio */}
-            <Card className="standard-card">
-              <CardHeader>
-                <CardTitle className="heading-card">Tipo de Cambio USD/ARS</CardTitle>
-                <CardDescription>
-                  Configura el tipo de cambio actual para conversiones
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="card-content space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Input
-                    type="number"
-                    value={exchangeRate}
-                    onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
-                    placeholder="1100"
-                    className="flex-1"
-                  />
-                  <Button 
-                    onClick={handleUpdateExchangeRate}
-                    disabled={exchangeRateMutation.isPending}
-                  >
-                    {exchangeRateMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Actualizar
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Tipo de cambio actual: <span className="font-mono">${currentExchangeRate}</span>
-                </p>
-              </CardContent>
-            </Card>
+
           </div>
 
           {/* Tabla de datos históricos */}
