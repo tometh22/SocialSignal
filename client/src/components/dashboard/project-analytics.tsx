@@ -181,12 +181,21 @@ const ProjectAnalytics: React.FC<ProjectAnalyticsProps> = ({
 
             <Card className="shadow-sm">
               <CardHeader className="p-4 pb-2">
-                <CardTitle className="text-xs font-medium text-muted-foreground">Costo Actual</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground">Costos del Proyecto</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="text-2xl font-bold">{formatCurrency(costSummary?.actualCost || 0)}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  vs {formatCurrency(costSummary?.plannedCost || 0)} planificado
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-lg font-bold text-green-600">{formatCurrency(costSummary?.actualCost || 0)}</div>
+                    <div className="text-xs text-muted-foreground">Costo Real (freelancers)</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-blue-600">{formatCurrency(costSummary?.operationalCost || 0)}</div>
+                    <div className="text-xs text-muted-foreground">Costo Operacional (total)</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
+                    vs {formatCurrency(costSummary?.plannedCost || 0)} planificado
+                  </div>
                 </div>
               </CardContent>
             </Card>

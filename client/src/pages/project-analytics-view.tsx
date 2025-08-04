@@ -66,7 +66,7 @@ interface ActiveProject {
     projectName: string;
     clientId: number;
     totalAmount: number;
-	baseCost?: number;
+        baseCost?: number;
     estimatedHours?: number;
     projectType?: string;
     billingFrequency?: string;
@@ -391,17 +391,50 @@ const ProjectAnalyticsView: React.FC = () => {
     return filtered;
   }, [timeEntries, timeFilter, getFilteredTimeEntries]);
 
-  // Calcular resumen de costos usando datos filtrados
+  // Calcular resumen de costos usando datos filtrados - USANDO LÓGICA CONSISTENTE
   const costSummary = useMemo(() => {
     if (!quotationData || !personnel || !roles) return null;
 
     const dataToUse = timeFilter === "all" ? timeEntries : filteredTimeEntries;
 
+    // Calcular costo real usando la misma lógica que getProjectCostSummary
     let actualCost = 0;
+    let operationalCost = 0;
+    
+    // Agrupar por persona y mes
+    const personMonthGroups = new Map<string, { person: any, entries: any[], monthYear: string }>();
+    
     dataToUse.forEach(entry => {
       const person = personnel.find(p => p.id === entry.personnelId);
-      if (person && entry.hours) {
-        actualCost += entry.hours * person.hourlyRate;
+      if (!person || !entry.hours) return;
+      
+      const entryDate = new Date(entry.date || entry.createdAt);
+      const monthYear = `${entryDate.getFullYear()}-${entryDate.getMonth()}`;
+      const key = `${person.id}-${monthYear}`;
+      
+      if (!personMonthGroups.has(key)) {
+        personMonthGroups.set(key, {
+          person,
+          entries: [],
+          monthYear
+        });
+      }
+      
+      personMonthGroups.get(key)!.entries.push(entry);
+    });
+
+    // Calcular costos por persona/mes
+    personMonthGroups.forEach(({ person, entries }) => {
+      const totalHours = entries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      
+      if (person.contractType === 'full-time' && person.monthlyFixedSalary) {
+        // Full-time: No genera costo real, solo operacional
+        operationalCost += totalHours * person.hourlyRate;
+      } else {
+        // Freelance/Part-time: Genera costo real
+        const costForPeriod = totalHours * person.hourlyRate;
+        actualCost += costForPeriod;
+        operationalCost += costForPeriod;
       }
     });
 
@@ -414,17 +447,20 @@ const ProjectAnalyticsView: React.FC = () => {
 
     const percentageUsed = plannedCost > 0 ? (actualCost / plannedCost) * 100 : 0;
 
-    console.log('💰 Cost summary calculated:', {
+    console.log('💰 Cost summary calculated (CONSISTENT LOGIC):', {
       filter: timeFilter,
-      actualCost,
+      actualCost: actualCost.toFixed(2),
+      operationalCost: operationalCost.toFixed(2),
       plannedCost,
       percentageUsed,
       entriesUsed: dataToUse.length,
+      personGroups: personMonthGroups.size,
       projectType: quotationData.projectType
     });
 
     return {
       actualCost,
+      operationalCost,
       plannedCost,
       percentageUsed: Math.min(percentageUsed, 100)
     };
@@ -816,7 +852,7 @@ const ProjectAnalyticsView: React.FC = () => {
               <h3 className="text-base font-medium text-gray-700">Métricas Detalladas</h3>
             </div>
 
-			{/* Filtros y botones de acción */}
+                        {/* Filtros y botones de acción */}
           <div className="flex flex-wrap gap-2 mb-4">
             <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
               <SelectTrigger className="w-48">
@@ -835,7 +871,7 @@ const ProjectAnalyticsView: React.FC = () => {
               </SelectContent>
             </Select>
 
-			{/* Selector de rango personalizado */}
+                        {/* Selector de rango personalizado */}
             {timeFilter === "custom" && (
               <div className="flex items-center gap-2">
                 <Input

@@ -23,7 +23,9 @@ export function TemplateCost({ templateId, platformCost, deviationPercentage }: 
     return <div className="font-medium">${total.toFixed(2)}</div>;
   }
 
-  // Calcular costo del personal
+  // Calcular costo del personal - USANDO LÓGICA CONSISTENTE
+  // NOTA: Para templates, usamos defaultRate ya que no tenemos datos históricos
+  // En proyectos reales se usa la lógica de getProjectCostSummary
   const personnelCost = assignments.reduce(
     (sum, assignment) => sum + (parseFloat(assignment.hours) * assignment.role.defaultRate),
     0
