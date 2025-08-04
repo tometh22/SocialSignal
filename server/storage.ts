@@ -296,13 +296,7 @@ export interface IStorage {
   bulkCreateExchangeRates(rates: InsertExchangeRate[]): Promise<ExchangeRate[]>;
   deleteMonthlyHourAdjustment(id: number): Promise<boolean>;
 
-  // Personnel Historical Costs operations
-  getPersonnelHistoricalCosts(): Promise<PersonnelHistoricalCost[]>;
-  getPersonnelHistoricalCostsByPersonnel(personnelId: number): Promise<PersonnelHistoricalCost[]>;
-  getPersonnelHistoricalCostByPeriod(personnelId: number, year: number, month: number): Promise<PersonnelHistoricalCost | undefined>;
-  createPersonnelHistoricalCost(cost: InsertPersonnelHistoricalCost): Promise<PersonnelHistoricalCost>;
-  updatePersonnelHistoricalCost(id: number, cost: Partial<InsertPersonnelHistoricalCost>): Promise<PersonnelHistoricalCost | undefined>;
-  deletePersonnelHistoricalCost(id: number): Promise<boolean>;
+  // Personnel Historical Costs operations (usando campos en personnel)
   getEffectivePersonnelCostForPeriod(personnelId: number, year: number, month: number): Promise<number | undefined>;
 
   // Indirect Cost Category operations
@@ -830,7 +824,6 @@ export class DatabaseStorage implements IStorage {
             personnelName: personnelData?.name || '',
             personnelEmail: personnelData?.email || '',
             personnelHourlyRate: personnelData?.hourlyRate || 0,
-            personnelProfilePicture: personnelData?.profilePicture || null,
             roleName: roleData[0]?.name || 'Unknown Role',
             roleDescription: roleData[0]?.description || ''
           };
@@ -866,7 +859,6 @@ export class DatabaseStorage implements IStorage {
             personnelName: personnelData?.name || '',
             personnelEmail: personnelData?.email || '',
             personnelHourlyRate: personnelData?.hourlyRate || 0,
-            personnelProfilePicture: personnelData?.profilePicture || null,
             roleName: roleData[0]?.name || 'Unknown Role',
             roleDescription: roleData[0]?.description || ''
           };
@@ -1138,27 +1130,7 @@ export class DatabaseStorage implements IStorage {
 
   // Time entry operations
   async getTimeEntriesByProject(projectId: number): Promise<TimeEntry[]> {
-    const entries = await db
-      .select({
-        ...timeEntries,
-        personnel: {
-          id: personnel.id,
-          name: personnel.name,
-          hourlyRate: personnel.hourlyRate,
-          roleId: personnel.roleId
-        },
-        role: {
-          id: roles.id,
-          name: roles.name,
-          description: roles.description
-        }
-      })
-      .from(timeEntries)
-      .leftJoin(personnel, eq(timeEntries.personnelId, personnel.id))
-      .leftJoin(roles, eq(personnel.roleId, roles.id))
-      .where(eq(timeEntries.projectId, projectId));
-    
-    return entries as any[];
+    return await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
   }
 
   async getTimeEntriesByPersonnel(personnelId: number): Promise<TimeEntry[]> {
@@ -1860,7 +1832,7 @@ export class DatabaseStorage implements IStorage {
       const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
       
       // Obtener personal involucrado en el proyecto
-      const personnelIds = [...new Set(entries.map(e => e.personnelId))];
+      const personnelIds = Array.from(new Set(entries.map(e => e.personnelId)));
       const allPersonnel = await db.select().from(personnel).where(inArray(personnel.id, personnelIds));
 
       let totalRealCost = 0;
@@ -1923,6 +1895,28 @@ export class DatabaseStorage implements IStorage {
 
       const budget = parseFloat(String(project.deliverableBudget || 0));
 
+      // Crear resumen por persona
+      const costByPerson = allPersonnel
+        .filter(person => person.includeInRealCosts)
+        .map(person => {
+          const personRealCost = Array.from(costByPersonMonth.entries())
+            .filter(([key]) => key.startsWith(`${person.id}-`))
+            .reduce((sum, [, cost]) => sum + cost, 0);
+            
+          const personOperationalCost = Array.from(operationalByPersonMonth.entries())
+            .filter(([key]) => key.startsWith(`${person.id}-`))
+            .reduce((sum, [, cost]) => sum + cost, 0);
+
+          return {
+            personnelId: person.id,
+            name: person.name,
+            contractType: person.contractType,
+            realCost: personRealCost,
+            operationalCost: personOperationalCost
+          };
+        })
+        .filter(person => person.realCost > 0 || person.operationalCost > 0);
+
       console.log(`💰 Proyecto ${projectId} - Real: $${totalRealCost.toFixed(2)} | Operacional: $${operationalCost.toFixed(2)} | Presupuesto: $${budget.toFixed(2)}`);
 
       return {
@@ -1932,6 +1926,7 @@ export class DatabaseStorage implements IStorage {
         budget,
         variance: budget - totalRealCost,
         percentageUsed: budget ? (totalRealCost / budget) * 100 : 0,
+        costByPerson, // Desglose por persona
         costBreakdown: {
           realCost: totalRealCost,
           operationalCost: operationalCost,
@@ -3142,12 +3137,7 @@ export class DatabaseStorage implements IStorage {
     return rate || undefined;
   }
 
-  // ==================== PERSONNEL HISTORICAL COSTS ====================
-
-  async getPersonnelHistoricalCosts(): Promise<PersonnelHistoricalCost[]> {
-    return db.select().from(personnelHistoricalCosts)
-      .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month));
-  }
+  // ==================== PERSONNEL HISTORICAL COSTS (Usando campos en personnel) ====================
 
   async getPersonnelHistoricalCostsByPersonnel(personnelId: number): Promise<PersonnelHistoricalCost[]> {
     return db.select().from(personnelHistoricalCosts)
@@ -3231,18 +3221,7 @@ export class DatabaseStorage implements IStorage {
     return person?.hourlyRateARS || undefined;
   }
 
-  // Función auxiliar para obtener el campo correcto de costo histórico
-  private getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
-    const monthNames = [
-      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-      'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
-    ];
-    
-    const monthName = monthNames[month];
-    const suffix = type === 'hourly' ? 'HourlyRateARS' : 'MonthlySalaryARS';
-    
-    return `${monthName}${year}${suffix}`;
-  }
+
 
 }
 
