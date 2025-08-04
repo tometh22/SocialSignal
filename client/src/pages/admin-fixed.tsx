@@ -82,7 +82,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
-import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
+import { CompactHistoricalCosts } from "@/components/admin/CompactHistoricalCosts";
 
 import { 
   InsertPersonnel, 
@@ -1121,21 +1121,21 @@ export default function Admin() {
             )}
           </Card>
 
-          {/* Separador visual */}
-          <div className="border-t border-gray-200 my-8"></div>
-
-          {/* Tabla de Costos Históricos */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-1 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
-              <h2 className="text-xl font-semibold text-gray-900">Gestión de Costos Históricos</h2>
+          {/* Sección de Costos Históricos - Solo si hay personal */}
+          {sortedPersonnel && sortedPersonnel.length > 0 && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1 w-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
+                  <h2 className="text-lg font-semibold text-gray-900">Costos Históricos Mensuales</h2>
+                </div>
+                <div className="text-sm text-gray-500">
+                  Para análisis de rentabilidad y costos reales
+                </div>  
+              </div>
+              <CompactHistoricalCosts personnel={sortedPersonnel} />
             </div>
-            <p className="text-sm text-gray-600 mb-6">
-              Configure los costos históricos mensuales para cada miembro del equipo. 
-              Esta información se utiliza para calcular costos reales en proyectos pasados y análisis de rentabilidad.
-            </p>
-            <HistoricalCostsTable personnel={sortedPersonnel || []} />
-          </div>
+          )}
         </TabsContent>
 
         <TabsContent value="templates">

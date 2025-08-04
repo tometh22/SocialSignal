@@ -109,34 +109,42 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
     }).format(value);
   };
 
+  if (personnel.length === 0) {
+    return (
+      <div className="bg-gray-50 rounded-lg border border-dashed border-gray-300 p-8 text-center">
+        <p className="text-gray-500">
+          Añada personal primero para configurar costos históricos mensuales.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="bg-white rounded-lg border shadow-sm">
-        <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Tabla de Costos Mensuales - Año 2025
-          </h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Haga clic en las celdas para editar. Valores en ARS. 
-            {personnel.length > 0 ? `${personnel.length} miembros del equipo` : 'Añada personal para configurar costos históricos.'}
-          </p>
+        <div className="p-4 border-b bg-gray-50">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-medium text-gray-900">
+              Año 2025 - {personnel.length} personas
+            </h3>
+            <div className="text-xs text-gray-500">
+              Clic para editar • Valores en ARS
+            </div>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
+        <div className="overflow-x-auto max-h-80 overflow-y-auto border rounded">
+          <table className="min-w-full text-xs">
+            <thead className="bg-gray-100 sticky top-0">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 border-r">
+                <th className="px-3 py-2 text-left font-medium text-gray-700 sticky left-0 bg-gray-100 border-r">
                   Personal
                 </th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                <th className="px-2 py-2 text-center font-medium text-gray-700 border-r w-16">
                   Tipo
                 </th>
                 {months.map((month) => (
-                  <th
-                    key={month.key}
-                    className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-r"
-                  >
+                  <th key={month.key} className="px-2 py-2 text-center font-medium text-gray-700 border-r w-20">
                     {month.label}
                   </th>
                 ))}
@@ -147,11 +155,11 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                 <>
                   {/* Fila de tarifa por hora */}
                   <tr key={`${person.id}-hourly`} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white border-r">
+                    <td className="px-3 py-1 text-sm font-medium text-gray-900 sticky left-0 bg-white border-r">
                       {person.name}
                     </td>
-                    <td className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 text-center border-r">
-                      ARS/Hora
+                    <td className="px-2 py-1 text-xs text-gray-600 text-center border-r">
+                      $/hr
                     </td>
                     {months.map((month) => {
                       const field = `${month.key}HourlyRateARS`;
