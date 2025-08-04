@@ -165,41 +165,26 @@ export default function Clients() {
       
       return response.json();
     },
-    onMutate: async (id: number) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
-      await queryClient.cancelQueries({ queryKey: ['/api/clients'] });
-
-      // Snapshot the previous value
-      const previousClients = queryClient.getQueryData(['/api/clients']);
-
-      // Optimistically update to the new value
-      queryClient.setQueryData(['/api/clients'], (old: Client[] | undefined) => {
-        if (!old) return old;
-        return old.filter(client => client.id !== id);
-      });
-
-      // Return a context object with the snapshotted value
-      return { previousClients };
-    },
     onSuccess: (_, id) => {
-      // Remove from deleting state since deletion was successful
-      setDeletingClients(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
+      // Wait a bit and then refresh the data
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+        queryClient.refetchQueries({ queryKey: ['/api/clients'] });
+        
+        // Remove from deleting state after refetch
+        setDeletingClients(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }, 500);
       
       toast({
         title: "Cliente eliminado",
         description: "El cliente ha sido eliminado exitosamente.",
       });
     },
-    onError: (error: Error, id, context) => {
-      // Rollback to previous state on error
-      if (context?.previousClients) {
-        queryClient.setQueryData(['/api/clients'], context.previousClients);
-      }
-      
+    onError: (error: Error, id) => {
       // Remove from deleting state on error
       setDeletingClients(prev => {
         const newSet = new Set(prev);
@@ -212,13 +197,6 @@ export default function Clients() {
         description: error.message || "No se pudo eliminar el cliente. Puede que tenga proyectos o cotizaciones activos.",
         variant: "destructive",
       });
-    },
-    onSettled: () => {
-      // Always refetch after error or success to sync with server
-      // But do it after a small delay to avoid race conditions
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      }, 1000);
     },
   });
 
@@ -325,11 +303,13 @@ export default function Clients() {
 
   const handleDeleteClient = (client: Client) => {
     if (confirm(`¿Estás seguro de que quieres eliminar el cliente ${client.name}?`)) {
-      // Add to deleting state immediately for instant UI feedback
+      // Add to deleting state for animation
       setDeletingClients(prev => new Set([...prev, client.id]));
       
-      // Then perform the actual deletion
-      deleteMutation.mutate(client.id);
+      // Wait for animation and then delete
+      setTimeout(() => {
+        deleteMutation.mutate(client.id);
+      }, 300);
     }
   };
 
@@ -394,7 +374,12 @@ export default function Clients() {
             ) : filteredClients.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredClients.map((client: Client) => (
-                  <div key={client.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div 
+                    key={client.id} 
+                    className={`border rounded-lg p-4 hover:shadow-md transition-all duration-300 ${
+                      deletingClients.has(client.id) ? 'opacity-0 scale-95 pointer-events-none' : ''
+                    }`}
+                  >
                     <div className="flex items-start justify-between mb-3">
                       <ClientLogo client={client} />
                       <div className="flex gap-1">
