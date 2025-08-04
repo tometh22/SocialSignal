@@ -79,6 +79,7 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClients, setDeletingClients] = useState<Set<number>>(new Set());
   const [deletedClients, setDeletedClients] = useState<Set<number>>(new Set());
+  const [newClients, setNewClients] = useState<Client[]>([]);
   const { toast } = useToast();
   const { forceRefresh } = useImageRefresh();
 
@@ -95,15 +96,17 @@ export default function Clients() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(client),
       }).then(res => res.json()),
-    onSuccess: () => {
-      // Invalidar múltiples queries para actualización inmediata
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/active-projects'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/quotations'] });
-      // Forzar refresh de todas las imágenes
-      forceRefresh();
+    onSuccess: (newClient: Client) => {
+      // Agregar inmediatamente a la lista local
+      setNewClients(prev => [...prev, newClient]);
+      
+      // Cerrar dialogo y limpiar formulario
       setDialogOpen(false);
       form.reset();
+      
+      // Forzar refresh de todas las imágenes
+      forceRefresh();
+      
       toast({
         title: "Cliente creado",
         description: "El cliente ha sido creado exitosamente.",
@@ -249,14 +252,17 @@ export default function Clients() {
     },
   });
 
+  // Combinar clientes del servidor con los nuevos creados localmente
+  const allClients = Array.isArray(clients) ? [...clients, ...newClients] : newClients;
+  
   // Filtrar clientes según término de búsqueda y excluir los que se están eliminando
-  const filteredClients = Array.isArray(clients) ? clients.filter((client: Client) =>
+  const filteredClients = allClients.filter((client: Client) =>
     !deletingClients.has(client.id) && !deletedClients.has(client.id) && (
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
     )
-  ) : [];
+  );
 
   const openNewClientDialog = () => {
     setIsEditing(false);
