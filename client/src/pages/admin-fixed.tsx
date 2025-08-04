@@ -82,7 +82,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
-import { CompactHistoricalCosts } from "@/components/admin/CompactHistoricalCosts";
+
 
 import { 
   InsertPersonnel, 
@@ -1126,14 +1126,19 @@ export default function Admin() {
             <div className="mt-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-1 w-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
-                  <h2 className="text-lg font-semibold text-gray-900">Costos Históricos Mensuales</h2>
+                  <div className="h-1 w-8 bg-gradient-to-r from-green-500 to-green-600 rounded"></div>
+                  <h2 className="text-lg font-semibold text-gray-900">Gestión de Costos Históricos</h2>
                 </div>
                 <div className="text-sm text-gray-500">
-                  Para análisis de rentabilidad y costos reales
+                  Haz clic en el botón ⌄ junto a cada persona para ver y editar costos históricos
                 </div>  
               </div>
-              <CompactHistoricalCosts personnel={sortedPersonnel} />
+              <div className="p-4 bg-green-50 rounded-lg border-l-4 border-green-400">
+                <p className="text-sm text-green-800">
+                  <strong>💡 Nuevo:</strong> Los costos históricos ahora se manejan directamente en la tabla de personal.
+                  Haz clic en el botón verde de expansión (⌄) junto a cualquier persona para ver y editar sus costos mensuales en ARS.
+                </p>
+              </div>
             </div>
           )}
         </TabsContent>

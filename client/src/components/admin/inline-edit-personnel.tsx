@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Check, X, Loader2, Trash2, HelpCircle } from "lucide-react";
+import { Edit, Check, X, Loader2, Trash2, HelpCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface InlineEditPersonnelProps {
@@ -20,6 +20,31 @@ interface InlineEditPersonnelProps {
     contractType?: string;
     monthlyFixedSalary?: number;
     includeInRealCosts?: boolean;
+    // Historical costs fields
+    jan2025HourlyRateARS?: number;
+    feb2025HourlyRateARS?: number;
+    mar2025HourlyRateARS?: number;
+    apr2025HourlyRateARS?: number;
+    may2025HourlyRateARS?: number;
+    jun2025HourlyRateARS?: number;
+    jul2025HourlyRateARS?: number;
+    aug2025HourlyRateARS?: number;
+    sep2025HourlyRateARS?: number;
+    oct2025HourlyRateARS?: number;
+    nov2025HourlyRateARS?: number;
+    dec2025HourlyRateARS?: number;
+    jan2025MonthlySalaryARS?: number;
+    feb2025MonthlySalaryARS?: number;
+    mar2025MonthlySalaryARS?: number;
+    apr2025MonthlySalaryARS?: number;
+    may2025MonthlySalaryARS?: number;
+    jun2025MonthlySalaryARS?: number;
+    jul2025MonthlySalaryARS?: number;
+    aug2025MonthlySalaryARS?: number;
+    sep2025MonthlySalaryARS?: number;
+    oct2025MonthlySalaryARS?: number;
+    nov2025MonthlySalaryARS?: number;
+    dec2025MonthlySalaryARS?: number;
   };
   roles: any[];
 }
@@ -27,6 +52,7 @@ interface InlineEditPersonnelProps {
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showHistoricalCosts, setShowHistoricalCosts] = useState(false);
   const [editedName, setEditedName] = useState(person.name);
   const [editedEmail, setEditedEmail] = useState(person.email);
   const [editedRoleId, setEditedRoleId] = useState(person.roleId.toString());
@@ -34,9 +60,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
+  const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const months = [
+    { key: "jan2025", label: "Ene" }, { key: "feb2025", label: "Feb" },
+    { key: "mar2025", label: "Mar" }, { key: "apr2025", label: "Abr" },
+    { key: "may2025", label: "May" }, { key: "jun2025", label: "Jun" },
+    { key: "jul2025", label: "Jul" }, { key: "aug2025", label: "Ago" },
+    { key: "sep2025", label: "Sep" }, { key: "oct2025", label: "Oct" },
+    { key: "nov2025", label: "Nov" }, { key: "dec2025", label: "Dic" },
+  ];
 
   const updatePersonnelMutation = useMutation({
     mutationFn: async (data: { 
@@ -122,6 +158,43 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setIsDeleting(true);
       deletePersonnelMutation.mutate();
     }
+  };
+
+  const updateHistoricalCostMutation = useMutation({
+    mutationFn: async (data: { field: string; value: number | null }) => {
+      return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      toast({
+        title: "Costo histórico actualizado",
+        description: "El valor ha sido guardado correctamente.",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Error al actualizar costo histórico:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Hubo un error al actualizar el costo histórico.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleHistoricalCostChange = (field: string, value: string) => {
+    const numericValue = value === '' ? null : parseFloat(value);
+    if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
+      updateHistoricalCostMutation.mutate({ field, value: numericValue });
+      setEditingCells(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const getCellValue = (field: string) => {
+    if (editingCells[field] !== undefined) {
+      return editingCells[field];
+    }
+    const value = (person as any)[field];
+    return value ? value.toString() : '';
   };
 
   const handleSave = () => {
@@ -340,6 +413,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   }
 
   return (
+    <>
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-6 py-4">
         <div className="font-medium text-gray-900">{person.name}</div>
@@ -388,6 +462,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowHistoricalCosts(!showHistoricalCosts)}
+                  className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors"
+                >
+                  {showHistoricalCosts ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Ver costos históricos mensuales</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Button
             size="sm"
             variant="ghost"
@@ -413,5 +504,88 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </div>
       </td>
     </tr>
+    {showHistoricalCosts && (
+      <tr className="border-b bg-green-50/30">
+        <td colSpan={8} className="px-6 py-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              <h4 className="font-semibold text-gray-900">Costos Históricos - {person.name}</h4>
+              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                Valores en ARS - Para análisis de rentabilidad
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-6">
+              {/* Tarifa por Hora ARS */}
+              <div className="space-y-3">
+                <h5 className="font-medium text-gray-700 flex items-center gap-2">
+                  💰 Tarifa por Hora (ARS)
+                </h5>
+                <div className="grid grid-cols-6 gap-2">
+                  {months.map((month) => {
+                    const fieldName = `${month.key}HourlyRateARS`;
+                    return (
+                      <div key={fieldName} className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600 block text-center">
+                          {month.label}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={getCellValue(fieldName)}
+                          onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
+                          className="h-8 text-xs text-center border-gray-200 focus:border-green-400"
+                          placeholder="0"
+                          disabled={updateHistoricalCostMutation.isPending}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sueldo Mensual ARS */}
+              <div className="space-y-3">
+                <h5 className="font-medium text-gray-700 flex items-center gap-2">
+                  🏢 Sueldo Mensual (ARS)
+                </h5>
+                <div className="grid grid-cols-6 gap-2">
+                  {months.map((month) => {
+                    const fieldName = `${month.key}MonthlySalaryARS`;
+                    return (
+                      <div key={fieldName} className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600 block text-center">
+                          {month.label}
+                        </label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={getCellValue(fieldName)}
+                          onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
+                          className="h-8 text-xs text-center border-gray-200 focus:border-green-400"
+                          placeholder="0"
+                          disabled={updateHistoricalCostMutation.isPending}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+              <p className="text-sm text-blue-800">
+                <strong>Uso de los datos:</strong> Los valores históricos se utilizan para calcular la rentabilidad real 
+                de proyectos pasados. Los valores actuales (tabla superior) se usan para nuevas cotizaciones.
+              </p>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
