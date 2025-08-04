@@ -187,6 +187,39 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   includeInRealCosts: true,
 });
 
+// ==================== COSTOS HISTÓRICOS DE PERSONAL ====================
+// Tabla para almacenar los costos por hora de cada persona en diferentes períodos
+export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  hourlyRateARS: doublePrecision("hourly_rate_ars").notNull(), // Costo por hora en ARS para ese período
+  hourlyRateUSD: doublePrecision("hourly_rate_usd"), // Opcional, para referencia
+  adjustmentReason: text("adjustment_reason"), // Por qué cambió el costo (inflación, upgrade de rol, etc.)
+  effectiveDate: timestamp("effective_date").notNull(), // Fecha desde cuando aplica esta tarifa
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"), // Notas adicionales sobre el cambio
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+// Índice único para evitar duplicados por persona/año/mes
+// Esto asegura que solo haya un costo por persona por mes
+
+export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  effectiveDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
+export type PersonnelHistoricalCost = typeof personnelHistoricalCosts.$inferSelect;
+export type InsertPersonnelHistoricalCost = z.infer<typeof insertPersonnelHistoricalCostSchema>;
+
 // ==================== PLANTILLAS DE REPORTES ====================
 // Report templates table
 export const reportTemplates = pgTable("report_templates", {
@@ -866,6 +899,14 @@ export const rolesRelations = relations(roles, ({ many }) => ({
 export const personnelRelations = relations(personnel, ({ one, many }) => ({
   role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
   quotationTeamMembers: many(quotationTeamMembers),
+  historicalCosts: many(personnelHistoricalCosts),
+}));
+
+// Relaciones de costos históricos de personal
+export const personnelHistoricalCostsRelations = relations(personnelHistoricalCosts, ({ one }) => ({
+  personnel: one(personnel, { fields: [personnelHistoricalCosts.personnelId], references: [personnel.id] }),
+  creator: one(users, { fields: [personnelHistoricalCosts.createdBy], references: [users.id] }),
+  updater: one(users, { fields: [personnelHistoricalCosts.updatedBy], references: [users.id] }),
 }));
 
 // Relaciones de plantillas de reportes

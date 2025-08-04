@@ -26,6 +26,7 @@ import {
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
   type ExchangeRate, type InsertExchangeRate,
+  type PersonnelHistoricalCost, type InsertPersonnelHistoricalCost,
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
   type NonBillableHours, type InsertNonBillableHours,
@@ -36,7 +37,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
+  negotiationHistory, exchangeRates, personnelHistoricalCosts, indirectCostCategories, indirectCosts, nonBillableHours
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -281,6 +282,15 @@ export interface IStorage {
   createExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate>;
   bulkCreateExchangeRates(rates: InsertExchangeRate[]): Promise<ExchangeRate[]>;
   deleteMonthlyHourAdjustment(id: number): Promise<boolean>;
+
+  // Personnel Historical Costs operations
+  getPersonnelHistoricalCosts(): Promise<PersonnelHistoricalCost[]>;
+  getPersonnelHistoricalCostsByPersonnel(personnelId: number): Promise<PersonnelHistoricalCost[]>;
+  getPersonnelHistoricalCostByPeriod(personnelId: number, year: number, month: number): Promise<PersonnelHistoricalCost | undefined>;
+  createPersonnelHistoricalCost(cost: InsertPersonnelHistoricalCost): Promise<PersonnelHistoricalCost>;
+  updatePersonnelHistoricalCost(id: number, cost: Partial<InsertPersonnelHistoricalCost>): Promise<PersonnelHistoricalCost | undefined>;
+  deletePersonnelHistoricalCost(id: number): Promise<boolean>;
+  getEffectivePersonnelCostForPeriod(personnelId: number, year: number, month: number): Promise<number | undefined>;
 
   // Indirect Cost Category operations
   getIndirectCostCategories(): Promise<IndirectCostCategory[]>;
@@ -3052,6 +3062,95 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(exchangeRates.year), desc(exchangeRates.month))
       .limit(1);
     return rate || undefined;
+  }
+
+  // ==================== PERSONNEL HISTORICAL COSTS ====================
+
+  async getPersonnelHistoricalCosts(): Promise<PersonnelHistoricalCost[]> {
+    return db.select().from(personnelHistoricalCosts)
+      .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month));
+  }
+
+  async getPersonnelHistoricalCostsByPersonnel(personnelId: number): Promise<PersonnelHistoricalCost[]> {
+    return db.select().from(personnelHistoricalCosts)
+      .where(eq(personnelHistoricalCosts.personnelId, personnelId))
+      .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month));
+  }
+
+  async getPersonnelHistoricalCostByPeriod(personnelId: number, year: number, month: number): Promise<PersonnelHistoricalCost | undefined> {
+    const [cost] = await db.select().from(personnelHistoricalCosts)
+      .where(and(
+        eq(personnelHistoricalCosts.personnelId, personnelId),
+        eq(personnelHistoricalCosts.year, year),
+        eq(personnelHistoricalCosts.month, month)
+      ))
+      .limit(1);
+    return cost || undefined;
+  }
+
+  async createPersonnelHistoricalCost(cost: InsertPersonnelHistoricalCost): Promise<PersonnelHistoricalCost> {
+    const [created] = await db.insert(personnelHistoricalCosts)
+      .values(cost)
+      .returning();
+    return created;
+  }
+
+  async updatePersonnelHistoricalCost(id: number, cost: Partial<InsertPersonnelHistoricalCost>): Promise<PersonnelHistoricalCost | undefined> {
+    try {
+      const [updated] = await db.update(personnelHistoricalCosts)
+        .set({
+          ...cost,
+          updatedAt: new Date(),
+        })
+        .where(eq(personnelHistoricalCosts.id, id))
+        .returning();
+      return updated || undefined;
+    } catch (error) {
+      console.error("Error updating personnel historical cost:", error);
+      return undefined;
+    }
+  }
+
+  async deletePersonnelHistoricalCost(id: number): Promise<boolean> {
+    try {
+      await db.delete(personnelHistoricalCosts)
+        .where(eq(personnelHistoricalCosts.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting personnel historical cost:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Obtiene el costo efectivo por hora de una persona para un período específico.
+   * Busca primero en costos históricos, si no encuentra usa el costo actual.
+   */
+  async getEffectivePersonnelCostForPeriod(personnelId: number, year: number, month: number): Promise<number | undefined> {
+    // Buscar costo histórico específico para ese período
+    const historicalCost = await this.getPersonnelHistoricalCostByPeriod(personnelId, year, month);
+    
+    if (historicalCost) {
+      return historicalCost.hourlyRateARS;
+    }
+
+    // Si no hay costo histórico, buscar el costo histórico más reciente anterior a ese período
+    const [previousCost] = await db.select().from(personnelHistoricalCosts)
+      .where(and(
+        eq(personnelHistoricalCosts.personnelId, personnelId),
+        sql`(${personnelHistoricalCosts.year} < ${year} OR (${personnelHistoricalCosts.year} = ${year} AND ${personnelHistoricalCosts.month} < ${month}))`,
+        eq(personnelHistoricalCosts.isActive, true)
+      ))
+      .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month))
+      .limit(1);
+
+    if (previousCost) {
+      return previousCost.hourlyRateARS;
+    }
+
+    // Si no hay costos históricos, usar el costo actual del personal
+    const person = await this.getPersonnelById(personnelId);
+    return person?.hourlyRateARS || undefined;
   }
 
 }

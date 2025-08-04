@@ -81,6 +81,7 @@ import { RoleSummary } from "@/components/admin/role-summary";
 import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
+import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
 
 import { 
   InsertPersonnel, 
@@ -910,7 +911,7 @@ export default function Admin() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Roles
@@ -934,6 +935,10 @@ export default function Admin() {
           <TabsTrigger value="inflation" className="flex items-center gap-2">
             <BadgeDollarSign className="h-4 w-4" />
             Inflación
+          </TabsTrigger>
+          <TabsTrigger value="historical-costs" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Costos Históricos
           </TabsTrigger>
         </TabsList>
 
@@ -1380,6 +1385,12 @@ export default function Admin() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="historical-costs">
+          <div className="mt-6">
+            <PersonnelHistoricalCostsManager />
+          </div>
         </TabsContent>
       </Tabs>
 

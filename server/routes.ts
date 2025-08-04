@@ -31,6 +31,7 @@ import {
   insertIndirectCostSchema,
   insertNonBillableHoursSchema,
   insertExchangeRateSchema,
+  insertPersonnelHistoricalCostSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   exchangeRateHistory,
@@ -7721,6 +7722,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching latest exchange rate:", error);
       res.status(500).json({ message: "Failed to fetch latest exchange rate" });
+    }
+  });
+
+  // ==================== PERSONNEL HISTORICAL COSTS ====================
+
+  // Obtener todos los costos históricos de personal
+  app.get("/api/personnel-historical-costs", requireAuth, async (req, res) => {
+    try {
+      const costs = await storage.getPersonnelHistoricalCosts();
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching personnel historical costs:", error);
+      res.status(500).json({ message: "Failed to fetch personnel historical costs" });
+    }
+  });
+
+  // Obtener costos históricos por persona
+  app.get("/api/personnel-historical-costs/personnel/:personnelId", requireAuth, async (req, res) => {
+    try {
+      const personnelId = parseInt(req.params.personnelId);
+      if (isNaN(personnelId)) {
+        return res.status(400).json({ message: "Invalid personnel ID" });
+      }
+
+      const costs = await storage.getPersonnelHistoricalCostsByPersonnel(personnelId);
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching personnel historical costs:", error);
+      res.status(500).json({ message: "Failed to fetch personnel historical costs" });
+    }
+  });
+
+  // Obtener costo histórico por período específico
+  app.get("/api/personnel-historical-costs/personnel/:personnelId/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const personnelId = parseInt(req.params.personnelId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      if (isNaN(personnelId) || isNaN(year) || isNaN(month)) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const cost = await storage.getPersonnelHistoricalCostByPeriod(personnelId, year, month);
+      
+      if (!cost) {
+        return res.status(404).json({ message: "No cost found for the specified period" });
+      }
+
+      res.json(cost);
+    } catch (error) {
+      console.error("Error fetching personnel historical cost:", error);
+      res.status(500).json({ message: "Failed to fetch personnel historical cost" });
+    }
+  });
+
+  // Obtener costo efectivo por período (con fallback)
+  app.get("/api/personnel-historical-costs/effective/:personnelId/:year/:month", requireAuth, async (req, res) => {
+    try {
+      const personnelId = parseInt(req.params.personnelId);
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+
+      if (isNaN(personnelId) || isNaN(year) || isNaN(month)) {
+        return res.status(400).json({ message: "Invalid parameters" });
+      }
+
+      const effectiveCost = await storage.getEffectivePersonnelCostForPeriod(personnelId, year, month);
+      
+      if (effectiveCost === undefined) {
+        return res.status(404).json({ message: "No cost found for personnel" });
+      }
+
+      res.json({ 
+        personnelId, 
+        year, 
+        month, 
+        effectiveHourlyRateARS: effectiveCost 
+      });
+    } catch (error) {
+      console.error("Error fetching effective personnel cost:", error);
+      res.status(500).json({ message: "Failed to fetch effective personnel cost" });
+    }
+  });
+
+  // Crear nuevo costo histórico
+  app.post("/api/personnel-historical-costs", requireAuth, async (req, res) => {
+    try {
+      const validatedData = insertPersonnelHistoricalCostSchema.parse({
+        ...req.body,
+        createdBy: req.session.userId,
+        effectiveDate: new Date(),
+        isActive: true
+      });
+
+      const newCost = await storage.createPersonnelHistoricalCost(validatedData);
+      res.status(201).json(newCost);
+    } catch (error) {
+      console.error("Error creating personnel historical cost:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid cost data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create personnel historical cost" });
+    }
+  });
+
+  // Actualizar costo histórico existente
+  app.patch("/api/personnel-historical-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+      
+      const validatedData = insertPersonnelHistoricalCostSchema.partial().parse({
+        ...req.body,
+        updatedBy: req.session.userId
+      });
+      
+      const updatedCost = await storage.updatePersonnelHistoricalCost(id, validatedData);
+      
+      if (!updatedCost) {
+        return res.status(404).json({ message: "Personnel historical cost not found" });
+      }
+      
+      res.json(updatedCost);
+    } catch (error) {
+      console.error("Error updating personnel historical cost:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid cost data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update personnel historical cost" });
+    }
+  });
+
+  // Eliminar costo histórico
+  app.delete("/api/personnel-historical-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+      
+      const success = await storage.deletePersonnelHistoricalCost(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Personnel historical cost not found" });
+      }
+      
+      res.json({ success: true, message: "Personnel historical cost deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting personnel historical cost:", error);
+      res.status(500).json({ message: "Failed to delete personnel historical cost" });
     }
   });
 
