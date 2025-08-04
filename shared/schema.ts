@@ -174,6 +174,55 @@ export const personnel = pgTable("personnel", {
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
   monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
   includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
+  
+  // ==================== COSTOS HISTÓRICOS 2025 ====================
+  // Enero 2025
+  jan2025HourlyRateARS: doublePrecision("jan_2025_hourly_rate_ars"),
+  jan2025MonthlySalaryARS: doublePrecision("jan_2025_monthly_salary_ars"),
+  
+  // Febrero 2025
+  feb2025HourlyRateARS: doublePrecision("feb_2025_hourly_rate_ars"),
+  feb2025MonthlySalaryARS: doublePrecision("feb_2025_monthly_salary_ars"),
+  
+  // Marzo 2025
+  mar2025HourlyRateARS: doublePrecision("mar_2025_hourly_rate_ars"),
+  mar2025MonthlySalaryARS: doublePrecision("mar_2025_monthly_salary_ars"),
+  
+  // Abril 2025
+  apr2025HourlyRateARS: doublePrecision("apr_2025_hourly_rate_ars"),
+  apr2025MonthlySalaryARS: doublePrecision("apr_2025_monthly_salary_ars"),
+  
+  // Mayo 2025
+  may2025HourlyRateARS: doublePrecision("may_2025_hourly_rate_ars"),
+  may2025MonthlySalaryARS: doublePrecision("may_2025_monthly_salary_ars"),
+  
+  // Junio 2025
+  jun2025HourlyRateARS: doublePrecision("jun_2025_hourly_rate_ars"),
+  jun2025MonthlySalaryARS: doublePrecision("jun_2025_monthly_salary_ars"),
+  
+  // Julio 2025
+  jul2025HourlyRateARS: doublePrecision("jul_2025_hourly_rate_ars"),
+  jul2025MonthlySalaryARS: doublePrecision("jul_2025_monthly_salary_ars"),
+  
+  // Agosto 2025
+  aug2025HourlyRateARS: doublePrecision("aug_2025_hourly_rate_ars"),
+  aug2025MonthlySalaryARS: doublePrecision("aug_2025_monthly_salary_ars"),
+  
+  // Septiembre 2025
+  sep2025HourlyRateARS: doublePrecision("sep_2025_hourly_rate_ars"),
+  sep2025MonthlySalaryARS: doublePrecision("sep_2025_monthly_salary_ars"),
+  
+  // Octubre 2025
+  oct2025HourlyRateARS: doublePrecision("oct_2025_hourly_rate_ars"),
+  oct2025MonthlySalaryARS: doublePrecision("oct_2025_monthly_salary_ars"),
+  
+  // Noviembre 2025
+  nov2025HourlyRateARS: doublePrecision("nov_2025_hourly_rate_ars"),
+  nov2025MonthlySalaryARS: doublePrecision("nov_2025_monthly_salary_ars"),
+  
+  // Diciembre 2025
+  dec2025HourlyRateARS: doublePrecision("dec_2025_hourly_rate_ars"),
+  dec2025MonthlySalaryARS: doublePrecision("dec_2025_monthly_salary_ars"),
 });
 
 export const insertPersonnelSchema = createInsertSchema(personnel).pick({
@@ -185,40 +234,34 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   contractType: true,
   monthlyFixedSalary: true,
   includeInRealCosts: true,
+  // Costos históricos 2025
+  jan2025HourlyRateARS: true,
+  jan2025MonthlySalaryARS: true,
+  feb2025HourlyRateARS: true,
+  feb2025MonthlySalaryARS: true,
+  mar2025HourlyRateARS: true,
+  mar2025MonthlySalaryARS: true,
+  apr2025HourlyRateARS: true,
+  apr2025MonthlySalaryARS: true,
+  may2025HourlyRateARS: true,
+  may2025MonthlySalaryARS: true,
+  jun2025HourlyRateARS: true,
+  jun2025MonthlySalaryARS: true,
+  jul2025HourlyRateARS: true,
+  jul2025MonthlySalaryARS: true,
+  aug2025HourlyRateARS: true,
+  aug2025MonthlySalaryARS: true,
+  sep2025HourlyRateARS: true,
+  sep2025MonthlySalaryARS: true,
+  oct2025HourlyRateARS: true,
+  oct2025MonthlySalaryARS: true,
+  nov2025HourlyRateARS: true,
+  nov2025MonthlySalaryARS: true,
+  dec2025HourlyRateARS: true,
+  dec2025MonthlySalaryARS: true,
 });
 
-// ==================== COSTOS HISTÓRICOS DE PERSONAL ====================
-// Tabla para almacenar los costos por hora de cada persona en diferentes períodos
-export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
-  id: serial("id").primaryKey(),
-  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
-  year: integer("year").notNull(),
-  month: integer("month").notNull(), // 1-12
-  hourlyRateARS: doublePrecision("hourly_rate_ars").notNull(), // Costo por hora en ARS para ese período
-  hourlyRateUSD: doublePrecision("hourly_rate_usd"), // Opcional, para referencia
-  adjustmentReason: text("adjustment_reason"), // Por qué cambió el costo (inflación, upgrade de rol, etc.)
-  effectiveDate: timestamp("effective_date").notNull(), // Fecha desde cuando aplica esta tarifa
-  isActive: boolean("is_active").notNull().default(true),
-  notes: text("notes"), // Notas adicionales sobre el cambio
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdBy: integer("created_by").notNull().references(() => users.id),
-  updatedBy: integer("updated_by").references(() => users.id),
-});
 
-// Índice único para evitar duplicados por persona/año/mes
-// Esto asegura que solo haya un costo por persona por mes
-
-export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  effectiveDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
-});
-
-export type PersonnelHistoricalCost = typeof personnelHistoricalCosts.$inferSelect;
-export type InsertPersonnelHistoricalCost = z.infer<typeof insertPersonnelHistoricalCostSchema>;
 
 // ==================== PLANTILLAS DE REPORTES ====================
 // Report templates table
@@ -899,15 +942,9 @@ export const rolesRelations = relations(roles, ({ many }) => ({
 export const personnelRelations = relations(personnel, ({ one, many }) => ({
   role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
   quotationTeamMembers: many(quotationTeamMembers),
-  historicalCosts: many(personnelHistoricalCosts),
 }));
 
-// Relaciones de costos históricos de personal
-export const personnelHistoricalCostsRelations = relations(personnelHistoricalCosts, ({ one }) => ({
-  personnel: one(personnel, { fields: [personnelHistoricalCosts.personnelId], references: [personnel.id] }),
-  creator: one(users, { fields: [personnelHistoricalCosts.createdBy], references: [users.id] }),
-  updater: one(users, { fields: [personnelHistoricalCosts.updatedBy], references: [users.id] }),
-}));
+
 
 // Relaciones de plantillas de reportes
 export const reportTemplatesRelations = relations(reportTemplates, ({ many }) => ({

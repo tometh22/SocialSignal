@@ -26,7 +26,7 @@ import {
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
   type ExchangeRate, type InsertExchangeRate,
-  type PersonnelHistoricalCost, type InsertPersonnelHistoricalCost,
+
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
   type NonBillableHours, type InsertNonBillableHours,
@@ -37,7 +37,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  negotiationHistory, exchangeRates, personnelHistoricalCosts, indirectCostCategories, indirectCosts, nonBillableHours
+  negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";

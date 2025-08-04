@@ -82,6 +82,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
+import { HistoricalCostsTable } from "@/components/admin/HistoricalCostsTable";
 
 import { 
   InsertPersonnel, 
@@ -736,7 +737,7 @@ export default function Admin() {
       email: personnel.email || "",
       roleId: personnel.roleId,
       hourlyRate: personnel.hourlyRate,
-      contractType: personnel.contractType || "full-time",
+      contractType: (personnel.contractType as "full-time" | "part-time" | "freelance") || "full-time",
       monthlyFixedSalary: personnel.monthlyFixedSalary || 0,
       includeInRealCosts: personnel.includeInRealCosts ?? true
     });
@@ -1122,6 +1123,11 @@ export default function Admin() {
               </div>
             )}
           </Card>
+
+          {/* Tabla de Costos Históricos */}
+          {sortedPersonnel && sortedPersonnel.length > 0 && (
+            <HistoricalCostsTable personnel={sortedPersonnel} />
+          )}
         </TabsContent>
 
         <TabsContent value="templates">
