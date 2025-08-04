@@ -937,10 +937,7 @@ export default function Admin() {
             <BadgeDollarSign className="h-4 w-4" />
             Inflación
           </TabsTrigger>
-          <TabsTrigger value="historical-costs" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Costos Históricos
-          </TabsTrigger>
+
         </TabsList>
 
         <TabsContent value="roles">
@@ -1125,9 +1122,7 @@ export default function Admin() {
           </Card>
 
           {/* Tabla de Costos Históricos */}
-          {sortedPersonnel && sortedPersonnel.length > 0 && (
-            <HistoricalCostsTable personnel={sortedPersonnel} />
-          )}
+          <HistoricalCostsTable personnel={sortedPersonnel || []} />
         </TabsContent>
 
         <TabsContent value="templates">
@@ -1393,11 +1388,7 @@ export default function Admin() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="historical-costs">
-          <div className="mt-6">
-            <PersonnelHistoricalCostsManager />
-          </div>
-        </TabsContent>
+
       </Tabs>
 
       {/* Diálogo para crear/editar roles */}
