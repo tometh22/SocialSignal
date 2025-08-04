@@ -44,6 +44,19 @@ import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
+// Función auxiliar para obtener el campo correcto de costo histórico
+function getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
+  const monthNames = [
+    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+    'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+  ];
+  
+  const monthName = monthNames[month];
+  const suffix = type === 'hourly' ? 'HourlyRateARS' : 'MonthlySalaryARS';
+  
+  return `${monthName}${year}${suffix}`;
+}
+
 export interface IStorage {
   // Client operations
   getClients(): Promise<Client[]>;
@@ -1845,20 +1858,85 @@ export class DatabaseStorage implements IStorage {
       if (!project) return null;
 
       const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
+      
+      // Obtener personal involucrado en el proyecto
+      const personnelIds = [...new Set(entries.map(e => e.personnelId))];
+      const allPersonnel = await db.select().from(personnel).where(inArray(personnel.id, personnelIds));
 
-      let totalCost = 0;
+      let totalRealCost = 0;
+      let operationalCost = 0;
+      
+      // Calcular costos reales por persona y mes
+      const costByPersonMonth = new Map<string, number>();
+      const operationalByPersonMonth = new Map<string, number>();
+
       for (const entry of entries) {
-        totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
+        if (!entry.billable) continue;
+
+        const person = allPersonnel.find(p => p.id === entry.personnelId);
+        if (!person || !person.includeInRealCosts) continue;
+
+        const entryDate = new Date(entry.date);
+        const year = entryDate.getFullYear();
+        const month = entryDate.getMonth(); // 0-based (0 = enero)
+        const personMonthKey = `${person.id}-${year}-${month}`;
+
+        // Calcular costo operacional (siempre horas × tarifa registrada)
+        const operationalEntryCoste = entry.hours * (entry.hourlyRateAtTime || person.hourlyRate);
+        operationalByPersonMonth.set(personMonthKey, 
+          (operationalByPersonMonth.get(personMonthKey) || 0) + operationalEntryCoste);
+
+        // Solo contar una vez por persona por mes para costos reales
+        if (!costByPersonMonth.has(personMonthKey)) {
+          let realMonthlyCost = 0;
+
+          if (person.contractType === 'full-time') {
+            // Para full-time: usar sueldo fijo mensual histórico
+            const monthField = getHistoricalMonthField(year, month, 'salary');
+            realMonthlyCost = person[monthField as keyof Personnel] as number || person.monthlyFixedSalary || 0;
+          } else {
+            // Para freelance/part-time: usar horas trabajadas × tarifa histórica de ese mes
+            const monthField = getHistoricalMonthField(year, month, 'hourly');
+            const historicalRate = person[monthField as keyof Personnel] as number || person.hourlyRate;
+            
+            // Sumar todas las horas de esa persona en ese mes
+            const monthlyHours = entries
+              .filter(e => {
+                const eDate = new Date(e.date);
+                return e.personnelId === person.id && 
+                       e.billable && 
+                       eDate.getFullYear() === year && 
+                       eDate.getMonth() === month;
+              })
+              .reduce((sum, e) => sum + e.hours, 0);
+            
+            realMonthlyCost = monthlyHours * historicalRate;
+          }
+
+          costByPersonMonth.set(personMonthKey, realMonthlyCost);
+        }
       }
+
+      // Sumar todos los costos reales y operacionales
+      totalRealCost = Array.from(costByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
+      operationalCost = Array.from(operationalByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
 
       const budget = parseFloat(String(project.deliverableBudget || 0));
 
+      console.log(`💰 Proyecto ${projectId} - Real: $${totalRealCost.toFixed(2)} | Operacional: $${operationalCost.toFixed(2)} | Presupuesto: $${budget.toFixed(2)}`);
+
       return {
         projectId,
-        totalCost,
+        totalCost: totalRealCost, // Costo real para rentabilidad
+        operationalCost, // Costo operacional para análisis de productividad
         budget,
-        variance: budget - totalCost,
-        percentageUsed: budget ? (totalCost / budget) * 100 : 0
+        variance: budget - totalRealCost,
+        percentageUsed: budget ? (totalRealCost / budget) * 100 : 0,
+        costBreakdown: {
+          realCost: totalRealCost,
+          operationalCost: operationalCost,
+          personnelCount: personnelIds.length
+        }
       };
     } catch (error) {
       console.error("Error al obtener resumen de costos del proyecto:", error);
@@ -3151,6 +3229,19 @@ export class DatabaseStorage implements IStorage {
     // Si no hay costos históricos, usar el costo actual del personal
     const person = await this.getPersonnelById(personnelId);
     return person?.hourlyRateARS || undefined;
+  }
+
+  // Función auxiliar para obtener el campo correcto de costo histórico
+  private getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
+    const monthNames = [
+      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+      'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+    ];
+    
+    const monthName = monthNames[month];
+    const suffix = type === 'hourly' ? 'HourlyRateARS' : 'MonthlySalaryARS';
+    
+    return `${monthName}${year}${suffix}`;
   }
 
 }
