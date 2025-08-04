@@ -870,15 +870,6 @@ export class DatabaseStorage implements IStorage {
     await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
   }
 
-  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
-    try {
-      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
-    } catch (error) {
-      console.error("Error al eliminar miembros del equipo:", error);
-      throw error;
-    }
-  }
-
   // Template role assignment operations
   async getTemplateRoleAssignments(templateId: number): Promise<TemplateRoleAssignment[]> {
     return await db.select().from(templateRoleAssignments).where(eq(templateRoleAssignments.templateId, templateId));
@@ -1730,14 +1721,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteQuotationTeamMembers(quotationId: number): Promise<void> {
-    try {
-      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, quotationId));
-    } catch (error) {
-      console.error("Error al eliminar miembros del equipo:", error);
-      throw error;
-    }
-  }
+
 
   async getProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]> {
     try {
@@ -1944,15 +1928,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteQuotationTeamMemberById(id: number): Promise<boolean> {
-    try {
-      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.id, id));
-      return true;
-    } catch (error) {
-      console.error("Error al eliminar miembro del equipo por ID:", error);
-      return false;
-    }
-  }
+
 
   // ==================== MULTIPLICADORES DE COSTOS ====================
 

@@ -7359,45 +7359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return meses[mesNormalizado] || 1;
   }
 
-  // Endpoint para obtener tipos de cambio de la base de datos
-  app.get("/api/exchange-rates", requireAuth, async (req, res) => {
-    try {
-      const exchangeRates = await storage.getExchangeRates();
-      res.json(exchangeRates);
-    } catch (error) {
-      console.error('❌ Error obteniendo tipos de cambio de la base de datos:', error);
-      res.status(500).json({ 
-        success: false,
-        message: "Error al obtener tipos de cambio",
-        error: error.message 
-      });
-    }
-  });
-
-  // Endpoint para obtener tipo de cambio específico por mes/año
-  app.get("/api/exchange-rates/:year/:month", requireAuth, async (req, res) => {
-    try {
-      const year = parseInt(req.params.year);
-      const month = parseInt(req.params.month);
-      
-      const exchangeRate = await storage.getExchangeRateByMonth(year, month);
-      if (!exchangeRate) {
-        return res.status(404).json({ 
-          success: false,
-          message: "Tipo de cambio no encontrado para el período especificado" 
-        });
-      }
-      
-      res.json(exchangeRate);
-    } catch (error) {
-      console.error('❌ Error obteniendo tipo de cambio específico:', error);
-      res.status(500).json({ 
-        success: false,
-        message: "Error al obtener tipo de cambio",
-        error: error.message 
-      });
-    }
-  });
+  // Estos endpoints están duplicados más abajo, eliminando duplicados
 
 
 
