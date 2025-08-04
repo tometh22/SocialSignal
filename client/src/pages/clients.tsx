@@ -78,6 +78,7 @@ export default function Clients() {
   const [isEditing, setIsEditing] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClients, setDeletingClients] = useState<Set<number>>(new Set());
+  const [deletedClients, setDeletedClients] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const { forceRefresh } = useImageRefresh();
 
@@ -166,18 +167,15 @@ export default function Clients() {
       return response.json();
     },
     onSuccess: (_, id) => {
-      // Wait a bit and then refresh the data
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-        queryClient.refetchQueries({ queryKey: ['/api/clients'] });
-        
-        // Remove from deleting state after refetch
-        setDeletingClients(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
-      }, 500);
+      // Move client to permanently deleted list
+      setDeletedClients(prev => new Set([...prev, id]));
+      
+      // Remove from deleting state
+      setDeletingClients(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
       
       toast({
         title: "Cliente eliminado",
@@ -253,7 +251,7 @@ export default function Clients() {
 
   // Filtrar clientes según término de búsqueda y excluir los que se están eliminando
   const filteredClients = Array.isArray(clients) ? clients.filter((client: Client) =>
-    !deletingClients.has(client.id) && (
+    !deletingClients.has(client.id) && !deletedClients.has(client.id) && (
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (client.contactName && client.contactName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (client.contactEmail && client.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()))
