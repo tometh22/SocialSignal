@@ -7635,7 +7635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertExchangeRateSchema.parse({
         ...req.body,
-        createdBy: (req as any).userId
+        createdBy: req.session.userId
       });
       
       // Verificar si ya existe un tipo de cambio para este período
@@ -7668,7 +7668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = insertExchangeRateSchema.partial().parse({
         ...req.body,
-        updatedBy: (req as any).userId
+        updatedBy: req.session.userId
       });
       
       const updatedRate = await storage.updateExchangeRate(id, validatedData);
