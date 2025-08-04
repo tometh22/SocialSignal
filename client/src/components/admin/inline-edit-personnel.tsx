@@ -442,12 +442,22 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           {person.contractType === 'full-time' && person.monthlyFixedSalary ? (
-            <>
-              <span className="text-sm font-semibold text-blue-700">${person.monthlyFixedSalary.toFixed(2)}</span>
-              <span className="text-xs text-muted-foreground">/mes</span>
-            </>
+            <div className="flex flex-col items-start">
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-blue-700">${person.monthlyFixedSalary.toFixed(2)}</span>
+                <span className="text-xs text-muted-foreground">/mes</span>
+              </div>
+              <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded">
+                💰 Costo fijo - Rentabilidad
+              </span>
+            </div>
           ) : (
-            <span className="text-xs text-gray-400">-</span>
+            <div className="flex flex-col items-start">
+              <span className="text-xs text-gray-400">-</span>
+              <span className="text-xs text-green-600 bg-green-50 px-1 rounded">
+                ⏱️ Por horas trabajadas
+              </span>
+            </div>
           )}
         </div>
       </td>
@@ -576,11 +586,27 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </div>
             </div>
 
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-              <p className="text-sm text-blue-800">
-                <strong>Uso de los datos:</strong> Los valores históricos se utilizan para calcular la rentabilidad real 
-                de proyectos pasados. Los valores actuales (tabla superior) se usan para nuevas cotizaciones.
-              </p>
+            <div className="mt-4 space-y-3">
+              <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                <p className="text-sm text-blue-800">
+                  <strong>📊 Análisis Operacional:</strong> Los valores históricos se registran automáticamente en cada entrada de tiempo 
+                  para analizar productividad y cumplimiento de presupuestos.
+                </p>
+              </div>
+              
+              <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
+                <p className="text-sm text-purple-800">
+                  <strong>💰 Análisis Económico Real:</strong><br/>
+                  • <strong>Full-time:</strong> Se usa el sueldo fijo mensual (independiente de horas registradas)<br/>
+                  • <strong>Freelance/Part-time:</strong> Se usan las horas reales × tarifa histórica de cada mes
+                </p>
+              </div>
+              
+              <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                <p className="text-sm text-green-800">
+                  <strong>🎯 Valores Actuales:</strong> Los valores de la tabla superior se usan para nuevas cotizaciones y proyectos futuros.
+                </p>
+              </div>
             </div>
           </div>
         </td>
