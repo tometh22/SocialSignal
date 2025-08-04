@@ -166,19 +166,21 @@ export default function Clients() {
       return response.json();
     },
     onSuccess: (_, id) => {
-      // DON'T remove from deleting state - let the refetch handle it
-      // The client should be gone from server data now
-      
-      // Invalidate and refetch to get updated data from server
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
-      queryClient.refetchQueries({ queryKey: ['/api/clients'] }).then(() => {
-        // Only remove from deleting state after successful refetch
-        setDeletingClients(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(id);
-          return newSet;
-        });
+      // Immediately update cache to remove the client
+      queryClient.setQueryData(['/api/clients'], (oldData: Client[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.filter(client => client.id !== id);
       });
+      
+      // Remove from deleting state since it's now permanently gone
+      setDeletingClients(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+      
+      // Background refresh to sync with server (but don't wait for it)
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
       
       toast({
         title: "Cliente eliminado",
