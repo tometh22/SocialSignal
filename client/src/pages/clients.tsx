@@ -151,19 +151,33 @@ export default function Clients() {
 
   // Mutación para eliminar cliente
   const deleteMutation = useMutation({
-    mutationFn: (id: number) =>
-      fetch(`/api/clients/${id}`, { method: 'DELETE' }),
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/clients/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete client');
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
+      // Invalidate multiple queries to ensure all data is refreshed
       queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.refetchQueries({ queryKey: ['/api/clients'] });
+      
       toast({
         title: "Cliente eliminado",
         description: "El cliente ha sido eliminado exitosamente.",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: "No se pudo eliminar el cliente.",
+        title: "Error al eliminar cliente",
+        description: error.message || "No se pudo eliminar el cliente. Puede que tenga proyectos o cotizaciones activos.",
         variant: "destructive",
       });
     },
