@@ -110,15 +110,15 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
   };
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6">
       <div className="bg-white rounded-lg border shadow-sm">
         <div className="p-6 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
-            Costos Históricos 2025
+            Tabla de Costos Mensuales - Año 2025
           </h3>
           <p className="text-sm text-gray-600 mt-1">
-            Haga clic en las celdas para editar los costos históricos por mes. 
-            Todos los valores están en ARS. ({personnel.length} personas registradas)
+            Haga clic en las celdas para editar. Valores en ARS. 
+            {personnel.length > 0 ? `${personnel.length} miembros del equipo` : 'Añada personal para configurar costos históricos.'}
           </p>
         </div>
 

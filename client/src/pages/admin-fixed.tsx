@@ -1121,8 +1121,21 @@ export default function Admin() {
             )}
           </Card>
 
+          {/* Separador visual */}
+          <div className="border-t border-gray-200 my-8"></div>
+
           {/* Tabla de Costos Históricos */}
-          <HistoricalCostsTable personnel={sortedPersonnel || []} />
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-1 w-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
+              <h2 className="text-xl font-semibold text-gray-900">Gestión de Costos Históricos</h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              Configure los costos históricos mensuales para cada miembro del equipo. 
+              Esta información se utiliza para calcular costos reales en proyectos pasados y análisis de rentabilidad.
+            </p>
+            <HistoricalCostsTable personnel={sortedPersonnel || []} />
+          </div>
         </TabsContent>
 
         <TabsContent value="templates">
