@@ -435,29 +435,33 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-green-700">${person.hourlyRate.toFixed(1)}</span>
-          <span className="text-xs text-muted-foreground">/hr</span>
+          <span className="text-sm font-semibold text-green-700">
+            ${(person.hourlyRateARS || person.hourlyRate * 1200).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </span>
+          <span className="text-xs text-muted-foreground">ARS/hr</span>
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center gap-1">
+        <div className="flex flex-col items-start gap-1">
           {person.contractType === 'full-time' && person.monthlyFixedSalary ? (
-            <div className="flex flex-col items-start">
+            <>
               <div className="flex items-center gap-1">
-                <span className="text-sm font-semibold text-blue-700">${person.monthlyFixedSalary.toFixed(2)}</span>
-                <span className="text-xs text-muted-foreground">/mes</span>
+                <span className="text-sm font-semibold text-blue-700">
+                  ${person.monthlyFixedSalary.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </span>
+                <span className="text-xs text-muted-foreground">ARS/mes</span>
               </div>
-              <span className="text-xs text-blue-600 bg-blue-50 px-1 rounded">
-                💰 Costo fijo - Rentabilidad
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                Costo fijo mensual
               </span>
-            </div>
+            </>
           ) : (
-            <div className="flex flex-col items-start">
+            <>
               <span className="text-xs text-gray-400">-</span>
-              <span className="text-xs text-green-600 bg-green-50 px-1 rounded">
-                ⏱️ Por horas trabajadas
+              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                Por horas trabajadas
               </span>
-            </div>
+            </>
           )}
         </div>
       </td>
@@ -515,38 +519,42 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
     </tr>
     {showHistoricalCosts && (
-      <tr className="border-b bg-green-50/30">
+      <tr className="border-b bg-green-50/20">
         <td colSpan={8} className="px-6 py-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <h4 className="font-semibold text-gray-900">Costos Históricos - {person.name}</h4>
-              <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                Valores en ARS - Para análisis de rentabilidad
+          <div className="space-y-6">
+            <div className="flex items-center justify-between border-b border-green-200 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <h4 className="font-semibold text-gray-900 text-lg">Costos Históricos - {person.name}</h4>
+              </div>
+              <div className="text-xs text-gray-600 bg-green-100 px-3 py-1.5 rounded-full font-medium">
+                Valores en ARS • Análisis de rentabilidad
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-6">
               {/* Tarifa por Hora ARS */}
-              <div className="space-y-3">
-                <h5 className="font-medium text-gray-700 flex items-center gap-2">
-                  💰 Tarifa por Hora (ARS)
-                </h5>
-                <div className="grid grid-cols-6 gap-2">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <h5 className="font-semibold text-gray-800">Tarifa por Hora (ARS)</h5>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis operacional</span>
+                </div>
+                <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
                     const fieldName = `${month.key}HourlyRateARS`;
                     return (
-                      <div key={fieldName} className="space-y-1">
+                      <div key={fieldName} className="space-y-2">
                         <label className="text-xs font-medium text-gray-600 block text-center">
-                          {month.label}
+                          {month.label} 2025
                         </label>
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="1"
                           value={getCellValue(fieldName)}
                           onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
-                          className="h-8 text-xs text-center border-gray-200 focus:border-green-400"
+                          className="h-9 text-sm text-center border-gray-200 focus:border-green-400 focus:ring-green-400/20"
                           placeholder="0"
                           disabled={updateHistoricalCostMutation.isPending}
                         />
@@ -557,25 +565,27 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </div>
 
               {/* Sueldo Mensual ARS */}
-              <div className="space-y-3">
-                <h5 className="font-medium text-gray-700 flex items-center gap-2">
-                  🏢 Sueldo Mensual (ARS)
-                </h5>
-                <div className="grid grid-cols-6 gap-2">
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Full-time</span>
+                </div>
+                <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
                     const fieldName = `${month.key}MonthlySalaryARS`;
                     return (
-                      <div key={fieldName} className="space-y-1">
+                      <div key={fieldName} className="space-y-2">
                         <label className="text-xs font-medium text-gray-600 block text-center">
-                          {month.label}
+                          {month.label} 2025
                         </label>
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="1"
                           value={getCellValue(fieldName)}
                           onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
-                          className="h-8 text-xs text-center border-gray-200 focus:border-green-400"
+                          className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
                           placeholder="0"
                           disabled={updateHistoricalCostMutation.isPending}
                         />
@@ -586,26 +596,29 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </div>
             </div>
 
-            <div className="mt-4 space-y-3">
-              <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                <p className="text-sm text-blue-800">
-                  <strong>📊 Análisis Operacional:</strong> Los valores históricos se registran automáticamente en cada entrada de tiempo 
-                  para analizar productividad y cumplimiento de presupuestos.
-                </p>
-              </div>
-              
-              <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
-                <p className="text-sm text-purple-800">
-                  <strong>💰 Análisis Económico Real:</strong><br/>
-                  • <strong>Full-time:</strong> Se usa el sueldo fijo mensual (independiente de horas registradas)<br/>
-                  • <strong>Freelance/Part-time:</strong> Se usan las horas reales × tarifa histórica de cada mes
-                </p>
-              </div>
-              
-              <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
-                <p className="text-sm text-green-800">
-                  <strong>🎯 Valores Actuales:</strong> Los valores de la tabla superior se usan para nuevas cotizaciones y proyectos futuros.
-                </p>
+            <div className="mt-6 bg-gray-50 rounded-lg p-4">
+              <h6 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                Cómo se Usan Estos Valores
+              </h6>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <div className="font-medium text-blue-800 mb-1">Análisis Operacional</div>
+                  <div className="text-blue-700">Se registran automáticamente en cada entrada de tiempo para analizar productividad</div>
+                </div>
+                
+                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
+                  <div className="font-medium text-purple-800 mb-1">Análisis Económico</div>
+                  <div className="text-purple-700">
+                    <strong>Full-time:</strong> Sueldo fijo mensual<br/>
+                    <strong>Freelance:</strong> Horas × tarifa histórica
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                  <div className="font-medium text-green-800 mb-1">Nuevas Cotizaciones</div>
+                  <div className="text-green-700">Los valores actuales (tabla superior) se usan para proyectos futuros</div>
+                </div>
               </div>
             </div>
           </div>
