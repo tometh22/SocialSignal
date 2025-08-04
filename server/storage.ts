@@ -602,11 +602,11 @@ export class DatabaseStorage implements IStorage {
   async deleteClient(id: number): Promise<boolean> {
     try {
       // Check if client has active projects or quotations
-      const activeProjects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, id));
-      const quotations = await db.select().from(quotations).where(eq(quotations.clientId, id));
+      const clientActiveProjects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, id));
+      const clientQuotations = await db.select().from(quotations).where(eq(quotations.clientId, id));
       
-      if (activeProjects.length > 0 || quotations.length > 0) {
-        console.log(`Cannot delete client ${id}: has ${activeProjects.length} active projects and ${quotations.length} quotations`);
+      if (clientActiveProjects.length > 0 || clientQuotations.length > 0) {
+        console.log(`Cannot delete client ${id}: has ${clientActiveProjects.length} active projects and ${clientQuotations.length} quotations`);
         return false;
       }
 
