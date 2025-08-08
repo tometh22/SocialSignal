@@ -534,7 +534,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-green-700">
-            ${(person.hourlyRateARS || person.hourlyRate * 1200).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            ${person.hourlyRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </span>
           <span className="text-xs text-muted-foreground">ARS/hr</span>
         </div>
