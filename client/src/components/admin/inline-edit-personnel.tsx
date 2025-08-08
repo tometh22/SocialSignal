@@ -65,6 +65,43 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Función para obtener el último sueldo histórico
+  const getLatestHistoricalSalary = (): number | null => {
+    const salaryFields = [
+      'dec2025MonthlySalaryARS', 'nov2025MonthlySalaryARS', 'oct2025MonthlySalaryARS',
+      'sep2025MonthlySalaryARS', 'aug2025MonthlySalaryARS', 'jul2025MonthlySalaryARS',
+      'jun2025MonthlySalaryARS', 'may2025MonthlySalaryARS', 'apr2025MonthlySalaryARS',
+      'mar2025MonthlySalaryARS', 'feb2025MonthlySalaryARS', 'jan2025MonthlySalaryARS'
+    ];
+    
+    // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
+    for (const field of salaryFields) {
+      const value = (person as any)[field];
+      if (value && value > 0) {
+        return value;
+      }
+    }
+    return null;
+  };
+
+  // Función para actualizar el sueldo fijo con el último valor histórico
+  const updateSalaryFromHistorical = () => {
+    const latestSalary = getLatestHistoricalSalary();
+    if (latestSalary) {
+      setEditedMonthlyFixedSalary(latestSalary.toString());
+      toast({
+        title: "Sueldo actualizado",
+        description: `Sueldo fijo actualizado a $${latestSalary.toLocaleString()} ARS (último valor histórico)`,
+      });
+    } else {
+      toast({
+        title: "Sin datos históricos",
+        description: "No se encontraron datos históricos de sueldo para esta persona",
+        variant: "destructive"
+      });
+    }
+  };
+
   const months = [
     { key: "jan2025", label: "Ene" }, { key: "feb2025", label: "Feb" },
     { key: "mar2025", label: "Mar" }, { key: "apr2025", label: "Abr" },
@@ -342,6 +379,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               disabled={updatePersonnelMutation.isPending || editedContractType !== 'full-time'}
               placeholder="0.00"
             />
+            {editedContractType === 'full-time' && getLatestHistoricalSalary() && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={updateSalaryFromHistorical}
+                disabled={updatePersonnelMutation.isPending}
+                className="h-9 px-2 text-xs"
+                title="Actualizar con último valor histórico"
+              >
+                ↻
+              </Button>
+            )}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -351,6 +401,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   <p className="text-sm">
                     Sueldo fijo mensual para empleados full-time. Este es un costo de oportunidad 
                     (no se resta de las ganancias reales). Solo habilitado para contratos Full-time.
+                    {getLatestHistoricalSalary() && (
+                      <>
+                        <br /><br />
+                        <strong>Último valor histórico:</strong> ${getLatestHistoricalSalary()?.toLocaleString()} ARS
+                        <br />Haz clic en ↻ para actualizarlo automáticamente.
+                      </>
+                    )}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -450,6 +507,49 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   ${person.monthlyFixedSalary.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>
                 <span className="text-xs text-muted-foreground">ARS/mes</span>
+                {getLatestHistoricalSalary() && getLatestHistoricalSalary() !== person.monthlyFixedSalary && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full cursor-help">
+                          ⚠
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">
+                          <strong>Desactualizado:</strong><br />
+                          Último valor histórico: ${getLatestHistoricalSalary()?.toLocaleString()} ARS<br />
+                          Haz clic en "Editar" para actualizarlo.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                Costo fijo mensual
+              </span>
+            </>
+          ) : person.contractType === 'full-time' && !person.monthlyFixedSalary && getLatestHistoricalSalary() ? (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-gray-400">Sin configurar</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full cursor-help">
+                        ↻
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="text-sm">
+                        <strong>Datos disponibles:</strong><br />
+                        Último valor histórico: ${getLatestHistoricalSalary()?.toLocaleString()} ARS<br />
+                        Haz clic en "Editar" para configurarlo.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
               <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                 Costo fijo mensual
