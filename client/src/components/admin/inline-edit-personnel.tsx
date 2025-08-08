@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,7 +66,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const queryClient = useQueryClient();
   
   // Forzar invalidación del cache al montar el componente para Tomi Criado
-  React.useEffect(() => {
+  useEffect(() => {
     if (person.name === 'Tomi Criado') {
       console.log('🔄 Invalidando cache para Tomi Criado...');
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
