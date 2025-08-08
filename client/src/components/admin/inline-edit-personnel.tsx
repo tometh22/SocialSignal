@@ -64,6 +64,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Forzar invalidación del cache al montar el componente para Tomi Criado
+  React.useEffect(() => {
+    if (person.name === 'Tomi Criado') {
+      console.log('🔄 Invalidando cache para Tomi Criado...');
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    }
+  }, [person.name, queryClient]);
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
@@ -241,6 +249,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return editingCells[field];
     }
     const value = (person as any)[field];
+    
+    // Debug temporal para Tomi Criado
+    if (person.name === 'Tomi Criado' && field.includes('MonthlySalary')) {
+      console.log(`🔍 ${field}: ${value} (${typeof value}) - persona completa:`, person);
+    }
+    
     // Cambio crítico: mostrar valores numéricos reales, incluso 0
     // Solo mostrar cadena vacía para null o undefined
     return (value !== null && value !== undefined) ? value.toString() : '';
