@@ -201,8 +201,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     mutationFn: async (data: { field: string; value: number | null }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Actualizar cache inmediatamente
+      queryClient.setQueryData(["/api/personnel"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: any) => 
+          p.id === person.id ? { ...p, ...data } : p
+        );
+      });
+      
+      // Invalidar cache para forzar recarga
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      
       toast({
         title: "Costo histórico actualizado",
         description: "El valor ha sido guardado correctamente.",
@@ -221,8 +231,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleHistoricalCostChange = (field: string, value: string) => {
     const numericValue = value === '' ? null : parseFloat(value);
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
-      updateHistoricalCostMutation.mutate({ field, value: numericValue });
       setEditingCells(prev => ({ ...prev, [field]: value }));
+      updateHistoricalCostMutation.mutate({ field, value: numericValue });
     }
   };
 
