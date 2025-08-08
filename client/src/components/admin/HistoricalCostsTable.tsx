@@ -162,7 +162,7 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                         <span>{person.name}</span>
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                           person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' :
-                          person.contractType === 'part-time' ? 'bg-yellow-100 text-yellow-800' :
+                          person.contractType === 'part-time' ? 'bg-orange-100 text-orange-800' :
                           'bg-green-100 text-green-800'
                         }`}>
                           {person.contractType === 'full-time' ? 'Full-time' : 
