@@ -205,6 +205,20 @@ export default function Admin() {
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
+    onSuccess: (data) => {
+      console.log('🔍 DATOS PERSONNEL EN ADMIN PANEL:', data);
+      const tomi = data?.find(p => p.name?.includes('Tomi'));
+      if (tomi) {
+        console.log('🔍 TOMI EN ADMIN PANEL:', {
+          name: tomi.name,
+          jan2025MonthlySalaryARS: tomi.jan2025MonthlySalaryARS,
+          feb2025MonthlySalaryARS: tomi.feb2025MonthlySalaryARS,
+          mar2025MonthlySalaryARS: tomi.mar2025MonthlySalaryARS,
+          apr2025MonthlySalaryARS: tomi.apr2025MonthlySalaryARS,
+          allKeys: Object.keys(tomi)
+        });
+      }
+    }
   });
 
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
