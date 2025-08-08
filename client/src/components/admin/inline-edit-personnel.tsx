@@ -338,13 +338,16 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             onValueChange={setEditedRoleId}
             disabled={updatePersonnelMutation.isPending}
           >
-            <SelectTrigger className="h-9 border-blue-200 focus:border-blue-400">
+            <SelectTrigger className="h-9 border-purple-200 focus:border-purple-400">
               <SelectValue placeholder="Seleccionar rol" />
             </SelectTrigger>
             <SelectContent>
               {roles?.map((role: any) => (
                 <SelectItem key={role.id} value={role.id.toString()}>
-                  {role.name}
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span>{role.name}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -535,7 +538,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <div className="text-sm text-muted-foreground">{person.email}</div>
       </td>
       <td className="px-6 py-4">
-        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-medium">
           {person.roleName}
         </span>
       </td>
