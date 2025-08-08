@@ -1107,6 +1107,24 @@ export default function Admin() {
                         </TableHead>
                         <TableHead>
                           <div className="flex items-center gap-1">
+                            Horas Mensuales
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="h-3 w-3 text-gray-400 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm">
+                                    Horas de trabajo mensuales para empleados Full-time. 
+                                    Se usa para calcular automáticamente la tarifa por hora.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </TableHead>
+                        <TableHead>
+                          <div className="flex items-center gap-1">
                             Incluir en Costos
                             <TooltipProvider>
                               <Tooltip>

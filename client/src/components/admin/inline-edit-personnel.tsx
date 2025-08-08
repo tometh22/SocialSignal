@@ -19,6 +19,7 @@ interface InlineEditPersonnelProps {
     hourlyRate: number;
     contractType?: string;
     monthlyFixedSalary?: number;
+    monthlyHours?: number;
     includeInRealCosts?: boolean;
     // Historical costs fields
     jan2025HourlyRateARS?: number;
@@ -59,6 +60,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedHourlyRate, setEditedHourlyRate] = useState(person.hourlyRate.toString());
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
+  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
@@ -133,6 +135,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       hourlyRate: number;
       contractType: string;
       monthlyFixedSalary?: number;
+      monthlyHours?: number;
       includeInRealCosts: boolean;
     }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
@@ -252,7 +255,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     const numericValue = value === '' ? null : parseFloat(value);
     
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
-      updateHistoricalCostMutation.mutate({ field, value: numericValue });
+      // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente
+      if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue && person.monthlyHours) {
+        const hourlyRate = numericValue / person.monthlyHours;
+        const hourlyRateField = field.replace('MonthlySalaryARS', 'HourlyRateARS');
+        
+        // Guardar tanto el sueldo como la tarifa calculada
+        updateHistoricalCostMutation.mutate({ field, value: numericValue });
+        updateHistoricalCostMutation.mutate({ field: hourlyRateField, value: Math.round(hourlyRate) });
+        
+        toast({
+          title: "Cálculo automático",
+          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ ${person.monthlyHours} horas)`
+        });
+      } else {
+        updateHistoricalCostMutation.mutate({ field, value: numericValue });
+      }
+      
       // Remover del estado de edición después de guardar
       setEditingCells(prev => {
         const newState = { ...prev };
@@ -314,6 +333,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       hourlyRate: hourlyRate,
       contractType: editedContractType,
       monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
+      monthlyHours: editedMonthlyHours ? parseFloat(editedMonthlyHours) : undefined,
       includeInRealCosts: editedIncludeInRealCosts
     });
   };
@@ -325,6 +345,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedHourlyRate(person.hourlyRate.toString());
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setIsEditing(false);
   };
@@ -493,6 +514,44 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           )}
         </td>
         <td className="px-6 py-4">
+          {editedContractType === 'full-time' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                max="300"
+                value={editedMonthlyHours}
+                onChange={(e) => setEditedMonthlyHours(e.target.value)}
+                className="h-9 w-20 border-blue-200 focus:border-blue-400"
+                disabled={updatePersonnelMutation.isPending}
+                placeholder="160"
+              />
+              <span className="text-sm text-muted-foreground">hrs/mes</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      Horas de trabajo mensuales. Se usa para calcular automáticamente la tarifa por hora 
+                      dividiendo el sueldo mensual entre las horas.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1">
+              <span className="text-xs text-gray-400">-</span>
+              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                Por horas
+              </span>
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4">
           <div className="flex items-center justify-center gap-1">
             <input
               type="checkbox"
@@ -652,6 +711,43 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               <span className="text-xs text-gray-400">-</span>
               <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                 Se paga por horas
+              </span>
+            </>
+          )}
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex flex-col items-start gap-1">
+          {person.contractType === 'full-time' ? (
+            person.monthlyHours ? (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold text-purple-700">
+                    {person.monthlyHours}
+                  </span>
+                  <span className="text-xs text-muted-foreground">hrs/mes</span>
+                </div>
+                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                  Horas mensuales
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-gray-700">160</span>
+                  <span className="text-xs text-muted-foreground">hrs/mes</span>
+                  <span className="text-xs text-gray-500">(por defecto)</span>
+                </div>
+                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                  Horas mensuales
+                </span>
+              </>
+            )
+          ) : (
+            <>
+              <span className="text-xs text-gray-400">-</span>
+              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                Por horas
               </span>
             </>
           )}

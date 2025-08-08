@@ -173,6 +173,7 @@ export const personnel = pgTable("personnel", {
   hourlyRateARS: doublePrecision("hourly_rate_ars"), // ARS per hour for local projects
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
   monthlyFixedSalary: doublePrecision("monthly_fixed_salary"), // For full-time employees
+  monthlyHours: doublePrecision("monthly_hours").default(160), // Standard monthly hours for full-time employees (160 = 8h/day * 20 working days)
   includeInRealCosts: boolean("include_in_real_costs").notNull().default(true), // Whether to include in real cost calculations
   
   // ==================== COSTOS HISTÓRICOS 2025 ====================
@@ -233,6 +234,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   hourlyRateARS: true,
   contractType: true,
   monthlyFixedSalary: true,
+  monthlyHours: true,
   includeInRealCosts: true,
   // Costos históricos 2025
   jan2025HourlyRateARS: true,
