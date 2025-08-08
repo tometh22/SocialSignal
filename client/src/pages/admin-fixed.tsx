@@ -82,7 +82,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
-import { TomiDebugger } from "@/components/admin/TomiDebugger";
+
 
 
 import { 
@@ -208,23 +208,7 @@ export default function Admin() {
     queryKey: ["/api/personnel"],
   });
 
-  // Debug temporal para verificar datos
-  useEffect(() => {
-    if (personnel) {
-      console.log('🔍 DATOS PERSONNEL EN ADMIN PANEL:', personnel);
-      const tomi = personnel?.find(p => p.name?.includes('Tomi'));
-      if (tomi) {
-        console.log('🔍 TOMI EN ADMIN PANEL:', {
-          name: tomi.name,
-          jan2025MonthlySalaryARS: tomi.jan2025MonthlySalaryARS,
-          feb2025MonthlySalaryARS: tomi.feb2025MonthlySalaryARS,
-          mar2025MonthlySalaryARS: tomi.mar2025MonthlySalaryARS,
-          apr2025MonthlySalaryARS: tomi.apr2025MonthlySalaryARS,
-          allKeys: Object.keys(tomi)
-        });
-      }
-    }
-  }, [personnel]);
+
 
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
@@ -1016,9 +1000,6 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="personnel">
-          {/* Debug Component - Temporal */}
-          <TomiDebugger />
-          
           <Card className="standard-card mt-6">
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -1117,7 +1098,33 @@ export default function Admin() {
                             hourlyRate: person.hourlyRate,
                             contractType: person.contractType,
                             monthlyFixedSalary: person.monthlyFixedSalary,
-                            includeInRealCosts: person.includeInRealCosts
+                            includeInRealCosts: person.includeInRealCosts,
+                            // Historical hourly rates
+                            jan2025HourlyRateARS: person.jan2025HourlyRateARS,
+                            feb2025HourlyRateARS: person.feb2025HourlyRateARS,
+                            mar2025HourlyRateARS: person.mar2025HourlyRateARS,
+                            apr2025HourlyRateARS: person.apr2025HourlyRateARS,
+                            may2025HourlyRateARS: person.may2025HourlyRateARS,
+                            jun2025HourlyRateARS: person.jun2025HourlyRateARS,
+                            jul2025HourlyRateARS: person.jul2025HourlyRateARS,
+                            aug2025HourlyRateARS: person.aug2025HourlyRateARS,
+                            sep2025HourlyRateARS: person.sep2025HourlyRateARS,
+                            oct2025HourlyRateARS: person.oct2025HourlyRateARS,
+                            nov2025HourlyRateARS: person.nov2025HourlyRateARS,
+                            dec2025HourlyRateARS: person.dec2025HourlyRateARS,
+                            // Historical monthly salaries
+                            jan2025MonthlySalaryARS: person.jan2025MonthlySalaryARS,
+                            feb2025MonthlySalaryARS: person.feb2025MonthlySalaryARS,
+                            mar2025MonthlySalaryARS: person.mar2025MonthlySalaryARS,
+                            apr2025MonthlySalaryARS: person.apr2025MonthlySalaryARS,
+                            may2025MonthlySalaryARS: person.may2025MonthlySalaryARS,
+                            jun2025MonthlySalaryARS: person.jun2025MonthlySalaryARS,
+                            jul2025MonthlySalaryARS: person.jul2025MonthlySalaryARS,
+                            aug2025MonthlySalaryARS: person.aug2025MonthlySalaryARS,
+                            sep2025MonthlySalaryARS: person.sep2025MonthlySalaryARS,
+                            oct2025MonthlySalaryARS: person.oct2025MonthlySalaryARS,
+                            nov2025MonthlySalaryARS: person.nov2025MonthlySalaryARS,
+                            dec2025MonthlySalaryARS: person.dec2025MonthlySalaryARS
                           }} 
                           roles={roles || []} 
                         />
