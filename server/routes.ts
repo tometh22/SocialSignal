@@ -1301,18 +1301,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
+      // Primero verificar las dependencias
+      const dependencies = await storage.getPersonnelDependencies(id);
+      
+      if (dependencies.timeEntries > 0 || dependencies.quotations.length > 0 || dependencies.projects.length > 0) {
+        let message = "No se puede eliminar este personal porque está siendo usado en:\n";
+        
+        if (dependencies.timeEntries > 0) {
+          message += `• ${dependencies.timeEntries} entradas de tiempo\n`;
+        }
+        
+        if (dependencies.quotations.length > 0) {
+          message += `• Cotizaciones: ${dependencies.quotations.map(q => q.projectName).join(', ')}\n`;
+        }
+        
+        if (dependencies.projects.length > 0) {
+          message += `• Proyectos activos: ${dependencies.projects.map(p => p.name).join(', ')}\n`;
+        }
+        
+        message += "\nPara eliminarlo, primero debe removerlo de estas cotizaciones y proyectos.";
+        
+        return res.status(400).json({ 
+          message,
+          dependencies
+        });
+      }
+
       const success = await storage.deletePersonnel(id);
 
       if (!success) {
         return res.status(400).json({ 
-          message: "Cannot delete this personnel. They may have active time entries or project assignments." 
+          message: "Error inesperado al eliminar el personal." 
         });
       }
 
-      res.json({ success: true, message: "Personnel deleted successfully" });
+      res.json({ success: true, message: "Personal eliminado exitosamente" });
     } catch (error) {
       console.error("Error deleting personnel:", error);
-      res.status(500).json({ message: "Failed to delete personnel" });
+      res.status(500).json({ message: "Error interno del servidor al eliminar personal" });
     }
   });
 

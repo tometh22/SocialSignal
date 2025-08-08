@@ -703,10 +703,53 @@ export class DatabaseStorage implements IStorage {
     return updatedPerson;
   }
 
+  async getPersonnelDependencies(id: number): Promise<{
+    timeEntries: number;
+    quotations: Array<{ id: number; projectName: string }>;
+    projects: Array<{ id: number; name: string }>;
+  }> {
+    const timeEntriesCount = await db.select({ count: sql<number>`count(*)::int` })
+      .from(timeEntries)
+      .where(eq(timeEntries.personnelId, id));
+    
+    const quotationsWithPersonnel = await db.select({
+      id: quotations.id,
+      projectName: quotations.projectName
+    })
+    .from(quotations)
+    .innerJoin(quotationTeamMembers, eq(quotations.id, quotationTeamMembers.quotationId))
+    .where(eq(quotationTeamMembers.personnelId, id));
+    
+    const projectsWithPersonnel = await db.select({
+      id: activeProjects.id,
+      name: activeProjects.projectName
+    })
+    .from(activeProjects)
+    .innerJoin(projectBaseTeam, eq(activeProjects.id, projectBaseTeam.projectId))
+    .where(eq(projectBaseTeam.personnelId, id));
+
+    return {
+      timeEntries: timeEntriesCount[0].count,
+      quotations: quotationsWithPersonnel,
+      projects: projectsWithPersonnel
+    };
+  }
+
   async deletePersonnel(id: number): Promise<boolean> {
-    await db.delete(personnel).where(eq(personnel.id, id));
-    const person = await db.select().from(personnel).where(eq(personnel.id, id));
-    return person.length === 0;
+    try {
+      const dependencies = await this.getPersonnelDependencies(id);
+      
+      if (dependencies.timeEntries > 0 || dependencies.quotations.length > 0 || dependencies.projects.length > 0) {
+        return false; // No se puede eliminar porque tiene referencias
+      }
+
+      await db.delete(personnel).where(eq(personnel.id, id));
+      const person = await db.select().from(personnel).where(eq(personnel.id, id));
+      return person.length === 0;
+    } catch (error) {
+      console.error("Error in deletePersonnel:", error);
+      return false;
+    }
   }
 
   // Template operations
