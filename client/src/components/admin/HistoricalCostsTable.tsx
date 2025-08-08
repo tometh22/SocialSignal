@@ -158,7 +158,18 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                   {/* Fila de tarifa por hora */}
                   <tr key={`${person.id}-hourly`} className="hover:bg-gray-50">
                     <td className="px-3 py-1 text-sm font-medium text-gray-900 sticky left-0 bg-white border-r">
-                      {person.name}
+                      <div className="flex items-center gap-2">
+                        <span>{person.name}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                          person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' :
+                          person.contractType === 'part-time' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {person.contractType === 'full-time' ? 'Full-time' : 
+                           person.contractType === 'part-time' ? 'Part-time' : 
+                           'Freelance'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-2 py-1 text-xs text-gray-600 text-center border-r">
                       $/hr
@@ -187,37 +198,39 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
                     })}
                   </tr>
 
-                  {/* Fila de salario mensual */}
-                  <tr key={`${person.id}-monthly`} className="hover:bg-gray-50 border-b-2 border-gray-200">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 sticky left-0 bg-white border-r">
-                      <span className="ml-4 text-xs">Salario Mensual</span>
-                    </td>
-                    <td className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 text-center border-r">
-                      ARS/Mes
-                    </td>
-                    {months.map((month) => {
-                      const field = `${month.key}MonthlySalaryARS`;
-                      const cellKey = `${person.id}-${field}`;
-                      const isEditing = cellKey in editingCells;
-                      
-                      return (
-                        <td key={field} className="px-1 py-2 border-r">
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={getCellValue(person, field)}
-                            onChange={(e) => handleCellChange(person.id, field, e.target.value)}
-                            onBlur={() => handleCellBlur(person.id, field)}
-                            className={`text-center text-xs h-8 border-0 focus:border focus:border-blue-500 ${
-                              isEditing ? "bg-blue-50" : "hover:bg-gray-50"
-                            }`}
-                            placeholder="0"
-                          />
-                        </td>
-                      );
-                    })}
-                  </tr>
+                  {/* Fila de salario mensual - solo para empleados full-time */}
+                  {person.contractType === 'full-time' && (
+                    <tr key={`${person.id}-monthly`} className="hover:bg-gray-50 border-b-2 border-gray-200">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 sticky left-0 bg-white border-r">
+                        <span className="ml-4 text-xs">Salario Mensual (solo full-time)</span>
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-xs text-gray-600 text-center border-r">
+                        $/mes
+                      </td>
+                      {months.map((month) => {
+                        const field = `${month.key}MonthlySalaryARS`;
+                        const cellKey = `${person.id}-${field}`;
+                        const isEditing = cellKey in editingCells;
+                        
+                        return (
+                          <td key={field} className="px-1 py-2 border-r">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={getCellValue(person, field)}
+                              onChange={(e) => handleCellChange(person.id, field, e.target.value)}
+                              onBlur={() => handleCellBlur(person.id, field)}
+                              className={`text-center text-xs h-8 border-0 focus:border focus:border-blue-500 ${
+                                isEditing ? "bg-blue-50" : "hover:bg-gray-50"
+                              }`}
+                              placeholder="0"
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  )}
                 </>
               ))}
             </tbody>
