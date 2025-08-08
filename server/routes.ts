@@ -1190,7 +1190,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleName: sql`roles.name`,
         contractType: sql`personnel.contract_type`,
         monthlyFixedSalary: sql`personnel.monthly_fixed_salary`,
-        includeInRealCosts: sql`personnel.include_in_real_costs`
+        includeInRealCosts: sql`personnel.include_in_real_costs`,
+        // Historical hourly rates (ARS) - CORREGIDO: nombres de columnas con guiones bajos
+        jan2025HourlyRateARS: sql`personnel.jan_2025_hourly_rate_ars`,
+        feb2025HourlyRateARS: sql`personnel.feb_2025_hourly_rate_ars`,
+        mar2025HourlyRateARS: sql`personnel.mar_2025_hourly_rate_ars`,
+        apr2025HourlyRateARS: sql`personnel.apr_2025_hourly_rate_ars`,
+        may2025HourlyRateARS: sql`personnel.may_2025_hourly_rate_ars`,
+        jun2025HourlyRateARS: sql`personnel.jun_2025_hourly_rate_ars`,
+        jul2025HourlyRateARS: sql`personnel.jul_2025_hourly_rate_ars`,
+        aug2025HourlyRateARS: sql`personnel.aug_2025_hourly_rate_ars`,
+        sep2025HourlyRateARS: sql`personnel.sep_2025_hourly_rate_ars`,
+        oct2025HourlyRateARS: sql`personnel.oct_2025_hourly_rate_ars`,
+        nov2025HourlyRateARS: sql`personnel.nov_2025_hourly_rate_ars`,
+        dec2025HourlyRateARS: sql`personnel.dec_2025_hourly_rate_ars`,
+        // Historical monthly salaries (ARS) - CORREGIDO: nombres de columnas con guiones bajos
+        jan2025MonthlySalaryARS: sql`personnel.jan_2025_monthly_salary_ars`,
+        feb2025MonthlySalaryARS: sql`personnel.feb_2025_monthly_salary_ars`,
+        mar2025MonthlySalaryARS: sql`personnel.mar_2025_monthly_salary_ars`,
+        apr2025MonthlySalaryARS: sql`personnel.apr_2025_monthly_salary_ars`,
+        may2025MonthlySalaryARS: sql`personnel.may_2025_monthly_salary_ars`,
+        jun2025MonthlySalaryARS: sql`personnel.jun_2025_monthly_salary_ars`,
+        jul2025MonthlySalaryARS: sql`personnel.jul_2025_monthly_salary_ars`,
+        aug2025MonthlySalaryARS: sql`personnel.aug_2025_monthly_salary_ars`,
+        sep2025MonthlySalaryARS: sql`personnel.sep_2025_monthly_salary_ars`,
+        oct2025MonthlySalaryARS: sql`personnel.oct_2025_monthly_salary_ars`,
+        nov2025MonthlySalaryARS: sql`personnel.nov_2025_monthly_salary_ars`,
+        dec2025MonthlySalaryARS: sql`personnel.dec_2025_monthly_salary_ars`
       })
       .from(sql`personnel`)
       .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)

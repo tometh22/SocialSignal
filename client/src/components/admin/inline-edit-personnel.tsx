@@ -700,6 +700,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
                           placeholder="0"
                           disabled={updateHistoricalCostMutation.isPending}
+
                         />
                       </div>
                     );
