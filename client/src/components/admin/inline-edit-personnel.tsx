@@ -231,7 +231,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return editingCells[field];
     }
     const value = (person as any)[field];
-    return value ? value.toString() : '';
+    // Cambio crítico: mostrar valores numéricos reales, incluso 0
+    // Solo mostrar cadena vacía para null o undefined
+    return (value !== null && value !== undefined) ? value.toString() : '';
   };
 
   const handleSave = () => {
