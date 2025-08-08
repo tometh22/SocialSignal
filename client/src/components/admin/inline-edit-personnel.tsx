@@ -384,7 +384,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-1">
-            <span className="text-sm font-medium text-gray-600">$</span>
+            <span className="text-sm font-medium text-gray-600">ARS</span>
             <Input
               type="number"
               step="0.1"
@@ -400,7 +400,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center gap-1">
-            <span className="text-sm font-medium text-gray-600">$</span>
+            <span className="text-sm font-medium text-gray-600">ARS</span>
             <Input
               type="number"
               step="0.01"
