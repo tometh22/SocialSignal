@@ -900,25 +900,16 @@ export default function Admin() {
       'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
     ];
     
-    // Debug temporal para verificar cálculos
-    console.log(`🔍 getCurrentHourlyRate para ${person.name}:`, {
-      person: person,
-      hourlyRateBase: person.hourlyRate
-    });
-    
     // Buscar el último valor histórico disponible (del más reciente al más antiguo)
     for (const month of months) {
       const fieldName = `${month}HourlyRateARS`;
       const value = person[fieldName];
-      console.log(`   ${fieldName}: ${value}`);
       if (value && value > 0) {
-        console.log(`   ✅ Usando valor histórico: ${value}`);
         return value;
       }
     }
     
     // Si no hay valores históricos, usar la tarifa base
-    console.log(`   ⚠️ Usando tarifa base: ${person.hourlyRate || 0}`);
     return person.hourlyRate || 0;
   };
 
@@ -929,25 +920,16 @@ export default function Admin() {
       'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
     ];
     
-    // Debug temporal para verificar cálculos
-    console.log(`🔍 getCurrentMonthlySalary para ${person.name}:`, {
-      monthlyFixedSalaryBase: person.monthlyFixedSalary,
-      contractType: person.contractType
-    });
-    
     // Buscar el último valor histórico disponible (del más reciente al más antiguo)
     for (const month of months) {
       const fieldName = `${month}MonthlySalaryARS`;
       const value = person[fieldName];
-      console.log(`   ${fieldName}: ${value}`);
       if (value && value > 0) {
-        console.log(`   ✅ Usando valor histórico: ${value}`);
         return value;
       }
     }
     
     // Si no hay valores históricos, usar el sueldo base
-    console.log(`   ⚠️ Usando sueldo base: ${person.monthlyFixedSalary || 0}`);
     return person.monthlyFixedSalary || 0;
   };
 

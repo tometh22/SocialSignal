@@ -714,37 +714,38 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 </div>
               </div>
 
-              {/* Sueldo Mensual ARS */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Full-time</span>
+              {/* Sueldo Mensual ARS - solo para empleados full-time */}
+              {person.contractType === 'full-time' && (
+                <div className="bg-white rounded-lg border border-gray-200 p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Solo Full-time</span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-3">
+                    {months.map((month) => {
+                      const fieldName = `${month.key}MonthlySalaryARS`;
+                      return (
+                        <div key={fieldName} className="space-y-2">
+                          <label className="text-xs font-medium text-gray-600 block text-center">
+                            {month.label} 2025
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={getCellValue(fieldName)}
+                            onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
+                            className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
+                            placeholder="0"
+                            disabled={updateHistoricalCostMutation.isPending}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="grid grid-cols-6 gap-3">
-                  {months.map((month) => {
-                    const fieldName = `${month.key}MonthlySalaryARS`;
-                    return (
-                      <div key={fieldName} className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 block text-center">
-                          {month.label} 2025
-                        </label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={getCellValue(fieldName)}
-                          onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
-                          className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
-                          placeholder="0"
-                          disabled={updateHistoricalCostMutation.isPending}
-
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="mt-6 bg-gray-50 rounded-lg p-4">
