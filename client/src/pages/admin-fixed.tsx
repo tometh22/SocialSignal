@@ -893,9 +893,49 @@ export default function Admin() {
 
   const currentExchangeRate = systemConfig.find(c => c.configKey === 'usd_exchange_rate')?.configValue || 1100;
 
-  // Ordenar datos por tarifa de mayor a menor
+  // Función para obtener la tarifa actual (último valor histórico o base)
+  const getCurrentHourlyRate = (person: any) => {
+    const months = [
+      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+    ];
+    
+    // Buscar el último valor histórico disponible (del más reciente al más antiguo)
+    for (const month of months) {
+      const fieldName = `${month}HourlyRateARS`;
+      const value = person[fieldName];
+      if (value && value > 0) {
+        return value;
+      }
+    }
+    
+    // Si no hay valores históricos, usar la tarifa base
+    return person.hourlyRate || 0;
+  };
+
+  // Función para obtener el sueldo mensual actual (último valor histórico o base)
+  const getCurrentMonthlySalary = (person: any) => {
+    const months = [
+      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+    ];
+    
+    // Buscar el último valor histórico disponible (del más reciente al más antiguo)
+    for (const month of months) {
+      const fieldName = `${month}MonthlySalaryARS`;
+      const value = person[fieldName];
+      if (value && value > 0) {
+        return value;
+      }
+    }
+    
+    // Si no hay valores históricos, usar el sueldo base
+    return person.monthlyFixedSalary || 0;
+  };
+
+  // Ordenar datos por tarifa de mayor a menor (usando tarifa actual calculada)
   const sortedRoles = roles ? [...roles].sort((a, b) => (b.defaultRate || 0) - (a.defaultRate || 0)) : [];
-  const sortedPersonnel = personnel ? [...personnel].sort((a, b) => (b.hourlyRate || 0) - (a.hourlyRate || 0)) : [];
+  const sortedPersonnel = personnel ? [...personnel].sort((a, b) => getCurrentHourlyRate(b) - getCurrentHourlyRate(a)) : [];
 
   return (
     <div className="page-container">
@@ -1095,9 +1135,9 @@ export default function Admin() {
                             email: person.email || '',
                             roleId: person.roleId,
                             roleName: getRoleName(person.roleId),
-                            hourlyRate: person.hourlyRate,
+                            hourlyRate: getCurrentHourlyRate(person),
                             contractType: person.contractType,
-                            monthlyFixedSalary: person.monthlyFixedSalary,
+                            monthlyFixedSalary: getCurrentMonthlySalary(person),
                             includeInRealCosts: person.includeInRealCosts,
                             // Historical hourly rates
                             jan2025HourlyRateARS: person.jan2025HourlyRateARS,
@@ -1143,7 +1183,7 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {sortedPersonnel.length} personal configurado</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(sortedPersonnel.reduce((sum, person) => sum + person.hourlyRate, 0) / sortedPersonnel.length).toFixed(2)}/hr
+                    Tarifa promedio: ${(sortedPersonnel.reduce((sum, person) => sum + getCurrentHourlyRate(person), 0) / sortedPersonnel.length).toFixed(2)}/hr
                   </span>
                 </div>
               </div>
