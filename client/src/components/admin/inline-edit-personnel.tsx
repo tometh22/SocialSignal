@@ -243,10 +243,29 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   });
 
   const handleHistoricalCostChange = (field: string, value: string) => {
+    // Solo actualizar el estado local, no guardar todavía
+    setEditingCells(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleHistoricalCostSave = (field: string) => {
+    const value = editingCells[field] || '';
     const numericValue = value === '' ? null : parseFloat(value);
+    
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
-      setEditingCells(prev => ({ ...prev, [field]: value }));
       updateHistoricalCostMutation.mutate({ field, value: numericValue });
+      // Remover del estado de edición después de guardar
+      setEditingCells(prev => {
+        const newState = { ...prev };
+        delete newState[field];
+        return newState;
+      });
+    } else {
+      // Si el valor no es válido, revertir al valor original
+      setEditingCells(prev => {
+        const newState = { ...prev };
+        delete newState[field];
+        return newState;
+      });
     }
   };
 
@@ -727,6 +746,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           step="1"
                           value={getCellValue(fieldName)}
                           onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
+                          onBlur={() => handleHistoricalCostSave(fieldName)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
                           className="h-9 text-sm text-center border-gray-200 focus:border-green-400 focus:ring-green-400/20"
                           placeholder="0"
                           disabled={updateHistoricalCostMutation.isPending}
@@ -759,6 +784,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             step="1"
                             value={getCellValue(fieldName)}
                             onChange={(e) => handleHistoricalCostChange(fieldName, e.target.value)}
+                            onBlur={() => handleHistoricalCostSave(fieldName)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur();
+                              }
+                            }}
                             className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
                             placeholder="0"
                             disabled={updateHistoricalCostMutation.isPending}
