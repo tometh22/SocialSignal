@@ -118,6 +118,44 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
+  // Función para recalcular todas las tarifas por hora basadas en sueldos existentes
+  const recalculateAllHourlyRates = () => {
+    if (person.contractType !== 'full-time') return;
+    
+    const monthlyHours = person.monthlyHours || 160;
+    const months = [
+      'jan2025', 'feb2025', 'mar2025', 'apr2025', 'may2025', 'jun2025',
+      'jul2025', 'aug2025', 'sep2025', 'oct2025', 'nov2025', 'dec2025'
+    ];
+    
+    let calculatedCount = 0;
+    
+    months.forEach(month => {
+      const salaryField = `${month}MonthlySalaryARS`;
+      const hourlyField = `${month}HourlyRateARS`;
+      const monthlySalary = (person as any)[salaryField];
+      
+      if (monthlySalary && monthlySalary > 0) {
+        const hourlyRate = Math.round(monthlySalary / monthlyHours);
+        updateHistoricalCostMutation.mutate({ field: hourlyField, value: hourlyRate });
+        calculatedCount++;
+      }
+    });
+    
+    if (calculatedCount > 0) {
+      toast({
+        title: "Recálculo completado",
+        description: `Se recalcularon ${calculatedCount} tarifas por hora usando ${monthlyHours} horas mensuales`,
+      });
+    } else {
+      toast({
+        title: "Sin datos para recalcular",
+        description: "No se encontraron sueldos mensuales para recalcular las tarifas",
+        variant: "destructive"
+      });
+    }
+  };
+
   const months = [
     { key: "jan2025", label: "Ene" }, { key: "feb2025", label: "Feb" },
     { key: "mar2025", label: "Mar" }, { key: "apr2025", label: "Abr" },
@@ -146,6 +184,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedEmail(updatedPerson.email);
       setEditedRoleId(updatedPerson.roleId.toString());
       setEditedHourlyRate(updatedPerson.hourlyRate.toString());
+
+      // Si se actualizaron las horas mensuales para un empleado full-time, recalcular tarifas por hora
+      if (updatedPerson.contractType === 'full-time' && updatedPerson.monthlyHours && updatedPerson.monthlyHours !== person.monthlyHours) {
+        setTimeout(() => {
+          recalculateAllHourlyRates();
+        }, 500); // Pequeño delay para que se actualice la data primero
+      }
 
       // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
@@ -256,8 +301,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
       // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente
-      if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue && person.monthlyHours) {
-        const hourlyRate = numericValue / person.monthlyHours;
+      if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
+        const monthlyHours = person.monthlyHours || 160; // Usar horas mensuales o 160 por defecto
+        const hourlyRate = numericValue / monthlyHours;
         const hourlyRateField = field.replace('MonthlySalaryARS', 'HourlyRateARS');
         
         // Guardar tanto el sueldo como la tarifa calculada
@@ -266,7 +312,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         
         toast({
           title: "Cálculo automático",
-          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ ${person.monthlyHours} horas)`
+          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ ${monthlyHours} horas)`
         });
       } else {
         updateHistoricalCostMutation.mutate({ field, value: numericValue });
@@ -827,6 +873,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <h5 className="font-semibold text-gray-800">Tarifa por Hora (ARS)</h5>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis operacional</span>
+                  {person.contractType === 'full-time' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={recalculateAllHourlyRates}
+                      disabled={updateHistoricalCostMutation.isPending}
+                      className="h-7 px-3 text-xs"
+                      title="Recalcular todas las tarifas por hora basándose en los sueldos mensuales"
+                    >
+                      🔄 Recalcular todas
+                    </Button>
+                  )}
                 </div>
                 <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
