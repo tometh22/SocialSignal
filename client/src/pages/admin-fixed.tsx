@@ -82,6 +82,7 @@ import { TemplateCost } from "@/components/admin/template-cost";
 import { CostMultipliersManager } from "@/components/cost-multipliers-manager";
 import { ExchangeRateManager } from "@/components/admin/ExchangeRateManager";
 import { PersonnelHistoricalCostsManager } from "@/components/admin/PersonnelHistoricalCostsManager";
+import { TomiDebugger } from "@/components/admin/TomiDebugger";
 
 
 import { 
@@ -205,9 +206,13 @@ export default function Admin() {
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
-    onSuccess: (data) => {
-      console.log('🔍 DATOS PERSONNEL EN ADMIN PANEL:', data);
-      const tomi = data?.find(p => p.name?.includes('Tomi'));
+  });
+
+  // Debug temporal para verificar datos
+  useEffect(() => {
+    if (personnel) {
+      console.log('🔍 DATOS PERSONNEL EN ADMIN PANEL:', personnel);
+      const tomi = personnel?.find(p => p.name?.includes('Tomi'));
       if (tomi) {
         console.log('🔍 TOMI EN ADMIN PANEL:', {
           name: tomi.name,
@@ -219,7 +224,7 @@ export default function Admin() {
         });
       }
     }
-  });
+  }, [personnel]);
 
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
     queryKey: ["/api/templates"],
@@ -1011,6 +1016,9 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="personnel">
+          {/* Debug Component - Temporal */}
+          <TomiDebugger />
+          
           <Card className="standard-card mt-6">
             <CardHeader>
               <div className="flex justify-between items-center">
