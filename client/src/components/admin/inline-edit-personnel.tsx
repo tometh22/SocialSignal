@@ -93,9 +93,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-    // También sincronizar el estado temporal de horas mensuales
-    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
+
+  // Sincronizar tempMonthlyHours independientemente - este es el estado crítico para la visualización
+  useEffect(() => {
+    console.log('🔄 Syncing tempMonthlyHours:', person.monthlyHours, 'for person:', person.name);
+    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
+  }, [person.monthlyHours, person.id]);
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
@@ -453,7 +457,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
-    console.log('🔧 Saving monthlyHours directly:', numericValue);
+    console.log('🔧 Saving monthlyHours directly:', numericValue, 'for person:', person.name);
     
     updatePersonnelMutation.mutate({
       name: person.name,
@@ -466,8 +470,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       includeInRealCosts: person.includeInRealCosts ?? true
     }, {
       onSuccess: (updatedPerson) => {
-        // Sincronizar el estado local con los datos actualizados del servidor
+        console.log('✅ Monthly hours updated successfully:', updatedPerson.monthlyHours, 'for person:', person.name);
+        
+        // Forzar actualización del estado temporal
         setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+        
+        // Actualizar también el estado de edición
+        setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
         
         // Después de actualizar las horas mensuales, recalcular todas las tarifas por hora
         if (person.contractType === 'full-time') {
