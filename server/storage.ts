@@ -708,31 +708,40 @@ export class DatabaseStorage implements IStorage {
     quotations: Array<{ id: number; projectName: string }>;
     projects: Array<{ id: number; name: string }>;
   }> {
-    const timeEntriesCount = await db.select({ count: sql<number>`count(*)::int` })
-      .from(timeEntries)
-      .where(eq(timeEntries.personnelId, id));
-    
-    const quotationsWithPersonnel = await db.select({
-      id: quotations.id,
-      projectName: quotations.projectName
-    })
-    .from(quotations)
-    .innerJoin(quotationTeamMembers, eq(quotations.id, quotationTeamMembers.quotationId))
-    .where(eq(quotationTeamMembers.personnelId, id));
-    
-    const projectsWithPersonnel = await db.select({
-      id: activeProjects.id,
-      name: activeProjects.projectName
-    })
-    .from(activeProjects)
-    .innerJoin(projectBaseTeam, eq(activeProjects.id, projectBaseTeam.projectId))
-    .where(eq(projectBaseTeam.personnelId, id));
+    try {
+      const timeEntriesCount = await db.select({ count: sql<number>`count(*)::int` })
+        .from(timeEntries)
+        .where(eq(timeEntries.personnelId, id));
+      
+      const quotationsWithPersonnel = await db.select({
+        id: quotations.id,
+        projectName: quotations.projectName
+      })
+      .from(quotations)
+      .innerJoin(quotationTeamMembers, eq(quotations.id, quotationTeamMembers.quotationId))
+      .where(eq(quotationTeamMembers.personnelId, id));
+      
+      const projectsWithPersonnel = await db.select({
+        id: activeProjects.id,
+        name: activeProjects.projectName
+      })
+      .from(activeProjects)
+      .innerJoin(projectBaseTeam, eq(activeProjects.id, projectBaseTeam.projectId))
+      .where(eq(projectBaseTeam.personnelId, id));
 
-    return {
-      timeEntries: timeEntriesCount[0].count,
-      quotations: quotationsWithPersonnel,
-      projects: projectsWithPersonnel
-    };
+      return {
+        timeEntries: timeEntriesCount?.[0]?.count || 0,
+        quotations: quotationsWithPersonnel || [],
+        projects: projectsWithPersonnel || []
+      };
+    } catch (error) {
+      console.error("Error in getPersonnelDependencies:", error);
+      return {
+        timeEntries: 0,
+        quotations: [],
+        projects: []
+      };
+    }
   }
 
   async deletePersonnel(id: number): Promise<boolean> {
