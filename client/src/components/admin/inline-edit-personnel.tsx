@@ -360,6 +360,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     const hourlyRate = parseFloat(editedHourlyRate);
     const roleId = parseInt(editedRoleId);
 
+    console.log('🔧 Frontend handleSave - editedMonthlyHours:', editedMonthlyHours);
+
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
         title: "Error",
@@ -378,7 +380,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
-    updatePersonnelMutation.mutate({
+    const dataToSend = {
       name: editedName.trim(),
       email: editedEmail.trim(),
       roleId: roleId,
@@ -387,7 +389,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
       monthlyHours: editedMonthlyHours ? parseFloat(editedMonthlyHours) : undefined,
       includeInRealCosts: editedIncludeInRealCosts
-    });
+    };
+    
+    console.log('🔧 Frontend handleSave - dataToSend:', dataToSend);
+
+    updatePersonnelMutation.mutate(dataToSend);
   };
 
   const handleCancel = () => {
