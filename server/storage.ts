@@ -723,16 +723,34 @@ export class DatabaseStorage implements IStorage {
       
       const projectsWithPersonnel = await db.select({
         id: activeProjects.id,
-        name: activeProjects.projectName
+        name: sql<string>`COALESCE(${activeProjects.subprojectName}, 'Proyecto sin nombre')`,
+        quotationId: activeProjects.quotationId
       })
       .from(activeProjects)
       .innerJoin(projectBaseTeam, eq(activeProjects.id, projectBaseTeam.projectId))
       .where(eq(projectBaseTeam.personnelId, id));
 
+      // Para proyectos, obtener el nombre real de la cotización
+      const projectsWithNames = await Promise.all(
+        projectsWithPersonnel.map(async (project) => {
+          if (project.quotationId) {
+            const [quotation] = await db.select({ projectName: quotations.projectName })
+              .from(quotations)
+              .where(eq(quotations.id, project.quotationId));
+            
+            return {
+              id: project.id,
+              name: quotation?.projectName || project.name
+            };
+          }
+          return { id: project.id, name: project.name };
+        })
+      );
+
       return {
         timeEntries: timeEntriesCount?.[0]?.count || 0,
         quotations: quotationsWithPersonnel || [],
-        projects: projectsWithPersonnel || []
+        projects: projectsWithNames || []
       };
     } catch (error) {
       console.error("Error in getPersonnelDependencies:", error);
