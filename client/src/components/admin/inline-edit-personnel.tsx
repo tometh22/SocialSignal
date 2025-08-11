@@ -378,6 +378,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
     const value = (person as any)[field];
     
+    // Debug temporal para verificar monthly hours
+    if (field === 'monthlyHours' && person.name === 'Trinidad Petreigne') {
+      console.log(`🔍 Trinidad monthlyHours: ${value} (${typeof value})`);
+    }
+    
     // Debug temporal para Tomi Criado
     if (person.name === 'Tomi Criado' && field.includes('MonthlySalary')) {
       console.log(`🔍 ${field}: ${value} (${typeof value}) - persona completa:`, person);
@@ -910,12 +915,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   Editando horas
                 </span>
               </>
-            ) : person.monthlyHours ? (
+            ) : (person.monthlyHours !== null && person.monthlyHours !== undefined) ? (
               <>
                 <div 
                   className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => {
-                    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
+                    console.log('🔧 Setting tempMonthlyHours to:', person.monthlyHours);
+                    setTempMonthlyHours(person.monthlyHours.toString());
                     setIsEditingMonthlyHours(true);
                   }}
                   title="Click para editar las horas mensuales"
@@ -935,6 +941,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <div 
                   className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => {
+                    console.log('🔧 No monthlyHours set, defaulting to 160');
                     setTempMonthlyHours('160');
                     setIsEditingMonthlyHours(true);
                   }}
