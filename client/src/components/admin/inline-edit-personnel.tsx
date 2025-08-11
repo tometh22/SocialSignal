@@ -124,10 +124,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const recalculateAllHourlyRates = () => {
     if (person.contractType !== 'full-time') return;
     
-    // Obtener las horas mensuales más actualizadas del cache
+    // Obtener las horas mensuales más actualizadas del cache o usar el valor recién guardado
     const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
     const currentPerson = personnelData?.find(p => p.id === person.id);
-    const monthlyHours = currentPerson?.monthlyHours || person.monthlyHours || 160;
+    const monthlyHours = currentPerson?.monthlyHours || parseFloat(tempMonthlyHours) || person.monthlyHours || 160;
+    
+    console.log('🔧 Recalculating hourly rates with monthlyHours:', monthlyHours);
     const months = [
       'jan2025', 'feb2025', 'mar2025', 'apr2025', 'may2025', 'jun2025',
       'jul2025', 'aug2025', 'sep2025', 'oct2025', 'nov2025', 'dec2025'
@@ -443,9 +445,17 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       monthlyFixedSalary: person.monthlyFixedSalary,
       monthlyHours: numericValue,
       includeInRealCosts: person.includeInRealCosts ?? true
+    }, {
+      onSuccess: () => {
+        // Después de actualizar las horas mensuales, recalcular todas las tarifas por hora
+        if (person.contractType === 'full-time') {
+          setTimeout(() => {
+            recalculateAllHourlyRates();
+          }, 500);
+        }
+        setIsEditingMonthlyHours(false);
+      }
     });
-    
-    setIsEditingMonthlyHours(false);
   };
 
   const handleMonthlyHoursCancel = () => {
