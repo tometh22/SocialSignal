@@ -1294,6 +1294,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertPersonnelSchema.partial().parse(data);
       console.log(`🔧 PATCH /api/personnel/${id} - Validated data:`, validatedData);
       
+      // Si se están actualizando horas mensuales y hay sueldo fijo, recalcular tarifa por hora
+      if (validatedData.monthlyHours !== undefined) {
+        const currentPerson = await storage.getPersonnel(id);
+        if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
+          validatedData.hourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
+          console.log(`🔧 Auto-calculating hourlyRate: ${currentPerson.monthlyFixedSalary} ÷ ${validatedData.monthlyHours} = ${validatedData.hourlyRate}`);
+        }
+      }
+      
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
       console.log(`🔧 PATCH /api/personnel/${id} - Updated person:`, updatedPerson);
 
