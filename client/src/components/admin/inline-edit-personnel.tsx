@@ -93,6 +93,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
+    // También sincronizar el estado temporal de horas mensuales
+    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
 
   // Función para obtener el último sueldo histórico
@@ -463,7 +465,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       monthlyHours: numericValue,
       includeInRealCosts: person.includeInRealCosts ?? true
     }, {
-      onSuccess: () => {
+      onSuccess: (updatedPerson) => {
+        // Sincronizar el estado local con los datos actualizados del servidor
+        setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+        
         // Después de actualizar las horas mensuales, recalcular todas las tarifas por hora
         if (person.contractType === 'full-time') {
           setTimeout(() => {
