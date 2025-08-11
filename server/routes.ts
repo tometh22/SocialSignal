@@ -1298,8 +1298,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (validatedData.monthlyHours !== undefined) {
         const currentPerson = await storage.getPersonnel(id);
         if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
-          validatedData.hourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
-          console.log(`🔧 Auto-calculating hourlyRate: ${currentPerson.monthlyFixedSalary} ÷ ${validatedData.monthlyHours} = ${validatedData.hourlyRate}`);
+          const newHourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
+          validatedData.hourlyRate = newHourlyRate;
+          console.log(`🔧 Auto-calculating hourlyRate: ${currentPerson.monthlyFixedSalary} ÷ ${validatedData.monthlyHours} = ${newHourlyRate}`);
+          
+          // También actualizar el campo histórico del mes actual si existe
+          const currentDate = new Date();
+          const currentYear = currentDate.getFullYear();
+          const currentMonth = currentDate.getMonth(); // 0-based
+          
+          const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateArs` as keyof typeof validatedData;
+          
+          // Si el campo histórico existe y tiene un valor, actualizarlo también
+          if (currentPerson[historicalField] !== null && currentPerson[historicalField] !== undefined) {
+            (validatedData as any)[historicalField] = newHourlyRate;
+            console.log(`🔧 Also updating historical field ${historicalField} to ${newHourlyRate}`);
+          }
         }
       }
       
