@@ -95,12 +95,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
 
-  // Sincronizar tempMonthlyHours independientemente - este es el estado crítico para la visualización
+  // Sincronizar tempMonthlyHours con un enfoque más agresivo
   useEffect(() => {
     const hoursValue = person.monthlyHours !== null && person.monthlyHours !== undefined ? person.monthlyHours : 160;
-    console.log('🔄 Syncing tempMonthlyHours:', person.monthlyHours, '→', hoursValue, 'for person:', person.name);
+    console.log('🔄 [CRITICAL] Syncing tempMonthlyHours for', person.name, ':', person.monthlyHours, '→', hoursValue);
     setTempMonthlyHours(hoursValue.toString());
-  }, [person.monthlyHours, person.id]);
+    setEditedMonthlyHours(hoursValue.toString());
+  }, [person.monthlyHours, person.id, person.name]);
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
@@ -463,34 +464,44 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
-    console.log('🔧 Saving monthlyHours directly:', numericValue, 'for person:', person.name);
+    console.log('🔧 [CRITICAL] Saving monthlyHours:', numericValue, 'for person:', person.name, 'current value:', person.monthlyHours);
     
-    updatePersonnelMutation.mutate({
-      name: person.name,
-      email: person.email,
-      roleId: person.roleId,
-      hourlyRate: person.hourlyRate,
-      contractType: person.contractType,
-      monthlyFixedSalary: person.monthlyFixedSalary,
-      monthlyHours: numericValue,
-      includeInRealCosts: person.includeInRealCosts ?? true
+    // Usar el mutation específico para campos históricos que ya sabemos que funciona
+    updateHistoricalCostMutation.mutate({ 
+      field: 'monthlyHours', 
+      value: numericValue 
     }, {
-      onSuccess: (updatedPerson) => {
-        console.log('✅ Monthly hours updated successfully:', updatedPerson.monthlyHours, 'for person:', person.name);
+      onSuccess: (updatedData) => {
+        console.log('✅ [CRITICAL] Monthly hours updated via historical mutation:', updatedData);
         
-        // Forzar actualización del estado temporal
-        setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+        // Actualizar estados locales inmediatamente
+        setTempMonthlyHours(numericValue.toString());
+        setEditedMonthlyHours(numericValue.toString());
         
-        // Actualizar también el estado de edición
-        setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+        // Forzar invalidación completa del cache
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
         
         // Después de actualizar las horas mensuales, recalcular todas las tarifas por hora
         if (person.contractType === 'full-time') {
           setTimeout(() => {
             recalculateAllHourlyRates();
-          }, 500);
+          }, 1000); // Aumentar el delay para asegurar que la data se actualizó
         }
+        
         setIsEditingMonthlyHours(false);
+        
+        toast({
+          title: "Horas mensuales actualizadas",
+          description: `Se establecieron ${numericValue} horas mensuales para ${person.name}`,
+        });
+      },
+      onError: (error) => {
+        console.error('❌ [CRITICAL] Error updating monthly hours:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron actualizar las horas mensuales",
+          variant: "destructive"
+        });
       }
     });
   };
@@ -921,15 +932,34 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <div 
                   className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => {
-                    const currentHours = person.monthlyHours || 160;
-                    console.log('🔧 Setting tempMonthlyHours to:', currentHours);
+                    // Forzar obtención del valor más actualizado del cache
+                    const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
+                    const currentPersonData = personnelData?.find(p => p.id === person.id);
+                    const currentHours = currentPersonData?.monthlyHours !== undefined ? currentPersonData.monthlyHours : (person.monthlyHours || 160);
+                    
+                    console.log('🔧 [CRITICAL] Click to edit - person.monthlyHours:', person.monthlyHours, 'cache value:', currentPersonData?.monthlyHours, 'final value:', currentHours);
                     setTempMonthlyHours(currentHours.toString());
                     setIsEditingMonthlyHours(true);
                   }}
                   title="Click para editar las horas mensuales"
                 >
                   <span className="text-sm font-semibold text-purple-700">
-                    {person.monthlyHours || 160}
+                    {(() => {
+                      // Intentar obtener el valor más actual del cache
+                      const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
+                      const currentPersonData = personnelData?.find(p => p.id === person.id);
+                      const displayValue = currentPersonData?.monthlyHours !== undefined ? currentPersonData.monthlyHours : (person.monthlyHours || 160);
+                      
+                      if (person.name === 'Trinidad Petreigne') {
+                        console.log('🔍 [TRINIDAD] Display value calculation:', {
+                          personMonthlyHours: person.monthlyHours,
+                          cacheValue: currentPersonData?.monthlyHours,
+                          finalDisplayValue: displayValue
+                        });
+                      }
+                      
+                      return displayValue;
+                    })()}
                   </span>
                   <span className="text-xs text-muted-foreground">hrs/mes</span>
                   {!person.monthlyHours && <span className="text-xs text-gray-500">(por defecto)</span>}
