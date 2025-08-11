@@ -97,8 +97,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   // Sincronizar tempMonthlyHours independientemente - este es el estado crítico para la visualización
   useEffect(() => {
-    console.log('🔄 Syncing tempMonthlyHours:', person.monthlyHours, 'for person:', person.name);
-    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
+    const hoursValue = person.monthlyHours !== null && person.monthlyHours !== undefined ? person.monthlyHours : 160;
+    console.log('🔄 Syncing tempMonthlyHours:', person.monthlyHours, '→', hoursValue, 'for person:', person.name);
+    setTempMonthlyHours(hoursValue.toString());
   }, [person.monthlyHours, person.id]);
 
   // Función para obtener el último sueldo histórico
@@ -915,41 +916,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   Editando horas
                 </span>
               </>
-            ) : (person.monthlyHours !== null && person.monthlyHours !== undefined) ? (
-              <>
-                <div 
-                  className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
-                  onClick={() => {
-                    console.log('🔧 Setting tempMonthlyHours to:', person.monthlyHours);
-                    setTempMonthlyHours(person.monthlyHours.toString());
-                    setIsEditingMonthlyHours(true);
-                  }}
-                  title="Click para editar las horas mensuales"
-                >
-                  <span className="text-sm font-semibold text-purple-700">
-                    {person.monthlyHours}
-                  </span>
-                  <span className="text-xs text-muted-foreground">hrs/mes</span>
-                  <Edit className="h-3 w-3 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                  Horas mensuales
-                </span>
-              </>
             ) : (
               <>
                 <div 
                   className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
                   onClick={() => {
-                    console.log('🔧 No monthlyHours set, defaulting to 160');
-                    setTempMonthlyHours('160');
+                    const currentHours = person.monthlyHours || 160;
+                    console.log('🔧 Setting tempMonthlyHours to:', currentHours);
+                    setTempMonthlyHours(currentHours.toString());
                     setIsEditingMonthlyHours(true);
                   }}
-                  title="Click para configurar las horas mensuales"
+                  title="Click para editar las horas mensuales"
                 >
-                  <span className="text-sm text-gray-700">160</span>
+                  <span className="text-sm font-semibold text-purple-700">
+                    {person.monthlyHours || 160}
+                  </span>
                   <span className="text-xs text-muted-foreground">hrs/mes</span>
-                  <span className="text-xs text-gray-500">(por defecto)</span>
+                  {!person.monthlyHours && <span className="text-xs text-gray-500">(por defecto)</span>}
                   <Edit className="h-3 w-3 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
