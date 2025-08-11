@@ -63,6 +63,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
+  const [isEditingMonthlyHours, setIsEditingMonthlyHours] = useState(false);
+  const [tempMonthlyHours, setTempMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -264,9 +266,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null }) => {
+      // Si es monthlyHours, es un campo base, no histórico
+      if (data.field === 'monthlyHours') {
+        console.log('🔧 Updating monthlyHours via historical cost mutation:', data.value);
+        return apiRequest(`/api/personnel/${person.id}`, "PATCH", { monthlyHours: data.value });
+      }
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       // Actualizar cache inmediatamente
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
@@ -278,16 +285,19 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       // Invalidar cache para forzar recarga
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       
+      const isMonthlyHours = variables.field === 'monthlyHours';
       toast({
-        title: "Costo histórico actualizado",
-        description: "El valor ha sido guardado correctamente.",
+        title: isMonthlyHours ? "Horas mensuales actualizadas" : "Costo histórico actualizado",
+        description: isMonthlyHours ? 
+          `Horas mensuales establecidas a ${variables.value} horas` : 
+          "El valor ha sido guardado correctamente.",
       });
     },
     onError: (error: any) => {
-      console.error("Error al actualizar costo histórico:", error);
+      console.error("Error al actualizar:", error);
       toast({
         title: "Error",
-        description: error.message || "Hubo un error al actualizar el costo histórico.",
+        description: error.message || "Hubo un error al actualizar el valor.",
         variant: "destructive",
       });
     },
@@ -301,6 +311,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleHistoricalCostSave = (field: string) => {
     const value = editingCells[field] || '';
     const numericValue = value === '' ? null : parseFloat(value);
+    
+    console.log('🔧 handleHistoricalCostSave called with field:', field, 'value:', value);
     
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
       // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente
@@ -406,6 +418,39 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setIsEditing(false);
+  };
+
+  const handleMonthlyHoursSave = () => {
+    const numericValue = parseFloat(tempMonthlyHours);
+    
+    if (isNaN(numericValue) || numericValue <= 0) {
+      toast({
+        title: "Error",
+        description: "Las horas mensuales deben ser un número válido mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('🔧 Saving monthlyHours directly:', numericValue);
+    
+    updatePersonnelMutation.mutate({
+      name: person.name,
+      email: person.email,
+      roleId: person.roleId,
+      hourlyRate: person.hourlyRate,
+      contractType: person.contractType,
+      monthlyFixedSalary: person.monthlyFixedSalary,
+      monthlyHours: numericValue,
+      includeInRealCosts: person.includeInRealCosts ?? true
+    });
+    
+    setIsEditingMonthlyHours(false);
+  };
+
+  const handleMonthlyHoursCancel = () => {
+    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
+    setIsEditingMonthlyHours(false);
   };
 
   if (isEditing) {
@@ -777,13 +822,68 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex flex-col items-start gap-1">
           {person.contractType === 'full-time' ? (
-            person.monthlyHours ? (
+            isEditingMonthlyHours ? (
               <>
                 <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    min="1"
+                    max="300"
+                    value={tempMonthlyHours}
+                    onChange={(e) => setTempMonthlyHours(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleMonthlyHoursSave();
+                      } else if (e.key === 'Escape') {
+                        handleMonthlyHoursCancel();
+                      }
+                    }}
+                    onBlur={handleMonthlyHoursSave}
+                    className="h-7 w-16 text-sm text-center border-purple-200 focus:border-purple-400"
+                    autoFocus
+                    disabled={updatePersonnelMutation.isPending}
+                  />
+                  <span className="text-xs text-muted-foreground">hrs/mes</span>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleMonthlyHoursSave}
+                      disabled={updatePersonnelMutation.isPending}
+                      className="h-6 w-6 p-0 hover:bg-green-100"
+                    >
+                      <Check className="h-3 w-3 text-green-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleMonthlyHoursCancel}
+                      disabled={updatePersonnelMutation.isPending}
+                      className="h-6 w-6 p-0 hover:bg-red-100"
+                    >
+                      <X className="h-3 w-3 text-red-600" />
+                    </Button>
+                  </div>
+                </div>
+                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                  Editando horas
+                </span>
+              </>
+            ) : person.monthlyHours ? (
+              <>
+                <div 
+                  className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
+                  onClick={() => {
+                    setTempMonthlyHours(person.monthlyHours?.toString() || '160');
+                    setIsEditingMonthlyHours(true);
+                  }}
+                  title="Click para editar las horas mensuales"
+                >
                   <span className="text-sm font-semibold text-purple-700">
                     {person.monthlyHours}
                   </span>
                   <span className="text-xs text-muted-foreground">hrs/mes</span>
+                  <Edit className="h-3 w-3 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
                   Horas mensuales
@@ -791,10 +891,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </>
             ) : (
               <>
-                <div className="flex items-center gap-1">
+                <div 
+                  className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-1 py-0.5 transition-colors"
+                  onClick={() => {
+                    setTempMonthlyHours('160');
+                    setIsEditingMonthlyHours(true);
+                  }}
+                  title="Click para configurar las horas mensuales"
+                >
                   <span className="text-sm text-gray-700">160</span>
                   <span className="text-xs text-muted-foreground">hrs/mes</span>
                   <span className="text-xs text-gray-500">(por defecto)</span>
+                  <Edit className="h-3 w-3 text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
                   Horas mensuales
