@@ -83,6 +83,18 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   }, [person]);
 
+  // Sincronizar estados locales con datos de la persona cuando cambien
+  useEffect(() => {
+    setEditedName(person.name);
+    setEditedEmail(person.email);
+    setEditedRoleId(person.roleId.toString());
+    setEditedHourlyRate(person.hourlyRate.toString());
+    setEditedContractType(person.contractType || 'full-time');
+    setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
+    setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
+  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
+
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
     const salaryFields = [
@@ -407,7 +419,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     
     console.log('🔧 Frontend handleSave - dataToSend:', dataToSend);
 
-    updatePersonnelMutation.mutate(dataToSend);
+    updatePersonnelMutation.mutate(dataToSend, {
+      onSuccess: (updatedPerson) => {
+        // Actualizar el estado local con los datos del servidor
+        setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+      }
+    });
   };
 
   const handleCancel = () => {
