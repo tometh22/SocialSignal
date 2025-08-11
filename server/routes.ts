@@ -1265,6 +1265,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
+      console.log(`🔧 PATCH /api/personnel/${id} - Raw body:`, req.body);
+      
       // Si hourlyRate viene como string, asegurarnos de convertirlo a número
       let data = { ...req.body };
 
@@ -1278,8 +1280,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Si monthlyHours viene como string, asegurarnos de convertirlo a número
+      if (typeof data.monthlyHours === 'string') {
+        // Reemplazar coma por punto si existe
+        const hoursString = data.monthlyHours.replace(',', '.');
+        const hoursNumber = parseFloat(hoursString);
+
+        if (!isNaN(hoursNumber) && hoursNumber > 0) {
+          data.monthlyHours = Math.round(hoursNumber); // Redondear a entero
+        }
+      }
+
       const validatedData = insertPersonnelSchema.partial().parse(data);
+      console.log(`🔧 PATCH /api/personnel/${id} - Validated data:`, validatedData);
+      
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
+      console.log(`🔧 PATCH /api/personnel/${id} - Updated person:`, updatedPerson);
 
       if (!updatedPerson) {
         return res.status(404).json({ message: "Personnel not found" });
