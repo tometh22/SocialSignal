@@ -122,7 +122,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const recalculateAllHourlyRates = () => {
     if (person.contractType !== 'full-time') return;
     
-    const monthlyHours = person.monthlyHours || 160;
+    // Obtener las horas mensuales más actualizadas del cache
+    const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
+    const currentPerson = personnelData?.find(p => p.id === person.id);
+    const monthlyHours = currentPerson?.monthlyHours || person.monthlyHours || 160;
     const months = [
       'jan2025', 'feb2025', 'mar2025', 'apr2025', 'may2025', 'jun2025',
       'jul2025', 'aug2025', 'sep2025', 'oct2025', 'nov2025', 'dec2025'
@@ -133,7 +136,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     months.forEach(month => {
       const salaryField = `${month}MonthlySalaryARS`;
       const hourlyField = `${month}HourlyRateARS`;
-      const monthlySalary = (person as any)[salaryField];
+      const monthlySalary = (currentPerson as any)?.[salaryField] || (person as any)[salaryField];
       
       if (monthlySalary && monthlySalary > 0) {
         const hourlyRate = Math.round(monthlySalary / monthlyHours);
@@ -302,7 +305,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
       // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente
       if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
-        const monthlyHours = person.monthlyHours || 160; // Usar horas mensuales o 160 por defecto
+        // Obtener las horas mensuales más actualizadas del cache
+        const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
+        const currentPerson = personnelData?.find(p => p.id === person.id);
+        const monthlyHours = currentPerson?.monthlyHours || person.monthlyHours || 160;
         const hourlyRate = numericValue / monthlyHours;
         const hourlyRateField = field.replace('MonthlySalaryARS', 'HourlyRateARS');
         
