@@ -50,6 +50,9 @@ interface InlineEditPersonnelProps {
 }
 
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
+  // DEBUG: Log person data on every render
+  console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
+  
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showHistoricalCosts, setShowHistoricalCosts] = useState(false);
@@ -761,7 +764,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-blue-700">
-            {Math.round(person.monthlyHours || 160)}
+            {(() => {
+              const displayValue = Math.round(person.monthlyHours || 160);
+              console.log(`🔍 [${person.name}] DISPLAY monthlyHours:`, person.monthlyHours, `-> showing: ${displayValue}`);
+              return displayValue;
+            })()}
           </span>
           <span className="text-xs text-muted-foreground">h/mes</span>
           {Math.round(person.monthlyHours || 160) !== 160 && (
