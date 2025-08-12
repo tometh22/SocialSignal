@@ -204,8 +204,8 @@ export default function Admin() {
     queryKey: ["/api/roles"],
   });
 
-  const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel"],
+  const { data: personnel, isLoading: personnelLoading, refetch: refetchPersonnel } = useQuery<Personnel[]>({
+    queryKey: ["/api/personnel", Date.now()], // Agregar timestamp para evitar cache
     staleTime: 0, // Forzar que siempre vaya al servidor
     gcTime: 0,    // No guardar en cache
     refetchOnMount: true,
@@ -229,6 +229,15 @@ export default function Admin() {
     console.log("🔄 CLEARING CACHE ON MOUNT...");
     queryClient.clear();
   }, []);
+
+  // Force refresh handler
+  const handleForceRefresh = () => {
+    console.log("🔄 FORCE REFRESH TRIGGERED");
+    queryClient.clear();
+    setTimeout(() => {
+      refetchPersonnel();
+    }, 100);
+  };
 
 
 
@@ -973,6 +982,12 @@ export default function Admin() {
           <div>
             <h1 className="heading-page">Panel de Administración</h1>
           </div>
+          <button 
+            onClick={handleForceRefresh}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            🔄 Refrescar Datos
+          </button>
         </div>
       </div>
 
