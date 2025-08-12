@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ interface InlineEditPersonnelProps {
     hourlyRate: number;
     contractType?: string;
     monthlyFixedSalary?: number;
-    monthlyHours?: number;
     includeInRealCosts?: boolean;
     // Historical costs fields
     jan2025HourlyRateARS?: number;
@@ -60,7 +58,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedHourlyRate, setEditedHourlyRate] = useState(person.hourlyRate.toString());
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
-  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
@@ -75,9 +72,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedHourlyRate(person.hourlyRate.toString());
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
-    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
+  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts]);
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
@@ -87,7 +83,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       'jun2025MonthlySalaryARS', 'may2025MonthlySalaryARS', 'apr2025MonthlySalaryARS',
       'mar2025MonthlySalaryARS', 'feb2025MonthlySalaryARS', 'jan2025MonthlySalaryARS'
     ];
-    
+
     // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
     for (const field of salaryFields) {
       const value = (person as any)[field];
@@ -116,49 +112,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
-  // Función para recalcular todas las tarifas por hora basadas en sueldos existentes
-  const recalculateAllHourlyRates = () => {
-    if (person.contractType !== 'full-time') return;
-    
-    // Obtener las horas mensuales más actualizadas del cache
-    const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
-    const currentPerson = personnelData?.find(p => p.id === person.id);
-    const monthlyHours = currentPerson?.monthlyHours || person.monthlyHours || 160;
-    
-    console.log('🔧 Recalculating hourly rates with monthlyHours:', monthlyHours);
-    const months = [
-      'jan2025', 'feb2025', 'mar2025', 'apr2025', 'may2025', 'jun2025',
-      'jul2025', 'aug2025', 'sep2025', 'oct2025', 'nov2025', 'dec2025'
-    ];
-    
-    let calculatedCount = 0;
-    
-    months.forEach(month => {
-      const salaryField = `${month}MonthlySalaryARS`;
-      const hourlyField = `${month}HourlyRateARS`;
-      const monthlySalary = (currentPerson as any)?.[salaryField] || (person as any)[salaryField];
-      
-      if (monthlySalary && monthlySalary > 0) {
-        const hourlyRate = Math.round(monthlySalary / monthlyHours);
-        updateHistoricalCostMutation.mutate({ field: hourlyField, value: hourlyRate });
-        calculatedCount++;
-      }
-    });
-    
-    if (calculatedCount > 0) {
-      toast({
-        title: "Recálculo completado",
-        description: `Se recalcularon ${calculatedCount} tarifas por hora usando ${monthlyHours} horas mensuales`,
-      });
-    } else {
-      toast({
-        title: "Sin datos para recalcular",
-        description: "No se encontraron sueldos mensuales para recalcular las tarifas",
-        variant: "destructive"
-      });
-    }
-  };
-
   const months = [
     { key: "jan2025", label: "Ene" }, { key: "feb2025", label: "Feb" },
     { key: "mar2025", label: "Mar" }, { key: "apr2025", label: "Abr" },
@@ -176,7 +129,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       hourlyRate: number;
       contractType: string;
       monthlyFixedSalary?: number;
-      monthlyHours?: number;
       includeInRealCosts: boolean;
     }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
@@ -187,13 +139,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedEmail(updatedPerson.email);
       setEditedRoleId(updatedPerson.roleId.toString());
       setEditedHourlyRate(updatedPerson.hourlyRate.toString());
-
-      // Si se actualizaron las horas mensuales para un empleado full-time, recalcular tarifas por hora
-      if (updatedPerson.contractType === 'full-time' && updatedPerson.monthlyHours && updatedPerson.monthlyHours !== person.monthlyHours) {
-        setTimeout(() => {
-          recalculateAllHourlyRates();
-        }, 500); // Pequeño delay para que se actualice la data primero
-      }
 
       // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
@@ -262,8 +207,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
-  
-
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
@@ -276,10 +219,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           p.id === person.id ? { ...p, ...data } : p
         );
       });
-      
+
       // Invalidar cache para forzar recarga
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      
+
       toast({
         title: "Costo histórico actualizado",
         description: "El valor ha sido guardado correctamente.",
@@ -303,31 +246,26 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleHistoricalCostSave = (field: string) => {
     const value = editingCells[field] || '';
     const numericValue = value === '' ? null : parseFloat(value);
-    
-    console.log('🔧 handleHistoricalCostSave called with field:', field, 'value:', value);
-    
+
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
-      // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente
+      // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente usando 160 horas fijas
       if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
-        // Obtener las horas mensuales más actualizadas del cache
-        const personnelData = queryClient.getQueryData(["/api/personnel"]) as any[];
-        const currentPerson = personnelData?.find(p => p.id === person.id);
-        const monthlyHours = currentPerson?.monthlyHours || person.monthlyHours || 160;
+        const monthlyHours = 160; // Horas fijas para cálculo
         const hourlyRate = numericValue / monthlyHours;
         const hourlyRateField = field.replace('MonthlySalaryARS', 'HourlyRateARS');
-        
+
         // Guardar tanto el sueldo como la tarifa calculada
         updateHistoricalCostMutation.mutate({ field, value: numericValue });
         updateHistoricalCostMutation.mutate({ field: hourlyRateField, value: Math.round(hourlyRate) });
-        
+
         toast({
           title: "Cálculo automático",
-          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ ${monthlyHours} horas)`
+          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ 160 horas)`
         });
       } else {
         updateHistoricalCostMutation.mutate({ field, value: numericValue });
       }
-      
+
       // Remover del estado de edición después de guardar
       setEditingCells(prev => {
         const newState = { ...prev };
@@ -349,27 +287,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return editingCells[field];
     }
     const value = (person as any)[field];
-    
-    // Debug temporal para verificar monthly hours
-    if (field === 'monthlyHours' && person.name === 'Trinidad Petreigne') {
-      console.log(`🔍 Trinidad monthlyHours: ${value} (${typeof value})`);
-    }
-    
-    // Debug temporal para Tomi Criado
-    if (person.name === 'Tomi Criado' && field.includes('MonthlySalary')) {
-      console.log(`🔍 ${field}: ${value} (${typeof value}) - persona completa:`, person);
-    }
-    
-    // Cambio crítico: mostrar valores numéricos reales, incluso 0
-    // Solo mostrar cadena vacía para null o undefined
     return (value !== null && value !== undefined) ? value.toString() : '';
   };
 
   const handleSave = () => {
     const hourlyRate = parseFloat(editedHourlyRate);
     const roleId = parseInt(editedRoleId);
-
-    console.log('🔧 Frontend handleSave - editedMonthlyHours:', editedMonthlyHours);
 
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
@@ -396,18 +319,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       hourlyRate: hourlyRate,
       contractType: editedContractType,
       monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
-      monthlyHours: editedMonthlyHours ? parseFloat(editedMonthlyHours) : undefined,
       includeInRealCosts: editedIncludeInRealCosts
     };
-    
-    console.log('🔧 Frontend handleSave - dataToSend:', dataToSend);
 
-    updatePersonnelMutation.mutate(dataToSend, {
-      onSuccess: (updatedPerson) => {
-        // Actualizar el estado local con los datos del servidor
-        setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
-      }
-    });
+    updatePersonnelMutation.mutate(dataToSend);
   };
 
   const handleCancel = () => {
@@ -417,12 +332,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedHourlyRate(person.hourlyRate.toString());
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
-    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setIsEditing(false);
   };
-
-  
 
   if (isEditing) {
     return (
@@ -583,44 +495,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               <span className="text-xs text-gray-400">-</span>
               <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                 Se paga por horas
-              </span>
-            </div>
-          )}
-        </td>
-        <td className="px-6 py-4">
-          {editedContractType === 'full-time' ? (
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                step="1"
-                min="1"
-                max="300"
-                value={editedMonthlyHours}
-                onChange={(e) => setEditedMonthlyHours(e.target.value)}
-                className="h-9 w-20 border-blue-200 focus:border-blue-400"
-                disabled={updatePersonnelMutation.isPending}
-                placeholder="160"
-              />
-              <span className="text-sm text-muted-foreground">hrs/mes</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-sm">
-                      Horas de trabajo mensuales. Se usa para calcular automáticamente la tarifa por hora 
-                      dividiendo el sueldo mensual entre las horas.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-1">
-              <span className="text-xs text-gray-400">-</span>
-              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                Por horas
               </span>
             </div>
           )}
@@ -791,35 +665,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex flex-col items-start gap-1">
-          {person.contractType === 'full-time' ? (
-            <>
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-semibold text-purple-700">
-                  {person.monthlyHours || 160}
-                </span>
-                <span className="text-xs text-muted-foreground">hrs/mes</span>
-                {!person.monthlyHours && (
-                  <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">
-                    por defecto
-                  </span>
-                )}
-              </div>
-              <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                Horas mensuales fijas
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="text-xs text-gray-400">-</span>
-              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                Por horas trabajadas
-              </span>
-            </>
-          )}
-        </div>
-      </td>
-      <td className="px-6 py-4">
         <div className="flex items-center justify-center">
           {person.includeInRealCosts !== false ? (
             <Check className="h-4 w-4 text-green-600" />
@@ -874,7 +719,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     </tr>
     {showHistoricalCosts && (
       <tr className="border-b bg-green-50/20">
-        <td colSpan={8} className="px-6 py-6">
+        <td colSpan={7} className="px-6 py-6">
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b border-green-200 pb-3">
               <div className="flex items-center gap-3">
@@ -885,7 +730,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 Valores en ARS • Análisis de rentabilidad
               </div>
             </div>
-            
+
             <div className="space-y-6">
               {/* Tarifa por Hora ARS */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -893,19 +738,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <h5 className="font-semibold text-gray-800">Tarifa por Hora (ARS)</h5>
                   <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis operacional</span>
-                  {person.contractType === 'full-time' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={recalculateAllHourlyRates}
-                      disabled={updateHistoricalCostMutation.isPending}
-                      className="h-7 px-3 text-xs"
-                      title="Recalcular todas las tarifas por hora basándose en los sueldos mensuales"
-                    >
-                      🔄 Recalcular todas
-                    </Button>
-                  )}
                 </div>
                 <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
@@ -944,6 +776,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Solo Full-time</span>
+                    <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Se usa 160h fijas para calcular tarifa/hora</span>
                   </div>
                   <div className="grid grid-cols-6 gap-3">
                     {months.map((month) => {
@@ -987,7 +820,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                   <div className="font-medium text-blue-800 mb-1">Análisis Operacional</div>
                   <div className="text-blue-700">Se registran automáticamente en cada entrada de tiempo para analizar productividad</div>
                 </div>
-                
+
                 <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
                   <div className="font-medium text-purple-800 mb-1">Análisis Económico</div>
                   <div className="text-purple-700">
@@ -995,7 +828,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     <strong>Freelance:</strong> Horas × tarifa histórica
                   </div>
                 </div>
-                
+
                 <div className="bg-green-50 rounded-lg p-3 border border-green-200">
                   <div className="font-medium text-green-800 mb-1">Nuevas Cotizaciones</div>
                   <div className="text-green-700">Los valores actuales (tabla superior) se usan para proyectos futuros</div>
