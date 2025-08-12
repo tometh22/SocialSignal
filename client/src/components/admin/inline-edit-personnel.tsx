@@ -50,9 +50,6 @@ interface InlineEditPersonnelProps {
 }
 
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
-  // Force re-render when monthlyHours changes by using it as part of the key
-  const componentKey = `${person.id}-${person.monthlyHours}-${Date.now()}`;
-  
   // DEBUG: Log person data on every render
   console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
   console.log(`🔍 [${person.name}] FULL PERSON DATA:`, person);

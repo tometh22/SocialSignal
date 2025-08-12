@@ -205,7 +205,7 @@ export default function Admin() {
   });
 
   const { data: personnel, isLoading: personnelLoading, refetch: refetchPersonnel } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel", Date.now()], // Agregar timestamp para evitar cache
+    queryKey: ["/api/personnel"],
     staleTime: 0, // Forzar que siempre vaya al servidor
     gcTime: 0,    // No guardar en cache
     refetchOnMount: true,
@@ -224,19 +224,11 @@ export default function Admin() {
     }
   }, [personnel]);
 
-  // Clear cache once on component mount to ensure fresh data
-  useEffect(() => {
-    console.log("🔄 CLEARING CACHE ON MOUNT...");
-    queryClient.clear();
-  }, []);
-
   // Force refresh handler
   const handleForceRefresh = () => {
     console.log("🔄 FORCE REFRESH TRIGGERED");
-    queryClient.clear();
-    setTimeout(() => {
-      refetchPersonnel();
-    }, 100);
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    refetchPersonnel();
   };
 
 
