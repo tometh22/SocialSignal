@@ -268,58 +268,83 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
-  // Mutation específica para horas mensuales
+  // Mutation específica para horas mensuales - REESCRITA COMPLETAMENTE
   const updateMonthlyHoursMutation = useMutation({
-    mutationFn: async (monthlyHours: number) => {
-      console.log('🔧 Updating monthlyHours:', monthlyHours, 'for person:', person.name);
-      const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", { monthlyHours });
-      console.log('🔧 Server response for monthlyHours update:', result);
+    mutationFn: async (data: { monthlyHours: number }) => {
+      console.log('🚀 NUEVA MUTACIÓN - Updating monthlyHours:', data.monthlyHours, 'for person ID:', person.id, 'name:', person.name);
+      
+      const payload = {
+        name: person.name,
+        email: person.email,
+        roleId: person.roleId,
+        hourlyRate: person.hourlyRate,
+        contractType: person.contractType || 'full-time',
+        monthlyFixedSalary: person.monthlyFixedSalary,
+        monthlyHours: data.monthlyHours, // El nuevo valor
+        includeInRealCosts: person.includeInRealCosts ?? true
+      };
+      
+      console.log('🚀 PAYLOAD COMPLETO:', payload);
+      
+      const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", payload);
+      console.log('🚀 RESPUESTA DEL SERVIDOR:', result);
       return result;
     },
     onSuccess: (updatedPerson) => {
-      console.log('✅ Monthly hours updated successfully:', updatedPerson);
+      console.log('✅ ÉXITO - Monthly hours updated:', updatedPerson.monthlyHours, 'for:', updatedPerson.name);
       
-      // Actualizar el estado local inmediatamente
-      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
-      setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+      // Limpiar todo el cache de personnel
+      queryClient.removeQueries({ queryKey: ["/api/personnel"] });
       
-      // Forzar actualización del cache con los datos del servidor
-      queryClient.setQueryData(["/api/personnel"], (old: any) => {
-        if (!Array.isArray(old)) return old;
-        console.log('🔧 Updating cache with new monthlyHours:', updatedPerson.monthlyHours);
-        return old.map((p: any) => 
-          p.id === person.id ? { ...p, monthlyHours: updatedPerson.monthlyHours } : p
-        );
+      // Establecer nuevos datos en cache
+      queryClient.setQueryData(["/api/personnel"], (oldData: any) => {
+        if (!Array.isArray(oldData)) return oldData;
+        
+        return oldData.map((p: any) => {
+          if (p.id === person.id) {
+            console.log('🔄 ACTUALIZANDO CACHE - De:', p.monthlyHours, 'A:', updatedPerson.monthlyHours);
+            return {
+              ...p,
+              ...updatedPerson,
+              monthlyHours: updatedPerson.monthlyHours
+            };
+          }
+          return p;
+        });
       });
       
-      // Invalidar todas las queries relacionadas
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      
+      // Actualizar estados locales
+      setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
+      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
       setIsEditingMonthlyHours(false);
       
+      // Forzar refetch
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
+      }, 100);
+      
       toast({
-        title: "✅ Horas mensuales actualizadas",
-        description: `${person.name}: ${updatedPerson.monthlyHours} horas mensuales`,
+        title: "✅ Horas actualizadas correctamente",
+        description: `${updatedPerson.name}: ${updatedPerson.monthlyHours} horas mensuales`,
       });
       
-      // Recalcular todas las tarifas por hora si es full-time (con delay para asegurar actualización)
-      if (person.contractType === 'full-time') {
+      // Recalcular tarifas si es full-time
+      if (updatedPerson.contractType === 'full-time') {
         setTimeout(() => {
           recalculateAllHourlyRates();
-        }, 1000);
+        }, 500);
       }
     },
     onError: (error: any) => {
-      console.error("❌ Error updating monthly hours:", error);
+      console.error("❌ ERROR COMPLETO:", error);
       toast({
-        title: "❌ Error",
-        description: `No se pudieron actualizar las horas mensuales: ${error.message || 'Error desconocido'}`,
+        title: "❌ Error al actualizar",
+        description: `No se pudieron actualizar las horas: ${error.message || 'Error desconocido'}`,
         variant: "destructive"
       });
-      // Revertir valores locales
-      const currentHours = person.monthlyHours || 160;
-      setTempMonthlyHours(currentHours.toString());
+      
+      // Revertir a valor original
+      setTempMonthlyHours((person.monthlyHours || 160).toString());
       setIsEditingMonthlyHours(false);
     }
   });
@@ -485,42 +510,39 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleMonthlyHoursSave = () => {
     const numericValue = parseFloat(tempMonthlyHours.trim());
     
-    console.log('🔧 handleMonthlyHoursSave - attempting to save:', {
-      personName: person.name,
-      currentValue: person.monthlyHours,
-      newValue: numericValue,
-      tempMonthlyHours
-    });
+    console.log('🚀 GUARDANDO HORAS - Valor:', numericValue, 'Persona:', person.name, 'ID:', person.id);
     
+    // Validación
     if (isNaN(numericValue) || numericValue <= 0 || numericValue > 500) {
       toast({
-        title: "❌ Error de validación",
-        description: "Las horas mensuales deben ser un número entre 1 y 500",
+        title: "❌ Valor inválido",
+        description: "Ingresa un número entre 1 y 500 horas",
         variant: "destructive"
       });
       return;
     }
 
-    // Si es el mismo valor, no hacer nada
-    if (numericValue === person.monthlyHours) {
+    // Si es el mismo valor, cancelar
+    if (numericValue === (person.monthlyHours || 160)) {
+      console.log('🔄 Sin cambios, cancelando...');
       setIsEditingMonthlyHours(false);
       return;
     }
 
-    console.log('🚀 Iniciando actualización de horas mensuales...');
-    updateMonthlyHoursMutation.mutate(numericValue);
+    // Ejecutar mutación
+    console.log('🚀 Ejecutando mutación con:', { monthlyHours: numericValue });
+    updateMonthlyHoursMutation.mutate({ monthlyHours: numericValue });
   };
 
   const handleMonthlyHoursCancel = () => {
-    console.log('❌ Cancelando edición de horas mensuales');
-    const currentHours = person.monthlyHours || 160;
-    setTempMonthlyHours(currentHours.toString());
+    console.log('❌ CANCELANDO edición para:', person.name);
+    setTempMonthlyHours((person.monthlyHours || 160).toString());
     setIsEditingMonthlyHours(false);
   };
 
   const startEditingMonthlyHours = () => {
-    console.log('✏️ Iniciando edición de horas mensuales para:', person.name, 'Valor actual:', person.monthlyHours);
     const currentHours = person.monthlyHours || 160;
+    console.log('✏️ INICIANDO EDICIÓN para:', person.name, 'Horas actuales:', currentHours);
     setTempMonthlyHours(currentHours.toString());
     setIsEditingMonthlyHours(true);
   };
