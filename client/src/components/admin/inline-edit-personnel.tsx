@@ -50,6 +50,9 @@ interface InlineEditPersonnelProps {
 }
 
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
+  // Force re-render when monthlyHours changes by using it as part of the key
+  const componentKey = `${person.id}-${person.monthlyHours}-${Date.now()}`;
+  
   // DEBUG: Log person data on every render
   console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
   console.log(`🔍 [${person.name}] FULL PERSON DATA:`, person);
@@ -764,14 +767,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-blue-700">
-            {(() => {
-              // FORZAR valor directo de la base de datos
-              const rawValue = person.monthlyHours;
-              const displayValue = rawValue !== null && rawValue !== undefined ? Math.round(rawValue) : 160;
-              console.log(`🔍 [${person.name}] DISPLAY monthlyHours - RAW:`, rawValue, `FINAL:`, displayValue);
-              return displayValue;
-            })()}
+          <span className="text-sm font-semibold text-blue-700" key={`${person.id}-${person.monthlyHours}`}>
+            {person.monthlyHours ?? 160}
           </span>
           <span className="text-xs text-muted-foreground">h/mes</span>
           {Math.round(person.monthlyHours || 160) !== 160 && (

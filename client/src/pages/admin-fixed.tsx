@@ -224,6 +224,12 @@ export default function Admin() {
     }
   }, [personnel]);
 
+  // Clear cache once on component mount to ensure fresh data
+  useEffect(() => {
+    console.log("🔄 CLEARING CACHE ON MOUNT...");
+    queryClient.clear();
+  }, []);
+
 
 
   const { data: templates, isLoading: templatesLoading } = useQuery<ReportTemplate[]>({
