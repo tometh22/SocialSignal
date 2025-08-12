@@ -151,19 +151,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
 
-      // Actualizar cache de forma optimista
+      // Actualizar cache de forma optimista CON PRIORIDAD
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: any) => 
           p.id === person.id ? {
-            ...updatedPerson,
-            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || updatedPerson.roleName
+            ...p, // Mantener datos existentes
+            ...updatedPerson, // Sobrescribir con datos actualizados
+            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || p.roleName
           } : p
         );
       });
 
       // Invalidar queries para forzar actualización completa
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      
+      // FORZAR re-renderizado inmediato
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
+      }, 100);
 
       toast({
         title: "Éxito",
@@ -744,10 +750,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-blue-700">
-            {person.monthlyHours || 160}
+            {Math.round(person.monthlyHours || 160)}
           </span>
           <span className="text-xs text-muted-foreground">h/mes</span>
-          {(person.monthlyHours || 160) !== 160 && (
+          {Math.round(person.monthlyHours || 160) !== 160 && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
               ≠ 160h
             </span>
@@ -759,14 +765,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-sm">
-                  <strong>Horas Mensuales:</strong> {person.monthlyHours || 160} horas por mes<br/>
+                  <strong>Horas Mensuales:</strong> {Math.round(person.monthlyHours || 160)} horas por mes<br/>
                   {person.contractType === 'full-time' && person.monthlyFixedSalary && (
                     <>
                       <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora<br/>
-                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {person.monthlyHours || 160}h)</small>
+                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {Math.round(person.monthlyHours || 160)}h)</small>
                     </>
                   )}
-                  {(person.monthlyHours || 160) !== 160 && (
+                  {Math.round(person.monthlyHours || 160) !== 160 && (
                     <><br/><strong>Nota:</strong> Valor personalizado (estándar: 160h)</>
                   )}
                 </p>
