@@ -163,7 +163,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedContractType(updatedPerson.contractType || 'full-time');
       setEditedMonthlyFixedSalary(updatedPerson.monthlyFixedSalary?.toString() || '');
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
-      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '0');
+      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '');
 
       console.log(`🔧 [${person.name}] Local state FORCED - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || '160'}`);
 
@@ -182,7 +182,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
       toast({
         title: "Éxito",
-        description: `${person.name} actualizado. Horas mensuales: ${updatedPerson.monthlyHours || 0}h`
+        description: `${person.name} actualizado. Horas mensuales: ${updatedPerson.monthlyHours}h`
       });
       
       // FORZAR re-render completo del componente padre
@@ -765,10 +765,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-blue-700" key={`${person.id}-${person.monthlyHours}`}>
-            {person.monthlyHours ?? 0}
+            {person.monthlyHours}
           </span>
           <span className="text-xs text-muted-foreground">h/mes</span>
-          {Math.round(person.monthlyHours || 0) !== 160 && (
+          {Math.round(person.monthlyHours || 160) !== 160 && (
             <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
               ≠ 160h
             </span>
@@ -780,14 +780,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-sm">
-                  <strong>Horas Mensuales:</strong> {Math.round(person.monthlyHours || 0)} horas por mes<br/>
+                  <strong>Horas Mensuales:</strong> {Math.round(person.monthlyHours || 160)} horas por mes<br/>
                   {person.contractType === 'full-time' && person.monthlyFixedSalary && (
                     <>
-                      <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 1))).toLocaleString()} ARS/hora<br/>
-                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {Math.round(person.monthlyHours || 1)}h)</small>
+                      <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora<br/>
+                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {Math.round(person.monthlyHours || 160)}h)</small>
                     </>
                   )}
-                  {Math.round(person.monthlyHours || 0) !== 160 && (
+                  {Math.round(person.monthlyHours || 160) !== 160 && (
                     <><br/><strong>Nota:</strong> Valor personalizado (estándar: 160h)</>
                   )}
                 </p>
