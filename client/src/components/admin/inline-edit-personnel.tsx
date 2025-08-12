@@ -135,14 +135,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       includeInRealCosts: boolean;
       monthlyHours?: number;
     }) => {
+      console.log(`🔧 Sending PATCH request for personnel ${person.id}:`, data);
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
     },
     onSuccess: (updatedPerson) => {
-      // Actualizar los valores locales inmediatamente
+      console.log(`✅ Personnel ${person.id} updated successfully:`, updatedPerson);
+      
+      // Actualizar los valores locales inmediatamente con los datos del servidor
       setEditedName(updatedPerson.name);
       setEditedEmail(updatedPerson.email);
       setEditedRoleId(updatedPerson.roleId.toString());
       setEditedHourlyRate(updatedPerson.hourlyRate.toString());
+      setEditedContractType(updatedPerson.contractType || 'full-time');
+      setEditedMonthlyFixedSalary(updatedPerson.monthlyFixedSalary?.toString() || '');
+      setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
+      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
 
       // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
@@ -155,12 +162,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         );
       });
 
-      // Invalidar queries para forzar actualización
+      // Invalidar queries para forzar actualización completa
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
       toast({
         title: "Éxito",
-        description: "Personal actualizado correctamente"
+        description: `Personal actualizado correctamente. Horas mensuales: ${updatedPerson.monthlyHours || 160}h`
       });
       setIsEditing(false);
     },
@@ -299,6 +306,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     const roleId = parseInt(editedRoleId);
     const monthlyHours = parseFloat(editedMonthlyHours);
 
+    console.log(`🔧 Validating data before save:`, {
+      name: editedName,
+      hourlyRate,
+      roleId,
+      monthlyHours,
+      contractType: editedContractType
+    });
+
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
         title: "Error",
@@ -326,6 +341,16 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
+    // Validación específica: horas mensuales entre 40 y 300 (rango razonable)
+    if (monthlyHours < 40 || monthlyHours > 300) {
+      toast({
+        title: "Error",
+        description: "Las horas mensuales deben estar entre 40 y 300 horas",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const dataToSend = {
       name: editedName.trim(),
       email: editedEmail.trim(),
@@ -337,6 +362,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       monthlyHours: monthlyHours
     };
 
+    console.log(`🚀 Sending update request:`, dataToSend);
     updatePersonnelMutation.mutate(dataToSend);
   };
 
@@ -521,9 +547,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             <Input
               type="number"
               step="1"
-              min="1"
+              min="40"
+              max="300"
               value={editedMonthlyHours}
-              onChange={(e) => setEditedMonthlyHours(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setEditedMonthlyHours(value);
+                console.log(`📝 Monthly hours changed to: ${value}`);
+              }}
               className="h-9 w-20 border-blue-200 focus:border-blue-400"
               disabled={updatePersonnelMutation.isPending}
               placeholder="160"
@@ -536,7 +567,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <TooltipContent className="max-w-xs">
                   <p className="text-sm">
                     <strong>Horas Mensuales:</strong> Cantidad de horas estimadas que esta persona 
-                    trabaja por mes. Para empleados full-time típicamente 160 horas (8h/día × 20 días).
+                    trabaja por mes. Rango válido: 40-300 horas.<br/>
+                    <strong>Estándar:</strong> 160h (full-time), 80h (part-time).<br/>
                     Se usa para calcular automáticamente la tarifa por hora basada en el sueldo fijo.
                   </p>
                 </TooltipContent>
@@ -715,6 +747,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             {person.monthlyHours || 160}
           </span>
           <span className="text-xs text-muted-foreground">h/mes</span>
+          {(person.monthlyHours || 160) !== 160 && (
+            <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
+              ≠ 160h
+            </span>
+          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -724,7 +761,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <p className="text-sm">
                   <strong>Horas Mensuales:</strong> {person.monthlyHours || 160} horas por mes<br/>
                   {person.contractType === 'full-time' && person.monthlyFixedSalary && (
-                    <>Tarifa calculada: ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora</>
+                    <>
+                      <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora<br/>
+                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {person.monthlyHours || 160}h)</small>
+                    </>
+                  )}
+                  {(person.monthlyHours || 160) !== 160 && (
+                    <><br/><strong>Nota:</strong> Valor personalizado (estándar: 160h)</>
                   )}
                 </p>
               </TooltipContent>

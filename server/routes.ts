@@ -1292,11 +1292,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Validar rango de horas mensuales
+      if (data.monthlyHours !== undefined) {
+        if (data.monthlyHours < 40 || data.monthlyHours > 300) {
+          console.error(`❌ Invalid monthly hours: ${data.monthlyHours}. Must be between 40 and 300.`);
+          return res.status(400).json({ 
+            message: "Las horas mensuales deben estar entre 40 y 300 horas",
+            field: "monthlyHours",
+            value: data.monthlyHours
+          });
+        }
+      }
+
       const validatedData = insertPersonnelSchema.partial().parse(data);
       console.log(`🔧 PATCH /api/personnel/${id} - Validated data:`, validatedData);
       
       // Si se están actualizando horas mensuales y hay sueldo fijo, recalcular tarifa por hora
       if (validatedData.monthlyHours !== undefined) {
+        console.log(`🔧 Monthly hours update detected: ${validatedData.monthlyHours}h`);
+        
         const currentPerson = await storage.getPersonnelById(id);
         if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
           const newHourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
@@ -1316,6 +1330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             (validatedData as any)[historicalField] = newHourlyRate;
             console.log(`🔧 Also updating historical field ${historicalField} to ${newHourlyRate}`);
           }
+        } else {
+          console.log(`📝 Monthly hours updated to ${validatedData.monthlyHours}h (no salary recalculation needed)`);
         }
       }
       
