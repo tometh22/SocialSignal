@@ -679,7 +679,7 @@ export default function Admin() {
 
       // Invalidar queries para forzar actualización
       queryClient.invalidateQueries({ queryKey: ['/api/admin/system-config'] });
-      
+
       toast({ title: 'Tipo de cambio actualizado exitosamente' });
     },
     onError: () => {
@@ -899,7 +899,7 @@ export default function Admin() {
       'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
       'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
     ];
-    
+
     // Buscar el último valor histórico disponible (del más reciente al más antiguo)
     for (const month of months) {
       const fieldName = `${month}HourlyRateARS`;
@@ -908,7 +908,7 @@ export default function Admin() {
         return value;
       }
     }
-    
+
     // Si no hay valores históricos, usar la tarifa base
     return person.hourlyRate || 0;
   };
@@ -919,7 +919,7 @@ export default function Admin() {
       'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
       'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
     ];
-    
+
     // Buscar el último valor histórico disponible (del más reciente al más antiguo)
     for (const month of months) {
       const fieldName = `${month}MonthlySalaryARS`;
@@ -928,7 +928,7 @@ export default function Admin() {
         return value;
       }
     }
-    
+
     // Si no hay valores históricos, usar el sueldo base
     return person.monthlyFixedSalary || 0;
   };
@@ -1116,7 +1116,8 @@ export default function Admin() {
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm">
                                     Horas de trabajo mensuales para empleados Full-time. 
-                                    Se usa para calcular automáticamente la tarifa por hora.
+                                    Se usa para calcular la tarifa por hora automáticamente 
+                                    basada en el sueldo fijo mensual.
                                   </p>
                                 </TooltipContent>
                               </Tooltip>
@@ -1394,11 +1395,6 @@ export default function Admin() {
               </div>
             </CardHeader>
           </Card>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Configuración del tipo de cambio */}
-
-          </div>
 
           {/* Tabla de datos históricos */}
           <Card className="standard-card mt-6">

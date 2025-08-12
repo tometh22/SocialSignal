@@ -1190,6 +1190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         roleName: sql`roles.name`,
         contractType: sql`personnel.contract_type`,
         monthlyFixedSalary: sql`personnel.monthly_fixed_salary`,
+        monthlyHours: sql`personnel.monthly_hours`,
         includeInRealCosts: sql`personnel.include_in_real_costs`,
         // Historical hourly rates (ARS) - CORREGIDO: nombres de columnas con guiones bajos
         jan2025HourlyRateARS: sql`personnel.jan_2025_hourly_rate_ars`,
@@ -1296,7 +1297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si se están actualizando horas mensuales y hay sueldo fijo, recalcular tarifa por hora
       if (validatedData.monthlyHours !== undefined) {
-        const currentPerson = await storage.getPersonnel(id);
+        const currentPerson = await storage.getPersonnelById(id);
         if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
           const newHourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
           validatedData.hourlyRate = newHourlyRate;
@@ -1308,13 +1309,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const currentMonth = currentDate.getMonth(); // 0-based
           
           const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateArs` as keyof typeof validatedData;
+          const historicalField = `${monthNames[currentMonth]}${currentYear}HourlyRateARS` as keyof typeof validatedData;
           
           // Si el campo histórico existe y tiene un valor, actualizarlo también
-          if (currentPerson[historicalField] !== null && currentPerson[historicalField] !== undefined) {
+          if (currentPerson[historicalField as keyof typeof currentPerson] !== null && currentPerson[historicalField as keyof typeof currentPerson] !== undefined) {
             (validatedData as any)[historicalField] = newHourlyRate;
             console.log(`🔧 Also updating historical field ${historicalField} to ${newHourlyRate}`);
           }
+        }
+      }
+      
+      // Si se actualiza el sueldo fijo y hay horas mensuales, recalcular tarifa por hora
+      if (validatedData.monthlyFixedSalary !== undefined) {
+        const currentPerson = await storage.getPersonnelById(id);
+        const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 160;
+        if (validatedData.monthlyFixedSalary > 0 && monthlyHours > 0) {
+          const newHourlyRate = Math.round(validatedData.monthlyFixedSalary / monthlyHours);
+          validatedData.hourlyRate = newHourlyRate;
+          console.log(`🔧 Auto-calculating hourlyRate from salary: ${validatedData.monthlyFixedSalary} ÷ ${monthlyHours} = ${newHourlyRate}`);
         }
       }
       

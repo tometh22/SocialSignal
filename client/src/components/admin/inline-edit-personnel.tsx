@@ -19,6 +19,7 @@ interface InlineEditPersonnelProps {
     contractType?: string;
     monthlyFixedSalary?: number;
     includeInRealCosts?: boolean;
+    monthlyHours?: number;
     // Historical costs fields
     jan2025HourlyRateARS?: number;
     feb2025HourlyRateARS?: number;
@@ -59,6 +60,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
+  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
@@ -73,7 +75,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts]);
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
+  }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours]);
 
   // Función para obtener el último sueldo histórico
   const getLatestHistoricalSalary = (): number | null => {
@@ -130,6 +133,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       contractType: string;
       monthlyFixedSalary?: number;
       includeInRealCosts: boolean;
+      monthlyHours?: number;
     }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
     },
@@ -293,6 +297,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleSave = () => {
     const hourlyRate = parseFloat(editedHourlyRate);
     const roleId = parseInt(editedRoleId);
+    const monthlyHours = parseFloat(editedMonthlyHours);
 
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
@@ -312,6 +317,15 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
+    if (isNaN(monthlyHours) || monthlyHours <= 0) {
+      toast({
+        title: "Error",
+        description: "Las horas mensuales deben ser un número válido mayor a 0",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const dataToSend = {
       name: editedName.trim(),
       email: editedEmail.trim(),
@@ -319,7 +333,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       hourlyRate: hourlyRate,
       contractType: editedContractType,
       monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
-      includeInRealCosts: editedIncludeInRealCosts
+      includeInRealCosts: editedIncludeInRealCosts,
+      monthlyHours: monthlyHours
     };
 
     updatePersonnelMutation.mutate(dataToSend);
@@ -333,6 +348,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setIsEditing(false);
   };
 
@@ -500,6 +516,35 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           )}
         </td>
         <td className="px-6 py-4">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-medium text-gray-600">horas/mes</span>
+            <Input
+              type="number"
+              step="1"
+              min="1"
+              value={editedMonthlyHours}
+              onChange={(e) => setEditedMonthlyHours(e.target.value)}
+              className="h-9 w-20 border-blue-200 focus:border-blue-400"
+              disabled={updatePersonnelMutation.isPending}
+              placeholder="160"
+            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Horas Mensuales:</strong> Cantidad de horas estimadas que esta persona 
+                    trabaja por mes. Para empleados full-time típicamente 160 horas (8h/día × 20 días).
+                    Se usa para calcular automáticamente la tarifa por hora basada en el sueldo fijo.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </td>
+        <td className="px-6 py-4">
           <div className="flex items-center justify-center gap-1">
             <input
               type="checkbox"
@@ -662,6 +707,29 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </span>
             </>
           )}
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-blue-700">
+            {person.monthlyHours || 160}
+          </span>
+          <span className="text-xs text-muted-foreground">h/mes</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-sm">
+                  <strong>Horas Mensuales:</strong> {person.monthlyHours || 160} horas por mes<br/>
+                  {person.contractType === 'full-time' && person.monthlyFixedSalary && (
+                    <>Tarifa calculada: ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora</>
+                  )}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </td>
       <td className="px-6 py-4">
