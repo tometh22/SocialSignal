@@ -140,8 +140,22 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     },
     onSuccess: (updatedPerson) => {
       console.log(`✅ Personnel ${person.id} updated successfully:`, updatedPerson);
+      console.log(`📊 Monthly hours in response: ${updatedPerson.monthlyHours}`);
       
-      // Actualizar los valores locales inmediatamente con los datos del servidor
+      // FORZAR actualización inmediata del cache con los datos exactos del servidor
+      queryClient.setQueryData(["/api/personnel"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        const newData = old.map((p: any) => 
+          p.id === person.id ? {
+            ...updatedPerson, // Usar SOLO los datos del servidor
+            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || p.roleName
+          } : p
+        );
+        console.log(`🔄 Cache updated for person ${person.id}:`, newData.find(p => p.id === person.id));
+        return newData;
+      });
+
+      // Actualizar estados locales después de la actualización exitosa
       setEditedName(updatedPerson.name);
       setEditedEmail(updatedPerson.email);
       setEditedRoleId(updatedPerson.roleId.toString());
@@ -151,25 +165,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
 
-      // Actualizar cache de forma optimista CON PRIORIDAD
-      queryClient.setQueryData(["/api/personnel"], (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((p: any) => 
-          p.id === person.id ? {
-            ...p, // Mantener datos existentes
-            ...updatedPerson, // Sobrescribir con datos actualizados
-            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || p.roleName
-          } : p
-        );
-      });
-
-      // Invalidar queries para forzar actualización completa
+      // Forzar invalidación y refetch inmediato
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
       
-      // FORZAR re-renderizado inmediato
+      // Re-fetch para asegurar sincronización
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 100);
+      }, 50);
 
       toast({
         title: "Éxito",
