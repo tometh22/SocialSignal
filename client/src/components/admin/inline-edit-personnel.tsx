@@ -148,29 +148,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       console.log(`✅ [${person.name}] Personnel ${person.id} updated successfully:`, updatedPerson);
       console.log(`📊 [${person.name}] Final monthly hours: ${updatedPerson.monthlyHours}`);
       
-      // LIMPIAR completamente el cache antes de actualizar
-      queryClient.removeQueries({ queryKey: ["/api/personnel"] });
+      // LIMPIAR TODO EL CACHE antes de actualizar
+      queryClient.clear();
       
-      // FORZAR actualización inmediata del cache con los datos exactos del servidor
-      queryClient.setQueryData(["/api/personnel"], (old: any) => {
-        console.log(`🔄 [${person.name}] Old cache data:`, old?.find?.((p: any) => p.id === person.id));
-        
-        if (!Array.isArray(old)) return old;
-        const newData = old.map((p: any) => 
-          p.id === person.id ? {
-            ...updatedPerson, // Usar SOLO los datos del servidor
-            roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || p.roleName
-          } : p
-        );
-        
-        const updatedPersonInCache = newData.find(p => p.id === person.id);
-        console.log(`🔄 [${person.name}] New cache data:`, updatedPersonInCache);
-        console.log(`🔄 [${person.name}] Cache updated monthlyHours: ${updatedPersonInCache?.monthlyHours}`);
-        
-        return newData;
-      });
-
-      // Actualizar estados locales después de la actualización exitosa
+      // Actualizar estados locales inmediatamente con datos del servidor
       setEditedName(updatedPerson.name);
       setEditedEmail(updatedPerson.email);
       setEditedRoleId(updatedPerson.roleId.toString());
@@ -180,28 +161,31 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
 
-      console.log(`🔧 [${person.name}] Local state updated - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || '160'}`);
+      console.log(`🔧 [${person.name}] Local state FORCED - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || '160'}`);
 
-      // Forzar invalidación y refetch inmediato múltiple
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel", person.id] });
-      
-      // Re-fetch para asegurar sincronización con delay más largo
+      // RECARGAR TODOS LOS DATOS desde el servidor
       setTimeout(() => {
-        console.log(`🔄 [${person.name}] Force refetching personnel data...`);
+        console.log(`🔄 [${person.name}] RELOADING ALL PERSONNEL DATA...`);
         queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 100);
+      }, 50);
 
-      // Segundo refetch como backup
+      // FORZAR segundo reload
       setTimeout(() => {
-        console.log(`🔄 [${person.name}] Secondary refetch...`);
+        console.log(`🔄 [${person.name}] FORCE SECOND RELOAD...`);
+        queryClient.invalidateQueries();
         queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 500);
+      }, 200);
 
       toast({
         title: "Éxito",
         description: `${person.name} actualizado. Horas mensuales: ${updatedPerson.monthlyHours || 160}h`
       });
+      
+      // FORZAR re-render completo del componente padre
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
       setIsEditing(false);
     },
     onError: (err) => {
