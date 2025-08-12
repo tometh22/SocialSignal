@@ -64,7 +64,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
-  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
+  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '0');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
@@ -79,7 +79,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours]);
 
   // Función para obtener el último sueldo histórico
@@ -395,7 +395,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedContractType(person.contractType || 'full-time');
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-    setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
+    setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
     setIsEditing(false);
   };
 
