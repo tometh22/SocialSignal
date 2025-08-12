@@ -63,8 +63,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '160');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
-  const [isEditingMonthlyHours, setIsEditingMonthlyHours] = useState(false);
-  const [tempMonthlyHours, setTempMonthlyHours] = useState('');
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,10 +77,6 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
     setEditedMonthlyHours(person.monthlyHours?.toString() || '160');
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
-    
-    // Actualizar tempMonthlyHours solo cuando cambia el person
-    const currentHours = person.monthlyHours || 160;
-    setTempMonthlyHours(currentHours.toString());
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.monthlyHours, person.includeInRealCosts]);
 
   // Función para obtener el último sueldo histórico
@@ -268,86 +262,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     }
   };
 
-  // Mutation específica para horas mensuales - REESCRITA COMPLETAMENTE
-  const updateMonthlyHoursMutation = useMutation({
-    mutationFn: async (data: { monthlyHours: number }) => {
-      console.log('🚀 NUEVA MUTACIÓN - Updating monthlyHours:', data.monthlyHours, 'for person ID:', person.id, 'name:', person.name);
-      
-      const payload = {
-        name: person.name,
-        email: person.email,
-        roleId: person.roleId,
-        hourlyRate: person.hourlyRate,
-        contractType: person.contractType || 'full-time',
-        monthlyFixedSalary: person.monthlyFixedSalary,
-        monthlyHours: data.monthlyHours, // El nuevo valor
-        includeInRealCosts: person.includeInRealCosts ?? true
-      };
-      
-      console.log('🚀 PAYLOAD COMPLETO:', payload);
-      
-      const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", payload);
-      console.log('🚀 RESPUESTA DEL SERVIDOR:', result);
-      return result;
-    },
-    onSuccess: (updatedPerson) => {
-      console.log('✅ ÉXITO - Monthly hours updated:', updatedPerson.monthlyHours, 'for:', updatedPerson.name);
-      
-      // Limpiar todo el cache de personnel
-      queryClient.removeQueries({ queryKey: ["/api/personnel"] });
-      
-      // Establecer nuevos datos en cache
-      queryClient.setQueryData(["/api/personnel"], (oldData: any) => {
-        if (!Array.isArray(oldData)) return oldData;
-        
-        return oldData.map((p: any) => {
-          if (p.id === person.id) {
-            console.log('🔄 ACTUALIZANDO CACHE - De:', p.monthlyHours, 'A:', updatedPerson.monthlyHours);
-            return {
-              ...p,
-              ...updatedPerson,
-              monthlyHours: updatedPerson.monthlyHours
-            };
-          }
-          return p;
-        });
-      });
-      
-      // Actualizar estados locales
-      setTempMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
-      setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
-      setIsEditingMonthlyHours(false);
-      
-      // Forzar refetch
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 100);
-      
-      toast({
-        title: "✅ Horas actualizadas correctamente",
-        description: `${updatedPerson.name}: ${updatedPerson.monthlyHours} horas mensuales`,
-      });
-      
-      // Recalcular tarifas si es full-time
-      if (updatedPerson.contractType === 'full-time') {
-        setTimeout(() => {
-          recalculateAllHourlyRates();
-        }, 500);
-      }
-    },
-    onError: (error: any) => {
-      console.error("❌ ERROR COMPLETO:", error);
-      toast({
-        title: "❌ Error al actualizar",
-        description: `No se pudieron actualizar las horas: ${error.message || 'Error desconocido'}`,
-        variant: "destructive"
-      });
-      
-      // Revertir a valor original
-      setTempMonthlyHours((person.monthlyHours || 160).toString());
-      setIsEditingMonthlyHours(false);
-    }
-  });
+  
 
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null }) => {
@@ -507,45 +422,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setIsEditing(false);
   };
 
-  const handleMonthlyHoursSave = () => {
-    const numericValue = parseFloat(tempMonthlyHours.trim());
-    
-    console.log('🚀 GUARDANDO HORAS - Valor:', numericValue, 'Persona:', person.name, 'ID:', person.id);
-    
-    // Validación
-    if (isNaN(numericValue) || numericValue <= 0 || numericValue > 500) {
-      toast({
-        title: "❌ Valor inválido",
-        description: "Ingresa un número entre 1 y 500 horas",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Si es el mismo valor, cancelar
-    if (numericValue === (person.monthlyHours || 160)) {
-      console.log('🔄 Sin cambios, cancelando...');
-      setIsEditingMonthlyHours(false);
-      return;
-    }
-
-    // Ejecutar mutación
-    console.log('🚀 Ejecutando mutación con:', { monthlyHours: numericValue });
-    updateMonthlyHoursMutation.mutate({ monthlyHours: numericValue });
-  };
-
-  const handleMonthlyHoursCancel = () => {
-    console.log('❌ CANCELANDO edición para:', person.name);
-    setTempMonthlyHours((person.monthlyHours || 160).toString());
-    setIsEditingMonthlyHours(false);
-  };
-
-  const startEditingMonthlyHours = () => {
-    const currentHours = person.monthlyHours || 160;
-    console.log('✏️ INICIANDO EDICIÓN para:', person.name, 'Horas actuales:', currentHours);
-    setTempMonthlyHours(currentHours.toString());
-    setIsEditingMonthlyHours(true);
-  };
+  
 
   if (isEditing) {
     return (
@@ -916,85 +793,27 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       <td className="px-6 py-4">
         <div className="flex flex-col items-start gap-1">
           {person.contractType === 'full-time' ? (
-            isEditingMonthlyHours ? (
-              <>
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
-                    min="1"
-                    max="300"
-                    value={tempMonthlyHours}
-                    onChange={(e) => setTempMonthlyHours(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleMonthlyHoursSave();
-                      } else if (e.key === 'Escape') {
-                        handleMonthlyHoursCancel();
-                      }
-                    }}
-                    className="h-7 w-16 text-sm text-center border-purple-200 focus:border-purple-400"
-                    autoFocus
-                    disabled={updateMonthlyHoursMutation.isPending}
-                  />
-                  <span className="text-xs text-muted-foreground">hrs/mes</span>
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleMonthlyHoursSave}
-                      disabled={updateMonthlyHoursMutation.isPending}
-                      className="h-6 w-6 p-0 hover:bg-green-100"
-                    >
-                      {updateMonthlyHoursMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                      ) : (
-                        <Check className="h-3 w-3 text-green-600" />
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleMonthlyHoursCancel}
-                      disabled={updateMonthlyHoursMutation.isPending}
-                      className="h-6 w-6 p-0 hover:bg-red-100"
-                    >
-                      <X className="h-3 w-3 text-red-600" />
-                    </Button>
-                  </div>
-                </div>
-                <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                  Editando horas
+            <>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-semibold text-purple-700">
+                  {person.monthlyHours || 160}
                 </span>
-              </>
-            ) : (
-              <>
-                <div 
-                  className="flex items-center gap-1 cursor-pointer hover:bg-purple-50 rounded px-2 py-1 transition-colors border border-transparent hover:border-purple-200"
-                  onClick={startEditingMonthlyHours}
-                  title={`Click para editar las horas mensuales (actual: ${person.monthlyHours || 160})`}
-                >
-                  <span className="text-sm font-bold text-purple-700">
-                    {person.monthlyHours || 160}
+                <span className="text-xs text-muted-foreground">hrs/mes</span>
+                {!person.monthlyHours && (
+                  <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full">
+                    por defecto
                   </span>
-                  <span className="text-xs text-muted-foreground">hrs/mes</span>
-                  {!person.monthlyHours && <span className="text-xs text-orange-600 bg-orange-100 px-1 rounded">(defecto)</span>}
-                  <Edit className="h-3 w-3 text-purple-400 ml-1" />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
-                    Horas mensuales
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    ID: {person.name.substring(0, 3)}-{person.id}
-                  </span>
-                </div>
-              </>
-            )
+                )}
+              </div>
+              <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">
+                Horas mensuales fijas
+              </span>
+            </>
           ) : (
             <>
               <span className="text-xs text-gray-400">-</span>
               <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                Por horas
+                Por horas trabajadas
               </span>
             </>
           )}
