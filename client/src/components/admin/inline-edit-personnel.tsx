@@ -135,15 +135,26 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       includeInRealCosts: boolean;
       monthlyHours?: number;
     }) => {
-      console.log(`🔧 Sending PATCH request for personnel ${person.id}:`, data);
-      return apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
+      console.log(`🔧 [${person.name}] Sending PATCH request for personnel ${person.id}:`, data);
+      console.log(`🔧 [${person.name}] Monthly hours being sent: ${data.monthlyHours} (type: ${typeof data.monthlyHours})`);
+      
+      const response = await apiRequest(`/api/personnel/${person.id}`, "PATCH", data);
+      console.log(`🔧 [${person.name}] Server response:`, response);
+      console.log(`🔧 [${person.name}] Monthly hours in response: ${response.monthlyHours} (type: ${typeof response.monthlyHours})`);
+      
+      return response;
     },
     onSuccess: (updatedPerson) => {
-      console.log(`✅ Personnel ${person.id} updated successfully:`, updatedPerson);
-      console.log(`📊 Monthly hours in response: ${updatedPerson.monthlyHours}`);
+      console.log(`✅ [${person.name}] Personnel ${person.id} updated successfully:`, updatedPerson);
+      console.log(`📊 [${person.name}] Final monthly hours: ${updatedPerson.monthlyHours}`);
+      
+      // LIMPIAR completamente el cache antes de actualizar
+      queryClient.removeQueries({ queryKey: ["/api/personnel"] });
       
       // FORZAR actualización inmediata del cache con los datos exactos del servidor
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
+        console.log(`🔄 [${person.name}] Old cache data:`, old?.find?.((p: any) => p.id === person.id));
+        
         if (!Array.isArray(old)) return old;
         const newData = old.map((p: any) => 
           p.id === person.id ? {
@@ -151,7 +162,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             roleName: roles.find(r => r.id === updatedPerson.roleId)?.name || p.roleName
           } : p
         );
-        console.log(`🔄 Cache updated for person ${person.id}:`, newData.find(p => p.id === person.id));
+        
+        const updatedPersonInCache = newData.find(p => p.id === person.id);
+        console.log(`🔄 [${person.name}] New cache data:`, updatedPersonInCache);
+        console.log(`🔄 [${person.name}] Cache updated monthlyHours: ${updatedPersonInCache?.monthlyHours}`);
+        
         return newData;
       });
 
@@ -165,25 +180,35 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '160');
 
-      // Forzar invalidación y refetch inmediato
+      console.log(`🔧 [${person.name}] Local state updated - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || '160'}`);
+
+      // Forzar invalidación y refetch inmediato múltiple
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel", person.id] });
       
-      // Re-fetch para asegurar sincronización
+      // Re-fetch para asegurar sincronización con delay más largo
       setTimeout(() => {
+        console.log(`🔄 [${person.name}] Force refetching personnel data...`);
         queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
-      }, 50);
+      }, 100);
+
+      // Segundo refetch como backup
+      setTimeout(() => {
+        console.log(`🔄 [${person.name}] Secondary refetch...`);
+        queryClient.refetchQueries({ queryKey: ["/api/personnel"] });
+      }, 500);
 
       toast({
         title: "Éxito",
-        description: `Personal actualizado correctamente. Horas mensuales: ${updatedPerson.monthlyHours || 160}h`
+        description: `${person.name} actualizado. Horas mensuales: ${updatedPerson.monthlyHours || 160}h`
       });
       setIsEditing(false);
     },
     onError: (err) => {
-      console.error("Error updating personnel:", err);
+      console.error(`❌ [${person.name}] Error updating personnel:`, err);
       toast({
         title: "Error",
-        description: "No se pudo actualizar el personal",
+        description: `No se pudo actualizar a ${person.name}`,
         variant: "destructive"
       });
     }

@@ -1266,7 +1266,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
 
     try {
-      console.log(`🔧 PATCH /api/personnel/${id} - Raw body:`, req.body);
+      // Get current person name for better logging
+      const currentPerson = await storage.getPersonnelById(id);
+      const personName = currentPerson?.name || `ID${id}`;
+      
+      console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Raw body:`, req.body);
       
       // Si hourlyRate viene como string, asegurarnos de convertirlo a número
       let data = { ...req.body };
@@ -1283,35 +1287,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Si monthlyHours viene como string, asegurarnos de convertirlo a número
       if (typeof data.monthlyHours === 'string') {
+        console.log(`🔧 [${personName}] Converting monthlyHours from string: "${data.monthlyHours}"`);
         // Reemplazar coma por punto si existe
         const hoursString = data.monthlyHours.replace(',', '.');
         const hoursNumber = parseFloat(hoursString);
 
         if (!isNaN(hoursNumber) && hoursNumber > 0) {
           data.monthlyHours = Math.round(hoursNumber); // Redondear a entero
+          console.log(`🔧 [${personName}] Converted monthlyHours to: ${data.monthlyHours}`);
+        } else {
+          console.error(`❌ [${personName}] Invalid monthlyHours string: "${data.monthlyHours}" -> ${hoursNumber}`);
         }
       }
 
       // Validar rango de horas mensuales
       if (data.monthlyHours !== undefined) {
+        console.log(`🔧 [${personName}] Validating monthlyHours: ${data.monthlyHours} (type: ${typeof data.monthlyHours})`);
         if (data.monthlyHours < 40 || data.monthlyHours > 300) {
-          console.error(`❌ Invalid monthly hours: ${data.monthlyHours}. Must be between 40 and 300.`);
+          console.error(`❌ [${personName}] Invalid monthly hours: ${data.monthlyHours}. Must be between 40 and 300.`);
           return res.status(400).json({ 
             message: "Las horas mensuales deben estar entre 40 y 300 horas",
             field: "monthlyHours",
             value: data.monthlyHours
           });
         }
+        console.log(`✅ [${personName}] Monthly hours validation passed: ${data.monthlyHours}h`);
       }
 
       const validatedData = insertPersonnelSchema.partial().parse(data);
-      console.log(`🔧 PATCH /api/personnel/${id} - Validated data:`, validatedData);
+      console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Validated data:`, validatedData);
       
       // Si se están actualizando horas mensuales y hay sueldo fijo, recalcular tarifa por hora
       if (validatedData.monthlyHours !== undefined) {
-        console.log(`🔧 Monthly hours update detected: ${validatedData.monthlyHours}h`);
+        console.log(`🔧 [${personName}] Monthly hours update detected: ${validatedData.monthlyHours}h`);
         
-        const currentPerson = await storage.getPersonnelById(id);
         if (currentPerson && currentPerson.monthlyFixedSalary && validatedData.monthlyHours > 0) {
           const newHourlyRate = Math.round(currentPerson.monthlyFixedSalary / validatedData.monthlyHours);
           validatedData.hourlyRate = newHourlyRate;
@@ -1347,12 +1356,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedPerson = await storage.updatePersonnel(id, validatedData);
-      console.log(`🔧 PATCH /api/personnel/${id} - Updated person:`, updatedPerson);
+      console.log(`🔧 [${personName}] PATCH /api/personnel/${id} - Updated person:`, updatedPerson);
 
       if (!updatedPerson) {
+        console.error(`❌ [${personName}] Personnel not found after update`);
         return res.status(404).json({ message: "Personnel not found" });
       }
 
+      console.log(`✅ [${personName}] Sending response with monthlyHours: ${updatedPerson.monthlyHours}`);
       res.json(updatedPerson);
     } catch (error) {
       console.error("Error al actualizar personal:", error);

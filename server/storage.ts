@@ -695,12 +695,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePersonnel(id: number, person: Partial<InsertPersonnel>): Promise<Personnel | undefined> {
-    const [updatedPerson] = await db
-      .update(personnel)
-      .set(person)
-      .where(eq(personnel.id, id))
-      .returning();
-    return updatedPerson;
+    try {
+      // Get current person for logging
+      const currentPerson = await this.getPersonnelById(id);
+      const personName = currentPerson?.name || `ID${id}`;
+      
+      console.log(`💾 [${personName}] STORAGE: Updating personnel ${id} with data:`, person);
+      
+      if (person.monthlyHours !== undefined) {
+        console.log(`💾 [${personName}] STORAGE: Monthly hours update - Before: ${currentPerson?.monthlyHours}, After: ${person.monthlyHours}`);
+      }
+      
+      const [updatedPerson] = await db
+        .update(personnel)
+        .set(person)
+        .where(eq(personnel.id, id))
+        .returning();
+      
+      console.log(`💾 [${personName}] STORAGE: Personnel updated successfully:`, updatedPerson);
+      
+      if (person.monthlyHours !== undefined) {
+        console.log(`💾 [${personName}] STORAGE: Final monthly hours in DB: ${updatedPerson.monthlyHours}`);
+      }
+      
+      return updatedPerson;
+    } catch (error) {
+      console.error(`💾 STORAGE ERROR: Failed to update personnel ${id}:`, error);
+      throw error;
+    }
   }
 
   async getPersonnelDependencies(id: number): Promise<{
