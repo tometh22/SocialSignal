@@ -1347,7 +1347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Si se actualiza el sueldo fijo y hay horas mensuales, recalcular tarifa por hora
       if (validatedData.monthlyFixedSalary !== undefined) {
         const currentPerson = await storage.getPersonnelById(id);
-        const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 160;
+        const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 0;
         if (validatedData.monthlyFixedSalary > 0 && monthlyHours > 0) {
           const newHourlyRate = Math.round(validatedData.monthlyFixedSalary / monthlyHours);
           validatedData.hourlyRate = newHourlyRate;
