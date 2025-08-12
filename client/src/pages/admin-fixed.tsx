@@ -206,7 +206,23 @@ export default function Admin() {
 
   const { data: personnel, isLoading: personnelLoading } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
+    staleTime: 0, // Forzar que siempre vaya al servidor
+    gcTime: 0,    // No guardar en cache
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
+
+  // DEBUG: Log personnel data when it changes
+  useEffect(() => {
+    if (personnel) {
+      console.log("📋 ADMIN PAGE - Personnel data loaded:", personnel);
+      const trinidad = personnel.find(p => p.name.includes("Trinidad"));
+      if (trinidad) {
+        console.log("📋 ADMIN PAGE - Trinidad data:", trinidad);
+        console.log("📋 ADMIN PAGE - Trinidad monthlyHours:", trinidad.monthlyHours);
+      }
+    }
+  }, [personnel]);
 
 
 

@@ -52,6 +52,7 @@ interface InlineEditPersonnelProps {
 export default function InlineEditPersonnel({ person, roles }: InlineEditPersonnelProps) {
   // DEBUG: Log person data on every render
   console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
+  console.log(`🔍 [${person.name}] FULL PERSON DATA:`, person);
   
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -765,8 +766,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-blue-700">
             {(() => {
-              const displayValue = Math.round(person.monthlyHours || 160);
-              console.log(`🔍 [${person.name}] DISPLAY monthlyHours:`, person.monthlyHours, `-> showing: ${displayValue}`);
+              // FORZAR valor directo de la base de datos
+              const rawValue = person.monthlyHours;
+              const displayValue = rawValue !== null && rawValue !== undefined ? Math.round(rawValue) : 160;
+              console.log(`🔍 [${person.name}] DISPLAY monthlyHours - RAW:`, rawValue, `FINAL:`, displayValue);
               return displayValue;
             })()}
           </span>
