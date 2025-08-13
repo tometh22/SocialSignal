@@ -165,7 +165,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       setEditedIncludeInRealCosts(updatedPerson.includeInRealCosts ?? true);
       setEditedMonthlyHours(updatedPerson.monthlyHours?.toString() || '');
 
-      console.log(`🔧 [${person.name}] Local state FORCED - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || '160'}`);
+      console.log(`🔧 [${person.name}] Local state FORCED - editedMonthlyHours: ${updatedPerson.monthlyHours?.toString() || 'undefined'}`);
 
       // RECARGAR TODOS LOS DATOS desde el servidor
       setTimeout(() => {
@@ -186,9 +186,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       });
       
       // FORZAR re-render completo del componente padre
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      // setTimeout(() => {
+      //   window.location.reload();
+      // }, 1000);
       
       setIsEditing(false);
     },
