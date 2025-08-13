@@ -107,6 +107,7 @@ export interface IStorage {
   createQuotationTeamMember(member: InsertQuotationTeamMember): Promise<QuotationTeamMember>;
   updateQuotationTeamMember(id: number, member: Partial<InsertQuotationTeamMember>): Promise<QuotationTeamMember | undefined>;
   deleteQuotationTeamMember(id: number): Promise<boolean>;
+  deleteQuotationTeamMemberById(id: number): Promise<void>;
 
   // Quotation variant operations
   getQuotationVariants(quotationId: number): Promise<QuotationVariant[]>;
@@ -136,6 +137,7 @@ export interface IStorage {
   // Active project operations
   getActiveProjects(): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } })[]>;
   getActiveProjectsByClient(clientId: number): Promise<(ActiveProject & { quotation: Quotation })[]>;
+  getActiveProjectsByQuotationId(quotationId: number): Promise<ActiveProject[]>;
   getActiveProject(id: number): Promise<(ActiveProject & { quotation: Quotation & { client?: Client } }) | undefined>;
   createActiveProject(project: InsertActiveProject): Promise<ActiveProject>;
   updateActiveProject(id: number, project: Partial<InsertActiveProject>): Promise<ActiveProject | undefined>;
