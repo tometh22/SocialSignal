@@ -274,7 +274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!project) return res.status(404).json({ message: "Project not found" });
 
       // 2. Obtener datos de la cotización (FUENTE ÚNICA para horas estimadas)
-      let quotationTeam = [];
+      let quotationTeam: any[] = [];
       let estimatedHours = 0;
       let baseCost = 0;
       let totalAmount = 0;
@@ -569,26 +569,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const originalHours = estimatedHours;
               estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 5);
               if (originalHours !== estimatedHours) {
-                console.log(`📊 Applied May 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+                console.log(`📊 Applied May 2025 adjustment for personnel ${entry.personnelId}: ${originalHours}h → ${estimatedHours}h`);
               }
             } else if (timeFilter.includes('june_2025')) {
               const originalHours = estimatedHours;
               estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 6);
               if (originalHours !== estimatedHours) {
-                console.log(`📊 Applied June 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+                console.log(`📊 Applied June 2025 adjustment for personnel ${entry.personnelId}: ${originalHours}h → ${estimatedHours}h`);
               }
             } else if (timeFilter.includes('july_2025')) {
               const originalHours = estimatedHours;
               estimatedHours = getAdjustedHours(entry.personnelId, estimatedHours, 2025, 7);
               if (originalHours !== estimatedHours) {
-                console.log(`📊 Applied July 2025 adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+                console.log(`📊 Applied July 2025 adjustment for personnel ${entry.personnelId}: ${originalHours}h → ${estimatedHours}h`);
               }
             } else {
               // Para rangos de múltiples meses (trimestres, semestres, etc.)
               const originalHours = estimatedHours;
               estimatedHours = getAdjustedHoursForDateRange(entry.personnelId, estimatedHours, dateRange.startDate, dateRange.endDate);
               if (originalHours !== estimatedHours) {
-                console.log(`📊 Applied range adjustment for ${entry.personnel?.name}: ${originalHours}h → ${estimatedHours}h`);
+                console.log(`📊 Applied range adjustment for personnel ${entry.personnelId}: ${originalHours}h → ${estimatedHours}h`);
               }
             }
           }
@@ -1893,7 +1893,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 3. Proceder con la eliminación
-      await storage.deleteQuotationTeamMembers(id);
+      // First delete team members associated with the quotation
+      const teamMembers = await storage.getQuotationTeamMembers(id);
+      for (const member of teamMembers) {
+        await storage.deleteQuotationTeamMember(member.id);
+      }
       const success = await storage.deleteQuotation(id);
 
       if (!success) {
@@ -2235,7 +2239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
-    await storage.deleteQuotationTeamMembers(quotationId);
+    // Delete team members associated with the quotation
+    const teamMembers = await storage.getQuotationTeamMembers(quotationId);
+    for (const member of teamMembers) {
+      await storage.deleteQuotationTeamMember(member.id);
+    }
     res.status(204).send();
   });
 
@@ -2259,7 +2267,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const quotationId = parseInt(req.params.quotationId);
     if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
 
-    await storage.deleteQuotationTeamMembers(quotationId);
+    // Delete team members associated with the quotation
+    const teamMembers = await storage.getQuotationTeamMembers(quotationId);
+    for (const member of teamMembers) {
+      await storage.deleteQuotationTeamMember(member.id);
+    }
     res.status(204).send();
   });
 
