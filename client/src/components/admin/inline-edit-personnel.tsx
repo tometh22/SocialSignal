@@ -597,13 +597,45 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               </span>
             </div>
           ) : (
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium text-gray-600">horas/mes</span>
+            <div className="flex items-center justify-center gap-1">
               <Input
                 type="number"
                 step="1"
                 min="40"
                 max="300"
+                value={editedMonthlyHours}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditedMonthlyHours(value);
+                  console.log(`📝 Monthly hours changed to: ${value}`);
+                }}
+                className="h-9 w-20 border-blue-200 focus:border-blue-400 text-center"
+                disabled={updatePersonnelMutation.isPending}
+                placeholder="160"
+              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      <strong>Horas Mensuales:</strong> Cantidad de horas estimadas que esta persona 
+                      trabaja por mes. Rango válido: 40-300 horas.<br/>
+                      <strong>Estándar:</strong> 160h (full-time), 80h (part-time).<br/>
+                      Se usa para calcular automáticamente la tarifa por hora basada en el sueldo fijo.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center justify-center gap-1">
+            <input
+              type="checkbox"
+              checked={editedIncludeI"300"
                 value={editedMonthlyHours}
                 onChange={(e) => {
                   const value = e.target.value;
