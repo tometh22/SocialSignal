@@ -54,6 +54,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   console.log(`🔍 [${person.name}] RENDER - monthlyHours from props:`, person.monthlyHours, `(type: ${typeof person.monthlyHours})`);
   console.log(`🔍 [${person.name}] FULL PERSON DATA:`, person);
   
+  // Función para obtener el color del rol basado en el nombre
+  const getRoleColor = (roleName: string) => {
+    const roleColorMap: Record<string, string> = {
+      'CEO': 'bg-purple-100 text-purple-800',
+      'COO': 'bg-indigo-100 text-indigo-800',
+      'Operations Lead': 'bg-blue-100 text-blue-800',
+      'Analista Semi Senior': 'bg-teal-100 text-teal-800',
+      'Analista Senior': 'bg-cyan-100 text-cyan-800',
+      'Data Senior': 'bg-emerald-100 text-emerald-800',
+      'Lead Project Manager': 'bg-green-100 text-green-800',
+      'Graficador/a': 'bg-lime-100 text-lime-800',
+      'Project Manager': 'bg-yellow-100 text-yellow-800',
+      'Analista Junior': 'bg-orange-100 text-orange-800',
+      'Analista Junior Member': 'bg-red-100 text-red-800',
+    };
+    
+    return roleColorMap[roleName] || 'bg-gray-100 text-gray-800';
+  };
+  
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showHistoricalCosts, setShowHistoricalCosts] = useState(false);
@@ -662,7 +681,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         <div className="text-sm text-muted-foreground">{person.email}</div>
       </td>
       <td className="px-6 py-4">
-        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-medium">
+        <span className={`text-xs px-2 py-1 rounded-full font-medium ${getRoleColor(person.roleName)}`}>
           {person.roleName}
         </span>
       </td>
