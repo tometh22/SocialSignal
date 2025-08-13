@@ -31,6 +31,7 @@ import {
   insertIndirectCostSchema,
   insertNonBillableHoursSchema,
   insertExchangeRateSchema,
+  insertPersonnelHistoricalCostSchema,
 
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -54,7 +55,8 @@ import {
   systemConfig,
   indirectCostCategories,
   indirectCosts,
-  nonBillableHours
+  nonBillableHours,
+  personnelHistoricalCosts
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -3993,24 +3995,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { personnelId, year, month } = req.query;
       
       let query = db.select({
-        id: sql`personnel_historical_costs.id`,
-        personnelId: sql`personnel_historical_costs.personnel_id`,
-        personnelName: sql`personnel.name`,
-        year: sql`personnel_historical_costs.year`,
-        month: sql`personnel_historical_costs.month`,
-        hourlyRateARS: sql`personnel_historical_costs.hourly_rate_ars`,
-        monthlySalaryARS: sql`personnel_historical_costs.monthly_salary_ars`,
-        hourlyRateUSD: sql`personnel_historical_costs.hourly_rate_usd`,
-        monthlySalaryUSD: sql`personnel_historical_costs.monthly_salary_usd`,
-        adjustmentReason: sql`personnel_historical_costs.adjustment_reason`,
-        notes: sql`personnel_historical_costs.notes`,
-        createdAt: sql`personnel_historical_costs.created_at`,
-        updatedAt: sql`personnel_historical_costs.updated_at`
+        id: personnelHistoricalCosts.id,
+        personnelId: personnelHistoricalCosts.personnelId,
+        personnelName: personnel.name,
+        year: personnelHistoricalCosts.year,
+        month: personnelHistoricalCosts.month,
+        hourlyRateARS: personnelHistoricalCosts.hourlyRateARS,
+        monthlySalaryARS: personnelHistoricalCosts.monthlySalaryARS,
+        hourlyRateUSD: personnelHistoricalCosts.hourlyRateUSD,
+        monthlySalaryUSD: personnelHistoricalCosts.monthlySalaryUSD,
+        adjustmentReason: personnelHistoricalCosts.adjustmentReason,
+        notes: personnelHistoricalCosts.notes,
+        createdAt: personnelHistoricalCosts.createdAt,
+        updatedAt: personnelHistoricalCosts.updatedAt
       })
-      .from(sql`personnel_historical_costs`)
-      .leftJoin(sql`personnel`, sql`personnel_historical_costs.personnel_id = personnel.id`)
-      .where(sql`personnel_historical_costs.is_active = true`)
-      .orderBy(sql`personnel_historical_costs.year DESC, personnel_historical_costs.month DESC`);
+      .from(personnelHistoricalCosts)
+      .leftJoin(personnel, eq(personnelHistoricalCosts.personnelId, personnel.id))
+      .where(eq(personnelHistoricalCosts.isActive, true))
+      .orderBy(desc(personnelHistoricalCosts.year), desc(personnelHistoricalCosts.month));
 
       const costs = await query;
       res.json(costs);
@@ -4030,8 +4032,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verificar si ya existe un registro para el mismo personal/año/mes
       const existing = await db.select()
-        .from(sql`personnel_historical_costs`)
-        .where(sql`personnel_id = ${validatedData.personnelId} AND year = ${validatedData.year} AND month = ${validatedData.month} AND is_active = true`);
+        .from(personnelHistoricalCosts)
+        .where(and(
+          eq(personnelHistoricalCosts.personnelId, validatedData.personnelId),
+          eq(personnelHistoricalCosts.year, validatedData.year),
+          eq(personnelHistoricalCosts.month, validatedData.month),
+          eq(personnelHistoricalCosts.isActive, true)
+        ));
 
       if (existing.length > 0) {
         return res.status(409).json({ 
@@ -4039,7 +4046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const result = await db.insert(sql`personnel_historical_costs`).values(validatedData).returning();
+      const result = await db.insert(personnelHistoricalCosts).values(validatedData).returning();
       res.status(201).json(result[0]);
     } catch (error) {
       console.error("Error creating personnel historical cost:", error);
@@ -4063,9 +4070,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const result = await db
-        .update(sql`personnel_historical_costs`)
+        .update(personnelHistoricalCosts)
         .set(validatedData)
-        .where(sql`id = ${id} AND is_active = true`)
+        .where(and(eq(personnelHistoricalCosts.id, id), eq(personnelHistoricalCosts.isActive, true)))
         .returning();
 
       if (result.length === 0) {
@@ -4089,9 +4096,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const result = await db
-        .update(sql`personnel_historical_costs`)
+        .update(personnelHistoricalCosts)
         .set({ isActive: false, updatedBy: req.user?.id, updatedAt: new Date() })
-        .where(sql`id = ${id}`)
+        .where(eq(personnelHistoricalCosts.id, id))
         .returning();
 
       if (result.length === 0) {
