@@ -263,7 +263,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   dec2025MonthlySalaryARS: true,
 }).extend({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
-  email: z.string().email("Email inválido").optional(),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
   hourlyRate: z.number().min(0, "La tarifa por hora debe ser positiva"),
   monthlyFixedSalary: z.number().min(0, "El salario mensual debe ser positivo").optional(),
   monthlyHours: z.number()
