@@ -64,7 +64,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
   const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
-  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '0');
+  const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
 
   const { toast } = useToast();

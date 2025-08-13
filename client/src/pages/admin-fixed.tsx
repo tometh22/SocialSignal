@@ -1186,6 +1186,7 @@ export default function Admin() {
                             hourlyRate: getCurrentHourlyRate(person),
                             contractType: person.contractType,
                             monthlyFixedSalary: getCurrentMonthlySalary(person),
+                            monthlyHours: person.monthlyHours,
                             includeInRealCosts: person.includeInRealCosts,
                             // Historical hourly rates
                             jan2025HourlyRateARS: person.jan2025HourlyRateARS,
