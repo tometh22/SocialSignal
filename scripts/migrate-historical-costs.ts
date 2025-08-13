@@ -1,7 +1,16 @@
 
-import { Pool } from '@neondatabase/serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
-import * as schema from '../shared/schema.js';
+import * as schema from '../shared/schema';
+import { and, eq } from 'drizzle-orm';
+import ws from 'ws';
+
+// Configure WebSocket for Neon
+neonConfig.webSocketConstructor = ws;
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+}
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle({ client: pool, schema });
@@ -10,14 +19,24 @@ interface HistoricalCostData {
   personnelId: number;
   year: number;
   month: number;
-  hourlyRateARS?: number;
-  monthlySalaryARS?: number;
+  hourlyRateARS?: string;
+  monthlySalaryARS?: string;
 }
 
 async function migrateHistoricalCosts() {
   console.log('🚀 Starting migration of personnel historical costs...');
 
   try {
+    // Check if any records already exist
+    const existingRecords = await db.select().from(schema.personnelHistoricalCosts).limit(1);
+    if (existingRecords.length > 0) {
+      console.log('⚠️ Historical costs already exist. Skipping migration to avoid duplicates.');
+      return;
+    }
+
+    // Get the first available user for created_by
+    const firstUser = await db.select({ id: schema.users.id }).from(schema.users).limit(1);
+    const systemUserId = firstUser.length > 0 ? firstUser[0].id : null;
     // Get all personnel with historical cost data
     const personnel = await db.select({
       id: schema.personnel.id,
@@ -76,8 +95,8 @@ async function migrateHistoricalCosts() {
             personnelId: person.id,
             year: 2025,
             month: month,
-            hourlyRateARS: hourlyRate || undefined,
-            monthlySalaryARS: monthlySalary || undefined,
+            hourlyRateARS: hourlyRate ? hourlyRate.toString() : undefined,
+            monthlySalaryARS: monthlySalary ? monthlySalary.toString() : undefined,
           });
         }
       }
@@ -90,17 +109,17 @@ async function migrateHistoricalCosts() {
     for (let i = 0; i < historicalCosts.length; i += batchSize) {
       const batch = historicalCosts.slice(i, i + batchSize);
       
-      await db.insert(schema.personnelHistoricalCosts).values(
-        batch.map(cost => ({
-          personnelId: cost.personnelId,
-          year: cost.year,
-          month: cost.month,
-          hourlyRateARS: cost.hourlyRateARS?.toString(),
-          monthlySalaryARS: cost.monthlySalaryARS?.toString(),
-          adjustmentReason: 'Migrated from legacy columns',
-          createdBy: 1, // System user
-        }))
-      );
+      const insertData = batch.map(cost => ({
+        personnelId: cost.personnelId,
+        year: cost.year,
+        month: cost.month,
+        hourlyRateARS: cost.hourlyRateARS,
+        monthlySalaryARS: cost.monthlySalaryARS,
+        adjustmentReason: 'Migrated from legacy columns',
+        ...(systemUserId && { createdBy: systemUserId }),
+      }));
+
+      await db.insert(schema.personnelHistoricalCosts).values(insertData);
 
       console.log(`✅ Inserted batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(historicalCosts.length / batchSize)}`);
     }
