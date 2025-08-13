@@ -18,10 +18,17 @@ const personnelHistoricalCostSchema = z.object({
   personnelId: z.number().min(1, "Debe seleccionar una persona"),
   year: z.number().min(2020, "Año debe ser mayor a 2020").max(2030, "Año debe ser menor a 2030"),
   month: z.number().min(1, "Mes debe ser entre 1 y 12").max(12, "Mes debe ser entre 1 y 12"),
-  hourlyRateARS: z.number().min(0, "Tarifa por hora debe ser positiva"),
-  hourlyRateUSD: z.number().optional(),
+  hourlyRateARS: z.number().min(0, "Tarifa por hora ARS debe ser positiva").optional(),
+  monthlySalaryARS: z.number().min(0, "Salario mensual ARS debe ser positivo").optional(),
+  hourlyRateUSD: z.number().min(0, "Tarifa por hora USD debe ser positiva").optional(),
+  monthlySalaryUSD: z.number().min(0, "Salario mensual USD debe ser positivo").optional(),
   adjustmentReason: z.string().optional(),
   notes: z.string().optional(),
+}).refine((data) => {
+  return data.hourlyRateARS || data.monthlySalaryARS || data.hourlyRateUSD || data.monthlySalaryUSD;
+}, {
+  message: "Debe especificar al menos una tarifa o salario",
+  path: ["hourlyRateARS"]
 });
 
 type PersonnelHistoricalCostFormData = z.infer<typeof personnelHistoricalCostSchema>;

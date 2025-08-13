@@ -17,20 +17,32 @@ export function HistoricalCostsTable({ personnel }: HistoricalCostsTableProps) {
 
   console.log("HistoricalCostsTable rendering with personnel:", personnel?.length || 0);
 
+  // Fetch historical costs from normalized table
+  const { data: historicalCosts = [] } = useQuery<PersonnelHistoricalCost[]>({
+    queryKey: ["/api/personnel-historical-costs"],
+  });
+
   const months = [
-    { key: "jan2025", label: "Ene 2025" },
-    { key: "feb2025", label: "Feb 2025" },
-    { key: "mar2025", label: "Mar 2025" },
-    { key: "apr2025", label: "Abr 2025" },
-    { key: "may2025", label: "May 2025" },
-    { key: "jun2025", label: "Jun 2025" },
-    { key: "jul2025", label: "Jul 2025" },
-    { key: "aug2025", label: "Ago 2025" },
-    { key: "sep2025", label: "Sep 2025" },
-    { key: "oct2025", label: "Oct 2025" },
-    { key: "nov2025", label: "Nov 2025" },
-    { key: "dec2025", label: "Dic 2025" },
+    { key: 1, label: "Ene 2025" },
+    { key: 2, label: "Feb 2025" },
+    { key: 3, label: "Mar 2025" },
+    { key: 4, label: "Abr 2025" },
+    { key: 5, label: "May 2025" },
+    { key: 6, label: "Jun 2025" },
+    { key: 7, label: "Jul 2025" },
+    { key: 8, label: "Ago 2025" },
+    { key: 9, label: "Sep 2025" },
+    { key: 10, label: "Oct 2025" },
+    { key: 11, label: "Nov 2025" },
+    { key: 12, label: "Dic 2025" },
   ];
+
+  // Helper function to get historical cost for a person/month
+  const getHistoricalCost = (personnelId: number, month: number, type: 'hourlyRate' | 'monthlySalary') => {
+    const cost = historicalCosts.find(c => c.personnelId === personnelId && c.month === month && c.year === 2025);
+    if (!cost) return null;
+    return type === 'hourlyRate' ? cost.hourlyRateARS : cost.monthlySalaryARS;
+  };
 
   const updateCostMutation = useMutation({
     mutationFn: async (data: { 

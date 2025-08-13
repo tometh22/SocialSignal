@@ -262,11 +262,16 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   dec2025HourlyRateARS: true,
   dec2025MonthlySalaryARS: true,
 }).extend({
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
+  email: z.string().email("Email inválido").optional(),
+  hourlyRate: z.number().min(0, "La tarifa por hora debe ser positiva"),
+  monthlyFixedSalary: z.number().min(0, "El salario mensual debe ser positivo").optional(),
   monthlyHours: z.number()
     .min(40, "Las horas mensuales deben ser al menos 40")
     .max(300, "Las horas mensuales no pueden exceder 300")
     .int("Las horas mensuales deben ser un número entero")
-    .optional()
+    .optional(),
+  contractType: z.enum(["full-time", "part-time", "freelance"]).default("full-time")
 });
 
 
@@ -1186,7 +1191,7 @@ export const deliverables = pgTable("deliverables", {
   pmId: integer("pm_id").references(() => personnel.id),
   deliveryOnTime: boolean("delivery_on_time").default(false),
   delay: integer("delay"),
-  retrabajo: boolean("retrabajo").default(false), // Nuevo: si requirió retrabajo
+  reworkRequired: boolean("rework_required").default(false), // Estandarizado: si requirió retrabajo
   narrativeQuality: numeric("narrative_quality", { precision: 3, scale: 2 }),
   graphicsEffectiveness: numeric("graphics_effectiveness", { precision: 3, scale: 2 }),
   formatDesign: numeric("format_design", { precision: 3, scale: 2 }),
@@ -1195,7 +1200,7 @@ export const deliverables = pgTable("deliverables", {
   hoursEstimated: numeric("hours_estimated", { precision: 5, scale: 2 }),
   hoursActual: numeric("hours_actual", { precision: 5, scale: 2 }),
   clientFeedback: numeric("client_feedback", { precision: 3, scale: 2 }),
-  feedback_general_cliente: numeric("feedback_general_cliente", { precision: 3, scale: 2 }), // Nuevo: feedback general del cliente (escala 1-5)
+  clientGeneralFeedback: numeric("client_general_feedback", { precision: 3, scale: 2 }), // Estandarizado: feedback general del cliente (escala 1-5)
   briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1343,6 +1348,36 @@ export type InsertRecurringTemplatePersonnel = z.infer<typeof insertRecurringTem
 export type ProjectCycle = typeof projectCycles.$inferSelect;
 export type InsertProjectCycle = z.infer<typeof insertProjectCycleSchema>;
 
+// ==================== COSTOS HISTÓRICOS DE PERSONAL NORMALIZADOS ====================
+// Tabla normalizada para costos históricos de personal (reemplaza campos repetitivos)
+export const personnelHistoricalCosts = pgTable("personnel_historical_costs", {
+  id: serial("id").primaryKey(),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  hourlyRateARS: numeric("hourly_rate_ars", { precision: 10, scale: 2 }),
+  monthlySalaryARS: numeric("monthly_salary_ars", { precision: 12, scale: 2 }),
+  hourlyRateUSD: numeric("hourly_rate_usd", { precision: 10, scale: 2 }),
+  monthlySalaryUSD: numeric("monthly_salary_usd", { precision: 12, scale: 2 }),
+  exchangeRateId: integer("exchange_rate_id").references(() => exchangeRates.id),
+  adjustmentReason: text("adjustment_reason"), // Razón del ajuste (inflación, promoción, etc.)
+  notes: text("notes"), // Notas adicionales
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+export const insertPersonnelHistoricalCostSchema = createInsertSchema(personnelHistoricalCosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PersonnelHistoricalCost = typeof personnelHistoricalCosts.$inferSelect;
+export type InsertPersonnelHistoricalCost = z.infer<typeof insertPersonnelHistoricalCostSchema>;
+
 // ==================== HISTORIAL DE TIPOS DE CAMBIO ====================
 // Tabla para versionado de tipos de cambio
 export const exchangeRateHistory = pgTable("exchange_rate_history", {
@@ -1360,6 +1395,21 @@ export const insertExchangeRateHistorySchema = createInsertSchema(exchangeRateHi
 
 export type ExchangeRateHistory = typeof exchangeRateHistory.$inferSelect;
 export type InsertExchangeRateHistory = z.infer<typeof insertExchangeRateHistorySchema>;
+
+// Relaciones para costos históricos de personal
+export const personnelHistoricalCostsRelations = relations(personnelHistoricalCosts, ({ one }) => ({
+  personnel: one(personnel, { fields: [personnelHistoricalCosts.personnelId], references: [personnel.id] }),
+  exchangeRate: one(exchangeRates, { fields: [personnelHistoricalCosts.exchangeRateId], references: [exchangeRates.id] }),
+  creator: one(users, { fields: [personnelHistoricalCosts.createdBy], references: [users.id] }),
+  updater: one(users, { fields: [personnelHistoricalCosts.updatedBy], references: [users.id] }),
+}));
+
+// Actualizar relaciones de personal para incluir costos históricos
+export const personnelRelations = relations(personnel, ({ one, many }) => ({
+  role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
+  quotationTeamMembers: many(quotationTeamMembers),
+  historicalCosts: many(personnelHistoricalCosts), // Nueva relación
+}));
 
 export const exchangeRateHistoryRelations = relations(exchangeRateHistory, ({ one }) => ({
   creator: one(users, { fields: [exchangeRateHistory.createdBy], references: [users.id] }),
