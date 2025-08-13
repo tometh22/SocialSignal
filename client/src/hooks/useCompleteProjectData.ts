@@ -139,8 +139,9 @@ export const useCompleteProjectData = (projectId: number, timeFilter: string = '
       return data;
     },
     enabled: !!projectId,
-    staleTime: 0, // No stale time - always fetch fresh data when timeFilter changes
-    cacheTime: 1 * 60 * 1000, // 1 minute cache
+    staleTime: 30 * 1000, // 30 seconds - reasonable freshness for project data
+    gcTime: 5 * 60 * 1000, // 5 minute cache - better performance
     refetchOnWindowFocus: false, // Disable refetch on window focus
+    refetchInterval: false, // Disable automatic polling
   });
 };

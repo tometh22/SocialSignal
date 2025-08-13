@@ -60,10 +60,10 @@ export default function SidebarFixed() {
     }
   };
 
-  // Actualizar inmediatamente y cada 2 segundos
+  // Actualizar inmediatamente y cada 2 minutos (optimizado)
   useEffect(() => {
     fetchProjectCount();
-    const interval = setInterval(fetchProjectCount, 2000);
+    const interval = setInterval(fetchProjectCount, 120000); // 2 minutos en lugar de 2 segundos
     return () => clearInterval(interval);
   }, []);
 

@@ -66,8 +66,8 @@ export default function Sidebar() {
         return { count: 0 };
       }
     },
-    staleTime: 5000, // 5 segundos para testing
-    refetchInterval: 10000, // Actualizar cada 10 segundos para testing
+    refetchInterval: false, // ✅ Deshabilitado polling excesivo
+    staleTime: 60 * 1000, // 1 minuto - datos de conteo no cambian tan frecuentemente
   });
 
   // Debug query para verificar datos

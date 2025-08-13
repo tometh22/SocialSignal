@@ -42,7 +42,8 @@ interface ExcelMaestroResponse {
 export function ExcelMaestroAnalytics() {
   const { data: maestroData, isLoading, error } = useQuery<ExcelMaestroResponse>({
     queryKey: ["/api/google-sheets/costos-maestro"],
-    refetchInterval: 30000, // Refrescar cada 30 segundos para datos en tiempo real
+    refetchInterval: false, // ✅ Usar invalidación manual en lugar de polling
+    staleTime: 2 * 60 * 1000, // 2 minutos - analytics no necesitan ser tan frecuentes
   });
 
   if (isLoading) {

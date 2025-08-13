@@ -7,8 +7,11 @@ type FetcherOptions = {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5, // 5 minutes - optimal for most data
+      gcTime: 1000 * 60 * 30, // 30 minutes - extended cache for better performance (v5 uses gcTime)
       retry: 1,
+      refetchOnWindowFocus: false, // Prevent excessive refetching
+      refetchOnReconnect: true, // Refetch when connection is restored
     },
   },
 });
