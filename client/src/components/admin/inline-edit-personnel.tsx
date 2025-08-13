@@ -344,7 +344,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const handleSave = () => {
     const hourlyRate = parseFloat(editedHourlyRate);
     const roleId = parseInt(editedRoleId);
-    const monthlyHours = parseFloat(editedMonthlyHours);
+    const monthlyHours = editedMonthlyHours ? parseFloat(editedMonthlyHours) : null;
 
     console.log(`🔧 Validating data before save:`, {
       name: editedName,
@@ -372,35 +372,42 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       return;
     }
 
-    if (isNaN(monthlyHours) || monthlyHours <= 0) {
-      toast({
-        title: "Error",
-        description: "Las horas mensuales deben ser un número válido mayor a 0",
-        variant: "destructive"
-      });
-      return;
+    // Solo validar horas mensuales para empleados full-time y part-time, no para freelancers
+    if (editedContractType !== 'freelance') {
+      if (!monthlyHours || isNaN(monthlyHours) || monthlyHours <= 0) {
+        toast({
+          title: "Error",
+          description: "Las horas mensuales son requeridas para empleados full-time y part-time",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Validación específica: horas mensuales entre 40 y 300 (rango razonable)
+      if (monthlyHours < 40 || monthlyHours > 300) {
+        toast({
+          title: "Error",
+          description: "Las horas mensuales deben estar entre 40 y 300 horas",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
-    // Validación específica: horas mensuales entre 40 y 300 (rango razonable)
-    if (monthlyHours < 40 || monthlyHours > 300) {
-      toast({
-        title: "Error",
-        description: "Las horas mensuales deben estar entre 40 y 300 horas",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const dataToSend = {
+    const dataToSend: any = {
       name: editedName.trim(),
       email: editedEmail.trim(),
       roleId: roleId,
       hourlyRate: hourlyRate,
       contractType: editedContractType,
       monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
-      includeInRealCosts: editedIncludeInRealCosts,
-      monthlyHours: monthlyHours
+      includeInRealCosts: editedIncludeInRealCosts
     };
+
+    // Solo incluir monthlyHours para empleados no-freelance
+    if (editedContractType !== 'freelance' && monthlyHours) {
+      dataToSend.monthlyHours = monthlyHours;
+    }
 
     console.log(`🚀 Sending update request:`, dataToSend);
     updatePersonnelMutation.mutate(dataToSend);
@@ -582,39 +589,48 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           )}
         </td>
         <td className="px-6 py-4">
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-medium text-gray-600">horas/mes</span>
-            <Input
-              type="number"
-              step="1"
-              min="40"
-              max="300"
-              value={editedMonthlyHours}
-              onChange={(e) => {
-                const value = e.target.value;
-                setEditedMonthlyHours(value);
-                console.log(`📝 Monthly hours changed to: ${value}`);
-              }}
-              className="h-9 w-20 border-blue-200 focus:border-blue-400"
-              disabled={updatePersonnelMutation.isPending}
-              placeholder="160"
-            />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">
-                    <strong>Horas Mensuales:</strong> Cantidad de horas estimadas que esta persona 
-                    trabaja por mes. Rango válido: 40-300 horas.<br/>
-                    <strong>Estándar:</strong> 160h (full-time), 80h (part-time).<br/>
-                    Se usa para calcular automáticamente la tarifa por hora basada en el sueldo fijo.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
+          {editedContractType === 'freelance' ? (
+            <div className="flex flex-col items-center justify-center gap-1">
+              <span className="text-xs text-gray-400">-</span>
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                Se paga por horas
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium text-gray-600">horas/mes</span>
+              <Input
+                type="number"
+                step="1"
+                min="40"
+                max="300"
+                value={editedMonthlyHours}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setEditedMonthlyHours(value);
+                  console.log(`📝 Monthly hours changed to: ${value}`);
+                }}
+                className="h-9 w-20 border-blue-200 focus:border-blue-400"
+                disabled={updatePersonnelMutation.isPending}
+                placeholder="160"
+              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-sm">
+                      <strong>Horas Mensuales:</strong> Cantidad de horas estimadas que esta persona 
+                      trabaja por mes. Rango válido: 40-300 horas.<br/>
+                      <strong>Estándar:</strong> 160h (full-time), 80h (part-time).<br/>
+                      Se usa para calcular automáticamente la tarifa por hora basada en el sueldo fijo.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </td>
         <td className="px-6 py-4">
           <div className="flex items-center justify-center gap-1">
@@ -782,37 +798,45 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex items-center gap-1">
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-            person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' : 
-            person.contractType === 'part-time' ? 'bg-orange-100 text-orange-800' : 
-            person.contractType === 'freelance' ? 'bg-green-100 text-green-800' : 
-            'bg-blue-100 text-blue-800'
-          }`} key={`${person.id}-${person.monthlyHours}`}>
-            {person.monthlyHours}h/mes
-          </span>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                <p className="text-sm">
-                  <strong>Horas Mensuales:</strong> {Math.round(person.monthlyHours || 160)} horas por mes<br/>
-                  {person.contractType === 'full-time' && person.monthlyFixedSalary && (
-                    <>
-                      <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora<br/>
-                      <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {Math.round(person.monthlyHours || 160)}h)</small>
-                    </>
-                  )}
-                  {Math.round(person.monthlyHours || 160) !== 160 && (
-                    <><br/><strong>Nota:</strong> Horario personalizado según contrato</>
-                  )}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        {person.contractType === 'freelance' ? (
+          <div className="flex flex-col items-center justify-center gap-1">
+            <span className="text-xs text-gray-400">-</span>
+            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              Se paga por horas
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+              person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' : 
+              person.contractType === 'part-time' ? 'bg-orange-100 text-orange-800' : 
+              'bg-blue-100 text-blue-800'
+            }`} key={`${person.id}-${person.monthlyHours}`}>
+              {person.monthlyHours}h/mes
+            </span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">
+                    <strong>Horas Mensuales:</strong> {Math.round(person.monthlyHours || 160)} horas por mes<br/>
+                    {person.contractType === 'full-time' && person.monthlyFixedSalary && (
+                      <>
+                        <strong>Tarifa calculada:</strong> ${Math.round((person.monthlyFixedSalary / (person.monthlyHours || 160))).toLocaleString()} ARS/hora<br/>
+                        <small>({person.monthlyFixedSalary.toLocaleString()} ÷ {Math.round(person.monthlyHours || 160)}h)</small>
+                      </>
+                    )}
+                    {Math.round(person.monthlyHours || 160) !== 160 && (
+                      <><br/><strong>Nota:</strong> Horario personalizado según contrato</>
+                    )}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center justify-center">
