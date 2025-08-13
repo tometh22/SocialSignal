@@ -764,15 +764,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-blue-700" key={`${person.id}-${person.monthlyHours}`}>
-            {person.monthlyHours}
+          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+            person.contractType === 'full-time' ? 'bg-blue-100 text-blue-800' : 
+            person.contractType === 'part-time' ? 'bg-orange-100 text-orange-800' : 
+            person.contractType === 'freelance' ? 'bg-green-100 text-green-800' : 
+            'bg-blue-100 text-blue-800'
+          }`} key={`${person.id}-${person.monthlyHours}`}>
+            {person.monthlyHours}h/mes
           </span>
-          <span className="text-xs text-muted-foreground">h/mes</span>
-          {Math.round(person.monthlyHours || 160) !== 160 && (
-            <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded-full">
-              ≠ 160h
-            </span>
-          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -788,7 +787,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     </>
                   )}
                   {Math.round(person.monthlyHours || 160) !== 160 && (
-                    <><br/><strong>Nota:</strong> Valor personalizado (estándar: 160h)</>
+                    <><br/><strong>Nota:</strong> Horario personalizado según contrato</>
                   )}
                 </p>
               </TooltipContent>
