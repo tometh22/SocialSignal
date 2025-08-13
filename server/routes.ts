@@ -1178,6 +1178,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Personnel historical costs routes
+  app.get("/api/personnel-historical-costs", requireAuth, async (req, res) => {
+    try {
+      const historicalCosts = await db
+        .select()
+        .from(sql`personnel_historical_costs`)
+        .where(sql`is_active = true`)
+        .orderBy(sql`personnel_id, year, month`);
+      
+      res.json(historicalCosts);
+    } catch (error) {
+      console.error("Error fetching historical costs:", error);
+      res.status(500).json({ message: "Failed to fetch historical costs" });
+    }
+  });
+
+  app.post("/api/personnel-historical-costs", requireAuth, async (req, res) => {
+    try {
+      const { personnelId, year, month, hourlyRateARS, monthlySalaryARS, hourlyRateUSD, monthlySalaryUSD, adjustmentReason, notes } = req.body;
+      
+      // Insert or update historical cost
+      const result = await db
+        .insert(sql`personnel_historical_costs`)
+        .values({
+          personnelId,
+          year,
+          month,
+          hourlyRateARS: hourlyRateARS?.toString(),
+          monthlySalaryARS: monthlySalaryARS?.toString(),
+          hourlyRateUSD: hourlyRateUSD?.toString(),
+          monthlySalaryUSD: monthlySalaryUSD?.toString(),
+          adjustmentReason,
+          notes,
+          createdBy: req.user?.id || 1
+        })
+        .onConflict(sql`(personnel_id, year, month) WHERE is_active = true`)
+        .doUpdate({
+          hourlyRateARS: sql`EXCLUDED.hourly_rate_ars`,
+          monthlySalaryARS: sql`EXCLUDED.monthly_salary_ars`,
+          hourlyRateUSD: sql`EXCLUDED.hourly_rate_usd`,
+          monthlySalaryUSD: sql`EXCLUDED.monthly_salary_usd`,
+          adjustmentReason: sql`EXCLUDED.adjustment_reason`,
+          notes: sql`EXCLUDED.notes`,
+          updatedAt: sql`NOW()`,
+          updatedBy: req.user?.id || 1
+        })
+        .returning();
+      
+      res.status(201).json(result[0]);
+    } catch (error) {
+      console.error("Error creating historical cost:", error);
+      res.status(500).json({ message: "Failed to create historical cost" });
+    }
+  });
+
   // Personnel routes
   app.get("/api/personnel", requireAuth, async (_, res) => {
     try {

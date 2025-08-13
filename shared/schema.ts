@@ -951,11 +951,7 @@ export const rolesRelations = relations(roles, ({ many }) => ({
   templateAssignments: many(templateRoleAssignments),
 }));
 
-// Relaciones de personal
-export const personnelRelations = relations(personnel, ({ one, many }) => ({
-  role: one(roles, { fields: [personnel.roleId], references: [roles.id] }),
-  quotationTeamMembers: many(quotationTeamMembers),
-}));
+// Relaciones de personal (removed duplicate, kept the complete version below)
 
 
 
