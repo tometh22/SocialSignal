@@ -457,6 +457,9 @@ export class DatabaseStorage implements IStorage {
         // 5.1. Eliminar personal no cotizado del proyecto
         await tx.delete(unquotedPersonnel).where(eq(unquotedPersonnel.projectId, id));
 
+        // 5.2. Eliminar ajustes mensuales de horas del proyecto
+        await tx.delete(monthlyHourAdjustments).where(eq(monthlyHourAdjustments.projectId, id));
+
         // 6. Eliminar entregables relacionados
         await tx.delete(deliverables).where(eq(deliverables.project_id, id));
 
