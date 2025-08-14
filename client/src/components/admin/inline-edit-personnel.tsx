@@ -1168,19 +1168,37 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                         <Select
                           value={(() => {
                             const value = getCellValue(fieldName) || '';
-                            console.log(`🔍 Getting value for ${fieldName}: editingCells="${editingCells[fieldName]}", person="${(person as any)[fieldName]}", final="${value}"`);
+                            console.log(`🔍 [${person.name}] Getting value for ${fieldName}: editingCells="${editingCells[fieldName]}", person="${(person as any)[fieldName]}", final="${value}"`);
                             return value;
                           })()}
-                          onValueChange={(value) => {
-                            console.log(`🔧 Contract type changed for ${fieldName}: ${value}`);
+                          onValueChange={async (value) => {
+                            console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
+                            
+                            // Actualizar estado local inmediatamente
                             handleHistoricalCostChange(fieldName, value);
-                            // Guardar inmediatamente sin timeout
-                            handleHistoricalCostSave(fieldName);
+                            
+                            // Guardar directamente sin depender del estado editingCells
+                            console.log(`💾 [${person.name}] Saving directly: ${fieldName} = ${value}`);
+                            try {
+                              await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
+                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}`);
+                              
+                              // Limpiar estado de edición después del éxito
+                              setEditingCells(prev => {
+                                const newState = { ...prev };
+                                delete newState[fieldName];
+                                return newState;
+                              });
+                            } catch (error) {
+                              console.error(`❌ [${person.name}] Error saving ${fieldName}:`, error);
+                            }
                           }}
                           disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
                         >
-                          <SelectTrigger className="h-9 text-xs border-gray-200 focus:border-purple-400 focus:ring-purple-400/20">
-                            <SelectValue placeholder="Tipo" />
+                          <SelectTrigger className={`h-9 text-xs border-gray-200 focus:border-purple-400 focus:ring-purple-400/20 ${
+                            updateHistoricalCostMutation.isPending ? 'bg-yellow-50 border-yellow-300' : ''
+                          }`}>
+                            <SelectValue placeholder={updateHistoricalCostMutation.isPending ? "Guardando..." : "Tipo"} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="full-time">
