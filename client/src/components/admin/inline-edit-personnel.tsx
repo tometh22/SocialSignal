@@ -294,6 +294,30 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditingCells(prev => ({ ...prev, [field]: value }));
   };
 
+  // Función para obtener el mes actual (hasta cuál mes buscar valores "actuales")
+  const getCurrentMonth = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-12
+    const currentYear = now.getFullYear();
+    
+    // Si estamos en 2025, usar el mes actual
+    if (currentYear === 2025) {
+      const monthNames = [
+        'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+      ];
+      return monthNames[currentMonth - 1] + '2025';
+    }
+    
+    // Si estamos después de 2025, considerar todos los meses de 2025
+    if (currentYear > 2025) {
+      return 'dec2025';
+    }
+    
+    // Si estamos antes de 2025, no hay datos "actuales" aún
+    return null;
+  };
+
   const handleHistoricalCostSave = (field: string) => {
     const value = editingCells[field] || '';
     
@@ -308,11 +332,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           Object.entries(editingCells).map(([k, v]) => [k, v])
         )};
         
-        // Determinar el mes más reciente con tipo de contrato
-        const months = [
+        // Determinar el mes más reciente con tipo de contrato (solo hasta el mes actual)
+        const currentMonth = getCurrentMonth();
+        const allMonths = [
           'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
           'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
         ];
+        
+        // Filtrar solo los meses hasta el actual (inclusive)
+        let months = allMonths;
+        if (currentMonth) {
+          const currentIndex = allMonths.indexOf(currentMonth);
+          if (currentIndex !== -1) {
+            months = allMonths.slice(currentIndex); // Desde el mes actual hacia atrás
+          }
+        }
         
         let latestContractType = null;
         for (const month of months) {
@@ -380,11 +414,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       const isSalaryField = field.includes('MonthlySalaryARS');
       
       if (isRateField || isSalaryField) {
-        // Determinar el mes más reciente con datos de tarifa/salario
-        const months = [
+        // Determinar el mes más reciente con datos de tarifa/salario (solo hasta el mes actual)
+        const currentMonth = getCurrentMonth();
+        const allMonths = [
           'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
           'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
         ];
+        
+        // Filtrar solo los meses hasta el actual (inclusive)
+        let months = allMonths;
+        if (currentMonth) {
+          const currentIndex = allMonths.indexOf(currentMonth);
+          if (currentIndex !== -1) {
+            months = allMonths.slice(currentIndex); // Desde el mes actual hacia atrás
+          }
+        }
         
         let latestRateValue = null;
         let latestSalaryValue = null;
@@ -409,7 +453,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         }
         
         // Actualizar campo principal de tarifa ARS si es diferente
-        if (latestRateValue && latestRateValue !== person.hourlyRateARS) {
+        if (latestRateValue && latestRateValue !== (person as any).hourlyRateARS) {
           updateHistoricalCostMutation.mutate({ field: 'hourlyRateARS', value: latestRateValue });
           
           toast({
@@ -1045,6 +1089,27 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </div>
 
             <div className="space-y-6">
+              {/* Información del Mes Actual */}
+              <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                  <h5 className="font-semibold text-blue-900">Sincronización Automática</h5>
+                </div>
+                <div className="text-sm text-blue-800 space-y-2">
+                  <p>
+                    <strong>Mes actual del sistema:</strong> {getCurrentMonth() || 'Antes de 2025 - Sin datos actuales'}
+                  </p>
+                  <p>
+                    Los <strong>campos principales</strong> (arriba) se actualizan automáticamente con los valores del 
+                    <strong> último mes registrado</strong> (desde {getCurrentMonth() || 'enero'} hacia atrás).
+                  </p>
+                  <div className="text-xs bg-blue-100 p-2 rounded border-l-4 border-blue-400">
+                    <strong>Ejemplo:</strong> Si configuras mayo como "full-time" con sueldo, el campo principal mostrará "full-time" 
+                    porque mayo es posterior a enero-abril freelance.
+                  </div>
+                </div>
+              </div>
+
               {/* Tipo de Contrato por Mes */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="flex items-center gap-3 mb-4">
@@ -1055,10 +1120,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
                     const fieldName = `${month.key}ContractType`;
+                    const currentMonth = getCurrentMonth();
+                    const isCurrentMonth = currentMonth === month.key;
+                    const allMonths = [
+                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+                    ];
+                    const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
+                    const monthIndex = allMonths.indexOf(month.key);
+                    const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
+                    
                     return (
                       <div key={fieldName} className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 block text-center">
+                        <label className={`text-xs font-medium block text-center ${
+                          isCurrentMonth ? 'text-blue-600 font-bold' : 
+                          isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
                           {month.label} 2025
+                          {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
+                          {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         <Select
                           value={getCellValue(fieldName) || ''}
@@ -1067,7 +1147,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             // Guardar automáticamente el cambio
                             setTimeout(() => handleHistoricalCostSave(fieldName), 100);
                           }}
-                          disabled={updateHistoricalCostMutation.isPending}
+                          disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
                         >
                           <SelectTrigger className="h-9 text-xs border-gray-200 focus:border-purple-400 focus:ring-purple-400/20">
                             <SelectValue placeholder="Tipo" />
@@ -1109,10 +1189,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 <div className="grid grid-cols-6 gap-3">
                   {months.map((month) => {
                     const fieldName = `${month.key}HourlyRateARS`;
+                    const currentMonth = getCurrentMonth();
+                    const isCurrentMonth = currentMonth === month.key;
+                    const allMonths = [
+                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+                    ];
+                    const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
+                    const monthIndex = allMonths.indexOf(month.key);
+                    const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
+                    
                     return (
                       <div key={fieldName} className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 block text-center">
+                        <label className={`text-xs font-medium block text-center ${
+                          isCurrentMonth ? 'text-blue-600 font-bold' : 
+                          isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
                           {month.label} 2025
+                          {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
+                          {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         <Input
                           type="number"
@@ -1126,9 +1221,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                               e.currentTarget.blur();
                             }
                           }}
-                          className="h-9 text-sm text-center border-gray-200 focus:border-green-400 focus:ring-green-400/20"
-                          placeholder="0"
-                          disabled={updateHistoricalCostMutation.isPending}
+                          className={`h-9 text-sm text-center border-gray-200 focus:border-green-400 focus:ring-green-400/20 ${
+                            isAfterCurrent ? 'bg-gray-50 text-gray-400' : ''
+                          }`}
+                          placeholder={isAfterCurrent ? "Futuro" : "0"}
+                          disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
                         />
                       </div>
                     );
@@ -1151,10 +1248,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     const contractTypeForMonth = getCellValue(contractTypeFieldName);
                     const isFreelanceMonth = contractTypeForMonth === 'freelance';
                     
+                    const currentMonth = getCurrentMonth();
+                    const isCurrentMonth = currentMonth === month.key;
+                    const allMonths = [
+                      'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+                      'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+                    ];
+                    const currentIndex = currentMonth ? allMonths.indexOf(currentMonth) : -1;
+                    const monthIndex = allMonths.indexOf(month.key);
+                    const isAfterCurrent = currentIndex !== -1 && monthIndex < currentIndex;
+                    
                     return (
                       <div key={fieldName} className="space-y-2">
-                        <label className="text-xs font-medium text-gray-600 block text-center">
+                        <label className={`text-xs font-medium block text-center ${
+                          isCurrentMonth ? 'text-blue-600 font-bold' : 
+                          isAfterCurrent ? 'text-gray-400' : 'text-gray-600'
+                        }`}>
                           {month.label} 2025
+                          {isCurrentMonth && <span className="block text-[10px] text-blue-500">• ACTUAL</span>}
+                          {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         {isFreelanceMonth ? (
                           <div className="h-9 flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded border border-gray-200">
@@ -1173,9 +1285,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                                 e.currentTarget.blur();
                               }
                             }}
-                            className="h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20"
-                            placeholder="0"
-                            disabled={updateHistoricalCostMutation.isPending}
+                            className={`h-9 text-sm text-center border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 ${
+                              isAfterCurrent ? 'bg-gray-50 text-gray-400' : ''
+                            }`}
+                            placeholder={isAfterCurrent ? "Futuro" : "0"}
+                            disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
                           />
                         )}
                       </div>
