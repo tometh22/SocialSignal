@@ -265,6 +265,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const queryClient = useQueryClient();
   const { convertToUSD } = useCurrency();
 
+  // Get data from queries first
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ["/api/roles"],
+  });
+
+  const { data: personnel = [] } = useQuery<Personnel[]>({
+    queryKey: ["/api/personnel"],
+  });
+
   // Helper function to get personnel hourly rate with currency conversion
   const getPersonnelRate = useCallback((personnelId: number, targetCurrency: string = 'ARS') => {
     if (!personnel || personnel.length === 0) return 0;
@@ -303,15 +312,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     
     return rateInARS;
   }, [personnel, convertToUSD]);
-
-  // Get data from queries
-  const { data: roles = [] } = useQuery<Role[]>({
-    queryKey: ["/api/roles"],
-  });
-
-  const { data: personnel = [] } = useQuery<Personnel[]>({
-    queryKey: ["/api/personnel"],
-  });
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
@@ -869,12 +869,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           priceMode: (quotation.priceMode as 'auto' | 'manual') || 'auto',
           manualPrice: quotation.manualPrice ? Number(quotation.manualPrice) : undefined
         },
+        quotationCurrency: quotation.quotationCurrency || "ARS", // Propiedad requerida en el nivel raíz
         inflation: {
           applyInflationAdjustment: Boolean(quotation.applyInflationAdjustment),
           inflationMethod: quotation.inflationMethod || "manual",
           manualInflationRate: Number(quotation.manualInflationRate || 0),
-          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : "",
-          quotationCurrency: quotation.quotationCurrency || "USD"
+          projectStartDate: quotation.projectStartDate ? new Date(quotation.projectStartDate).toISOString().split('T')[0] : ""
         },
         proposalLink: quotation.proposalLink || undefined
       };
