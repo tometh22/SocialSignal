@@ -412,12 +412,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             });
           }
           
-          // Remover del estado de edición después de guardar exitosamente
-          setEditingCells(prev => {
-            const newState = { ...prev };
-            delete newState[field];
-            return newState;
-          });
+          // El estado de edición se limpiará automáticamente en onSuccess de la mutación
           
         } catch (error) {
           console.error(`❌ Error saving contract type ${field}:`, error);
@@ -1187,7 +1182,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                         </label>
                         <Select
                           key={`${person.id}-${fieldName}-${(person as any)[fieldName]}`}
-                          value={(person as any)[fieldName] || ''}
+                          value={editingCells[fieldName] !== undefined ? editingCells[fieldName] : ((person as any)[fieldName] || '')}
                           onValueChange={async (value) => {
                             console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
                             
@@ -1199,6 +1194,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                               await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
                             } catch (error) {
                               console.error(`❌ Error saving ${fieldName}:`, error);
+                              // Revertir el estado local si hay error
+                              setEditingCells(prev => {
+                                const newState = { ...prev };
+                                delete newState[fieldName];
+                                return newState;
+                              });
                             }
                           }}
                           disabled={savingFields[fieldName] || isAfterCurrent}
