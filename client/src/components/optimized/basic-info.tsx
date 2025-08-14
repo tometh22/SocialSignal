@@ -186,6 +186,12 @@ const OptimizedBasicInfo: React.FC = () => {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  {/* Explicación sobre conversión automática */}
+                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs text-blue-700">
+                      💡 <strong>Conversión automática:</strong> Las tarifas del personal se muestran en ARS (peso argentino) y se convierten automáticamente a USD usando el tipo de cambio actual si seleccionas esa moneda.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Duración del Proyecto */}

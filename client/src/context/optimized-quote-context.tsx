@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Client, ReportTemplate, Role, Personnel, Quotation } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useCurrency } from "@/hooks/use-currency";
 
 export interface OptimizedTeamMember {
   id: string;
@@ -112,6 +113,7 @@ interface OptimizedQuoteContextType {
   loadRoles: () => void;
   loadPersonnel: () => void;
   forceRecalculate: () => void;
+  getPersonnelRate: (personnelId: number, targetCurrency?: string) => number;
 
   // Deliverables
   updateDeliverables: (deliverables: any[]) => void;
@@ -261,6 +263,46 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
 
   const queryClient = useQueryClient();
+  const { convertToUSD } = useCurrency();
+
+  // Helper function to get personnel hourly rate with currency conversion
+  const getPersonnelRate = useCallback((personnelId: number, targetCurrency: string = 'ARS') => {
+    if (!personnel || personnel.length === 0) return 0;
+    const person = personnel.find(p => p.id === personnelId);
+    if (!person) return 0;
+
+    // Get the most recent ARS hourly rate from historical data
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
+    
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    // Try to find the most recent rate starting from current month and going backwards
+    let rateInARS = 0;
+    for (let i = currentMonth; i >= 0; i--) {
+      const monthName = monthNames[i];
+      const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
+      const rate = person[rateField] as number;
+      
+      if (rate && rate > 0) {
+        rateInARS = rate;
+        break;
+      }
+    }
+    
+    // If no historical rate found, fall back to hourlyRateARS or hourlyRate
+    if (rateInARS === 0) {
+      rateInARS = person.hourlyRateARS || person.hourlyRate || 0;
+    }
+
+    // Convert to target currency if needed
+    if (targetCurrency === 'USD' && rateInARS > 0) {
+      return convertToUSD(rateInARS, 'ARS');
+    }
+    
+    return rateInARS;
+  }, [personnel, convertToUSD]);
 
   // Get data from queries
   const { data: roles = [] } = useQuery<Role[]>({
@@ -675,7 +717,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Get default values from role if available
     const role = roles.find(r => r.id === member.roleId);
     const defaultHours = member.hours || 40;
-    const defaultRate = member.rate || role?.defaultRate || 50;
+    
+    // Use personnel rate if available, otherwise fall back to role default
+    let defaultRate = member.rate;
+    if (!defaultRate && member.personnelId) {
+      defaultRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
+    }
+    if (!defaultRate) {
+      defaultRate = role?.defaultRate || 50;
+    }
 
     const newMember: OptimizedTeamMember = {
       ...member,
@@ -695,7 +745,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }));
 
     forceRecalculate();
-  }, [roles, forceRecalculate]);
+  }, [roles, getPersonnelRate, quotationData.quotationCurrency, forceRecalculate]);
 
   const updateTeamMember = useCallback((id: string, updates: Partial<OptimizedTeamMember>) => {
     console.log('📝 Updating team member:', id, updates);
@@ -1181,7 +1231,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     updatePriceMode,
     updateManualPrice,
     // General update function
-    updateQuotationData
+    updateQuotationData,
+    // Currency conversion helper
+    getPersonnelRate
   };
 
   return (

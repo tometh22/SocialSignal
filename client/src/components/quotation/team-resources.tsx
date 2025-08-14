@@ -11,9 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import CostBreakdown from "./cost-breakdown";
 import { cn } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
+import { useCurrency } from "@/hooks/use-currency";
 
 export default function TeamResources({ onPrevious, onNext }: { onPrevious: () => void; onNext: () => void }) {
   const { toast } = useToast();
+  const { convertToUSD } = useCurrency();
   const {
     teamMembers,
     recommendedRoleIds,
@@ -65,8 +67,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     return role ? role.defaultRate : 0;
   };
 
-  // Helper to get personnel hourly rate - uses most recent historical rate in ARS
-  const getPersonnelRate = (personnelId: number) => {
+  // Helper to get personnel hourly rate - uses most recent historical rate
+  const getPersonnelRate = (personnelId: number, targetCurrency: string = 'ARS') => {
     if (!allPersonnel) return 0;
     const person = allPersonnel.find(p => p.id === personnelId);
     if (!person) return 0;
@@ -79,18 +81,29 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
     
     // Try to find the most recent rate starting from current month and going backwards
+    let rateInARS = 0;
     for (let i = currentMonth; i >= 0; i--) {
       const monthName = monthNames[i];
       const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
       const rate = person[rateField] as number;
       
       if (rate && rate > 0) {
-        return rate;
+        rateInARS = rate;
+        break;
       }
     }
     
     // If no historical rate found, fall back to hourlyRateARS or hourlyRate
-    return person.hourlyRateARS || person.hourlyRate || 0;
+    if (rateInARS === 0) {
+      rateInARS = person.hourlyRateARS || person.hourlyRate || 0;
+    }
+
+    // Convert to target currency if needed
+    if (targetCurrency === 'USD' && rateInARS > 0) {
+      return convertToUSD(rateInARS, 'ARS');
+    }
+    
+    return rateInARS;
   };
 
   // Toggle role selection
@@ -453,7 +466,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                               <div className="ml-3 flex-1">
                                 <div className="flex items-center justify-between">
                                   <h5 className="text-base font-medium text-neutral-800">{person.name}</h5>
-                                  <span className="text-sm font-mono text-neutral-600">${getPersonnelRate(person.id).toFixed(2)} ARS/hr</span>
+                                  <span className="text-sm font-mono text-neutral-600">${getPersonnelRate(person.id, 'ARS').toFixed(2)} ARS/hr</span>
                                 </div>
                                 
                                 {isSelected && teamMember && (
