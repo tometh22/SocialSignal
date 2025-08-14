@@ -281,6 +281,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         return newState;
       });
       
+      // Limpiar el estado local de edición para este campo
+      setEditingCells(prev => {
+        const newState = { ...prev };
+        delete newState[variables.field];
+        return newState;
+      });
+      
       // Solo invalidar el cache para forzar una recarga completa desde la base de datos
       // Esto asegura que el valor guardado se mantenga persistente
       queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
@@ -529,11 +536,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const getCellValue = (field: string) => {
     // Priorizar siempre el estado local de edición para mostrar cambios inmediatos
     if (editingCells[field] !== undefined) {
-      console.log(`📝 [${person.name}] getCellValue(${field}): usando estado local = "${editingCells[field]}"`);
       return editingCells[field];
     }
     const value = (person as any)[field];
-    console.log(`📦 [${person.name}] getCellValue(${field}): desde props = "${value}" (type: ${typeof value})`);
     return (value !== null && value !== undefined) ? value.toString() : '';
   };
 
@@ -1185,7 +1190,20 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             const editingValue = editingCells[fieldName];
                             const personValue = (person as any)[fieldName];
                             const finalValue = editingValue !== undefined ? editingValue : (personValue || '');
-                            console.log(`🔍 [${person.name}] Select ${fieldName}: editing="${editingValue}", person="${personValue}", final="${finalValue}"`);
+                            if (fieldName === 'feb2025ContractType' || fieldName === 'mar2025ContractType') {
+                              console.log(`🔍🔍🔍 [${person.name}] DEBUG ${fieldName}:`, {
+                                editingValue,
+                                personValue,
+                                finalValue,
+                                editingCells: editingCells,
+                                personKeys: Object.keys(person).filter(k => k.includes('ContractType')).slice(0, 5)
+                              });
+                              // FORCE TEST: Forzar "full-time" para feb y mar
+                              if ((fieldName === 'feb2025ContractType' || fieldName === 'mar2025ContractType') && personValue === 'full-time') {
+                                console.log(`🚀 FORCING ${fieldName} to "full-time"`);
+                                return 'full-time';
+                              }
+                            }
                             return finalValue;
                           })()}
                           onValueChange={async (value) => {
