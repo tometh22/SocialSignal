@@ -168,7 +168,7 @@ export const personnel = pgTable("personnel", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email"), // Email opcional
-  roleId: integer("role_id").notNull(),
+  roleId: integer("role_id").notNull().references(() => roles.id),
   hourlyRate: doublePrecision("hourly_rate").notNull(), // USD per hour
   hourlyRateARS: doublePrecision("hourly_rate_ars"), // ARS per hour for local projects
   contractType: text("contract_type").notNull().default("full-time"), // 'full-time', 'part-time', 'freelance'
