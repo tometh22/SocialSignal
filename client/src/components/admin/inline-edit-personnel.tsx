@@ -254,18 +254,48 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         description: "Personal eliminado correctamente"
       });
     },
-    onError: (err) => {
+    onError: (err: any) => {
       console.error("Error deleting personnel:", err);
+      const errorMessage = err?.response?.data?.message || err?.message || "No se pudo eliminar el personal";
+      
       toast({
-        title: "Error",
-        description: "No se pudo eliminar el personal",
+        title: "No se puede eliminar",
+        description: errorMessage,
         variant: "destructive"
       });
       setIsDeleting(false);
     }
   });
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    // Primero verificar dependencias antes de intentar eliminar
+    try {
+      const dependencies = await apiRequest(`/api/personnel/${person.id}/dependencies`, "GET");
+      
+      if (dependencies.timeEntries > 0 || dependencies.quotations.length > 0 || dependencies.projects.length > 0) {
+        let warningMessage = `⚠️ No se puede eliminar a "${person.name}" porque está siendo usado en:\n\n`;
+        
+        if (dependencies.timeEntries > 0) {
+          warningMessage += `• ${dependencies.timeEntries} entradas de tiempo registradas\n`;
+        }
+        
+        if (dependencies.quotations.length > 0) {
+          warningMessage += `• Cotizaciones: ${dependencies.quotations.map((q: any) => q.projectName).join(', ')}\n`;
+        }
+        
+        if (dependencies.projects.length > 0) {
+          warningMessage += `• Proyectos activos: ${dependencies.projects.map((p: any) => p.name).join(', ')}\n`;
+        }
+        
+        warningMessage += `\n📋 Para eliminarlo, primero debes removerlo de estas cotizaciones y proyectos.`;
+        
+        alert(warningMessage);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking dependencies:", error);
+    }
+    
     if (window.confirm(`¿Estás seguro de que quieres eliminar a "${person.name}"? Esta acción no se puede deshacer.`)) {
       setIsDeleting(true);
       deletePersonnelMutation.mutate();

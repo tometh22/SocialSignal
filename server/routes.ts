@@ -1446,6 +1446,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get personnel dependencies before deletion
+  app.get("/api/personnel/:id/dependencies", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
+
+    try {
+      const dependencies = await storage.getPersonnelDependencies(id);
+      res.json(dependencies);
+    } catch (error) {
+      console.error("Error getting personnel dependencies:", error);
+      res.status(500).json({ message: "Error interno del servidor al obtener dependencias" });
+    }
+  });
+
   app.delete("/api/personnel/:id", requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ message: "Invalid personnel ID" });
