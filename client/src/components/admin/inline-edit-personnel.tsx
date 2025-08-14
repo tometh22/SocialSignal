@@ -299,9 +299,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     const numericValue = value === '' ? null : parseFloat(value);
 
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
-      // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente usando 160 horas fijas
+      // Si es un campo de sueldo mensual para full-time, calcular tarifa por hora automáticamente usando las horas mensuales asignadas
       if (field.includes('MonthlySalaryARS') && person.contractType === 'full-time' && numericValue) {
-        const monthlyHours = 160; // Horas fijas para cálculo
+        const monthlyHours = person.monthlyHours || 160; // Usar horas mensuales asignadas, defaultear a 160
         const hourlyRate = numericValue / monthlyHours;
         const hourlyRateField = field.replace('MonthlySalaryARS', 'HourlyRateARS');
 
@@ -311,7 +311,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
         toast({
           title: "Cálculo automático",
-          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ 160 horas)`
+          description: `Tarifa por hora calculada: $${Math.round(hourlyRate).toLocaleString()} ARS (${numericValue.toLocaleString()} ÷ ${Math.round(monthlyHours)} horas)`
         });
       } else {
         updateHistoricalCostMutation.mutate({ field, value: numericValue });
@@ -977,7 +977,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
                     <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Solo Full-time</span>
-                    <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Se usa 160h fijas para calcular tarifa/hora</span>
+                    <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Se usa {Math.round(person.monthlyHours || 160)}h para calcular tarifa/hora</span>
                   </div>
                   <div className="grid grid-cols-6 gap-3">
                     {months.map((month) => {
