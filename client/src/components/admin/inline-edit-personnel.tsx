@@ -85,6 +85,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
+  const [savingFields, setSavingFields] = useState<Record<string, boolean>>({});
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -261,14 +262,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null | string }) => {
       console.log(`🚀 Mutation starting: ${data.field} = ${data.value}`);
+      
+      // Marcar que este campo se está guardando
+      setSavingFields(prev => ({ ...prev, [data.field]: true }));
+      
       const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
       console.log(`✅ Mutation completed: ${data.field} = ${data.value}, result:`, result);
-      return result;
+      return { result, fieldName: data.field };
     },
     onSuccess: (data, variables) => {
-      console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}, server response:`, data);
+      console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}`);
       
-      // Actualizar cache silenciosamente sin invalidar para evitar conflictos
+      // Quitar el estado de guardado para este campo específico
+      setSavingFields(prev => {
+        const newState = { ...prev };
+        delete newState[variables.field];
+        return newState;
+      });
+      
+      // Actualizar cache silenciosamente
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
         return old.map((p: any) => 
@@ -278,8 +290,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
       console.log(`✅ Successfully saved: ${variables.field} = ${variables.value}`);
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       console.error("❌ Mutation error:", error);
+      
+      // Quitar el estado de guardado para este campo específico
+      setSavingFields(prev => {
+        const newState = { ...prev };
+        delete newState[variables.field];
+        return newState;
+      });
+      
+      // Revertir el valor en caso de error
+      setEditingCells(prev => {
+        const newState = { ...prev };
+        delete newState[variables.field];
+        return newState;
+      });
+      
       toast({
         title: "Error",
         description: error.message || "Hubo un error al actualizar el valor.",
@@ -1163,35 +1190,22 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           onValueChange={async (value) => {
                             console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
                             
-                            // Actualizar estado local inmediatamente
+                            // Actualizar estado local inmediatamente para mostrar el cambio
                             handleHistoricalCostChange(fieldName, value);
                             
-                            // Guardar directamente sin depender del estado editingCells
-                            console.log(`💾 [${person.name}] Saving directly: ${fieldName} = ${value}`);
+                            // Guardar en el servidor
                             try {
                               await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
-                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}`);
-                              
-                              // Mantener el valor en el estado local para que persista visualmente
-                              // Se limpiará automáticamente cuando el cache se actualice
-                              
                             } catch (error) {
-                              console.error(`❌ [${person.name}] Error saving ${fieldName}:`, error);
-                              
-                              // En caso de error, revertir al valor original
-                              setEditingCells(prev => {
-                                const newState = { ...prev };
-                                delete newState[fieldName];
-                                return newState;
-                              });
+                              console.error(`❌ Error saving ${fieldName}:`, error);
                             }
                           }}
-                          disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
+                          disabled={savingFields[fieldName] || isAfterCurrent}
                         >
                           <SelectTrigger className={`h-9 text-xs border-gray-200 focus:border-purple-400 focus:ring-purple-400/20 ${
-                            updateHistoricalCostMutation.isPending ? 'bg-yellow-50 border-yellow-300' : ''
+                            savingFields[fieldName] ? 'bg-yellow-50 border-yellow-300' : ''
                           }`}>
-                            <SelectValue placeholder={updateHistoricalCostMutation.isPending ? "Guardando..." : "Tipo"} />
+                            <SelectValue placeholder={savingFields[fieldName] ? "Guardando..." : "Tipo"} />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="full-time">
