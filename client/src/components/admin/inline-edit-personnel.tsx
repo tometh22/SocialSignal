@@ -281,13 +281,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         return newState;
       });
       
-      // Actualizar cache silenciosamente
-      queryClient.setQueryData(["/api/personnel"], (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.map((p: any) => 
-          p.id === person.id ? { ...p, [variables.field]: variables.value } : p
-        );
-      });
+      // Solo invalidar el cache para forzar una recarga completa desde la base de datos
+      // Esto asegura que el valor guardado se mantenga persistente
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
       console.log(`✅ Successfully saved: ${variables.field} = ${variables.value}`);
     },
