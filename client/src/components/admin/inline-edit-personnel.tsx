@@ -529,9 +529,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const getCellValue = (field: string) => {
     // Priorizar siempre el estado local de edición para mostrar cambios inmediatos
     if (editingCells[field] !== undefined) {
+      console.log(`📝 [${person.name}] getCellValue(${field}): usando estado local = "${editingCells[field]}"`);
       return editingCells[field];
     }
     const value = (person as any)[field];
+    console.log(`📦 [${person.name}] getCellValue(${field}): desde props = "${value}" (type: ${typeof value})`);
     return (value !== null && value !== undefined) ? value.toString() : '';
   };
 
@@ -1180,9 +1182,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                         </label>
                         <Select
                           value={(() => {
-                            const value = getCellValue(fieldName) || '';
-                            console.log(`🔍 [${person.name}] Getting value for ${fieldName}: editingCells="${editingCells[fieldName]}", person="${(person as any)[fieldName]}", final="${value}"`);
-                            return value;
+                            const editingValue = editingCells[fieldName];
+                            const personValue = (person as any)[fieldName];
+                            const finalValue = editingValue !== undefined ? editingValue : (personValue || '');
+                            console.log(`🔍 [${person.name}] Select ${fieldName}: editing="${editingValue}", person="${personValue}", final="${finalValue}"`);
+                            return finalValue;
                           })()}
                           onValueChange={async (value) => {
                             console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
