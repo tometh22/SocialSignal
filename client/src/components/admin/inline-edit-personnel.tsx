@@ -318,71 +318,85 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     return null;
   };
 
-  const handleHistoricalCostSave = (field: string) => {
+  const handleHistoricalCostSave = async (field: string) => {
     const value = editingCells[field] || '';
+    console.log(`💾 Saving field ${field} with value:`, value);
     
     // Si es un campo de tipo de contrato, manejarlo como string
     if (field.includes('ContractType')) {
       if (value && ['full-time', 'part-time', 'freelance'].includes(value)) {
-        // Guardar el campo mensual
-        updateHistoricalCostMutation.mutate({ field, value: value });
-        
-        // Actualizar el campo principal si este es el mes más reciente con datos
-        const currentPersonData = { ...person, ...Object.fromEntries(
-          Object.entries(editingCells).map(([k, v]) => [k, v])
-        )};
-        
-        // Determinar el mes más reciente con tipo de contrato (solo hasta el mes actual)
-        const currentMonth = getCurrentMonth();
-        const allMonths = [
-          'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
-          'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
-        ];
-        
-        // Filtrar solo los meses hasta el actual (inclusive)
-        let months = allMonths;
-        if (currentMonth) {
-          const currentIndex = allMonths.indexOf(currentMonth);
-          if (currentIndex !== -1) {
-            months = allMonths.slice(currentIndex); // Desde el mes actual hacia atrás
-          }
-        }
-        
-        let latestContractType = null;
-        for (const month of months) {
-          const contractField = `${month}ContractType`;
-          let contractValue = null;
+        try {
+          // Guardar el campo mensual primero
+          console.log(`💾 Saving monthly contract type: ${field} = ${value}`);
+          await updateHistoricalCostMutation.mutateAsync({ field, value: value });
+          console.log(`✅ Monthly contract type saved successfully: ${field} = ${value}`);
           
-          // Si estamos editando este campo, usar el nuevo valor
-          if (contractField === field) {
-            contractValue = value;
-          } else {
-            // Usar el valor existente
-            contractValue = (currentPersonData as any)[contractField];
+          // Actualizar el campo principal si este es el mes más reciente con datos
+          const currentPersonData = { ...person, ...Object.fromEntries(
+            Object.entries(editingCells).map(([k, v]) => [k, v])
+          )};
+          
+          // Determinar el mes más reciente con tipo de contrato (solo hasta el mes actual)
+          const currentMonth = getCurrentMonth();
+          const allMonths = [
+            'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+            'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+          ];
+          
+          // Filtrar solo los meses hasta el actual (inclusive)
+          let months = allMonths;
+          if (currentMonth) {
+            const currentIndex = allMonths.indexOf(currentMonth);
+            if (currentIndex !== -1) {
+              months = allMonths.slice(currentIndex); // Desde el mes actual hacia atrás
+            }
           }
           
-          if (contractValue) {
-            latestContractType = contractValue;
-            break;
+          let latestContractType = null;
+          for (const month of months) {
+            const contractField = `${month}ContractType`;
+            let contractValue = null;
+            
+            // Si estamos editando este campo, usar el nuevo valor
+            if (contractField === field) {
+              contractValue = value;
+            } else {
+              // Usar el valor existente
+              contractValue = (currentPersonData as any)[contractField];
+            }
+            
+            if (contractValue) {
+              latestContractType = contractValue;
+              break;
+            }
           }
-        }
-        
-        // Si encontramos un tipo de contrato más reciente, actualizar el campo principal
-        if (latestContractType && latestContractType !== person.contractType) {
-          updateHistoricalCostMutation.mutate({ field: 'contractType', value: latestContractType });
           
+          // Si encontramos un tipo de contrato más reciente, actualizar el campo principal
+          if (latestContractType && latestContractType !== person.contractType) {
+            console.log(`🔄 Updating main contractType to: ${latestContractType}`);
+            await updateHistoricalCostMutation.mutateAsync({ field: 'contractType', value: latestContractType });
+            
+            toast({
+              title: "Campo principal actualizado",
+              description: `Tipo de contrato principal actualizado a: ${latestContractType}`,
+            });
+          }
+          
+          // Remover del estado de edición después de guardar exitosamente
+          setEditingCells(prev => {
+            const newState = { ...prev };
+            delete newState[field];
+            return newState;
+          });
+          
+        } catch (error) {
+          console.error(`❌ Error saving contract type ${field}:`, error);
           toast({
-            title: "Campo principal actualizado",
-            description: `Tipo de contrato principal actualizado a: ${latestContractType}`,
+            title: "Error al guardar",
+            description: "No se pudo guardar el tipo de contrato",
+            variant: "destructive",
           });
         }
-        
-        // Remover del estado de edición después de guardar
-        setEditingCells(prev => {
-          const newState = { ...prev };
-          delete newState[field];
-          return newState;
-        });
       }
       return;
     }
@@ -1143,9 +1157,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                         <Select
                           value={getCellValue(fieldName) || ''}
                           onValueChange={(value) => {
+                            console.log(`🔧 Contract type changed for ${fieldName}: ${value}`);
                             handleHistoricalCostChange(fieldName, value);
-                            // Guardar automáticamente el cambio
-                            setTimeout(() => handleHistoricalCostSave(fieldName), 100);
+                            // Guardar inmediatamente sin timeout
+                            handleHistoricalCostSave(fieldName);
                           }}
                           disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
                         >
