@@ -65,11 +65,32 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
     return role ? role.defaultRate : 0;
   };
 
-  // Helper to get personnel hourly rate
+  // Helper to get personnel hourly rate - uses most recent historical rate in ARS
   const getPersonnelRate = (personnelId: number) => {
     if (!allPersonnel) return 0;
     const person = allPersonnel.find(p => p.id === personnelId);
-    return person ? person.hourlyRate : 0;
+    if (!person) return 0;
+
+    // Get the most recent ARS hourly rate from historical data
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
+    
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    // Try to find the most recent rate starting from current month and going backwards
+    for (let i = currentMonth; i >= 0; i--) {
+      const monthName = monthNames[i];
+      const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
+      const rate = person[rateField] as number;
+      
+      if (rate && rate > 0) {
+        return rate;
+      }
+    }
+    
+    // If no historical rate found, fall back to hourlyRateARS or hourlyRate
+    return person.hourlyRateARS || person.hourlyRate || 0;
   };
 
   // Toggle role selection
@@ -400,8 +421,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                                   roleId: role.id,
                                   personnelId: person.id,
                                   hours: 10, // Default hours
-                                  rate: person.hourlyRate,
-                                  cost: 10 * person.hourlyRate
+                                  rate: getPersonnelRate(person.id),
+                                  cost: 10 * getPersonnelRate(person.id)
                                 });
                               }
                             }}
@@ -417,8 +438,8 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                                         roleId: role.id,
                                         personnelId: person.id,
                                         hours: 10, // Default hours
-                                        rate: person.hourlyRate,
-                                        cost: 10 * person.hourlyRate
+                                        rate: getPersonnelRate(person.id),
+                                        cost: 10 * getPersonnelRate(person.id)
                                       });
                                     } else if (!checked && isSelected && teamMember) {
                                       // Remove this person
@@ -432,7 +453,7 @@ export default function TeamResources({ onPrevious, onNext }: { onPrevious: () =
                               <div className="ml-3 flex-1">
                                 <div className="flex items-center justify-between">
                                   <h5 className="text-base font-medium text-neutral-800">{person.name}</h5>
-                                  <span className="text-sm font-mono text-neutral-600">${person.hourlyRate.toFixed(2)}/hr</span>
+                                  <span className="text-sm font-mono text-neutral-600">${getPersonnelRate(person.id).toFixed(2)} ARS/hr</span>
                                 </div>
                                 
                                 {isSelected && teamMember && (
