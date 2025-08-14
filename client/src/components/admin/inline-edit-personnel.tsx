@@ -268,27 +268,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     onSuccess: (data, variables) => {
       console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}, server response:`, data);
       
-      // Actualizar cache inmediatamente con la respuesta del servidor
+      // Actualizar cache inmediatamente con la respuesta del servidor completa
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
         const updated = old.map((p: any) => 
-          p.id === person.id ? { ...p, ...data } : p
+          p.id === person.id ? data : p  // Usar toda la respuesta del servidor
         );
         console.log(`🔄 Cache updated for person ${person.id}:`, updated.find(p => p.id === person.id));
         return updated;
       });
 
-      // NO invalidar inmediatamente para evitar conflictos
-      // Solo invalidar después de un pequeño delay
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-        console.log(`🔄 Cache invalidated for personnel after delay`);
-      }, 500);
+      // Invalidar cache después de actualizar para asegurar consistencia
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
 
-      toast({
-        title: "Valor actualizado",
-        description: `${variables.field}: ${variables.value}`,
-      });
+      // No mostrar toast para evitar distracciones
+      console.log(`✅ Successfully saved: ${variables.field} = ${variables.value}`);
     },
     onError: (error: any) => {
       console.error("❌ Mutation error:", error);
@@ -1180,15 +1174,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             // Guardar directamente sin depender del estado editingCells
                             console.log(`💾 [${person.name}] Saving directly: ${fieldName} = ${value}`);
                             try {
-                              await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
-                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}`);
+                              const result = await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
+                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}, result:`, result);
                               
-                              // Limpiar estado de edición después del éxito
+                              // Limpiar estado de edición después del éxito  
                               setEditingCells(prev => {
                                 const newState = { ...prev };
                                 delete newState[fieldName];
                                 return newState;
                               });
+                              
+                              // Forzar refrescado de la página después de un pequeño delay
+                              setTimeout(() => {
+                                window.location.reload();
+                              }, 1000);
+                              
                             } catch (error) {
                               console.error(`❌ [${person.name}] Error saving ${fieldName}:`, error);
                             }
