@@ -305,7 +305,7 @@ export const insertReportTemplateSchema = createInsertSchema(reportTemplates).pi
 // Quotations table
 export const quotations = pgTable("quotations", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").notNull(),
+  clientId: integer("client_id").notNull().references(() => clients.id),
   projectName: text("project_name").notNull(),
   analysisType: text("analysis_type").notNull(), // 'basic', 'standard', 'deep'
   projectType: text("project_type").notNull(), // 'demo', 'executive', 'comprehensive', 'always-on', 'monitoring'
@@ -419,10 +419,10 @@ export type InsertQuotationVariant = z.infer<typeof insertQuotationVariantSchema
 // Quotation team members junction table
 export const quotationTeamMembers = pgTable("quotation_team_members", {
   id: serial("id").primaryKey(),
-  quotationId: integer("quotation_id").notNull(),
+  quotationId: integer("quotation_id").notNull().references(() => quotations.id),
   variantId: integer("variant_id").references(() => quotationVariants.id), // Opcional: para asociar a una variante específica
-  personnelId: integer("personnel_id"), // Permitir null para asignaciones solo por rol
-  roleId: integer("role_id"), // ID del rol (puede ser diferente del rol del personnel)
+  personnelId: integer("personnel_id").references(() => personnel.id), // Permitir null para asignaciones solo por rol
+  roleId: integer("role_id").references(() => roles.id), // ID del rol (puede ser diferente del rol del personnel)
   hours: doublePrecision("hours").notNull(),
   rate: doublePrecision("rate").notNull(),
   cost: doublePrecision("cost").notNull(),

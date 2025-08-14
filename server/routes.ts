@@ -594,8 +594,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Usar el rol REAL del personal desde su perfil, no el rol de la cotización
-          let actualRole = entry.role?.name || 'Sin Rol';
-          let actualRate = quotationMember?.rate || entry.personnel?.hourlyRate || 0;
+          let actualRole = 'Sin Rol';
+          let actualRate = quotationMember?.rate || 0;
           
           if (!isQuoted) {
             // Buscar datos de personal no cotizado para este proyecto
@@ -604,11 +604,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (unquotedEntry) {
               // Para personal no cotizado, usar también el rol real de su perfil
-              actualRole = entry.role?.name || unquotedEntry.role?.name || 'Sin Rol';
-              actualRate = unquotedEntry.estimatedRate || entry.personnel?.hourlyRate || 0;
+              actualRole = 'Sin Rol';
+              actualRate = unquotedEntry.estimatedRate || 0;
               console.log(`📊 Found unquoted personnel data:`, {
                 personnelId: entry.personnelId,
-                name: entry.personnel?.name,
+                name: 'Personnel Name',
                 role: actualRole,
                 rate: actualRate
               });
@@ -617,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           teamBreakdown[personnelId] = {
             personnelId: entry.personnelId,
-            name: entry.personnel?.name || 'Unknown',
+            name: 'Personnel Name',
             roleName: actualRole,
             hourlyRate: actualRate,
             hours: 0,
@@ -1185,9 +1185,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const historicalCosts = await db
         .select()
-        .from(sql`personnel_historical_costs`)
-        .where(sql`is_active = true`)
-        .orderBy(sql`personnel_id, year, month`);
+        .from(personnelHistoricalCosts)
+        .where(eq(personnelHistoricalCosts.isActive, true))
+        .orderBy(personnelHistoricalCosts.personnelId, personnelHistoricalCosts.year, personnelHistoricalCosts.month);
       
       res.json(historicalCosts);
     } catch (error) {
@@ -1202,7 +1202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Insert or update historical cost
       const result = await db
-        .insert(sql`personnel_historical_costs`)
+        .insert(personnelHistoricalCosts)
         .values({
           personnelId,
           year,
@@ -1215,16 +1215,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes,
           createdBy: req.user?.id || 1
         })
-        .onConflict(sql`(personnel_id, year, month) WHERE is_active = true`)
-        .doUpdate({
-          hourlyRateARS: sql`EXCLUDED.hourly_rate_ars`,
-          monthlySalaryARS: sql`EXCLUDED.monthly_salary_ars`,
-          hourlyRateUSD: sql`EXCLUDED.hourly_rate_usd`,
-          monthlySalaryUSD: sql`EXCLUDED.monthly_salary_usd`,
-          adjustmentReason: sql`EXCLUDED.adjustment_reason`,
-          notes: sql`EXCLUDED.notes`,
-          updatedAt: sql`NOW()`,
-          updatedBy: req.user?.id || 1
+        .onDuplicateKeyUpdate({
+          set: {
+            hourlyRateARS: hourlyRateARS?.toString(),
+            monthlySalaryARS: monthlySalaryARS?.toString(),
+            hourlyRateUSD: hourlyRateUSD?.toString(),
+            monthlySalaryUSD: monthlySalaryUSD?.toString(),
+            adjustmentReason,
+            notes,
+            updatedAt: new Date(),
+            updatedBy: req.user?.id || 1
+          }
         })
         .returning();
       
@@ -1238,49 +1239,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Personnel routes
   app.get("/api/personnel", requireAuth, async (_, res) => {
     try {
-      const personnel = await db.select({
-        id: sql`personnel.id`,
-        name: sql`personnel.name`,
-        email: sql`personnel.email`,
-        roleId: sql`personnel.role_id`,
-        hourlyRate: sql`personnel.hourly_rate`,
-        roleName: sql`roles.name`,
-        contractType: sql`personnel.contract_type`,
-        monthlyFixedSalary: sql`personnel.monthly_fixed_salary`,
-        monthlyHours: sql`personnel.monthly_hours`,
-        includeInRealCosts: sql`personnel.include_in_real_costs`,
+      const personnelData = await db.select({
+        id: personnel.id,
+        name: personnel.name,
+        email: personnel.email,
+        roleId: personnel.roleId,
+        hourlyRate: personnel.hourlyRate,
+        roleName: roles.name,
+        contractType: personnel.contractType,
+        monthlyFixedSalary: personnel.monthlyFixedSalary,
+        monthlyHours: personnel.monthlyHours,
+        includeInRealCosts: personnel.includeInRealCosts,
         // Historical hourly rates (ARS) - CORREGIDO: nombres de columnas con guiones bajos
-        jan2025HourlyRateARS: sql`personnel.jan_2025_hourly_rate_ars`,
-        feb2025HourlyRateARS: sql`personnel.feb_2025_hourly_rate_ars`,
-        mar2025HourlyRateARS: sql`personnel.mar_2025_hourly_rate_ars`,
-        apr2025HourlyRateARS: sql`personnel.apr_2025_hourly_rate_ars`,
-        may2025HourlyRateARS: sql`personnel.may_2025_hourly_rate_ars`,
-        jun2025HourlyRateARS: sql`personnel.jun_2025_hourly_rate_ars`,
-        jul2025HourlyRateARS: sql`personnel.jul_2025_hourly_rate_ars`,
-        aug2025HourlyRateARS: sql`personnel.aug_2025_hourly_rate_ars`,
-        sep2025HourlyRateARS: sql`personnel.sep_2025_hourly_rate_ars`,
-        oct2025HourlyRateARS: sql`personnel.oct_2025_hourly_rate_ars`,
-        nov2025HourlyRateARS: sql`personnel.nov_2025_hourly_rate_ars`,
-        dec2025HourlyRateARS: sql`personnel.dec_2025_hourly_rate_ars`,
-        // Historical monthly salaries (ARS) - CORREGIDO: nombres de columnas con guiones bajos
-        jan2025MonthlySalaryARS: sql`personnel.jan_2025_monthly_salary_ars`,
-        feb2025MonthlySalaryARS: sql`personnel.feb_2025_monthly_salary_ars`,
-        mar2025MonthlySalaryARS: sql`personnel.mar_2025_monthly_salary_ars`,
-        apr2025MonthlySalaryARS: sql`personnel.apr_2025_monthly_salary_ars`,
-        may2025MonthlySalaryARS: sql`personnel.may_2025_monthly_salary_ars`,
-        jun2025MonthlySalaryARS: sql`personnel.jun_2025_monthly_salary_ars`,
-        jul2025MonthlySalaryARS: sql`personnel.jul_2025_monthly_salary_ars`,
-        aug2025MonthlySalaryARS: sql`personnel.aug_2025_monthly_salary_ars`,
-        sep2025MonthlySalaryARS: sql`personnel.sep_2025_monthly_salary_ars`,
-        oct2025MonthlySalaryARS: sql`personnel.oct_2025_monthly_salary_ars`,
-        nov2025MonthlySalaryARS: sql`personnel.nov_2025_monthly_salary_ars`,
-        dec2025MonthlySalaryARS: sql`personnel.dec_2025_monthly_salary_ars`
+        jan2025HourlyRateARS: personnel.jan2025HourlyRateARS,
+        feb2025HourlyRateARS: personnel.feb2025HourlyRateARS,
+        mar2025HourlyRateARS: personnel.mar2025HourlyRateARS,
+        apr2025HourlyRateARS: personnel.apr2025HourlyRateARS,
+        may2025HourlyRateARS: personnel.may2025HourlyRateARS,
+        jun2025HourlyRateARS: personnel.jun2025HourlyRateARS,
+        jul2025HourlyRateARS: personnel.jul2025HourlyRateARS,
+        aug2025HourlyRateARS: personnel.aug2025HourlyRateARS,
+        sep2025HourlyRateARS: personnel.sep2025HourlyRateARS,
+        oct2025HourlyRateARS: personnel.oct2025HourlyRateARS,
+        nov2025HourlyRateARS: personnel.nov2025HourlyRateARS,
+        dec2025HourlyRateARS: personnel.dec2025HourlyRateARS,
+        // Historical monthly salaries (ARS)
+        jan2025MonthlySalaryARS: personnel.jan2025MonthlySalaryARS,
+        feb2025MonthlySalaryARS: personnel.feb2025MonthlySalaryARS,
+        mar2025MonthlySalaryARS: personnel.mar2025MonthlySalaryARS,
+        apr2025MonthlySalaryARS: personnel.apr2025MonthlySalaryARS,
+        may2025MonthlySalaryARS: personnel.may2025MonthlySalaryARS,
+        jun2025MonthlySalaryARS: personnel.jun2025MonthlySalaryARS,
+        jul2025MonthlySalaryARS: personnel.jul2025MonthlySalaryARS,
+        aug2025MonthlySalaryARS: personnel.aug2025MonthlySalaryARS,
+        sep2025MonthlySalaryARS: personnel.sep2025MonthlySalaryARS,
+        oct2025MonthlySalaryARS: personnel.oct2025MonthlySalaryARS,
+        nov2025MonthlySalaryARS: personnel.nov2025MonthlySalaryARS,
+        dec2025MonthlySalaryARS: personnel.dec2025MonthlySalaryARS
       })
-      .from(sql`personnel`)
-      .leftJoin(sql`roles`, sql`personnel.role_id = roles.id`)
-      .orderBy(sql`personnel.name`);
+      .from(personnel)
+      .leftJoin(roles, eq(personnel.roleId, roles.id))
+      .orderBy(personnel.name);
 
-      res.json(personnel);
+      res.json(personnelData);
     } catch (error) {
       console.error("Error fetching personnel:", error);
       res.status(500).json({ error: "Error fetching personnel" });
