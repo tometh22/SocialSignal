@@ -454,6 +454,9 @@ export class DatabaseStorage implements IStorage {
         // 5. Eliminar equipos base del proyecto (importante para proyectos Always-On)
         await tx.delete(projectBaseTeam).where(eq(projectBaseTeam.projectId, id));
 
+        // 5.1. Eliminar personal no cotizado del proyecto
+        await tx.delete(unquotedPersonnel).where(eq(unquotedPersonnel.projectId, id));
+
         // 6. Eliminar entregables relacionados
         await tx.delete(deliverables).where(eq(deliverables.project_id, id));
 
