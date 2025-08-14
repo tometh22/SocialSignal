@@ -262,13 +262,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null | string }) => {
       console.log(`🚀 Mutation starting: ${data.field} = ${data.value}`);
-      
-      // Marcar que este campo se está guardando
-      setSavingFields(prev => ({ ...prev, [data.field]: true }));
-      
       const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
       console.log(`✅ Mutation completed: ${data.field} = ${data.value}, result:`, result);
       return { result, fieldName: data.field };
+    },
+    onMutate: (variables) => {
+      console.log(`⏳ Starting mutation for field: ${variables.field}`);
+      // Marcar que este campo se está guardando al inicio de la mutation
+      setSavingFields(prev => ({ ...prev, [variables.field]: true }));
     },
     onSuccess: (data, variables) => {
       console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}`);
