@@ -268,20 +268,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     onSuccess: (data, variables) => {
       console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}, server response:`, data);
       
-      // Actualizar cache inmediatamente con la respuesta del servidor completa
+      // Actualizar cache silenciosamente sin invalidar para evitar conflictos
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
-        const updated = old.map((p: any) => 
-          p.id === person.id ? data : p  // Usar toda la respuesta del servidor
+        return old.map((p: any) => 
+          p.id === person.id ? { ...p, [variables.field]: variables.value } : p
         );
-        console.log(`🔄 Cache updated for person ${person.id}:`, updated.find(p => p.id === person.id));
-        return updated;
       });
 
-      // Invalidar cache después de actualizar para asegurar consistencia
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-
-      // No mostrar toast para evitar distracciones
       console.log(`✅ Successfully saved: ${variables.field} = ${variables.value}`);
     },
     onError: (error: any) => {
@@ -509,6 +503,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   };
 
   const getCellValue = (field: string) => {
+    // Priorizar siempre el estado local de edición para mostrar cambios inmediatos
     if (editingCells[field] !== undefined) {
       return editingCells[field];
     }
@@ -1174,23 +1169,21 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             // Guardar directamente sin depender del estado editingCells
                             console.log(`💾 [${person.name}] Saving directly: ${fieldName} = ${value}`);
                             try {
-                              const result = await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
-                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}, result:`, result);
+                              await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
+                              console.log(`✅ [${person.name}] Saved successfully: ${fieldName} = ${value}`);
                               
-                              // Limpiar estado de edición después del éxito  
+                              // Mantener el valor en el estado local para que persista visualmente
+                              // Se limpiará automáticamente cuando el cache se actualice
+                              
+                            } catch (error) {
+                              console.error(`❌ [${person.name}] Error saving ${fieldName}:`, error);
+                              
+                              // En caso de error, revertir al valor original
                               setEditingCells(prev => {
                                 const newState = { ...prev };
                                 delete newState[fieldName];
                                 return newState;
                               });
-                              
-                              // Forzar refrescado de la página después de un pequeño delay
-                              setTimeout(() => {
-                                window.location.reload();
-                              }, 1000);
-                              
-                            } catch (error) {
-                              console.error(`❌ [${person.name}] Error saving ${fieldName}:`, error);
                             }
                           }}
                           disabled={updateHistoricalCostMutation.isPending || isAfterCurrent}
