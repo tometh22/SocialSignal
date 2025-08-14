@@ -115,7 +115,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
     form.setValue("personnelId", cost.personnelId);
     form.setValue("year", cost.year);
     form.setValue("month", cost.month);
-    form.setValue("hourlyRateARS", cost.hourlyRateARS);
+    form.setValue("hourlyRateARS", cost.hourlyRateARS || undefined);
     form.setValue("hourlyRateUSD", cost.hourlyRateUSD || 0);
     form.setValue("adjustmentReason", cost.adjustmentReason || "");
     form.setValue("notes", cost.notes || "");
@@ -397,7 +397,7 @@ export function PersonnelHistoricalCostsManager({ onClose }: PersonnelHistorical
                       <div className="flex items-center gap-2">
                         <DollarSign className="h-4 w-4 text-emerald-600" />
                         <span className="font-mono text-sm">
-                          ${cost.hourlyRateARS.toLocaleString()} ARS/h
+                          ${(cost.hourlyRateARS || 0).toLocaleString()} ARS/h
                         </span>
                       </div>
                       {cost.hourlyRateUSD && (
