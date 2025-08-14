@@ -1186,26 +1186,8 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         <Select
-                          value={(() => {
-                            const editingValue = editingCells[fieldName];
-                            const personValue = (person as any)[fieldName];
-                            const finalValue = editingValue !== undefined ? editingValue : (personValue || '');
-                            if (fieldName === 'feb2025ContractType' || fieldName === 'mar2025ContractType') {
-                              console.log(`🔍🔍🔍 [${person.name}] DEBUG ${fieldName}:`, {
-                                editingValue,
-                                personValue,
-                                finalValue,
-                                editingCells: editingCells,
-                                personKeys: Object.keys(person).filter(k => k.includes('ContractType')).slice(0, 5)
-                              });
-                              // FORCE TEST: Forzar "full-time" para feb y mar
-                              if ((fieldName === 'feb2025ContractType' || fieldName === 'mar2025ContractType') && personValue === 'full-time') {
-                                console.log(`🚀 FORCING ${fieldName} to "full-time"`);
-                                return 'full-time';
-                              }
-                            }
-                            return finalValue;
-                          })()}
+                          key={`${person.id}-${fieldName}-${(person as any)[fieldName]}`}
+                          value={(person as any)[fieldName] || ''}
                           onValueChange={async (value) => {
                             console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
                             
