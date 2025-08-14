@@ -260,27 +260,38 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   const updateHistoricalCostMutation = useMutation({
     mutationFn: async (data: { field: string; value: number | null | string }) => {
-      return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
+      console.log(`🚀 Mutation starting: ${data.field} = ${data.value}`);
+      const result = await apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
+      console.log(`✅ Mutation completed: ${data.field} = ${data.value}, result:`, result);
+      return result;
     },
     onSuccess: (data, variables) => {
-      // Actualizar cache inmediatamente
+      console.log(`🎉 Mutation onSuccess: ${variables.field} = ${variables.value}, server response:`, data);
+      
+      // Actualizar cache inmediatamente con la respuesta del servidor
       queryClient.setQueryData(["/api/personnel"], (old: any) => {
         if (!Array.isArray(old)) return old;
-        return old.map((p: any) => 
+        const updated = old.map((p: any) => 
           p.id === person.id ? { ...p, ...data } : p
         );
+        console.log(`🔄 Cache updated for person ${person.id}:`, updated.find(p => p.id === person.id));
+        return updated;
       });
 
-      // Invalidar cache para forzar recarga
-      queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+      // NO invalidar inmediatamente para evitar conflictos
+      // Solo invalidar después de un pequeño delay
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+        console.log(`🔄 Cache invalidated for personnel after delay`);
+      }, 500);
 
       toast({
-        title: "Costo histórico actualizado",
-        description: "El valor ha sido guardado correctamente.",
+        title: "Valor actualizado",
+        description: `${variables.field}: ${variables.value}`,
       });
     },
     onError: (error: any) => {
-      console.error("Error al actualizar:", error);
+      console.error("❌ Mutation error:", error);
       toast({
         title: "Error",
         description: error.message || "Hubo un error al actualizar el valor.",
@@ -1155,7 +1166,11 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         <Select
-                          value={getCellValue(fieldName) || ''}
+                          value={(() => {
+                            const value = getCellValue(fieldName) || '';
+                            console.log(`🔍 Getting value for ${fieldName}: editingCells="${editingCells[fieldName]}", person="${(person as any)[fieldName]}", final="${value}"`);
+                            return value;
+                          })()}
                           onValueChange={(value) => {
                             console.log(`🔧 Contract type changed for ${fieldName}: ${value}`);
                             handleHistoricalCostChange(fieldName, value);
