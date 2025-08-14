@@ -300,7 +300,48 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     // Si es un campo de tipo de contrato, manejarlo como string
     if (field.includes('ContractType')) {
       if (value && ['full-time', 'part-time', 'freelance'].includes(value)) {
+        // Guardar el campo mensual
         updateHistoricalCostMutation.mutate({ field, value: value });
+        
+        // Actualizar el campo principal si este es el mes más reciente con datos
+        const currentPersonData = { ...person, ...Object.fromEntries(
+          Object.entries(editingCells).map(([k, v]) => [k, v])
+        )};
+        
+        // Determinar el mes más reciente con tipo de contrato
+        const months = [
+          'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+          'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+        ];
+        
+        let latestContractType = null;
+        for (const month of months) {
+          const contractField = `${month}ContractType`;
+          let contractValue = null;
+          
+          // Si estamos editando este campo, usar el nuevo valor
+          if (contractField === field) {
+            contractValue = value;
+          } else {
+            // Usar el valor existente
+            contractValue = (currentPersonData as any)[contractField];
+          }
+          
+          if (contractValue) {
+            latestContractType = contractValue;
+            break;
+          }
+        }
+        
+        // Si encontramos un tipo de contrato más reciente, actualizar el campo principal
+        if (latestContractType && latestContractType !== person.contractType) {
+          updateHistoricalCostMutation.mutate({ field: 'contractType', value: latestContractType });
+          
+          toast({
+            title: "Campo principal actualizado",
+            description: `Tipo de contrato principal actualizado a: ${latestContractType}`,
+          });
+        }
         
         // Remover del estado de edición después de guardar
         setEditingCells(prev => {
@@ -332,6 +373,60 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
         });
       } else {
         updateHistoricalCostMutation.mutate({ field, value: numericValue });
+      }
+
+      // Actualizar campos principales si este es el último mes con datos
+      const isRateField = field.includes('HourlyRateARS');
+      const isSalaryField = field.includes('MonthlySalaryARS');
+      
+      if (isRateField || isSalaryField) {
+        // Determinar el mes más reciente con datos de tarifa/salario
+        const months = [
+          'dec2025', 'nov2025', 'oct2025', 'sep2025', 'aug2025', 'jul2025',
+          'jun2025', 'may2025', 'apr2025', 'mar2025', 'feb2025', 'jan2025'
+        ];
+        
+        let latestRateValue = null;
+        let latestSalaryValue = null;
+        
+        for (const month of months) {
+          const rateField = `${month}HourlyRateARS`;
+          const salaryField = `${month}MonthlySalaryARS`;
+          
+          // Obtener valor actual o editado
+          let currentRateValue = field === rateField ? numericValue : (person as any)[rateField];
+          let currentSalaryValue = field === salaryField ? numericValue : (person as any)[salaryField];
+          
+          if (currentRateValue && !latestRateValue) {
+            latestRateValue = currentRateValue;
+          }
+          if (currentSalaryValue && !latestSalaryValue) {
+            latestSalaryValue = currentSalaryValue;
+          }
+          
+          // Si encontramos ambos valores, parar la búsqueda
+          if (latestRateValue && latestSalaryValue) break;
+        }
+        
+        // Actualizar campo principal de tarifa ARS si es diferente
+        if (latestRateValue && latestRateValue !== person.hourlyRateARS) {
+          updateHistoricalCostMutation.mutate({ field: 'hourlyRateARS', value: latestRateValue });
+          
+          toast({
+            title: "Tarifa principal actualizada",
+            description: `Tarifa por hora ARS principal actualizada: $${latestRateValue.toLocaleString()}`,
+          });
+        }
+        
+        // Actualizar campo principal de salario si es diferente
+        if (latestSalaryValue && latestSalaryValue !== person.monthlyFixedSalary) {
+          updateHistoricalCostMutation.mutate({ field: 'monthlyFixedSalary', value: latestSalaryValue });
+          
+          toast({
+            title: "Salario principal actualizado",
+            description: `Salario mensual principal actualizado: $${latestSalaryValue.toLocaleString()}`,
+          });
+        }
       }
 
       // Remover del estado de edición después de guardar
