@@ -178,50 +178,62 @@ export const personnel = pgTable("personnel", {
   
   // ==================== COSTOS HISTÓRICOS 2025 ====================
   // Enero 2025
+  jan2025ContractType: text("jan_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   jan2025HourlyRateARS: doublePrecision("jan_2025_hourly_rate_ars"),
   jan2025MonthlySalaryARS: doublePrecision("jan_2025_monthly_salary_ars"),
   
   // Febrero 2025
+  feb2025ContractType: text("feb_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   feb2025HourlyRateARS: doublePrecision("feb_2025_hourly_rate_ars"),
   feb2025MonthlySalaryARS: doublePrecision("feb_2025_monthly_salary_ars"),
   
   // Marzo 2025
+  mar2025ContractType: text("mar_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   mar2025HourlyRateARS: doublePrecision("mar_2025_hourly_rate_ars"),
   mar2025MonthlySalaryARS: doublePrecision("mar_2025_monthly_salary_ars"),
   
   // Abril 2025
+  apr2025ContractType: text("apr_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   apr2025HourlyRateARS: doublePrecision("apr_2025_hourly_rate_ars"),
   apr2025MonthlySalaryARS: doublePrecision("apr_2025_monthly_salary_ars"),
   
   // Mayo 2025
+  may2025ContractType: text("may_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   may2025HourlyRateARS: doublePrecision("may_2025_hourly_rate_ars"),
   may2025MonthlySalaryARS: doublePrecision("may_2025_monthly_salary_ars"),
   
   // Junio 2025
+  jun2025ContractType: text("jun_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   jun2025HourlyRateARS: doublePrecision("jun_2025_hourly_rate_ars"),
   jun2025MonthlySalaryARS: doublePrecision("jun_2025_monthly_salary_ars"),
   
   // Julio 2025
+  jul2025ContractType: text("jul_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   jul2025HourlyRateARS: doublePrecision("jul_2025_hourly_rate_ars"),
   jul2025MonthlySalaryARS: doublePrecision("jul_2025_monthly_salary_ars"),
   
   // Agosto 2025
+  aug2025ContractType: text("aug_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   aug2025HourlyRateARS: doublePrecision("aug_2025_hourly_rate_ars"),
   aug2025MonthlySalaryARS: doublePrecision("aug_2025_monthly_salary_ars"),
   
   // Septiembre 2025
+  sep2025ContractType: text("sep_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   sep2025HourlyRateARS: doublePrecision("sep_2025_hourly_rate_ars"),
   sep2025MonthlySalaryARS: doublePrecision("sep_2025_monthly_salary_ars"),
   
   // Octubre 2025
+  oct2025ContractType: text("oct_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   oct2025HourlyRateARS: doublePrecision("oct_2025_hourly_rate_ars"),
   oct2025MonthlySalaryARS: doublePrecision("oct_2025_monthly_salary_ars"),
   
   // Noviembre 2025
+  nov2025ContractType: text("nov_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   nov2025HourlyRateARS: doublePrecision("nov_2025_hourly_rate_ars"),
   nov2025MonthlySalaryARS: doublePrecision("nov_2025_monthly_salary_ars"),
   
   // Diciembre 2025
+  dec2025ContractType: text("dec_2025_contract_type"), // 'full-time', 'part-time', 'freelance'
   dec2025HourlyRateARS: doublePrecision("dec_2025_hourly_rate_ars"),
   dec2025MonthlySalaryARS: doublePrecision("dec_2025_monthly_salary_ars"),
 });
@@ -236,7 +248,20 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   monthlyFixedSalary: true,
   monthlyHours: true,
   includeInRealCosts: true,
-  // Costos históricos 2025
+  // Costos históricos 2025 - Contract Types
+  jan2025ContractType: true,
+  feb2025ContractType: true,
+  mar2025ContractType: true,
+  apr2025ContractType: true,
+  may2025ContractType: true,
+  jun2025ContractType: true,
+  jul2025ContractType: true,
+  aug2025ContractType: true,
+  sep2025ContractType: true,
+  oct2025ContractType: true,
+  nov2025ContractType: true,
+  dec2025ContractType: true,
+  // Costos históricos 2025 - Rates and Salaries
   jan2025HourlyRateARS: true,
   jan2025MonthlySalaryARS: true,
   feb2025HourlyRateARS: true,

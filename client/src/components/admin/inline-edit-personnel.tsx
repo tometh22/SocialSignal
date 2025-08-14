@@ -259,7 +259,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   };
 
   const updateHistoricalCostMutation = useMutation({
-    mutationFn: async (data: { field: string; value: number | null }) => {
+    mutationFn: async (data: { field: string; value: number | null | string }) => {
       return apiRequest(`/api/personnel/${person.id}`, "PATCH", { [data.field]: data.value });
     },
     onSuccess: (data, variables) => {
@@ -296,6 +296,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
 
   const handleHistoricalCostSave = (field: string) => {
     const value = editingCells[field] || '';
+    
+    // Si es un campo de tipo de contrato, manejarlo como string
+    if (field.includes('ContractType')) {
+      if (value && ['full-time', 'part-time', 'freelance'].includes(value)) {
+        updateHistoricalCostMutation.mutate({ field, value: value });
+        
+        // Remover del estado de edición después de guardar
+        setEditingCells(prev => {
+          const newState = { ...prev };
+          delete newState[field];
+          return newState;
+        });
+      }
+      return;
+    }
+    
+    // Para campos numéricos (tarifas y salarios)
     const numericValue = value === '' ? null : parseFloat(value);
 
     if (value === '' || (!isNaN(numericValue!) && numericValue! >= 0)) {
@@ -933,6 +950,60 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             </div>
 
             <div className="space-y-6">
+              {/* Tipo de Contrato por Mes */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                  <h5 className="font-semibold text-gray-800">Tipo de Contrato por Mes</h5>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Controla qué campos están disponibles por mes</span>
+                </div>
+                <div className="grid grid-cols-6 gap-3">
+                  {months.map((month) => {
+                    const fieldName = `${month.key}ContractType`;
+                    return (
+                      <div key={fieldName} className="space-y-2">
+                        <label className="text-xs font-medium text-gray-600 block text-center">
+                          {month.label} 2025
+                        </label>
+                        <Select
+                          value={getCellValue(fieldName) || ''}
+                          onValueChange={(value) => {
+                            handleHistoricalCostChange(fieldName, value);
+                            // Guardar automáticamente el cambio
+                            setTimeout(() => handleHistoricalCostSave(fieldName), 100);
+                          }}
+                          disabled={updateHistoricalCostMutation.isPending}
+                        >
+                          <SelectTrigger className="h-9 text-xs border-gray-200 focus:border-purple-400 focus:ring-purple-400/20">
+                            <SelectValue placeholder="Tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="full-time">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-xs">Full-time</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="part-time">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                <span className="text-xs">Part-time</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="freelance">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <span className="text-xs">Freelance</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Tarifa por Hora ARS */}
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="flex items-center gap-3 mb-4">
@@ -970,23 +1041,31 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                 </div>
               </div>
 
-              {/* Sueldo Mensual ARS - solo para empleados full-time */}
-              {person.contractType === 'full-time' && (
-                <div className="bg-white rounded-lg border border-gray-200 p-4">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Para análisis económico - Solo Full-time</span>
-                    <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Se usa {Math.round(person.monthlyHours || 160)}h para calcular tarifa/hora</span>
-                  </div>
-                  <div className="grid grid-cols-6 gap-3">
-                    {months.map((month) => {
-                      const fieldName = `${month.key}MonthlySalaryARS`;
-                      return (
-                        <div key={fieldName} className="space-y-2">
-                          <label className="text-xs font-medium text-gray-600 block text-center">
-                            {month.label} 2025
-                          </label>
+              {/* Sueldo Mensual ARS - condicional por mes */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <h5 className="font-semibold text-gray-800">Sueldo Mensual (ARS)</h5>
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Solo para meses con contrato full-time o part-time</span>
+                  <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded">Se usa {Math.round(person.monthlyHours || 160)}h para calcular tarifa/hora</span>
+                </div>
+                <div className="grid grid-cols-6 gap-3">
+                  {months.map((month) => {
+                    const fieldName = `${month.key}MonthlySalaryARS`;
+                    const contractTypeFieldName = `${month.key}ContractType`;
+                    const contractTypeForMonth = getCellValue(contractTypeFieldName);
+                    const isFreelanceMonth = contractTypeForMonth === 'freelance';
+                    
+                    return (
+                      <div key={fieldName} className="space-y-2">
+                        <label className="text-xs font-medium text-gray-600 block text-center">
+                          {month.label} 2025
+                        </label>
+                        {isFreelanceMonth ? (
+                          <div className="h-9 flex items-center justify-center text-xs text-gray-400 bg-gray-50 rounded border border-gray-200">
+                            N/A (Freelance)
+                          </div>
+                        ) : (
                           <Input
                             type="number"
                             min="0"
@@ -1003,12 +1082,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                             placeholder="0"
                             disabled={updateHistoricalCostMutation.isPending}
                           />
-                        </div>
-                      );
-                    })}
-                  </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="mt-6 bg-gray-50 rounded-lg p-4">
