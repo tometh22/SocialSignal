@@ -1275,7 +1275,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sep2025MonthlySalaryARS: personnel.sep2025MonthlySalaryARS,
         oct2025MonthlySalaryARS: personnel.oct2025MonthlySalaryARS,
         nov2025MonthlySalaryARS: personnel.nov2025MonthlySalaryARS,
-        dec2025MonthlySalaryARS: personnel.dec2025MonthlySalaryARS
+        dec2025MonthlySalaryARS: personnel.dec2025MonthlySalaryARS,
+        // Historical contract types by month
+        jan2025ContractType: personnel.jan2025ContractType,
+        feb2025ContractType: personnel.feb2025ContractType,
+        mar2025ContractType: personnel.mar2025ContractType,
+        apr2025ContractType: personnel.apr2025ContractType,
+        may2025ContractType: personnel.may2025ContractType,
+        jun2025ContractType: personnel.jun2025ContractType,
+        jul2025ContractType: personnel.jul2025ContractType,
+        aug2025ContractType: personnel.aug2025ContractType,
+        sep2025ContractType: personnel.sep2025ContractType,
+        oct2025ContractType: personnel.oct2025ContractType,
+        nov2025ContractType: personnel.nov2025ContractType,
+        dec2025ContractType: personnel.dec2025ContractType
       })
       .from(personnel)
       .leftJoin(roles, eq(personnel.roleId, roles.id))
