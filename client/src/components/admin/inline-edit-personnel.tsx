@@ -20,6 +20,19 @@ interface InlineEditPersonnelProps {
     monthlyFixedSalary?: number;
     includeInRealCosts?: boolean;
     monthlyHours?: number;
+    // Historical contract types
+    jan2025ContractType?: string;
+    feb2025ContractType?: string;
+    mar2025ContractType?: string;
+    apr2025ContractType?: string;
+    may2025ContractType?: string;
+    jun2025ContractType?: string;
+    jul2025ContractType?: string;
+    aug2025ContractType?: string;
+    sep2025ContractType?: string;
+    oct2025ContractType?: string;
+    nov2025ContractType?: string;
+    dec2025ContractType?: string;
     // Historical costs fields
     jan2025HourlyRateARS?: number;
     feb2025HourlyRateARS?: number;
@@ -1181,26 +1194,10 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
                           {isAfterCurrent && <span className="block text-[10px] text-gray-400">• FUTURO</span>}
                         </label>
                         <Select
-                          key={`${person.id}-${fieldName}-${(person as any)[fieldName]}`}
-                          value={editingCells[fieldName] !== undefined ? editingCells[fieldName] : ((person as any)[fieldName] || '')}
-                          onValueChange={async (value) => {
+                          value={(person as any)[fieldName] || ''}
+                          onValueChange={(value) => {
                             console.log(`🔧 [${person.name}] Contract type changed for ${fieldName}: ${value}`);
-                            
-                            // Actualizar estado local inmediatamente para mostrar el cambio
-                            handleHistoricalCostChange(fieldName, value);
-                            
-                            // Guardar en el servidor
-                            try {
-                              await updateHistoricalCostMutation.mutateAsync({ field: fieldName, value: value });
-                            } catch (error) {
-                              console.error(`❌ Error saving ${fieldName}:`, error);
-                              // Revertir el estado local si hay error
-                              setEditingCells(prev => {
-                                const newState = { ...prev };
-                                delete newState[fieldName];
-                                return newState;
-                              });
-                            }
+                            updateHistoricalCostMutation.mutate({ field: fieldName, value: value });
                           }}
                           disabled={savingFields[fieldName] || isAfterCurrent}
                         >
