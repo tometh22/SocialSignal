@@ -156,7 +156,7 @@ const initialQuotationData: QuotationData = {
     priceMode: 'auto' as const,
     manualPrice: undefined
   },
-  quotationCurrency: "ARS", // Moneda por defecto
+  quotationCurrency: "ARS", // Siempre en pesos argentinos
   inflation: {
     applyInflationAdjustment: false,
     inflationMethod: "manual",
@@ -275,8 +275,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
-  // Helper function to get personnel hourly rate with currency conversion
-  const getPersonnelRate = useCallback((personnelId: number, targetCurrency: string = 'ARS') => {
+  // Helper function to get personnel hourly rate in ARS
+  const getPersonnelRate = useCallback((personnelId: number) => {
     if (!personnel || personnel.length === 0) return 0;
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
@@ -284,7 +284,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log('🔍 DEBUGGING RATE CALCULATION - Full person data:', {
       id: personnelId,
       name: person.name,
-      targetCurrency,
       aug_2025_hourly_rate_ars: (person as any).aug_2025_hourly_rate_ars,
       jul_2025_hourly_rate_ars: (person as any).jul_2025_hourly_rate_ars,
       jun_2025_hourly_rate_ars: (person as any).jun_2025_hourly_rate_ars,
@@ -293,13 +292,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       allPersonData: person
     });
 
-    // Validation check - detect obviously wrong data
-    if (person.hourlyRate && person.hourlyRate > 1000) {
-      console.warn('💰 WARNING: Suspicious hourly rate detected:', person.hourlyRate, 'for', person.name);
-      console.warn('💰 This rate is likely in the wrong currency or corrupted data');
-    }
-
-    // Determine the base rate in ARS
+    // Determine the rate in ARS
     let rateInARS = 0;
 
     // Función para obtener la tarifa horaria más reciente desde los datos históricos mensuales
@@ -315,7 +308,6 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       for (const field of hourlyRateFields) {
         const value = (person as any)[field];
         if (value && value > 0) {
-          // Los valores históricos YA están en pesos, NO dividir
           return value;
         }
       }
@@ -338,19 +330,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       rateInARS = 150; // 150 ARS por hora (tarifa razonable para analista)
       console.log('💰 Usando tarifa de respaldo:', rateInARS);
     }
-
-    // Convert to target currency if needed
-    if (targetCurrency === 'USD' && rateInARS > 0) {
-      // Use simple conversion (divide by exchange rate)
-      const exchangeRate = 1000; // Approximate USD to ARS rate
-      const convertedRate = rateInARS / exchangeRate;
-      console.log('💰 Converting ARS to USD:', { arsRate: rateInARS, exchangeRate, usdRate: convertedRate });
-      return convertedRate;
-    }
     
-    console.log('💰 Final rate:', { targetCurrency, finalRate: rateInARS });
+    console.log('💰 Final rate in ARS:', rateInARS);
     return rateInARS;
-  }, [personnel, convertToUSD]);
+  }, [personnel]);
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
@@ -700,9 +683,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }));
   }, []);
 
-  const updateQuotationCurrency = useCallback((currency: string) => {
-    console.log('💱 Updating quotation currency:', currency);
-    setQuotationData(prev => ({ ...prev, quotationCurrency: currency }));
+  const updateQuotationCurrency = useCallback((currency: string = 'ARS') => {
+    console.log('💱 Quotation currency fixed at ARS');
+    setQuotationData(prev => ({ ...prev, quotationCurrency: 'ARS' }));
     forceRecalculate();
   }, [forceRecalculate]);
 
@@ -774,7 +757,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     
     if (!defaultRate && member.personnelId) {
       console.log('🔍 Calling getPersonnelRate for personnelId:', member.personnelId);
-      defaultRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
+      defaultRate = getPersonnelRate(member.personnelId);
       console.log('🔍 getPersonnelRate returned:', defaultRate);
     }
     if (!defaultRate) {

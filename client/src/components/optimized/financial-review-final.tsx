@@ -90,22 +90,12 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.financials?.marginFactor, quotationData.financials?.discountPercentage]);
 
-  // Use the enhanced currency hook
-  const { 
-    exchangeRate, 
-    exchangeRateLoading, 
-    convertFromUSD, 
-    formatCurrency 
-  } = useCurrency();
-
-  // Helper function to convert values based on selected currency
-  const convertToDisplayCurrency = (usdAmount: number) => {
-    return convertFromUSD(usdAmount, quotationData.quotationCurrency);
-  };
-
-  // Helper function to format currency with current quotation currency
+  // Helper function to format currency in ARS
   const formatFinalCurrency = (amount: number) => 
-    formatCurrency(amount, quotationData.quotationCurrency);
+    `ARS ${amount.toLocaleString('es-AR', { 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 0 
+    })}`;
 
   // Helper function to get role name
   const getRoleName = (roleId: number) => {
@@ -122,13 +112,13 @@ export default function FinancialReviewFinal() {
   const calculateTeamBaseCost = () => {
     let cost = 0;
     quotationData.teamMembers.forEach(member => {
-      // Calculate cost directly from hours and rate in the quotation currency
+      // Calculate cost directly from hours and rate in ARS
       const memberHours = Number(member.hours) || 0;
       let memberRate = Number(member.rate) || 0;
       
-      // If we have personnelId, get the correct rate for the quotation currency
+      // If we have personnelId, get the rate in ARS
       if (member.personnelId) {
-        memberRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
+        memberRate = getPersonnelRate(member.personnelId);
       }
       
       const memberCost = memberHours * memberRate;
@@ -154,21 +144,19 @@ export default function FinancialReviewFinal() {
     return (totalFactor * 100).toFixed(1);
   };
 
-  // Calculate base values in quotation currency
-  // Use the correct calculated cost based on current team members
-  const teamBaseCostInQuotationCurrency = calculateTeamBaseCost();
+  // Calculate base values in ARS
+  const teamBaseCostARS = calculateTeamBaseCost();
   console.log('🔍 Financial Review - baseCost from context:', baseCost);
-  console.log('🔍 Financial Review - teamBaseCost calculated:', teamBaseCostInQuotationCurrency);
-  console.log('🔍 Financial Review - quotation currency:', quotationData.quotationCurrency);
+  console.log('🔍 Financial Review - teamBaseCost calculated:', teamBaseCostARS);
   console.log('🔍 Financial Review - teamMembers:', quotationData.teamMembers);
   
-  const teamComplexityAdjustmentInQuotationCurrency = calculateComplexityAdjustment(teamBaseCostInQuotationCurrency);
-  const subtotalWithComplexityInQuotationCurrency = teamBaseCostInQuotationCurrency + teamComplexityAdjustmentInQuotationCurrency;
+  const teamComplexityAdjustmentARS = calculateComplexityAdjustment(teamBaseCostARS);
+  const subtotalWithComplexityARS = teamBaseCostARS + teamComplexityAdjustmentARS;
 
-  // Calculate inflation if applicable - SIMPLIFIED LOGIC
-  const baseForInflation = subtotalWithComplexityInQuotationCurrency;
-  let inflationAdjustmentInQuotationCurrency = 0;
-  let inflationProjectedCostInQuotationCurrency = baseForInflation;
+  // Calculate inflation if applicable - in ARS
+  const baseForInflation = subtotalWithComplexityARS;
+  let inflationAdjustmentARS = 0;
+  let inflationProjectedCostARS = baseForInflation;
   let monthlyInflationRate = 0;
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
@@ -196,71 +184,71 @@ export default function FinancialReviewFinal() {
       const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
       totalInflationPercentage = (inflationFactor - 1) * 100;
 
-      // SIMPLIFIED: Apply inflation directly to base cost
-      inflationProjectedCostInQuotationCurrency = baseForInflation * inflationFactor;
-      inflationAdjustmentInQuotationCurrency = inflationProjectedCostInQuotationCurrency - baseForInflation;
+      // Apply inflation directly to base cost in ARS
+      inflationProjectedCostARS = baseForInflation * inflationFactor;
+      inflationAdjustmentARS = inflationProjectedCostARS - baseForInflation;
 
-      console.log('🏦 Inflation calculation (simplified):');
-      console.log('💰 Base:', baseForInflation, quotationData.quotationCurrency);
+      console.log('🏦 Inflation calculation in ARS:');
+      console.log('💰 Base:', baseForInflation, 'ARS');
       console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
-      console.log('💰 Projected:', inflationProjectedCostInQuotationCurrency.toFixed(2), quotationData.quotationCurrency);
-      console.log('💰 Adjustment:', inflationAdjustmentInQuotationCurrency.toFixed(2), quotationData.quotationCurrency);
+      console.log('💰 Projected:', inflationProjectedCostARS.toFixed(2), 'ARS');
+      console.log('💰 Adjustment:', inflationAdjustmentARS.toFixed(2), 'ARS');
     }
   }
 
   // Calculate final base after inflation (if any)
-  let finalBaseAfterInflationInQuotationCurrency = inflationProjectedCostInQuotationCurrency;
+  let finalBaseAfterInflationARS = inflationProjectedCostARS;
 
   // If inflation wasn't applied, use the original subtotal
   if (!quotationData.inflation.applyInflationAdjustment) {
-    finalBaseAfterInflationInQuotationCurrency = subtotalWithComplexityInQuotationCurrency;
+    finalBaseAfterInflationARS = subtotalWithComplexityARS;
   }
 
-  // Platform cost - keep in USD (tools will be added AFTER markup)
-  const platformCostUSD = quotationData.financials.platformCost || 0;
-  const toolsCostUSD = quotationData.financials.toolsCost || 0;
-  const subtotalWithPlatformUSD = finalBaseAfterInflationUSD + platformCostUSD;
+  // Platform cost in ARS (tools will be added AFTER markup)
+  const platformCostARS = quotationData.financials.platformCost || 0;
+  const toolsCostARS = quotationData.financials.toolsCost || 0;
+  const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
 
   // Check if we're in manual pricing mode
-  let finalTotalUSD, marginAmountUSD, discountAmountUSD, subtotalWithMarginUSD, subtotalWithPlatformAndToolsUSD;
+  let finalTotalARS, marginAmountARS, discountAmountARS, subtotalWithMarginARS, subtotalWithPlatformAndToolsARS;
   
   if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
     // Manual pricing mode - work backwards from final price
     // The manual price is the final price AFTER discount and tools
-    finalTotalUSD = quotationData.financials.manualPrice;
+    finalTotalARS = quotationData.financials.manualPrice;
     // Subtract tools to get the price before tools
-    const priceBeforeToolsUSD = finalTotalUSD - toolsCostUSD;
+    const priceBeforeToolsARS = finalTotalARS - toolsCostARS;
     // Calculate subtotal before discount: final / (1 - discount_rate)
-    subtotalWithMarginUSD = priceBeforeToolsUSD / (1 - (discountPercentage / 100));
-    discountAmountUSD = subtotalWithMarginUSD - priceBeforeToolsUSD;
-    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+    subtotalWithMarginARS = priceBeforeToolsARS / (1 - (discountPercentage / 100));
+    discountAmountARS = subtotalWithMarginARS - priceBeforeToolsARS;
+    marginAmountARS = subtotalWithMarginARS - subtotalWithPlatformARS;
     // Add tools back at the end
-    subtotalWithPlatformAndToolsUSD = subtotalWithMarginUSD + toolsCostUSD;
+    subtotalWithPlatformAndToolsARS = subtotalWithMarginARS + toolsCostARS;
   } else {
     // Automatic pricing mode - work forwards from costs
     // Apply markup BEFORE adding tools
-    subtotalWithMarginUSD = subtotalWithPlatformUSD * markupMultiplier;
-    marginAmountUSD = subtotalWithMarginUSD - subtotalWithPlatformUSD;
+    subtotalWithMarginARS = subtotalWithPlatformARS * markupMultiplier;
+    marginAmountARS = subtotalWithMarginARS - subtotalWithPlatformARS;
     // Add tools AFTER markup
-    subtotalWithPlatformAndToolsUSD = subtotalWithMarginUSD + toolsCostUSD;
-    discountAmountUSD = subtotalWithPlatformAndToolsUSD * (discountPercentage / 100);
-    finalTotalUSD = subtotalWithPlatformAndToolsUSD - discountAmountUSD;
+    subtotalWithPlatformAndToolsARS = subtotalWithMarginARS + toolsCostARS;
+    discountAmountARS = subtotalWithPlatformAndToolsARS * (discountPercentage / 100);
+    finalTotalARS = subtotalWithPlatformAndToolsARS - discountAmountARS;
   }
 
-  // Convert final amounts to display currency (for UI display only)
-  const teamBaseCostDisplay = convertToDisplayCurrency(teamBaseCostUSD);
-  const teamComplexityAdjustmentDisplay = convertToDisplayCurrency(teamComplexityAdjustmentUSD);
+  // All values are already in ARS - no conversion needed
+  const teamBaseCostDisplay = teamBaseCostARS;
+  const teamComplexityAdjustmentDisplay = teamComplexityAdjustmentARS;
   const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
-  const platformCostDisplay = convertToDisplayCurrency(platformCostUSD);
-  const toolsCostDisplay = convertToDisplayCurrency(toolsCostUSD);
-  const finalBaseAfterInflationDisplay = convertToDisplayCurrency(finalBaseAfterInflationUSD);
-  const subtotalWithPlatformDisplay = convertToDisplayCurrency(subtotalWithPlatformUSD);
-  const subtotalWithPlatformAndToolsDisplay = convertToDisplayCurrency(subtotalWithPlatformAndToolsUSD);
-  const subtotalWithMarginDisplay = convertToDisplayCurrency(subtotalWithMarginUSD);
-  const marginAmountDisplay = convertToDisplayCurrency(marginAmountUSD);
-  const discountAmountDisplay = convertToDisplayCurrency(discountAmountUSD);
-  const finalTotalDisplay = convertToDisplayCurrency(finalTotalUSD);
-  const inflationAdjustmentDisplay = convertToDisplayCurrency(inflationAdjustmentUSD);
+  const platformCostDisplay = platformCostARS;
+  const toolsCostDisplay = toolsCostARS;
+  const finalBaseAfterInflationDisplay = finalBaseAfterInflationARS;
+  const subtotalWithPlatformDisplay = subtotalWithPlatformARS;
+  const subtotalWithPlatformAndToolsDisplay = subtotalWithPlatformAndToolsARS;
+  const subtotalWithMarginDisplay = subtotalWithMarginARS;
+  const marginAmountDisplay = marginAmountARS;
+  const discountAmountDisplay = discountAmountARS;
+  const finalTotalDisplay = finalTotalARS;
+  const inflationAdjustmentDisplay = inflationAdjustmentARS;
 
   // Update discount percentage when it changes
   React.useEffect(() => {
@@ -614,7 +602,7 @@ export default function FinancialReviewFinal() {
                     ? 'text-orange-600' 
                     : 'text-gray-600'
                 }`}>
-                  {inflationAdjustmentUSD > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'N/A'}
+                  {inflationAdjustmentARS > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'N/A'}
                 </p>
               </div>
             </div>
@@ -633,7 +621,7 @@ export default function FinancialReviewFinal() {
                     <p className="text-xs font-medium text-green-800">Markup</p>
                     <p className="text-lg font-bold text-green-900">
                       {quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice 
-                        ? `${((subtotalWithMarginUSD / subtotalWithPlatformUSD) || 1).toFixed(1)}x`
+                        ? `${((subtotalWithMarginARS / subtotalWithPlatformARS) || 1).toFixed(1)}x`
                         : `${markupMultiplier.toFixed(1)}x`}
                     </p>
                     <p className="text-xs text-green-600">+{formatFinalCurrency(marginAmountDisplay)}</p>
@@ -694,7 +682,7 @@ export default function FinancialReviewFinal() {
                           </p>
                           <p className="text-xs text-gray-500">
                             {member.hours}h × ${(member.personnelId 
-                              ? getPersonnelRate(member.personnelId, quotationData.quotationCurrency)
+                              ? getPersonnelRate(member.personnelId)
                               : member.rate
                             ).toFixed(1)}/h
                           </p>
@@ -703,8 +691,8 @@ export default function FinancialReviewFinal() {
                       <span className="text-sm font-bold text-gray-900">
                         {formatFinalCurrency(
                           member.hours * (member.personnelId 
-                            ? getPersonnelRate(member.personnelId, quotationData.quotationCurrency)
-                            : convertToDisplayCurrency(member.rate)
+                            ? getPersonnelRate(member.personnelId)
+                            : member.rate
                           )
                         )}
                       </span>
@@ -716,7 +704,7 @@ export default function FinancialReviewFinal() {
               <div className="p-4 bg-blue-50 border-t border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold text-blue-900">Subtotal Base</span>
-                  <span className="text-lg font-bold text-blue-900">{formatCurrency(teamBaseCostDisplay, quotationData.quotationCurrency)}</span>
+                  <span className="text-lg font-bold text-blue-900">{formatFinalCurrency(teamBaseCostDisplay)}</span>
                 </div>
               </div>
                 </CardContent>

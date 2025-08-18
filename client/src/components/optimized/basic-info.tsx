@@ -152,48 +152,6 @@ const OptimizedBasicInfo: React.FC = () => {
                   </Select>
                 </div>
 
-                {/* Moneda de Cotización */}
-                <div className="space-y-2">
-                  <Label htmlFor="quotation-currency" className="text-sm font-medium text-gray-700 flex items-center">
-                    <DollarSign className="h-3.5 w-3.5 mr-1.5 text-primary/70" />
-                    Moneda <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <Select
-                    value={quotationData.quotationCurrency || 'ARS'}
-                    onValueChange={updateQuotationCurrency}
-                  >
-                    <SelectTrigger id="quotation-currency" className="w-full bg-white border-neutral-200 h-10 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
-                      <SelectValue placeholder="Seleccionar moneda" />
-                    </SelectTrigger>
-                    <SelectContent className="border border-neutral-200 bg-white w-full min-w-[280px]">
-                      <SelectItem value="ARS" className="hover:bg-neutral-50 py-3">
-                        <div className="flex items-center gap-3 w-full">
-                          <span className="text-lg">🇦🇷</span>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium text-sm">Pesos Argentinos</span>
-                            <span className="text-xs text-gray-500">ARS - Cotización local</span>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="USD" className="hover:bg-neutral-50 py-3">
-                        <div className="flex items-center gap-3 w-full">
-                          <span className="text-lg">🇺🇸</span>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium text-sm">Dólares</span>
-                            <span className="text-xs text-gray-500">USD - Cotización internacional</span>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {/* Explicación sobre conversión automática */}
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs text-blue-700 leading-relaxed">
-                      💡 <strong>Conversión automática:</strong> Las tarifas del personal se muestran en ARS y se convierten automáticamente a USD usando el tipo de cambio actual si seleccionas esa moneda.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Duración del Proyecto */}
                 {quotationData.project.type && (
                   <div className="space-y-2">
@@ -268,23 +226,23 @@ const OptimizedBasicInfo: React.FC = () => {
                     )}
                     <span className="font-medium text-gray-700">{quotationData.client.name}</span>
                   </div>
-                  
+
                   <div className="space-y-2 text-sm">
-                    
+
                     {quotationData.client.contactName && (
                       <div className="flex justify-between">
                         <span className="text-xs text-gray-500">Contacto:</span>
                         <span className="text-gray-700">{quotationData.client.contactName}</span>
                       </div>
                     )}
-                    
+
                     {quotationData.client.contactEmail && (
                       <div className="flex justify-between">
                         <span className="text-xs text-gray-500">Email:</span>
                         <span className="text-gray-700">{quotationData.client.contactEmail}</span>
                       </div>
                     )}
-                    
+
                     {quotationData.client.contactPhone && (
                       <div className="flex justify-between">
                         <span className="text-xs text-gray-500">Teléfono:</span>
