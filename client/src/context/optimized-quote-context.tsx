@@ -298,13 +298,18 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Determine the base rate in ARS
     let rateInARS = 0;
 
-    // First priority: hourlyRateARS if available
-    if (person.hourlyRateARS && person.hourlyRateARS > 0) {
-      // hourlyRateARS is stored in centavos, divide by 100 to get pesos
-      rateInARS = person.hourlyRateARS / 100;
-      console.log('💰 Using hourlyRateARS (converted from centavos):', { centavos: person.hourlyRateARS, pesos: rateInARS });
+    // PRIORITY 1: Convert USD rate to ARS (most reliable method)
+    if (person.hourlyRate && person.hourlyRate > 0) {
+      const exchangeRate = 1000; // This should come from system config
+      rateInARS = person.hourlyRate * exchangeRate;
+      console.log('💰 Converting USD to ARS (primary method):', { 
+        usdRate: person.hourlyRate, 
+        exchangeRate, 
+        arsRate: rateInARS,
+        person: person.name
+      });
     }
-    // Second priority: try historical data for current year
+    // PRIORITY 2: Use historical data ONLY if USD rate unavailable  
     else {
       const currentDate = new Date();
       const currentYear = currentDate.getFullYear();
@@ -319,26 +324,23 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         const rate = person[rateField] as number;
         
         if (rate && rate > 0) {
-          // Historical rates are also stored in centavos, convert to pesos
-          rateInARS = rate / 100;
-          console.log('💰 Using historical rate (converted from centavos):', { month: monthName, year: currentYear, centavos: rate, pesos: rateInARS });
+          // Check if rate seems inflated (likely in centavos) and adjust
+          rateInARS = rate > 5000 ? rate / 100 : rate;
+          console.log('💰 Using historical rate (adjusted if needed):', { 
+            month: monthName, 
+            year: currentYear, 
+            originalRate: rate,
+            adjustedRate: rateInARS,
+            person: person.name
+          });
           break;
         }
       }
     }
-    
-    // If still no ARS rate, convert from USD rate using proper conversion
-    if (rateInARS === 0 && person.hourlyRate && person.hourlyRate > 0) {
-      // Assume hourlyRate is in USD and convert to ARS using proper rate
-      // Use approximate rate of 1000 as fallback instead of hardcoded 1200
-      const exchangeRate = 1000; // This should come from system config but using safe fallback
-      rateInARS = person.hourlyRate * exchangeRate;
-      console.log('💰 Converting USD to ARS:', { usdRate: person.hourlyRate, exchangeRate, arsRate: rateInARS });
-    }
 
     // Final fallback - more reasonable default rates
     if (rateInARS === 0) {
-      rateInARS = 150; // 150 ARS per hour (reasonable for mid-level analyst)
+      rateInARS = 15000; // 15,000 ARS per hour (reasonable for mid-level analyst)
       console.log('💰 Using fallback rate:', rateInARS);
     }
 
