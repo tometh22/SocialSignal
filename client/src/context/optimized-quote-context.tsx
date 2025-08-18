@@ -121,7 +121,7 @@ interface OptimizedQuoteContextType {
   updateDeliverable: (index: number, deliverable: any) => void;
   removeDeliverable: (index: number) => void;
   updateAdditionalDeliverableCost: (cost: number) => void;
-  
+
   // General update function
   updateQuotationData: (data: Partial<QuotationData>) => void;
 }
@@ -330,7 +330,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       rateInARS = 150; // 150 ARS por hora (tarifa razonable para analista)
       console.log('💰 Usando tarifa de respaldo:', rateInARS);
     }
-    
+
     console.log('💰 Final rate in ARS:', rateInARS);
     return rateInARS;
   }, [personnel]);
@@ -349,10 +349,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
 
     localStorage.setItem('last-recalc-time', now.toString());
-    
+
     // Invalidate personnel cache to get fresh data
     queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
-    
+
     setRecalculationTrigger(prev => prev + 1);
   }, [queryClient]);
 
@@ -744,17 +744,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Get default values from role if available
     const role = roles.find(r => r.id === member.roleId);
     const defaultHours = member.hours || 40;
-    
+
     // Use personnel rate if available, otherwise fall back to role default
     let defaultRate = member.rate;
-    
+
     console.log('🔍 ADDING TEAM MEMBER - Initial data:', {
       memberRate: member.rate,
       personnelId: member.personnelId,
       quotationCurrency: quotationData.quotationCurrency,
       roleDefaultRate: role?.defaultRate
     });
-    
+
     if (!defaultRate && member.personnelId) {
       console.log('🔍 Calling getPersonnelRate for personnelId:', member.personnelId);
       defaultRate = getPersonnelRate(member.personnelId);
@@ -764,7 +764,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       defaultRate = role?.defaultRate || 50;
       console.log('🔍 Using fallback rate:', defaultRate);
     }
-    
+
     console.log('🔍 Final rate used:', defaultRate);
 
     const newMember: OptimizedTeamMember = {
@@ -848,7 +848,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           rate: Number(member.rate) || 0,
           cost: Number(member.cost) || (Number(member.hours || 0) * Number(member.rate || 0))
         };
-        
+
         console.log('👤 Processing team member:', {
           id: member.id,
           roleId: member.roleId,
@@ -856,7 +856,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
           personnelName: member.personnelName,
           processed: teamMember
         });
-        
+
         return teamMember;
       });
 
@@ -1059,14 +1059,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         // IMPORTANTE: Mantener el personnelId tal como está, incluso si es genérico
         // No convertir a null aquí, dejar que el backend lo maneje si es necesario
         let finalPersonnelId = member.personnelId;
-        
+
         if (finalPersonnelId) {
           const person = personnel.find(p => p.id === finalPersonnelId);
           if (person && person.name.includes('Member')) {
             console.log('⚠️ Detected generic personnel, but keeping ID for storage:', person.name, finalPersonnelId);
           }
         }
-        
+
         const teamMemberPayload = {
           quotationId: savedQuotation.id,
           roleId: member.roleId,
@@ -1287,8 +1287,8 @@ export { OptimizedQuoteProvider };
 
 export const useOptimizedQuote = () => {
   const context = useContext(OptimizedQuoteContext);
-  if (context === undefined) {
-    throw new Error("useOptimizedQuote must be used within an OptimizedQuoteProvider");
+  if (!context) {
+    throw new Error('useOptimizedQuote must be used within an OptimizedQuoteProvider');
   }
   return context;
 };

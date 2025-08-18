@@ -79,9 +79,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
   // Load quotation if editing
   useEffect(() => {
-    console.log('🔍 OptimizedQuote useEffect:', { 
-      effectiveQuotationId, 
-      isRequote, 
+    console.log('🔍 OptimizedQuote useEffect:', {
+      effectiveQuotationId,
+      isRequote,
       urlQuotationId,
       quotationId,
       currentQuotationData: quotationData
@@ -284,12 +284,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             <div className="flex items-center gap-1">
               {steps.map((step, index) => (
                 <div key={step.num} className="flex items-center">
-                  <div 
+                  <div
                     onClick={() => step.num < currentStep && goToStep(step.num)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all 
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all
                     ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
-                    ${currentStep >= step.num 
-                      ? 'bg-primary text-white shadow-sm' 
+                    ${currentStep >= step.num
+                      ? 'bg-primary text-white shadow-sm'
                       : 'bg-gray-100 text-gray-400 border border-gray-200'}`}
                   >
                     {step.num < currentStep ? (
@@ -313,7 +313,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
           {/* Autosave indicator */}
           <div className="flex justify-center mt-4">
-            <AutosaveIndicator 
+            <AutosaveIndicator
               lastSaveTime={localStorage.getItem('last-autosave-time') ? parseInt(localStorage.getItem('last-autosave-time')!) : undefined}
               hasUnsavedChanges={Date.now() - (parseInt(localStorage.getItem('last-autosave-time') || '0')) > 10000}
               isOnline={isOnline}
@@ -330,7 +330,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 2 && <OptimizedTemplateSelection />}
             {currentStep === 3 && <EnhancedTeamConfig />}
             {currentStep === 4 && (
-              <QuotationVariants 
+              <QuotationVariants
                 quotationId={quotationData.id || 0}
                 baseTeamMembers={quotationData.teamMembers as any}
                 quotationData={quotationData}
@@ -347,7 +347,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             {currentStep === 6 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
-                <DeliverableConfiguration 
+                <DeliverableConfiguration
                   isAlwaysOnProject={true}
                   onIsAlwaysOnProjectChange={() => {}}
                   deliverables={quotationData.deliverables || []}
@@ -358,7 +358,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
 
-            {((currentStep === 6 && quotationData.project?.type !== 'always-on') || 
+            {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
               <OptimizedFinancialReview />
             )}
