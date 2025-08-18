@@ -162,24 +162,24 @@ const OptimizedBasicInfo: React.FC = () => {
                     value={quotationData.quotationCurrency || 'ARS'}
                     onValueChange={updateQuotationCurrency}
                   >
-                    <SelectTrigger id="quotation-currency" className="w-full bg-white border-neutral-200 h-9 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
+                    <SelectTrigger id="quotation-currency" className="w-full bg-white border-neutral-200 h-10 focus:ring-1 focus:ring-primary/20 focus:border-primary/60 text-gray-800">
                       <SelectValue placeholder="Seleccionar moneda" />
                     </SelectTrigger>
-                    <SelectContent className="border border-neutral-200 bg-white">
-                      <SelectItem value="ARS" className="hover:bg-neutral-50">
-                        <div className="flex items-center gap-2">
+                    <SelectContent className="border border-neutral-200 bg-white w-full min-w-[280px]">
+                      <SelectItem value="ARS" className="hover:bg-neutral-50 py-3">
+                        <div className="flex items-center gap-3 w-full">
                           <span className="text-lg">🇦🇷</span>
-                          <div className="flex flex-col">
-                            <span className="font-medium">Pesos Argentinos</span>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-sm">Pesos Argentinos</span>
                             <span className="text-xs text-gray-500">ARS - Cotización local</span>
                           </div>
                         </div>
                       </SelectItem>
-                      <SelectItem value="USD" className="hover:bg-neutral-50">
-                        <div className="flex items-center gap-2">
+                      <SelectItem value="USD" className="hover:bg-neutral-50 py-3">
+                        <div className="flex items-center gap-3 w-full">
                           <span className="text-lg">🇺🇸</span>
-                          <div className="flex flex-col">
-                            <span className="font-medium">Dólares</span>
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium text-sm">Dólares</span>
                             <span className="text-xs text-gray-500">USD - Cotización internacional</span>
                           </div>
                         </div>
@@ -187,9 +187,9 @@ const OptimizedBasicInfo: React.FC = () => {
                     </SelectContent>
                   </Select>
                   {/* Explicación sobre conversión automática */}
-                  <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs text-blue-700">
-                      💡 <strong>Conversión automática:</strong> Las tarifas del personal se muestran en ARS (peso argentino) y se convierten automáticamente a USD usando el tipo de cambio actual si seleccionas esa moneda.
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      💡 <strong>Conversión automática:</strong> Las tarifas del personal se muestran en ARS y se convierten automáticamente a USD usando el tipo de cambio actual si seleccionas esa moneda.
                     </p>
                   </div>
                 </div>
