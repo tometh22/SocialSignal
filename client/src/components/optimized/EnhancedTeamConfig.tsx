@@ -386,7 +386,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       <div className="flex-grow">
                         <div className="font-medium">{role.name}</div>
                         <div className={`${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
-                          ${role.defaultRate}/h
+                          {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{role.defaultRate}/h
                         </div>
                       </div>
                       {isSelected && (
