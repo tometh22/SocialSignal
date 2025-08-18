@@ -300,8 +300,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
     // First priority: hourlyRateARS if available
     if (person.hourlyRateARS && person.hourlyRateARS > 0) {
-      rateInARS = person.hourlyRateARS;
-      console.log('💰 Using hourlyRateARS:', rateInARS);
+      // hourlyRateARS is stored in centavos, divide by 100 to get pesos
+      rateInARS = person.hourlyRateARS / 100;
+      console.log('💰 Using hourlyRateARS (converted from centavos):', { centavos: person.hourlyRateARS, pesos: rateInARS });
     }
     // Second priority: try historical data for current year
     else {
@@ -318,8 +319,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         const rate = person[rateField] as number;
         
         if (rate && rate > 0) {
-          rateInARS = rate;
-          console.log('💰 Using historical rate:', { month: monthName, year: currentYear, rate: rateInARS });
+          // Historical rates are also stored in centavos, convert to pesos
+          rateInARS = rate / 100;
+          console.log('💰 Using historical rate (converted from centavos):', { month: monthName, year: currentYear, centavos: rate, pesos: rateInARS });
           break;
         }
       }
@@ -336,7 +338,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
     // Final fallback - more reasonable default rates
     if (rateInARS === 0) {
-      rateInARS = 15000; // 15,000 ARS per hour (reasonable for mid-level analyst)
+      rateInARS = 150; // 150 ARS per hour (reasonable for mid-level analyst)
       console.log('💰 Using fallback rate:', rateInARS);
     }
 
