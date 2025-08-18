@@ -305,10 +305,10 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Función para obtener la tarifa horaria más reciente desde los datos históricos mensuales
     const getLatestHistoricalHourlyRate = (): number | null => {
       const hourlyRateFields = [
-        'dec_2025_hourly_rate_ars', 'nov_2025_hourly_rate_ars', 'oct_2025_hourly_rate_ars',
-        'sep_2025_hourly_rate_ars', 'aug_2025_hourly_rate_ars', 'jul_2025_hourly_rate_ars',
-        'jun_2025_hourly_rate_ars', 'may_2025_hourly_rate_ars', 'apr_2025_hourly_rate_ars',
-        'mar_2025_hourly_rate_ars', 'feb_2025_hourly_rate_ars', 'jan_2025_hourly_rate_ars'
+        'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
+        'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
+        'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
+        'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
       ];
 
       // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
