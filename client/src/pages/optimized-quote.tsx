@@ -281,12 +281,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       <div className="standard-card mb-6">
         <div className="card-content py-4">
           <div className="flex items-center justify-center">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 flex-wrap justify-center">
               {steps.map((step, index) => (
-                <div key={step.num} className="flex items-center">
+                <div key={step.num} className="flex items-center min-w-0">
                   <div
                     onClick={() => step.num < currentStep && goToStep(step.num)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all shrink-0
                     ${step.num < currentStep ? 'cursor-pointer hover:scale-110' : ''}
                     ${currentStep >= step.num
                       ? 'bg-primary text-white shadow-sm'
@@ -298,12 +298,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
                       step.num
                     )}
                   </div>
-                  <span className={`ml-2 text-sm font-medium transition-colors
-                    ${currentStep === step.num ? 'text-primary' : 'text-gray-500'}`}>
+                  <span className={`ml-2 text-sm font-medium transition-colors whitespace-nowrap
+                    ${currentStep === step.num ? 'text-primary font-semibold' : 'text-gray-600'}`}>
                     {step.title}
                   </span>
                   {index < steps.length - 1 && (
-                    <div className={`mx-4 h-px w-12 transition-colors
+                    <div className={`mx-3 h-px w-8 transition-colors shrink-0
                       ${step.num < currentStep ? 'bg-primary' : 'bg-gray-200'}`}></div>
                   )}
                 </div>
