@@ -280,36 +280,59 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
 
-    // Get the most recent ARS hourly rate from historical data
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
-    
-    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    
-    // Try to find the most recent rate starting from current month and going backwards
+    console.log('💰 getPersonnelRate called:', { personnelId, targetCurrency, person: person.name });
+
+    // Determine the base rate in ARS
     let rateInARS = 0;
-    for (let i = currentMonth; i >= 0; i--) {
-      const monthName = monthNames[i];
-      const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
-      const rate = person[rateField] as number;
+
+    // First priority: hourlyRateARS if available
+    if (person.hourlyRateARS && person.hourlyRateARS > 0) {
+      rateInARS = person.hourlyRateARS;
+      console.log('💰 Using hourlyRateARS:', rateInARS);
+    }
+    // Second priority: try historical data for current year
+    else {
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
       
-      if (rate && rate > 0) {
-        rateInARS = rate;
-        break;
+      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+      
+      // Try to find the most recent rate starting from current month and going backwards
+      for (let i = currentMonth; i >= 0; i--) {
+        const monthName = monthNames[i];
+        const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
+        const rate = person[rateField] as number;
+        
+        if (rate && rate > 0) {
+          rateInARS = rate;
+          console.log('💰 Using historical rate:', { month: monthName, year: currentYear, rate: rateInARS });
+          break;
+        }
       }
     }
     
-    // If no historical rate found, fall back to hourlyRateARS or hourlyRate
+    // If still no ARS rate, convert from USD rate
+    if (rateInARS === 0 && person.hourlyRate && person.hourlyRate > 0) {
+      // Assume hourlyRate is in USD and convert to ARS
+      rateInARS = person.hourlyRate * 1200; // Approximate conversion
+      console.log('💰 Converting USD to ARS:', { usdRate: person.hourlyRate, arsRate: rateInARS });
+    }
+
+    // Final fallback
     if (rateInARS === 0) {
-      rateInARS = person.hourlyRateARS || person.hourlyRate || 0;
+      rateInARS = targetCurrency === 'ARS' ? 5000 : 50; // Default rates
+      console.log('💰 Using fallback rate:', rateInARS);
     }
 
     // Convert to target currency if needed
     if (targetCurrency === 'USD' && rateInARS > 0) {
-      return convertToUSD(rateInARS, 'ARS');
+      const convertedRate = convertToUSD(rateInARS, 'ARS');
+      console.log('💰 Converting ARS to USD:', { arsRate: rateInARS, usdRate: convertedRate });
+      return convertedRate;
     }
     
+    console.log('💰 Final rate:', { targetCurrency, finalRate: rateInARS });
     return rateInARS;
   }, [personnel, convertToUSD]);
 

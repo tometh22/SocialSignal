@@ -165,9 +165,11 @@ const EnhancedTeamConfig: React.FC = () => {
       const role = getRoleInfo(roleId);
       if (role) {
         const hours = 40;
-        // Para roles sin personal específico, usar la tarifa por defecto del rol
-        const isARS = quotationData.quotationCurrency === 'ARS';
-        const rate = role.defaultRate || (isARS ? 5000 : 50);
+        // Para roles sin personal específico, usar la tarifa por defecto del rol convertida
+        const defaultRate = role.defaultRate || 50;
+        const rate = quotationData.quotationCurrency === 'ARS' ? 
+          (defaultRate * 1200) : // Convertir USD a ARS aproximadamente
+          defaultRate;
         addTeamMember({
           roleId,
           personnelId: null,
@@ -546,7 +548,7 @@ const EnhancedTeamConfig: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-2 mb-1">
                                 <Badge variant="outline" className="font-medium">
-                                  {role?.name || 'Rol desconocido'}
+                                  {availableRoles.find(r => r.id === member.roleId)?.name || 'Rol desconocido'}
                                 </Badge>
                                 {recommendedRoleIds.includes(member.roleId) && (
                                   <Star className="h-3 w-3 text-yellow-500" />
@@ -554,7 +556,7 @@ const EnhancedTeamConfig: React.FC = () => {
                               </div>
                               <div className="flex items-center space-x-1 text-sm text-gray-600">
                                 <User className="h-3 w-3" />
-                                <span>{personnel?.name || 'Sin asignar'}</span>
+                                <span>{availablePersonnel.find(p => p.id === member.personnelId)?.name || 'Sin asignar'}</span>
                               </div>
                             </div>
 
@@ -601,7 +603,12 @@ const EnhancedTeamConfig: React.FC = () => {
                                     <div className="text-xs text-gray-500">horas</div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="font-medium text-sm">${member.rate}</div>
+                                    <div className="font-medium text-sm">
+                                      ${member.personnelId ? 
+                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                        member.rate
+                                      }
+                                    </div>
                                     <div className="text-xs text-gray-500">por hora</div>
                                   </div>
                                 </>
