@@ -298,31 +298,35 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Determine the base rate in ARS
     let rateInARS = 0;
 
-    // SOLO usar tarifas históricas mensuales en ARS (los valores más recientes y confiables)
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
-    
-    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    
-    // Buscar la tarifa más reciente empezando desde el mes actual hacia atrás
-    for (let i = currentMonth; i >= 0; i--) {
-      const monthName = monthNames[i];
-      const rateField = `${monthName}_${currentYear}_hourly_rate_ars` as keyof typeof person;
-      const rate = person[rateField] as number;
-      
-      if (rate && rate > 0) {
-        // Estas tarifas están almacenadas en centavos, convertir a pesos
-        rateInARS = rate / 100;
-        console.log('💰 Usando tarifa histórica mensual (convertida de centavos a pesos):', { 
-          month: monthName, 
-          year: currentYear, 
-          centavos: rate,
-          pesos: rateInARS,
-          person: person.name
-        });
-        break;
+    // Función para obtener la tarifa horaria más reciente desde los datos históricos mensuales
+    const getLatestHistoricalHourlyRate = (): number | null => {
+      const hourlyRateFields = [
+        'dec_2025_hourly_rate_ars', 'nov_2025_hourly_rate_ars', 'oct_2025_hourly_rate_ars',
+        'sep_2025_hourly_rate_ars', 'aug_2025_hourly_rate_ars', 'jul_2025_hourly_rate_ars',
+        'jun_2025_hourly_rate_ars', 'may_2025_hourly_rate_ars', 'apr_2025_hourly_rate_ars',
+        'mar_2025_hourly_rate_ars', 'feb_2025_hourly_rate_ars', 'jan_2025_hourly_rate_ars'
+      ];
+
+      // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
+      for (const field of hourlyRateFields) {
+        const value = (person as any)[field];
+        if (value && value > 0) {
+          // Los valores históricos están en centavos, convertir a pesos
+          return value / 100;
+        }
       }
+      return null;
+    };
+
+    // USAR EXCLUSIVAMENTE las tarifas históricas mensuales más recientes
+    const latestRate = getLatestHistoricalHourlyRate();
+    if (latestRate) {
+      rateInARS = latestRate;
+      console.log('💰 Usando tarifa histórica más reciente:', { 
+        person: person.name,
+        rate: rateInARS,
+        source: 'historical_monthly_data'
+      });
     }
 
     // Final fallback - tarifa por defecto razonable en pesos
