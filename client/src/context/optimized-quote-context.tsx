@@ -298,50 +298,37 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Determine the base rate in ARS
     let rateInARS = 0;
 
-    // PRIORITY 1: Convert USD rate to ARS (most reliable method)
-    if (person.hourlyRate && person.hourlyRate > 0) {
-      const exchangeRate = 1000; // This should come from system config
-      rateInARS = person.hourlyRate * exchangeRate;
-      console.log('💰 Converting USD to ARS (primary method):', { 
-        usdRate: person.hourlyRate, 
-        exchangeRate, 
-        arsRate: rateInARS,
-        person: person.name
-      });
-    }
-    // PRIORITY 2: Use historical data ONLY if USD rate unavailable  
-    else {
-      const currentDate = new Date();
-      const currentYear = currentDate.getFullYear();
-      const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
+    // SOLO usar tarifas históricas mensuales en ARS (los valores más recientes y confiables)
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth(); // 0-based (0 = January)
+    
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    // Buscar la tarifa más reciente empezando desde el mes actual hacia atrás
+    for (let i = currentMonth; i >= 0; i--) {
+      const monthName = monthNames[i];
+      const rateField = `${monthName}_${currentYear}_hourly_rate_ars` as keyof typeof person;
+      const rate = person[rateField] as number;
       
-      const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-      
-      // Try to find the most recent rate starting from current month and going backwards
-      for (let i = currentMonth; i >= 0; i--) {
-        const monthName = monthNames[i];
-        const rateField = `${monthName}${currentYear}HourlyRateARS` as keyof typeof person;
-        const rate = person[rateField] as number;
-        
-        if (rate && rate > 0) {
-          // Check if rate seems inflated (likely in centavos) and adjust
-          rateInARS = rate > 5000 ? rate / 100 : rate;
-          console.log('💰 Using historical rate (adjusted if needed):', { 
-            month: monthName, 
-            year: currentYear, 
-            originalRate: rate,
-            adjustedRate: rateInARS,
-            person: person.name
-          });
-          break;
-        }
+      if (rate && rate > 0) {
+        // Estas tarifas están almacenadas en centavos, convertir a pesos
+        rateInARS = rate / 100;
+        console.log('💰 Usando tarifa histórica mensual (convertida de centavos a pesos):', { 
+          month: monthName, 
+          year: currentYear, 
+          centavos: rate,
+          pesos: rateInARS,
+          person: person.name
+        });
+        break;
       }
     }
 
-    // Final fallback - more reasonable default rates
+    // Final fallback - tarifa por defecto razonable en pesos
     if (rateInARS === 0) {
-      rateInARS = 15000; // 15,000 ARS per hour (reasonable for mid-level analyst)
-      console.log('💰 Using fallback rate:', rateInARS);
+      rateInARS = 150; // 150 ARS por hora (tarifa razonable para analista)
+      console.log('💰 Usando tarifa de respaldo:', rateInARS);
     }
 
     // Convert to target currency if needed
