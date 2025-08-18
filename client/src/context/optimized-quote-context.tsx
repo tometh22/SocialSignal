@@ -768,12 +768,25 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     
     // Use personnel rate if available, otherwise fall back to role default
     let defaultRate = member.rate;
+    
+    console.log('🔍 ADDING TEAM MEMBER - Initial data:', {
+      memberRate: member.rate,
+      personnelId: member.personnelId,
+      quotationCurrency: quotationData.quotationCurrency,
+      roleDefaultRate: role?.defaultRate
+    });
+    
     if (!defaultRate && member.personnelId) {
+      console.log('🔍 Calling getPersonnelRate for personnelId:', member.personnelId);
       defaultRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
+      console.log('🔍 getPersonnelRate returned:', defaultRate);
     }
     if (!defaultRate) {
       defaultRate = role?.defaultRate || 50;
+      console.log('🔍 Using fallback rate:', defaultRate);
     }
+    
+    console.log('🔍 Final rate used:', defaultRate);
 
     const newMember: OptimizedTeamMember = {
       ...member,
