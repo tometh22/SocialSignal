@@ -280,7 +280,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
 
-    console.log('💰 getPersonnelRate called:', { personnelId, targetCurrency, person: person.name });
+    console.log('💰 getPersonnelRate called:', { 
+      personnelId, 
+      targetCurrency, 
+      person: person.name,
+      hourlyRate: person.hourlyRate,
+      hourlyRateARS: person.hourlyRateARS
+    });
 
     // Determine the base rate in ARS
     let rateInARS = 0;

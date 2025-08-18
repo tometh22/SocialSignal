@@ -548,7 +548,16 @@ const EnhancedTeamConfig: React.FC = () => {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-2 mb-1">
                                 <Badge variant="outline" className="font-medium">
-                                  {availableRoles.find(r => r.id === member.roleId)?.name || 'Rol desconocido'}
+                                  {(() => {
+                                    const foundRole = availableRoles.find(r => r.id === member.roleId);
+                                    console.log('🏷️ Role lookup:', { 
+                                      roleId: member.roleId, 
+                                      availableRolesCount: availableRoles.length,
+                                      foundRole: foundRole?.name,
+                                      allRoles: availableRoles.map(r => ({ id: r.id, name: r.name }))
+                                    });
+                                    return foundRole?.name || `Rol ${member.roleId}`;
+                                  })()}
                                 </Badge>
                                 {recommendedRoleIds.includes(member.roleId) && (
                                   <Star className="h-3 w-3 text-yellow-500" />
@@ -556,7 +565,13 @@ const EnhancedTeamConfig: React.FC = () => {
                               </div>
                               <div className="flex items-center space-x-1 text-sm text-gray-600">
                                 <User className="h-3 w-3" />
-                                <span>{availablePersonnel.find(p => p.id === member.personnelId)?.name || 'Sin asignar'}</span>
+                                <span>{(() => {
+                                  if (!member.personnelId) return 'Sin asignar';
+                                  console.log('👤 Looking for personnel:', { personnelId: member.personnelId, availablePersonnel: availablePersonnel.length });
+                                  const foundPerson = availablePersonnel.find(p => p.id === member.personnelId);
+                                  console.log('👤 Found person:', foundPerson);
+                                  return foundPerson?.name || `Personal ${member.personnelId}`;
+                                })()}</span>
                               </div>
                             </div>
 
@@ -618,16 +633,27 @@ const EnhancedTeamConfig: React.FC = () => {
                               <div className="text-center">
                                 <div className="font-bold text-lg text-primary">
                                   ${(() => {
-                                    if (!isEditing) return member.cost;
+                                    if (!isEditing) {
+                                      // Recalculate cost with correct rate
+                                      const correctRate = member.personnelId ? 
+                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                        member.rate;
+                                      return (member.hours * correctRate).toLocaleString();
+                                    }
                                     
                                     const tempValues = tempEditValues[member.id];
-                                    if (!tempValues) return member.cost;
+                                    if (!tempValues) {
+                                      const correctRate = member.personnelId ? 
+                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                        member.rate;
+                                      return (member.hours * correctRate).toLocaleString();
+                                    }
                                     
-                                    const hours = tempValues.hours === '' ? 0 : parseFloat(tempValues.hours) || 0;
-                                    const rate = tempValues.rate === '' ? 0 : parseFloat(tempValues.rate) || 0;
+                                    const hours = tempValues.hours === '' ? member.hours : parseFloat(tempValues.hours) || 0;
+                                    const rate = tempValues.rate === '' ? member.rate : parseFloat(tempValues.rate) || 0;
                                       
-                                    return hours * rate;
-                                  })().toLocaleString()}
+                                    return (hours * rate).toLocaleString();
+                                  })()}
                                 </div>
                                 <div className="text-xs text-gray-500">total</div>
                               </div>
