@@ -333,12 +333,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               <QuotationVariants 
                 quotationId={quotationData.id || 0}
                 baseTeamMembers={quotationData.teamMembers}
-                quotationData={{
-                  baseCost,
-                  complexityAdjustment,
-                  markupAmount,
-                  totalAmount
-                }}
+                quotationData={quotationData}
+                baseCost={baseCost}
+                complexityAdjustment={complexityAdjustment}
+                markupAmount={markupAmount}
+                totalAmount={totalAmount}
                 onVariantSelected={(variant) => {
                   console.log('Variant selected:', variant);
                 }}

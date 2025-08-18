@@ -41,6 +41,10 @@ interface QuotationVariantsProps {
   quotationId: number;
   baseTeamMembers: TeamMember[];
   quotationData: any;
+  baseCost: number;
+  complexityAdjustment: number;
+  markupAmount: number;
+  totalAmount: number;
   onVariantSelected?: (variant: QuotationVariant) => void;
 }
 
@@ -48,6 +52,10 @@ export function QuotationVariants({
   quotationId, 
   baseTeamMembers, 
   quotationData, 
+  baseCost,
+  complexityAdjustment,
+  markupAmount,
+  totalAmount,
   onVariantSelected 
 }: QuotationVariantsProps) {
   const [variants, setVariants] = useState<QuotationVariant[]>([]);
@@ -68,7 +76,7 @@ export function QuotationVariants({
       // For new quotations, create local variants based on current data
       createLocalVariants();
     }
-  }, [quotationId, quotationData.baseCost, quotationData.totalAmount]);
+  }, [quotationId, baseCost, totalAmount]);
 
   const fetchVariants = async () => {
     try {
@@ -98,10 +106,10 @@ export function QuotationVariants({
         variantName: 'Básico', 
         variantDescription: 'Versión esencial con funcionalidades básicas',
         variantOrder: 1,
-        baseCost: quotationData.baseCost * 0.75,
-        complexityAdjustment: quotationData.complexityAdjustment * 0.75,
-        markupAmount: quotationData.markupAmount * 0.75,
-        totalAmount: quotationData.totalAmount * 0.75,
+        baseCost: baseCost * 0.75,
+        complexityAdjustment: complexityAdjustment * 0.75,
+        markupAmount: markupAmount * 0.75,
+        totalAmount: totalAmount * 0.75,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -111,10 +119,10 @@ export function QuotationVariants({
         variantName: 'Intermedio', 
         variantDescription: 'Versión estándar con funcionalidades completas',
         variantOrder: 2,
-        baseCost: quotationData.baseCost,
-        complexityAdjustment: quotationData.complexityAdjustment,
-        markupAmount: quotationData.markupAmount,
-        totalAmount: quotationData.totalAmount,
+        baseCost: baseCost,
+        complexityAdjustment: complexityAdjustment,
+        markupAmount: markupAmount,
+        totalAmount: totalAmount,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -124,10 +132,10 @@ export function QuotationVariants({
         variantName: 'Full', 
         variantDescription: 'Versión premium con todas las funcionalidades',
         variantOrder: 3,
-        baseCost: quotationData.baseCost * 1.35,
-        complexityAdjustment: quotationData.complexityAdjustment * 1.35,
-        markupAmount: quotationData.markupAmount * 1.35,
-        totalAmount: quotationData.totalAmount * 1.35,
+        baseCost: baseCost * 1.35,
+        complexityAdjustment: complexityAdjustment * 1.35,
+        markupAmount: markupAmount * 1.35,
+        totalAmount: totalAmount * 1.35,
         isSelected: false,
         createdAt: new Date().toISOString()
       }
@@ -162,10 +170,10 @@ export function QuotationVariants({
 
     try {
       for (const variant of defaultVariants) {
-        const adjustedBaseCost = quotationData.baseCost * (1 + variant.adjustmentPercentage / 100);
-        const adjustedComplexity = quotationData.complexityAdjustment * (1 + variant.adjustmentPercentage / 100);
-        const adjustedMarkup = quotationData.markupAmount * (1 + variant.adjustmentPercentage / 100);
-        const adjustedTotal = quotationData.totalAmount * (1 + variant.adjustmentPercentage / 100);
+        const adjustedBaseCost = baseCost * (1 + variant.adjustmentPercentage / 100);
+        const adjustedComplexity = complexityAdjustment * (1 + variant.adjustmentPercentage / 100);
+        const adjustedMarkup = markupAmount * (1 + variant.adjustmentPercentage / 100);
+        const adjustedTotal = totalAmount * (1 + variant.adjustmentPercentage / 100);
 
         await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
           variantName: variant.name,
