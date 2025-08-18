@@ -281,12 +281,16 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
 
-    console.log('💰 getPersonnelRate called:', { 
-      personnelId, 
-      targetCurrency, 
-      person: person.name,
-      hourlyRate: person.hourlyRate,
-      hourlyRateARS: person.hourlyRateARS
+    console.log('🔍 DEBUGGING RATE CALCULATION - Full person data:', {
+      id: personnelId,
+      name: person.name,
+      targetCurrency,
+      aug_2025_hourly_rate_ars: (person as any).aug_2025_hourly_rate_ars,
+      jul_2025_hourly_rate_ars: (person as any).jul_2025_hourly_rate_ars,
+      jun_2025_hourly_rate_ars: (person as any).jun_2025_hourly_rate_ars,
+      hourly_rate_old: person.hourlyRate,
+      hourlyRateARS_old: person.hourlyRateARS,
+      allPersonData: person
     });
 
     // Validation check - detect obviously wrong data
@@ -311,8 +315,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       for (const field of hourlyRateFields) {
         const value = (person as any)[field];
         if (value && value > 0) {
-          // Los valores históricos están en centavos, convertir a pesos
-          return value / 100;
+          // Los valores históricos YA están en pesos, NO dividir
+          return value;
         }
       }
       return null;
