@@ -505,8 +505,7 @@ export default function FinancialReviewFinal() {
   };
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
         {/* Modern Sticky Header */}
         <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
@@ -1096,7 +1095,6 @@ export default function FinancialReviewFinal() {
                   </CardContent>
                 </Card>
               </div>
-              </Card>
 
               {/* Inflation Card */}
               <Card className="shadow-sm border-0 bg-white">
@@ -1476,6 +1474,6 @@ export default function FinancialReviewFinal() {
           </div>
         </div>
       </div>
-    </TooltipProvider>
+    </div>
   );
 }
