@@ -692,12 +692,12 @@ export default function FinancialReviewFinal() {
                         </div>
                       </div>
                       <span className="text-sm font-bold text-gray-900">
-                        {formatFinalCurrency(convertToDisplayCurrency(
+                        {formatFinalCurrency(
                           member.hours * (member.personnelId 
                             ? getPersonnelRate(member.personnelId, quotationData.quotationCurrency)
-                            : member.rate
+                            : convertToDisplayCurrency(member.rate)
                           )
-                        ))}
+                        )}
                       </span>
                     </div>
                   </div>
