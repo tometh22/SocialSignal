@@ -506,15 +506,11 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return;
     }
 
-    // Calculate base cost from team members with correct rates
+    // Calculate base cost from team members - use the cost already calculated in the member object
     const calculatedBaseCost = quotationData.teamMembers.reduce((sum, member) => {
-      // Use correct rate calculation
-      const correctRate = member.personnelId ? 
-        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
-        (member.rate || 0);
-      
-      const memberCost = (member.hours || 0) * correctRate;
-      console.log(`👤 Member ${member.id}: ${member.hours}h × $${correctRate} = $${memberCost} (corrected rate)`);
+      // Use the cost that's already been calculated and stored in the member object
+      const memberCost = member.cost || 0;
+      console.log(`👤 Member ${member.id}: cost = ${memberCost} (using stored cost)`);
       return sum + memberCost;
     }, 0);
 

@@ -122,13 +122,13 @@ export default function FinancialReviewFinal() {
   const calculateTeamBaseCost = () => {
     let cost = 0;
     quotationData.teamMembers.forEach(member => {
-      // Asegurar que el costo es un número válido
+      // Use the member.cost directly - it should already be calculated correctly
       const memberCost = Number(member.cost) || 0;
       cost += memberCost;
-      console.log('💰 Team member cost:', member, 'cost:', memberCost);
+      console.log('💰 Team member:', member.id, 'hours:', member.hours, 'rate:', member.rate, 'cost:', memberCost);
     });
-    console.log('💰 Total team base cost:', cost);
-    // Keep in USD for calculations, convert only for display
+    console.log('💰 Total team base cost calculated:', cost);
+    console.log('💰 baseCost from context:', baseCost);
     return cost;
   };
 
