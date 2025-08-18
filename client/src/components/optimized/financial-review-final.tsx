@@ -84,7 +84,7 @@ export default function FinancialReviewFinal() {
   });
 
   // Obtener el tipo de cambio desde la configuración del sistema
-  const exchangeRateConfig = systemConfig.find((config: any) => config.configKey === 'usd_exchange_rate');
+  const exchangeRateConfig = (systemConfig as any[]).find((config: any) => config.configKey === 'usd_exchange_rate');
   const currentExchangeRate = exchangeRateConfig?.configValue || 1200;
 
   // Obtener datos de tipos de cambio para obtener el más reciente
@@ -1019,7 +1019,7 @@ export default function FinancialReviewFinal() {
                             updateFinancials({ priceMode: 'manual' });
                             // Si no hay precio manual, usar el precio actual como punto de partida
                             if (!quotationData.financials.manualPrice) {
-                              updateFinancials({ manualPrice: finalTotalUSD });
+                              updateFinancials({ manualPrice: finalTotalARS });
                             }
                           }}
                           className="flex-1"
@@ -1092,8 +1092,10 @@ export default function FinancialReviewFinal() {
                         </div>
                       )}
                     </div>
+                  </div>
                   </CardContent>
                 </Card>
+              </div>
               </Card>
 
               {/* Inflation Card */}
@@ -1165,7 +1167,7 @@ export default function FinancialReviewFinal() {
                           </div>
                         </div>
                         <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                          {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay, quotationData.quotationCurrency)}` : 'Configurando...'}
+                          {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay)}` : 'Configurando...'}
                         </Badge>
                       </div>
 

@@ -14,7 +14,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
+// import OptimizedFinancialReview from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
@@ -360,7 +360,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <OptimizedFinancialReview />
+              <div className="p-6">
+                <div className="text-center py-12">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Revisión Financiera</h3>
+                  <p className="text-gray-600">Componente temporalmente deshabilitado para pruebas de sistema</p>
+                </div>
+              </div>
             )}
           </div>
         </div>
