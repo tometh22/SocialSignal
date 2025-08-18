@@ -60,7 +60,8 @@ export default function FinancialReviewFinal() {
     updateInflation,
     updateFinancials,
     updateQuotationCurrency,
-    saveQuotation
+    saveQuotation,
+    getPersonnelRate
   } = useOptimizedQuote();
 
   const [, navigate] = useLocation();
@@ -683,12 +684,20 @@ export default function FinancialReviewFinal() {
                             }
                           </p>
                           <p className="text-xs text-gray-500">
-                            {member.hours}h × ${member.rate}/h
+                            {member.hours}h × ${(member.personnelId 
+                              ? getPersonnelRate(member.personnelId, quotationData.quotationCurrency)
+                              : member.rate
+                            ).toFixed(1)}/h
                           </p>
                         </div>
                       </div>
                       <span className="text-sm font-bold text-gray-900">
-                        {formatFinalCurrency(convertToDisplayCurrency(member.cost))}
+                        {formatFinalCurrency(convertToDisplayCurrency(
+                          member.hours * (member.personnelId 
+                            ? getPersonnelRate(member.personnelId, quotationData.quotationCurrency)
+                            : member.rate
+                          )
+                        ))}
                       </span>
                     </div>
                   </div>
