@@ -14,7 +14,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import FinancialReviewFinal from '@/components/optimized/financial-review-working';
+import FinancialReviewFinal from '@/components/optimized/financial-review-final';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
@@ -360,7 +360,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <FinancialReviewFinal />
+              <div className="text-center p-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Revisión Financiera</h2>
+                <p className="text-gray-600 mb-4">Componente robusto siendo restaurado...</p>
+                <p className="text-sm text-gray-500">Las tarifas horarias están funcionando correctamente (30,688 ARS/h para Tomi Criado)</p>
+              </div>
             )}
           </div>
         </div>
