@@ -332,7 +332,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 4 && (
               <QuotationVariants 
                 quotationId={quotationData.id || 0}
-                baseTeamMembers={quotationData.teamMembers}
+                baseTeamMembers={quotationData.teamMembers as any}
                 quotationData={quotationData}
                 baseCost={baseCost}
                 complexityAdjustment={complexityAdjustment}

@@ -98,7 +98,16 @@ export function QuotationVariants({
   };
 
   const createLocalVariants = () => {
+    console.log('🎨 Creating local variants with:', { baseCost, complexityAdjustment, markupAmount, totalAmount });
     setLoading(true);
+    
+    // Check if we have valid data
+    if (!baseCost || baseCost === 0) {
+      console.warn('⚠️ baseCost is 0 or invalid, cannot create variants');
+      setLoading(false);
+      return;
+    }
+    
     const localVariants = [
       { 
         id: -1,
@@ -141,6 +150,7 @@ export function QuotationVariants({
       }
     ];
     
+    console.log('🎨 Created variants:', localVariants);
     setVariants(localVariants);
     setSelectedVariantIds([-1, -2, -3]); // Select all variants by default for client presentation
     setLoading(false);
@@ -222,10 +232,10 @@ export function QuotationVariants({
         variantName: newVariant.name,
         variantDescription: newVariant.description,
         variantOrder: variants.length + 1,
-        baseCost: quotationData.baseCost * adjustmentFactor,
-        complexityAdjustment: quotationData.complexityAdjustment * adjustmentFactor,
-        markupAmount: quotationData.markupAmount * adjustmentFactor,
-        totalAmount: quotationData.totalAmount * adjustmentFactor,
+        baseCost: baseCost * adjustmentFactor,
+        complexityAdjustment: complexityAdjustment * adjustmentFactor,
+        markupAmount: markupAmount * adjustmentFactor,
+        totalAmount: totalAmount * adjustmentFactor,
         isSelected: false,
         createdAt: new Date().toISOString()
       };
@@ -348,17 +358,17 @@ export function QuotationVariants({
     const baseTeamSize = baseTeamMembers?.length || 3; // Default to 3 if no team members
     
     // Safely handle complexity calculation
-    if (!quotationData.complexityAdjustment || quotationData.complexityAdjustment === 0) {
+    if (!complexityAdjustment || complexityAdjustment === 0) {
       // If no complexity adjustment, use ratio based on cost
-      const costRatio = variant.totalAmount / quotationData.totalAmount;
+      const costRatio = variant.totalAmount / totalAmount;
       return Math.max(1, Math.round(baseTeamSize * costRatio));
     }
     
-    const complexityFactor = variant.complexityAdjustment / quotationData.complexityAdjustment;
+    const complexityFactor = variant.complexityAdjustment / complexityAdjustment;
     return Math.max(1, Math.round(baseTeamSize * complexityFactor));
   };
 
-  if (loading || !quotationData.baseCost) {
+  if (loading) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
@@ -369,7 +379,7 @@ export function QuotationVariants({
             ))}
           </div>
         </div>
-        {!quotationData.baseCost && (
+        {!baseCost && (
           <div className="text-center mt-4">
             <p className="text-gray-500">
               Configura el equipo en el paso anterior para ver las variantes disponibles
