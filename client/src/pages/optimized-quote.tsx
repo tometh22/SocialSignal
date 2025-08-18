@@ -14,7 +14,7 @@ import OptimizedBasicInfo from '@/components/optimized/basic-info';
 import { default as ComplexityFactorsCard } from '@/components/optimized/complexity-factors-card';
 import OptimizedTemplateSelection from '@/components/optimized/template-selection';
 import EnhancedTeamConfig from '@/components/optimized/EnhancedTeamConfig';
-import FinancialReviewSimple from '@/components/optimized/financial-review-simple';
+import FinancialReviewFinal from '@/components/optimized/financial-review-working';
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
@@ -360,7 +360,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <FinancialReviewSimple />
+              <FinancialReviewFinal />
             )}
           </div>
         </div>
