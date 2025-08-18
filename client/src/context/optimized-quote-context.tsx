@@ -272,6 +272,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/personnel"],
+    staleTime: 0, // Force fresh data after fixes
   });
 
   // Helper function to get personnel hourly rate with currency conversion
@@ -287,6 +288,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       hourlyRate: person.hourlyRate,
       hourlyRateARS: person.hourlyRateARS
     });
+
+    // Validation check - detect obviously wrong data
+    if (person.hourlyRate && person.hourlyRate > 1000) {
+      console.warn('💰 WARNING: Suspicious hourly rate detected:', person.hourlyRate, 'for', person.name);
+      console.warn('💰 This rate is likely in the wrong currency or corrupted data');
+    }
 
     // Determine the base rate in ARS
     let rateInARS = 0;
@@ -360,8 +367,12 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
 
     localStorage.setItem('last-recalc-time', now.toString());
+    
+    // Invalidate personnel cache to get fresh data
+    queryClient.invalidateQueries({ queryKey: ["/api/personnel"] });
+    
     setRecalculationTrigger(prev => prev + 1);
-  }, []);
+  }, [queryClient]);
 
   // Enhanced auto-save draft to localStorage with error handling
   useEffect(() => {
