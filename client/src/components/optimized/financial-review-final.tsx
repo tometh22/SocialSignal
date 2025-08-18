@@ -122,10 +122,18 @@ export default function FinancialReviewFinal() {
   const calculateTeamBaseCost = () => {
     let cost = 0;
     quotationData.teamMembers.forEach(member => {
-      // Use the member.cost directly - it should already be calculated correctly
-      const memberCost = Number(member.cost) || 0;
+      // Calculate cost directly from hours and rate in the quotation currency
+      const memberHours = Number(member.hours) || 0;
+      let memberRate = Number(member.rate) || 0;
+      
+      // If we have personnelId, get the correct rate for the quotation currency
+      if (member.personnelId) {
+        memberRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
+      }
+      
+      const memberCost = memberHours * memberRate;
       cost += memberCost;
-      console.log('💰 Team member:', member.id, 'hours:', member.hours, 'rate:', member.rate, 'cost:', memberCost);
+      console.log('💰 Team member:', member.id, 'hours:', memberHours, 'rate:', memberRate, 'cost:', memberCost);
     });
     console.log('💰 Total team base cost calculated:', cost);
     console.log('💰 baseCost from context:', baseCost);
@@ -146,20 +154,21 @@ export default function FinancialReviewFinal() {
     return (totalFactor * 100).toFixed(1);
   };
 
-  // Calculate base values in USD
-  // Use baseCost from context which is already calculated
-  const teamBaseCostUSD = baseCost || calculateTeamBaseCost();
+  // Calculate base values in quotation currency
+  // Use the correct calculated cost based on current team members
+  const teamBaseCostInQuotationCurrency = calculateTeamBaseCost();
   console.log('🔍 Financial Review - baseCost from context:', baseCost);
-  console.log('🔍 Financial Review - teamBaseCostUSD calculated:', calculateTeamBaseCost());
+  console.log('🔍 Financial Review - teamBaseCost calculated:', teamBaseCostInQuotationCurrency);
+  console.log('🔍 Financial Review - quotation currency:', quotationData.quotationCurrency);
   console.log('🔍 Financial Review - teamMembers:', quotationData.teamMembers);
   
-  const teamComplexityAdjustmentUSD = calculateComplexityAdjustment(teamBaseCostUSD);
-  const subtotalWithComplexityUSD = teamBaseCostUSD + teamComplexityAdjustmentUSD;
+  const teamComplexityAdjustmentInQuotationCurrency = calculateComplexityAdjustment(teamBaseCostInQuotationCurrency);
+  const subtotalWithComplexityInQuotationCurrency = teamBaseCostInQuotationCurrency + teamComplexityAdjustmentInQuotationCurrency;
 
   // Calculate inflation if applicable - SIMPLIFIED LOGIC
-  const baseForInflation = subtotalWithComplexityUSD;
-  let inflationAdjustmentUSD = 0;
-  let inflationProjectedCostUSD = baseForInflation;
+  const baseForInflation = subtotalWithComplexityInQuotationCurrency;
+  let inflationAdjustmentInQuotationCurrency = 0;
+  let inflationProjectedCostInQuotationCurrency = baseForInflation;
   let monthlyInflationRate = 0;
   let totalInflationPercentage = 0;
   let monthsToProject = 0;
@@ -187,24 +196,24 @@ export default function FinancialReviewFinal() {
       const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
       totalInflationPercentage = (inflationFactor - 1) * 100;
 
-      // SIMPLIFIED: Apply inflation directly to USD base cost
-      inflationProjectedCostUSD = baseForInflation * inflationFactor;
-      inflationAdjustmentUSD = inflationProjectedCostUSD - baseForInflation;
+      // SIMPLIFIED: Apply inflation directly to base cost
+      inflationProjectedCostInQuotationCurrency = baseForInflation * inflationFactor;
+      inflationAdjustmentInQuotationCurrency = inflationProjectedCostInQuotationCurrency - baseForInflation;
 
       console.log('🏦 Inflation calculation (simplified):');
-      console.log('💰 Base:', baseForInflation, 'USD');
+      console.log('💰 Base:', baseForInflation, quotationData.quotationCurrency);
       console.log('📊 Inflation factor:', inflationFactor.toFixed(4));
-      console.log('💰 Projected:', inflationProjectedCostUSD.toFixed(2), 'USD');
-      console.log('💰 Adjustment:', inflationAdjustmentUSD.toFixed(2), 'USD');
+      console.log('💰 Projected:', inflationProjectedCostInQuotationCurrency.toFixed(2), quotationData.quotationCurrency);
+      console.log('💰 Adjustment:', inflationAdjustmentInQuotationCurrency.toFixed(2), quotationData.quotationCurrency);
     }
   }
 
-  // Calculate final base after inflation (if any) - keep in USD for now
-  let finalBaseAfterInflationUSD = inflationProjectedCostUSD;
+  // Calculate final base after inflation (if any)
+  let finalBaseAfterInflationInQuotationCurrency = inflationProjectedCostInQuotationCurrency;
 
-  // If inflation wasn't applied, use the original subtotal in USD
+  // If inflation wasn't applied, use the original subtotal
   if (!quotationData.inflation.applyInflationAdjustment) {
-    finalBaseAfterInflationUSD = subtotalWithComplexityUSD;
+    finalBaseAfterInflationInQuotationCurrency = subtotalWithComplexityInQuotationCurrency;
   }
 
   // Platform cost - keep in USD (tools will be added AFTER markup)
