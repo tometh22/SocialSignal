@@ -46,7 +46,8 @@ const EnhancedTeamConfig: React.FC = () => {
     loadPersonnel,
     availableRoles,
     availablePersonnel,
-    recommendedRoleIds
+    recommendedRoleIds,
+    getPersonnelRate
   } = useOptimizedQuote();
 
   // Estados para la nueva UI
@@ -463,10 +464,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       <div className="flex-grow">
                         <div className="font-medium">{person.name}</div>
                         <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
-                          {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{quotationData.quotationCurrency === 'ARS' ? 
-                            (person.hourlyRateARS || person.hourlyRate || 50) :
-                            (person.hourlyRate || 50)
-                          }/h
+                          ${getPersonnelRate(person.id, quotationData.quotationCurrency)}/h
                         </div>
                       </div>
                       {isSelected && (
@@ -580,7 +578,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     <span className="text-xs text-gray-500">h</span>
                                   </div>
                                   <div className="flex items-center space-x-2">
-                                    <span className="text-xs">{quotationData.quotationCurrency === 'ARS' ? '$' : '$'}</span>
+                                    <span className="text-xs">$</span>
                                     <Input
                                       type="number"
                                       step="0.01"
@@ -603,7 +601,7 @@ const EnhancedTeamConfig: React.FC = () => {
                                     <div className="text-xs text-gray-500">horas</div>
                                   </div>
                                   <div className="text-center">
-                                    <div className="font-medium text-sm">{quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{member.rate}</div>
+                                    <div className="font-medium text-sm">${member.rate}</div>
                                     <div className="text-xs text-gray-500">por hora</div>
                                   </div>
                                 </>
@@ -612,7 +610,7 @@ const EnhancedTeamConfig: React.FC = () => {
                               {/* Cost */}
                               <div className="text-center">
                                 <div className="font-bold text-lg text-primary">
-                                  {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{(() => {
+                                  ${(() => {
                                     if (!isEditing) return member.cost;
                                     
                                     const tempValues = tempEditValues[member.id];

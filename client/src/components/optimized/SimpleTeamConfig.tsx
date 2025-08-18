@@ -372,9 +372,7 @@ const SimpleTeamConfig: React.FC = () => {
 
                     // Solo actualizar personal y tarifa, NO cambiar el rol automáticamente
                     // Usar la tarifa correcta según la moneda de cotización
-                    const officialRate = quotationData.quotationCurrency === 'ARS' ? 
-                      (selectedPerson.hourlyRateARS || selectedPerson.hourlyRate || 0) :
-                      (selectedPerson.hourlyRate || 0);
+                    const officialRate = getPersonnelRate(personnelId, quotationData.quotationCurrency);
 
                     setNewMember(prev => ({
                       ...prev,
