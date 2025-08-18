@@ -219,7 +219,7 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 5, title: "Complejidad" },
     ];
 
-    if (quotationData.project?.type === 'fee-mensual') {
+    if (quotationData.project?.type === 'always-on') {
       baseSteps.push({ num: 6, title: "Entregables" });
       baseSteps.push({ num: 7, title: "Revisión" });
     } else {
