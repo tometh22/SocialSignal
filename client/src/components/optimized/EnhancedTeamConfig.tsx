@@ -97,8 +97,11 @@ const EnhancedTeamConfig: React.FC = () => {
     setDraggedMembers(members);
   }, [quotationData.teamMembers]);
 
-  // Los datos ya están siendo gestionados por React Query en el contexto
-  // No necesitamos cargar datos adicionales aquí
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadRoles();
+    loadPersonnel();
+  }, [loadRoles, loadPersonnel]);
 
   // Obtener información del rol
   const getRoleInfo = (roleId: number) => {
