@@ -1311,49 +1311,10 @@ export default function FinancialReviewFinal() {
           </Card>
 
           <div className="flex flex-col gap-3">
-            {/* Botón Guardar Borrador */}
-            <Button 
-              onClick={handleSaveDraft}
-              disabled={isSavingDraft || !quotationData.client || !quotationData.project.name?.trim()}
-              size="lg"
-              variant="outline"
-              className="w-full border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-semibold py-3 px-8 rounded-xl transition-all"
-            >
-              {isSavingDraft ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Guardando borrador...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-5 w-5" />
-                  Guardar Borrador
-                </>
-              )}
-            </Button>
-
-            {/* Botón Finalizar Cotización */}
-            <Button 
-              onClick={handleFinalizeQuotation}
-              disabled={isFinalizing}
-              size="lg"
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all"
-            >
-              {isFinalizing ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Finalizando cotización...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-5 w-5" />
-                  Finalizar Cotización
-                  <div className="text-sm opacity-90">
-                    {formatFinalCurrency(finalTotalDisplay)}
-                  </div>
-                </>
-              )}
-            </Button>
+            {/* Botones de finalización removidos - ahora están solo en el último paso */}
+            <div className="text-center text-sm text-gray-500 py-4">
+              Continúa al siguiente paso para finalizar la cotización
+            </div>
           </div>
         </div>
       </div>

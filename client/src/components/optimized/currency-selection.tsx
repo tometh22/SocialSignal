@@ -2,12 +2,12 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
-import { DollarSign, Info } from 'lucide-react';
+import { DollarSign, Info, ArrowRight } from 'lucide-react';
 import { useCurrency } from '@/hooks/use-currency';
 import { Badge } from '@/components/ui/badge';
 
 const CurrencySelection: React.FC = () => {
-  const { quotationData, updateQuotationData, totalAmount } = useOptimizedQuote();
+  const { quotationData, updateQuotationData, totalAmount, nextStep } = useOptimizedQuote();
   const { exchangeRate, formatCurrency } = useCurrency();
 
   const handleCurrencyChange = (currency: 'ARS' | 'USD') => {
@@ -146,6 +146,20 @@ const CurrencySelection: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Botón para continuar */}
+      {quotationData.quotationCurrency && (
+        <div className="flex justify-center pt-4">
+          <Button 
+            onClick={nextStep}
+            size="lg"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3"
+          >
+            Continuar a Variantes
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       )}
     </div>
   );
