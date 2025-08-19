@@ -138,7 +138,7 @@ export function QuotationVariants({
     
     // IMPORTANTE: Intermedio es la BASE (cotización original sin cambios)
     // Básico y Full usan MISMO markup factor pero ajustan solo costo base
-    const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
+    const baseMarkupFactor = 2.0; // Fijo x2 como establece la cotización original
     
     const localVariants = [
       { 
@@ -222,10 +222,11 @@ export function QuotationVariants({
         const adjustedBaseCost = baseCost * costAdjustmentFactor;
         const adjustedComplexity = complexityAdjustment * costAdjustmentFactor;
         
-        // Usar el MISMO markup factor de la cotización base
-        const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
-        const adjustedMarkup = (adjustedBaseCost + adjustedComplexity) * (baseMarkupFactor - 1);
-        const adjustedTotal = (adjustedBaseCost + adjustedComplexity) * baseMarkupFactor;
+        // CALCULAR markup basado en la cotización original (x2 exacto)
+        // La cotización original: costo base + complejidad, luego x2
+        const originalMarkupFactor = 2.0; // Fijo x2 como en la cotización base
+        const adjustedMarkup = (adjustedBaseCost + adjustedComplexity) * (originalMarkupFactor - 1);
+        const adjustedTotal = (adjustedBaseCost + adjustedComplexity) * originalMarkupFactor;
 
         await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
           variantName: variant.name,
