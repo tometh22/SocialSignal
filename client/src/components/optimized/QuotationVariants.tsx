@@ -136,6 +136,10 @@ export function QuotationVariants({
       adjustedTotalAmount = totalAmount * exchangeRate;
     }
     
+    // IMPORTANTE: Intermedio es la BASE (cotización original sin cambios)
+    // Básico y Full usan MISMO markup factor pero ajustan solo costo base
+    const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
+    
     const localVariants = [
       { 
         id: -1,
@@ -145,8 +149,9 @@ export function QuotationVariants({
         variantOrder: 1,
         baseCost: adjustedBaseCost * 0.75,
         complexityAdjustment: adjustedComplexityAdjustment * 0.75,
-        markupAmount: adjustedMarkupAmount * 0.75,
-        totalAmount: adjustedTotalAmount * 0.75,
+        // Recalcular markup con el MISMO factor pero sobre los costos reducidos
+        markupAmount: (adjustedBaseCost * 0.75 + adjustedComplexityAdjustment * 0.75) * (baseMarkupFactor - 1),
+        totalAmount: (adjustedBaseCost * 0.75 + adjustedComplexityAdjustment * 0.75) * baseMarkupFactor,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -156,11 +161,11 @@ export function QuotationVariants({
         variantName: 'Intermedio', 
         variantDescription: 'Versión estándar con funcionalidades completas',
         variantOrder: 2,
-        baseCost: adjustedBaseCost,
-        complexityAdjustment: adjustedComplexityAdjustment,
-        markupAmount: adjustedMarkupAmount,
-        totalAmount: adjustedTotalAmount,
-        isSelected: false,
+        baseCost: adjustedBaseCost, // BASE SIN CAMBIOS
+        complexityAdjustment: adjustedComplexityAdjustment, // BASE SIN CAMBIOS
+        markupAmount: adjustedMarkupAmount, // BASE SIN CAMBIOS
+        totalAmount: adjustedTotalAmount, // BASE SIN CAMBIOS - Esta es la cotización original
+        isSelected: true, // Esta debe estar seleccionada por defecto
         createdAt: new Date().toISOString()
       },
       { 
@@ -169,10 +174,11 @@ export function QuotationVariants({
         variantName: 'Full', 
         variantDescription: 'Versión premium con todas las funcionalidades',
         variantOrder: 3,
-        baseCost: adjustedBaseCost * 1.35,
-        complexityAdjustment: adjustedComplexityAdjustment * 1.35,
-        markupAmount: adjustedMarkupAmount * 1.35,
-        totalAmount: adjustedTotalAmount * 1.35,
+        baseCost: adjustedBaseCost * 1.8,
+        complexityAdjustment: adjustedComplexityAdjustment * 1.8,
+        // Recalcular markup con el MISMO factor pero sobre los costos aumentados
+        markupAmount: (adjustedBaseCost * 1.8 + adjustedComplexityAdjustment * 1.8) * (baseMarkupFactor - 1),
+        totalAmount: (adjustedBaseCost * 1.8 + adjustedComplexityAdjustment * 1.8) * baseMarkupFactor,
         isSelected: false,
         createdAt: new Date().toISOString()
       }
@@ -185,33 +191,41 @@ export function QuotationVariants({
   };
 
   const createDefaultVariants = async () => {
+    // IMPORTANTE: Aplicar MISMO markup pero ajustar solo costos base
+    const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
+    
     const defaultVariants = [
       { 
         name: 'Básico', 
         description: 'Versión esencial con funcionalidades básicas',
-        adjustmentPercentage: -25,
+        adjustmentPercentage: -25, // 25% menos costo base
         order: 1 
       },
       { 
         name: 'Intermedio', 
         description: 'Versión estándar con funcionalidades completas',
-        adjustmentPercentage: 0,
+        adjustmentPercentage: 0, // BASE sin cambios - esta es la cotización original
         order: 2 
       },
       { 
         name: 'Full', 
         description: 'Versión premium con todas las funcionalidades',
-        adjustmentPercentage: 35,
+        adjustmentPercentage: 80, // 80% más costo base
         order: 3 
       }
     ];
 
     try {
       for (const variant of defaultVariants) {
-        const adjustedBaseCost = baseCost * (1 + variant.adjustmentPercentage / 100);
-        const adjustedComplexity = complexityAdjustment * (1 + variant.adjustmentPercentage / 100);
-        const adjustedMarkup = markupAmount * (1 + variant.adjustmentPercentage / 100);
-        const adjustedTotal = totalAmount * (1 + variant.adjustmentPercentage / 100);
+        // IMPORTANTE: Para variantes, aplicar MISMO markup factor pero solo ajustar costos base
+        const costAdjustmentFactor = (1 + variant.adjustmentPercentage / 100);
+        const adjustedBaseCost = baseCost * costAdjustmentFactor;
+        const adjustedComplexity = complexityAdjustment * costAdjustmentFactor;
+        
+        // Usar el MISMO markup factor de la cotización base
+        const baseMarkupFactor = quotationData.financials.marginFactor || 2.0;
+        const adjustedMarkup = (adjustedBaseCost + adjustedComplexity) * (baseMarkupFactor - 1);
+        const adjustedTotal = (adjustedBaseCost + adjustedComplexity) * baseMarkupFactor;
 
         await apiRequest(`/api/quotations/${quotationId}/variants`, 'POST', {
           variantName: variant.name,
