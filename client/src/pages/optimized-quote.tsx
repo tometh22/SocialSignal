@@ -215,15 +215,16 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
       { num: 1, title: "Info Básica" },
       { num: 2, title: "Plantilla" },
       { num: 3, title: "Equipo" },
-      { num: 4, title: "Variantes" },
-      { num: 5, title: "Complejidad" },
+      { num: 4, title: "Complejidad" },
     ];
 
     if (quotationData.project?.type === 'always-on') {
-      baseSteps.push({ num: 6, title: "Entregables" });
-      baseSteps.push({ num: 7, title: "Revisión" });
-    } else {
+      baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
+      baseSteps.push({ num: 7, title: "Variantes" });
+    } else {
+      baseSteps.push({ num: 5, title: "Revisión" });
+      baseSteps.push({ num: 6, title: "Variantes" });
     }
 
     return baseSteps;
@@ -329,23 +330,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
             {currentStep === 1 && <OptimizedBasicInfo />}
             {currentStep === 2 && <OptimizedTemplateSelection />}
             {currentStep === 3 && <EnhancedTeamConfig />}
-            {currentStep === 4 && (
-              <QuotationVariants
-                quotationId={quotationData.id || 0}
-                baseTeamMembers={quotationData.teamMembers as any}
-                quotationData={quotationData}
-                baseCost={baseCost}
-                complexityAdjustment={complexityAdjustment}
-                markupAmount={markupAmount}
-                totalAmount={totalAmount}
-                onVariantSelected={(variant) => {
-                  console.log('Variant selected:', variant);
-                }}
-              />
-            )}
-            {currentStep === 5 && <ComplexityFactorsCard />}
+            {currentStep === 4 && <ComplexityFactorsCard />}
 
-            {currentStep === 6 && quotationData.project?.type === 'always-on' && (
+            {currentStep === 5 && quotationData.project?.type === 'always-on' && (
               <div className="p-6">
                 <DeliverableConfiguration
                   isAlwaysOnProject={true}
@@ -358,9 +345,25 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
               </div>
             )}
 
+            {((currentStep === 5 && quotationData.project?.type !== 'always-on') ||
+              (currentStep === 6 && quotationData.project?.type === 'always-on')) && (
+              <OptimizedFinancialReview />
+            )}
+
             {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
-              <OptimizedFinancialReview />
+              <QuotationVariants
+                quotationId={quotationData.id || 0}
+                baseTeamMembers={quotationData.teamMembers as any}
+                quotationData={quotationData}
+                baseCost={baseCost}
+                complexityAdjustment={complexityAdjustment}
+                markupAmount={markupAmount}
+                totalAmount={totalAmount}
+                onVariantSelected={(variant) => {
+                  console.log('Variant selected:', variant);
+                }}
+              />
             )}
           </div>
         </div>
