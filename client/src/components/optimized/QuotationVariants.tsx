@@ -389,17 +389,30 @@ export function QuotationVariants({
   const handleFinalize = async () => {
     try {
       setIsFinalizing(true);
+      console.log("🚀 Iniciando finalización de cotización...");
+      
+      // Verificar que tenemos variantes seleccionadas o al menos crear una cotización válida
+      if (selectedVariantIds.length === 0) {
+        console.log("⚠️ No hay variantes seleccionadas, creando cotización base");
+      }
+      
       await saveQuotation('pending'); // Cambiar a pending en lugar de approved
+      console.log("✅ Cotización guardada exitosamente como pending");
+      
       toast({
         title: "Cotización creada",
         description: "La cotización se ha creado exitosamente y está pendiente de aprobación.",
       });
       setLocation('/manage-quotes');
-    } catch (error) {
-      console.error("Error al finalizar:", error);
+    } catch (error: any) {
+      console.error("❌ Error al finalizar:", error);
+      console.error("❌ Error details:", error.message);
+      console.error("❌ Error stack:", error.stack);
+      
+      const errorMessage = error.message || 'Error desconocido';
       toast({
         title: "Error al finalizar",
-        description: "No se pudo finalizar la cotización.",
+        description: `No se pudo finalizar la cotización: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -694,7 +707,7 @@ export function QuotationVariants({
                               +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
                             </div>
                           </div>
                         ) : variant.totalAmount < quotationData.totalAmount ? (
@@ -703,14 +716,14 @@ export function QuotationVariants({
                               {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
                             </div>
                           </div>
                         ) : (
                           <div className="text-right">
                             <span className="text-gray-500 font-medium">Base</span>
                             <div className="text-xs text-gray-500">
-                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
                             </div>
                           </div>
                         )}
