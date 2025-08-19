@@ -13,6 +13,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedQuote } from '@/context/optimized-quote-context';
 import { useLocation } from 'wouter';
+import { useCurrency } from '@/hooks/use-currency';
 
 interface QuotationVariant {
   id: number;
@@ -74,6 +75,7 @@ export function QuotationVariants({
   const { toast } = useToast();
   const { saveQuotation } = useOptimizedQuote();
   const [, setLocation] = useLocation();
+  const { exchangeRate } = useCurrency();
 
   useEffect(() => {
     if (quotationId && quotationId > 0) {
@@ -113,6 +115,19 @@ export function QuotationVariants({
       setLoading(false);
       return;
     }
+
+    // Ajustar valores según la moneda seleccionada
+    let adjustedBaseCost = baseCost;
+    let adjustedComplexityAdjustment = complexityAdjustment;
+    let adjustedMarkupAmount = markupAmount;
+    let adjustedTotalAmount = totalAmount;
+
+    if (quotationData.quotationCurrency === 'ARS') {
+      adjustedBaseCost = baseCost * exchangeRate;
+      adjustedComplexityAdjustment = complexityAdjustment * exchangeRate;
+      adjustedMarkupAmount = markupAmount * exchangeRate;
+      adjustedTotalAmount = totalAmount * exchangeRate;
+    }
     
     const localVariants = [
       { 
@@ -121,10 +136,10 @@ export function QuotationVariants({
         variantName: 'Básico', 
         variantDescription: 'Versión esencial con funcionalidades básicas',
         variantOrder: 1,
-        baseCost: baseCost * 0.75,
-        complexityAdjustment: complexityAdjustment * 0.75,
-        markupAmount: markupAmount * 0.75,
-        totalAmount: totalAmount * 0.75,
+        baseCost: adjustedBaseCost * 0.75,
+        complexityAdjustment: adjustedComplexityAdjustment * 0.75,
+        markupAmount: adjustedMarkupAmount * 0.75,
+        totalAmount: adjustedTotalAmount * 0.75,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -134,10 +149,10 @@ export function QuotationVariants({
         variantName: 'Intermedio', 
         variantDescription: 'Versión estándar con funcionalidades completas',
         variantOrder: 2,
-        baseCost: baseCost,
-        complexityAdjustment: complexityAdjustment,
-        markupAmount: markupAmount,
-        totalAmount: totalAmount,
+        baseCost: adjustedBaseCost,
+        complexityAdjustment: adjustedComplexityAdjustment,
+        markupAmount: adjustedMarkupAmount,
+        totalAmount: adjustedTotalAmount,
         isSelected: false,
         createdAt: new Date().toISOString()
       },
@@ -147,10 +162,10 @@ export function QuotationVariants({
         variantName: 'Full', 
         variantDescription: 'Versión premium con todas las funcionalidades',
         variantOrder: 3,
-        baseCost: baseCost * 1.35,
-        complexityAdjustment: complexityAdjustment * 1.35,
-        markupAmount: markupAmount * 1.35,
-        totalAmount: totalAmount * 1.35,
+        baseCost: adjustedBaseCost * 1.35,
+        complexityAdjustment: adjustedComplexityAdjustment * 1.35,
+        markupAmount: adjustedMarkupAmount * 1.35,
+        totalAmount: adjustedTotalAmount * 1.35,
         isSelected: false,
         createdAt: new Date().toISOString()
       }
@@ -342,11 +357,12 @@ export function QuotationVariants({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', {
+    const isARS = quotationData.quotationCurrency === 'ARS';
+    return new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
       style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      currency: isARS ? 'ARS' : 'USD',
+      minimumFractionDigits: isARS ? 0 : 2,
+      maximumFractionDigits: isARS ? 0 : 2,
     }).format(amount);
   };
 

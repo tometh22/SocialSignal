@@ -10,7 +10,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useLocation } from 'wouter';
 
 const CurrencySelection: React.FC = () => {
-  const { quotationData, updateQuotationData, totalAmount, nextStep } = useOptimizedQuote();
+  const { quotationData, updateQuotationData, totalAmount, nextStep, baseCost, complexityAdjustment, markupAmount } = useOptimizedQuote();
   const { exchangeRate, formatCurrency } = useCurrency();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -43,25 +43,55 @@ const CurrencySelection: React.FC = () => {
         return;
       }
 
-      // Crear cotización directa sin variantes
+      // Los valores ya están disponibles desde el contexto
+
+      // Ajustar los montos según la moneda seleccionada
+      let finalTotalAmount = totalAmount;
+      let finalBaseCost = baseCost;
+      let finalComplexityAdjustment = complexityAdjustment; 
+      let finalMarkupAmount = markupAmount;
+
+      if (quotationData.quotationCurrency === 'ARS') {
+        // Convertir a ARS si está seleccionada esa moneda
+        finalTotalAmount = totalAmount * exchangeRate;
+        finalBaseCost = baseCost * exchangeRate;
+        finalComplexityAdjustment = complexityAdjustment * exchangeRate;
+        finalMarkupAmount = markupAmount * exchangeRate;
+      }
+
+      // Crear cotización con el formato correcto que espera el API
       const finalQuotationData = {
-        ...quotationData,
+        clientId: quotationData.client.id,
+        projectName: quotationData.project.name,
+        analysisType: quotationData.analysisType,
+        projectType: quotationData.project.type,
+        mentionsVolume: quotationData.mentionsVolume,
+        countriesCovered: quotationData.countriesCovered,
+        clientEngagement: quotationData.clientEngagement,
+        templateId: quotationData.template?.id || null,
+        baseCost: finalBaseCost,
+        complexityAdjustment: finalComplexityAdjustment,
+        markupAmount: finalMarkupAmount,
+        marginFactor: quotationData.financials.marginFactor,
+        platformCost: quotationData.financials.platformCost,
+        deviationPercentage: quotationData.financials.deviationPercentage,
+        discountPercentage: quotationData.financials.discountPercentage || 0,
+        totalAmount: finalTotalAmount,
+        toolsCost: quotationData.financials.toolsCost,
+        priceMode: quotationData.financials.priceMode,
+        manualPrice: quotationData.financials.manualPrice,
         status: 'approved',
-        finalizedAt: new Date().toISOString(),
-        variants: [{
-          id: -1,
-          quotationId: quotationData.id || 0,
-          variantName: 'Única',
-          variantDescription: 'Cotización finalizada directamente',
-          variantOrder: 1,
-          baseCost: totalAmount * 0.7, // Estimación de base cost
-          complexityAdjustment: totalAmount * 0.2, // Estimación de ajuste
-          markupAmount: totalAmount * 0.1, // Estimación de markup
-          totalAmount: totalAmount,
-          isSelected: true,
-          createdAt: new Date().toISOString()
-        }]
+        projectStartDate: quotationData.inflation.projectStartDate || null,
+        applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment,
+        inflationMethod: quotationData.inflation.inflationMethod,
+        manualInflationRate: quotationData.inflation.manualInflationRate,
+        quotationCurrency: quotationData.quotationCurrency,
+        exchangeRateAtQuote: exchangeRate,
+        usdExchangeRate: exchangeRate,
+        createdBy: 3 // TODO: Get actual user ID
       };
+
+      console.log('🚀 Sending quotation data:', finalQuotationData);
 
       const response = await apiRequest('/api/quotations', {
         method: 'POST',
