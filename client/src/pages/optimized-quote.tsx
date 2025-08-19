@@ -18,6 +18,7 @@ import OptimizedFinancialReview from '@/components/optimized/financial-review-fi
 import DeliverableConfiguration from '@/components/quotation/DeliverableConfiguration';
 import QuotationErrorBoundary from '@/components/quotation-error-boundary';
 import { QuotationVariants } from '@/components/optimized/QuotationVariants';
+import CurrencySelection from '@/components/optimized/currency-selection';
 
 interface OptimizedQuoteProps {
   quotationId?: number;
@@ -221,10 +222,12 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     if (quotationData.project?.type === 'always-on') {
       baseSteps.push({ num: 5, title: "Entregables" });
       baseSteps.push({ num: 6, title: "Revisión" });
-      baseSteps.push({ num: 7, title: "Variantes" });
+      baseSteps.push({ num: 7, title: "Moneda" });
+      baseSteps.push({ num: 8, title: "Variantes" });
     } else {
       baseSteps.push({ num: 5, title: "Revisión" });
-      baseSteps.push({ num: 6, title: "Variantes" });
+      baseSteps.push({ num: 6, title: "Moneda" });
+      baseSteps.push({ num: 7, title: "Variantes" });
     }
 
     return baseSteps;
@@ -352,6 +355,11 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
 
             {((currentStep === 6 && quotationData.project?.type !== 'always-on') ||
               (currentStep === 7 && quotationData.project?.type === 'always-on')) && (
+              <CurrencySelection />
+            )}
+
+            {((currentStep === 7 && quotationData.project?.type !== 'always-on') ||
+              (currentStep === 8 && quotationData.project?.type === 'always-on')) && (
               <QuotationVariants
                 quotationId={quotationData.id || 0}
                 baseTeamMembers={quotationData.teamMembers as any}
