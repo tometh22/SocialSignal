@@ -380,22 +380,26 @@ export function QuotationVariants({
   const formatCurrency = (amount: number) => {
     const isARS = quotationData.quotationCurrency === 'ARS';
     
-    // Solo logear cuando hay problemas
-    if (amount > 100 && quotationData.quotationCurrency) {
-      console.log('🪙 formatCurrency debug:', {
-        amount,
-        currency: quotationData.quotationCurrency,
-        isARS,
-        willShowAs: isARS ? `$${amount.toLocaleString('es-AR')}` : `$${amount.toFixed(2)}`
-      });
+    // IMPORTANTE: Las variantes están guardadas en USD, pero necesitamos mostrarlas en la moneda elegida
+    let finalAmount = amount;
+    if (isARS) {
+      finalAmount = amount * exchangeRate; // Convertir USD a ARS
     }
+    
+    console.log('🪙 formatCurrency conversion:', {
+      originalAmount: amount,
+      currency: quotationData.quotationCurrency,
+      exchangeRate,
+      finalAmount,
+      isARS
+    });
     
     return new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
       style: 'currency',
       currency: isARS ? 'ARS' : 'USD',
       minimumFractionDigits: isARS ? 0 : 2,
       maximumFractionDigits: isARS ? 0 : 2,
-    }).format(amount);
+    }).format(finalAmount);
   };
 
   const handleSave = async () => {
@@ -749,7 +753,7 @@ export function QuotationVariants({
                     <tr key={variant.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 font-medium">{variant.variantName}</td>
                       <td className="p-2 text-right">{formatCurrency(variant.baseCost)}</td>
-                      <td className="p-2 text-right">x{(variant.totalAmount / variant.baseCost).toFixed(1)}</td>
+                      <td className="p-2 text-right">x{(variant.totalAmount / (variant.baseCost + variant.complexityAdjustment)).toFixed(1)}</td>
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
                         {(() => {
