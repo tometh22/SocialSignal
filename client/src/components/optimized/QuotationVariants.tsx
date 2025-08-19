@@ -106,7 +106,14 @@ export function QuotationVariants({
   };
 
   const createLocalVariants = () => {
-    console.log('🎨 Creating local variants with:', { baseCost, complexityAdjustment, markupAmount, totalAmount });
+    console.log('🎨 Creating local variants with:', { 
+      baseCost, 
+      complexityAdjustment, 
+      markupAmount, 
+      totalAmount,
+      currency: quotationData.quotationCurrency,
+      exchangeRate
+    });
     setLoading(true);
     
     // Check if we have valid data
@@ -358,6 +365,17 @@ export function QuotationVariants({
 
   const formatCurrency = (amount: number) => {
     const isARS = quotationData.quotationCurrency === 'ARS';
+    
+    // Solo logear cuando hay problemas
+    if (amount > 100 && quotationData.quotationCurrency) {
+      console.log('🪙 formatCurrency debug:', {
+        amount,
+        currency: quotationData.quotationCurrency,
+        isARS,
+        willShowAs: isARS ? `$${amount.toLocaleString('es-AR')}` : `$${amount.toFixed(2)}`
+      });
+    }
+    
     return new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
       style: 'currency',
       currency: isARS ? 'ARS' : 'USD',
@@ -720,32 +738,44 @@ export function QuotationVariants({
                       <td className="p-2 text-right">x{(variant.totalAmount / variant.baseCost).toFixed(1)}</td>
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
-                        {variant.totalAmount > quotationData.totalAmount ? (
-                          <div className="text-right">
-                            <span className="text-green-600 font-medium">
-                              +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                            </span>
-                            <div className="text-xs text-gray-500">
-                              +${(variant.totalAmount - quotationData.totalAmount).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} ARS
-                            </div>
-                          </div>
-                        ) : variant.totalAmount < quotationData.totalAmount ? (
-                          <div className="text-right">
-                            <span className="text-red-600 font-medium">
-                              {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                            </span>
-                            <div className="text-xs text-gray-500">
-                              ${(variant.totalAmount - quotationData.totalAmount).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} ARS
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-right">
-                            <span className="text-gray-500 font-medium">Base</span>
-                            <div className="text-xs text-gray-500">
-                              0 ARS
-                            </div>
-                          </div>
-                        )}
+                        {(() => {
+                          // Encontrar la variante base (Básico) como referencia
+                          const baseVariant = variants.find(v => v.variantName === 'Básico') || variants[0];
+                          if (!baseVariant) return <span>-</span>;
+                          
+                          if (variant.totalAmount > baseVariant.totalAmount) {
+                            const percentDiff = Math.round(((variant.totalAmount / baseVariant.totalAmount) - 1) * 100);
+                            const amountDiff = variant.totalAmount - baseVariant.totalAmount;
+                            return (
+                              <div className="text-right">
+                                <span className="text-green-600 font-medium">+{percentDiff}%</span>
+                                <div className="text-xs text-gray-500">
+                                  +{formatCurrency(amountDiff)}
+                                </div>
+                              </div>
+                            );
+                          } else if (variant.totalAmount < baseVariant.totalAmount) {
+                            const percentDiff = Math.round(((variant.totalAmount / baseVariant.totalAmount) - 1) * 100);
+                            const amountDiff = variant.totalAmount - baseVariant.totalAmount;
+                            return (
+                              <div className="text-right">
+                                <span className="text-red-600 font-medium">{percentDiff}%</span>
+                                <div className="text-xs text-gray-500">
+                                  {formatCurrency(amountDiff)}
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="text-right">
+                                <span className="text-gray-500 font-medium">Base</span>
+                                <div className="text-xs text-gray-500">
+                                  {formatCurrency(0)}
+                                </div>
+                              </div>
+                            );
+                          }
+                        })()}
                       </td>
                     </tr>
                   ))}
