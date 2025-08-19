@@ -872,8 +872,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteQuotation(id: number): Promise<boolean> {
-    const result = await db.delete(quotations).where(eq(quotations.id, id)).returning();
-    return result.length > 0;
+    try {
+      // Primero eliminar las variantes de cotización
+      await db.delete(quotationVariants).where(eq(quotationVariants.quotationId, id));
+      
+      // Luego eliminar los miembros del equipo
+      await db.delete(quotationTeamMembers).where(eq(quotationTeamMembers.quotationId, id));
+      
+      // Finalmente eliminar la cotización
+      const result = await db.delete(quotations).where(eq(quotations.id, id)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error(`❌ Error eliminando cotización ${id}:`, error);
+      throw error;
+    }
   }
 
   // Negotiation history operations
