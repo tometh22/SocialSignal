@@ -390,6 +390,11 @@ export function QuotationVariants({
     try {
       setIsFinalizing(true);
       console.log("🚀 Iniciando finalización de cotización...");
+      console.log("🔍 Estado actual del contexto:", {
+        quotationData: quotationData,
+        teamMembersLength: quotationData.teamMembers?.length || 0,
+        selectedVariantIds: selectedVariantIds
+      });
       
       // Verificar que tenemos variantes seleccionadas o al menos crear una cotización válida
       if (selectedVariantIds.length === 0) {
@@ -401,13 +406,14 @@ export function QuotationVariants({
       
       toast({
         title: "Cotización creada",
-        description: "La cotización se ha creado exitosamente y está pendiente de aprobación.",
+        description: "La cotización se ha creada exitosamente y está pendiente de aprobación.",
       });
       setLocation('/manage-quotes');
     } catch (error: any) {
       console.error("❌ Error al finalizar:", error);
       console.error("❌ Error details:", error.message);
       console.error("❌ Error stack:", error.stack);
+      console.error("❌ quotationData at error:", quotationData);
       
       const errorMessage = error.message || 'Error desconocido';
       toast({
@@ -698,7 +704,7 @@ export function QuotationVariants({
                     <tr key={variant.id} className="border-b hover:bg-gray-50">
                       <td className="p-2 font-medium">{variant.variantName}</td>
                       <td className="p-2 text-right">{formatCurrency(variant.baseCost)}</td>
-                      <td className="p-2 text-right">{formatCurrency(variant.markupAmount)}</td>
+                      <td className="p-2 text-right">x{(variant.totalAmount / variant.baseCost).toFixed(1)}</td>
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
                         {variant.totalAmount > quotationData.totalAmount ? (
@@ -707,7 +713,7 @@ export function QuotationVariants({
                               +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
+                              +{formatCurrency(variant.totalAmount - quotationData.totalAmount).replace('$', '').replace(',', '.')} ARS
                             </div>
                           </div>
                         ) : variant.totalAmount < quotationData.totalAmount ? (
@@ -716,14 +722,14 @@ export function QuotationVariants({
                               {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
+                              {formatCurrency(variant.totalAmount - quotationData.totalAmount).replace('$', '').replace(',', '.')} ARS
                             </div>
                           </div>
                         ) : (
                           <div className="text-right">
                             <span className="text-gray-500 font-medium">Base</span>
                             <div className="text-xs text-gray-500">
-                              Markup: x{(variant.totalAmount / variant.baseCost).toFixed(1)}
+                              0 ARS
                             </div>
                           </div>
                         )}
