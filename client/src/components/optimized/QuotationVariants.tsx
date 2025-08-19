@@ -389,10 +389,10 @@ export function QuotationVariants({
   const handleFinalize = async () => {
     try {
       setIsFinalizing(true);
-      await saveQuotation('approved');
+      await saveQuotation('pending'); // Cambiar a pending en lugar de approved
       toast({
-        title: "Cotización finalizada",
-        description: "La cotización se ha finalizado exitosamente.",
+        title: "Cotización creada",
+        description: "La cotización se ha creado exitosamente y está pendiente de aprobación.",
       });
       setLocation('/manage-quotes');
     } catch (error) {
