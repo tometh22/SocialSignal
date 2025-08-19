@@ -638,7 +638,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
   // Navigation functions
   const nextStep = useCallback(() => {
-    const maxStep = quotationData.project.type === 'always-on' ? 7 : 6;
+    const maxStep = quotationData.project.type === 'always-on' ? 8 : 7;
     if (currentStep < maxStep) {
       setCurrentStep(currentStep + 1);
     }
