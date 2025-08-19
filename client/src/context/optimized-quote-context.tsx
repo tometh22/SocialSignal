@@ -263,7 +263,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
 
   const queryClient = useQueryClient();
-  const { convertToUSD } = useCurrency();
+  const { convertToUSD, exchangeRate } = useCurrency();
 
   // Get data from queries first
   const { data: roles = [] } = useQuery<Role[]>({
@@ -516,13 +516,13 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
 
     // Check if we're in manual pricing mode
     if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
-      console.log(`✏️ Manual pricing mode: Target price $${quotationData.financials.manualPrice}`);
+      console.log(`✏️ Manual pricing mode: Target price ARS $${quotationData.financials.manualPrice}`);
 
-      // Calculate what margin would be needed to reach the manual price (before tools)
-      const manualPrice = quotationData.financials.manualPrice;
+      // Convert manual price from ARS to USD for internal calculations
+      const manualPriceUSD = quotationData.financials.manualPrice / exchangeRate;
       const toolsCost = quotationData.financials.toolsCost || 0;
       // Manual price includes tools, so we need to subtract tools to get the base for markup calculation
-      const priceBeforeTools = manualPrice - toolsCost;
+      const priceBeforeTools = manualPriceUSD - toolsCost;
       calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
       const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
 
@@ -542,7 +542,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }));
 
       subtotalWithMarkup = priceBeforeTools;
-      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup}`);
+      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup} USD`);
     } else {
       // Calculate markup (margin) normally
       const marginFactor = quotationData.financials.marginFactor || 2.0;

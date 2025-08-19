@@ -964,9 +964,9 @@ export default function FinancialReviewFinal() {
                       size="sm"
                       onClick={() => {
                         updateFinancials({ priceMode: 'manual' });
-                        // Si no hay precio manual, usar el precio actual como punto de partida
+                        // Si no hay precio manual, usar el precio actual convertido a ARS como punto de partida
                         if (!quotationData.financials.manualPrice) {
-                          updateFinancials({ manualPrice: finalTotalUSD });
+                          updateFinancials({ manualPrice: finalTotalUSD * exchangeRate });
                         }
                       }}
                       className="flex-1"
@@ -982,7 +982,7 @@ export default function FinancialReviewFinal() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between mb-1">
                             <Label className="text-sm font-medium text-blue-900">
-                              Precio objetivo (USD)
+                              Precio objetivo (ARS)
                             </Label>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -994,7 +994,7 @@ export default function FinancialReviewFinal() {
                             </Tooltip>
                           </div>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-500" />
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 font-semibold">$</span>
                             <Input
                               type="number"
                               placeholder="0.00"
@@ -1015,14 +1015,14 @@ export default function FinancialReviewFinal() {
                           <div className="bg-gray-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-gray-600">Costo Base</p>
                             <p className="font-mono text-sm font-semibold text-gray-900">
-                              ${(subtotalWithPlatformUSD + toolsCostUSD).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              ${((subtotalWithPlatformUSD + toolsCostUSD) * exchangeRate).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </p>
                           </div>
                           <div className="bg-blue-50 rounded-lg p-2 text-center">
                             <p className="text-xs text-blue-600">Markup</p>
                             <p className="font-mono text-sm font-semibold text-blue-900">
                               {quotationData.financials.manualPrice 
-                                ? `${(((quotationData.financials.manualPrice - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
+                                ? `${(((quotationData.financials.manualPrice / exchangeRate - toolsCostUSD) / (1 - (discountPercentage / 100))) / subtotalWithPlatformUSD).toFixed(2)}x`
                                 : '0.00x'}
                             </p>
                           </div>
@@ -1030,7 +1030,7 @@ export default function FinancialReviewFinal() {
                             <p className="text-xs text-green-600">Ganancia</p>
                             <p className="font-mono text-sm font-semibold text-green-900">
                               ${quotationData.financials.manualPrice 
-                                ? Math.max(0, quotationData.financials.manualPrice - (subtotalWithPlatformUSD + toolsCostUSD)).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                                ? Math.max(0, quotationData.financials.manualPrice - ((subtotalWithPlatformUSD + toolsCostUSD) * exchangeRate)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
                                 : '0'}
                             </p>
                           </div>
