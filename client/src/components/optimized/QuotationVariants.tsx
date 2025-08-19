@@ -689,15 +689,30 @@ export function QuotationVariants({
                       <td className="p-2 text-right font-medium">{formatCurrency(variant.totalAmount)}</td>
                       <td className="p-2 text-center">
                         {variant.totalAmount > quotationData.totalAmount ? (
-                          <span className="text-green-600">
-                            +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                          </span>
+                          <div className="text-right">
+                            <span className="text-green-600 font-medium">
+                              +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                            </span>
+                            <div className="text-xs text-gray-500">
+                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                            </div>
+                          </div>
                         ) : variant.totalAmount < quotationData.totalAmount ? (
-                          <span className="text-red-600">
-                            {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
-                          </span>
+                          <div className="text-right">
+                            <span className="text-red-600 font-medium">
+                              {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
+                            </span>
+                            <div className="text-xs text-gray-500">
+                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                            </div>
+                          </div>
                         ) : (
-                          <span className="text-gray-500">Base</span>
+                          <div className="text-right">
+                            <span className="text-gray-500 font-medium">Base</span>
+                            <div className="text-xs text-gray-500">
+                              Markup: {Math.round((variant.markupAmount / variant.baseCost) * 100)}%
+                            </div>
+                          </div>
                         )}
                       </td>
                     </tr>

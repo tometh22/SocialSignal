@@ -42,6 +42,7 @@ import {
   clientModoComments,
   activeProjects,
   quotations,
+  quotationVariants,
   timeEntries,
   personnel,
   roles,
@@ -2536,6 +2537,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error(`❌ Error fetching team members for variant ${variantId}:`, error);
       res.status(500).json({ message: "Failed to fetch team members", error: String(error) });
+    }
+  });
+
+  // Select a quotation variant (mark as selected and update quotation)
+  app.patch("/api/quotations/:quotationId/variants/:variantId/select", requireAuth, async (req, res) => {
+    const quotationId = parseInt(req.params.quotationId);
+    const variantId = parseInt(req.params.variantId);
+    
+    if (isNaN(quotationId)) return res.status(400).json({ message: "Invalid quotation ID" });
+    if (isNaN(variantId)) return res.status(400).json({ message: "Invalid variant ID" });
+
+    try {
+      console.log(`🎯 Selecting variant ${variantId} for quotation ${quotationId}`);
+      
+      // First, unselect all variants for this quotation
+      await db.update(quotationVariants)
+        .set({ isSelected: false })
+        .where(eq(quotationVariants.quotationId, quotationId));
+
+      // Then select the chosen variant
+      await db.update(quotationVariants)
+        .set({ isSelected: true })
+        .where(and(
+          eq(quotationVariants.id, variantId),
+          eq(quotationVariants.quotationId, quotationId)
+        ));
+
+      console.log(`✅ Variant ${variantId} selected for quotation ${quotationId}`);
+      res.json({ success: true, message: "Variant selected successfully" });
+      
+    } catch (error) {
+      console.error(`❌ Error selecting variant ${variantId} for quotation ${quotationId}:`, error);
+      res.status(500).json({ message: "Failed to select variant", error: String(error) });
     }
   });
 

@@ -80,7 +80,7 @@ const CurrencySelection: React.FC = () => {
         toolsCost: quotationData.financials.toolsCost,
         priceMode: quotationData.financials.priceMode,
         manualPrice: quotationData.financials.manualPrice,
-        status: 'approved',
+        status: 'pending',
         projectStartDate: quotationData.inflation.projectStartDate || null,
         applyInflationAdjustment: quotationData.inflation.applyInflationAdjustment,
         inflationMethod: quotationData.inflation.inflationMethod,

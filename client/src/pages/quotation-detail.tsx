@@ -14,6 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { NegotiationHistory } from '@/components/negotiation-history';
+import { QuotationVariantsDisplay } from '@/components/quotation/quotation-variants-display';
 
 // Interfaces
 interface TeamMember {
@@ -43,6 +44,7 @@ interface Quotation {
   status: string;
   adjustmentReason: string;
   additionalNotes: string;
+  quotationCurrency?: string;
   createdAt: string;
 }
 
@@ -713,6 +715,18 @@ const QuotationDetail: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Componente de Variantes de Cotización */}
+          <QuotationVariantsDisplay
+            quotationId={parseInt(quotationId!)}
+            quotationStatus={quotation.status}
+            quotationCurrency={quotation.quotationCurrency || 'ARS'}
+            baseTotal={quotation.totalAmount}
+            onVariantApproved={() => {
+              // Recargar los datos de la cotización después de aprobar una variante
+              window.location.reload();
+            }}
+          />
         </div>
       </div>
     </div>
