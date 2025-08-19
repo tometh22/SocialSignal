@@ -762,25 +762,40 @@ export function QuotationVariants({
                           const baseVariant = variants.find(v => v.variantName === 'Básico') || variants[0];
                           if (!baseVariant) return <span>-</span>;
                           
-                          if (variant.totalAmount > baseVariant.totalAmount) {
-                            const percentDiff = Math.round(((variant.totalAmount / baseVariant.totalAmount) - 1) * 100);
-                            const amountDiff = variant.totalAmount - baseVariant.totalAmount;
+                          // IMPORTANTE: Aplicar conversión de moneda ANTES de calcular diferencias
+                          const isARS = quotationData.quotationCurrency === 'ARS';
+                          const convertedVariantAmount = isARS ? variant.totalAmount * exchangeRate : variant.totalAmount;
+                          const convertedBaseAmount = isARS ? baseVariant.totalAmount * exchangeRate : baseVariant.totalAmount;
+                          
+                          if (convertedVariantAmount > convertedBaseAmount) {
+                            const percentDiff = Math.round(((convertedVariantAmount / convertedBaseAmount) - 1) * 100);
+                            const amountDiff = convertedVariantAmount - convertedBaseAmount;
                             return (
                               <div className="text-right">
                                 <span className="text-green-600 font-medium">+{percentDiff}%</span>
                                 <div className="text-xs text-gray-500">
-                                  +{formatCurrency(amountDiff)}
+                                  +{new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
+                                    style: 'currency',
+                                    currency: isARS ? 'ARS' : 'USD',
+                                    minimumFractionDigits: isARS ? 0 : 2,
+                                    maximumFractionDigits: isARS ? 0 : 2,
+                                  }).format(amountDiff)}
                                 </div>
                               </div>
                             );
-                          } else if (variant.totalAmount < baseVariant.totalAmount) {
-                            const percentDiff = Math.round(((variant.totalAmount / baseVariant.totalAmount) - 1) * 100);
-                            const amountDiff = variant.totalAmount - baseVariant.totalAmount;
+                          } else if (convertedVariantAmount < convertedBaseAmount) {
+                            const percentDiff = Math.round(((convertedVariantAmount / convertedBaseAmount) - 1) * 100);
+                            const amountDiff = convertedVariantAmount - convertedBaseAmount;
                             return (
                               <div className="text-right">
                                 <span className="text-red-600 font-medium">{percentDiff}%</span>
                                 <div className="text-xs text-gray-500">
-                                  {formatCurrency(amountDiff)}
+                                  {new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
+                                    style: 'currency',
+                                    currency: isARS ? 'ARS' : 'USD',
+                                    minimumFractionDigits: isARS ? 0 : 2,
+                                    maximumFractionDigits: isARS ? 0 : 2,
+                                  }).format(amountDiff)}
                                 </div>
                               </div>
                             );
@@ -789,7 +804,12 @@ export function QuotationVariants({
                               <div className="text-right">
                                 <span className="text-gray-500 font-medium">Base</span>
                                 <div className="text-xs text-gray-500">
-                                  {formatCurrency(0)}
+                                  {new Intl.NumberFormat(isARS ? 'es-AR' : 'en-US', {
+                                    style: 'currency',
+                                    currency: isARS ? 'ARS' : 'USD',
+                                    minimumFractionDigits: isARS ? 0 : 2,
+                                    maximumFractionDigits: isARS ? 0 : 2,
+                                  }).format(0)}
                                 </div>
                               </div>
                             );
