@@ -206,7 +206,10 @@ export default function FinancialReviewFinal() {
 
   // Platform cost in ARS (tools will be added AFTER markup)
   const platformCostARS = quotationData.financials.platformCost || 0;
-  const toolsCostARS = quotationData.financials.toolsCost || 0;
+  // Tools cost is stored in USD, convert to ARS
+  const toolsCostUSD = quotationData.financials.toolsCost || 0;
+  const { convertFromUSD } = useCurrency();
+  const toolsCostARS = convertFromUSD(toolsCostUSD, 'ARS');
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
 
   // Check if we're in manual pricing mode
@@ -235,7 +238,14 @@ export default function FinancialReviewFinal() {
     finalTotalARS = subtotalWithPlatformAndToolsARS - discountAmountARS;
   }
 
-  // All values are already in ARS - no conversion needed
+  // Create USD equivalents for calculations that need them
+  const { convertToUSD, exchangeRate } = useCurrency();
+  const subtotalWithPlatformUSD = convertToUSD(subtotalWithPlatformARS, 'ARS');
+  const subtotalWithMarginUSD = convertToUSD(subtotalWithMarginARS, 'ARS');
+  const finalTotalUSD = convertToUSD(finalTotalARS, 'ARS');
+  const inflationAdjustmentUSD = convertToUSD(inflationAdjustmentARS, 'ARS');
+  
+  // All values are already in ARS - no conversion needed for display
   const teamBaseCostDisplay = teamBaseCostARS;
   const teamComplexityAdjustmentDisplay = teamComplexityAdjustmentARS;
   const subtotalWithComplexityDisplay = teamBaseCostDisplay + teamComplexityAdjustmentDisplay;
@@ -1104,7 +1114,7 @@ export default function FinancialReviewFinal() {
                       </div>
                     </div>
                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">
-                      {inflationAdjustmentUSD > 0 ? `+${formatCurrency(inflationAdjustmentDisplay, quotationData.quotationCurrency)}` : 'Configurando...'}
+                      {inflationAdjustmentUSD > 0 ? `+${formatFinalCurrency(inflationAdjustmentDisplay)}` : 'Configurando...'}
                     </Badge>
                   </div>
 

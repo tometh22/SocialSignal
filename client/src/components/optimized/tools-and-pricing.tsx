@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useOptimizedQuote } from "@/context/optimized-quote-context";
+import { useCurrency } from "@/hooks/use-currency";
 import { Calculator, Wrench, DollarSign, ArrowRight } from "lucide-react";
 
 const ToolsAndPricing: React.FC = () => {
@@ -21,8 +22,12 @@ const ToolsAndPricing: React.FC = () => {
     updateManualPrice
   } = useOptimizedQuote();
 
+  const { convertFromUSD } = useCurrency();
   const subtotalBeforeTools = baseCost + complexityAdjustment;
-  const subtotalWithTools = subtotalBeforeTools + (quotationData.financials.toolsCost || 0);
+  // Convert tools cost from USD to ARS for display
+  const toolsCostUSD = quotationData.financials.toolsCost || 0;
+  const toolsCostARS = convertFromUSD(toolsCostUSD, 'ARS');
+  const subtotalWithTools = subtotalBeforeTools + toolsCostARS;
   
   const isManualMode = quotationData.financials.priceMode === 'manual';
   const effectiveMarginPercentage = quotationData.financials.marginPercentage || 0;
@@ -79,16 +84,16 @@ const ToolsAndPricing: React.FC = () => {
               <div className="p-3 bg-white rounded-md border text-sm space-y-1">
                 <div className="flex justify-between">
                   <span>Base + Complejidad:</span>
-                  <span className="font-mono">${subtotalBeforeTools.toFixed(2)}</span>
+                  <span className="font-mono">ARS {subtotalBeforeTools.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>+ Herramientas:</span>
-                  <span className="font-mono">${(quotationData.financials.toolsCost || 0).toFixed(2)}</span>
+                  <span>+ Herramientas (USD {toolsCostUSD.toFixed(2)}):</span>
+                  <span className="font-mono">ARS {toolsCostARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
                 <Separator className="my-1" />
                 <div className="flex justify-between font-medium">
                   <span>Subtotal:</span>
-                  <span className="font-mono">${subtotalWithTools.toFixed(2)}</span>
+                  <span className="font-mono">ARS {subtotalWithTools.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                 </div>
               </div>
             </div>
@@ -190,7 +195,10 @@ const ToolsAndPricing: React.FC = () => {
             <div>
               <div className="text-xs text-blue-600 mb-1">Herramientas</div>
               <div className="font-mono text-sm font-medium">
-                ${(quotationData.financials.toolsCost || 0).toFixed(2)}
+                USD {toolsCostUSD.toFixed(2)}
+              </div>
+              <div className="text-xs text-blue-500">
+                ARS {toolsCostARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </div>
             </div>
             <div>
