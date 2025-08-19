@@ -396,6 +396,19 @@ export function QuotationVariants({
         selectedVariantIds: selectedVariantIds
       });
       
+      // Verificar datos críticos antes de continuar
+      if (!quotationData.project.name?.trim()) {
+        throw new Error("Debe completar el nombre del proyecto en el primer paso antes de finalizar");
+      }
+      
+      if (!quotationData.client?.id) {
+        throw new Error("Debe seleccionar un cliente en el primer paso antes de finalizar");
+      }
+      
+      if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
+        throw new Error("Debe configurar el equipo en el paso correspondiente antes de finalizar");
+      }
+
       // Verificar que tenemos variantes seleccionadas o al menos crear una cotización válida
       if (selectedVariantIds.length === 0) {
         console.log("⚠️ No hay variantes seleccionadas, creando cotización base");
@@ -696,7 +709,7 @@ export function QuotationVariants({
                     <th className="text-right p-2">Costo Base</th>
                     <th className="text-right p-2">Markup</th>
                     <th className="text-right p-2">Total</th>
-                    <th className="text-center p-2">Diferencia</th>
+                    <th className="text-center p-2">Margen vs Base</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -713,7 +726,7 @@ export function QuotationVariants({
                               +{Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              +{formatCurrency(variant.totalAmount - quotationData.totalAmount).replace('$', '').replace(',', '.')} ARS
+                              +${(variant.totalAmount - quotationData.totalAmount).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} ARS
                             </div>
                           </div>
                         ) : variant.totalAmount < quotationData.totalAmount ? (
@@ -722,7 +735,7 @@ export function QuotationVariants({
                               {Math.round(((variant.totalAmount / quotationData.totalAmount) - 1) * 100)}%
                             </span>
                             <div className="text-xs text-gray-500">
-                              {formatCurrency(variant.totalAmount - quotationData.totalAmount).replace('$', '').replace(',', '.')} ARS
+                              ${(variant.totalAmount - quotationData.totalAmount).toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0})} ARS
                             </div>
                           </div>
                         ) : (

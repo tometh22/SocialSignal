@@ -942,6 +942,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }
 
       if (!quotationData.project.name?.trim()) {
+        console.error("❌ Validation failed: Missing project name");
         throw new Error("Debe ingresar el nombre del proyecto");
       }
 
@@ -956,6 +957,9 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       });
 
       if (status !== 'draft' && (!quotationData.teamMembers || quotationData.teamMembers.length === 0)) {
+        console.error("❌ Validation failed: No team members found for non-draft status");
+        console.error("❌ Team members data:", quotationData.teamMembers);
+        console.error("❌ Status:", status);
         throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
