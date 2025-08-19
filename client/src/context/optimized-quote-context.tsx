@@ -946,8 +946,17 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }
 
       // Para borradores, permitir cotizaciones sin equipo
-      if (status !== 'draft' && quotationData.teamMembers.length === 0) {
-        throw new Error("Debe agregar al menos un miembro al equipo");
+      // Logging para debug
+      console.log('📋 Validating quotation data:', {
+        status,
+        clientId: quotationData.client?.id,
+        projectName: quotationData.project.name,
+        teamMembersCount: quotationData.teamMembers?.length || 0,
+        teamMembers: quotationData.teamMembers
+      });
+
+      if (status !== 'draft' && (!quotationData.teamMembers || quotationData.teamMembers.length === 0)) {
+        throw new Error("Debe agregar al menos un miembro al equipo antes de finalizar la cotización");
       }
 
       const quotationPayload = {
