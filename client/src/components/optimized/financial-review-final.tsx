@@ -470,64 +470,7 @@ export default function FinancialReviewFinal() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
-      {/* Modern Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate("/quotations")}
-                className="hover:bg-gray-100"
-                size="sm"
-              >
-                ← Volver
-              </Button>
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">Editar Cotización</h1>
-                  <p className="text-xs text-gray-500">
-                    Crea y gestiona cotizaciones de manera optimizada
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={handleSaveDraft}
-                disabled={isSavingDraft}
-                className="border-gray-200 hover:bg-gray-50"
-                size="sm"
-              >
-                {isSavingDraft ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-1" />
-                )}
-                Guardar
-              </Button>
-              <Button
-                onClick={handleFinalizeQuotation}
-                disabled={isFinalizing}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-                size="sm"
-              >
-                {isFinalizing ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                )}
-                Finalizar Cotización
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Header removido - los botones de finalización ahora están solo en el último paso */}
 
       <div className="max-w-7xl mx-auto px-4 lg:px-6 py-8">
         {/* Executive Summary Cards */}

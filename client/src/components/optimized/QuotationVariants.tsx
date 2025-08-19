@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, Clock, DollarSign } from 'lucide-react';
+import { Plus, Copy, Trash2, Check, X, TrendingUp, TrendingDown, Minus, Users, Clock, DollarSign, Save, CheckCircle, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useOptimizedQuote } from '@/context/optimized-quote-context';
+import { useLocation } from 'wouter';
 
 interface QuotationVariant {
   id: number;
@@ -67,7 +69,11 @@ export function QuotationVariants({
     description: '',
     adjustmentPercentage: 0
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const { toast } = useToast();
+  const { saveQuotation } = useOptimizedQuote();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (quotationId && quotationId > 0) {
@@ -342,6 +348,47 @@ export function QuotationVariants({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await saveQuotation();
+      toast({
+        title: "Cotización guardada",
+        description: "La cotización se ha guardado correctamente.",
+      });
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      toast({
+        title: "Error al guardar",
+        description: "No se pudo guardar la cotización.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFinalize = async () => {
+    try {
+      setIsFinalizing(true);
+      await saveQuotation('approved');
+      toast({
+        title: "Cotización finalizada",
+        description: "La cotización se ha finalizado exitosamente.",
+      });
+      setLocation('/manage-quotes');
+    } catch (error) {
+      console.error("Error al finalizar:", error);
+      toast({
+        title: "Error al finalizar",
+        description: "No se pudo finalizar la cotización.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFinalizing(false);
+    }
   };
 
   const calculateTeamHours = (variant: QuotationVariant) => {
@@ -659,6 +706,50 @@ export function QuotationVariants({
           </div>
         </div>
       )}
+
+      {/* Botones de Finalización */}
+      <div className="flex justify-between items-center pt-8 border-t border-gray-200 mt-8">
+        <div className="text-sm text-gray-600">
+          Este es el último paso del proceso de cotización
+        </div>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={handleSave}
+            disabled={isSaving || isFinalizing}
+            className="border-gray-200 hover:bg-gray-50"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Guardar Borrador
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={handleFinalize}
+            disabled={isSaving || isFinalizing}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {isFinalizing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Finalizando...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Finalizar Cotización
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
