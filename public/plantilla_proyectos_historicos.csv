@@ -1,2 +1,1 @@
 Cliente,Proyecto,Fecha_Inicio,Fecha_Fin_Esperada,Fecha_Fin_Real,Estado,Tipo_Proyecto,Tipo_Analisis,Volumen_Menciones,Paises,Engagement,Costo_Base_USD,Ajuste_Complejidad,Factor_Markup,Moneda_Cotizacion,Tipo_Cambio,Personal_Asignado,Horas_Trabajadas,Costo_Herramientas,Notas
-"Ejemplo Cliente S.A.","Proyecto Demo","2024-01-15","2024-03-15","2024-03-20","completed","desarrollo-web","comprehensive","high","Argentina;Chile","medium",2500.00,450.00,2.0,"ARS",1300.00,"Juan Pérez;María García",120.5,150.00,"Ejemplo - eliminar esta fila"
