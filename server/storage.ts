@@ -24,6 +24,7 @@ import {
   type QuickTimeEntryDetail, type InsertQuickTimeEntryDetail,
   type UnquotedPersonnel, type InsertUnquotedPersonnel,
   type MonthlyHourAdjustment, type InsertMonthlyHourAdjustment,
+  type ProjectPriceAdjustment, type InsertProjectPriceAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
   type ExchangeRate, type InsertExchangeRate,
 
@@ -37,7 +38,7 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
+  projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -290,6 +291,14 @@ export interface IStorage {
   getMonthlyHourAdjustment(projectId: number, personnelId: number, year: number, month: number): Promise<any | undefined>;
   createMonthlyHourAdjustment(adjustment: any): Promise<any>;
   updateMonthlyHourAdjustment(id: number, adjustment: any): Promise<any | undefined>;
+
+  // Project Price Adjustment operations
+  getProjectPriceAdjustments(projectId: number): Promise<ProjectPriceAdjustment[]>;
+  getProjectPriceAdjustment(id: number): Promise<ProjectPriceAdjustment | undefined>;
+  createProjectPriceAdjustment(adjustment: InsertProjectPriceAdjustment): Promise<ProjectPriceAdjustment>;
+  updateProjectPriceAdjustment(id: number, adjustment: Partial<InsertProjectPriceAdjustment>): Promise<ProjectPriceAdjustment | undefined>;
+  deleteProjectPriceAdjustment(id: number): Promise<boolean>;
+  getCurrentProjectPrice(projectId: number): Promise<number>;
 
   // Exchange Rate operations
   getExchangeRates(): Promise<ExchangeRate[]>;
@@ -3024,6 +3033,120 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error deleting monthly hour adjustment:", error);
       return false;
+    }
+  }
+
+  // ==================== PROJECT PRICE ADJUSTMENT OPERATIONS ====================
+
+  async getProjectPriceAdjustments(projectId: number): Promise<ProjectPriceAdjustment[]> {
+    try {
+      const result = await db.select({
+        id: projectPriceAdjustments.id,
+        projectId: projectPriceAdjustments.projectId,
+        previousPrice: projectPriceAdjustments.previousPrice,
+        newPrice: projectPriceAdjustments.newPrice,
+        adjustmentPercentage: projectPriceAdjustments.adjustmentPercentage,
+        effectiveDate: projectPriceAdjustments.effectiveDate,
+        reason: projectPriceAdjustments.reason,
+        changeType: projectPriceAdjustments.changeType,
+        clientNotified: projectPriceAdjustments.clientNotified,
+        clientApproval: projectPriceAdjustments.clientApproval,
+        approvalDate: projectPriceAdjustments.approvalDate,
+        notes: projectPriceAdjustments.notes,
+        createdBy: projectPriceAdjustments.createdBy,
+        createdAt: projectPriceAdjustments.createdAt,
+        createdByName: users.name
+      })
+      .from(projectPriceAdjustments)
+      .leftJoin(users, eq(projectPriceAdjustments.createdBy, users.id))
+      .where(eq(projectPriceAdjustments.projectId, projectId))
+      .orderBy(desc(projectPriceAdjustments.effectiveDate));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting project price adjustments:", error);
+      throw error;
+    }
+  }
+
+  async getProjectPriceAdjustment(id: number): Promise<ProjectPriceAdjustment | undefined> {
+    try {
+      const [result] = await db.select()
+        .from(projectPriceAdjustments)
+        .where(eq(projectPriceAdjustments.id, id));
+
+      return result;
+    } catch (error) {
+      console.error("Error getting project price adjustment:", error);
+      throw error;
+    }
+  }
+
+  async createProjectPriceAdjustment(adjustment: InsertProjectPriceAdjustment): Promise<ProjectPriceAdjustment> {
+    try {
+      console.log(`🔧 Creating project price adjustment:`, adjustment);
+      
+      const [created] = await db.insert(projectPriceAdjustments)
+        .values(adjustment)
+        .returning();
+        
+      console.log(`✅ Successfully created project price adjustment:`, created);
+      return created;
+    } catch (error) {
+      console.error("Error creating project price adjustment:", error);
+      throw error;
+    }
+  }
+
+  async updateProjectPriceAdjustment(id: number, adjustment: Partial<InsertProjectPriceAdjustment>): Promise<ProjectPriceAdjustment | undefined> {
+    try {
+      const [updated] = await db.update(projectPriceAdjustments)
+        .set(adjustment)
+        .where(eq(projectPriceAdjustments.id, id))
+        .returning();
+
+      return updated;
+    } catch (error) {
+      console.error("Error updating project price adjustment:", error);
+      throw error;
+    }
+  }
+
+  async deleteProjectPriceAdjustment(id: number): Promise<boolean> {
+    try {
+      await db.delete(projectPriceAdjustments)
+        .where(eq(projectPriceAdjustments.id, id));
+      
+      return true;
+    } catch (error) {
+      console.error("Error deleting project price adjustment:", error);
+      return false;
+    }
+  }
+
+  async getCurrentProjectPrice(projectId: number): Promise<number> {
+    try {
+      // Buscar el último ajuste de precio válido para el proyecto
+      const [latestAdjustment] = await db.select()
+        .from(projectPriceAdjustments)
+        .where(eq(projectPriceAdjustments.projectId, projectId))
+        .orderBy(desc(projectPriceAdjustments.effectiveDate))
+        .limit(1);
+
+      if (latestAdjustment) {
+        return Number(latestAdjustment.newPrice);
+      }
+
+      // Si no hay ajustes, devolver el precio original del proyecto
+      const project = await this.getActiveProject(projectId);
+      if (project) {
+        return Number(project.totalCost || 0);
+      }
+
+      return 0;
+    } catch (error) {
+      console.error("Error getting current project price:", error);
+      return 0;
     }
   }
 

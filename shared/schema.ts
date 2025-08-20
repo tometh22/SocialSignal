@@ -910,6 +910,36 @@ export const insertMonthlyHourAdjustmentSchema = createInsertSchema(monthlyHourA
 export type MonthlyHourAdjustment = typeof monthlyHourAdjustments.$inferSelect;
 export type InsertMonthlyHourAdjustment = z.infer<typeof insertMonthlyHourAdjustmentSchema>;
 
+// ==================== AJUSTES DE PRECIO DE PROYECTO ====================
+// Tabla para registrar cambios de precio al cliente durante la ejecución del proyecto
+export const projectPriceAdjustments = pgTable("project_price_adjustments", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  previousPrice: doublePrecision("previous_price").notNull(),
+  newPrice: doublePrecision("new_price").notNull(),
+  adjustmentPercentage: doublePrecision("adjustment_percentage").notNull(), // Porcentaje de cambio
+  effectiveDate: timestamp("effective_date").notNull(), // A partir de qué fecha aplica el nuevo precio
+  reason: text("reason").notNull(), // Motivo del cambio de precio
+  changeType: varchar("change_type", { length: 50 }).notNull(), // 'increase', 'decrease', 'scope_change', 'market_adjustment'
+  clientNotified: boolean("client_notified").notNull().default(false), // Si se notificó al cliente
+  clientApproval: boolean("client_approval"), // Aprobación del cliente (null = pendiente)
+  approvalDate: timestamp("approval_date"), // Fecha de aprobación del cliente
+  notes: text("notes"), // Notas adicionales sobre el cambio
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectPriceAdjustmentSchema = createInsertSchema(projectPriceAdjustments).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  effectiveDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  approvalDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
+export type ProjectPriceAdjustment = typeof projectPriceAdjustments.$inferSelect;
+export type InsertProjectPriceAdjustment = z.infer<typeof insertProjectPriceAdjustmentSchema>;
+
 // ==================== SISTEMA DE CHAT ====================
 // Tabla de conversaciones
 export const chatConversations = pgTable("chat_conversations", {

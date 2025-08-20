@@ -27,6 +27,7 @@ import {
   insertMonthlyInflationSchema,
   insertSystemConfigSchema,
   insertMonthlyHourAdjustmentSchema,
+  insertProjectPriceAdjustmentSchema,
   insertIndirectCostCategorySchema,
   insertIndirectCostSchema,
   insertNonBillableHoursSchema,
@@ -57,7 +58,8 @@ import {
   indirectCostCategories,
   indirectCosts,
   nonBillableHours,
-  personnelHistoricalCosts
+  personnelHistoricalCosts,
+  projectPriceAdjustments
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -5819,6 +5821,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting monthly hour adjustment:", error);
       res.status(500).json({ message: "Failed to delete monthly hour adjustment" });
+    }
+  });
+
+  // ==================== PROJECT PRICE ADJUSTMENTS ====================
+
+  // Obtener todos los ajustes de precio de un proyecto
+  app.get("/api/projects/:id/price-adjustments", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const adjustments = await storage.getProjectPriceAdjustments(projectId);
+      res.json(adjustments);
+    } catch (error) {
+      console.error("Error fetching project price adjustments:", error);
+      res.status(500).json({ message: "Failed to fetch project price adjustments" });
+    }
+  });
+
+  // Crear ajuste de precio de proyecto
+  app.post("/api/projects/:id/price-adjustments", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const adjustmentData = insertProjectPriceAdjustmentSchema.parse({
+        ...req.body,
+        projectId,
+        createdBy: req.user?.id || 1
+      });
+
+      const adjustment = await storage.createProjectPriceAdjustment(adjustmentData);
+      res.status(201).json(adjustment);
+    } catch (error) {
+      console.error("Error creating project price adjustment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create project price adjustment" });
+    }
+  });
+
+  // Obtener ajuste específico de precio
+  app.get("/api/price-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const adjustment = await storage.getProjectPriceAdjustment(id);
+      if (!adjustment) {
+        return res.status(404).json({ message: "Price adjustment not found" });
+      }
+
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Error fetching project price adjustment:", error);
+      res.status(500).json({ message: "Failed to fetch project price adjustment" });
+    }
+  });
+
+  // Actualizar ajuste de precio
+  app.patch("/api/price-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const updateData = insertProjectPriceAdjustmentSchema.partial().parse(req.body);
+      const adjustment = await storage.updateProjectPriceAdjustment(id, updateData);
+      
+      if (!adjustment) {
+        return res.status(404).json({ message: "Price adjustment not found" });
+      }
+
+      res.json(adjustment);
+    } catch (error) {
+      console.error("Error updating project price adjustment:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update project price adjustment" });
+    }
+  });
+
+  // Eliminar ajuste de precio
+  app.delete("/api/price-adjustments/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid adjustment ID" });
+      }
+
+      const success = await storage.deleteProjectPriceAdjustment(id);
+      if (!success) {
+        return res.status(404).json({ message: "Price adjustment not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting project price adjustment:", error);
+      res.status(500).json({ message: "Failed to delete project price adjustment" });
+    }
+  });
+
+  // Obtener precio actual del proyecto
+  app.get("/api/projects/:id/current-price", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const currentPrice = await storage.getCurrentProjectPrice(projectId);
+      res.json({ currentPrice });
+    } catch (error) {
+      console.error("Error fetching current project price:", error);
+      res.status(500).json({ message: "Failed to fetch current project price" });
     }
   });
 
