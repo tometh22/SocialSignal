@@ -110,12 +110,10 @@ const SimpleTeamConfig: React.FC = () => {
       return;
     }
 
-    // Usar la función getPersonnelRate del contexto para obtener la tarifa correcta según la moneda
+    // CORREGIR BUG UX: Usar getPersonnelRate del contexto para mantener consistencia
+    // Esto evita conversiones confusas entre USD/ARS 
     const rate = selectedPersonnel ? 
-      (quotationData.quotationCurrency === 'ARS' ? 
-        (selectedPersonnel.hourlyRateARS || selectedPersonnel.hourlyRate || selectedRole.defaultRate || 0) :
-        (selectedPersonnel.hourlyRate || selectedRole.defaultRate || 0)
-      ) : 
+      getPersonnelRate(selectedPersonnel.id) : 
       selectedRole.defaultRate || 0;
     const hours = newMember.hours;
     const cost = hours * rate;
@@ -169,29 +167,36 @@ const SimpleTeamConfig: React.FC = () => {
       // VALIDACIÓN AUTOMÁTICA: Verificar si la tarifa editada coincide con la oficial
       if (member.personnelId && availablePersonnel) {
         const personnel = availablePersonnel.find(p => p.id === member.personnelId);
-        if (personnel && personnel.hourlyRate !== rate) {
-          const useOfficial = window.confirm(
-            `⚠️ INCONSISTENCIA DE TARIFA DETECTADA\n\n` +
-            `${personnel.name} tiene una tarifa oficial de $${personnel.hourlyRate}/hora\n` +
-            `Pero estás intentando guardar $${rate}/hora\n\n` +
-            `¿Deseas usar la tarifa oficial ($${personnel.hourlyRate}/hora)?`
-          );
+        if (personnel) {
+          // CORREGIR BUG UX: Usar getPersonnelRate para obtener tarifa oficial en moneda correcta
+          const officialRate = getPersonnelRate(personnel.id);
+          const rateDifference = Math.abs(officialRate - rate);
+          const significantDifference = rateDifference > (officialRate * 0.05); // 5% tolerance
+          
+          if (significantDifference) {
+            const useOfficial = window.confirm(
+              `⚠️ INCONSISTENCIA DE TARIFA DETECTADA\n\n` +
+              `${personnel.name} tiene una tarifa oficial de $${officialRate.toFixed(0)}/hora\n` +
+              `Pero estás intentando guardar $${rate}/hora\n\n` +
+              `¿Deseas usar la tarifa oficial ($${officialRate.toFixed(0)}/hora)?`
+            );
 
-          if (useOfficial) {
-            // Actualizar con la tarifa oficial
-            setEditingMember({
-              ...editingMember,
-              [memberId]: { hours, rate: personnel.hourlyRate }
-            });
+            if (useOfficial) {
+              // Actualizar con la tarifa oficial
+              setEditingMember({
+                ...editingMember,
+                [memberId]: { hours, rate: officialRate }
+              });
 
-            updateTeamMember(member.id, {
-              ...member,
-              hours,
-              rate: personnel.hourlyRate,
-              cost: hours * personnel.hourlyRate
-            });
-            setIsEditing({...isEditing, [memberId]: false});
-            return;
+              updateTeamMember(member.id, {
+                ...member,
+                hours,
+                rate: officialRate,
+                cost: hours * officialRate
+              });
+              setIsEditing({...isEditing, [memberId]: false});
+              return;
+            }
           }
         }
       }
@@ -218,14 +223,12 @@ const SimpleTeamConfig: React.FC = () => {
 
         if (field === 'personnelId') {
           const selectedPersonnel = value ? availablePersonnel.find(p => p.id === value) : null;
-          const selectedRole = availableRoles.find(r => r.id === member.roleId);
-          // Usar la tarifa correcta según la moneda de cotización
-          rate = selectedPersonnel ? 
-            (quotationData.quotationCurrency === 'ARS' ? 
-              (selectedPersonnel.hourlyRateARS || selectedPersonnel.hourlyRate || selectedRole?.defaultRate || 0) :
-              (selectedPersonnel.hourlyRate || selectedRole?.defaultRate || 0)
-            ) : 
-            selectedRole?.defaultRate || 0;
+          
+          // CORREGIR BUG UX: Usar getPersonnelRate del contexto para mantener consistencia
+          // Esto evita el cambio confuso entre USD/ARS durante la edición
+          if (selectedPersonnel) {
+            rate = getPersonnelRate(selectedPersonnel.id);
+          }
           updates.rate = rate;
         }
 
