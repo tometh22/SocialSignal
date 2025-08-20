@@ -745,27 +745,36 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const role = roles.find(r => r.id === member.roleId);
     const defaultHours = member.hours || 40;
 
-    // Use personnel rate if available, otherwise fall back to role default
-    let defaultRate = member.rate;
+    // CRITICAL FIX: ALWAYS use getPersonnelRate to ensure correct currency, never trust member.rate
+    let defaultRate = 0;
 
     console.log('🔍 ADDING TEAM MEMBER - Initial data:', {
-      memberRate: member.rate,
+      memberRateIgnored: member.rate, // Este valor se ignora porque puede estar en moneda incorrecta
       personnelId: member.personnelId,
       quotationCurrency: quotationData.quotationCurrency,
       roleDefaultRate: role?.defaultRate
     });
 
-    if (!defaultRate && member.personnelId) {
-      console.log('🔍 Calling getPersonnelRate for personnelId:', member.personnelId);
+    // PRIORITY 1: Always get rate from getPersonnelRate if personnelId exists
+    if (member.personnelId) {
+      console.log('🔍 PRIORITY: Using getPersonnelRate for personnelId:', member.personnelId);
       defaultRate = getPersonnelRate(member.personnelId);
-      console.log('🔍 getPersonnelRate returned:', defaultRate);
+      console.log('🔍 getPersonnelRate returned (correct currency):', defaultRate);
     }
-    if (!defaultRate) {
+    
+    // FALLBACK: Only use role default if no personnel assigned
+    if (!defaultRate && !member.personnelId) {
       defaultRate = role?.defaultRate || 50;
-      console.log('🔍 Using fallback rate:', defaultRate);
+      console.log('🔍 Using fallback rate (no personnel):', defaultRate);
     }
 
-    console.log('🔍 Final rate used:', defaultRate);
+    // EMERGENCY FALLBACK: Absolute minimum rate
+    if (!defaultRate) {
+      defaultRate = 150; // ARS reasonable rate
+      console.log('🔍 Using emergency fallback rate:', defaultRate);
+    }
+
+    console.log('🔍 Final rate used (currency consistent):', defaultRate);
 
     const newMember: OptimizedTeamMember = {
       ...member,
