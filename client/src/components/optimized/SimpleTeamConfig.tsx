@@ -154,27 +154,30 @@ const SimpleTeamConfig: React.FC = () => {
       quotationCurrency: quotationData.quotationCurrency
     });
     
-    // Encontrar el miembro y verificar si tiene personal asignado
+    // CRITICAL FIX: ALWAYS use getPersonnelRate to ensure consistent currency display
     const member = quotationData.teamMembers.find(m => m.id === memberId);
-    let correctRate = rate;
+    let displayRate = rate; // Fallback to passed rate
     
     if (member?.personnelId && availablePersonnel) {
       const personnel = availablePersonnel.find(p => p.id === member.personnelId);
       if (personnel) {
-        // CORREGIR BUG UX: Usar getPersonnelRate para obtener la tarifa correcta
-        correctRate = getPersonnelRate(personnel.id);
-        console.log('🐛 BUG DEBUG - Rate correction applied:', {
-          originalRate: rate,
-          correctedRate: correctRate,
+        // CORREGIR BUG UX: Usar SIEMPRE getPersonnelRate para obtener la tarifa en moneda correcta
+        displayRate = getPersonnelRate(personnel.id);
+        console.log('🐛 BUG FIX APPLIED - Using corrected rate:', {
+          memberIdPassed: memberId,
+          originalRatePassed: rate,
+          personnelId: personnel.id,
           personnelName: personnel.name,
-          personnelId: personnel.id
+          correctedDisplayRate: displayRate,
+          quotationCurrency: quotationData.quotationCurrency
         });
       }
     }
     
+    // ALWAYS use the corrected rate for display consistency
     setEditingMember({
       ...editingMember, 
-      [memberId]: { hours, rate: correctRate }
+      [memberId]: { hours, rate: displayRate }
     });
     setIsEditing({...isEditing, [memberId]: true});
   };
