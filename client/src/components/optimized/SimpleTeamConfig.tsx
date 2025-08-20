@@ -545,10 +545,16 @@ const SimpleTeamConfig: React.FC = () => {
                     })));
                     
                     const role = availableRoles?.find(r => {
-                      const roleIdNum = Number(r.id);
-                      const memberRoleIdNum = Number(member.roleId);
-                      const match = roleIdNum === memberRoleIdNum;
-                      console.log(`🔍 DEBUG - Comparing role ${r.id} (${typeof r.id}) → ${roleIdNum} with member.roleId ${member.roleId} (${typeof member.roleId}) → ${memberRoleIdNum}: ${match}`);
+                      // CRITICAL FIX: More robust role comparison - try both string and number comparisons
+                      const directMatch = r.id === member.roleId;
+                      const stringMatch = String(r.id) === String(member.roleId);
+                      const numberMatch = Number(r.id) === Number(member.roleId);
+                      const match = directMatch || stringMatch || numberMatch;
+                      
+                      if (!match) {
+                        console.log(`🔍 Role mismatch: role.id=${r.id} (${typeof r.id}) vs member.roleId=${member.roleId} (${typeof member.roleId})`);
+                      }
+                      
                       return match;
                     });
                     console.log('🔍 DEBUG - Found role:', role);
