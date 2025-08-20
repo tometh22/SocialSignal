@@ -147,9 +147,34 @@ const SimpleTeamConfig: React.FC = () => {
 
   // Funciones para edición inline
   const startEditing = (memberId: string, hours: number, rate: number) => {
+    console.log('🐛 BUG DEBUG - startEditing called with:', {
+      memberId,
+      hours,
+      rate,
+      quotationCurrency: quotationData.quotationCurrency
+    });
+    
+    // Encontrar el miembro y verificar si tiene personal asignado
+    const member = quotationData.teamMembers.find(m => m.id === memberId);
+    let correctRate = rate;
+    
+    if (member?.personnelId && availablePersonnel) {
+      const personnel = availablePersonnel.find(p => p.id === member.personnelId);
+      if (personnel) {
+        // CORREGIR BUG UX: Usar getPersonnelRate para obtener la tarifa correcta
+        correctRate = getPersonnelRate(personnel.id);
+        console.log('🐛 BUG DEBUG - Rate correction applied:', {
+          originalRate: rate,
+          correctedRate: correctRate,
+          personnelName: personnel.name,
+          personnelId: personnel.id
+        });
+      }
+    }
+    
     setEditingMember({
       ...editingMember, 
-      [memberId]: { hours, rate }
+      [memberId]: { hours, rate: correctRate }
     });
     setIsEditing({...isEditing, [memberId]: true});
   };
