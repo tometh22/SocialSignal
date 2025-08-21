@@ -478,6 +478,8 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     console.log('🔧 Team members:', quotationData.teamMembers);
     console.log('🔧 Template:', quotationData.template?.name);
     console.log('🔧 Financials:', quotationData.financials);
+    console.log('🔧 Currency:', quotationData.quotationCurrency);
+    console.log('🔧 Exchange rate:', exchangeRate);
     console.log('🔧 Recalculation trigger:', recalculationTrigger);
 
     if (!quotationData.teamMembers || quotationData.teamMembers.length === 0) {
@@ -489,26 +491,28 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return;
     }
 
-    // Calculate base cost from team members - use the cost already calculated in the member object
-    const calculatedBaseCost = quotationData.teamMembers.reduce((sum, member) => {
-      // Use the cost that's already been calculated and stored in the member object
+    // CRITICAL FIX: Calculate base cost with proper currency handling
+    const calculatedBaseCostARS = quotationData.teamMembers.reduce((sum, member) => {
+      // Member cost is always in ARS (from getPersonnelRate)
       const memberCost = member.cost || 0;
-      console.log(`👤 Member ${member.id}: cost = ${memberCost} (using stored cost)`);
+      console.log(`👤 Member ${member.id}: cost = ${memberCost} ARS (from stored cost)`);
       return sum + memberCost;
     }, 0);
 
-    console.log(`💵 Calculated base cost: $${calculatedBaseCost}`);
-    setBaseCost(calculatedBaseCost);
+    // Convert to USD for internal calculations (all calculations are done in USD)
+    const calculatedBaseCostUSD = calculatedBaseCostARS / exchangeRate;
+    console.log(`💵 Calculated base cost: ${calculatedBaseCostARS} ARS → ${calculatedBaseCostUSD} USD (rate: ${exchangeRate})`);
+    setBaseCost(calculatedBaseCostUSD);
 
-    // Calculate complexity adjustment
+    // Calculate complexity adjustment (in USD)
     const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
-    const calculatedComplexityAdjustment = calculatedBaseCost * totalComplexityFactor;
-    console.log(`🔧 Complexity adjustment: $${calculatedBaseCost} × ${totalComplexityFactor} = $${calculatedComplexityAdjustment}`);
+    const calculatedComplexityAdjustment = calculatedBaseCostUSD * totalComplexityFactor;
+    console.log(`🔧 Complexity adjustment: $${calculatedBaseCostUSD} USD × ${totalComplexityFactor} = $${calculatedComplexityAdjustment} USD`);
     setComplexityAdjustment(calculatedComplexityAdjustment);
 
-    // Calculate subtotal after complexity
-    const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
-    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity}`);
+    // Calculate subtotal after complexity (in USD)
+    const subtotalWithComplexity = calculatedBaseCostUSD + calculatedComplexityAdjustment;
+    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity} USD`);
 
     // Declare variables for calculated values
     let calculatedMarkup = 0;
