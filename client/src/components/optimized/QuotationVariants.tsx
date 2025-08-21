@@ -123,18 +123,20 @@ export function QuotationVariants({
       return;
     }
 
-    // Ajustar valores según la moneda seleccionada
+    // CRITICAL FIX: Los valores ya vienen calculados en la moneda correcta del contexto
+    // NO multiplicar por exchange rate porque causaría valores erróneos
     let adjustedBaseCost = baseCost;
     let adjustedComplexityAdjustment = complexityAdjustment;
     let adjustedMarkupAmount = markupAmount;
     let adjustedTotalAmount = totalAmount;
 
-    if (quotationData.quotationCurrency === 'ARS') {
-      adjustedBaseCost = baseCost * exchangeRate;
-      adjustedComplexityAdjustment = complexityAdjustment * exchangeRate;
-      adjustedMarkupAmount = markupAmount * exchangeRate;
-      adjustedTotalAmount = totalAmount * exchangeRate;
-    }
+    console.log('💰 Using values as-is (already in correct currency):', {
+      baseCost: adjustedBaseCost,
+      complexityAdjustment: adjustedComplexityAdjustment,
+      markupAmount: adjustedMarkupAmount,
+      totalAmount: adjustedTotalAmount,
+      currency: quotationData.quotationCurrency
+    });
     
     // IMPORTANTE: Intermedio es la BASE (cotización original sin cambios)
     // Básico y Full usan MISMO markup factor pero ajustan solo costo base
