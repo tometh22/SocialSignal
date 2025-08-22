@@ -107,6 +107,7 @@ interface OptimizedQuoteContextType {
   // Actions
   loadQuotation: (quotationId: number) => Promise<void>;
   saveQuotation: (status?: 'draft' | 'pending' | 'approved' | 'rejected' | 'in-negotiation') => Promise<void>;
+  calculateBaseCost: () => void;
   calculateTotalCost: () => void;
   resetQuotation: () => void;
   setQuotationData: (data: QuotationData) => void;
@@ -624,7 +625,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
 
     // Ensure all values are properly rounded and consistent
-    const finalBaseCost = Math.round(calculatedBaseCost * 100) / 100;
+    const finalBaseCost = Math.round(calculatedBaseCostUSD * 100) / 100;
     const finalComplexityAdjustment = Math.round(calculatedComplexityAdjustment * 100) / 100;
     const finalMarkupAmount = Math.round(calculatedMarkup * 100) / 100;
     const finalTotalAmount = Math.round(finalTotalWithInflation * 100) / 100;
@@ -1287,6 +1288,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     loadRoles,
     loadPersonnel,
     forceRecalculate,
+    calculateBaseCost: calculateTotalCost,
     updateDeliverables,
     addDeliverable,
     updateDeliverable,
