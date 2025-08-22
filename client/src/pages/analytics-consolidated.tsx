@@ -191,16 +191,18 @@ export default function AnalyticsConsolidated() {
     const fullTimePersonnel = personnel.filter((p: any) => p.contractType === 'full-time');
     const partTimePersonnel = personnel.filter((p: any) => p.contractType === 'part-time' || p.contractType === 'freelance');
     
-    // Fixed monthly costs (full-time salaries)
+    // Fixed monthly costs (full-time salaries) - converted to USD
+    const EXCHANGE_RATE = 1300; // ARS per USD
     const fixedMonthlyCosts = fullTimePersonnel.reduce((sum: number, p: any) => {
       // La columna en la DB es monthly_fixed_salary, que se convierte a camelCase
-      const salary = p.monthlyFixedSalary || p.monthly_fixed_salary || 0;
-      if (salary > 0) {
-        console.log(`💰 Personal ${p.name}: ${p.contractType}, salario mensual: $${salary}`);
+      const salaryARS = p.monthlyFixedSalary || p.monthly_fixed_salary || 0;
+      const salaryUSD = salaryARS / EXCHANGE_RATE; // Convert ARS to USD
+      if (salaryARS > 0) {
+        console.log(`💰 Personal ${p.name}: ${p.contractType}, salario mensual: $${salaryARS} ARS = $${salaryUSD.toFixed(2)} USD`);
       }
-      return sum + salary;
+      return sum + salaryUSD;
     }, 0);
-    console.log('💵 Total costos fijos mensuales:', fixedMonthlyCosts);
+    console.log('💵 Total costos fijos mensuales (USD):', fixedMonthlyCosts.toFixed(2));
     
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
@@ -468,11 +470,13 @@ export default function AnalyticsConsolidated() {
       filteredRevenue = monthlyRevenue * totalMonthsWithData.size + totalRevenue;
     }
 
-    // Calculate variable costs for the period
+    // Calculate variable costs for the period - converted to USD
     const variableCosts = periodEntries.reduce((sum: number, entry: any) => {
       const person = personnel.find((p: any) => p.id === entry.personnelId);
       if (person && (person.contractType === 'part-time' || person.contractType === 'freelance')) {
-        return sum + (entry.totalCost || 0);
+        const costARS = entry.totalCost || 0;
+        const costUSD = costARS / EXCHANGE_RATE; // Convert ARS to USD
+        return sum + costUSD;
       }
       return sum;
     }, 0);
