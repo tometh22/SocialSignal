@@ -196,9 +196,11 @@ const QuotationDetail: React.FC = () => {
 
   // Formatear moneda
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-MX', {
+    // Usar la moneda de la cotización, por defecto ARS
+    const currency = quotation?.quotationCurrency || 'ARS';
+    return new Intl.NumberFormat('es-AR', {
       style: 'currency',
-      currency: 'USD',
+      currency: currency,
       minimumFractionDigits: 2
     }).format(amount);
   };
