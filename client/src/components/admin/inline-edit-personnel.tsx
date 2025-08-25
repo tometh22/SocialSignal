@@ -134,6 +134,25 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     return null;
   };
 
+  // Función para obtener la última tarifa por hora histórica
+  const getLatestHistoricalHourlyRate = (): number | null => {
+    const hourlyRateFields = [
+      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
+      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
+      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
+      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
+    ];
+
+    // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
+    for (const field of hourlyRateFields) {
+      const value = (person as any)[field];
+      if (value && value > 0) {
+        return value;
+      }
+    }
+    return null;
+  };
+
   // Función para actualizar el sueldo fijo con el último valor histórico
   const updateSalaryFromHistorical = () => {
     const latestSalary = getLatestHistoricalSalary();
@@ -755,68 +774,48 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="flex items-center gap-1">
-            <span className="text-sm font-medium text-gray-600">ARS</span>
-            <Input
-              type="number"
-              step="0.1"
-              min="0"
-              value={editedHourlyRate}
-              onChange={(e) => setEditedHourlyRate(e.target.value)}
-              className="h-9 w-24 border-blue-200 focus:border-blue-400"
-              disabled={updatePersonnelMutation.isPending}
-              placeholder="0.0"
-            />
-            <span className="text-sm text-muted-foreground">/hr</span>
+          <div className="flex flex-col items-center gap-1">
+            {getLatestHistoricalHourlyRate() ? (
+              <>
+                <span className="text-sm font-semibold text-green-700">
+                  ${getLatestHistoricalHourlyRate()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </span>
+                <span className="text-xs text-muted-foreground">ARS/hr</span>
+                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                  Último mes
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-gray-400">Sin configurar</span>
+                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                  Configura en "Datos"
+                </span>
+              </>
+            )}
           </div>
         </td>
         <td className="px-6 py-4">
           {editedContractType === 'full-time' ? (
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium text-gray-600">ARS</span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={editedMonthlyFixedSalary}
-                onChange={(e) => setEditedMonthlyFixedSalary(e.target.value)}
-                className="h-9 w-28 border-blue-200 focus:border-blue-400"
-                disabled={updatePersonnelMutation.isPending}
-                placeholder="0.00"
-              />
-              {getLatestHistoricalSalary() && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={updateSalaryFromHistorical}
-                  disabled={updatePersonnelMutation.isPending}
-                  className="h-9 px-2 text-xs"
-                  title="Actualizar con último valor histórico"
-                >
-                  ↻
-                </Button>
+            <div className="flex flex-col items-center gap-1">
+              {getLatestHistoricalSalary() ? (
+                <>
+                  <span className="text-sm font-semibold text-blue-700">
+                    ${getLatestHistoricalSalary()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-xs text-muted-foreground">ARS/mes</span>
+                  <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                    Último mes
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs text-gray-400">Sin configurar</span>
+                  <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                    Configura en "Datos"
+                  </span>
+                </>
               )}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="h-4 w-4 text-gray-400 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-sm">
-                      Sueldo fijo mensual para empleados full-time. Este es un costo de oportunidad 
-                      (no se resta de las ganancias reales).
-                      {getLatestHistoricalSalary() && (
-                        <>
-                          <br /><br />
-                          <strong>Último valor histórico:</strong> ${getLatestHistoricalSalary()?.toLocaleString()} ARS
-                          <br />Haz clic en ↻ para actualizarlo automáticamente.
-                        </>
-                      )}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-1">
@@ -979,65 +978,59 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-green-700">
-            ${person.hourlyRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </span>
-          <span className="text-xs text-muted-foreground">ARS/hr</span>
+          {getLatestHistoricalHourlyRate() ? (
+            <>
+              <span className="text-sm font-semibold text-green-700">
+                ${getLatestHistoricalHourlyRate()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-xs text-muted-foreground">ARS/hr</span>
+              <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full ml-1" title="Valor del último mes cargado">
+                ✓
+              </span>
+            </>
+          ) : person.hourlyRate > 0 ? (
+            <>
+              <span className="text-sm font-semibold text-orange-600">
+                ${person.hourlyRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-xs text-muted-foreground">ARS/hr</span>
+              <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full ml-1" title="Valor desactualizado - configurar en datos históricos">
+                ⚠
+              </span>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400">Sin configurar</span>
+          )}
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="flex flex-col items-start gap-1">
           {person.contractType === 'full-time' ? (
-            person.monthlyFixedSalary ? (
+            getLatestHistoricalSalary() ? (
               <>
                 <div className="flex items-center gap-1">
                   <span className="text-sm font-semibold text-blue-700">
-                    ${person.monthlyFixedSalary.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    ${getLatestHistoricalSalary()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </span>
                   <span className="text-xs text-muted-foreground">ARS/mes</span>
-                  {getLatestHistoricalSalary() && getLatestHistoricalSalary() !== person.monthlyFixedSalary && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full cursor-help">
-                            ⚠
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="text-sm">
-                            <strong>Desactualizado:</strong><br />
-                            Último valor histórico: ${getLatestHistoricalSalary()?.toLocaleString()} ARS<br />
-                            Haz clic en "Editar" para actualizarlo.
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+                  <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full ml-1" title="Valor del último mes cargado">
+                    ✓
+                  </span>
                 </div>
                 <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                   Costo fijo mensual
                 </span>
               </>
-            ) : getLatestHistoricalSalary() ? (
+            ) : person.monthlyFixedSalary ? (
               <>
                 <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-400">Sin configurar</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="text-xs text-green-600 bg-green-100 px-1.5 py-0.5 rounded-full cursor-help">
-                          ↻
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">
-                          <strong>Datos disponibles:</strong><br />
-                          Último valor histórico: ${getLatestHistoricalSalary()?.toLocaleString()} ARS<br />
-                          Haz clic en "Editar" para configurarlo.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <span className="text-sm font-semibold text-orange-600">
+                    ${person.monthlyFixedSalary.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-xs text-muted-foreground">ARS/mes</span>
+                  <span className="text-xs text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded-full ml-1" title="Valor desactualizado - configurar en datos históricos">
+                    ⚠
+                  </span>
                 </div>
                 <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
                   Costo fijo mensual
@@ -1120,15 +1113,23 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
               <TooltipTrigger asChild>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  variant={showHistoricalCosts ? "default" : "outline"}
                   onClick={() => setShowHistoricalCosts(!showHistoricalCosts)}
-                  className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors"
+                  className={`h-8 px-3 transition-all ${
+                    showHistoricalCosts 
+                      ? "bg-green-600 text-white hover:bg-green-700" 
+                      : "border-green-300 text-green-600 hover:bg-green-50 hover:border-green-400"
+                  }`}
                 >
-                  {showHistoricalCosts ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {showHistoricalCosts ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+                  <span className="text-xs font-medium">Datos</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Ver costos históricos mensuales</p>
+                <p className="font-medium">Gestionar datos históricos mensuales</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Aquí se configuran las tarifas y sueldos que se muestran en la tabla
+                </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
