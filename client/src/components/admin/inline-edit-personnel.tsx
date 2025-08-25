@@ -600,13 +600,16 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   };
 
   const handleSave = () => {
-    const hourlyRate = parseFloat(editedHourlyRate);
+    // Usar valores históricos en lugar de editados
+    const hourlyRate = getLatestHistoricalHourlyRate() || person.hourlyRate;
+    const monthlyFixedSalary = getLatestHistoricalSalary() || person.monthlyFixedSalary;
     const roleId = parseInt(editedRoleId);
     const monthlyHours = editedMonthlyHours ? parseFloat(editedMonthlyHours) : null;
 
-    console.log(`🔧 Validating data before save:`, {
+    console.log(`🔧 Validating data before save (usando valores históricos):`, {
       name: editedName,
       hourlyRate,
+      monthlyFixedSalary,
       roleId,
       monthlyHours,
       contractType: editedContractType
@@ -615,7 +618,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
         title: "Error",
-        description: "La tarifa por hora debe ser un número válido",
+        description: "Configure la tarifa por hora en los datos históricos",
         variant: "destructive"
       });
       return;
@@ -658,7 +661,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
       roleId: roleId,
       hourlyRate: hourlyRate,
       contractType: editedContractType,
-      monthlyFixedSalary: editedMonthlyFixedSalary ? parseFloat(editedMonthlyFixedSalary) : undefined,
+      monthlyFixedSalary: monthlyFixedSalary,
       includeInRealCosts: editedIncludeInRealCosts
     };
 
@@ -774,54 +777,63 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
             {getLatestHistoricalHourlyRate() ? (
               <>
-                <span className="text-sm font-semibold text-green-700">
+                <span className="text-sm font-bold text-green-700">
                   ${getLatestHistoricalHourlyRate()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </span>
                 <span className="text-xs text-muted-foreground">ARS/hr</span>
-                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
-                  Último mes
+                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full font-bold">
+                  ✓ DATOS HISTÓRICOS
                 </span>
               </>
             ) : (
               <>
-                <span className="text-xs text-gray-400">Sin configurar</span>
-                <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-                  Configura en "Datos"
+                <span className="text-xs text-gray-500 font-semibold">❌ SIN CONFIGURAR</span>
+                <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full font-bold">
+                  Configure en "Datos" ↓
                 </span>
               </>
             )}
+            <span className="text-xs text-gray-400 italic mt-1">
+              (No editable)
+            </span>
           </div>
         </td>
         <td className="px-6 py-4">
           {editedContractType === 'full-time' ? (
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
               {getLatestHistoricalSalary() ? (
                 <>
-                  <span className="text-sm font-semibold text-blue-700">
+                  <span className="text-sm font-bold text-blue-700">
                     ${getLatestHistoricalSalary()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </span>
                   <span className="text-xs text-muted-foreground">ARS/mes</span>
-                  <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
-                    Último mes
+                  <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full font-bold">
+                    ✓ DATOS HISTÓRICOS
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-gray-400">Sin configurar</span>
-                  <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-                    Configura en "Datos"
+                  <span className="text-xs text-gray-500 font-semibold">❌ SIN CONFIGURAR</span>
+                  <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full font-bold">
+                    Configure en "Datos" ↓
                   </span>
                 </>
               )}
+              <span className="text-xs text-gray-400 italic mt-1">
+                (No editable)
+              </span>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-1">
+            <div className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
               <span className="text-xs text-gray-400">-</span>
               <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                 Se paga por horas
+              </span>
+              <span className="text-xs text-gray-400 italic mt-1">
+                (No aplica)
               </span>
             </div>
           )}
