@@ -963,8 +963,9 @@ export default function ManageQuotes() {
                                       <span className="text-gray-500">Markup:</span>
                                       <span className={`font-bold ${
                                         (() => {
-                                          // SIEMPRE calcular el factor real basado en valores finales
-                                          const realFactor = quote.baseCost > 0 ? (quote.totalAmount / quote.baseCost) : 1;
+                                          // Calcular el factor real basado en costo base + ajuste de complejidad
+                                          const totalBaseCost = quote.baseCost + (quote.complexityAdjustment || 0);
+                                          const realFactor = totalBaseCost > 0 ? (quote.totalAmount / totalBaseCost) : 1;
                                           return realFactor >= 2.5 ? 'text-emerald-600' :
                                                  realFactor >= 2.0 ? 'text-blue-600' :
                                                  realFactor >= 1.5 ? 'text-amber-600' :
@@ -972,8 +973,9 @@ export default function ManageQuotes() {
                                         })()
                                       }`}>
                                         {(() => {
-                                          // SIEMPRE calcular el factor real basado en valores finales
-                                          const realFactor = quote.baseCost > 0 ? (quote.totalAmount / quote.baseCost) : 1;
+                                          // Calcular el factor real basado en costo base + ajuste de complejidad
+                                          const totalBaseCost = quote.baseCost + (quote.complexityAdjustment || 0);
+                                          const realFactor = totalBaseCost > 0 ? (quote.totalAmount / totalBaseCost) : 1;
                                           const markupPercentage = ((realFactor - 1) * 100).toFixed(0);
                                           return `${markupPercentage}% (${realFactor.toFixed(1)}x)`;
                                         })()}
