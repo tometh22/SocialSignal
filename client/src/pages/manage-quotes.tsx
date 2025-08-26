@@ -973,6 +973,12 @@ export default function ManageQuotes() {
                                         })()
                                       }`}>
                                         {(() => {
+                                          // DEBUG: Verificar qué datos está recibiendo
+                                          console.log(`🔍 DEBUG Quote ${quote.id}:`, {
+                                            baseCost: quote.baseCost,
+                                            complexityAdjustment: quote.complexityAdjustment,
+                                            totalAmount: quote.totalAmount
+                                          });
                                           // Calcular el factor real basado en costo base + ajuste de complejidad
                                           const totalBaseCost = quote.baseCost + (quote.complexityAdjustment || 0);
                                           const realFactor = totalBaseCost > 0 ? (quote.totalAmount / totalBaseCost) : 1;
