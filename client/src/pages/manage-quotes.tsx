@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Quotation } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrency } from "@/hooks/use-currency";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,7 @@ interface Client {
 
 export default function ManageQuotes() {
   const [, navigate] = useLocation();
+  const { formatCurrency: formatCurrencyWithConversion, convertFromUSD } = useCurrency();
 
   console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
 
@@ -936,7 +938,12 @@ export default function ManageQuotes() {
                                       {quote.projectType === 'always-on' ? 'Precio Mensual' : 'Precio Total'}
                                     </p>
                                     <p className="text-2xl font-bold text-gray-900">
-                                      ${quote.totalAmount.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                      {(() => {
+                                        // Mostrar cotización en su moneda original
+                                        const currency = quote.quotationCurrency || 'ARS';
+                                        const displayAmount = currency === 'ARS' ? quote.totalAmount : convertFromUSD(quote.totalAmount, currency);
+                                        return formatCurrencyWithConversion(displayAmount, currency);
+                                      })()}
                                     </p>
                                   </div>
                                   
@@ -945,7 +952,11 @@ export default function ManageQuotes() {
                                     <div className="flex items-center justify-between gap-8 text-xs">
                                       <span className="text-gray-500">Costo:</span>
                                       <span className="font-medium text-gray-700">
-                                        ${quote.baseCost.toLocaleString('es-ES', { minimumFractionDigits: 0 })}
+                                        {(() => {
+                                          const currency = quote.quotationCurrency || 'ARS';
+                                          const displayAmount = currency === 'ARS' ? quote.baseCost : convertFromUSD(quote.baseCost, currency);
+                                          return formatCurrencyWithConversion(displayAmount, currency);
+                                        })()}
                                       </span>
                                     </div>
                                     <div className="flex items-center justify-between gap-8 text-xs">
