@@ -500,20 +500,20 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       return sum + memberCost;
     }, 0);
 
-    // Convert to USD for internal calculations (all calculations are done in USD)
-    const calculatedBaseCostUSD = calculatedBaseCostARS / exchangeRate;
-    console.log(`💵 Calculated base cost: ${calculatedBaseCostARS} ARS → ${calculatedBaseCostUSD} USD (rate: ${exchangeRate})`);
-    setBaseCost(calculatedBaseCostUSD);
+    // FIXED: Keep costs in original currency (ARS) instead of converting to USD
+    const calculatedBaseCost = calculatedBaseCostARS;
+    console.log(`💵 Calculated base cost: ${calculatedBaseCost} ARS (keeping in original currency)`);
+    setBaseCost(calculatedBaseCost);
 
-    // Calculate complexity adjustment (in USD)
+    // Calculate complexity adjustment (in ARS)
     const totalComplexityFactor = Object.values(complexityFactors).reduce((sum, factor) => sum + (factor || 0), 0);
-    const calculatedComplexityAdjustment = calculatedBaseCostUSD * totalComplexityFactor;
-    console.log(`🔧 Complexity adjustment: $${calculatedBaseCostUSD} USD × ${totalComplexityFactor} = $${calculatedComplexityAdjustment} USD`);
+    const calculatedComplexityAdjustment = calculatedBaseCost * totalComplexityFactor;
+    console.log(`🔧 Complexity adjustment: $${calculatedBaseCost} ARS × ${totalComplexityFactor} = $${calculatedComplexityAdjustment} ARS`);
     setComplexityAdjustment(calculatedComplexityAdjustment);
 
-    // Calculate subtotal after complexity (in USD)
-    const subtotalWithComplexity = calculatedBaseCostUSD + calculatedComplexityAdjustment;
-    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity} USD`);
+    // Calculate subtotal after complexity (in ARS)
+    const subtotalWithComplexity = calculatedBaseCost + calculatedComplexityAdjustment;
+    console.log(`📊 Subtotal with complexity: $${subtotalWithComplexity} ARS`);
 
     // Declare variables for calculated values
     let calculatedMarkup = 0;
@@ -523,15 +523,15 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     if (quotationData.financials.priceMode === 'manual' && quotationData.financials.manualPrice) {
       console.log(`✏️ Manual pricing mode: Target price ARS $${quotationData.financials.manualPrice}`);
 
-      // Convert manual price from ARS to USD for internal calculations
-      const manualPriceUSD = quotationData.financials.manualPrice / exchangeRate;
+      // Keep manual price in ARS (no conversion needed)
+      const manualPriceARS = quotationData.financials.manualPrice;
       const toolsCost = quotationData.financials.toolsCost || 0;
       // Manual price includes tools, so we need to subtract tools to get the base for markup calculation
-      const priceBeforeTools = manualPriceUSD - toolsCost;
+      const priceBeforeTools = manualPriceARS - toolsCost;
       calculatedMarkup = priceBeforeTools - subtotalWithComplexity;
       const marginFactor = subtotalWithComplexity > 0 ? (priceBeforeTools / subtotalWithComplexity) : 1;
 
-      console.log(`✏️ Manual price markup: $${calculatedMarkup}, Effective margin: ${marginFactor}x`);
+      console.log(`✏️ Manual price markup: $${calculatedMarkup} ARS, Effective margin: ${marginFactor}x`);
       setMarkupAmount(calculatedMarkup);
 
       // Update margin factor in the context for display purposes
@@ -547,22 +547,22 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       }));
 
       subtotalWithMarkup = priceBeforeTools;
-      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup} USD`);
+      console.log(`📈 Manual subtotal with markup (before tools): $${subtotalWithMarkup} ARS`);
     } else {
       // Calculate markup (margin) normally
       const marginFactor = quotationData.financials.marginFactor || 2.0;
       calculatedMarkup = subtotalWithComplexity * (marginFactor - 1);
-      console.log(`💰 Auto markup: $${subtotalWithComplexity} × ${marginFactor - 1} = $${calculatedMarkup}`);
+      console.log(`💰 Auto markup: $${subtotalWithComplexity} ARS × ${marginFactor - 1} = $${calculatedMarkup} ARS`);
       setMarkupAmount(calculatedMarkup);
 
       subtotalWithMarkup = subtotalWithComplexity + calculatedMarkup;
-      console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup}`);
+      console.log(`📈 Auto subtotal with markup: $${subtotalWithMarkup} ARS`);
     }
 
     // Add tools cost AFTER markup
     const toolsCost = quotationData.financials.toolsCost || 0;
     const subtotalWithTools = subtotalWithMarkup + toolsCost;
-    console.log(`🔧 Tools cost (added after markup): $${toolsCost}, Subtotal with tools: $${subtotalWithTools}`);
+    console.log(`🔧 Tools cost (added after markup): ${toolsCost} ARS, Subtotal with tools: ${subtotalWithTools} ARS`);
 
     // Update the variable name for consistency
     subtotalWithMarkup = subtotalWithTools;
@@ -570,19 +570,19 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     // Add platform cost
     const platformCost = quotationData.financials.platformCost || 0;
     const subtotalWithPlatform = subtotalWithMarkup + platformCost;
-    console.log(`🖥️ Platform cost: $${platformCost}, Subtotal: $${subtotalWithPlatform}`);
+    console.log(`🖥️ Platform cost: ${platformCost} ARS, Subtotal: ${subtotalWithPlatform} ARS`);
 
     // Apply deviation percentage
     const deviationPercentage = quotationData.financials.deviationPercentage || 0;
     const deviationAmount = subtotalWithPlatform * (deviationPercentage / 100);
     const subtotalWithDeviation = subtotalWithPlatform + deviationAmount;
-    console.log(`📊 Deviation: ${deviationPercentage}% = $${deviationAmount}, Subtotal: $${subtotalWithDeviation}`);
+    console.log(`📊 Deviation: ${deviationPercentage}% = ${deviationAmount} ARS, Subtotal: ${subtotalWithDeviation} ARS`);
 
     // Apply discount
     const discountPercentage = quotationData.financials.discountPercentage || 0;
     const discountAmount = subtotalWithDeviation * (discountPercentage / 100);
     const finalTotal = subtotalWithDeviation - discountAmount;
-    console.log(`💸 Discount: ${discountPercentage}% = $${discountAmount}, Final: $${finalTotal}`);
+    console.log(`💸 Discount: ${discountPercentage}% = ${discountAmount} ARS, Final: ${finalTotal} ARS`);
 
     // Handle inflation if applicable
     let finalTotalWithInflation = finalTotal;
@@ -604,7 +604,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         const inflationFactor = Math.pow(1 + monthlyRateDecimal, monthsToProject);
         finalTotalWithInflation = finalTotal * inflationFactor;
 
-        console.log(`📈 Inflation adjustment: ${annualInflationRate}% annual, ${monthsToProject} months = $${finalTotalWithInflation}`);
+        console.log(`📈 Inflation adjustment: ${annualInflationRate}% annual, ${monthsToProject} months = ${finalTotalWithInflation} ARS`);
       }
     }
 
@@ -625,7 +625,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     }
 
     // Ensure all values are properly rounded and consistent
-    const finalBaseCost = Math.round(calculatedBaseCostUSD * 100) / 100;
+    const finalBaseCost = Math.round(calculatedBaseCost * 100) / 100;
     const finalComplexityAdjustment = Math.round(calculatedComplexityAdjustment * 100) / 100;
     const finalMarkupAmount = Math.round(calculatedMarkup * 100) / 100;
     const finalTotalAmount = Math.round(finalTotalWithInflation * 100) / 100;
