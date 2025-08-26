@@ -51,7 +51,10 @@ export default function ManageQuotes() {
   console.log('[QUOTES] 🚀 Inicializando página de gestión de cotizaciones');
 
   const { data: quotations, isLoading, refetch, error: quotationsError } = useQuery<Quotation[]>({
-    queryKey: ["/api/quotations"]
+    queryKey: ["/api/quotations"],
+    staleTime: 0, // Always refetch to avoid cache issues
+    cacheTime: 0,  // Don't cache to ensure fresh data
+    refetchOnWindowFocus: true
   });
 
   const { data: clients = [], error: clientsError } = useQuery<Client[]>({
@@ -125,6 +128,17 @@ export default function ManageQuotes() {
   useEffect(() => {
     if (quotations) {
       console.log(`[QUOTES] ✅ Cotizaciones cargadas exitosamente: ${quotations.length} elementos`);
+      console.log('[QUOTES] 📊 Datos detallados de cotizaciones:', quotations);
+      quotations.forEach(quote => {
+        console.log(`[QUOTES] Cotización ${quote.id}:`, {
+          id: quote.id,
+          projectName: quote.projectName,
+          baseCost: quote.baseCost,
+          complexityAdjustment: quote.complexityAdjustment,
+          totalAmount: quote.totalAmount,
+          quotationCurrency: quote.quotationCurrency
+        });
+      });
     }
   }, [quotations]);
 
