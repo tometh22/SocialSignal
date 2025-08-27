@@ -7708,6 +7708,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Migrar proyectos de Google Sheets a proyectos activos
+  app.post("/api/google-sheets/migrate-to-active", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Migrando proyectos de Google Sheets a proyectos activos...');
+      
+      // Obtener proyectos de Google Sheets
+      const googleProjects = await storage.getGoogleSheetsProjects();
+      
+      if (googleProjects.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No hay proyectos de Google Sheets para migrar',
+          migrated: 0
+        });
+      }
+      
+      // Obtener clientes existentes para hacer el mapeo
+      const clients = await storage.getClients();
+      const clientMap = new Map();
+      clients.forEach(client => {
+        clientMap.set(client.name.toLowerCase(), client.id);
+      });
+      
+      let migrated = 0;
+      let errors: string[] = [];
+      
+      for (const project of googleProjects) {
+        try {
+          const clientId = clientMap.get(project.clientName.toLowerCase());
+          
+          if (!clientId) {
+            errors.push(`Cliente no encontrado: ${project.clientName}`);
+            continue;
+          }
+          
+          // Crear una cotización automática para este proyecto
+          const quotationData = {
+            clientId: clientId,
+            projectName: project.projectName,
+            projectDescription: `${project.projectType} - ${project.projectName}`,
+            totalAmount: project.originalAmountUsd || 0,
+            currency: 'USD',
+            exchangeRate: 1,
+            status: 'approved',
+            createdBy: req.session.userId,
+            validityDays: 30,
+            notes: `Migrado desde Google Sheets - Tipo: ${project.projectType}`,
+            analysisType: project.projectType === 'Fee' ? 'standard' : 'basic'
+          };
+          
+          const quotation = await storage.createQuotation(quotationData);
+          
+          // Crear el proyecto activo
+          const activeProjectData = {
+            quotationId: quotation.id,
+            clientId: clientId,
+            status: 'active',
+            startDate: new Date(),
+            trackingFrequency: project.projectType === 'Fee' ? 'monthly' : 'weekly',
+            notes: `Migrado desde Google Sheets - Precio original: $${project.originalAmountUsd} USD`,
+            createdBy: req.session.userId,
+            budget: project.originalAmountUsd || 0
+          };
+          
+          const activeProject = await storage.createActiveProject(activeProjectData);
+          
+          console.log(`✅ Proyecto migrado: ${project.projectName} (${project.clientName})`);
+          migrated++;
+          
+        } catch (error) {
+          const errorMsg = `Error migrando proyecto ${project.projectName}: ${error.message}`;
+          errors.push(errorMsg);
+          console.error('❌', errorMsg);
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: `Migración completada: ${migrated} proyectos migrados a proyectos activos`,
+        migrated: migrated,
+        totalProjects: googleProjects.length,
+        errors: errors
+      });
+      
+    } catch (error) {
+      console.error('❌ Error al migrar proyectos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al migrar proyectos desde Google Sheets',
+        error: error.message
+      });
+    }
+  });
+
   // Importar clientes desde Google Sheets a la base de datos
   app.post("/api/google-sheets/import-clients", requireAuth, async (req, res) => {
     try {
