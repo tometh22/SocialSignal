@@ -75,7 +75,7 @@ class GoogleSheetsSimpleService {
       const auth = google.auth.fromJSON(credentialsJson);
       auth.scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 
-      return google.sheets({ version: 'v4', auth });
+      return google.sheets({ version: 'v4', auth: auth as any });
     } catch (error) {
       console.error('❌ Error creating Google Sheets client:', error);
       throw error;
@@ -151,9 +151,9 @@ class GoogleSheetsSimpleService {
       console.log(`📊 Procesando ${rows.length} filas del Excel MAESTRO`);
       return this.processCostosData(rows);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error obteniendo datos de costos:', error);
-      throw new Error(`Failed to fetch costs data: ${error.message}`);
+      throw new Error(`Failed to fetch costs data: ${error?.message || 'Unknown error'}`);
     }
   }
 
@@ -236,6 +236,51 @@ class GoogleSheetsSimpleService {
     });
 
     return map;
+  }
+
+  /**
+   * Obtener lista de clientes únicos desde la pestaña "Activo", columna C
+   */
+  async getClientesFromSheet(): Promise<string[]> {
+    try {
+      const range = 'Activo!C:C'; // Columna C de la pestaña Activo
+      
+      const sheets = this.createSheetsClient();
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('No data found in Activo!C:C');
+        return [];
+      }
+
+      // Extraer nombres de clientes únicos (saltar la primera fila que es el header)
+      const clientNames = new Set<string>();
+      
+      for (let i = 1; i < rows.length; i++) {
+        const cellValue = rows[i][0]; // Primera columna del rango C:C
+        
+        if (cellValue && typeof cellValue === 'string') {
+          const cleanName = cellValue.trim();
+          if (cleanName && cleanName !== '') {
+            clientNames.add(cleanName);
+          }
+        }
+      }
+
+      const uniqueClients = Array.from(clientNames).sort();
+      console.log(`✅ Encontrados ${uniqueClients.length} clientes únicos:`, uniqueClients);
+      
+      return uniqueClients;
+      
+    } catch (error: any) {
+      console.error('❌ Error obteniendo clientes desde Google Sheets:', error);
+      throw new Error(`Failed to fetch clients data: ${error?.message || 'Unknown error'}`);
+    }
   }
 
   /**

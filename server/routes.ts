@@ -7610,6 +7610,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Obtener lista de clientes desde Google Sheets (pestaña Activo, columna C)
+  app.get("/api/google-sheets/clients", async (req, res) => {
+    try {
+      console.log('📋 Obteniendo lista de clientes desde Google Sheets...');
+      const clientNames = await googleSheetsSimpleService.getClientesFromSheet();
+      res.json({
+        success: true,
+        message: `Se encontraron ${clientNames.length} clientes únicos`,
+        data: clientNames,
+        count: clientNames.length
+      });
+    } catch (error) {
+      console.error('❌ Error obteniendo clientes desde Google Sheets:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al obtener lista de clientes del Google Sheet",
+        error: error.message 
+      });
+    }
+  });
+
+  // Importar clientes desde Google Sheets a la base de datos
+  app.post("/api/google-sheets/import-clients", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Importando clientes desde Google Sheets...');
+      
+      // Obtener lista de clientes desde el sheet
+      const clientNames = await googleSheetsSimpleService.getClientesFromSheet();
+      
+      // Obtener clientes existentes en la base de datos
+      const existingClients = await storage.getClients();
+      const existingClientNames = new Set(existingClients.map(c => c.name.toLowerCase()));
+      
+      // Filtrar solo los clientes nuevos
+      const newClientNames = clientNames.filter(name => 
+        !existingClientNames.has(name.toLowerCase())
+      );
+      
+      let imported = 0;
+      let errors: string[] = [];
+      
+      // Crear clientes nuevos
+      for (const clientName of newClientNames) {
+        try {
+          const newClient = {
+            name: clientName,
+            contactName: 'Sin especificar', // Valor por defecto
+            contactEmail: `contact@${clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`,
+            contactPhone: 'Sin especificar'
+          };
+          
+          await storage.createClient(newClient);
+          imported++;
+          console.log(`✅ Cliente creado: ${clientName}`);
+        } catch (error) {
+          const errorMsg = `Error creando cliente ${clientName}: ${error.message}`;
+          errors.push(errorMsg);
+          console.error('❌', errorMsg);
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: `Importación completada: ${imported} nuevos clientes agregados`,
+        totalFound: clientNames.length,
+        alreadyExists: clientNames.length - newClientNames.length,
+        imported: imported,
+        errors: errors
+      });
+      
+    } catch (error) {
+      console.error('❌ Error importando clientes:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al importar clientes desde Google Sheets",
+        error: error.message 
+      });
+    }
+  });
+
   // Verificar credenciales completas de Google
   app.get("/api/google-sheets/verify-credentials", async (req, res) => {
     try {

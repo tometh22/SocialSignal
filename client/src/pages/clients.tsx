@@ -7,7 +7,7 @@ import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, UserPlus, Users, Mail, Phone, Edit, Trash, Upload, Image } from "lucide-react";
+import { Search, UserPlus, Users, Mail, Phone, Edit, Trash, Upload, Image, Download } from "lucide-react";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -240,6 +240,38 @@ export default function Clients() {
     },
   });
 
+  // Mutación para importar clientes desde Google Sheets
+  const importClientsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/google-sheets/import-clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to import clients');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      toast({
+        title: "Clientes importados",
+        description: `Se importaron ${data.imported} nuevos clientes desde Google Sheets.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "No se pudieron importar los clientes.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Configuración del formulario
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
@@ -341,10 +373,20 @@ export default function Clients() {
         description="Gestiona la información de tus clientes y accede a sus resúmenes"
         breadcrumbs={[{ label: "Clientes", current: true }]}
         actions={
-          <Button onClick={openNewClientDialog}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Añadir Nuevo Cliente
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={openNewClientDialog}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Añadir Nuevo Cliente
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => importClientsMutation.mutate()}
+              disabled={importClientsMutation.isPending}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {importClientsMutation.isPending ? "Importando..." : "Importar desde Google Sheets"}
+            </Button>
+          </div>
         }
       >
         {/* Buscador */}
