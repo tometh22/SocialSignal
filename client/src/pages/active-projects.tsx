@@ -151,76 +151,68 @@ function ProjectCard({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <Card className="group hover:shadow-lg hover:scale-[1.01] transition-all duration-300 border border-gray-200 hover:border-blue-300 bg-gradient-to-r from-white to-gray-50">
-      <CardHeader className="pb-3">
+    <Card className="group hover:shadow-lg hover:scale-[1.01] transition-all duration-300 border border-gray-200 hover:border-blue-300">
+      <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center gap-3">
-                {/* Logo del cliente - más grande y visible */}
-                {client?.logoUrl ? (
-                  <div className="relative group">
-                    <div className="h-8 w-8 rounded-lg overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
-                      <img 
-                        key={`logo-${client.id}-${refreshTimestamp}`}
-                        src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${refreshTimestamp}`}
-                        alt={`Logo de ${clientName}`}
-                        className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-200"
-                        onError={(e) => {
-                          // Fallback al icono Building2 si el logo falla
-                          const target = e.currentTarget;
-                          const container = target.parentElement;
-                          if (container) {
-                            container.innerHTML = '<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
-                          }
-                        }}
-                      />
-                    </div>
+            {/* Header principal con cliente y proyecto */}
+            <div className="flex items-center gap-3 mb-3">
+              {/* Logo del cliente */}
+              {client?.logoUrl ? (
+                <div className="relative group">
+                  <div className="h-10 w-10 rounded-lg overflow-hidden bg-white border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
+                    <img 
+                      key={`logo-${client.id}-${refreshTimestamp}`}
+                      src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${refreshTimestamp}`}
+                      alt={`Logo de ${clientName}`}
+                      className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-200"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        const container = target.parentElement;
+                        if (container) {
+                          container.innerHTML = '<svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
+                        }
+                      }}
+                    />
                   </div>
-                ) : (
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-600" />
-                  </div>
-                )}
-                <div className="flex flex-col min-w-0">
-                  {/* Nombre del cliente PROMINENTE */}
-                  <div className="text-sm font-semibold text-blue-700 mb-1">
-                    {clientName}
-                  </div>
-                  {/* Nombre del proyecto */}
-                  <h3 className="font-semibold text-gray-900 truncate text-lg leading-tight">
+                </div>
+              ) : (
+                <div className="h-10 w-10 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center">
+                  <Building2 className="h-6 w-6 text-blue-600" />
+                </div>
+              )}
+              
+              {/* Información del proyecto */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold text-gray-900 truncate text-lg">
                     {projectName}
                   </h3>
+                  {project.quotation?.projectType && (
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs shrink-0 ${
+                        project.quotation.projectType === 'recurring' 
+                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                          : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }`}
+                    >
+                      {project.quotation.projectType === 'recurring' ? 'Recurrente' : 'One-time'}
+                    </Badge>
+                  )}
+                </div>
+                <div className="text-sm font-medium text-blue-700">
+                  {clientName}
                 </div>
               </div>
-              {/* Project Type Badge */}
-              {project.quotation?.projectType && (
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs ${
-                    project.quotation.projectType === 'fee-mensual' 
-                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                      : 'bg-blue-50 text-blue-700 border-blue-200'
-                  }`}
-                >
-                  {project.quotation.projectType === 'fee-mensual' ? 'Fee Mensual' : 'On Demand'}
-                </Badge>
-              )}
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-              <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+            {/* Estados y badges organizados */}
+            <div className="flex items-center gap-2 mb-3">
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
                 <StatusIcon className="h-3 w-3" />
                 {statusConfig.label}
               </div>
-              {/* Badge de tipo de proyecto */}
-              {isFeeMensual && (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
-                  <Calendar className="h-3 w-3" />
-                  Fee Mensual
-                </div>
-              )}
-              {/* Badge para indicar datos del período específico */}
               {hasPeriodMetrics && (
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
                   <CalendarDays className="h-3 w-3" />
@@ -229,121 +221,71 @@ function ProjectCard({
               )}
             </div>
 
-            {/* Métricas principales compactas */}
-            <div className="grid grid-cols-3 gap-3 mb-3">
-              <div className="bg-green-50 p-2 rounded-lg flex items-center gap-2 hover:bg-green-100 transition-colors">
-                <div className="p-1 bg-green-500 rounded-full">
-                  <DollarSign className="h-3 w-3 text-white" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-green-800">${totalAmount.toLocaleString()}</div>
-                  <div className="text-xs text-green-600">Precio al cliente</div>
+            {/* Métricas principales organizadas */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-lg font-bold text-green-700">${totalAmount.toLocaleString()}</div>
+                <div className="text-xs text-gray-600">Precio al cliente</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="text-lg font-bold text-blue-700">{totalHours.toFixed(1)}h</div>
+                <div className="text-xs text-gray-600">
+                  {hasPeriodMetrics ? 'Del período' : 'Registradas'}
                 </div>
               </div>
               
-              <div className="bg-blue-50 p-2 rounded-lg flex items-center gap-2 hover:bg-blue-100 transition-colors">
-                <div className="p-1 bg-blue-500 rounded-full">
-                  <Clock className="h-3 w-3 text-white" />
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-blue-800">{totalHours.toFixed(1)}h</div>
-                  <div className="text-xs text-blue-600">
-                    {hasPeriodMetrics ? 'Del período' : 'Registradas'}
-                  </div>
-                </div>
-              </div>
-              
-              <div className={`p-2 rounded-lg flex items-center gap-2 transition-colors ${
-                isFeeMensual ? 'bg-blue-50 hover:bg-blue-100' : 'bg-purple-50 hover:bg-purple-100'
-              }`}>
-                <div className={`p-1 rounded-full ${
-                  isFeeMensual ? 'bg-blue-500' : 'bg-purple-500'
+              <div className="text-center">
+                <div className={`text-lg font-bold ${
+                  isFeeMensual ? 'text-blue-700' : 'text-purple-700'
                 }`}>
-                  <Target className="h-3 w-3 text-white" />
+                  {progressPercentage.toFixed(0)}%
                 </div>
-                <div>
-                  <div className={`text-sm font-bold ${
-                    isFeeMensual ? 'text-blue-800' : 'text-purple-800'
-                  }`}>
-                    {progressPercentage.toFixed(0)}%
-                  </div>
-                  <div className={`text-xs ${
-                    isFeeMensual ? 'text-blue-600' : 'text-purple-600'
-                  }`}>
-                    {isFeeMensual ? 'Mes' : 'Progreso'}
-                  </div>
+                <div className="text-xs text-gray-600">
+                  {isFeeMensual ? 'Progreso mensual' : 'Progreso'}
                 </div>
               </div>
             </div>
 
-            {/* Barra de progreso inteligente */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-700">{progressLabel}</span>
-                <span className="text-xs font-bold text-gray-900">{progressPercentage.toFixed(1)}%</span>
+            {/* Barra de progreso más simple */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">{progressLabel}</span>
+                <span className="text-sm font-bold text-gray-900">{progressPercentage.toFixed(0)}%</span>
               </div>
-              <div className="relative">
-                <Progress 
-                  value={Math.min(progressPercentage, 100)} 
-                  className={`h-3 ${isFeeMensual ? 'bg-blue-100' : 'bg-gray-200'}`} 
-                />
-                {!isFeeMensual && progressPercentage > 100 && (
-                  <div className="absolute top-0 left-0 h-3 bg-red-500 opacity-30 rounded-full" style={{width: '100%'}}></div>
-                )}
-              </div>
-              <div className="flex justify-between text-xs mt-1">
-                <span className="text-gray-600 font-medium">
+              <Progress 
+                value={Math.min(progressPercentage, 100)} 
+                className="h-2" 
+              />
+              <div className="flex justify-between text-xs mt-1 text-gray-500">
+                <span>
                   {isFeeMensual ? `${totalHours.toFixed(1)}h registradas` : progressSubtitle}
                 </span>
-                <span className={`font-medium ${!isFeeMensual && progressPercentage > 100 ? 'text-red-600' : 'text-gray-600'}`}>
+                <span className={!isFeeMensual && progressPercentage > 100 ? 'text-red-600' : ''}>
                   {isFeeMensual ? progressSubtitle : `${estimatedHours.toFixed(0)}h estimadas`}
                 </span>
               </div>
             </div>
 
-            {/* Fechas */}
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>
-                  Inicio: {project.startDate ? 
-                    (() => {
-                      try {
-                        const date = new Date(project.startDate);
-                        return !isNaN(date.getTime()) ? 
-                          date.toLocaleDateString('es-ES', { 
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                          }) : 
-                          'Sin fecha';
-                      } catch {
-                        return 'Sin fecha';
-                      }
-                    })() : 'Sin fecha'}
-                </span>
-              </div>
-              {project.expectedEndDate && (
-                <div className="flex items-center gap-1">
-                  <Timer className="h-3 w-3" />
-                  <span>Fin: {
-                    (() => {
-                      try {
-                        const date = new Date(project.expectedEndDate);
-                        return !isNaN(date.getTime()) ? 
-                          date.toLocaleDateString('es-ES', { 
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                          }) : 
-                          'Sin fecha';
-                      } catch {
-                        return 'Sin fecha';
-                      }
-                    })()
-                  }</span>
-                </div>
-              )}
+            {/* Fechas simplificadas */}
+            <div className="text-xs text-gray-500 border-t pt-3">
+              <span>
+                Inicio: {project.startDate ? 
+                  (() => {
+                    try {
+                      const date = new Date(project.startDate);
+                      return !isNaN(date.getTime()) ? 
+                        date.toLocaleDateString('es-ES', { 
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        }) : 
+                        'Sin fecha';
+                    } catch {
+                      return 'Sin fecha';
+                    }
+                  })() : 'Sin fecha'}
+              </span>
             </div>
           </div>
 
