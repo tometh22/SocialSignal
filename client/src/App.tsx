@@ -29,6 +29,7 @@ import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
 import { IndirectCosts } from "@/pages/indirect-costs";
 import CurrencyDemo from "@/pages/currency-demo";
+import GoogleSheetsManager from "@/pages/google-sheets-manager";
 
 
 // Authentication & Utilities
@@ -146,6 +147,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin" component={Admin} />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
                   <ProtectedRoute path="/indirect-costs" component={IndirectCosts} />
+                  <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} />
                   
                   {/* Specialized Tools */}
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />

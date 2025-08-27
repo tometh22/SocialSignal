@@ -28,6 +28,7 @@ import {
   Plus,
   Layers,
   Receipt,
+  FileSpreadsheet,
 } from "lucide-react";
 
 // Tipo para elementos de navegación
@@ -83,6 +84,7 @@ export default function SidebarFixed() {
     { href: "/clients", title: "Clientes", icon: Building2, description: "Información de clientes" },
     { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
     { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos indirectos" },
+    { href: "/google-sheets", title: "Google Sheets", icon: FileSpreadsheet, description: "Importar desde Excel MAESTRO" },
     { href: "/admin", title: "Configuración", icon: Settings, description: "Admin del sistema" },
   ];
 

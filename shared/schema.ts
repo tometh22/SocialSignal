@@ -723,6 +723,78 @@ export const insertUnquotedPersonnelSchema = createInsertSchema(unquotedPersonne
 });
 
 export type UnquotedPersonnel = typeof unquotedPersonnel.$inferSelect;
+
+// ==================== PROYECTOS GOOGLE SHEETS ====================
+// Tabla para proyectos importados desde Google Sheets con evolución temporal de precios
+export const googleSheetsProjects = pgTable("google_sheets_projects", {
+  id: serial("id").primaryKey(),
+  clientName: text("client_name").notNull(), // Nombre del cliente como aparece en Google Sheets
+  projectName: text("project_name").notNull(), // Detalle/nombre del proyecto
+  projectType: text("project_type").notNull(), // "One Shot" o "Fee"
+  isConfirmed: boolean("is_confirmed").notNull().default(true), // Si/No confirmado
+  paymentTerms: integer("payment_terms"), // Condición de pago en días (ej: 90)
+  
+  // Fechas de creación basadas en primer registro de facturación
+  firstBillingMonth: text("first_billing_month"), // "01 ene", "02 feb", etc.
+  firstBillingYear: integer("first_billing_year").notNull(),
+  createdDate: timestamp("created_date").notNull(), // Fecha calculada desde primer mes
+  
+  // Precio original (del primer mes de facturación)
+  originalCurrency: text("original_currency").notNull(), // "ARS" o "USD"
+  originalAmountARS: doublePrecision("original_amount_ars"), 
+  originalAmountUSD: doublePrecision("original_amount_usd"),
+  
+  // Precio actual (último registrado)
+  currentAmountARS: doublePrecision("current_amount_ars"),
+  currentAmountUSD: doublePrecision("current_amount_usd"),
+  
+  // Control de importación
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  googleSheetsKey: text("google_sheets_key").notNull(), // cliente + proyecto para identificar únicos
+});
+
+// Tabla para registros mensuales de facturación (evolución temporal)
+export const googleSheetsProjectBilling = pgTable("google_sheets_project_billing", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => googleSheetsProjects.id),
+  
+  // Información temporal
+  billingMonth: text("billing_month").notNull(), // "01 ene", "02 feb"
+  billingYear: integer("billing_year").notNull(),
+  collectionMonth: text("collection_month"), // Mes cobro si está disponible
+  collectionYear: integer("collection_year"),
+  
+  // Montos del mes específico
+  amountARS: doublePrecision("amount_ars"),
+  amountUSD: doublePrecision("amount_usd"),
+  
+  // Información adicional
+  adjustment: doublePrecision("adjustment").default(0),
+  baseValue: doublePrecision("base_value"),
+  invoiced: boolean("invoiced").default(false), // Facturado/No Facturado
+  
+  // Control
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertGoogleSheetsProjectSchema = createInsertSchema(googleSheetsProjects).omit({
+  id: true,
+  importedAt: true,
+  lastUpdated: true,
+}).extend({
+  createdDate: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+});
+
+export const insertGoogleSheetsProjectBillingSchema = createInsertSchema(googleSheetsProjectBilling).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type GoogleSheetsProject = typeof googleSheetsProjects.$inferSelect;
+export type InsertGoogleSheetsProject = z.infer<typeof insertGoogleSheetsProjectSchema>;
+export type GoogleSheetsProjectBilling = typeof googleSheetsProjectBilling.$inferSelect;
+export type InsertGoogleSheetsProjectBilling = z.infer<typeof insertGoogleSheetsProjectBillingSchema>;
 export type InsertUnquotedPersonnel = z.infer<typeof insertUnquotedPersonnelSchema>;
 
 // ==================== REGISTRO RÁPIDO DE HORAS ====================

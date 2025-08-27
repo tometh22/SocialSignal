@@ -31,6 +31,8 @@ import {
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
   type NonBillableHours, type InsertNonBillableHours,
+  type GoogleSheetsProject, type InsertGoogleSheetsProject,
+  type GoogleSheetsProjectBilling, type InsertGoogleSheetsProjectBilling,
   clients, roles, personnel, reportTemplates, quotations, quotationTeamMembers, quotationVariants, templateRoleAssignments,
   activeProjects, projectComponents, timeEntries, progressReports, users, quarterlyNpsSurveys,
   analysisTypes, projectTypes, mentionsVolumeOptions, countriesCoveredOptions, clientEngagementOptions,
@@ -38,7 +40,8 @@ import {
   chatConversations, chatMessages, chatConversationParticipants,
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
-  projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours
+  projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
+  googleSheetsProjects, googleSheetsProjectBilling
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -332,6 +335,24 @@ export interface IStorage {
   createNonBillableHours(hours: InsertNonBillableHours): Promise<NonBillableHours>;
   updateNonBillableHours(id: number, hours: Partial<InsertNonBillableHours>): Promise<NonBillableHours | undefined>;
   deleteNonBillableHours(id: number): Promise<boolean>;
+
+  // Google Sheets Projects operations
+  getGoogleSheetsProjects(): Promise<GoogleSheetsProject[]>;
+  getGoogleSheetsProject(id: number): Promise<GoogleSheetsProject | undefined>;
+  getGoogleSheetsProjectByKey(googleSheetsKey: string): Promise<GoogleSheetsProject | undefined>;
+  createGoogleSheetsProject(project: InsertGoogleSheetsProject): Promise<GoogleSheetsProject>;
+  updateGoogleSheetsProject(id: number, project: Partial<InsertGoogleSheetsProject>): Promise<GoogleSheetsProject | undefined>;
+  deleteGoogleSheetsProject(id: number): Promise<boolean>;
+
+  // Google Sheets Project Billing operations
+  getProjectBillingRecords(projectId: number): Promise<GoogleSheetsProjectBilling[]>;
+  getProjectBillingRecord(id: number): Promise<GoogleSheetsProjectBilling | undefined>;
+  createProjectBillingRecord(billing: InsertGoogleSheetsProjectBilling): Promise<GoogleSheetsProjectBilling>;
+  updateProjectBillingRecord(id: number, billing: Partial<InsertGoogleSheetsProjectBilling>): Promise<GoogleSheetsProjectBilling | undefined>;
+  deleteProjectBillingRecord(id: number): Promise<boolean>;
+
+  // Import operations
+  importGoogleSheetsProjects(projectsData: any[]): Promise<{ imported: number; updated: number; errors: string[] }>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -3397,7 +3418,215 @@ export class DatabaseStorage implements IStorage {
     return person.hourlyRateARS || undefined;
   }
 
+  // ==================== GOOGLE SHEETS PROJECTS OPERATIONS ====================
+  
+  async getGoogleSheetsProjects(): Promise<GoogleSheetsProject[]> {
+    return await db.select().from(googleSheetsProjects).orderBy(desc(googleSheetsProjects.createdDate));
+  }
 
+  async getGoogleSheetsProject(id: number): Promise<GoogleSheetsProject | undefined> {
+    const [project] = await db.select().from(googleSheetsProjects).where(eq(googleSheetsProjects.id, id));
+    return project;
+  }
+
+  async getGoogleSheetsProjectByKey(googleSheetsKey: string): Promise<GoogleSheetsProject | undefined> {
+    const [project] = await db.select().from(googleSheetsProjects).where(eq(googleSheetsProjects.googleSheetsKey, googleSheetsKey));
+    return project;
+  }
+
+  async createGoogleSheetsProject(project: InsertGoogleSheetsProject): Promise<GoogleSheetsProject> {
+    const [newProject] = await db.insert(googleSheetsProjects).values(project).returning();
+    return newProject;
+  }
+
+  async updateGoogleSheetsProject(id: number, project: Partial<InsertGoogleSheetsProject>): Promise<GoogleSheetsProject | undefined> {
+    const [updatedProject] = await db
+      .update(googleSheetsProjects)
+      .set({ ...project, lastUpdated: new Date() })
+      .where(eq(googleSheetsProjects.id, id))
+      .returning();
+    return updatedProject;
+  }
+
+  async deleteGoogleSheetsProject(id: number): Promise<boolean> {
+    try {
+      await db.transaction(async (tx) => {
+        // Delete all billing records first
+        await tx.delete(googleSheetsProjectBilling).where(eq(googleSheetsProjectBilling.projectId, id));
+        // Delete the project
+        await tx.delete(googleSheetsProjects).where(eq(googleSheetsProjects.id, id));
+      });
+      return true;
+    } catch (error) {
+      console.error("Error deleting Google Sheets project:", error);
+      return false;
+    }
+  }
+
+  // ==================== GOOGLE SHEETS PROJECT BILLING OPERATIONS ====================
+  
+  async getProjectBillingRecords(projectId: number): Promise<GoogleSheetsProjectBilling[]> {
+    return await db.select()
+      .from(googleSheetsProjectBilling)
+      .where(eq(googleSheetsProjectBilling.projectId, projectId))
+      .orderBy(googleSheetsProjectBilling.billingYear, googleSheetsProjectBilling.billingMonth);
+  }
+
+  async getProjectBillingRecord(id: number): Promise<GoogleSheetsProjectBilling | undefined> {
+    const [record] = await db.select().from(googleSheetsProjectBilling).where(eq(googleSheetsProjectBilling.id, id));
+    return record;
+  }
+
+  async createProjectBillingRecord(billing: InsertGoogleSheetsProjectBilling): Promise<GoogleSheetsProjectBilling> {
+    const [newRecord] = await db.insert(googleSheetsProjectBilling).values(billing).returning();
+    return newRecord;
+  }
+
+  async updateProjectBillingRecord(id: number, billing: Partial<InsertGoogleSheetsProjectBilling>): Promise<GoogleSheetsProjectBilling | undefined> {
+    const [updatedRecord] = await db
+      .update(googleSheetsProjectBilling)
+      .set(billing)
+      .where(eq(googleSheetsProjectBilling.id, id))
+      .returning();
+    return updatedRecord;
+  }
+
+  async deleteProjectBillingRecord(id: number): Promise<boolean> {
+    try {
+      await db.delete(googleSheetsProjectBilling).where(eq(googleSheetsProjectBilling.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting project billing record:", error);
+      return false;
+    }
+  }
+
+  // ==================== GOOGLE SHEETS IMPORT OPERATIONS ====================
+  
+  async importGoogleSheetsProjects(projectsData: any[]): Promise<{ imported: number; updated: number; errors: string[] }> {
+    const results = { imported: 0, updated: 0, errors: [] };
+    
+    try {
+      // Utility function to parse amounts
+      const parseAmount = (amountStr: string | number): number => {
+        if (typeof amountStr === 'number') return amountStr;
+        if (!amountStr) return 0;
+        // Remove $ and , from the string and convert to number
+        return parseFloat(amountStr.toString().replace(/[$,]/g, '')) || 0;
+      };
+
+      // Utility function to parse month to date
+      const parseMonthToDate = (monthStr: string, year: number): Date => {
+        const monthMap: { [key: string]: number } = {
+          'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'may': 4, 'jun': 5,
+          'jul': 6, 'ago': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11
+        };
+        
+        const monthName = monthStr.split(' ')[1]; // Extract month from "01 ene"
+        const monthIndex = monthMap[monthName] || 0;
+        return new Date(year, monthIndex, 1);
+      };
+
+      // Group projects by unique key (client + project name)
+      const uniqueProjects = new Map<string, any[]>();
+      
+      for (const project of projectsData) {
+        const key = `${project.cliente}_${project.detalle}`;
+        if (!uniqueProjects.has(key)) {
+          uniqueProjects.set(key, []);
+        }
+        uniqueProjects.get(key)!.push(project);
+      }
+
+      // Process each unique project
+      for (const [key, projectRecords] of Array.from(uniqueProjects.entries())) {
+        try {
+          // Sort records by billing month to find first occurrence
+          projectRecords.sort((a: any, b: any) => {
+            if (a.añoFacturacion !== b.añoFacturacion) {
+              return a.añoFacturacion - b.añoFacturacion;
+            }
+            return a.mesFacturacion.localeCompare(b.mesFacturacion);
+          });
+
+          const firstRecord = projectRecords[0];
+          const lastRecord = projectRecords[projectRecords.length - 1];
+
+          // Determine currency and amounts
+          const originalCurrency = firstRecord.monedaUSD > 0 ? 'USD' : 'ARS';
+          const originalAmountUSD = parseAmount(firstRecord.monedaUSD);
+          const originalAmountARS = parseAmount(firstRecord.monedaARS);
+          const currentAmountUSD = parseAmount(lastRecord.monedaUSD);
+          const currentAmountARS = parseAmount(lastRecord.monedaARS);
+
+          // Check if project already exists
+          const existingProject = await this.getGoogleSheetsProjectByKey(key);
+
+          const projectData: InsertGoogleSheetsProject = {
+            clientName: firstRecord.cliente,
+            projectName: firstRecord.detalle,
+            projectType: firstRecord.proyecto,
+            isConfirmed: firstRecord.confirmado === 'Si' || firstRecord.confirmado === true,
+            paymentTerms: parseInt(firstRecord.condicionPago) || null,
+            firstBillingMonth: firstRecord.mesFacturacion,
+            firstBillingYear: firstRecord.añoFacturacion,
+            createdDate: parseMonthToDate(firstRecord.mesFacturacion, firstRecord.añoFacturacion),
+            originalCurrency,
+            originalAmountARS: originalAmountARS || null,
+            originalAmountUSD: originalAmountUSD || null,
+            currentAmountARS: currentAmountARS || null,
+            currentAmountUSD: currentAmountUSD || null,
+            googleSheetsKey: key
+          };
+
+          let savedProject: GoogleSheetsProject;
+
+          if (existingProject) {
+            // Update existing project
+            const updated = await this.updateGoogleSheetsProject(existingProject.id, projectData);
+            if (updated) {
+              savedProject = updated;
+              results.updated++;
+            } else {
+              throw new Error(`Failed to update project ${key}`);
+            }
+          } else {
+            // Create new project
+            savedProject = await this.createGoogleSheetsProject(projectData);
+            results.imported++;
+          }
+
+          // Import all billing records
+          for (const record of projectRecords) {
+            const billingData: InsertGoogleSheetsProjectBilling = {
+              projectId: savedProject.id,
+              billingMonth: record.mesFacturacion,
+              billingYear: record.añoFacturacion,
+              collectionMonth: record.mesCobre || null,
+              collectionYear: record.añoCobre || null,
+              amountARS: parseAmount(record.monedaARS) || null,
+              amountUSD: parseAmount(record.monedaUSD) || null,
+              adjustment: parseAmount(record.ajuste) || 0,
+              baseValue: parseAmount(record.valorBase) || null,
+              invoiced: false // Default, could be enhanced later
+            };
+
+            await this.createProjectBillingRecord(billingData);
+          }
+
+        } catch (error: any) {
+          results.errors.push(`Error processing project ${key}: ${error?.message || error}`);
+          console.error(`Error processing project ${key}:`, error);
+        }
+      }
+
+    } catch (error: any) {
+      results.errors.push(`General import error: ${error?.message || error}`);
+      console.error("Error in importGoogleSheetsProjects:", error);
+    }
+
+    return results;
+  }
 
 }
 

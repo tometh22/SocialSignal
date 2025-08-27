@@ -7631,6 +7631,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Importar proyectos desde Google Sheets a la base de datos
+  app.post("/api/google-sheets/import-projects", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Importando proyectos desde Google Sheets...');
+      
+      // Obtener los datos de proyectos del Excel MAESTRO
+      const projectsData = await googleSheetsWorkingService.getProyectosConfirmados();
+      
+      console.log(`📊 Procesando ${projectsData.length} registros de proyectos...`);
+      
+      // Importar proyectos usando el storage
+      const importResult = await storage.importGoogleSheetsProjects(projectsData);
+      
+      console.log(`✅ Importación completada:`, importResult);
+      
+      res.json({
+        success: true,
+        message: `Importación completada: ${importResult.imported} nuevos proyectos agregados, ${importResult.updated} actualizados`,
+        imported: importResult.imported,
+        updated: importResult.updated,
+        totalProcessed: projectsData.length,
+        errors: importResult.errors
+      });
+
+    } catch (error) {
+      console.error('❌ Error al importar proyectos:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al importar proyectos desde Google Sheets',
+        error: error.message
+      });
+    }
+  });
+
+  // Obtener proyectos importados desde Google Sheets
+  app.get("/api/google-sheets/projects", requireAuth, async (req, res) => {
+    try {
+      const projects = await storage.getGoogleSheetsProjects();
+      
+      res.json({
+        success: true,
+        projects: projects,
+        count: projects.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error al obtener proyectos de Google Sheets:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener proyectos',
+        error: error.message
+      });
+    }
+  });
+
+  // Obtener registros de facturación de un proyecto específico
+  app.get("/api/google-sheets/projects/:id/billing", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const billingRecords = await storage.getProjectBillingRecords(projectId);
+      
+      res.json({
+        success: true,
+        billingRecords: billingRecords,
+        count: billingRecords.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error al obtener registros de facturación:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener registros de facturación',
+        error: error.message
+      });
+    }
+  });
+
   // Importar clientes desde Google Sheets a la base de datos
   app.post("/api/google-sheets/import-clients", requireAuth, async (req, res) => {
     try {
