@@ -60,6 +60,7 @@ interface ProjectCardProps {
   onNavigate: (path: string) => void;
   getProjectHours: (id: number) => number;
   onDeleteProject: (id: number) => void;
+  allClients: any[];
 }
 
 function ProjectCard({ 
@@ -70,7 +71,8 @@ function ProjectCard({
   onToggleExpand, 
   onNavigate,
   getProjectHours,
-  onDeleteProject
+  onDeleteProject,
+  allClients
 }: ProjectCardProps) {
   const { refreshTimestamp } = useImageRefresh();
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
@@ -154,11 +156,11 @@ function ProjectCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2">
-              <div className="flex items-center gap-2">
-                {/* Logo del cliente - pequeño y elegante */}
+              <div className="flex items-center gap-3">
+                {/* Logo del cliente - más grande y visible */}
                 {client?.logoUrl ? (
                   <div className="relative group">
-                    <div className="h-6 w-6 rounded-md overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
+                    <div className="h-8 w-8 rounded-lg overflow-hidden bg-gray-50 border border-gray-200 flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-200">
                       <img 
                         key={`logo-${client.id}-${refreshTimestamp}`}
                         src={`${client.logoUrl}${client.logoUrl.includes('?') ? '&' : '?'}t=${refreshTimestamp}`}
@@ -169,24 +171,27 @@ function ProjectCard({
                           const target = e.currentTarget;
                           const container = target.parentElement;
                           if (container) {
-                            container.innerHTML = '<svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
+                            container.innerHTML = '<svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>';
                           }
                         }}
                       />
                     </div>
-                    {/* Tooltip con nombre del cliente */}
-                    <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                      {clientName}
-                    </div>
                   </div>
                 ) : (
-                  <div className="h-6 w-6 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center">
-                    <Building2 className="h-4 w-4 text-gray-400" />
+                  <div className="h-8 w-8 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center">
+                    <Building2 className="h-5 w-5 text-blue-600" />
                   </div>
                 )}
-                <h3 className="font-semibold text-gray-900 truncate text-lg">
-                  {projectName}
-                </h3>
+                <div className="flex flex-col min-w-0">
+                  {/* Nombre del cliente PROMINENTE */}
+                  <div className="text-sm font-semibold text-blue-700 mb-1">
+                    {clientName}
+                  </div>
+                  {/* Nombre del proyecto */}
+                  <h3 className="font-semibold text-gray-900 truncate text-lg leading-tight">
+                    {projectName}
+                  </h3>
+                </div>
               </div>
               {/* Project Type Badge */}
               {project.quotation?.projectType && (
@@ -204,8 +209,6 @@ function ProjectCard({
             </div>
             
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-              <span className="font-medium">{clientName}</span>
-              <Separator orientation="vertical" className="h-4" />
               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
                 <StatusIcon className="h-3 w-3" />
                 {statusConfig.label}
@@ -1009,6 +1012,7 @@ export default function ActiveProjectsRedesigned() {
                   onNavigate={setLocation}
                   getProjectHours={getProjectHours}
                   onDeleteProject={handleDeleteProject}
+                  allClients={clients as any[]}
                 />
               );
             })}
