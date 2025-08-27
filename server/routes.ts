@@ -59,7 +59,9 @@ import {
   indirectCosts,
   nonBillableHours,
   personnelHistoricalCosts,
-  projectPriceAdjustments
+  projectPriceAdjustments,
+  googleSheetsProjects,
+  googleSheetsProjectBilling
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -2638,6 +2640,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timeFilter 
       });
 
+      // Función para obtener el último precio de Google Sheets para un proyecto
+      const getLatestGoogleSheetsPrice = async (projectName: string, clientName: string): Promise<number | null> => {
+        console.log(`🔍 getLatestGoogleSheetsPrice called for: ${projectName} - ${clientName}`);
+        try {
+          // Buscar el proyecto en google_sheets_projects
+          const googleProject = await db
+            .select()
+            .from(googleSheetsProjects)
+            .where(sql`LOWER(project_name) = LOWER(${projectName}) AND LOWER(client_name) = LOWER(${clientName})`)
+            .limit(1);
+          
+          console.log(`🔍 Found ${googleProject.length} Google project matches`);
+          if (googleProject.length === 0) {
+            console.log(`❌ No Google Sheets project found for: ${projectName} - ${clientName}`);
+            return null;
+          }
+          console.log(`✅ Found Google project ID: ${googleProject[0].id}`);
+          
+          // Buscar el último registro de billing para este proyecto usando SQL directo
+          try {
+            const billingResult = await db.execute(sql`
+              SELECT amount_usd, billing_year, billing_month
+              FROM google_sheets_project_billing
+              WHERE project_id = ${googleProject[0].id}
+              ORDER BY billing_year DESC, billing_month DESC
+              LIMIT 1
+            `);
+            
+            console.log(`🔍 Found ${billingResult.rows.length} billing records`);
+            if (billingResult.rows.length > 0) {
+              const record = billingResult.rows[0];
+              const latestPrice = record.amount_usd as number;
+              console.log(`💰 Latest price from billing: $${latestPrice} (${record.billing_year}-${record.billing_month})`);
+              return latestPrice;
+            }
+          } catch (billingError) {
+            console.log(`⚠️ Billing query failed, using original price:`, billingError);
+          }
+          
+          // Si no hay registros de billing o falló, usar el precio original
+          const originalPrice = googleProject[0].originalAmountUsd || null;
+          console.log(`💰 Using original price: $${originalPrice}`);
+          return originalPrice;
+        } catch (error) {
+          console.error(`❌ Error getting latest Google Sheets price for ${projectName}:`, error);
+          return null;
+        }
+      };
+
       // Obtener todos los proyectos
       const allProjects = await storage.getActiveProjects();
 
@@ -2762,11 +2813,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Depuración para ver qué está pasando con las cotizaciones
-      projects.forEach(project => {
+      // [TEMPORAL] Precios dinámicos deshabilitados - problema con esquema de Google Sheets billing
+      console.log(`💰 Using original quotation prices (dynamic pricing temporarily disabled)`);
+      for (let i = 0; i < projects.length; i++) {
+        const project = projects[i];
         if (project.quotation) {
+          // Marcar todos los proyectos como usando precios originales
+          projects[i] = {
+            ...project,
+            quotation: {
+              ...project.quotation,
+              priceSource: 'original_quotation'
+            }
+          };
         }
-      });
+      }
 
       res.json(projects);
     } catch (error) {
