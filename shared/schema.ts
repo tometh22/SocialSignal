@@ -1395,6 +1395,128 @@ export type InsertDeliverable = z.infer<typeof insertDeliverableSchema>;
 export type ClientModoComment = typeof clientModoComments.$inferSelect;
 export type InsertClientModoComment = z.infer<typeof insertClientModoCommentSchema>;
 
+// ==================== GESTIÓN FINANCIERA Y VENTAS ====================
+
+// Tabla de registros de ingresos mensuales por proyecto
+export const projectMonthlyRevenue = pgTable("project_monthly_revenue", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  
+  // Datos financieros
+  amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }).notNull(),
+  amountArs: numeric("amount_ars", { precision: 15, scale: 2 }),
+  exchangeRate: numeric("exchange_rate", { precision: 8, scale: 4 }),
+  
+  // Estados de proceso
+  invoiced: boolean("invoiced").default(false), // Si se facturó (columna S)
+  invoiceDate: timestamp("invoice_date"), // Fecha real de facturación
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  
+  collected: boolean("collected").default(false), // Si se cobró
+  collectionDate: timestamp("collection_date"), // Fecha real de cobro (columna C)
+  
+  // Metadatos
+  revenueSource: varchar("revenue_source", { length: 50 }).notNull().default('manual'), // 'manual', 'google_sheets', 'automated'
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+});
+
+// Tabla de cambios de pricing por proyecto (para manejar casos como Warner)
+export const projectPricingChanges = pgTable("project_pricing_changes", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  
+  // Período de vigencia
+  effectiveFromYear: integer("effective_from_year").notNull(),
+  effectiveFromMonth: integer("effective_from_month").notNull(),
+  effectiveToYear: integer("effective_to_year"), // null = vigente
+  effectiveToMonth: integer("effective_to_month"),
+  
+  // Pricing
+  monthlyAmountUsd: numeric("monthly_amount_usd", { precision: 12, scale: 2 }).notNull(),
+  monthlyAmountArs: numeric("monthly_amount_ars", { precision: 15, scale: 2 }),
+  
+  // Contexto del cambio
+  changeReason: text("change_reason"), // "Scope expansion", "Contract renewal", etc.
+  scopeDescription: text("scope_description"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+});
+
+// Vista de resumen financiero por proyecto
+export const projectFinancialSummary = pgTable("project_financial_summary", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id).unique(),
+  
+  // Totales acumulados
+  totalRevenueUsd: numeric("total_revenue_usd", { precision: 12, scale: 2 }).default('0'),
+  totalInvoicedUsd: numeric("total_invoiced_usd", { precision: 12, scale: 2 }).default('0'),
+  totalCollectedUsd: numeric("total_collected_usd", { precision: 12, scale: 2 }).default('0'),
+  
+  // Estado actual
+  currentMonthlyRateUsd: numeric("current_monthly_rate_usd", { precision: 12, scale: 2 }),
+  lastRevenueMonth: integer("last_revenue_month"),
+  lastRevenueYear: integer("last_revenue_year"),
+  
+  // Indicadores
+  outstandingInvoicesUsd: numeric("outstanding_invoices_usd", { precision: 12, scale: 2 }).default('0'),
+  pendingCollectionUsd: numeric("pending_collection_usd", { precision: 12, scale: 2 }).default('0'),
+  
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  updatedBy: integer("updated_by").references(() => users.id),
+});
+
+// Esquemas de inserción
+export const insertProjectMonthlyRevenueSchema = createInsertSchema(projectMonthlyRevenue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectPricingChangesSchema = createInsertSchema(projectPricingChanges).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProjectFinancialSummarySchema = createInsertSchema(projectFinancialSummary).omit({
+  id: true,
+  updatedAt: true,
+});
+
+// Tipos
+export type ProjectMonthlyRevenue = typeof projectMonthlyRevenue.$inferSelect;
+export type InsertProjectMonthlyRevenue = z.infer<typeof insertProjectMonthlyRevenueSchema>;
+
+export type ProjectPricingChange = typeof projectPricingChanges.$inferSelect;
+export type InsertProjectPricingChange = z.infer<typeof insertProjectPricingChangesSchema>;
+
+export type ProjectFinancialSummary = typeof projectFinancialSummary.$inferSelect;
+export type InsertProjectFinancialSummary = z.infer<typeof insertProjectFinancialSummarySchema>;
+
+// Relaciones de ingresos mensuales de proyectos
+export const projectMonthlyRevenueRelations = relations(projectMonthlyRevenue, ({ one }) => ({
+  project: one(activeProjects, { fields: [projectMonthlyRevenue.projectId], references: [activeProjects.id] }),
+  creator: one(users, { fields: [projectMonthlyRevenue.createdBy], references: [users.id] }),
+}));
+
+// Relaciones de cambios de pricing de proyectos
+export const projectPricingChangesRelations = relations(projectPricingChanges, ({ one }) => ({
+  project: one(activeProjects, { fields: [projectPricingChanges.projectId], references: [activeProjects.id] }),
+  creator: one(users, { fields: [projectPricingChanges.createdBy], references: [users.id] }),
+}));
+
+// Relaciones de resumen financiero de proyectos
+export const projectFinancialSummaryRelations = relations(projectFinancialSummary, ({ one }) => ({
+  project: one(activeProjects, { fields: [projectFinancialSummary.projectId], references: [activeProjects.id] }),
+  updater: one(users, { fields: [projectFinancialSummary.updatedBy], references: [users.id] }),
+}));
+
 // ==================== ENCUESTAS NPS TRIMESTRALES ====================
 // Tabla de encuestas NPS trimestrales a clientes
 export const quarterlyNpsSurveys = pgTable("quarterly_nps_surveys", {

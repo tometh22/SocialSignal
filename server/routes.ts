@@ -8703,5 +8703,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== RUTAS API FINANCIERAS ====================
+  
+  // Obtener ingresos mensuales de un proyecto
+  app.get("/api/projects/:projectId/monthly-revenue", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const revenues = await storage.getProjectMonthlyRevenue(projectId);
+      res.json(revenues);
+    } catch (error) {
+      console.error("Error obteniendo ingresos mensuales del proyecto:", error);
+      res.status(500).json({ message: "Error al obtener ingresos mensuales del proyecto" });
+    }
+  });
+  
+  // Crear ingreso mensual para un proyecto
+  app.post("/api/projects/:projectId/monthly-revenue", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const revenueData = { ...req.body, projectId, createdBy: req.user!.id };
+      const revenue = await storage.createProjectMonthlyRevenue(revenueData);
+      
+      // Actualizar resumen financiero
+      await storage.calculateAndUpdateFinancialSummary(projectId);
+      
+      res.status(201).json(revenue);
+    } catch (error) {
+      console.error("Error creando ingreso mensual:", error);
+      res.status(500).json({ message: "Error al crear ingreso mensual" });
+    }
+  });
+  
+  // Actualizar ingreso mensual
+  app.put("/api/monthly-revenue/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "ID de ingreso inválido" });
+      }
+      
+      const updated = await storage.updateProjectMonthlyRevenue(id, req.body);
+      if (!updated) {
+        return res.status(404).json({ message: "Ingreso mensual no encontrado" });
+      }
+      
+      // Actualizar resumen financiero
+      await storage.calculateAndUpdateFinancialSummary(updated.projectId);
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error actualizando ingreso mensual:", error);
+      res.status(500).json({ message: "Error al actualizar ingreso mensual" });
+    }
+  });
+  
+  // Generar ingresos automáticos para proyectos de fee mensual
+  app.post("/api/projects/:projectId/generate-revenue", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const { fromYear, fromMonth, toYear, toMonth } = req.body;
+      
+      if (!fromYear || !fromMonth || !toYear || !toMonth) {
+        return res.status(400).json({ message: "Se requieren fechas de inicio y fin" });
+      }
+      
+      const revenues = await storage.generateMonthlyRevenueForProject(
+        projectId, fromYear, fromMonth, toYear, toMonth
+      );
+      
+      res.json({
+        message: `Se generaron ${revenues.length} registros de ingresos mensuales`,
+        revenues
+      });
+    } catch (error: any) {
+      console.error("Error generando ingresos automáticos:", error);
+      res.status(500).json({ message: error?.message || "Error al generar ingresos automáticos" });
+    }
+  });
+  
+  // Obtener cambios de pricing de un proyecto
+  app.get("/api/projects/:projectId/pricing-changes", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const changes = await storage.getProjectPricingChanges(projectId);
+      res.json(changes);
+    } catch (error) {
+      console.error("Error obteniendo cambios de pricing:", error);
+      res.status(500).json({ message: "Error al obtener cambios de pricing" });
+    }
+  });
+  
+  // Crear cambio de pricing
+  app.post("/api/projects/:projectId/pricing-changes", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const changeData = { ...req.body, projectId, createdBy: req.user!.id };
+      const change = await storage.createProjectPricingChange(changeData);
+      
+      res.status(201).json(change);
+    } catch (error) {
+      console.error("Error creando cambio de pricing:", error);
+      res.status(500).json({ message: "Error al crear cambio de pricing" });
+    }
+  });
+  
+  // Obtener resumen financiero de un proyecto
+  app.get("/api/projects/:projectId/financial-summary", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      let summary = await storage.getProjectFinancialSummary(projectId);
+      
+      // Si no existe, calcularlo
+      if (!summary) {
+        summary = await storage.calculateAndUpdateFinancialSummary(projectId);
+      }
+      
+      res.json(summary);
+    } catch (error) {
+      console.error("Error obteniendo resumen financiero:", error);
+      res.status(500).json({ message: "Error al obtener resumen financiero" });
+    }
+  });
+  
+  // Obtener reporte financiero completo
+  app.get("/api/projects/:projectId/financial-report", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "ID de proyecto inválido" });
+      }
+      
+      const report = await storage.generateProjectFinancialReport(projectId);
+      res.json(report);
+    } catch (error) {
+      console.error("Error generando reporte financiero:", error);
+      res.status(500).json({ message: "Error al generar reporte financiero" });
+    }
+  });
+
   return httpServer;
 }

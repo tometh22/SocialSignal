@@ -329,9 +329,19 @@ function ProjectCard({
                   <TrendingUp className="h-4 w-4 mr-2 text-purple-600" />
                   Ver Analíticas
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem 
+                  onClick={() => onNavigate(`/active-projects/${project.id}/time-entries`)}
+                  className="cursor-pointer"
+                >
                   <Timer className="h-4 w-4 mr-2 text-orange-600" />
                   Registro de Tiempo
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onNavigate(`/active-projects/${project.id}/financial-management`)}
+                  className="cursor-pointer"
+                >
+                  <DollarSign className="h-4 w-4 mr-2 text-emerald-600" />
+                  Gestión Financiera
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 

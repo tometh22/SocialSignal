@@ -27,6 +27,9 @@ import {
   type ProjectPriceAdjustment, type InsertProjectPriceAdjustment,
   type NegotiationHistory, type InsertNegotiationHistory,
   type ExchangeRate, type InsertExchangeRate,
+  type ProjectMonthlyRevenue, type InsertProjectMonthlyRevenue,
+  type ProjectPricingChange, type InsertProjectPricingChange,
+  type ProjectFinancialSummary, type InsertProjectFinancialSummary,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -41,7 +44,7 @@ import {
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
   projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
-  googleSheetsProjects, googleSheetsProjectBilling
+  googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -353,6 +356,41 @@ export interface IStorage {
 
   // Import operations
   importGoogleSheetsProjects(projectsData: any[]): Promise<{ imported: number; updated: number; errors: string[] }>;
+
+  // ==================== FINANCIAL MANAGEMENT ====================
+  // Monthly Revenue operations
+  getProjectMonthlyRevenue(projectId: number): Promise<ProjectMonthlyRevenue[]>;
+  getProjectMonthlyRevenueByPeriod(projectId: number, year: number, month: number): Promise<ProjectMonthlyRevenue | undefined>;
+  createProjectMonthlyRevenue(revenue: InsertProjectMonthlyRevenue): Promise<ProjectMonthlyRevenue>;
+  updateProjectMonthlyRevenue(id: number, revenue: Partial<InsertProjectMonthlyRevenue>): Promise<ProjectMonthlyRevenue | undefined>;
+  deleteProjectMonthlyRevenue(id: number): Promise<boolean>;
+  
+  // Pricing Changes operations
+  getProjectPricingChanges(projectId: number): Promise<ProjectPricingChange[]>;
+  getCurrentProjectPricing(projectId: number, year: number, month: number): Promise<ProjectPricingChange | undefined>;
+  createProjectPricingChange(change: InsertProjectPricingChange): Promise<ProjectPricingChange>;
+  
+  // Financial Summary operations
+  getProjectFinancialSummary(projectId: number): Promise<ProjectFinancialSummary | undefined>;
+  updateProjectFinancialSummary(projectId: number, summary: Partial<InsertProjectFinancialSummary>): Promise<ProjectFinancialSummary>;
+  calculateAndUpdateFinancialSummary(projectId: number): Promise<ProjectFinancialSummary>;
+  
+  // Business Intelligence operations
+  generateProjectFinancialReport(projectId: number): Promise<{
+    totalRevenue: number;
+    totalInvoiced: number;
+    totalCollected: number;
+    monthlyBreakdown: Array<{
+      year: number;
+      month: number;
+      amount: number;
+      invoiced: boolean;
+      collected: boolean;
+    }>;
+  }>;
+  
+  // Bulk Revenue Generation for Fee Projects
+  generateMonthlyRevenueForProject(projectId: number, fromYear: number, fromMonth: number, toYear: number, toMonth: number): Promise<ProjectMonthlyRevenue[]>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -3625,6 +3663,237 @@ export class DatabaseStorage implements IStorage {
       console.error("Error in importGoogleSheetsProjects:", error);
     }
 
+    return results;
+  }
+
+  // ==================== FINANCIAL MANAGEMENT IMPLEMENTATION ====================
+  
+  async getProjectMonthlyRevenue(projectId: number): Promise<ProjectMonthlyRevenue[]> {
+    return await db
+      .select()
+      .from(projectMonthlyRevenue)
+      .where(eq(projectMonthlyRevenue.projectId, projectId))
+      .orderBy(desc(projectMonthlyRevenue.year), desc(projectMonthlyRevenue.month));
+  }
+
+  async getProjectMonthlyRevenueByPeriod(projectId: number, year: number, month: number): Promise<ProjectMonthlyRevenue | undefined> {
+    const result = await db
+      .select()
+      .from(projectMonthlyRevenue)
+      .where(
+        and(
+          eq(projectMonthlyRevenue.projectId, projectId),
+          eq(projectMonthlyRevenue.year, year),
+          eq(projectMonthlyRevenue.month, month)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async createProjectMonthlyRevenue(revenue: InsertProjectMonthlyRevenue): Promise<ProjectMonthlyRevenue> {
+    const result = await db
+      .insert(projectMonthlyRevenue)
+      .values(revenue)
+      .returning();
+    return result[0];
+  }
+
+  async updateProjectMonthlyRevenue(id: number, revenue: Partial<InsertProjectMonthlyRevenue>): Promise<ProjectMonthlyRevenue | undefined> {
+    const result = await db
+      .update(projectMonthlyRevenue)
+      .set({ ...revenue, updatedAt: new Date() })
+      .where(eq(projectMonthlyRevenue.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProjectMonthlyRevenue(id: number): Promise<boolean> {
+    const result = await db
+      .delete(projectMonthlyRevenue)
+      .where(eq(projectMonthlyRevenue.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async getProjectPricingChanges(projectId: number): Promise<ProjectPricingChange[]> {
+    return await db
+      .select()
+      .from(projectPricingChanges)
+      .where(eq(projectPricingChanges.projectId, projectId))
+      .orderBy(desc(projectPricingChanges.effectiveFromYear), desc(projectPricingChanges.effectiveFromMonth));
+  }
+
+  async getCurrentProjectPricing(projectId: number, year: number, month: number): Promise<ProjectPricingChange | undefined> {
+    const result = await db
+      .select()
+      .from(projectPricingChanges)
+      .where(
+        and(
+          eq(projectPricingChanges.projectId, projectId),
+          sql`(effective_from_year < ${year} OR (effective_from_year = ${year} AND effective_from_month <= ${month}))`,
+          sql`(effective_to_year IS NULL OR effective_to_year > ${year} OR (effective_to_year = ${year} AND effective_to_month >= ${month}))`
+        )
+      )
+      .orderBy(desc(projectPricingChanges.effectiveFromYear), desc(projectPricingChanges.effectiveFromMonth))
+      .limit(1);
+    return result[0];
+  }
+
+  async createProjectPricingChange(change: InsertProjectPricingChange): Promise<ProjectPricingChange> {
+    const result = await db
+      .insert(projectPricingChanges)
+      .values(change)
+      .returning();
+    return result[0];
+  }
+
+  async getProjectFinancialSummary(projectId: number): Promise<ProjectFinancialSummary | undefined> {
+    const result = await db
+      .select()
+      .from(projectFinancialSummary)
+      .where(eq(projectFinancialSummary.projectId, projectId))
+      .limit(1);
+    return result[0];
+  }
+
+  async updateProjectFinancialSummary(projectId: number, summary: Partial<InsertProjectFinancialSummary>): Promise<ProjectFinancialSummary> {
+    // Intentar actualizar primero
+    const updateResult = await db
+      .update(projectFinancialSummary)
+      .set({ ...summary, updatedAt: new Date() })
+      .where(eq(projectFinancialSummary.projectId, projectId))
+      .returning();
+
+    if (updateResult.length > 0) {
+      return updateResult[0];
+    }
+
+    // Si no existe, crear nuevo
+    const insertResult = await db
+      .insert(projectFinancialSummary)
+      .values({ projectId, ...summary })
+      .returning();
+    return insertResult[0];
+  }
+
+  async calculateAndUpdateFinancialSummary(projectId: number): Promise<ProjectFinancialSummary> {
+    // Obtener todos los ingresos mensuales del proyecto
+    const revenues = await this.getProjectMonthlyRevenue(projectId);
+    
+    // Calcular totales
+    const totalRevenueUsd = revenues.reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0);
+    const totalInvoicedUsd = revenues
+      .filter(rev => rev.invoiced)
+      .reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0);
+    const totalCollectedUsd = revenues
+      .filter(rev => rev.collected)
+      .reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0);
+    
+    // Calcular pendientes
+    const outstandingInvoicesUsd = totalInvoicedUsd - totalCollectedUsd;
+    const pendingCollectionUsd = totalRevenueUsd - totalInvoicedUsd;
+    
+    // Obtener último registro para mes/año
+    const lastRevenue = revenues[0];
+    
+    // Obtener pricing actual
+    const currentPricing = lastRevenue ? 
+      await this.getCurrentProjectPricing(projectId, lastRevenue.year, lastRevenue.month) :
+      null;
+
+    const summaryData: Partial<InsertProjectFinancialSummary> = {
+      totalRevenueUsd: totalRevenueUsd.toString(),
+      totalInvoicedUsd: totalInvoicedUsd.toString(),
+      totalCollectedUsd: totalCollectedUsd.toString(),
+      outstandingInvoicesUsd: outstandingInvoicesUsd.toString(),
+      pendingCollectionUsd: pendingCollectionUsd.toString(),
+      currentMonthlyRateUsd: currentPricing?.monthlyAmountUsd?.toString() || null,
+      lastRevenueMonth: lastRevenue?.month || null,
+      lastRevenueYear: lastRevenue?.year || null,
+    };
+
+    return await this.updateProjectFinancialSummary(projectId, summaryData);
+  }
+
+  async generateProjectFinancialReport(projectId: number): Promise<{
+    totalRevenue: number;
+    totalInvoiced: number;
+    totalCollected: number;
+    monthlyBreakdown: Array<{
+      year: number;
+      month: number;
+      amount: number;
+      invoiced: boolean;
+      collected: boolean;
+    }>;
+  }> {
+    const revenues = await this.getProjectMonthlyRevenue(projectId);
+    
+    return {
+      totalRevenue: revenues.reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0),
+      totalInvoiced: revenues.filter(rev => rev.invoiced).reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0),
+      totalCollected: revenues.filter(rev => rev.collected).reduce((sum, rev) => sum + Number(rev.amountUsd || 0), 0),
+      monthlyBreakdown: revenues.map(rev => ({
+        year: rev.year,
+        month: rev.month,
+        amount: Number(rev.amountUsd || 0),
+        invoiced: rev.invoiced || false,
+        collected: rev.collected || false,
+      }))
+    };
+  }
+
+  async generateMonthlyRevenueForProject(
+    projectId: number, 
+    fromYear: number, 
+    fromMonth: number, 
+    toYear: number, 
+    toMonth: number
+  ): Promise<ProjectMonthlyRevenue[]> {
+    const results: ProjectMonthlyRevenue[] = [];
+    
+    // Obtener el proyecto para verificar que es fee mensual
+    const project = await this.getActiveProject(projectId);
+    if (!project || !project.quotation || project.quotation.projectType !== 'fee-mensual') {
+      throw new Error('Solo se pueden generar ingresos mensuales automáticamente para proyectos de fee mensual');
+    }
+
+    let currentYear = fromYear;
+    let currentMonth = fromMonth;
+    
+    while (currentYear < toYear || (currentYear === toYear && currentMonth <= toMonth)) {
+      // Verificar si ya existe un registro para este período
+      const existing = await this.getProjectMonthlyRevenueByPeriod(projectId, currentYear, currentMonth);
+      
+      if (!existing) {
+        // Obtener el pricing vigente para este período
+        const pricing = await this.getCurrentProjectPricing(projectId, currentYear, currentMonth);
+        const amount = pricing?.monthlyAmountUsd || project.quotation.totalAmount;
+
+        const revenueData: InsertProjectMonthlyRevenue = {
+          projectId,
+          year: currentYear,
+          month: currentMonth,
+          amountUsd: amount.toString(),
+          revenueSource: 'automated',
+          createdBy: 1, // Usuario del sistema
+        };
+
+        const created = await this.createProjectMonthlyRevenue(revenueData);
+        results.push(created);
+      }
+
+      // Avanzar al siguiente mes
+      currentMonth++;
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+      }
+    }
+    
+    // Actualizar el resumen financiero
+    await this.calculateAndUpdateFinancialSummary(projectId);
+    
     return results;
   }
 

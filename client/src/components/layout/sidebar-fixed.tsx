@@ -29,6 +29,7 @@ import {
   Layers,
   Receipt,
   FileSpreadsheet,
+  DollarSign,
 } from "lucide-react";
 
 // Tipo para elementos de navegación
