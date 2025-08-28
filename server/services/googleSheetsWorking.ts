@@ -388,15 +388,19 @@ class GoogleSheetsWorkingService {
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
         
-        // Debug primeras filas para entender estructura
-        if (i <= 10 && (cliente || proyecto)) {
-          console.log(`🔍 Proyecto ${i} debug:`, {
+        // Debug TODAS las filas de Warner para análisis preciso
+        if (cliente && cliente.toLowerCase().includes('warner') && proyecto && proyecto.toLowerCase().includes('fee')) {
+          console.log(`🔍 Warner Fila ${i} DETALLE:`, {
+            fila: i,
+            mesFacturacion: this.getCellValue(row, columnMap.mesFacturacion),
+            añoFacturacion: this.getCellValue(row, columnMap.añoFacturacion),
             cliente: cliente,
             proyecto: proyecto,
             detalle: this.getCellValue(row, columnMap.detalle),
             confirmado: this.getCellValue(row, columnMap.confirmado),
             valorBase: this.getCellValue(row, columnMap.valorBase),
-            monedaUSD: this.getCellValue(row, columnMap.monedaUSD)
+            monedaUSD: this.getCellValue(row, columnMap.monedaUSD),
+            rawRow: row.slice(0, 15) // Mostrar primeras 15 columnas raw
           });
         }
         
