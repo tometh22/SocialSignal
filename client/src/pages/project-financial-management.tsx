@@ -91,9 +91,14 @@ export default function ProjectFinancialManagement() {
   // Forzar actualización del cache cuando el componente se monta
   useEffect(() => {
     if (projectId) {
+      // Force cache refresh with current timestamp
+      const timestamp = Date.now();
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/pricing-changes`] });
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
+      
+      // Also refetch immediately
+      queryClient.refetchQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
     }
   }, [projectId, queryClient]);
 
