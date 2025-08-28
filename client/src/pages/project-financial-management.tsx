@@ -103,22 +103,22 @@ export default function ProjectFinancialManagement() {
   }, [projectId, queryClient]);
 
   // Queries
-  const { data: monthlyRevenues = [], isLoading: revenuesLoading } = useQuery({
+  const { data: monthlyRevenues = [], isLoading: revenuesLoading } = useQuery<ProjectMonthlyRevenue[]>({
     queryKey: [`/api/projects/${projectId}/monthly-revenue`],
     enabled: !!projectId,
   });
 
-  const { data: pricingChanges = [], isLoading: pricingLoading } = useQuery({
+  const { data: pricingChanges = [], isLoading: pricingLoading } = useQuery<ProjectPricingChange[]>({
     queryKey: [`/api/projects/${projectId}/pricing-changes`],
     enabled: !!projectId,
   });
 
-  const { data: financialSummary, isLoading: summaryLoading } = useQuery({
+  const { data: financialSummary, isLoading: summaryLoading } = useQuery<ProjectFinancialSummary>({
     queryKey: [`/api/projects/${projectId}/financial-summary`],
     enabled: !!projectId,
   });
 
-  const { data: project } = useQuery({
+  const { data: project } = useQuery<any>({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: !!projectId,
   });
@@ -222,6 +222,7 @@ export default function ProjectFinancialManagement() {
       invoiceNumber: revenue?.invoiceNumber || '',
       collected: revenue?.collected || false,
       collectionDate: revenue?.collectionDate || '',
+      revenueSource: revenue?.revenueSource || 'manual_entry',
       notes: revenue?.notes || '',
     });
 
@@ -293,6 +294,21 @@ export default function ProjectFinancialManagement() {
             value={formData.exchangeRate}
             onChange={(e) => setFormData({ ...formData, exchangeRate: e.target.value })}
           />
+        </div>
+
+        <div>
+          <Label htmlFor="revenueSource">Fuente de Ingreso</Label>
+          <Select value={formData.revenueSource} onValueChange={(value) => setFormData({ ...formData, revenueSource: value })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="manual_entry">Entrada Manual</SelectItem>
+              <SelectItem value="excel_automated">Excel Automatizado</SelectItem>
+              <SelectItem value="contract_payment">Pago de Contrato</SelectItem>
+              <SelectItem value="recurring_service">Servicio Recurrente</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="space-y-4">
