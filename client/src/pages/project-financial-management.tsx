@@ -88,6 +88,15 @@ export default function ProjectFinancialManagement() {
   const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
   const [isGenerateRevenueDialogOpen, setIsGenerateRevenueDialogOpen] = useState(false);
 
+  // Forzar actualización del cache cuando el componente se monta
+  useEffect(() => {
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/pricing-changes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
+    }
+  }, [projectId, queryClient]);
+
   // Queries
   const { data: monthlyRevenues = [], isLoading: revenuesLoading } = useQuery({
     queryKey: [`/api/projects/${projectId}/monthly-revenue`],
@@ -453,7 +462,13 @@ export default function ProjectFinancialManagement() {
           </div>
 
           <div className="grid gap-4">
-            {monthlyRevenues.map((revenue: ProjectMonthlyRevenue) => (
+            {monthlyRevenues
+              .sort((a, b) => {
+                // Ordenar por año y mes descendente (más reciente primero)
+                if (a.year !== b.year) return b.year - a.year;
+                return b.month - a.month;
+              })
+              .map((revenue: ProjectMonthlyRevenue) => (
               <Card key={revenue.id} className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => {
                       setSelectedRevenue(revenue);
