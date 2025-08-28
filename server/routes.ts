@@ -8765,7 +8765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Generar ingresos automáticos para proyectos de fee mensual
+  // Generar ingresos automáticos para cualquier tipo de proyecto
   app.post("/api/projects/:projectId/generate-revenue", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.projectId);
@@ -8779,7 +8779,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Se requieren fechas de inicio y fin" });
       }
       
-      const revenues = await storage.generateMonthlyRevenueForProject(
+      console.log(`🤖 Manual revenue generation requested for project ${projectId}`);
+      console.log(`📅 Period: ${fromMonth}/${fromYear} to ${toMonth}/${toYear}`);
+      
+      // Usar la nueva función que funciona con cualquier tipo de proyecto
+      const revenues = await storage.generateMonthlyRevenueForAnyProject(
         projectId, fromYear, fromMonth, toYear, toMonth
       );
       
@@ -8790,6 +8794,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error generando ingresos automáticos:", error);
       res.status(500).json({ message: error?.message || "Error al generar ingresos automáticos" });
+    }
+  });
+
+  // Ejecutar generación automática de ingresos para TODOS los proyectos activos
+  app.post("/api/projects/generate-all-revenues", requireAuth, async (req, res) => {
+    try {
+      console.log("🚀 INICIANDO GENERACIÓN AUTOMÁTICA DE INGRESOS PARA TODOS LOS PROYECTOS");
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      
+      // Obtener todos los proyectos activos
+      const projects = await storage.getActiveProjects();
+      console.log(`📊 Found ${projects.length} active projects`);
+      
+      let processedProjects = 0;
+      let totalRevenuesCreated = 0;
+      
+      for (const project of projects) {
+        try {
+          // Procesar TODOS los proyectos activos que tengan cotización
+          if (!project.quotation) {
+            console.log(`⚠️ Skipping project ${project.id} - no quotation found`);
+            continue;
+          }
+          
+          console.log(`💰 Processing project: ${project.quotation.projectName} (ID: ${project.id}) - Type: ${project.quotation.projectType}`);
+          
+          // Determinar fecha de inicio del proyecto
+          const projectStartDate = project.quotation.createdAt ? new Date(project.quotation.createdAt) : new Date(2024, 0, 1);
+          const startYear = projectStartDate.getFullYear();
+          const startMonth = projectStartDate.getMonth() + 1;
+          
+          // Generar ingresos usando la nueva función universal
+          const revenues = await storage.generateMonthlyRevenueForAnyProject(
+            project.id,
+            startYear,
+            startMonth,
+            currentYear,
+            currentMonth
+          );
+          
+          processedProjects++;
+          totalRevenuesCreated += revenues.length;
+          
+          console.log(`✅ Created ${revenues.length} revenue records for project ${project.id}`);
+          
+        } catch (projectError: any) {
+          console.error(`❌ Error processing project ${project.id}:`, projectError);
+        }
+      }
+      
+      res.json({
+        message: `Generación completada: ${processedProjects} proyectos procesados, ${totalRevenuesCreated} ingresos creados`,
+        processedProjects,
+        totalRevenuesCreated,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error("❌ Error en generación automática masiva:", error);
+      res.status(500).json({ 
+        message: error?.message || "Error en la generación automática masiva",
+        error: error?.message
+      });
     }
   });
   

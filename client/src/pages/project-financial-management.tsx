@@ -617,55 +617,34 @@ export default function ProjectFinancialManagement() {
                 variant="default" 
                 className="w-full"
                 onClick={() => {
-                  // Generar ingresos automáticamente desde Excel
-                  apiRequest('/api/financial/auto-generate-from-excel', {
+                  // Generar ingresos para TODOS los proyectos confirmados
+                  apiRequest('/api/projects/generate-all-revenues', {
                     method: 'POST',
                   }).then((response) => {
                     // Refrescar datos después de la generación
                     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
                     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-                    alert(`¡Ingresos generados automáticamente desde Excel! ${response.revenuesCreated} registros creados.`);
+                    alert(`¡Ingresos generados para todos los proyectos activos! ${response.message}`);
                   }).catch((error) => {
-                    console.error('Error generating revenues from Excel:', error);
-                    alert('Error al generar ingresos desde Excel');
+                    console.error('Error generating revenues for all projects:', error);
+                    alert('Error al generar ingresos para todos los proyectos');
                   });
                 }}
                 disabled={generateRevenueMutation.isPending}
               >
-                {generateRevenueMutation.isPending ? 'Procesando...' : 'Sincronizar Ingresos desde Excel'}
-              </Button>
-
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => {
-                  // Generar ingresos para todos los proyectos fee mensual (método anterior)
-                  apiRequest('/api/financial/auto-generate-all-revenues', {
-                    method: 'POST',
-                  }).then(() => {
-                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-                    alert('¡Ingresos generados para todos los proyectos fee mensual hasta agosto 2025!');
-                  }).catch((error) => {
-                    console.error('Error generating revenues:', error);
-                    alert('Error al generar ingresos automáticamente');
-                  });
-                }}
-                disabled={generateRevenueMutation.isPending}
-              >
-                {generateRevenueMutation.isPending ? 'Generando...' : 'Generar Ingresos (Método Manual)'}
+                {generateRevenueMutation.isPending ? 'Procesando...' : 'Generar Ingresos para TODOS los Proyectos Activos'}
               </Button>
               
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p className="font-medium">🔄 Sincronización desde Excel:</p>
+                <p className="font-medium">Generación Automática de Ingresos:</p>
                 <p>
-                  Lee automáticamente los datos financieros del Excel MAESTRO, incluyendo las columnas S (facturación) 
-                  y C (cobranza), para generar ingresos mensuales con estados realistas hasta agosto 2025.
+                  Genera ingresos mensuales para TODOS los proyectos activos (no solo fee mensual), 
+                  distribuyendo el valor total de cada proyecto a lo largo de su duración desde la 
+                  fecha de inicio hasta el mes actual.
                 </p>
-                <p className="font-medium">⚡ Método Manual:</p>
                 <p>
-                  Genera ingresos básicos para todos los proyectos fee mensual desde su fecha de inicio 
-                  hasta el mes actual, sin usar datos específicos del Excel.
+                  Esto resuelve el problema de proyectos confirmados que aparecen con $0 en 
+                  gestión financiera, permitiendo análisis operacional de ingresos vs costos.
                 </p>
               </div>
             </CardContent>

@@ -77,20 +77,21 @@ export class RevenueAutomationService {
       
       for (const project of projects) {
         try {
-          // Only process fee monthly projects
-          if (!project.quotation || project.quotation.projectType !== 'fee-mensual') {
+          // Process ALL active projects (no type restriction)
+          if (!project.quotation) {
+            console.log(`⚠️ Skipping project ${project.id} - no quotation found`);
             continue;
           }
           
-          console.log(`💰 Processing fee mensual project: ${project.quotation.projectName} (ID: ${project.id})`);
+          console.log(`💰 Processing project: ${project.quotation.projectName} (ID: ${project.id}) - Type: ${project.quotation.projectType}`);
           
           // Determine project start date
           const projectStartDate = project.quotation.createdAt ? new Date(project.quotation.createdAt) : new Date(2024, 0, 1);
           const startYear = projectStartDate.getFullYear();
           const startMonth = projectStartDate.getMonth() + 1;
           
-          // Generate revenues from project start to current month
-          const revenues = await this.storage.generateMonthlyRevenueForProject(
+          // Generate revenues from project start to current month using the new universal function
+          const revenues = await this.storage.generateMonthlyRevenueForAnyProject(
             project.id,
             startYear,
             startMonth,

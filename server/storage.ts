@@ -3897,6 +3897,108 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
+  /**
+   * Genera ingresos mensuales para CUALQUIER tipo de proyecto confirmado
+   * Distribuye el valor total del proyecto a lo largo de su duración
+   */
+  async generateMonthlyRevenueForAnyProject(
+    projectId: number, 
+    fromYear: number, 
+    fromMonth: number, 
+    toYear: number, 
+    toMonth: number
+  ): Promise<ProjectMonthlyRevenue[]> {
+    const results: ProjectMonthlyRevenue[] = [];
+    
+    // Obtener el proyecto 
+    const project = await this.getActiveProject(projectId);
+    if (!project || !project.quotation) {
+      console.log(`❌ Project ${projectId} not found or has no quotation`);
+      return results;
+    }
+
+    console.log(`💰 Generating revenue for project ${projectId}: ${project.quotation.projectName}`);
+    console.log(`📊 Project type: ${project.quotation.projectType}, Total: $${project.quotation.totalAmount}`);
+
+    // Calcular el número total de meses del proyecto
+    let totalMonths = 0;
+    let currentYear = fromYear;
+    let currentMonth = fromMonth;
+    
+    while (currentYear < toYear || (currentYear === toYear && currentMonth <= toMonth)) {
+      totalMonths++;
+      currentMonth++;
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+      }
+    }
+
+    if (totalMonths === 0) {
+      console.log(`❌ No months to process for project ${projectId}`);
+      return results;
+    }
+
+    // Obtener valor total del proyecto
+    const totalAmount = parseFloat(project.quotation.totalAmount.toString());
+    
+    // Para fee mensual, usar el valor mensual específico
+    let monthlyAmount = totalAmount;
+    if (project.quotation.projectType === 'fee-mensual') {
+      // Para fee mensual, el totalAmount ya es el monto mensual
+      monthlyAmount = totalAmount;
+    } else {
+      // Para otros tipos de proyectos, distribuir el total entre todos los meses
+      monthlyAmount = totalAmount / totalMonths;
+    }
+
+    console.log(`📈 Monthly amount calculated: $${monthlyAmount.toFixed(2)} (${totalMonths} months total)`);
+
+    // Resetear para generar los registros
+    currentYear = fromYear;
+    currentMonth = fromMonth;
+    
+    while (currentYear < toYear || (currentYear === toYear && currentMonth <= toMonth)) {
+      // Verificar si ya existe un registro para este período
+      const existing = await this.getProjectMonthlyRevenueByPeriod(projectId, currentYear, currentMonth);
+      
+      if (!existing) {
+        // Obtener el pricing vigente para este período
+        const pricing = await this.getCurrentProjectPricing(projectId, currentYear, currentMonth);
+        const finalAmount = pricing?.monthlyAmountUsd || monthlyAmount;
+        const finalAmountNumber = typeof finalAmount === 'string' ? parseFloat(finalAmount) : finalAmount;
+
+        const revenueData: InsertProjectMonthlyRevenue = {
+          projectId,
+          year: currentYear,
+          month: currentMonth,
+          amountUsd: finalAmountNumber.toString(),
+          revenueSource: 'excel_automated',
+          createdBy: 1, // Usuario del sistema
+        };
+
+        const created = await this.createProjectMonthlyRevenue(revenueData);
+        results.push(created);
+        console.log(`✅ Created revenue for ${currentMonth}/${currentYear}: $${finalAmountNumber.toFixed(2)}`);
+      } else {
+        console.log(`⚠️ Revenue already exists for ${currentMonth}/${currentYear}: $${existing.amountUsd}`);
+      }
+
+      // Avanzar al siguiente mes
+      currentMonth++;
+      if (currentMonth > 12) {
+        currentMonth = 1;
+        currentYear++;
+      }
+    }
+    
+    // Actualizar el resumen financiero
+    await this.calculateAndUpdateFinancialSummary(projectId);
+    
+    console.log(`🎉 Generated ${results.length} new revenue records for project ${projectId}`);
+    return results;
+  }
+
 }
 
 // Exportar solo la implementación de base de datos
