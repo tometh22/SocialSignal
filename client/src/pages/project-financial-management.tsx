@@ -566,7 +566,7 @@ export default function ProjectFinancialManagement() {
               <Dialog open={isGenerateRevenueDialogOpen} onOpenChange={setIsGenerateRevenueDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="w-full">
-                    Generar Ingresos Automáticamente (Proyectos Fee Mensual)
+                    Generar Ingresos Automáticamente (Este Proyecto)
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -576,10 +576,32 @@ export default function ProjectFinancialManagement() {
                   {/* Generate revenue form would go here */}
                 </DialogContent>
               </Dialog>
+
+              <Button 
+                variant="default" 
+                className="w-full"
+                onClick={() => {
+                  // Generar ingresos para todos los proyectos fee mensual
+                  apiRequest('/api/financial/auto-generate-all-revenues', {
+                    method: 'POST',
+                  }).then(() => {
+                    // Refrescar datos después de la generación
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
+                    alert('¡Ingresos generados automáticamente para todos los proyectos fee mensual hasta agosto 2025!');
+                  }).catch((error) => {
+                    console.error('Error generating revenues:', error);
+                    alert('Error al generar ingresos automáticamente');
+                  });
+                }}
+                disabled={generateRevenueMutation.isPending}
+              >
+                {generateRevenueMutation.isPending ? 'Generando...' : 'Generar Ingresos para TODOS los Proyectos (hasta Agosto 2025)'}
+              </Button>
               
               <p className="text-sm text-muted-foreground">
-                Esta herramienta genera automáticamente registros de ingresos mensuales para proyectos 
-                de fee mensual basándose en los cambios de pricing configurados.
+                Esta herramienta genera automáticamente registros de ingresos mensuales para TODOS los proyectos 
+                de fee mensual desde su fecha de inicio hasta agosto 2025 (mes actual).
               </p>
             </CardContent>
           </Card>

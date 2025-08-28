@@ -8865,5 +8865,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generar ingresos automáticos para todos los proyectos fee mensual hasta el mes actual
+  app.post("/api/financial/auto-generate-all-revenues", requireAuth, async (req, res) => {
+    try {
+      console.log("🤖 Starting automatic revenue generation for all fee monthly projects...");
+      
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      
+      console.log(`📅 Generating revenues up to: ${currentMonth}/${currentYear}`);
+      
+      const projects = await storage.getActiveProjects();
+      console.log(`📊 Found ${projects.length} active projects`);
+      
+      let processedProjects = 0;
+      let totalRevenuesCreated = 0;
+      const results = [];
+      
+      for (const project of projects) {
+        try {
+          if (!project.quotation || project.quotation.projectType !== 'fee-mensual') {
+            console.log(`⏭️ Skipping project ${project.id} - not fee mensual (type: ${project.quotation?.projectType})`);
+            continue;
+          }
+          
+          console.log(`💰 Processing fee mensual project: ${project.quotation.projectName} (ID: ${project.id})`);
+          
+          const projectStartDate = project.quotation.createdAt ? new Date(project.quotation.createdAt) : new Date(2024, 0, 1);
+          const startYear = projectStartDate.getFullYear();
+          const startMonth = projectStartDate.getMonth() + 1;
+          
+          console.log(`📅 Project start date: ${startMonth}/${startYear}`);
+          
+          const revenues = await storage.generateMonthlyRevenueForProject(
+            project.id,
+            startYear,
+            startMonth,
+            currentYear,
+            currentMonth
+          );
+          
+          processedProjects++;
+          totalRevenuesCreated += revenues.length;
+          
+          results.push({
+            projectId: project.id,
+            projectName: project.quotation.projectName,
+            revenuesCreated: revenues.length,
+            startPeriod: `${startMonth}/${startYear}`,
+            endPeriod: `${currentMonth}/${currentYear}`
+          });
+          
+          console.log(`✅ Created ${revenues.length} revenue records for project ${project.id}`);
+          
+        } catch (projectError: any) {
+          console.error(`❌ Error processing project ${project.id}:`, projectError);
+          results.push({
+            projectId: project.id,
+            projectName: project.quotation?.projectName || 'Unknown',
+            error: projectError.message || 'Unknown error'
+          });
+        }
+      }
+      
+      console.log(`🎉 Auto-generation completed: ${processedProjects} projects processed, ${totalRevenuesCreated} total revenues created`);
+      
+      res.json({
+        success: true,
+        message: `Generación automática completada`,
+        summary: {
+          projectsProcessed: processedProjects,
+          totalRevenuesCreated,
+          currentPeriod: `${currentMonth}/${currentYear}`
+        },
+        results
+      });
+      
+    } catch (error: any) {
+      console.error("❌ Error in automatic revenue generation:", error);
+      res.status(500).json({ 
+        message: "Error en la generación automática de ingresos", 
+        error: error?.message || error 
+      });
+    }
+  });
+
   return httpServer;
 }
