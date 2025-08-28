@@ -8865,6 +8865,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generar ingresos automáticamente desde datos del Excel
+  app.post("/api/financial/auto-generate-from-excel", requireAuth, async (req, res) => {
+    try {
+      console.log("🤖 Iniciando generación automática desde Excel...");
+      
+      const result = await googleSheetsWorkingService.generateMonthlyRevenuesFromExcel(storage);
+      
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Generación automática desde Excel completada: ${result.revenuesCreated} ingresos creados`
+          : 'Error en la generación automática desde Excel',
+        revenuesCreated: result.revenuesCreated,
+        errors: result.errors
+      });
+      
+    } catch (error: any) {
+      console.error("❌ Error en generación automática desde Excel:", error);
+      res.status(500).json({ 
+        message: "Error en la generación automática desde Excel", 
+        error: error?.message || error 
+      });
+    }
+  });
+
   // Generar ingresos automáticos para todos los proyectos fee mensual hasta el mes actual
   app.post("/api/financial/auto-generate-all-revenues", requireAuth, async (req, res) => {
     try {

@@ -437,6 +437,183 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Generar ingresos mensuales automáticamente basándose en datos del Excel
+   * Procesa las columnas S (facturación) y C (cobranza) para crear registros de ingresos
+   */
+  async generateMonthlyRevenuesFromExcel(storage: any): Promise<{ success: boolean; revenuesCreated: number; errors: string[] }> {
+    console.log('🤖 Generando ingresos mensuales automáticamente desde Excel...');
+    
+    try {
+      // Obtener proyectos confirmados del Excel
+      const proyectosConfirmados = await this.getProyectosConfirmados();
+      const proyectosFee = proyectosConfirmados.filter(p => 
+        p.confirmado && 
+        p.proyecto && 
+        p.cliente &&
+        (p.monedaUSD > 0 || p.monedaARS > 0)
+      );
+      
+      console.log(`📊 Encontrados ${proyectosFee.length} proyectos fee confirmados en el Excel`);
+      
+      let revenuesCreated = 0;
+      const errors: string[] = [];
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      
+      for (const proyecto of proyectosFee) {
+        try {
+          // Buscar el proyecto activo correspondiente
+          const activeProjects = await storage.getActiveProjects();
+          const matchingProject = activeProjects.find((ap: any) => 
+            ap.quotation?.projectName?.toLowerCase().includes(proyecto.proyecto.toLowerCase()) ||
+            proyecto.proyecto.toLowerCase().includes(ap.quotation?.projectName?.toLowerCase())
+          );
+          
+          if (!matchingProject) {
+            errors.push(`Proyecto activo no encontrado para: ${proyecto.proyecto}`);
+            continue;
+          }
+          
+          console.log(`💰 Procesando ingresos para proyecto: ${proyecto.proyecto} (ID: ${matchingProject.id})`);
+          
+          // Determinar período de facturación desde el Excel
+          const startYear = proyecto.añoFacturacion || 2024;
+          const startMonth = this.parseMonthFromSpanish(proyecto.mesFacturacion) || 1;
+          
+          // Generar ingresos mensuales desde inicio hasta mes actual
+          const monthlyAmount = proyecto.monedaUSD || (proyecto.monedaARS / 1000); // Convert ARS to USD approx
+          
+          for (let year = startYear; year <= currentYear; year++) {
+            const monthStart = (year === startYear) ? startMonth : 1;
+            const monthEnd = (year === currentYear) ? currentMonth : 12;
+            
+            for (let month = monthStart; month <= monthEnd; month++) {
+              try {
+                // Verificar si ya existe el ingreso para este mes
+                const existingRevenues = await storage.getProjectMonthlyRevenue(matchingProject.id);
+                const exists = existingRevenues.some((rev: any) => 
+                  rev.year === year && rev.month === month
+                );
+                
+                if (!exists) {
+                  // Determinar estado de facturación y cobranza basado en información del Excel
+                  const isInvoiced = this.shouldBeInvoiced(proyecto, year, month);
+                  const isCollected = this.shouldBeCollected(proyecto, year, month);
+                  
+                  const revenueData = {
+                    projectId: matchingProject.id,
+                    year: year,
+                    month: month,
+                    amountUsd: monthlyAmount,
+                    invoiced: isInvoiced,
+                    collected: isCollected,
+                    revenueSource: 'excel_automated',
+                    notes: `Generado automáticamente desde Excel - ${proyecto.cliente}`,
+                    createdBy: 1 // Sistema
+                  };
+                  
+                  await storage.createProjectMonthlyRevenue(revenueData);
+                  revenuesCreated++;
+                  
+                  console.log(`✅ Ingreso creado: ${proyecto.proyecto} - ${month}/${year} - $${monthlyAmount}`);
+                }
+              } catch (monthError: any) {
+                console.error(`❌ Error creando ingreso para ${proyecto.proyecto} ${month}/${year}:`, monthError);
+              }
+            }
+          }
+          
+        } catch (projectError: any) {
+          const errorMsg = `Error procesando proyecto ${proyecto.proyecto}: ${projectError.message}`;
+          errors.push(errorMsg);
+          console.error('❌', errorMsg);
+        }
+      }
+      
+      console.log(`🎉 Generación automática completada: ${revenuesCreated} ingresos creados`);
+      
+      return {
+        success: true,
+        revenuesCreated,
+        errors
+      };
+      
+    } catch (error: any) {
+      console.error('❌ Error en generación automática desde Excel:', error);
+      return {
+        success: false,
+        revenuesCreated: 0,
+        errors: [error.message || 'Error desconocido']
+      };
+    }
+  }
+
+  /**
+   * Determinar si un ingreso debería estar facturado basándose en columna S del Excel
+   */
+  private shouldBeInvoiced(proyecto: ProyectoConfirmado, year: number, month: number): boolean {
+    // Lógica basada en la información de facturación del Excel
+    // Si tiene mes de facturación específico, verificar si ya pasó
+    if (proyecto.mesFacturacion && proyecto.añoFacturacion) {
+      const factMonth = this.parseMonthFromSpanish(proyecto.mesFacturacion);
+      const factYear = proyecto.añoFacturacion;
+      
+      if (year > factYear || (year === factYear && month >= factMonth)) {
+        return true;
+      }
+    }
+    
+    // Por defecto, considerar facturado si ya pasaron 2 meses desde el inicio
+    const monthsSinceStart = (year * 12 + month) - (proyecto.añoFacturacion * 12 + this.parseMonthFromSpanish(proyecto.mesFacturacion));
+    return monthsSinceStart >= 2;
+  }
+
+  /**
+   * Determinar si un ingreso debería estar cobrado basándose en columna C del Excel
+   */
+  private shouldBeCollected(proyecto: ProyectoConfirmado, year: number, month: number): boolean {
+    // Lógica basada en la información de cobranza del Excel
+    if (proyecto.mesCobre && proyecto.añoCobre) {
+      const cobMonth = this.parseMonthFromSpanish(proyecto.mesCobre);
+      const cobYear = proyecto.añoCobre;
+      
+      if (year > cobYear || (year === cobYear && month >= cobMonth)) {
+        return true;
+      }
+    }
+    
+    // Por defecto, considerar cobrado si ya pasaron 3 meses desde facturación
+    const monthsSinceStart = (year * 12 + month) - (proyecto.añoFacturacion * 12 + this.parseMonthFromSpanish(proyecto.mesFacturacion));
+    return monthsSinceStart >= 3;
+  }
+
+  /**
+   * Convertir mes en español a número
+   */
+  private parseMonthFromSpanish(mesSpanish: string): number {
+    if (!mesSpanish) return 1;
+    
+    const mes = mesSpanish.toLowerCase().trim();
+    const meses: Record<string, number> = {
+      'enero': 1, 'ene': 1, '01': 1, '1': 1,
+      'febrero': 2, 'feb': 2, '02': 2, '2': 2,
+      'marzo': 3, 'mar': 3, '03': 3, '3': 3,
+      'abril': 4, 'abr': 4, '04': 4, '4': 4,
+      'mayo': 5, 'may': 5, '05': 5, '5': 5,
+      'junio': 6, 'jun': 6, '06': 6, '6': 6,
+      'julio': 7, 'jul': 7, '07': 7, '7': 7,
+      'agosto': 8, 'ago': 8, '08': 8, '8': 8,
+      'septiembre': 9, 'sep': 9, '09': 9, '9': 9,
+      'octubre': 10, 'oct': 10, '10': 10,
+      'noviembre': 11, 'nov': 11, '11': 11,
+      'diciembre': 12, 'dic': 12, '12': 12
+    };
+    
+    return meses[mes] || 1;
+  }
+
+  /**
    * Datos simulados como fallback
    */
   private getMockCostosData(): CostoDirectoIndirecto[] {

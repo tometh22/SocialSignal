@@ -581,14 +581,35 @@ export default function ProjectFinancialManagement() {
                 variant="default" 
                 className="w-full"
                 onClick={() => {
-                  // Generar ingresos para todos los proyectos fee mensual
-                  apiRequest('/api/financial/auto-generate-all-revenues', {
+                  // Generar ingresos automáticamente desde Excel
+                  apiRequest('/api/financial/auto-generate-from-excel', {
                     method: 'POST',
-                  }).then(() => {
+                  }).then((response) => {
                     // Refrescar datos después de la generación
                     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
                     queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-                    alert('¡Ingresos generados automáticamente para todos los proyectos fee mensual hasta agosto 2025!');
+                    alert(`¡Ingresos generados automáticamente desde Excel! ${response.revenuesCreated} registros creados.`);
+                  }).catch((error) => {
+                    console.error('Error generating revenues from Excel:', error);
+                    alert('Error al generar ingresos desde Excel');
+                  });
+                }}
+                disabled={generateRevenueMutation.isPending}
+              >
+                {generateRevenueMutation.isPending ? 'Procesando...' : 'Sincronizar Ingresos desde Excel'}
+              </Button>
+
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  // Generar ingresos para todos los proyectos fee mensual (método anterior)
+                  apiRequest('/api/financial/auto-generate-all-revenues', {
+                    method: 'POST',
+                  }).then(() => {
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
+                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
+                    alert('¡Ingresos generados para todos los proyectos fee mensual hasta agosto 2025!');
                   }).catch((error) => {
                     console.error('Error generating revenues:', error);
                     alert('Error al generar ingresos automáticamente');
@@ -596,13 +617,21 @@ export default function ProjectFinancialManagement() {
                 }}
                 disabled={generateRevenueMutation.isPending}
               >
-                {generateRevenueMutation.isPending ? 'Generando...' : 'Generar Ingresos para TODOS los Proyectos (hasta Agosto 2025)'}
+                {generateRevenueMutation.isPending ? 'Generando...' : 'Generar Ingresos (Método Manual)'}
               </Button>
               
-              <p className="text-sm text-muted-foreground">
-                Esta herramienta genera automáticamente registros de ingresos mensuales para TODOS los proyectos 
-                de fee mensual desde su fecha de inicio hasta agosto 2025 (mes actual).
-              </p>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p className="font-medium">🔄 Sincronización desde Excel:</p>
+                <p>
+                  Lee automáticamente los datos financieros del Excel MAESTRO, incluyendo las columnas S (facturación) 
+                  y C (cobranza), para generar ingresos mensuales con estados realistas hasta agosto 2025.
+                </p>
+                <p className="font-medium">⚡ Método Manual:</p>
+                <p>
+                  Genera ingresos básicos para todos los proyectos fee mensual desde su fecha de inicio 
+                  hasta el mes actual, sin usar datos específicos del Excel.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
