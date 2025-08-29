@@ -1,652 +1,646 @@
-import { useState, useEffect } from 'react';
-import { useParams } from 'wouter';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Calendar, DollarSign, TrendingUp, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
-import { format, parse } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { CalendarIcon, Plus, TrendingUp, DollarSign, FileText, Calendar } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-interface ProjectMonthlyRevenue {
+// Tipos
+type ProjectMonthlySales = {
   id: number;
   projectId: number;
   year: number;
   month: number;
-  amountUsd: string;
-  amountArs?: string;
-  exchangeRate?: string;
-  invoiced: boolean;
-  invoiceDate?: string;
-  invoiceNumber?: string;
-  collected: boolean;
-  collectionDate?: string;
-  revenueSource: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
+  salesAmountUsd: number;
+  salesType: string;
+  description?: string;
+  createdAt: Date;
+  createdBy?: number;
+};
 
-interface ProjectPricingChange {
+type ProjectFinancialTransaction = {
   id: number;
   projectId: number;
-  effectiveFromYear: number;
-  effectiveFromMonth: number;
-  effectiveToYear?: number;
-  effectiveToMonth?: number;
-  monthlyAmountUsd: string;
-  monthlyAmountArs?: string;
-  changeReason?: string;
-  scopeDescription?: string;
-  createdAt: string;
-}
+  invoiceDate: Date;
+  invoiceAmountUsd: number;
+  collectionDate?: Date;
+  invoiceStatus: string;
+  description?: string;
+  createdAt: Date;
+  createdBy?: number;
+};
 
-interface ProjectFinancialSummary {
-  id: number;
-  projectId: number;
-  totalRevenueUsd: string;
-  totalInvoicedUsd: string;
-  totalCollectedUsd: string;
-  currentMonthlyRateUsd?: string;
-  lastRevenueMonth?: number;
-  lastRevenueYear?: number;
-  outstandingInvoicesUsd: string;
-  pendingCollectionUsd: string;
-  updatedAt: string;
-}
+// Esquemas de validación
+const monthlySalesSchema = z.object({
+  year: z.number().min(2020).max(2030),
+  month: z.number().min(1).max(12),
+  salesAmountUsd: z.number().min(0),
+  salesType: z.string().min(1, "Tipo de venta requerido"),
+  description: z.string().optional(),
+});
 
-const MONTHS = [
-  { value: 1, label: 'Enero' },
-  { value: 2, label: 'Febrero' },
-  { value: 3, label: 'Marzo' },
-  { value: 4, label: 'Abril' },
-  { value: 5, label: 'Mayo' },
-  { value: 6, label: 'Junio' },
-  { value: 7, label: 'Julio' },
-  { value: 8, label: 'Agosto' },
-  { value: 9, label: 'Septiembre' },
-  { value: 10, label: 'Octubre' },
-  { value: 11, label: 'Noviembre' },
-  { value: 12, label: 'Diciembre' },
-];
+const financialTransactionSchema = z.object({
+  invoiceDate: z.string().min(1, "Fecha de factura requerida"),
+  invoiceAmountUsd: z.number().min(0),
+  collectionDate: z.string().optional(),
+  invoiceStatus: z.string().min(1, "Estado de factura requerido"),
+  description: z.string().optional(),
+});
+
+type MonthlySalesFormData = z.infer<typeof monthlySalesSchema>;
+type FinancialTransactionFormData = z.infer<typeof financialTransactionSchema>;
 
 export default function ProjectFinancialManagement() {
-  const params = useParams();
-  const projectId = parseInt(params.projectId || '0');
+  const { projectId } = useParams();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  const [selectedRevenue, setSelectedRevenue] = useState<ProjectMonthlyRevenue | null>(null);
-  const [isRevenueDialogOpen, setIsRevenueDialogOpen] = useState(false);
-  const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
-  const [isGenerateRevenueDialogOpen, setIsGenerateRevenueDialogOpen] = useState(false);
+  const [openMonthlySales, setOpenMonthlySales] = useState(false);
+  const [openFinancialTransaction, setOpenFinancialTransaction] = useState(false);
 
-  // Forzar actualización del cache cuando el componente se monta
-  useEffect(() => {
-    if (projectId) {
-      // Force cache refresh with current timestamp
-      const timestamp = Date.now();
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/pricing-changes`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-      
-      // Also refetch immediately
-      queryClient.refetchQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-    }
-  }, [projectId, queryClient]);
-
-  // Queries
-  const { data: monthlyRevenues = [], isLoading: revenuesLoading } = useQuery<ProjectMonthlyRevenue[]>({
-    queryKey: [`/api/projects/${projectId}/monthly-revenue`],
-    enabled: !!projectId,
-  });
-
-  const { data: pricingChanges = [], isLoading: pricingLoading } = useQuery<ProjectPricingChange[]>({
-    queryKey: [`/api/projects/${projectId}/pricing-changes`],
-    enabled: !!projectId,
-  });
-
-  const { data: financialSummary, isLoading: summaryLoading } = useQuery<ProjectFinancialSummary>({
-    queryKey: [`/api/projects/${projectId}/financial-summary`],
-    enabled: !!projectId,
-  });
-
-  const { data: project } = useQuery<any>({
+  // Obtener datos del proyecto
+  const { data: project, isLoading: loadingProject } = useQuery({
     queryKey: [`/api/active-projects/${projectId}`],
     enabled: !!projectId,
   });
 
-  // Mutations
-  const createRevenueMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${projectId}/monthly-revenue`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-      setIsRevenueDialogOpen(false);
+  // Obtener ventas operacionales mensuales
+  const { data: monthlySales = [], isLoading: loadingMonthlySales } = useQuery({
+    queryKey: [`/api/projects/${projectId}/monthly-sales`],
+    enabled: !!projectId,
+  });
+
+  // Obtener transacciones financieras
+  const { data: financialTransactions = [], isLoading: loadingTransactions } = useQuery({
+    queryKey: [`/api/projects/${projectId}/financial-transactions`],
+    enabled: !!projectId,
+  });
+
+  // Formularios
+  const monthlySalesForm = useForm<MonthlySalesFormData>({
+    resolver: zodResolver(monthlySalesSchema),
+    defaultValues: {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+      salesAmountUsd: 0,
+      salesType: "",
+      description: "",
     },
   });
 
-  const updateRevenueMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
-      apiRequest(`/api/monthly-revenue/${id}`, {
-        method: 'PUT',
+  const financialTransactionForm = useForm<FinancialTransactionFormData>({
+    resolver: zodResolver(financialTransactionSchema),
+    defaultValues: {
+      invoiceDate: "",
+      invoiceAmountUsd: 0,
+      collectionDate: "",
+      invoiceStatus: "pendiente",
+      description: "",
+    },
+  });
+
+  // Mutaciones
+  const createMonthlySalesMutation = useMutation({
+    mutationFn: (data: MonthlySalesFormData) =>
+      apiRequest(`/api/projects/${projectId}/monthly-sales`, {
+        method: "POST",
         body: JSON.stringify(data),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-      setIsRevenueDialogOpen(false);
-      setSelectedRevenue(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-sales`] });
+      setOpenMonthlySales(false);
+      monthlySalesForm.reset();
+      toast({
+        title: "Venta operacional registrada",
+        description: "Los datos se guardaron correctamente",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la venta operacional",
+        variant: "destructive",
+      });
     },
   });
 
-  const createPricingChangeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${projectId}/pricing-changes`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  const createFinancialTransactionMutation = useMutation({
+    mutationFn: (data: FinancialTransactionFormData) =>
+      apiRequest(`/api/projects/${projectId}/financial-transactions`, {
+        method: "POST",
+        body: JSON.stringify({
+          ...data,
+          invoiceDate: new Date(data.invoiceDate).toISOString(),
+          collectionDate: data.collectionDate ? new Date(data.collectionDate).toISOString() : null,
+        }),
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/pricing-changes`] });
-      setIsPricingDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-transactions`] });
+      setOpenFinancialTransaction(false);
+      financialTransactionForm.reset();
+      toast({
+        title: "Transacción financiera registrada",
+        description: "Los datos se guardaron correctamente",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la transacción financiera",
+        variant: "destructive",
+      });
     },
   });
 
-  const generateRevenueMutation = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/projects/${projectId}/generate-revenue`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-      setIsGenerateRevenueDialogOpen(false);
-    },
-  });
+  // Cálculos de resumen
+  const totalMonthlySales = (monthlySales as ProjectMonthlySales[]).reduce((sum: number, sale: ProjectMonthlySales) => sum + sale.salesAmountUsd, 0);
+  const totalInvoiced = (financialTransactions as ProjectFinancialTransaction[]).reduce((sum: number, txn: ProjectFinancialTransaction) => sum + txn.invoiceAmountUsd, 0);
+  const totalCollected = (financialTransactions as ProjectFinancialTransaction[])
+    .filter((txn: ProjectFinancialTransaction) => txn.collectionDate)
+    .reduce((sum: number, txn: ProjectFinancialTransaction) => sum + txn.invoiceAmountUsd, 0);
+  const pendingCollection = totalInvoiced - totalCollected;
 
-  const formatCurrency = (amount: string | undefined) => {
-    if (!amount) return '$0';
-    const num = parseFloat(amount);
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
-  };
-
-  const getMonthName = (month: number) => {
-    return MONTHS.find(m => m.value === month)?.label || month.toString();
-  };
-
-  const getStatusBadge = (revenue: ProjectMonthlyRevenue) => {
-    if (revenue.collected) {
-      return <Badge variant="secondary" className="bg-green-100 text-green-800">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Cobrado
-      </Badge>;
-    }
-    if (revenue.invoiced) {
-      return <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-        <Clock className="w-3 h-3 mr-1" />
-        Facturado
-      </Badge>;
-    }
-    return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-      <AlertCircle className="w-3 h-3 mr-1" />
-      Pendiente
-    </Badge>;
-  };
-
-  const RevenueForm = ({ revenue, onSubmit }: { 
-    revenue?: ProjectMonthlyRevenue; 
-    onSubmit: (data: any) => void;
-  }) => {
-    const [formData, setFormData] = useState({
-      year: revenue?.year || new Date().getFullYear(),
-      month: revenue?.month || new Date().getMonth() + 1,
-      amountUsd: revenue?.amountUsd || '',
-      amountArs: revenue?.amountArs || '',
-      exchangeRate: revenue?.exchangeRate || '',
-      invoiced: revenue?.invoiced || false,
-      invoiceDate: revenue?.invoiceDate || '',
-      invoiceNumber: revenue?.invoiceNumber || '',
-      collected: revenue?.collected || false,
-      collectionDate: revenue?.collectionDate || '',
-      revenueSource: revenue?.revenueSource || 'manual_entry',
-      notes: revenue?.notes || '',
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      onSubmit(formData);
-    };
-
+  if (loadingProject) {
     return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="year">Año</Label>
-            <Input
-              id="year"
-              type="number"
-              value={formData.year}
-              onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="month">Mes</Label>
-            <Select value={formData.month.toString()} onValueChange={(value) => setFormData({ ...formData, month: parseInt(value) })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTHS.map(month => (
-                  <SelectItem key={month.value} value={month.value.toString()}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="amountUsd">Monto USD</Label>
-            <Input
-              id="amountUsd"
-              type="number"
-              step="0.01"
-              value={formData.amountUsd}
-              onChange={(e) => setFormData({ ...formData, amountUsd: e.target.value })}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="amountArs">Monto ARS (opcional)</Label>
-            <Input
-              id="amountArs"
-              type="number"
-              step="0.01"
-              value={formData.amountArs}
-              onChange={(e) => setFormData({ ...formData, amountArs: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div>
-          <Label htmlFor="exchangeRate">Tipo de Cambio (opcional)</Label>
-          <Input
-            id="exchangeRate"
-            type="number"
-            step="0.01"
-            value={formData.exchangeRate}
-            onChange={(e) => setFormData({ ...formData, exchangeRate: e.target.value })}
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="revenueSource">Fuente de Ingreso</Label>
-          <Select value={formData.revenueSource} onValueChange={(value) => setFormData({ ...formData, revenueSource: value })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="manual_entry">Entrada Manual</SelectItem>
-              <SelectItem value="excel_automated">Excel Automatizado</SelectItem>
-              <SelectItem value="contract_payment">Pago de Contrato</SelectItem>
-              <SelectItem value="recurring_service">Servicio Recurrente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="invoiced"
-              checked={formData.invoiced}
-              onCheckedChange={(checked) => setFormData({ ...formData, invoiced: checked })}
-            />
-            <Label htmlFor="invoiced">Facturado</Label>
-          </div>
-
-          {formData.invoiced && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="invoiceDate">Fecha de Factura</Label>
-                <Input
-                  id="invoiceDate"
-                  type="date"
-                  value={formData.invoiceDate}
-                  onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="invoiceNumber">Número de Factura</Label>
-                <Input
-                  id="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={(e) => setFormData({ ...formData, invoiceNumber: e.target.value })}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="collected"
-              checked={formData.collected}
-              onCheckedChange={(checked) => setFormData({ ...formData, collected: checked })}
-            />
-            <Label htmlFor="collected">Cobrado</Label>
-          </div>
-
-          {formData.collected && (
-            <div>
-              <Label htmlFor="collectionDate">Fecha de Cobro</Label>
-              <Input
-                id="collectionDate"
-                type="date"
-                value={formData.collectionDate}
-                onChange={(e) => setFormData({ ...formData, collectionDate: e.target.value })}
-              />
-            </div>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-            rows={3}
-          />
-        </div>
-
-        <Button type="submit" className="w-full">
-          {revenue ? 'Actualizar' : 'Crear'} Ingreso
-        </Button>
-      </form>
-    );
-  };
-
-  if (!projectId) return <div>Proyecto no encontrado</div>;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Gestión Financiera</h1>
-          <p className="text-muted-foreground">
-            {project?.quotation?.projectName} - {project?.quotation?.client?.name}
-          </p>
+      <div className="container mx-auto py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
+    );
+  }
 
-      {/* Financial Summary Cards */}
-      {financialSummary && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(financialSummary.totalRevenueUsd)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(financialSummary.totalInvoicedUsd)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cobrado</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(financialSummary.totalCollectedUsd)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pendiente Facturación</CardTitle>
-              <AlertCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {formatCurrency(financialSummary.pendingCollectionUsd)}
-              </div>
-            </CardContent>
-          </Card>
+  if (!project) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Proyecto no encontrado</h1>
+          <Button onClick={() => setLocation("/active-projects")}>Volver a Proyectos</Button>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      <Tabs defaultValue="revenue" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="revenue">Ingresos Mensuales</TabsTrigger>
-          <TabsTrigger value="pricing">Cambios de Pricing</TabsTrigger>
-          <TabsTrigger value="tools">Herramientas</TabsTrigger>
+  return (
+    <div className="container mx-auto py-8 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Gestión Financiera
+          </h1>
+          <p className="text-lg text-gray-600 mb-1">
+            {(project as any)?.quotation?.projectName || "Proyecto sin nombre"}
+          </p>
+          <p className="text-sm text-gray-500">
+            Cliente: {(project as any)?.quotation?.client?.name || "Cliente no especificado"}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setLocation("/active-projects")}
+        >
+          Volver a Proyectos
+        </Button>
+      </div>
+
+      {/* Resumen Financiero */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Ventas Operacionales</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalMonthlySales.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total reconocido</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Facturado</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalInvoiced.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Facturas emitidas</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cobrado</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">${totalCollected.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Efectivamente cobrado</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pendiente Cobro</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">${pendingCollection.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Por cobrar</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs para análisis separado */}
+      <Tabs defaultValue="operational" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="operational">Análisis Operacional</TabsTrigger>
+          <TabsTrigger value="financial">Análisis Financiero</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="revenue" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Ingresos Mensuales</h3>
-            <Dialog open={isRevenueDialogOpen} onOpenChange={setIsRevenueDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>Agregar Ingreso</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedRevenue ? 'Editar' : 'Nuevo'} Ingreso Mensual
-                  </DialogTitle>
-                </DialogHeader>
-                <RevenueForm
-                  revenue={selectedRevenue || undefined}
-                  onSubmit={(data) => {
-                    if (selectedRevenue) {
-                      updateRevenueMutation.mutate({ id: selectedRevenue.id, data });
-                    } else {
-                      createRevenueMutation.mutate(data);
-                    }
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-4">
-            {monthlyRevenues
-              .sort((a, b) => {
-                // Ordenar por año y mes descendente (más reciente primero)
-                if (a.year !== b.year) return b.year - a.year;
-                return b.month - a.month;
-              })
-              .map((revenue: ProjectMonthlyRevenue) => (
-              <Card key={revenue.id} className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => {
-                      setSelectedRevenue(revenue);
-                      setIsRevenueDialogOpen(true);
-                    }}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          {getMonthName(revenue.month)} {revenue.year}
-                        </span>
-                        {getStatusBadge(revenue)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Fuente: {revenue.revenueSource}
-                      </div>
-                      {revenue.notes && (
-                        <div className="text-sm text-muted-foreground">
-                          {revenue.notes}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">
-                        {formatCurrency(revenue.amountUsd)}
-                      </div>
-                      {revenue.amountArs && (
-                        <div className="text-sm text-muted-foreground">
-                          ${parseFloat(revenue.amountArs).toLocaleString()} ARS
-                        </div>
-                      )}
-                      {revenue.invoiceNumber && (
-                        <div className="text-xs text-muted-foreground">
-                          Factura: {revenue.invoiceNumber}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="pricing" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Cambios de Pricing</h3>
-            <Dialog open={isPricingDialogOpen} onOpenChange={setIsPricingDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>Agregar Cambio</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Nuevo Cambio de Pricing</DialogTitle>
-                </DialogHeader>
-                {/* Pricing form would go here */}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="grid gap-4">
-            {pricingChanges.map((change: ProjectPricingChange) => (
-              <Card key={change.id}>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          {getMonthName(change.effectiveFromMonth)} {change.effectiveFromYear}
-                          {change.effectiveToMonth && change.effectiveToYear && 
-                            ` - ${getMonthName(change.effectiveToMonth)} ${change.effectiveToYear}`
-                          }
-                        </span>
-                      </div>
-                      {change.changeReason && (
-                        <div className="text-sm text-muted-foreground">
-                          {change.changeReason}
-                        </div>
-                      )}
-                      {change.scopeDescription && (
-                        <div className="text-sm text-muted-foreground">
-                          {change.scopeDescription}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold">
-                        {formatCurrency(change.monthlyAmountUsd)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        por mes
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="tools" className="space-y-4">
+        {/* Tab de Análisis Operacional */}
+        <TabsContent value="operational" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Herramientas Automatizadas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Dialog open={isGenerateRevenueDialogOpen} onOpenChange={setIsGenerateRevenueDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="w-full">
-                    Generar Ingresos Automáticamente (Este Proyecto)
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Generar Ingresos Mensuales</DialogTitle>
-                  </DialogHeader>
-                  {/* Generate revenue form would go here */}
-                </DialogContent>
-              </Dialog>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Ventas Operacionales Mensuales</CardTitle>
+                  <CardDescription>
+                    Reconocimiento de ingresos por servicios prestados (independiente de facturación)
+                  </CardDescription>
+                </div>
+                <Dialog open={openMonthlySales} onOpenChange={setOpenMonthlySales}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Registrar Venta
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Venta Operacional</DialogTitle>
+                      <DialogDescription>
+                        Registra los ingresos reconocidos por servicios prestados en un período específico
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...monthlySalesForm}>
+                      <form onSubmit={monthlySalesForm.handleSubmit((data) => createMonthlySalesMutation.mutate(data))} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={monthlySalesForm.control}
+                            name="year"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Año</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    {...field} 
+                                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={monthlySalesForm.control}
+                            name="month"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Mes</FormLabel>
+                                <Select onValueChange={(value) => field.onChange(parseInt(value))}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Seleccionar mes" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {Array.from({ length: 12 }, (_, i) => (
+                                      <SelectItem key={i + 1} value={(i + 1).toString()}>
+                                        {format(new Date(2024, i, 1), "MMMM", { locale: es })}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
 
-              <Button 
-                variant="default" 
-                className="w-full"
-                onClick={() => {
-                  // Generar ingresos para TODOS los proyectos confirmados
-                  apiRequest('/api/projects/generate-all-revenues', {
-                    method: 'POST',
-                  }).then((response) => {
-                    // Refrescar datos después de la generación
-                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-revenue`] });
-                    queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-summary`] });
-                    alert(`¡Ingresos generados para todos los proyectos activos! ${response.message}`);
-                  }).catch((error) => {
-                    console.error('Error generating revenues for all projects:', error);
-                    alert('Error al generar ingresos para todos los proyectos');
-                  });
-                }}
-                disabled={generateRevenueMutation.isPending}
-              >
-                {generateRevenueMutation.isPending ? 'Procesando...' : 'Generar Ingresos para TODOS los Proyectos Activos'}
-              </Button>
-              
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p className="font-medium">Generación Automática de Ingresos:</p>
-                <p>
-                  Genera ingresos mensuales para TODOS los proyectos activos (no solo fee mensual), 
-                  distribuyendo el valor total de cada proyecto a lo largo de su duración desde la 
-                  fecha de inicio hasta el mes actual.
-                </p>
-                <p>
-                  Esto resuelve el problema de proyectos confirmados que aparecen con $0 en 
-                  gestión financiera, permitiendo análisis operacional de ingresos vs costos.
-                </p>
+                        <FormField
+                          control={monthlySalesForm.control}
+                          name="salesAmountUsd"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Monto Venta (USD)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={monthlySalesForm.control}
+                          name="salesType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tipo de Venta</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar tipo" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="fee_monthly">Fee Mensual</SelectItem>
+                                  <SelectItem value="one_time">Proyecto Único</SelectItem>
+                                  <SelectItem value="social_listening">Social Listening</SelectItem>
+                                  <SelectItem value="campaign">Campaña Digital</SelectItem>
+                                  <SelectItem value="other">Otro</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={monthlySalesForm.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descripción</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Detalles del servicio prestado..." />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex justify-end space-x-2">
+                          <Button type="button" variant="outline" onClick={() => setOpenMonthlySales(false)}>
+                            Cancelar
+                          </Button>
+                          <Button type="submit" disabled={createMonthlySalesMutation.isPending}>
+                            {createMonthlySalesMutation.isPending ? "Guardando..." : "Guardar"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </div>
+            </CardHeader>
+            <CardContent>
+              {loadingMonthlySales ? (
+                <div className="animate-pulse space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              ) : (monthlySales as ProjectMonthlySales[]).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay ventas operacionales registradas
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Monto (USD)</TableHead>
+                      <TableHead>Descripción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(monthlySales as ProjectMonthlySales[]).map((sale: ProjectMonthlySales) => (
+                      <TableRow key={sale.id}>
+                        <TableCell>
+                          {format(new Date(sale.year, sale.month - 1, 1), "MMMM yyyy", { locale: es })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{sale.salesType}</Badge>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ${sale.salesAmountUsd.toLocaleString()}
+                        </TableCell>
+                        <TableCell>{sale.description || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab de Análisis Financiero */}
+        <TabsContent value="financial" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Transacciones Financieras</CardTitle>
+                  <CardDescription>
+                    Facturación y cobranza real con fechas exactas (cash flow)
+                  </CardDescription>
+                </div>
+                <Dialog open={openFinancialTransaction} onOpenChange={setOpenFinancialTransaction}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Registrar Transacción
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Registrar Transacción Financiera</DialogTitle>
+                      <DialogDescription>
+                        Registra facturas emitidas y fechas de cobranza reales
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...financialTransactionForm}>
+                      <form onSubmit={financialTransactionForm.handleSubmit((data) => createFinancialTransactionMutation.mutate(data))} className="space-y-4">
+                        <FormField
+                          control={financialTransactionForm.control}
+                          name="invoiceDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fecha de Factura</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={financialTransactionForm.control}
+                          name="invoiceAmountUsd"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Monto Facturado (USD)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01"
+                                  {...field} 
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={financialTransactionForm.control}
+                          name="invoiceStatus"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Estado de Factura</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar estado" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="pendiente">Pendiente</SelectItem>
+                                  <SelectItem value="cobrada">Cobrada</SelectItem>
+                                  <SelectItem value="vencida">Vencida</SelectItem>
+                                  <SelectItem value="cancelada">Cancelada</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={financialTransactionForm.control}
+                          name="collectionDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fecha de Cobranza (opcional)</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={financialTransactionForm.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descripción</FormLabel>
+                              <FormControl>
+                                <Textarea {...field} placeholder="Detalles de la factura..." />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex justify-end space-x-2">
+                          <Button type="button" variant="outline" onClick={() => setOpenFinancialTransaction(false)}>
+                            Cancelar
+                          </Button>
+                          <Button type="submit" disabled={createFinancialTransactionMutation.isPending}>
+                            {createFinancialTransactionMutation.isPending ? "Guardando..." : "Guardar"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingTransactions ? (
+                <div className="animate-pulse space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-200 rounded"></div>
+                  ))}
+                </div>
+              ) : (financialTransactions as ProjectFinancialTransaction[]).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay transacciones financieras registradas
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha Factura</TableHead>
+                      <TableHead>Monto (USD)</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Fecha Cobranza</TableHead>
+                      <TableHead>Descripción</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(financialTransactions as ProjectFinancialTransaction[]).map((txn: ProjectFinancialTransaction) => (
+                      <TableRow key={txn.id}>
+                        <TableCell>
+                          {format(new Date(txn.invoiceDate), "dd/MM/yyyy", { locale: es })}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          ${txn.invoiceAmountUsd.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              txn.invoiceStatus === 'cobrada' ? 'default' :
+                              txn.invoiceStatus === 'vencida' ? 'destructive' :
+                              txn.invoiceStatus === 'cancelada' ? 'secondary' : 'outline'
+                            }
+                          >
+                            {txn.invoiceStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {txn.collectionDate 
+                            ? format(new Date(txn.collectionDate), "dd/MM/yyyy", { locale: es })
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell>{txn.description || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
