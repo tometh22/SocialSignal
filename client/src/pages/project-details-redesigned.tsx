@@ -1616,6 +1616,107 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="dashboard" className="space-y-6">
             
+            {/* RESUMEN FINANCIERO SIMPLE */}
+            <div className="bg-white border rounded-lg p-6">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">💰 Estado Financiero del Proyecto</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Dinero Recibido */}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600 mb-2">
+                    ${(() => {
+                      const confirmedRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      return confirmedRevenue.toLocaleString();
+                    })()}
+                  </div>
+                  <p className="text-sm text-gray-600">💵 Dinero Recibido</p>
+                  <p className="text-xs text-gray-500">Pagos confirmados del cliente</p>
+                </div>
+
+                {/* Costo Gastado */}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600 mb-2">
+                    ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                  </div>
+                  <p className="text-sm text-gray-600">🏗️ Costo del Trabajo</p>
+                  <p className="text-xs text-gray-500">Dinero invertido en el proyecto</p>
+                </div>
+
+                {/* Ganancia/Pérdida */}
+                <div className="text-center">
+                  <div className={`text-2xl font-bold mb-2 ${(() => {
+                    const confirmedRevenue = (unifiedData as any)?.googleSheetsSales
+                      ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                      ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                    const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const profit = confirmedRevenue - actualCost;
+                    return profit >= 0 ? 'text-blue-600' : 'text-red-600';
+                  })()}`}>
+                    ${(() => {
+                      const confirmedRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const profit = confirmedRevenue - actualCost;
+                      return profit.toLocaleString();
+                    })()}
+                  </div>
+                  <p className={`text-sm mb-1 ${(() => {
+                    const confirmedRevenue = (unifiedData as any)?.googleSheetsSales
+                      ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                      ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                    const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const profit = confirmedRevenue - actualCost;
+                    return profit >= 0 ? 'text-blue-600' : 'text-red-600';
+                  })()}`}>
+                    {(() => {
+                      const confirmedRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const profit = confirmedRevenue - actualCost;
+                      return profit >= 0 ? '📈 Ganancia' : '📉 Pérdida';
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500">Resultado hasta ahora</p>
+                </div>
+              </div>
+
+              {/* Ingresos Futuros */}
+              {(() => {
+                const projectedRevenue = (unifiedData as any)?.googleSheetsSales
+                  ?.filter((sale: any) => sale.status === 'proyectada')
+                  ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                
+                if (projectedRevenue > 0) {
+                  return (
+                    <div className="border-t pt-4">
+                      <div className="flex items-center justify-between bg-purple-50 p-4 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">🔮 Ingresos Futuros Proyectados</p>
+                          <p className="text-xs text-gray-500">Ventas planificadas pendientes</p>
+                        </div>
+                        <div className="text-xl font-bold text-purple-600">
+                          +${projectedRevenue.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Explicación Simple */}
+              <div className="mt-4 text-xs text-gray-600 bg-gray-50 p-3 rounded">
+                <p><strong>💡 ¿Qué significa esto?</strong></p>
+                <p>• <strong>Verde:</strong> Dinero que ya tenemos del cliente</p>
+                <p>• <strong>Naranja:</strong> Dinero que hemos gastado en trabajo</p>
+                <p>• <strong>Azul/Rojo:</strong> Si estamos ganando o perdiendo dinero</p>
+              </div>
+            </div>
+
             {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
             <TooltipProvider>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
