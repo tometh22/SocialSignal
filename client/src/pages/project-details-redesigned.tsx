@@ -1648,9 +1648,12 @@ const ProjectDetailsPage = () => {
                     </div>
                     <Badge variant={(() => {
                       const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const realRevenue = (unifiedData as any)?.googleSheetsSales
-                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                      const markup = actualCost > 0 && realRevenue > 0 ? realRevenue / actualCost : 0;
+                      // Lógica condicional: proyectos legacy usan ingresos reales, proyectos nuevos usan cotización
+                      const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                      const revenue = isLegacyProject 
+                        ? (unifiedData as any)?.googleSheetsSales?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0
+                        : unifiedData?.quotation?.totalAmount || 0;
+                      const markup = actualCost > 0 && revenue > 0 ? revenue / actualCost : 0;
                       if (markup >= 2.5) return 'default';
                       if (markup >= 1.8) return 'secondary';
                       if (markup >= 1.2) return 'outline';
@@ -1658,9 +1661,11 @@ const ProjectDetailsPage = () => {
                     })()} className="text-xs">
                       {(() => {
                         const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                        const realRevenue = (unifiedData as any)?.googleSheetsSales
-                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                        const markup = actualCost > 0 && realRevenue > 0 ? realRevenue / actualCost : 0;
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        const revenue = isLegacyProject 
+                          ? (unifiedData as any)?.googleSheetsSales?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0
+                          : unifiedData?.quotation?.totalAmount || 0;
+                        const markup = actualCost > 0 && revenue > 0 ? revenue / actualCost : 0;
                         if (markup >= 2.5) return 'Excelente';
                         if (markup >= 1.8) return 'Bueno';
                         if (markup >= 1.2) return 'Aceptable';
@@ -1672,17 +1677,22 @@ const ProjectDetailsPage = () => {
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
                         const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                        const realRevenue = (unifiedData as any)?.googleSheetsSales
-                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                        if (actualCost > 0 && realRevenue > 0) {
-                          const markup = realRevenue / actualCost;
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        const revenue = isLegacyProject 
+                          ? (unifiedData as any)?.googleSheetsSales?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0
+                          : unifiedData?.quotation?.totalAmount || 0;
+                        if (actualCost > 0 && revenue > 0) {
+                          const markup = revenue / actualCost;
                           return `${markup.toFixed(1)}x`;
                         }
                         return '0.0x';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Ingresos reales / Costo real
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        return isLegacyProject ? 'Ingresos reales / Costo real' : 'Cotización / Costo real';
+                      })()}
                     </p>
                   </div>
                 </CardContent>
@@ -2037,7 +2047,7 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Ingresos Periodo */}
+              {/* Ingresos/Precio Cliente */}
               <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -2045,20 +2055,35 @@ const ProjectDetailsPage = () => {
                       <div className="p-2 bg-emerald-100 rounded-lg">
                         <Building className="h-4 w-4 text-emerald-600" />
                       </div>
-                      <span className="text-sm font-medium text-emerald-700">Ingresos Periodo</span>
+                      <span className="text-sm font-medium text-emerald-700">
+                        {(() => {
+                          const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                          return isLegacyProject ? 'Ingresos Periodo' : 'Precio Cliente';
+                        })()}
+                      </span>
                     </div>
                     <Badge variant="secondary" className="text-xs">
-                      Real
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        return isLegacyProject ? 'Real' : 'Cotizado';
+                      })()}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
-                      ${((unifiedData as any)?.googleSheetsSales
-                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0)
-                        .toLocaleString()}
+                      ${(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        const value = isLegacyProject 
+                          ? (unifiedData as any)?.googleSheetsSales?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0
+                          : unifiedData?.quotation?.totalAmount || 0;
+                        return value.toLocaleString();
+                      })()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Ventas confirmadas y cobradas
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        return isLegacyProject ? 'Ventas confirmadas y cobradas' : 'Valor cotizado al cliente';
+                      })()}
                     </p>
                   </div>
                 </CardContent>

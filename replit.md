@@ -76,6 +76,11 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - Automatic server startup initialization
 - **Sales Data Management**: Complete CRUD operations for Google Sheets sales import with proper data validation and temporal filtering.
 - **Monitoring Interface**: Real-time status monitoring for synchronization services with live updates every 30 seconds.
+- **Conditional Financial Logic (Aug 29, 2025)**: Implemented dual financial analysis system based on project creation date:
+  - **Legacy Projects** (pre-Sept 2025): Use real income data from Google Sheets vs actual costs for markup calculations
+  - **Future Projects** (post-Sept 2025): Use approved quotation pricing vs actual costs for markup calculations
+  - Dynamic dashboard labels and tooltips that adjust based on project type
+  - Seamless transition logic ensuring accuracy for both historical and forward-looking analysis
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL serverless database connection.
