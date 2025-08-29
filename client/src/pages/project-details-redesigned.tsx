@@ -1858,6 +1858,66 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
+              {/* Ingresos vs Costos (Excel MAESTRO) */}
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="p-2 bg-emerald-100 rounded-lg cursor-help">
+                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <p className="font-semibold text-sm">Ingresos vs Costos</p>
+                            <p className="text-xs">Comparación entre los ingresos registrados en el Excel MAESTRO y los costos reales del proyecto para el período seleccionado.</p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                      <span className="text-sm font-medium text-emerald-700">Margen Real</span>
+                    </div>
+                    <Badge variant="default" className="text-xs">
+                      {(() => {
+                        const salesRevenue = (unifiedData as any)?.googleSheetsSales
+                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
+                        const margin = salesRevenue - actualCosts;
+                        return margin >= 0 ? 'Positivo' : 'Negativo';
+                      })()}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-lg font-bold text-gray-900">
+                      {(() => {
+                        const salesRevenue = (unifiedData as any)?.googleSheetsSales
+                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
+                        const margin = salesRevenue - actualCosts;
+                        return `$${margin.toLocaleString()}`;
+                      })()}
+                    </p>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Ingresos Excel:</span>
+                        <span className="font-mono">
+                          ${((unifiedData as any)?.googleSheetsSales
+                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0)
+                            .toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Costos Reales:</span>
+                        <span className="font-mono">
+                          ${((unifiedData as any)?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Estado General */}
               <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${(() => {
                 if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
@@ -3473,7 +3533,8 @@ export default function ProjectDetailsRedesigned() {
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-medium text-gray-600">Total USD</p>
+                              <p className="text-sm font-medium text-gray-600">Ingresos USD</p>
+                              <p className="text-xs text-gray-500 mb-1">({dateFilter.label})</p>
                               <p className="text-2xl font-bold text-gray-900">
                                 ${(unifiedData as any).googleSheetsSales
                                   .filter((sale: any) => sale.amountUsd)

@@ -268,6 +268,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Función auxiliar para filtrar ventas de Google Sheets por período temporal
+  const getFilteredGoogleSheetsSales = async (projectId: number, timeFilter: string, dateRange: any) => {
+    try {
+      // Obtener todas las ventas del proyecto
+      const allSales = await storage.getGoogleSheetsSalesByProject(projectId);
+      
+      if (!allSales || allSales.length === 0) return [];
+      
+      // Si es 'all', retornar todas las ventas
+      if (timeFilter === 'all') return allSales;
+      
+      // Filtrar por fechas según el período temporal
+      const filteredSales = allSales.filter(sale => {
+        // Crear fecha del primer día del mes de la venta
+        const saleDate = new Date(sale.year, sale.monthNumber - 1, 1);
+        
+        // Comparar con el rango de fechas del filtro
+        return saleDate >= dateRange.startDate && saleDate <= dateRange.endDate;
+      });
+      
+      console.log(`📊 Ventas filtradas para proyecto ${projectId} (${timeFilter}): ${filteredSales.length} de ${allSales.length} ventas`);
+      
+      return filteredSales;
+    } catch (error) {
+      console.error(`❌ Error filtrando ventas para proyecto ${projectId}:`, error);
+      return [];
+    }
+  };
+
   // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
@@ -943,8 +972,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           costDeviation: Math.round((totalWorkedCost - adjustedBaseCost) * 100) / 100
         },
 
-        // Datos de ventas desde Excel MAESTRO
-        googleSheetsSales: await storage.getGoogleSheetsSalesByProject(id)
+        // Datos de ventas desde Excel MAESTRO (filtradas por período temporal)
+        googleSheetsSales: await getFilteredGoogleSheetsSales(id, timeFilter, dateRange)
       };
 
       // Agregar campos principales en el nivel superior para compatibilidad con frontend
