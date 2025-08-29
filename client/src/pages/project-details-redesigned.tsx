@@ -1569,7 +1569,7 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-5 w-full max-w-4xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-6 w-full max-w-5xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -1604,6 +1604,13 @@ const ProjectDetailsPage = () => {
             >
               <Settings className="h-4 w-4" />
               Ajustes de Precio
+            </TabsTrigger>
+            <TabsTrigger 
+              value="income-details" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Ingresos
             </TabsTrigger>
           </TabsList>
 
@@ -3499,6 +3506,113 @@ const ProjectDetailsPage = () => {
               projectId={Number(projectId)} 
               currentPrice={quotationData?.totalAmount} 
             />
+          </TabsContent>
+
+          {/* INGRESOS DETALLADOS */}
+          <TabsContent value="income-details" className="space-y-6">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-green-600 p-2 rounded-lg">
+                  <FileSpreadsheet className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-green-900">Ingresos Reales Detallados</h2>
+                  <p className="text-green-700">Registros mensuales de ventas importados desde Excel MAESTRO</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabla de ingresos mensuales */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Historial de Ingresos por Período
+                </CardTitle>
+                <CardDescription>
+                  Datos sincronizados automáticamente desde Google Sheets
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {unifiedData?.salesData && unifiedData.salesData.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            <th className="text-left p-3 font-semibold text-gray-700">Fecha</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Cliente</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Servicio</th>
+                            <th className="text-right p-3 font-semibold text-gray-700">Monto USD</th>
+                            <th className="text-right p-3 font-semibold text-gray-700">Monto ARS</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {unifiedData.salesData.map((sale: any, index: number) => (
+                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="p-3 text-sm">
+                                {sale.fecha ? new Date(sale.fecha).toLocaleDateString('es-ES', { 
+                                  year: 'numeric', 
+                                  month: 'short', 
+                                  day: 'numeric' 
+                                }) : 'Sin fecha'}
+                              </td>
+                              <td className="p-3 text-sm font-medium">{sale.cliente || 'N/A'}</td>
+                              <td className="p-3 text-sm">{sale.servicio || 'N/A'}</td>
+                              <td className="p-3 text-sm text-right font-medium">
+                                {sale.montoUSD ? `$${parseFloat(sale.montoUSD).toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-3 text-sm text-right font-medium">
+                                {sale.montoARS ? `$${parseFloat(sale.montoARS).toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  Activo
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Resumen financiero */}
+                    <div className="bg-gray-50 rounded-lg p-4 mt-6">
+                      <h4 className="font-semibold text-gray-900 mb-3">Resumen del Período</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Total Ingresos USD</p>
+                          <p className="text-lg font-bold text-green-600">
+                            ${unifiedData.salesData.reduce((sum: number, sale: any) => 
+                              sum + (parseFloat(sale.montoUSD) || 0), 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Total Ingresos ARS</p>
+                          <p className="text-lg font-bold text-green-600">
+                            ${unifiedData.salesData.reduce((sum: number, sale: any) => 
+                              sum + (parseFloat(sale.montoARS) || 0), 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Registros</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {unifiedData.salesData.length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileSpreadsheet className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>No hay datos de ingresos para el período seleccionado</p>
+                    <p className="text-sm mt-1">Los datos se sincronizan automáticamente cada 30 minutos</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
