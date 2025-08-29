@@ -39,6 +39,17 @@ interface TipoCambio {
   fuente: string;
 }
 
+interface VentaTomi {
+  cliente: string;
+  proyecto: string;
+  mes: string;
+  año: number;
+  monto_usd?: number;
+  monto_ars?: number;
+  tipo_venta: string;
+  confirmado: string;
+}
+
 class GoogleSheetsWorkingService {
   private spreadsheetId: string;
 
@@ -881,7 +892,108 @@ class GoogleSheetsWorkingService {
     console.log(`✅ Procesados ${tiposCambio.length} tipos de cambio`);
     return tiposCambio;
   }
+
+  /**
+   * Obtener datos de ventas desde la pestaña "Ventas Tomi"
+   */
+  async getVentasTomi(): Promise<VentaTomi[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = 'Ventas Tomi!A:I'; // Ajustar según las columnas necesarias
+      
+      console.log('🔄 Obteniendo ventas desde Ventas Tomi...');
+      console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
+      console.log(`📋 Range: ${range}`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ No se encontraron datos en Ventas Tomi');
+        return [];
+      }
+
+      console.log(`📊 Procesando ${rows.length} filas de ventas`);
+      return this.processVentasData(rows);
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo ventas de Tomi:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Procesar los datos de ventas de la pestaña "Ventas Tomi"
+   */
+  private processVentasData(rows: any[][]): VentaTomi[] {
+    const result: VentaTomi[] = [];
+    
+    if (rows.length === 0) return result;
+
+    // La primera fila contiene los headers
+    const headers = rows[0];
+    console.log('📋 Headers de ventas encontrados:', headers);
+
+    // Mapear las columnas según los headers esperados
+    const columnMap = {
+      cliente: headers.findIndex(h => h && h.toLowerCase().includes('cliente')),
+      proyecto: headers.findIndex(h => h && h.toLowerCase().includes('proyecto')),
+      mes: headers.findIndex(h => h && h.toLowerCase().includes('mes')),
+      año: headers.findIndex(h => h && h.toLowerCase().includes('año')),
+      monto_usd: headers.findIndex(h => h && h.toLowerCase().includes('usd')),
+      monto_ars: headers.findIndex(h => h && h.toLowerCase().includes('ars')),
+      tipo_venta: headers.findIndex(h => h && h.toLowerCase().includes('tipo')),
+      confirmado: headers.findIndex(h => h && h.toLowerCase().includes('confirmado'))
+    };
+
+    console.log('🗺️ Mapeo de columnas ventas:', columnMap);
+
+    // Procesar cada fila de datos (omitir headers)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (!row || row.length === 0) continue;
+
+      try {
+        const cliente = this.getCellValue(row, columnMap.cliente);
+        const proyecto = this.getCellValue(row, columnMap.proyecto);
+        const mes = this.getCellValue(row, columnMap.mes);
+        const año = this.getCellValue(row, columnMap.año);
+        
+        // Solo procesar filas con datos mínimos requeridos
+        if (!cliente || !proyecto || !mes || !año) continue;
+        
+        const ventaData: VentaTomi = {
+          cliente: cliente,
+          proyecto: proyecto,
+          mes: mes,
+          año: parseInt(año) || new Date().getFullYear(),
+          monto_usd: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_usd)),
+          monto_ars: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_ars)),
+          tipo_venta: this.getCellValue(row, columnMap.tipo_venta) || 'fee',
+          confirmado: this.getCellValue(row, columnMap.confirmado) || 'SI'
+        };
+
+        result.push(ventaData);
+        
+        // Debug primeras 5 filas
+        if (i <= 5) {
+          console.log(`🔍 Venta ${i} debug:`, ventaData);
+        }
+        
+      } catch (error) {
+        console.warn(`⚠️ Error procesando fila de venta ${i}:`, error);
+      }
+    }
+
+    console.log(`✅ Procesadas ${result.length} ventas válidas de ${rows.length - 1} filas`);
+    return result;
+  }
 }
 
 export const googleSheetsWorkingService = new GoogleSheetsWorkingService();
-export type { CostoDirectoIndirecto, ProyectoConfirmado, TipoCambio };
+export type { CostoDirectoIndirecto, ProyectoConfirmado, TipoCambio, VentaTomi };

@@ -35,6 +35,7 @@ import {
   insertPersonnelHistoricalCostSchema,
   insertProjectMonthlySalesSchema,
   insertProjectFinancialTransactionSchema,
+  insertGoogleSheetsSalesSchema,
 
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -63,7 +64,8 @@ import {
   personnelHistoricalCosts,
   projectPriceAdjustments,
   googleSheetsProjects,
-  googleSheetsProjectBilling
+  googleSheetsProjectBilling,
+  googleSheetsSales
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -7766,6 +7768,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Error al obtener registros de facturación',
+        error: error.message
+      });
+    }
+  });
+
+  // ==================== GOOGLE SHEETS SALES IMPORT ====================
+  
+  // Importar ventas desde Google Sheets "Ventas Tomi"
+  app.post("/api/google-sheets/import-sales", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Importando ventas desde Google Sheets...');
+      
+      // Obtener datos de ventas desde el Google Sheets
+      const salesData = await googleSheetsWorkingService.getVentasTomi();
+      
+      console.log(`📊 Procesando ${salesData.length} registros de ventas...`);
+      
+      // Importar ventas usando el storage
+      const importResult = await storage.importSalesFromGoogleSheets(salesData);
+      
+      console.log(`✅ Importación completada:`, importResult);
+      
+      res.json({
+        success: true,
+        message: `Importación completada: ${importResult.imported} nuevos registros agregados, ${importResult.updated} actualizados`,
+        imported: importResult.imported,
+        updated: importResult.updated,
+        totalProcessed: salesData.length,
+        errors: importResult.errors
+      });
+
+    } catch (error) {
+      console.error('❌ Error al importar ventas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al importar ventas desde Google Sheets',
+        error: error.message
+      });
+    }
+  });
+
+  // Obtener ventas importadas desde Google Sheets
+  app.get("/api/google-sheets/sales", requireAuth, async (req, res) => {
+    try {
+      const sales = await storage.getGoogleSheetsSales();
+      
+      res.json({
+        success: true,
+        sales: sales,
+        count: sales.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error al obtener ventas de Google Sheets:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener ventas',
+        error: error.message
+      });
+    }
+  });
+
+  // Obtener ventas de un proyecto específico
+  app.get("/api/google-sheets/sales/:projectId", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const sales = await storage.getGoogleSheetsSalesByProject(projectId);
+      
+      res.json({
+        success: true,
+        sales: sales,
+        count: sales.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error al obtener ventas del proyecto:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener ventas del proyecto',
+        error: error.message
+      });
+    }
+  });
+
+  // Limpiar datos de ventas de Google Sheets
+  app.delete("/api/google-sheets/sales", requireAuth, async (req, res) => {
+    try {
+      const cleared = await storage.clearGoogleSheetsSales();
+      
+      if (cleared) {
+        res.json({
+          success: true,
+          message: 'Todos los datos de ventas han sido eliminados'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: 'Error al limpiar los datos'
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Error al limpiar ventas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al limpiar los datos de ventas',
+        error: error.message
+      });
+    }
+  });
+
+  // Probar obtener datos de Ventas Tomi desde Google Sheets
+  app.get("/api/google-sheets/test-sales", requireAuth, async (req, res) => {
+    try {
+      console.log('🧪 Probando lectura de Ventas Tomi desde Google Sheets...');
+      
+      const salesData = await googleSheetsWorkingService.getVentasTomi();
+      
+      res.json({
+        success: true,
+        message: `Se obtuvieron ${salesData.length} registros de ventas`,
+        data: salesData.slice(0, 5), // Solo mostrar los primeros 5 para ver estructura
+        totalCount: salesData.length
+      });
+
+    } catch (error) {
+      console.error('❌ Error probando lectura de ventas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al probar lectura de ventas',
         error: error.message
       });
     }

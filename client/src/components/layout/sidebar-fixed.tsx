@@ -108,7 +108,7 @@ export default function SidebarFixed() {
     {
       title: "Herramientas",
       items: [
-        { href: "/google-sheets", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva" },
+        { href: "/excel-maestro", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva" },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración" }
       ]
     }

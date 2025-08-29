@@ -1523,6 +1523,41 @@ export const projectFinancialSummary = pgTable("project_financial_summary", {
   updatedBy: integer("updated_by").references(() => users.id),
 });
 
+// ==================== IMPORTACIÓN VENTAS GOOGLE SHEETS ====================
+// Tabla para importar datos de la pestaña "Ventas Tomi"
+export const googleSheetsSales = pgTable("google_sheets_sales", {
+  id: serial("id").primaryKey(),
+  
+  // Datos desde Google Sheets
+  clientName: varchar("client_name", { length: 200 }).notNull(),
+  projectName: varchar("project_name", { length: 200 }).notNull(),
+  month: varchar("month", { length: 50 }).notNull(), // "Enero", "Febrero", etc.
+  year: integer("year").notNull(),
+  salesType: varchar("sales_type", { length: 50 }).notNull(), // "Fee", "One Shot"
+  amountArs: numeric("amount_ars", { precision: 15, scale: 2 }),
+  amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }),
+  confirmed: varchar("confirmed", { length: 10 }).notNull().default('SI'), // "SI", "NO"
+  
+  // Campos calculados automáticamente
+  monthNumber: integer("month_number"), // 1-12
+  status: varchar("status", { length: 20 }), // "completada", "activa", "proyectada"
+  
+  // Referencias al sistema (null si no existe match)
+  clientId: integer("client_id").references(() => clients.id),
+  projectId: integer("project_id").references(() => activeProjects.id),
+  
+  // Metadatos de importación
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  rowNumber: integer("row_number"), // Fila en el Excel para debugging
+  importBatch: varchar("import_batch", { length: 100 }), // ID del batch de importación
+  
+  // Control de duplicados
+  uniqueKey: varchar("unique_key", { length: 500 }).notNull().unique(), // client_project_month_year_type
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Esquemas de inserción
 export const insertProjectMonthlyRevenueSchema = createInsertSchema(projectMonthlyRevenue).omit({
   id: true,
@@ -1553,6 +1588,14 @@ export const insertProjectFinancialTransactionSchema = createInsertSchema(projec
   updatedAt: true,
 });
 
+// Esquema para importación de ventas desde Google Sheets
+export const insertGoogleSheetsSalesSchema = createInsertSchema(googleSheetsSales).omit({
+  id: true,
+  importedAt: true,
+  lastUpdated: true,
+  createdAt: true,
+});
+
 // Tipos
 export type ProjectMonthlyRevenue = typeof projectMonthlyRevenue.$inferSelect;
 export type InsertProjectMonthlyRevenue = z.infer<typeof insertProjectMonthlyRevenueSchema>;
@@ -1569,6 +1612,10 @@ export type InsertProjectMonthlySales = z.infer<typeof insertProjectMonthlySales
 
 export type ProjectFinancialTransaction = typeof projectFinancialTransactions.$inferSelect;
 export type InsertProjectFinancialTransaction = z.infer<typeof insertProjectFinancialTransactionSchema>;
+
+// Tipos para ventas de Google Sheets
+export type GoogleSheetsSales = typeof googleSheetsSales.$inferSelect;
+export type InsertGoogleSheetsSales = z.infer<typeof insertGoogleSheetsSalesSchema>;
 
 // Relaciones de ingresos mensuales de proyectos
 export const projectMonthlyRevenueRelations = relations(projectMonthlyRevenue, ({ one }) => ({

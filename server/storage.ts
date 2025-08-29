@@ -32,6 +32,7 @@ import {
   type ProjectFinancialSummary, type InsertProjectFinancialSummary,
   type ProjectMonthlySales, type InsertProjectMonthlySales,
   type ProjectFinancialTransaction, type InsertProjectFinancialTransaction,
+  type GoogleSheetsSales, type InsertGoogleSheetsSales,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -47,7 +48,7 @@ import {
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
   projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
   googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary,
-  projectMonthlySales, projectFinancialTransactions
+  projectMonthlySales, projectFinancialTransactions, googleSheetsSales
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -409,6 +410,16 @@ export interface IStorage {
   createProjectFinancialTransaction(transaction: InsertProjectFinancialTransaction): Promise<ProjectFinancialTransaction>;
   updateProjectFinancialTransaction(id: number, transaction: Partial<InsertProjectFinancialTransaction>): Promise<ProjectFinancialTransaction | undefined>;
   deleteProjectFinancialTransaction(id: number): Promise<boolean>;
+
+  // ==================== GOOGLE SHEETS SALES IMPORT ====================
+  // Google Sheets Sales operations
+  getGoogleSheetsSales(): Promise<GoogleSheetsSales[]>;
+  getGoogleSheetsSalesByProject(projectId: number): Promise<GoogleSheetsSales[]>;
+  createGoogleSheetsSales(sales: InsertGoogleSheetsSales): Promise<GoogleSheetsSales>;
+  updateGoogleSheetsSales(id: number, sales: Partial<InsertGoogleSheetsSales>): Promise<GoogleSheetsSales | undefined>;
+  deleteGoogleSheetsSales(id: number): Promise<boolean>;
+  importSalesFromGoogleSheets(salesData: any[]): Promise<{ imported: number; updated: number; errors: string[] }>;
+  clearGoogleSheetsSales(): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -4107,6 +4118,187 @@ export class DatabaseStorage implements IStorage {
       .delete(projectFinancialTransactions)
       .where(eq(projectFinancialTransactions.id, id));
     return result.rowCount! > 0;
+  }
+
+  // ==================== GOOGLE SHEETS SALES IMPORT OPERATIONS ====================
+  
+  async getGoogleSheetsSales(): Promise<GoogleSheetsSales[]> {
+    return await db
+      .select()
+      .from(googleSheetsSales)
+      .orderBy(desc(googleSheetsSales.year), desc(googleSheetsSales.monthNumber));
+  }
+
+  async getGoogleSheetsSalesByProject(projectId: number): Promise<GoogleSheetsSales[]> {
+    return await db
+      .select()
+      .from(googleSheetsSales)
+      .where(eq(googleSheetsSales.projectId, projectId))
+      .orderBy(desc(googleSheetsSales.year), desc(googleSheetsSales.monthNumber));
+  }
+
+  async createGoogleSheetsSales(sales: InsertGoogleSheetsSales): Promise<GoogleSheetsSales> {
+    const result = await db
+      .insert(googleSheetsSales)
+      .values(sales)
+      .returning();
+    return result[0];
+  }
+
+  async updateGoogleSheetsSales(id: number, sales: Partial<InsertGoogleSheetsSales>): Promise<GoogleSheetsSales | undefined> {
+    const result = await db
+      .update(googleSheetsSales)
+      .set({ ...sales, lastUpdated: new Date() })
+      .where(eq(googleSheetsSales.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteGoogleSheetsSales(id: number): Promise<boolean> {
+    const result = await db
+      .delete(googleSheetsSales)
+      .where(eq(googleSheetsSales.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async clearGoogleSheetsSales(): Promise<boolean> {
+    try {
+      await db.delete(googleSheetsSales);
+      return true;
+    } catch (error) {
+      console.error("Error clearing Google Sheets sales:", error);
+      return false;
+    }
+  }
+
+  async importSalesFromGoogleSheets(salesData: any[]): Promise<{ imported: number; updated: number; errors: string[] }> {
+    const result = { imported: 0, updated: 0, errors: [] as string[] };
+    const importBatch = `batch_${Date.now()}`;
+    
+    // Mapeo de meses en español a números
+    const monthMap: { [key: string]: number } = {
+      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+      'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+    };
+
+    // Función para calcular estado automáticamente
+    const calculateStatus = (month: number, year: number, salesType: string): string => {
+      const now = new Date();
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      
+      if (salesType.toLowerCase() === 'one shot') {
+        // Para proyectos one-shot, determinar basado en fechas (simplificado para este ejemplo)
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          return 'completada';
+        } else if (year === currentYear && month === currentMonth) {
+          return 'activa';
+        } else {
+          return 'proyectada';
+        }
+      } else {
+        // Para fees mensuales
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          return 'completada';
+        } else if (year === currentYear && month === currentMonth) {
+          return 'activa';
+        } else {
+          return 'proyectada';
+        }
+      }
+    };
+
+    for (let i = 0; i < salesData.length; i++) {
+      try {
+        const row = salesData[i];
+        
+        // Validar datos requeridos
+        if (!row.cliente || !row.proyecto || !row.mes || !row.año) {
+          result.errors.push(`Fila ${i + 1}: Faltan datos requeridos (cliente, proyecto, mes, año)`);
+          continue;
+        }
+
+        // Normalizar datos
+        const clientName = String(row.cliente).trim();
+        const projectName = String(row.proyecto).trim();
+        const monthName = String(row.mes).toLowerCase().trim();
+        const year = parseInt(row.año);
+        const salesType = String(row.tipo_venta || row.tipoVenta || 'fee').trim();
+        const amountArs = row.monto_ars || row.montoArs || null;
+        const amountUsd = row.monto_usd || row.montoUsd || null;
+        const confirmed = String(row.confirmado || 'SI').toUpperCase();
+        
+        // Convertir mes a número
+        const monthNumber = monthMap[monthName];
+        if (!monthNumber) {
+          result.errors.push(`Fila ${i + 1}: Mes '${monthName}' no reconocido`);
+          continue;
+        }
+
+        // Calcular estado automáticamente
+        const status = calculateStatus(monthNumber, year, salesType);
+
+        // Buscar cliente y proyecto en el sistema
+        const client = await this.getClientByName(clientName);
+        const projects = await this.getActiveProjects();
+        const project = projects.find(p => 
+          p.quotation?.projectName?.toLowerCase().includes(projectName.toLowerCase()) ||
+          p.name?.toLowerCase().includes(projectName.toLowerCase())
+        );
+
+        // Crear clave única para evitar duplicados
+        const uniqueKey = `${clientName}_${projectName}_${monthNumber}_${year}_${salesType}`.toLowerCase();
+
+        // Preparar datos para inserción
+        const salesRecord: InsertGoogleSheetsSales = {
+          clientName,
+          projectName,
+          month: monthName,
+          year,
+          salesType,
+          amountArs: amountArs ? String(amountArs) : null,
+          amountUsd: amountUsd ? String(amountUsd) : null,
+          confirmed,
+          monthNumber,
+          status,
+          clientId: client?.id || null,
+          projectId: project?.id || null,
+          rowNumber: i + 1,
+          importBatch,
+          uniqueKey
+        };
+
+        // Intentar insertar o actualizar
+        try {
+          const existing = await db
+            .select()
+            .from(googleSheetsSales)
+            .where(eq(googleSheetsSales.uniqueKey, uniqueKey))
+            .limit(1);
+
+          if (existing.length > 0) {
+            // Actualizar registro existente
+            await this.updateGoogleSheetsSales(existing[0].id, salesRecord);
+            result.updated++;
+          } else {
+            // Crear nuevo registro
+            await this.createGoogleSheetsSales(salesRecord);
+            result.imported++;
+          }
+        } catch (dbError: any) {
+          if (dbError.code === '23505') { // Unique constraint violation
+            result.errors.push(`Fila ${i + 1}: Registro duplicado - ${uniqueKey}`);
+          } else {
+            result.errors.push(`Fila ${i + 1}: Error de base de datos - ${dbError.message}`);
+          }
+        }
+        
+      } catch (error: any) {
+        result.errors.push(`Fila ${i + 1}: Error procesando - ${error.message}`);
+      }
+    }
+
+    return result;
   }
 
 }
