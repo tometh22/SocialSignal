@@ -1715,9 +1715,9 @@ const ProjectDetailsPage = () => {
               </div>
             </div>
 
-            {/* SECCIÓN 1: KPI Cards Principales - Layout Profesional */}
+            {/* SECCIÓN 2: Métricas Adicionales (si las necesitamos después) */}
             <TooltipProvider>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
+              <div className="hidden grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-6">
               
               {/* Markup Card - Métrica más importante */}
               <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 via-blue-25 to-white shadow-sm hover:shadow-md transition-shadow">
