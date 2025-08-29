@@ -466,7 +466,16 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Inicializar sincronización automática con Excel MAESTRO
+    try {
+      const { autoSyncService } = await import('./services/autoSyncService');
+      autoSyncService.start();
+      log('🔄 Sincronización automática con Excel MAESTRO iniciada');
+    } catch (error) {
+      console.error('❌ Error iniciando sincronización automática:', error);
+    }
   });
 })();

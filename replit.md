@@ -5,6 +5,7 @@ This platform is a comprehensive internal project management system for Epical D
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
+User specifically wants automatic synchronization with the Excel MAESTRO rather than manual front-end interfaces.
 
 ## System Architecture
 
@@ -49,7 +50,7 @@ Preferred communication style: Simple, everyday language.
 - **Chat System**: Project-based internal communication.
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), and predictive insights.
 - **Financial Overview**: Consolidated financial dashboard with operational vs financial analysis comparison.
-- **Google Sheets Integration**: Automated client import from "Activo" tab (column C) with duplicate prevention and batch processing.
+- **Google Sheets Integration**: Automated client import from "Activo" tab (column C) with duplicate prevention and batch processing. Complete Excel MAESTRO synchronization service with automatic imports from "Ventas Tomi" sheet every 30 minutes.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
 - **UI/UX Decisions**: Emphasis on clean, professional interfaces with consistent color schemes, intuitive layouts, and responsive design. Features like dynamic color indicators, clear typography, and enhanced visual hierarchies are implemented across dashboards and forms. Advanced features include a professional business intelligence dashboard, detailed financial analysis, and prediction/recommendation systems.
@@ -64,6 +65,17 @@ Preferred communication style: Simple, everyday language.
 - **Dynamic Content**: Elimination of hardcoded values, relying on dynamic data integration from approved quotations.
 - **Dual-Cost System**: Complete implementation of real costs (actual cash outflow from freelancers) vs operational costs (total team productivity analysis). Full-time employees with fixed salaries generate only operational costs, while part-time/freelance workers generate both types. System verified as 100% mathematically consistent across all components (Aug 2025).
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
+
+## Recent Implementation (Aug 2025)
+- **Automatic Excel MAESTRO Synchronization**: Implemented complete background service that synchronizes sales data from "Ventas Tomi" sheet every 30 minutes. Features include:
+  - AutoSyncService with configurable intervals
+  - Duplicate detection and automatic updates
+  - Real-time monitoring dashboard in Excel MAESTRO page
+  - Manual synchronization triggers
+  - Complete error handling and logging
+  - Automatic server startup initialization
+- **Sales Data Management**: Complete CRUD operations for Google Sheets sales import with proper data validation and temporal filtering.
+- **Monitoring Interface**: Real-time status monitoring for synchronization services with live updates every 30 seconds.
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL serverless database connection.

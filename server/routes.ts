@@ -76,6 +76,7 @@ import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAl
 import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
 import { googleSheetsFixedService } from "./services/googleSheetsFixed";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
+import { autoSyncService } from "./services/autoSyncService";
 
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
@@ -7768,6 +7769,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Error al obtener registros de facturación',
+        error: error.message
+      });
+    }
+  });
+
+  // ==================== AUTO SYNC SERVICE ====================
+  
+  // Ejecutar sincronización manual
+  app.post("/api/auto-sync/execute", async (req, res) => {
+    try {
+      console.log('🔄 Ejecutando sincronización manual...');
+      
+      const result = await autoSyncService.manualSync();
+      
+      res.json({
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error: any) {
+      console.error('❌ Error en sincronización manual:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error ejecutando sincronización',
+        error: error.message
+      });
+    }
+  });
+
+  // Obtener estado de sincronización
+  app.get("/api/auto-sync/status", (req, res) => {
+    try {
+      const status = autoSyncService.getStatus();
+      res.json({
+        success: true,
+        status: status,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Iniciar sincronización automática
+  app.post("/api/auto-sync/start", (req, res) => {
+    try {
+      autoSyncService.start();
+      res.json({
+        success: true,
+        message: 'Sincronización automática iniciada',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // Detener sincronización automática
+  app.post("/api/auto-sync/stop", (req, res) => {
+    try {
+      autoSyncService.stop();
+      res.json({
+        success: true,
+        message: 'Sincronización automática detenida',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
         error: error.message
       });
     }
