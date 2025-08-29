@@ -66,8 +66,11 @@ export class AutoSyncService {
       // 2. Sincronizar con proyectos activos
       const projectSyncResult = await this.syncSalesWithProjects();
 
+      // 3. Importar costos directos desde Excel MAESTRO
+      const directCostsResult = await this.syncDirectCosts();
+
       const duration = Date.now() - startTime;
-      const message = `Sincronización completada en ${duration}ms: ${salesResult.imported} ventas importadas, ${salesResult.updated} actualizadas, ${projectSyncResult.linked} vinculadas con proyectos`;
+      const message = `Sincronización completada en ${duration}ms: ${salesResult.imported} ventas importadas, ${salesResult.updated} actualizadas, ${projectSyncResult.linked} vinculadas con proyectos, ${directCostsResult.imported} costos directos importados, ${directCostsResult.updated} costos actualizados`;
       
       console.log(`✅ ${message}`);
       
@@ -77,6 +80,7 @@ export class AutoSyncService {
         data: {
           sales: salesResult,
           projectSync: projectSyncResult,
+          directCosts: directCostsResult,
           duration
         }
       };
@@ -256,6 +260,42 @@ export class AutoSyncService {
     };
     
     return monthMap[month.toLowerCase()] || 1;
+  }
+
+  /**
+   * Sincronizar costos directos desde Excel MAESTRO
+   */
+  private async syncDirectCosts(): Promise<{ imported: number; updated: number; errors: string[] }> {
+    try {
+      console.log('💰 Sincronizando costos directos desde Excel MAESTRO...');
+
+      // Usar el servicio de Google Sheets para importar costos directos
+      const result = await googleSheetsWorkingService.importDirectCosts(storage);
+      
+      if (result.success) {
+        console.log(`✅ Costos directos sincronizados: ${result.costsImported} importados, ${result.costsUpdated} actualizados`);
+        return {
+          imported: result.costsImported,
+          updated: result.costsUpdated,
+          errors: result.errors
+        };
+      } else {
+        console.error('❌ Error sincronizando costos directos:', result.errors);
+        return {
+          imported: 0,
+          updated: 0,
+          errors: result.errors
+        };
+      }
+
+    } catch (error: any) {
+      console.error('❌ Error sincronizando costos directos:', error);
+      return { 
+        imported: 0, 
+        updated: 0, 
+        errors: [`Error sincronizando costos directos: ${error.message}`] 
+      };
+    }
   }
 
   /**

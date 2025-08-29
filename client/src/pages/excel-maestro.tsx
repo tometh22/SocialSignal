@@ -52,20 +52,8 @@ export default function ExcelMaestroPage() {
     },
   });
 
-  // Importar costos directos desde Excel MAESTRO
-  const importDirectCostsMutation = useMutation({
-    mutationFn: () => apiRequest('/api/google-sheets/import-direct-costs', { method: 'POST' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/direct-costs'] });
-    },
-  });
-
   const handleManualSync = () => {
     syncMutation.mutate();
-  };
-
-  const handleImportDirectCosts = () => {
-    importDirectCostsMutation.mutate();
   };
 
   const isRunning = syncStatus?.status?.isRunning || false;
@@ -193,26 +181,6 @@ export default function ExcelMaestroPage() {
                 </>
               ) : (
                 'Sincronizar Ahora'
-              )}
-            </Button>
-            
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              className="w-full"
-              onClick={handleImportDirectCosts}
-              disabled={importDirectCostsMutation.isPending}
-            >
-              {importDirectCostsMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <Database className="h-4 w-4 mr-2" />
-                  Importar Costos Directos
-                </>
               )}
             </Button>
           </CardContent>

@@ -309,6 +309,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   };
 
+  const getFilteredDirectCosts = async (projectId: number, timeFilter: string, dateRange: any) => {
+    try {
+      console.log(`💰 Getting direct costs for project ${projectId}...`);
+      // Obtener todos los costos directos del proyecto
+      const allDirectCosts = await storage.getDirectCostsByProject(projectId);
+      
+      console.log(`💰 Retrieved ${allDirectCosts ? allDirectCosts.length : 0} direct costs from storage for project ${projectId}`);
+      console.log(`💰 Sample direct costs data:`, allDirectCosts?.slice(0, 2));
+      
+      if (!allDirectCosts || allDirectCosts.length === 0) {
+        console.log(`⚠️ No direct costs data found for project ${projectId}`);
+        return [];
+      }
+      
+      // Si es 'all', retornar todos los costos directos
+      if (timeFilter === 'all') {
+        console.log(`💰 Returning all ${allDirectCosts.length} direct costs (filter: all)`);
+        return allDirectCosts;
+      }
+      
+      // Filtrar por fechas según el período temporal
+      const filteredDirectCosts = allDirectCosts.filter(cost => {
+        // Crear fecha del primer día del mes del costo
+        const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
+        
+        // Comparar con el rango de fechas del filtro
+        return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+      });
+      
+      console.log(`💰 Costos directos filtrados para proyecto ${projectId} (${timeFilter}): ${filteredDirectCosts.length} de ${allDirectCosts.length} costos`);
+      
+      return filteredDirectCosts;
+    } catch (error) {
+      console.error(`❌ Error filtrando costos directos para proyecto ${projectId}:`, error);
+      return [];
+    }
+  };
+
+  // Helper function for month name to number conversion
+  const getMonthNumber = (monthName: string): number => {
+    const monthMap: Record<string, number> = {
+      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+      'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+      'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+      '01 ene': 1, '02 feb': 2, '03 mar': 3, '04 abr': 4,
+      '05 may': 5, '06 jun': 6, '07 jul': 7, '08 ago': 8,
+      '09 sep': 9, '10 oct': 10, '11 nov': 11, '12 dic': 12
+    };
+    
+    return monthMap[monthName.toLowerCase()] || 1;
+  };
+
   // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
@@ -602,7 +654,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-      const totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
+      let totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
+      
+      // 4.5 Obtener y agregar costos directos de Excel MAESTRO
+      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
+      const totalDirectCosts = projectDirectCosts.reduce((total, cost) => total + (cost.costoTotal || 0), 0);
+      
+      // Agregar costos directos al costo total trabajado
+      totalWorkedCost += totalDirectCosts;
+      
+      console.log(`💰 Direct costs calculation for project ${id}:`, {
+        timeEntriesCost: totalWorkedCost - totalDirectCosts,
+        directCostsFromExcel: totalDirectCosts,
+        totalCombinedCost: totalWorkedCost,
+        directCostsCount: projectDirectCosts.length
+      });
       
       // Generate team breakdown from filtered time entries
       const teamBreakdown: { [personnelId: string]: any } = {};
@@ -985,7 +1051,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
 
         // Datos de ventas desde Excel MAESTRO (filtradas por período temporal)
-        googleSheetsSales: await getFilteredGoogleSheetsSales(id, timeFilter, dateRange)
+        googleSheetsSales: await getFilteredGoogleSheetsSales(id, timeFilter, dateRange),
+        
+        // Costos directos desde Excel MAESTRO (filtrados por período temporal)
+        directCosts: await getFilteredDirectCosts(id, timeFilter, dateRange)
       };
 
       // Agregar campos principales en el nivel superior para compatibilidad con frontend

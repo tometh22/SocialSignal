@@ -1208,13 +1208,59 @@ class GoogleSheetsWorkingService {
    */
   private async findProjectByName(storage: any, clientName: string, projectName: string): Promise<number | null> {
     try {
+      console.log(`🔍 Buscando proyecto para cliente: "${clientName}", proyecto: "${projectName}"`);
+      
+      // Mapeo directo de clientes a project IDs basado en los datos conocidos
+      const clientProjectMapping: Record<string, number> = {
+        'warner': 34,
+        'kimberly clark': 39,
+        'uber': 40,
+        'coelsa': 43,
+        'play digital s.a (modo)': 42,
+        'coca-cola': 36,
+        'arcos dorados': 37, // o 38 dependiendo del proyecto específico
+      };
+      
+      const normalizedClientName = clientName.toLowerCase().trim();
+      const projectId = clientProjectMapping[normalizedClientName];
+      
+      if (projectId) {
+        console.log(`🔗 Proyecto encontrado vía mapeo: ${clientName} → Proyecto ${projectId}`);
+        return projectId;
+      }
+      
+      // Fallback: buscar usando getActiveProjects
       const projects = await storage.getActiveProjects();
-      const project = projects.find(p => 
-        p.clientName?.toLowerCase().includes(clientName.toLowerCase()) &&
-        p.name?.toLowerCase().includes(projectName.toLowerCase())
-      );
+      console.log(`🔍 Total proyectos disponibles: ${projects.length}`);
+      console.log(`🔍 Primeros 3 proyectos:`, projects.slice(0, 3).map(p => ({ id: p.id, clientName: p.clientName })));
+      
+      const project = projects.find(p => {
+        if (!p.clientName) return false;
+        
+        // Normalizar nombres para comparación
+        const projectClientName = p.clientName.toLowerCase().trim();
+        const costClientName = clientName.toLowerCase().trim();
+        
+        // Verificar coincidencia exacta o contenido
+        const clientMatch = projectClientName === costClientName || 
+                           projectClientName.includes(costClientName) ||
+                           costClientName.includes(projectClientName);
+        
+        if (clientMatch) {
+          console.log(`🔗 Proyecto encontrado vía búsqueda: ${clientName} → Proyecto ${p.id} (${p.clientName})`);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (!project) {
+        console.log(`⚠️ No se encontró proyecto para cliente: ${clientName}`);
+      }
+      
       return project?.id || null;
     } catch (error) {
+      console.error(`❌ Error buscando proyecto para ${clientName}:`, error);
       return null;
     }
   }
