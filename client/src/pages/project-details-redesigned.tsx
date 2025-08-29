@@ -47,7 +47,8 @@ import {
   Lightbulb,
   Info,
   Star,
-  Flame
+  Flame,
+  Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1603,6 +1604,13 @@ export default function ProjectDetailsRedesigned() {
             >
               <Settings className="h-4 w-4" />
               Ajustes de Precio
+            </TabsTrigger>
+            <TabsTrigger 
+              value="excel-maestro-data" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
+            >
+              <Database className="h-4 w-4" />
+              Excel MAESTRO
             </TabsTrigger>
           </TabsList>
 
@@ -3428,6 +3436,172 @@ export default function ProjectDetailsRedesigned() {
               projectId={Number(projectId)} 
               currentPrice={quotationData?.totalAmount} 
             />
+          </TabsContent>
+
+          {/* DATOS DE EXCEL MAESTRO */}
+          <TabsContent value="excel-maestro-data" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-emerald-600" />
+                  Datos de Ventas del Excel MAESTRO
+                </CardTitle>
+                <CardDescription>
+                  Información financiera sincronizada automáticamente desde la hoja "Ventas Tomi"
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(unifiedData as any)?.googleSheetsSales?.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Resumen de ventas */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card className="border-l-4 border-l-emerald-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Total Registros</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                {(unifiedData as any).googleSheetsSales.length}
+                              </p>
+                            </div>
+                            <FileSpreadsheet className="h-8 w-8 text-emerald-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Total USD</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${(unifiedData as any).googleSheetsSales
+                                  .filter((sale: any) => sale.amountUsd)
+                                  .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0)
+                                  .toLocaleString()}
+                              </p>
+                            </div>
+                            <DollarSign className="h-8 w-8 text-blue-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-l-4 border-l-purple-500">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-600">Total ARS</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                ${(unifiedData as any).googleSheetsSales
+                                  .filter((sale: any) => sale.amountArs)
+                                  .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountArs || 0), 0)
+                                  .toLocaleString()}
+                              </p>
+                            </div>
+                            <TrendingUp className="h-8 w-8 text-purple-500" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Tabla de ventas detallada */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg">Detalle de Ventas por Mes</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left p-3 font-medium text-gray-700">Mes</th>
+                                <th className="text-left p-3 font-medium text-gray-700">Año</th>
+                                <th className="text-left p-3 font-medium text-gray-700">Tipo</th>
+                                <th className="text-right p-3 font-medium text-gray-700">Monto USD</th>
+                                <th className="text-right p-3 font-medium text-gray-700">Monto ARS</th>
+                                <th className="text-center p-3 font-medium text-gray-700">Estado</th>
+                                <th className="text-center p-3 font-medium text-gray-700">Confirmado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(unifiedData as any).googleSheetsSales
+                                .sort((a: any, b: any) => {
+                                  // Ordenar por año y mes
+                                  if (a.year !== b.year) return b.year - a.year;
+                                  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                                                 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+                                  return months.indexOf(a.month.toLowerCase()) - months.indexOf(b.month.toLowerCase());
+                                })
+                                .map((sale: any, index: number) => (
+                                <tr key={sale.id || index} className="border-b hover:bg-gray-50">
+                                  <td className="p-3 capitalize font-medium">{sale.month}</td>
+                                  <td className="p-3">{sale.year}</td>
+                                  <td className="p-3">
+                                    <Badge variant={sale.salesType === 'Fee' ? 'default' : 'secondary'}>
+                                      {sale.salesType}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-3 text-right font-mono">
+                                    {sale.amountUsd ? `$${parseFloat(sale.amountUsd).toLocaleString()}` : '-'}
+                                  </td>
+                                  <td className="p-3 text-right font-mono">
+                                    {sale.amountArs ? `$${parseFloat(sale.amountArs).toLocaleString()}` : '-'}
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <Badge variant={
+                                      sale.status === 'completada' ? 'default' :
+                                      sale.status === 'activa' ? 'secondary' : 'outline'
+                                    }>
+                                      {sale.status || 'No definido'}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    {sale.confirmed === 'SI' ? (
+                                      <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                                    ) : (
+                                      <AlertCircle className="h-4 w-4 text-yellow-500 mx-auto" />
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Información de sincronización */}
+                    <Card className="bg-emerald-50 border-emerald-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-emerald-800">Sincronización Automática Activa</p>
+                            <p className="text-sm text-emerald-600 mt-1">
+                              Los datos se actualizan automáticamente cada 30 minutos desde el Excel MAESTRO. 
+                              Última sincronización: {new Date().toLocaleString('es-ES')}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No hay datos de ventas vinculados
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                      Este proyecto aún no tiene datos sincronizados desde el Excel MAESTRO.
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      La sincronización automática vincula proyectos mediante coincidencias de cliente y nombre.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>

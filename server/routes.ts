@@ -941,7 +941,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           budgetUtilization: Math.round(budgetUtilization * 100) / 100,
           hoursDeviation: Math.round((totalWorkedHours - adjustedEstimatedHours) * 100) / 100,
           costDeviation: Math.round((totalWorkedCost - adjustedBaseCost) * 100) / 100
-        }
+        },
+
+        // Datos de ventas desde Excel MAESTRO
+        googleSheetsSales: await storage.getGoogleSheetsSalesByProject(id)
       };
 
       // Agregar campos principales en el nivel superior para compatibilidad con frontend
