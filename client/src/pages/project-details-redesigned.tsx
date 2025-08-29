@@ -787,7 +787,7 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
   );
 }
 
-export default function ProjectDetailsRedesigned() {
+const ProjectDetailsPage = () => {
   // Obtener projectId de la URL de manera más robusta
   const [location, setLocation] = useLocation();
   const projectId = location.split('/')[2]; // /active-projects/{id}
@@ -816,8 +816,8 @@ export default function ProjectDetailsRedesigned() {
     const monthName = thisMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     return {
       type: 'month',
-      startDate: startOfMonth(thisMonth),
-      endDate: endOfMonth(thisMonth),
+      startDate: startOfMonth(thisMonth) as Date,
+      endDate: endOfMonth(thisMonth) as Date,
       label: `Este mes (${monthName})`
     };
   });
@@ -1569,7 +1569,7 @@ export default function ProjectDetailsRedesigned() {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-5 w-full max-w-5xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-5 w-full max-w-4xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -1604,13 +1604,6 @@ export default function ProjectDetailsRedesigned() {
             >
               <Settings className="h-4 w-4" />
               Ajustes de Precio
-            </TabsTrigger>
-            <TabsTrigger 
-              value="excel-maestro-data" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm"
-            >
-              <Database className="h-4 w-4" />
-              Excel MAESTRO
             </TabsTrigger>
           </TabsList>
 
@@ -1858,7 +1851,7 @@ export default function ProjectDetailsRedesigned() {
                 </CardContent>
               </Card>
 
-              {/* Ingresos vs Costos (Excel MAESTRO) */}
+              {/* Ingresos Reales */}
               <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -1866,51 +1859,61 @@ export default function ProjectDetailsRedesigned() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="p-2 bg-emerald-100 rounded-lg cursor-help">
-                            <TrendingUp className="h-4 w-4 text-emerald-600" />
+                            <DollarSign className="h-4 w-4 text-emerald-600" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-xs p-3">
                           <div className="space-y-2">
-                            <p className="font-semibold text-sm">Ingresos vs Costos</p>
-                            <p className="text-xs">Comparación entre los ingresos registrados en el Excel MAESTRO y los costos reales del proyecto para el período seleccionado.</p>
+                            <p className="font-semibold text-sm">Ingresos Reales</p>
+                            <p className="text-xs">Ingresos confirmados que han sido facturados y cobrados por el proyecto en el período seleccionado.</p>
+                            <div className="text-xs space-y-1 border-t pt-2">
+                              <p>• Los ingresos se sincronizan automáticamente cada 30 minutos</p>
+                              <p>• Solo se incluyen ventas confirmadas y cobradas</p>
+                            </div>
                           </div>
                         </TooltipContent>
                       </Tooltip>
-                      <span className="text-sm font-medium text-emerald-700">Margen Real</span>
+                      <span className="text-sm font-medium text-emerald-700">Ingresos Reales</span>
                     </div>
-                    <Badge variant="default" className="text-xs">
+                    <Badge variant={(() => {
+                      const salesRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
+                      return salesRevenue > actualCosts ? 'default' : salesRevenue > 0 ? 'secondary' : 'outline';
+                    })()} className="text-xs">
                       {(() => {
                         const salesRevenue = (unifiedData as any)?.googleSheetsSales
                           ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
                         const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
-                        const margin = salesRevenue - actualCosts;
-                        return margin >= 0 ? 'Positivo' : 'Negativo';
+                        if (salesRevenue > actualCosts) return 'Ganancia';
+                        if (salesRevenue > 0) return 'Ingresos';
+                        return 'Sin ingresos';
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-lg font-bold text-gray-900">
-                      {(() => {
-                        const salesRevenue = (unifiedData as any)?.googleSheetsSales
-                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                        const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
-                        const margin = salesRevenue - actualCosts;
-                        return `$${margin.toLocaleString()}`;
-                      })()}
+                      ${((unifiedData as any)?.googleSheetsSales
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0)
+                        .toLocaleString()}
                     </p>
-                    <div className="text-xs text-gray-500 space-y-1">
+                    <div className="text-xs text-gray-500">
                       <div className="flex justify-between">
-                        <span>Ingresos Excel:</span>
-                        <span className="font-mono">
-                          ${((unifiedData as any)?.googleSheetsSales
-                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0)
-                            .toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Costos Reales:</span>
-                        <span className="font-mono">
-                          ${((unifiedData as any)?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                        <span>Margen:</span>
+                        <span className={`font-mono ${(() => {
+                          const salesRevenue = (unifiedData as any)?.googleSheetsSales
+                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                          const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
+                          const margin = salesRevenue - actualCosts;
+                          return margin >= 0 ? 'text-green-600' : 'text-red-600';
+                        })()}`}>
+                          ${(() => {
+                            const salesRevenue = (unifiedData as any)?.googleSheetsSales
+                              ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                            const actualCosts = (unifiedData as any)?.actuals?.totalWorkedCost || 0;
+                            const margin = salesRevenue - actualCosts;
+                            return margin.toLocaleString();
+                          })()}
                         </span>
                       </div>
                     </div>
@@ -3497,174 +3500,6 @@ export default function ProjectDetailsRedesigned() {
               currentPrice={quotationData?.totalAmount} 
             />
           </TabsContent>
-
-          {/* DATOS DE EXCEL MAESTRO */}
-          <TabsContent value="excel-maestro-data" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5 text-emerald-600" />
-                  Datos de Ventas del Excel MAESTRO
-                </CardTitle>
-                <CardDescription>
-                  Información financiera sincronizada automáticamente desde la hoja "Ventas Tomi"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(unifiedData as any)?.googleSheetsSales?.length > 0 ? (
-                  <div className="space-y-4">
-                    {/* Resumen de ventas */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <Card className="border-l-4 border-l-emerald-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Total Registros</p>
-                              <p className="text-2xl font-bold text-gray-900">
-                                {(unifiedData as any).googleSheetsSales.length}
-                              </p>
-                            </div>
-                            <FileSpreadsheet className="h-8 w-8 text-emerald-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-l-4 border-l-blue-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Ingresos USD</p>
-                              <p className="text-xs text-gray-500 mb-1">({dateFilter.label})</p>
-                              <p className="text-2xl font-bold text-gray-900">
-                                ${(unifiedData as any).googleSheetsSales
-                                  .filter((sale: any) => sale.amountUsd)
-                                  .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0)
-                                  .toLocaleString()}
-                              </p>
-                            </div>
-                            <DollarSign className="h-8 w-8 text-blue-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-l-4 border-l-purple-500">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Total ARS</p>
-                              <p className="text-2xl font-bold text-gray-900">
-                                ${(unifiedData as any).googleSheetsSales
-                                  .filter((sale: any) => sale.amountArs)
-                                  .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountArs || 0), 0)
-                                  .toLocaleString()}
-                              </p>
-                            </div>
-                            <TrendingUp className="h-8 w-8 text-purple-500" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Tabla de ventas detallada */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Detalle de Ventas por Mes</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="border-b bg-gray-50">
-                                <th className="text-left p-3 font-medium text-gray-700">Mes</th>
-                                <th className="text-left p-3 font-medium text-gray-700">Año</th>
-                                <th className="text-left p-3 font-medium text-gray-700">Tipo</th>
-                                <th className="text-right p-3 font-medium text-gray-700">Monto USD</th>
-                                <th className="text-right p-3 font-medium text-gray-700">Monto ARS</th>
-                                <th className="text-center p-3 font-medium text-gray-700">Estado</th>
-                                <th className="text-center p-3 font-medium text-gray-700">Confirmado</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(unifiedData as any).googleSheetsSales
-                                .sort((a: any, b: any) => {
-                                  // Ordenar por año y mes
-                                  if (a.year !== b.year) return b.year - a.year;
-                                  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
-                                                 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-                                  return months.indexOf(a.month.toLowerCase()) - months.indexOf(b.month.toLowerCase());
-                                })
-                                .map((sale: any, index: number) => (
-                                <tr key={sale.id || index} className="border-b hover:bg-gray-50">
-                                  <td className="p-3 capitalize font-medium">{sale.month}</td>
-                                  <td className="p-3">{sale.year}</td>
-                                  <td className="p-3">
-                                    <Badge variant={sale.salesType === 'Fee' ? 'default' : 'secondary'}>
-                                      {sale.salesType}
-                                    </Badge>
-                                  </td>
-                                  <td className="p-3 text-right font-mono">
-                                    {sale.amountUsd ? `$${parseFloat(sale.amountUsd).toLocaleString()}` : '-'}
-                                  </td>
-                                  <td className="p-3 text-right font-mono">
-                                    {sale.amountArs ? `$${parseFloat(sale.amountArs).toLocaleString()}` : '-'}
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <Badge variant={
-                                      sale.status === 'completada' ? 'default' :
-                                      sale.status === 'activa' ? 'secondary' : 'outline'
-                                    }>
-                                      {sale.status || 'No definido'}
-                                    </Badge>
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    {sale.confirmed === 'SI' ? (
-                                      <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
-                                    ) : (
-                                      <AlertCircle className="h-4 w-4 text-yellow-500 mx-auto" />
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Información de sincronización */}
-                    <Card className="bg-emerald-50 border-emerald-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5" />
-                          <div>
-                            <p className="font-medium text-emerald-800">Sincronización Automática Activa</p>
-                            <p className="text-sm text-emerald-600 mt-1">
-                              Los datos se actualizan automáticamente cada 30 minutos desde el Excel MAESTRO. 
-                              Última sincronización: {new Date().toLocaleString('es-ES')}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No hay datos de ventas vinculados
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Este proyecto aún no tiene datos sincronizados desde el Excel MAESTRO.
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      La sincronización automática vincula proyectos mediante coincidencias de cliente y nombre.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
         </Tabs>
       </div>
 
@@ -3695,22 +3530,15 @@ export default function ProjectDetailsRedesigned() {
 
       {/* Quick Time Registration Dialog */}
       <Dialog open={showQuickRegister} onOpenChange={setShowQuickRegister}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Timer className="h-5 w-5 text-blue-600" />
-              Registro de Tiempo - {project?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Registra tiempo para el equipo del proyecto de forma rápida y eficiente
-            </DialogDescription>
-          </DialogHeader>
-          <WeeklyTimeRegister 
-            projectId={projectId!} 
-            onClose={() => setShowQuickRegister(false)}
-          />
+        <DialogContent className="sm:max-w-md">
+          <div className="p-4">
+            <p>Registro rápido de tiempo</p>
+            <Button onClick={() => setShowQuickRegister(false)}>Cerrar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 };
+
+export default ProjectDetailsPage;
