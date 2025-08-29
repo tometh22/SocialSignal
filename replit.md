@@ -81,6 +81,12 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - **Future Projects** (post-Sept 2025): Use approved quotation pricing vs actual costs for markup calculations
   - Dynamic dashboard labels and tooltips that adjust based on project type
   - Seamless transition logic ensuring accuracy for both historical and forward-looking analysis
+- **Temporal Data Differentiation (Aug 29, 2025)**: Enhanced dashboard to distinguish real worked data from projected data:
+  - **Real Data**: Sales with status "completada" (past) + "activa" (current) for authentic revenue calculations
+  - **Projected Data**: Sales with status "proyectada" (future) displayed separately for planning purposes
+  - **Dashboard Cards**: Markup calculations use only real income vs actual costs, ensuring accurate performance metrics
+  - **New Card**: Added dedicated "Ingresos Proyectados" card to clearly separate estimates from actuals
+  - **Financial Coherence**: All metrics now properly differentiate between worked periods and projected periods
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL serverless database connection.

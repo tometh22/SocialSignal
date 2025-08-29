@@ -1698,7 +1698,8 @@ const ProjectDetailsPage = () => {
                           const markup = revenue / actualCost;
                           return `${markup.toFixed(1)}x`;
                         }
-                        return '0.0x';
+                        // Si hay ingresos pero no costos, mostrar infinito
+                        return revenue > 0 ? '∞' : '0.0x';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">
