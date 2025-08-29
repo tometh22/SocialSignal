@@ -271,13 +271,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Función auxiliar para filtrar ventas de Google Sheets por período temporal
   const getFilteredGoogleSheetsSales = async (projectId: number, timeFilter: string, dateRange: any) => {
     try {
+      console.log(`🔍 Getting sales for project ${projectId}...`);
       // Obtener todas las ventas del proyecto
       const allSales = await storage.getGoogleSheetsSalesByProject(projectId);
       
-      if (!allSales || allSales.length === 0) return [];
+      console.log(`🔍 Retrieved ${allSales ? allSales.length : 0} sales from storage for project ${projectId}`);
+      console.log(`🔍 Sample sales data:`, allSales?.slice(0, 2));
+      
+      if (!allSales || allSales.length === 0) {
+        console.log(`⚠️ No sales data found for project ${projectId}`);
+        return [];
+      }
       
       // Si es 'all', retornar todas las ventas
-      if (timeFilter === 'all') return allSales;
+      if (timeFilter === 'all') {
+        console.log(`🔍 Returning all ${allSales.length} sales (filter: all)`);
+        return allSales;
+      }
       
       // Filtrar por fechas según el período temporal
       const filteredSales = allSales.filter(sale => {
@@ -987,7 +997,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         efficiency: completeData.metrics.efficiency,
         markup: completeData.metrics.markup,
         timeFilter: timeFilter,
-        isAlwaysOn: project.quotation?.projectType === 'always-on'
+        isAlwaysOn: project.quotation?.projectType === 'always-on',
+        // Agregar salesData para compatibilidad con frontend
+        salesData: completeData.googleSheetsSales
       };
 
       console.log(`📊 Complete data prepared for project ${id}:`, {
