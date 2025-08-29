@@ -43,7 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **Client Management**: Client information, logo handling, and Google Sheets integration for automated client import.
 - **Quotation System**: Comprehensive quotation creation with team assignment and cost multipliers.
 - **Project Management**: Active project and subproject tracking with integrated financial management.
-- **Financial Management System**: Dual-purpose analysis separating operational sales (monthly revenue recognition) from financial transactions (real invoicing/collection tracking).
+- **Financial Management System**: Dual-purpose analysis separating operational sales (monthly revenue recognition) from financial transactions (real invoicing/collection tracking). Project-level financial management accessible via dedicated page (no internal tabs duplication).
 - **Time Tracking**: Hourly and cost-based time entry.
 - **Deliverable Management**: MODO-style tracking with quality metrics.
 - **Chat System**: Project-based internal communication.

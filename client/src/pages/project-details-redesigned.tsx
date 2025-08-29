@@ -1474,7 +1474,15 @@ export default function ProjectDetailsRedesigned() {
                   Registrar Tiempo
                 </Button>
 
-
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  onClick={() => setLocation(`/active-projects/${projectId}/financial-management`)}
+                >
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  Gestión Financiera
+                </Button>
 
                 <Button 
                   variant="outline" 
@@ -1560,7 +1568,7 @@ export default function ProjectDetailsRedesigned() {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-6xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-5 w-full max-w-5xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -1588,13 +1596,6 @@ export default function ProjectDetailsRedesigned() {
             >
               <Timer className="h-4 w-4" />
               Tiempo
-            </TabsTrigger>
-            <TabsTrigger 
-              value="details" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-orange-50 data-[state=active]:text-orange-700 data-[state=active]:shadow-sm"
-            >
-              <DollarSign className="h-4 w-4" />
-              Análisis Financiero
             </TabsTrigger>
             <TabsTrigger 
               value="price-adjustments" 
