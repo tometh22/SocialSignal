@@ -1449,6 +1449,57 @@ export const projectPricingChanges = pgTable("project_pricing_changes", {
   createdBy: integer("created_by").notNull().references(() => users.id),
 });
 
+// ==================== NUEVAS TABLAS PARA SEPARAR ANÁLISIS OPERACIONAL Y FINANCIERO ====================
+
+// Tabla de VENTAS OPERACIONALES MENSUALES (para análisis operacional en proyectos)
+export const projectMonthlySales = pgTable("project_monthly_sales", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  year: integer("year").notNull(),
+  month: integer("month").notNull(), // 1-12
+  
+  // Ventas operacionales (reconocimiento de ingresos por servicios prestados)
+  salesAmountUsd: numeric("sales_amount_usd", { precision: 12, scale: 2 }).notNull(),
+  salesAmountArs: numeric("sales_amount_ars", { precision: 15, scale: 2 }),
+  
+  // Metadatos operacionales
+  salesType: varchar("sales_type", { length: 50 }).notNull(), // 'monthly_fee', 'milestone', 'deliverable'
+  description: text("description"), // Descripción del servicio prestado
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+});
+
+// Tabla de FACTURACIÓN Y COBRANZA (para análisis financiero real)
+export const projectFinancialTransactions = pgTable("project_financial_transactions", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  
+  // Datos de facturación
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  invoiceDate: timestamp("invoice_date"),
+  invoiceAmountUsd: numeric("invoice_amount_usd", { precision: 12, scale: 2 }),
+  invoiceAmountArs: numeric("invoice_amount_ars", { precision: 15, scale: 2 }),
+  
+  // Datos de cobranza
+  collectionDate: timestamp("collection_date"),
+  collectedAmountUsd: numeric("collected_amount_usd", { precision: 12, scale: 2 }),
+  collectedAmountArs: numeric("collected_amount_ars", { precision: 15, scale: 2 }),
+  
+  // Información adicional
+  paymentMethod: varchar("payment_method", { length: 50 }), // 'wire_transfer', 'check', 'cash', etc.
+  exchangeRateUsed: numeric("exchange_rate_used", { precision: 8, scale: 4 }),
+  notes: text("notes"),
+  
+  // Estados
+  invoiceStatus: varchar("invoice_status", { length: 30 }).notNull().default('pending'), // 'pending', 'sent', 'paid', 'overdue'
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+});
+
 // Vista de resumen financiero por proyecto
 export const projectFinancialSummary = pgTable("project_financial_summary", {
   id: serial("id").primaryKey(),
@@ -1489,6 +1540,19 @@ export const insertProjectFinancialSummarySchema = createInsertSchema(projectFin
   updatedAt: true,
 });
 
+// Esquemas para las nuevas tablas de análisis operacional y financiero
+export const insertProjectMonthlySalesSchema = createInsertSchema(projectMonthlySales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectFinancialTransactionSchema = createInsertSchema(projectFinancialTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Tipos
 export type ProjectMonthlyRevenue = typeof projectMonthlyRevenue.$inferSelect;
 export type InsertProjectMonthlyRevenue = z.infer<typeof insertProjectMonthlyRevenueSchema>;
@@ -1498,6 +1562,13 @@ export type InsertProjectPricingChange = z.infer<typeof insertProjectPricingChan
 
 export type ProjectFinancialSummary = typeof projectFinancialSummary.$inferSelect;
 export type InsertProjectFinancialSummary = z.infer<typeof insertProjectFinancialSummarySchema>;
+
+// Tipos para las nuevas tablas
+export type ProjectMonthlySales = typeof projectMonthlySales.$inferSelect;
+export type InsertProjectMonthlySales = z.infer<typeof insertProjectMonthlySalesSchema>;
+
+export type ProjectFinancialTransaction = typeof projectFinancialTransactions.$inferSelect;
+export type InsertProjectFinancialTransaction = z.infer<typeof insertProjectFinancialTransactionSchema>;
 
 // Relaciones de ingresos mensuales de proyectos
 export const projectMonthlyRevenueRelations = relations(projectMonthlyRevenue, ({ one }) => ({
@@ -1515,6 +1586,17 @@ export const projectPricingChangesRelations = relations(projectPricingChanges, (
 export const projectFinancialSummaryRelations = relations(projectFinancialSummary, ({ one }) => ({
   project: one(activeProjects, { fields: [projectFinancialSummary.projectId], references: [activeProjects.id] }),
   updater: one(users, { fields: [projectFinancialSummary.updatedBy], references: [users.id] }),
+}));
+
+// Relaciones para las nuevas tablas
+export const projectMonthlySalesRelations = relations(projectMonthlySales, ({ one }) => ({
+  project: one(activeProjects, { fields: [projectMonthlySales.projectId], references: [activeProjects.id] }),
+  creator: one(users, { fields: [projectMonthlySales.createdBy], references: [users.id] }),
+}));
+
+export const projectFinancialTransactionsRelations = relations(projectFinancialTransactions, ({ one }) => ({
+  project: one(activeProjects, { fields: [projectFinancialTransactions.projectId], references: [activeProjects.id] }),
+  creator: one(users, { fields: [projectFinancialTransactions.createdBy], references: [users.id] }),
 }));
 
 // ==================== ENCUESTAS NPS TRIMESTRALES ====================

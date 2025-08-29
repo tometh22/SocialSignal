@@ -33,6 +33,8 @@ import {
   insertNonBillableHoursSchema,
   insertExchangeRateSchema,
   insertPersonnelHistoricalCostSchema,
+  insertProjectMonthlySalesSchema,
+  insertProjectFinancialTransactionSchema,
 
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -9043,6 +9045,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Error en la generación automática de ingresos", 
         error: error?.message || error 
       });
+    }
+  });
+
+  // ==================== NUEVAS RUTAS PARA ANÁLISIS OPERACIONAL Y FINANCIERO ====================
+  
+  // Project Monthly Sales Operations (para análisis operacional)
+  app.get("/api/projects/:projectId/monthly-sales", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const sales = await storage.getProjectMonthlySales(projectId);
+      res.json(sales);
+    } catch (error) {
+      console.error("Error fetching project monthly sales:", error);
+      res.status(500).json({ message: "Failed to fetch project monthly sales" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/monthly-sales", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const validatedData = insertProjectMonthlySalesSchema.parse({
+        ...req.body,
+        projectId,
+        createdBy: req.session.userId
+      });
+      
+      const sales = await storage.createProjectMonthlySales(validatedData);
+      res.status(201).json(sales);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid sales data", errors: error.errors });
+      }
+      console.error("Error creating project monthly sales:", error);
+      res.status(500).json({ message: "Failed to create project monthly sales" });
+    }
+  });
+
+  app.patch("/api/projects/:projectId/monthly-sales/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid sales ID" });
+
+    try {
+      const validatedData = insertProjectMonthlySalesSchema.partial().parse(req.body);
+      const updatedSales = await storage.updateProjectMonthlySales(id, validatedData);
+      
+      if (!updatedSales) {
+        return res.status(404).json({ message: "Monthly sales record not found" });
+      }
+      
+      res.json(updatedSales);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid sales data", errors: error.errors });
+      }
+      console.error("Error updating project monthly sales:", error);
+      res.status(500).json({ message: "Failed to update project monthly sales" });
+    }
+  });
+
+  app.delete("/api/projects/:projectId/monthly-sales/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid sales ID" });
+
+    try {
+      const success = await storage.deleteProjectMonthlySales(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Monthly sales record not found" });
+      }
+      
+      res.json({ success: true, message: "Monthly sales record deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project monthly sales:", error);
+      res.status(500).json({ message: "Failed to delete project monthly sales" });
+    }
+  });
+
+  // Project Financial Transactions Operations (para análisis financiero)
+  app.get("/api/projects/:projectId/financial-transactions", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const transactions = await storage.getProjectFinancialTransactions(projectId);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching project financial transactions:", error);
+      res.status(500).json({ message: "Failed to fetch project financial transactions" });
+    }
+  });
+
+  app.post("/api/projects/:projectId/financial-transactions", requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    if (isNaN(projectId)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      const validatedData = insertProjectFinancialTransactionSchema.parse({
+        ...req.body,
+        projectId,
+        createdBy: req.session.userId
+      });
+      
+      const transaction = await storage.createProjectFinancialTransaction(validatedData);
+      res.status(201).json(transaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid transaction data", errors: error.errors });
+      }
+      console.error("Error creating project financial transaction:", error);
+      res.status(500).json({ message: "Failed to create project financial transaction" });
+    }
+  });
+
+  app.patch("/api/projects/:projectId/financial-transactions/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid transaction ID" });
+
+    try {
+      const validatedData = insertProjectFinancialTransactionSchema.partial().parse(req.body);
+      const updatedTransaction = await storage.updateProjectFinancialTransaction(id, validatedData);
+      
+      if (!updatedTransaction) {
+        return res.status(404).json({ message: "Financial transaction not found" });
+      }
+      
+      res.json(updatedTransaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid transaction data", errors: error.errors });
+      }
+      console.error("Error updating project financial transaction:", error);
+      res.status(500).json({ message: "Failed to update project financial transaction" });
+    }
+  });
+
+  app.delete("/api/projects/:projectId/financial-transactions/:id", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid transaction ID" });
+
+    try {
+      const success = await storage.deleteProjectFinancialTransaction(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Financial transaction not found" });
+      }
+      
+      res.json({ success: true, message: "Financial transaction deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting project financial transaction:", error);
+      res.status(500).json({ message: "Failed to delete project financial transaction" });
     }
   });
 

@@ -30,6 +30,8 @@ import {
   type ProjectMonthlyRevenue, type InsertProjectMonthlyRevenue,
   type ProjectPricingChange, type InsertProjectPricingChange,
   type ProjectFinancialSummary, type InsertProjectFinancialSummary,
+  type ProjectMonthlySales, type InsertProjectMonthlySales,
+  type ProjectFinancialTransaction, type InsertProjectFinancialTransaction,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -44,7 +46,8 @@ import {
   deliverables, clientModoComments, costMultipliers, recurringProjectTemplates, recurringTemplatePersonnel, projectCycles,
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
   projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
-  googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary
+  googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary,
+  projectMonthlySales, projectFinancialTransactions
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -391,6 +394,21 @@ export interface IStorage {
   
   // Bulk Revenue Generation for Fee Projects
   generateMonthlyRevenueForProject(projectId: number, fromYear: number, fromMonth: number, toYear: number, toMonth: number): Promise<ProjectMonthlyRevenue[]>;
+
+  // ==================== NUEVOS MÉTODOS PARA ANÁLISIS OPERACIONAL Y FINANCIERO ====================
+  // Project Monthly Sales operations (análisis operacional)
+  getProjectMonthlySales(projectId: number): Promise<ProjectMonthlySales[]>;
+  getProjectMonthlySalesByPeriod(projectId: number, year: number, month: number): Promise<ProjectMonthlySales | undefined>;
+  createProjectMonthlySales(sales: InsertProjectMonthlySales): Promise<ProjectMonthlySales>;
+  updateProjectMonthlySales(id: number, sales: Partial<InsertProjectMonthlySales>): Promise<ProjectMonthlySales | undefined>;
+  deleteProjectMonthlySales(id: number): Promise<boolean>;
+  
+  // Project Financial Transactions operations (análisis financiero)
+  getProjectFinancialTransactions(projectId: number): Promise<ProjectFinancialTransaction[]>;
+  getProjectFinancialTransaction(id: number): Promise<ProjectFinancialTransaction | undefined>;
+  createProjectFinancialTransaction(transaction: InsertProjectFinancialTransaction): Promise<ProjectFinancialTransaction>;
+  updateProjectFinancialTransaction(id: number, transaction: Partial<InsertProjectFinancialTransaction>): Promise<ProjectFinancialTransaction | undefined>;
+  deleteProjectFinancialTransaction(id: number): Promise<boolean>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -3997,6 +4015,98 @@ export class DatabaseStorage implements IStorage {
     
     console.log(`🎉 Generated ${results.length} new revenue records for project ${projectId}`);
     return results;
+  }
+
+  // ==================== IMPLEMENTACIÓN DE MÉTODOS PARA ANÁLISIS OPERACIONAL Y FINANCIERO ====================
+  
+  // Project Monthly Sales operations (análisis operacional)
+  async getProjectMonthlySales(projectId: number): Promise<ProjectMonthlySales[]> {
+    return await db
+      .select()
+      .from(projectMonthlySales)
+      .where(eq(projectMonthlySales.projectId, projectId))
+      .orderBy(desc(projectMonthlySales.year), desc(projectMonthlySales.month));
+  }
+
+  async getProjectMonthlySalesByPeriod(projectId: number, year: number, month: number): Promise<ProjectMonthlySales | undefined> {
+    const result = await db
+      .select()
+      .from(projectMonthlySales)
+      .where(
+        and(
+          eq(projectMonthlySales.projectId, projectId),
+          eq(projectMonthlySales.year, year),
+          eq(projectMonthlySales.month, month)
+        )
+      )
+      .limit(1);
+    return result[0];
+  }
+
+  async createProjectMonthlySales(sales: InsertProjectMonthlySales): Promise<ProjectMonthlySales> {
+    const result = await db
+      .insert(projectMonthlySales)
+      .values(sales)
+      .returning();
+    return result[0];
+  }
+
+  async updateProjectMonthlySales(id: number, sales: Partial<InsertProjectMonthlySales>): Promise<ProjectMonthlySales | undefined> {
+    const result = await db
+      .update(projectMonthlySales)
+      .set({ ...sales, updatedAt: new Date() })
+      .where(eq(projectMonthlySales.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProjectMonthlySales(id: number): Promise<boolean> {
+    const result = await db
+      .delete(projectMonthlySales)
+      .where(eq(projectMonthlySales.id, id));
+    return result.rowCount! > 0;
+  }
+
+  // Project Financial Transactions operations (análisis financiero)
+  async getProjectFinancialTransactions(projectId: number): Promise<ProjectFinancialTransaction[]> {
+    return await db
+      .select()
+      .from(projectFinancialTransactions)
+      .where(eq(projectFinancialTransactions.projectId, projectId))
+      .orderBy(desc(projectFinancialTransactions.invoiceDate), desc(projectFinancialTransactions.collectionDate));
+  }
+
+  async getProjectFinancialTransaction(id: number): Promise<ProjectFinancialTransaction | undefined> {
+    const result = await db
+      .select()
+      .from(projectFinancialTransactions)
+      .where(eq(projectFinancialTransactions.id, id))
+      .limit(1);
+    return result[0];
+  }
+
+  async createProjectFinancialTransaction(transaction: InsertProjectFinancialTransaction): Promise<ProjectFinancialTransaction> {
+    const result = await db
+      .insert(projectFinancialTransactions)
+      .values(transaction)
+      .returning();
+    return result[0];
+  }
+
+  async updateProjectFinancialTransaction(id: number, transaction: Partial<InsertProjectFinancialTransaction>): Promise<ProjectFinancialTransaction | undefined> {
+    const result = await db
+      .update(projectFinancialTransactions)
+      .set({ ...transaction, updatedAt: new Date() })
+      .where(eq(projectFinancialTransactions.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProjectFinancialTransaction(id: number): Promise<boolean> {
+    const result = await db
+      .delete(projectFinancialTransactions)
+      .where(eq(projectFinancialTransactions.id, id));
+    return result.rowCount! > 0;
   }
 
 }
