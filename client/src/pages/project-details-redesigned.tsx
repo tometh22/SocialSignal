@@ -1616,71 +1616,15 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="dashboard" className="space-y-6">
             
-            {/* ANÁLISIS OPERACIONAL DEL PROYECTO */}
-            <div className="bg-white border rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900">🔧 Análisis Operacional del Proyecto</h3>
+            {/* DASHBOARD OPERACIONAL PRINCIPAL */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {/* Ingresos del Período */}
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 mb-2">
-                    ${(() => {
-                      const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                      if (isLegacyProject) {
-                        // Usar ingresos reales para análisis operacional
-                        const realRevenue = (unifiedData as any)?.googleSheetsSales
-                          ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
-                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                        return realRevenue.toLocaleString();
-                      } else {
-                        // Usar cotización para proyectos futuros
-                        return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
-                      }
-                    })()}
-                  </div>
-                  <p className="text-sm text-gray-600">💰 Ingresos Operacionales</p>
-                  <p className="text-xs text-gray-500">
-                    {(() => {
-                      const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                      return isLegacyProject ? 'Ingresos reales del período' : 'Valor cotizado al cliente';
-                    })()}
-                  </p>
-                </div>
-
-                {/* Costos Operacionales */}
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600 mb-2">
-                    ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
-                  </div>
-                  <p className="text-sm text-gray-600">⚙️ Costos Operacionales</p>
-                  <p className="text-xs text-gray-500">Costo directo del trabajo realizado</p>
-                </div>
-
-                {/* Eficiencia Operacional */}
-                <div className="text-center">
-                  <div className={`text-2xl font-bold mb-2 ${(() => {
-                    const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                    const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                    let revenue = 0;
-                    
-                    if (isLegacyProject) {
-                      revenue = (unifiedData as any)?.googleSheetsSales
-                        ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
-                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                    } else {
-                      revenue = unifiedData?.quotation?.totalAmount || 0;
-                    }
-                    
-                    if (actualCost === 0) {
-                      return revenue > 0 ? 'text-green-600' : 'text-gray-600';
-                    }
-                    
-                    const efficiency = revenue / actualCost;
-                    if (efficiency >= 2.0) return 'text-green-600';
-                    if (efficiency >= 1.5) return 'text-yellow-600';
-                    return 'text-red-600';
-                  })()}`}>
-                    {(() => {
+              {/* Métrica Principal: Markup */}
+              <div className="lg:col-span-2">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6 h-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-blue-900">📈 Markup del Proyecto</h3>
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${(() => {
                       const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
                       const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
                       let revenue = 0;
@@ -1694,24 +1638,127 @@ const ProjectDetailsPage = () => {
                       }
                       
                       if (actualCost === 0) {
-                        return revenue > 0 ? 'Sin costos' : '0.0x';
+                        return revenue > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
                       }
                       
-                      const efficiency = revenue / actualCost;
-                      return `${efficiency.toFixed(1)}x`;
-                    })()}
+                      const markup = revenue / actualCost;
+                      if (markup >= 2.0) return 'bg-green-100 text-green-800';
+                      if (markup >= 1.5) return 'bg-yellow-100 text-yellow-800';
+                      return 'bg-red-100 text-red-800';
+                    })()}`}>
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                        let revenue = 0;
+                        
+                        if (isLegacyProject) {
+                          revenue = (unifiedData as any)?.googleSheetsSales
+                            ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        } else {
+                          revenue = unifiedData?.quotation?.totalAmount || 0;
+                        }
+                        
+                        if (actualCost === 0) {
+                          return revenue > 0 ? 'Excelente' : 'Sin datos';
+                        }
+                        
+                        const markup = revenue / actualCost;
+                        if (markup >= 2.0) return 'Excelente';
+                        if (markup >= 1.5) return 'Bueno';
+                        return 'Mejorar';
+                      })()}
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600">📊 Multiplicador Operacional</p>
-                  <p className="text-xs text-gray-500">Ingresos / Costos directos</p>
+                  
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-blue-900 mb-2">
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                        let revenue = 0;
+                        
+                        if (isLegacyProject) {
+                          revenue = (unifiedData as any)?.googleSheetsSales
+                            ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        } else {
+                          revenue = unifiedData?.quotation?.totalAmount || 0;
+                        }
+                        
+                        if (actualCost === 0) {
+                          return revenue > 0 ? '∞x' : '0.0x';
+                        }
+                        
+                        const markup = revenue / actualCost;
+                        return `${markup.toFixed(1)}x`;
+                      })()}
+                    </div>
+                    <p className="text-sm text-blue-700 font-medium">
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        return isLegacyProject ? 'Ingresos Reales / Costos' : 'Cotización / Costos';
+                      })()}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Contexto Operacional */}
-              <div className="mt-4 text-xs text-gray-600 bg-gray-50 p-3 rounded">
-                <p><strong>ℹ️ Análisis Operacional:</strong></p>
-                <p>• <strong>Ingresos:</strong> Revenue operacional del proyecto en el período seleccionado</p>
-                <p>• <strong>Costos:</strong> Costos directos del trabajo (salarios, freelancers)</p>
-                <p>• <strong>Multiplicador:</strong> Eficiencia operacional - cuánto genera cada peso invertido</p>
+              {/* Métricas Complementarias */}
+              <div className="lg:col-span-2 space-y-4">
+                
+                {/* Ingresos */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">💰 Ingresos</p>
+                      <p className="text-lg font-bold text-green-900">
+                        ${(() => {
+                          const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                          if (isLegacyProject) {
+                            const realRevenue = (unifiedData as any)?.googleSheetsSales
+                              ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                              ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                            return realRevenue.toLocaleString();
+                          } else {
+                            return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
+                          }
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">
+                    {(() => {
+                      const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                      return isLegacyProject ? 'Revenue real del período' : 'Valor cotizado';
+                    })()}
+                  </p>
+                </div>
+
+                {/* Costos */}
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-orange-800">⚙️ Costos Directos</p>
+                      <p className="text-lg font-bold text-orange-900">
+                        ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-orange-600 mt-1">Costo del trabajo realizado</p>
+                </div>
+                
+              </div>
+            </div>
+
+            {/* Explicación Simple */}
+            <div className="bg-gray-50 border rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-gray-900 mb-2">📋 ¿Qué significa el Markup?</h4>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>• <strong>Markup = Ingresos ÷ Costos:</strong> Muestra cuántos dólares genera cada dólar invertido</p>
+                <p>• <strong>2.0x o más:</strong> Excelente rentabilidad - el proyecto genera el doble de lo invertido</p>
+                <p>• <strong>1.5x - 2.0x:</strong> Buena rentabilidad - ganancia saludable</p>
+                <p>• <strong>Menos de 1.5x:</strong> Necesita mejoras - poca ganancia o pérdida</p>
               </div>
             </div>
 
