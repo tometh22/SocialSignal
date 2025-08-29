@@ -36,6 +36,7 @@ import {
   insertProjectMonthlySalesSchema,
   insertProjectFinancialTransactionSchema,
   insertGoogleSheetsSalesSchema,
+  insertDirectCostSchema,
 
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -65,7 +66,8 @@ import {
   projectPriceAdjustments,
   googleSheetsProjects,
   googleSheetsProjectBilling,
-  googleSheetsSales
+  googleSheetsSales,
+  directCosts
 } from "@shared/schema";
 import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -8312,6 +8314,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Error al obtener resumen del Excel MAESTRO",
         error: error.message 
       });
+    }
+  });
+
+  // Importar costos directos desde Excel MAESTRO
+  app.post("/api/google-sheets/import-direct-costs", async (req, res) => {
+    try {
+      const result = await googleSheetsWorkingService.importDirectCosts(storage);
+      res.json({
+        success: result.success,
+        message: result.success 
+          ? `Importación completada: ${result.costsImported} costos importados, ${result.costsUpdated} actualizados`
+          : "Error en la importación de costos directos",
+        costsImported: result.costsImported,
+        costsUpdated: result.costsUpdated,
+        errors: result.errors
+      });
+    } catch (error) {
+      console.error('❌ Error importando costos directos:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Error al importar costos directos del Excel MAESTRO",
+        error: error.message,
+        costsImported: 0,
+        costsUpdated: 0,
+        errors: [error.message]
+      });
+    }
+  });
+
+  // Obtener costos directos
+  app.get("/api/direct-costs", requireAuth, async (req, res) => {
+    try {
+      const costs = await storage.getDirectCosts();
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching direct costs:", error);
+      res.status(500).json({ message: "Failed to fetch direct costs" });
+    }
+  });
+
+  // Obtener costos directos por proyecto
+  app.get("/api/direct-costs/project/:projectId", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const costs = await storage.getDirectCostsByProject(projectId);
+      res.json(costs);
+    } catch (error) {
+      console.error("Error fetching project direct costs:", error);
+      res.status(500).json({ message: "Failed to fetch project direct costs" });
+    }
+  });
+
+  // Crear costo directo
+  app.post("/api/direct-costs", requireAuth, async (req, res) => {
+    try {
+      const costData = insertDirectCostSchema.parse(req.body);
+      const cost = await storage.createDirectCost(costData);
+      res.status(201).json(cost);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error creating direct cost:", error);
+      res.status(500).json({ message: "Failed to create direct cost" });
+    }
+  });
+
+  // Actualizar costo directo
+  app.patch("/api/direct-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+
+      const costData = insertDirectCostSchema.partial().parse(req.body);
+      const cost = await storage.updateDirectCost(id, costData);
+      
+      if (!cost) {
+        return res.status(404).json({ message: "Direct cost not found" });
+      }
+
+      res.json(cost);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Error updating direct cost:", error);
+      res.status(500).json({ message: "Failed to update direct cost" });
+    }
+  });
+
+  // Eliminar costo directo
+  app.delete("/api/direct-costs/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid cost ID" });
+      }
+
+      const success = await storage.deleteDirectCost(id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Direct cost not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting direct cost:", error);
+      res.status(500).json({ message: "Failed to delete direct cost" });
     }
   });
 

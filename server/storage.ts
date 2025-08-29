@@ -33,6 +33,7 @@ import {
   type ProjectMonthlySales, type InsertProjectMonthlySales,
   type ProjectFinancialTransaction, type InsertProjectFinancialTransaction,
   type GoogleSheetsSales, type InsertGoogleSheetsSales,
+  type DirectCost, type InsertDirectCost,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -48,7 +49,7 @@ import {
   projectBaseTeam, quickTimeEntries, quickTimeEntryDetails, passwordResetTokens, unquotedPersonnel, monthlyHourAdjustments,
   projectPriceAdjustments, negotiationHistory, exchangeRates, indirectCostCategories, indirectCosts, nonBillableHours,
   googleSheetsProjects, googleSheetsProjectBilling, projectMonthlyRevenue, projectPricingChanges, projectFinancialSummary,
-  projectMonthlySales, projectFinancialTransactions, googleSheetsSales
+  projectMonthlySales, projectFinancialTransactions, googleSheetsSales, directCosts
 } from "@shared/schema";
 import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
@@ -420,6 +421,20 @@ export interface IStorage {
   deleteGoogleSheetsSales(id: number): Promise<boolean>;
   importSalesFromGoogleSheets(salesData: any[]): Promise<{ imported: number; updated: number; errors: string[] }>;
   clearGoogleSheetsSales(): Promise<boolean>;
+
+  // Direct Costs operations
+  getDirectCosts(): Promise<DirectCost[]>;
+  getDirectCost(id: number): Promise<DirectCost | undefined>;
+  getDirectCostByUniqueKey(uniqueKey: string): Promise<DirectCost | undefined>;
+  getDirectCostsByProject(projectId: number): Promise<DirectCost[]>;
+  getDirectCostsByPersonnel(personnelId: number): Promise<DirectCost[]>;
+  createDirectCost(cost: InsertDirectCost): Promise<DirectCost>;
+  updateDirectCost(id: number, cost: Partial<InsertDirectCost>): Promise<DirectCost | undefined>;
+  deleteDirectCost(id: number): Promise<boolean>;
+  clearDirectCosts(): Promise<boolean>;
+
+  // Personnel lookup
+  getPersonnelByName(name: string): Promise<Personnel | undefined>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -4299,6 +4314,70 @@ export class DatabaseStorage implements IStorage {
     }
 
     return result;
+  }
+
+  // Direct Costs operations
+  async getDirectCosts(): Promise<DirectCost[]> {
+    return db.select().from(directCosts).orderBy(desc(directCosts.id));
+  }
+
+  async getDirectCost(id: number): Promise<DirectCost | undefined> {
+    const result = await db.select().from(directCosts).where(eq(directCosts.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getDirectCostByUniqueKey(uniqueKey: string): Promise<DirectCost | undefined> {
+    const result = await db.select()
+      .from(directCosts)
+      .where(eq(directCosts.uniqueKey, uniqueKey))
+      .limit(1);
+    return result[0];
+  }
+
+  async getDirectCostsByProject(projectId: number): Promise<DirectCost[]> {
+    return db.select()
+      .from(directCosts)
+      .where(eq(directCosts.projectId, projectId))
+      .orderBy(desc(directCosts.id));
+  }
+
+  async getDirectCostsByPersonnel(personnelId: number): Promise<DirectCost[]> {
+    return db.select()
+      .from(directCosts)
+      .where(eq(directCosts.personnelId, personnelId))
+      .orderBy(desc(directCosts.id));
+  }
+
+  async createDirectCost(cost: InsertDirectCost): Promise<DirectCost> {
+    const result = await db.insert(directCosts).values(cost).returning();
+    return result[0];
+  }
+
+  async updateDirectCost(id: number, cost: Partial<InsertDirectCost>): Promise<DirectCost | undefined> {
+    const result = await db.update(directCosts)
+      .set({ ...cost, updatedAt: new Date() })
+      .where(eq(directCosts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDirectCost(id: number): Promise<boolean> {
+    const result = await db.delete(directCosts).where(eq(directCosts.id, id));
+    return result.rowCount > 0;
+  }
+
+  async clearDirectCosts(): Promise<boolean> {
+    await db.delete(directCosts);
+    return true;
+  }
+
+  // Personnel lookup by name
+  async getPersonnelByName(name: string): Promise<Personnel | undefined> {
+    const result = await db.select()
+      .from(personnel)
+      .where(eq(personnel.name, name))
+      .limit(1);
+    return result[0];
   }
 
 }

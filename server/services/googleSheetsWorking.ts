@@ -50,6 +50,20 @@ interface VentaTomi {
   confirmado: string;
 }
 
+interface CostoDirectoExcel {
+  persona: string;
+  mes: string;
+  año: number;
+  tipoGasto: string;
+  especificacion: string;
+  proyecto: string;
+  tipoProyecto: string;
+  cliente: string;
+  horasRealesAsana: number;
+  valorHoraPersona?: number;
+  costoTotal?: number;
+}
+
 class GoogleSheetsWorkingService {
   private spreadsheetId: string;
 
@@ -992,6 +1006,254 @@ class GoogleSheetsWorkingService {
 
     console.log(`✅ Procesadas ${result.length} ventas válidas de ${rows.length - 1} filas`);
     return result;
+  }
+
+  /**
+   * Importar costos directos desde "Costos directos e indirectos"
+   */
+  async importDirectCosts(storage: any): Promise<{ success: boolean; costsImported: number; costsUpdated: number; errors: string[] }> {
+    console.log('📊 Importando costos directos desde Excel...');
+    
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      
+      // Leer datos de la pestaña "Costos directos e indirectos"
+      const range = 'Costos directos e indirectos!A:M';
+      console.log('📋 Range:', range);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+      });
+
+      const rows = response.data.values;
+      if (!rows || rows.length === 0) {
+        return { success: false, costsImported: 0, costsUpdated: 0, errors: ['No se encontraron datos en la pestaña'] };
+      }
+
+      console.log(`📊 Procesando ${rows.length} filas de costos directos`);
+      const costosDirectos = this.processDirectCostsData(rows);
+      console.log(`📋 Procesados ${costosDirectos.length} registros válidos de costos`);
+      
+      if (costosDirectos.length === 0) {
+        return { success: false, costsImported: 0, costsUpdated: 0, errors: ['No se encontraron costos válidos para procesar'] };
+      }
+
+      // Procesar e importar costos directos
+      let costsImported = 0;
+      let costsUpdated = 0;
+      const errors: string[] = [];
+      const importBatch = `batch_${Date.now()}`;
+
+      for (const costo of costosDirectos) {
+        try {
+          // Obtener valor hora de la persona para el mes/año
+          const valorHora = await this.getPersonnelHourlyRate(storage, costo.persona, costo.mes, costo.año);
+          if (!valorHora) {
+            console.log(`⚠️ No se encontró valor hora para ${costo.persona} en ${costo.mes} ${costo.año}`);
+            continue;
+          }
+
+          // Calcular costo total
+          const costoTotal = costo.horasRealesAsana * valorHora;
+
+          // Crear unique key para control de duplicados
+          const uniqueKey = `${costo.persona}_${costo.proyecto}_${costo.cliente}_${costo.mes}_${costo.año}`.replace(/\s+/g, '_').toLowerCase();
+
+          // Buscar referencias al sistema
+          const projectId = await this.findProjectByName(storage, costo.cliente, costo.proyecto);
+          const personnelId = await this.findPersonnelByName(storage, costo.persona);
+
+          const directCostData = {
+            persona: costo.persona,
+            mes: costo.mes,
+            año: costo.año,
+            tipoGasto: costo.tipoGasto,
+            especificacion: costo.especificacion,
+            proyecto: costo.proyecto,
+            tipoProyecto: costo.tipoProyecto,
+            cliente: costo.cliente,
+            horasRealesAsana: costo.horasRealesAsana,
+            valorHoraPersona: valorHora,
+            costoTotal: costoTotal,
+            projectId: projectId,
+            personnelId: personnelId,
+            importBatch: importBatch,
+            uniqueKey: uniqueKey
+          };
+
+          // Verificar si ya existe un registro
+          const existingCost = await storage.getDirectCostByUniqueKey(uniqueKey);
+          
+          if (existingCost) {
+            await storage.updateDirectCost(existingCost.id, directCostData);
+            costsUpdated++;
+            console.log(`🔄 Actualizado: ${costo.persona} - ${costo.proyecto} - $${costoTotal.toFixed(2)}`);
+          } else {
+            await storage.createDirectCost(directCostData);
+            costsImported++;
+            console.log(`➕ Creado: ${costo.persona} - ${costo.proyecto} - $${costoTotal.toFixed(2)}`);
+          }
+
+        } catch (error) {
+          const errorMsg = `Error procesando costo de ${costo.persona}: ${error.message}`;
+          errors.push(errorMsg);
+          console.error('❌', errorMsg);
+        }
+      }
+
+      console.log(`✅ Importación completada: ${costsImported} importados, ${costsUpdated} actualizados`);
+      
+      return {
+        success: true,
+        costsImported,
+        costsUpdated,
+        errors
+      };
+
+    } catch (error) {
+      console.error('❌ Error importando costos directos:', error);
+      return { success: false, costsImported: 0, costsUpdated: 0, errors: [error.message] };
+    }
+  }
+
+  /**
+   * Procesar datos de costos directos del Excel
+   */
+  private processDirectCostsData(rows: any[][]): CostoDirectoExcel[] {
+    const result: CostoDirectoExcel[] = [];
+    
+    if (rows.length === 0) return result;
+
+    // Headers esperados según la imagen
+    const headers = rows[0];
+    console.log('📋 Headers costos directos:', headers);
+
+    // Mapear columnas
+    const columnMap = {
+      persona: 0, // Columna A - Detalle (nombre persona)
+      mes: 2, // Columna C - Mes  
+      año: 3, // Columna D - Año
+      tipoGasto: 4, // Columna E - Tipo de Costo
+      especificacion: 5, // Columna F - Especificación
+      proyecto: 7, // Columna H - Proyecto
+      tipoProyecto: 8, // Columna I - Tipo de Proyecto
+      cliente: 9, // Columna J - Cliente
+      horasRealesAsana: 12 // Columna M - Cantidad de horas reales Asana
+    };
+
+    console.log('🗺️ Mapeo de columnas costos directos:', columnMap);
+
+    // Procesar cada fila
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (!row || row.length === 0) continue;
+
+      try {
+        const persona = this.getCellValue(row, columnMap.persona);
+        const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
+
+        // Solo procesar filas válidas
+        if (!persona || horasRealesAsana <= 0) continue;
+
+        const costoData: CostoDirectoExcel = {
+          persona: persona,
+          mes: this.getCellValue(row, columnMap.mes) || '',
+          año: parseInt(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
+          tipoGasto: this.getCellValue(row, columnMap.tipoGasto) || '',
+          especificacion: this.getCellValue(row, columnMap.especificacion) || '',
+          proyecto: this.getCellValue(row, columnMap.proyecto) || '',
+          tipoProyecto: this.getCellValue(row, columnMap.tipoProyecto) || '',
+          cliente: this.getCellValue(row, columnMap.cliente) || '',
+          horasRealesAsana: horasRealesAsana
+        };
+
+        result.push(costoData);
+        
+      } catch (error) {
+        console.error(`❌ Error procesando fila ${i} de costos:`, error);
+        continue;
+      }
+    }
+
+    console.log(`✅ Procesados ${result.length} costos directos de ${rows.length - 1} filas`);
+    return result;
+  }
+
+  /**
+   * Obtener valor hora histórico de una persona
+   */
+  private async getPersonnelHourlyRate(storage: any, personName: string, month: string, year: number): Promise<number | null> {
+    try {
+      const personnel = await storage.getPersonnelByName(personName);
+      if (!personnel) return null;
+
+      // Buscar valor hora histórico
+      const monthField = this.getMonthField(month, year);
+      if (monthField && personnel[monthField]) {
+        return personnel[monthField];
+      }
+
+      // Fallback al valor actual
+      return personnel.hourlyRateARS || personnel.hourlyRate || null;
+    } catch (error) {
+      console.error(`Error obteniendo valor hora para ${personName}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Buscar proyecto por cliente y nombre
+   */
+  private async findProjectByName(storage: any, clientName: string, projectName: string): Promise<number | null> {
+    try {
+      const projects = await storage.getActiveProjects();
+      const project = projects.find(p => 
+        p.clientName?.toLowerCase().includes(clientName.toLowerCase()) &&
+        p.name?.toLowerCase().includes(projectName.toLowerCase())
+      );
+      return project?.id || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Buscar personal por nombre
+   */
+  private async findPersonnelByName(storage: any, personName: string): Promise<number | null> {
+    try {
+      const personnel = await storage.getPersonnelByName(personName);
+      return personnel?.id || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Obtener campo de mes histórico
+   */
+  private getMonthField(month: string, year: number): string | null {
+    const monthMap = {
+      'enero': 'jan',
+      'febrero': 'feb', 
+      'marzo': 'mar',
+      'abril': 'apr',
+      'mayo': 'may',
+      'junio': 'jun',
+      'julio': 'jul',
+      'agosto': 'aug',
+      'septiembre': 'sep',
+      'octubre': 'oct',
+      'noviembre': 'nov',
+      'diciembre': 'dec'
+    };
+
+    const monthKey = monthMap[month.toLowerCase()];
+    if (!monthKey) return null;
+
+    return `${monthKey}${year}HourlyRateARS`;
   }
 }
 

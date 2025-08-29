@@ -1646,6 +1646,58 @@ export const projectFinancialTransactionsRelations = relations(projectFinancialT
   creator: one(users, { fields: [projectFinancialTransactions.createdBy], references: [users.id] }),
 }));
 
+// ==================== COSTOS DIRECTOS EXCEL ====================
+// Tabla para importar costos directos desde la pestaña "Costos directos e indirectos"
+export const directCosts = pgTable("direct_costs", {
+  id: serial("id").primaryKey(),
+  
+  // Datos desde Excel "Costos directos e indirectos"
+  persona: text("persona").notNull(),
+  mes: text("mes").notNull(),
+  año: integer("año").notNull(),
+  tipoGasto: text("tipo_gasto"), // "Directo", "Indirecto"
+  especificacion: text("especificacion"), // PRO00003734, etc.
+  proyecto: text("proyecto"), // Fee mensual, Especial, General
+  tipoProyecto: text("tipo_proyecto"), // Fee mensual, Especial
+  cliente: text("cliente"), // Warner, Uber, Epical, etc.
+  
+  // Datos de horas y costos
+  horasRealesAsana: doublePrecision("horas_reales_asana").notNull(), // Columna M
+  valorHoraPersona: doublePrecision("valor_hora_persona").notNull(), // Obtenido de personnel histórico
+  costoTotal: doublePrecision("costo_total").notNull(), // horas * valor_hora
+  
+  // Referencias al sistema (null si no existe match)
+  projectId: integer("project_id").references(() => activeProjects.id),
+  personnelId: integer("personnel_id").references(() => personnel.id),
+  
+  // Metadatos de importación
+  importedAt: timestamp("imported_at").notNull().defaultNow(),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  rowNumber: integer("row_number"), // Fila en el Excel para debugging
+  importBatch: varchar("import_batch", { length: 100 }), // ID del batch de importación
+  
+  // Control de duplicados
+  uniqueKey: varchar("unique_key", { length: 500 }).notNull().unique(), // persona_proyecto_cliente_mes_año
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDirectCostSchema = createInsertSchema(directCosts).omit({
+  id: true,
+  importedAt: true,
+  lastUpdated: true,
+  createdAt: true,
+});
+
+export type DirectCost = typeof directCosts.$inferSelect;
+export type InsertDirectCost = z.infer<typeof insertDirectCostSchema>;
+
+// Relaciones de costos directos
+export const directCostsRelations = relations(directCosts, ({ one }) => ({
+  project: one(activeProjects, { fields: [directCosts.projectId], references: [activeProjects.id] }),
+  personnel: one(personnel, { fields: [directCosts.personnelId], references: [personnel.id] }),
+}));
+
 // ==================== ENCUESTAS NPS TRIMESTRALES ====================
 // Tabla de encuestas NPS trimestrales a clientes
 export const quarterlyNpsSurveys = pgTable("quarterly_nps_surveys", {
