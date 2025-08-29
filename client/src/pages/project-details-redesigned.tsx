@@ -1648,8 +1648,9 @@ const ProjectDetailsPage = () => {
                     </div>
                     <Badge variant={(() => {
                       const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const clientPrice = quotationData?.totalAmount || 0;
-                      const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                      const realRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const markup = actualCost > 0 && realRevenue > 0 ? realRevenue / actualCost : 0;
                       if (markup >= 2.5) return 'default';
                       if (markup >= 1.8) return 'secondary';
                       if (markup >= 1.2) return 'outline';
@@ -1657,8 +1658,9 @@ const ProjectDetailsPage = () => {
                     })()} className="text-xs">
                       {(() => {
                         const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                        const clientPrice = quotationData?.totalAmount || 0;
-                        const markup = actualCost > 0 && clientPrice > 0 ? clientPrice / actualCost : 0;
+                        const realRevenue = (unifiedData as any)?.googleSheetsSales
+                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        const markup = actualCost > 0 && realRevenue > 0 ? realRevenue / actualCost : 0;
                         if (markup >= 2.5) return 'Excelente';
                         if (markup >= 1.8) return 'Bueno';
                         if (markup >= 1.2) return 'Aceptable';
@@ -1669,15 +1671,18 @@ const ProjectDetailsPage = () => {
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.totalAmount) {
-                          const markup = (unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedCost;
+                        const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                        const realRevenue = (unifiedData as any)?.googleSheetsSales
+                          ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                        if (actualCost > 0 && realRevenue > 0) {
+                          const markup = realRevenue / actualCost;
                           return `${markup.toFixed(1)}x`;
                         }
                         return '0.0x';
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Precio cliente / Costo real
+                      Ingresos reales / Costo real
                     </p>
                   </div>
                 </CardContent>
@@ -2032,7 +2037,7 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Precio al Cliente */}
+              {/* Ingresos Periodo */}
               <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -2040,18 +2045,20 @@ const ProjectDetailsPage = () => {
                       <div className="p-2 bg-emerald-100 rounded-lg">
                         <Building className="h-4 w-4 text-emerald-600" />
                       </div>
-                      <span className="text-sm font-medium text-emerald-700">Precio Cliente</span>
+                      <span className="text-sm font-medium text-emerald-700">Ingresos Periodo</span>
                     </div>
                     <Badge variant="secondary" className="text-xs">
-                      Cotizado
+                      Real
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
-                      ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
+                      ${((unifiedData as any)?.googleSheetsSales
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0)
+                        .toLocaleString()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Valor facturado mensual
+                      Ventas confirmadas y cobradas
                     </p>
                   </div>
                 </CardContent>
