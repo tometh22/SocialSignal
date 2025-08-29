@@ -22,6 +22,7 @@ import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
 import EditProject from "@/pages/edit-project";
 import ProjectFinancialManagement from "@/pages/project-financial-management";
+import FinancialOverview from "@/pages/financial-overview";
 
 // Analytics & Specialized Pages
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
@@ -138,6 +139,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
                   
                   {/* Analytics & Reports */}
+                  <ProtectedRoute path="/financial-overview" component={FinancialOverview} />
                   <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} />
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} />

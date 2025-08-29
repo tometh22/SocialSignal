@@ -75,18 +75,43 @@ export default function SidebarFixed() {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  // Navegación simplificada y organizada
-  const navItems = [
-    { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" },
-    { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
-
-    { href: "/quotations", title: "Gestión de Cotizaciones", icon: FileText, description: "Ver y editar cotizaciones" },
-    { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Gestión de proyectos en curso" },
-    { href: "/clients", title: "Clientes", icon: Building2, description: "Información de clientes" },
-    { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
-    { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos indirectos" },
-    { href: "/google-sheets", title: "Google Sheets", icon: FileSpreadsheet, description: "Importar desde Excel MAESTRO" },
-    { href: "/admin", title: "Configuración", icon: Settings, description: "Admin del sistema" },
+  // Navegación organizada por secciones
+  const navSections = [
+    {
+      title: "Principal",
+      items: [
+        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" }
+      ]
+    },
+    {
+      title: "Gestión Comercial",
+      items: [
+        { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
+        { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones" },
+        { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" }
+      ]
+    },
+    {
+      title: "Gestión Operacional", 
+      items: [
+        { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso" }
+      ]
+    },
+    {
+      title: "Análisis Financiero",
+      items: [
+        { href: "/financial-overview", title: "Resumen Financiero", icon: DollarSign, description: "Vista consolidada financiera" },
+        { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
+        { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos" }
+      ]
+    },
+    {
+      title: "Herramientas",
+      items: [
+        { href: "/google-sheets", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva" },
+        { href: "/admin", title: "Configuración", icon: Settings, description: "Administración" }
+      ]
+    }
   ];
 
   // Renderizar enlace de navegación compacto
@@ -178,10 +203,21 @@ export default function SidebarFixed() {
           </Button>
         </div>
 
-        {/* Navegación principal - sin scroll, altura fija */}
-        <div className="flex-1 px-2 py-3">
-          <nav className="space-y-1">
-            {navItems.map((item) => renderNavLink(item))}
+        {/* Navegación principal organizada por secciones */}
+        <div className="flex-1 px-2 py-3 overflow-y-auto">
+          <nav className="space-y-4">
+            {navSections.map((section, index) => (
+              <div key={section.title}>
+                {!isCollapsed && (
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+                    {section.title}
+                  </h3>
+                )}
+                <div className="space-y-1">
+                  {section.items.map((item) => renderNavLink(item))}
+                </div>
+              </div>
+            ))}
           </nav>
         </div>
 

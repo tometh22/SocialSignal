@@ -30,14 +30,25 @@ Preferred communication style: Simple, everyday language.
 - **Connection Pooling**: Neon serverless connection pooling
 
 ### Core Modules & Features
+
+#### **Navigation Structure (Reorganized Aug 2025):**
+- **Principal**: Dashboard Ejecutivo
+- **Gestión Comercial**: Nueva Cotización, Cotizaciones, Clientes
+- **Gestión Operacional**: Proyectos Activos
+- **Análisis Financiero**: Resumen Financiero, Analytics & Reportes, Costos Indirectos
+- **Herramientas**: Excel MAESTRO, Configuración
+
+#### **Core Features:**
 - **User Management**: Role-based access control.
 - **Client Management**: Client information, logo handling, and Google Sheets integration for automated client import.
 - **Quotation System**: Comprehensive quotation creation with team assignment and cost multipliers.
-- **Project Management**: Active project and subproject tracking.
+- **Project Management**: Active project and subproject tracking with integrated financial management.
+- **Financial Management System**: Dual-purpose analysis separating operational sales (monthly revenue recognition) from financial transactions (real invoicing/collection tracking).
 - **Time Tracking**: Hourly and cost-based time entry.
 - **Deliverable Management**: MODO-style tracking with quality metrics.
 - **Chat System**: Project-based internal communication.
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), and predictive insights.
+- **Financial Overview**: Consolidated financial dashboard with operational vs financial analysis comparison.
 - **Google Sheets Integration**: Automated client import from "Activo" tab (column C) with duplicate prevention and batch processing.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
