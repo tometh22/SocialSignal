@@ -3552,23 +3552,19 @@ const ProjectDetailsPage = () => {
                           {unifiedData.salesData.map((sale: any, index: number) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="p-3 text-sm">
-                                {sale.fecha ? new Date(sale.fecha).toLocaleDateString('es-ES', { 
-                                  year: 'numeric', 
-                                  month: 'short', 
-                                  day: 'numeric' 
-                                }) : 'Sin fecha'}
+                                {sale.month && sale.year ? `${sale.month} ${sale.year}` : 'Sin fecha'}
                               </td>
-                              <td className="p-3 text-sm font-medium">{sale.cliente || 'N/A'}</td>
-                              <td className="p-3 text-sm">{sale.servicio || 'N/A'}</td>
+                              <td className="p-3 text-sm font-medium">{sale.clientName || 'N/A'}</td>
+                              <td className="p-3 text-sm">{sale.projectName || sale.salesType || 'N/A'}</td>
                               <td className="p-3 text-sm text-right font-medium">
-                                {sale.montoUSD ? `$${parseFloat(sale.montoUSD).toLocaleString()}` : '-'}
+                                {sale.amountUsd ? `$${parseFloat(sale.amountUsd).toLocaleString()}` : '-'}
                               </td>
                               <td className="p-3 text-sm text-right font-medium">
-                                {sale.montoARS ? `$${parseFloat(sale.montoARS).toLocaleString()}` : '-'}
+                                {sale.amountArs ? `$${parseFloat(sale.amountArs).toLocaleString()}` : '-'}
                               </td>
                               <td className="p-3 text-sm">
                                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                  Activo
+                                  {sale.status || 'Activo'}
                                 </Badge>
                               </td>
                             </tr>
@@ -3585,14 +3581,14 @@ const ProjectDetailsPage = () => {
                           <p className="text-sm text-gray-600">Total Ingresos USD</p>
                           <p className="text-lg font-bold text-green-600">
                             ${unifiedData.salesData.reduce((sum: number, sale: any) => 
-                              sum + (parseFloat(sale.montoUSD) || 0), 0).toLocaleString()}
+                              sum + (parseFloat(sale.amountUsd) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Total Ingresos ARS</p>
                           <p className="text-lg font-bold text-green-600">
                             ${unifiedData.salesData.reduce((sum: number, sale: any) => 
-                              sum + (parseFloat(sale.montoARS) || 0), 0).toLocaleString()}
+                              sum + (parseFloat(sale.amountArs) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
