@@ -273,44 +273,45 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Mapear las columnas del Excel MAESTRO a nuestros campos
+   * Mapear las columnas EXACTAS del Excel MAESTRO a nuestros campos
    */
   private createColumnMap(headers: string[]): Record<string, number> {
     const map: Record<string, number> = {};
     
     headers.forEach((header, index) => {
-      const normalizedHeader = header?.toLowerCase().trim();
-      
-      // Mapeo específico para el Excel MAESTRO de Epical
-      if (normalizedHeader?.includes('detalle')) {
-        map.persona = index; // "Detalle" contiene el nombre de la persona
-      } else if (normalizedHeader?.includes('mes')) {
-        map.mes = index;
-      } else if (normalizedHeader?.includes('año')) {
-        map.año = index;
-      } else if (normalizedHeader?.includes('subtipo de costo')) {
-        map.categoria = index; // "Subtipo de costo" es la categoría
-      } else if (normalizedHeader?.includes('tipo de costo')) {
-        map.tipoCosto = index; // Directo/Indirecto
-      } else if (normalizedHeader?.includes('valor hora')) {
-        map.valorHora = index;
-      } else if (normalizedHeader === 'proyecto') {
-        map.proyecto = index;
-      } else if (normalizedHeader?.includes('cliente')) {
-        map.cliente = index;
-      } else if (normalizedHeader?.includes('monto total usd')) {
-        map.costoTotal = index; // "Monto Total USD" es el costo total
-      } else if (normalizedHeader?.includes('moneda original ars')) {
-        map.montoARS = index;
-      } else if (normalizedHeader?.includes('moneda original usd')) {
-        map.montoUSD = index;
-      } else if (normalizedHeader?.includes('cantidad de horas objetivo')) {
-        map.horasObjetivo = index;
-      } else if (normalizedHeader?.includes('cantidad de horas reales')) {
-        map.horasReales = index;
+      // Mapeo EXACTO basado en las columnas reales del Excel MAESTRO
+      if (header === 'Detalle') {
+        map.persona = index; // A: Nombre de la persona
+      } else if (header === 'Mes') {
+        map.mes = index; // C: Mes
+      } else if (header === 'Año') {
+        map.año = index; // D: Año
+      } else if (header === 'Subtipo de costo') {
+        map.categoria = index; // B: Categoría del gasto
+      } else if (header === 'Tipo de Costo') {
+        map.tipoCosto = index; // E: Directo/Indirecto
+      } else if (header === 'Valor Hora') {
+        map.valorHora = index; // N: Tarifa horaria
+      } else if (header === 'Proyecto') {
+        map.proyecto = index; // I: Nombre del proyecto
+      } else if (header === 'Cliente') {
+        map.cliente = index; // J: Nombre del cliente
+      } else if (header === 'Monto Total USD') {
+        map.costoTotal = index; // R: Costo total en USD
+      } else if (header === 'Moneda Original ARS') {
+        map.montoARS = index; // O: Monto en pesos
+      } else if (header === 'Moneda Original USD') {
+        map.montoUSD = index; // P: Monto en dólares
+      } else if (header === 'Cantidad de horas objetivo') {
+        map.horasObjetivo = index; // K: Horas estimadas
+      } else if (header === 'Cantidad de horas reales Asana') {
+        map.horasReales = index; // L: Horas reales trabajadas
+      } else if (header === 'Cotización') {
+        map.tipoCambio = index; // Q: Tipo de cambio USD/ARS
       }
     });
 
+    console.log('🗺️ Mapeo de columnas costos directos:', map);
     return map;
   }
 
@@ -954,16 +955,16 @@ class GoogleSheetsWorkingService {
     const headers = rows[0];
     console.log('📋 Headers de ventas encontrados:', headers);
 
-    // Mapear las columnas según los headers esperados
+    // Mapear las columnas según los headers EXACTOS del Excel MAESTRO
     const columnMap = {
-      cliente: headers.findIndex(h => h && h.toLowerCase().includes('cliente')),
-      proyecto: headers.findIndex(h => h && h.toLowerCase().includes('proyecto')),
-      mes: headers.findIndex(h => h && h.toLowerCase().includes('mes')),
-      año: headers.findIndex(h => h && h.toLowerCase().includes('año')),
-      monto_usd: headers.findIndex(h => h && h.toLowerCase().includes('usd')),
-      monto_ars: headers.findIndex(h => h && h.toLowerCase().includes('ars')),
-      tipo_venta: headers.findIndex(h => h && h.toLowerCase().includes('tipo')),
-      confirmado: headers.findIndex(h => h && h.toLowerCase().includes('confirmado'))
+      cliente: headers.findIndex(h => h === 'Cliente'),
+      proyecto: headers.findIndex(h => h === 'Proyecto'),
+      mes: headers.findIndex(h => h === 'Mes'),
+      año: headers.findIndex(h => h === 'Año ' || h === 'Año'), // Incluir versión con espacio
+      monto_usd: headers.findIndex(h => h === 'Monto_USD'),
+      monto_ars: headers.findIndex(h => h === 'Monto_ARS'),
+      tipo_venta: headers.findIndex(h => h === 'Tipo_Venta'),
+      confirmado: headers.findIndex(h => h === 'Confirmado')
     };
 
     console.log('🗺️ Mapeo de columnas ventas:', columnMap);
