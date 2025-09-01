@@ -66,7 +66,16 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Dual-Cost System**: Complete implementation of real costs (actual cash outflow from freelancers) vs operational costs (total team productivity analysis). Full-time employees with fixed salaries generate only operational costs, while part-time/freelance workers generate both types. System verified as 100% mathematically consistent across all components (Aug 2025).
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
-## Recent Implementation (Aug 2025)
+## Recent Implementation (Sep 2025)
+- **Corrección Completa de Costos Directos (Sep 1, 2025)**: Rediseñada completamente la importación de costos directos desde Excel MAESTRO:
+  - **Filtrado Crítico**: Solo procesar filas con tipo "DIRECTO" (columna E)
+  - **Mapeo Corregido**: Cliente (col J) + Proyecto (col I) para identificación correcta
+  - **Datos Precisos**: Horas reales (col L) + Costo USD ya convertido (col R)
+  - **Estructura Temporal**: Cada fila representa un mes de trabajo de una persona específica
+  - **Eliminación de Datos Incorrectos**: Limpieza de registros que mezclaban costos directos/indirectos
+  - **Sincronización Automática**: Integrada con ciclo de 30 minutos para mantener datos actualizados
+
+## Previous Implementation (Aug 2025)
 - **Automatic Excel MAESTRO Synchronization**: Implemented complete background service that synchronizes sales data from "Ventas Tomi" sheet every 30 minutes. Features include:
   - AutoSyncService with configurable intervals
   - Duplicate detection and automatic updates

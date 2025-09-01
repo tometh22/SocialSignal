@@ -1019,8 +1019,8 @@ class GoogleSheetsWorkingService {
     try {
       const sheets = this.createSheetsClientFromJSON();
       
-      // Leer datos de la pestaña "Costos directos e indirectos"
-      const range = 'Costos directos e indirectos!A:Q'; // Extendido a Q para incluir tipo de cambio y USD
+      // Leer datos de la pestaña "Costos directos e indirectos" 
+      const range = 'Costos directos e indirectos!A:R'; // Extendido a R para incluir montos USD convertidos
       console.log('📋 Range:', range);
       
       const response = await sheets.spreadsheets.values.get({
@@ -1129,23 +1129,23 @@ class GoogleSheetsWorkingService {
     
     if (rows.length === 0) return result;
 
-    // Headers esperados según la imagen
+    // Headers esperados según la nueva imagen
     const headers = rows[0];
     console.log('📋 Headers costos directos:', headers);
 
-    // Mapear columnas
+    // CORRECCIÓN COMPLETA: Mapeo según la estructura real del Excel
     const columnMap = {
       persona: 0, // Columna A - Detalle (nombre persona)
       mes: 2, // Columna C - Mes  
       año: 3, // Columna D - Año
-      tipoGasto: 4, // Columna E - Tipo de Costo
+      tipoGasto: 4, // Columna E - Tipo de Costo (DIRECTO/INDIRECTO)
       especificacion: 5, // Columna F - Especificación
-      proyecto: 7, // Columna H - Proyecto
-      tipoProyecto: 8, // Columna I - Tipo de Proyecto
+      proyecto: 8, // Columna I - Nombre del proyecto
       cliente: 9, // Columna J - Cliente
-      horasRealesAsana: 12, // Columna M - Cantidad de horas reales Asana
-      tipoCambio: 16, // Columna Q - Tipo Cambio
-      montoTotalUSD: 17 // Columna R - Monto Original USD (valores ya convertidos)
+      horasRealesAsana: 11, // Columna L - Cantidad de horas reales Asana
+      montoOriginalARS: 14, // Columna O - Moneda Original ARS
+      montoTotalUSD: 17, // Columna R - Monto Total USD (ya convertido)
+      tipoCambio: 16 // Columna Q - Tipo Cambio (para referencia)
     };
 
     console.log('🗺️ Mapeo de columnas costos directos:', columnMap);
@@ -1158,23 +1158,34 @@ class GoogleSheetsWorkingService {
 
       try {
         const persona = this.getCellValue(row, columnMap.persona);
+        const tipoGasto = this.getCellValue(row, columnMap.tipoGasto);
         const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
+        const cliente = this.getCellValue(row, columnMap.cliente);
+        const proyecto = this.getCellValue(row, columnMap.proyecto);
 
-        // Solo procesar filas válidas
-        if (!persona || horasRealesAsana <= 0) continue;
+        // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS
+        if (tipoGasto !== 'Directo') continue;
+        
+        // Solo procesar filas válidas con datos esenciales
+        if (!persona || !cliente || !proyecto || horasRealesAsana <= 0) continue;
 
         const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
+        const montoOriginalARSRaw = this.getCellValue(row, columnMap.montoOriginalARS) || '';
 
-        // Debug: Log the raw values from Excel to verify mapping
+        // Debug: Log para verificar el mapeo correcto
         if (persona === 'Sol Ayala' && this.getCellValue(row, columnMap.mes).includes('jul')) {
-          console.log(`🔍 EXCEL RAW VALUES DEBUG - Sol Ayala julio:`, {
+          console.log(`🔍 NUEVO MAPEO DEBUG - Sol Ayala julio:`, {
             persona,
+            tipoGasto,
+            cliente,
+            proyecto,
             mes: this.getCellValue(row, columnMap.mes),
-            columnP_montoTotalUSD: montoTotalUSDRaw,
-            columnQ_tipoCambio: tipoCambioRaw,
             horasAsana: horasRealesAsana,
-            fullRow: row.slice(0, 20) // First 20 columns for debugging
+            montoOriginalARS: montoOriginalARSRaw,
+            montoTotalUSD: montoTotalUSDRaw,
+            tipoCambio: tipoCambioRaw,
+            fullRow: row.slice(0, 20) // Primeras 20 columnas para debug
           });
         }
 
@@ -1182,11 +1193,11 @@ class GoogleSheetsWorkingService {
           persona: persona,
           mes: this.getCellValue(row, columnMap.mes) || '',
           año: parseInt(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
-          tipoGasto: this.getCellValue(row, columnMap.tipoGasto) || '',
+          tipoGasto: tipoGasto,
           especificacion: this.getCellValue(row, columnMap.especificacion) || '',
-          proyecto: this.getCellValue(row, columnMap.proyecto) || '',
-          tipoProyecto: this.getCellValue(row, columnMap.tipoProyecto) || '',
-          cliente: this.getCellValue(row, columnMap.cliente) || '',
+          proyecto: proyecto,
+          tipoProyecto: '', // No usado en la nueva estructura
+          cliente: cliente,
           horasRealesAsana: horasRealesAsana,
           tipoCambio: tipoCambioRaw ? parseFloat(tipoCambioRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined,
           montoTotalUSD: montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined
