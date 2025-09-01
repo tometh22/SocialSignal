@@ -1144,8 +1144,8 @@ class GoogleSheetsWorkingService {
       tipoProyecto: 8, // Columna I - Tipo de Proyecto
       cliente: 9, // Columna J - Cliente
       horasRealesAsana: 12, // Columna M - Cantidad de horas reales Asana
-      montoTotalUSD: 15, // Columna P - Monto Total USD  
-      tipoCambio: 16 // Columna Q - Tipo Cambio
+      tipoCambio: 16, // Columna Q - Tipo Cambio
+      montoTotalUSD: 17 // Columna R - Monto Original USD (valores ya convertidos)
     };
 
     console.log('🗺️ Mapeo de columnas costos directos:', columnMap);

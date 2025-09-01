@@ -656,6 +656,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
       
+      // 4.5 Obtener y agregar costos directos de Excel MAESTRO PRIMERO
+      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
+      
       // 🚨 CRITICAL FIX: Apply currency conversion for USD projects to time entries
       const projectNotes = project.notes || '';
       const isUSDProject = projectNotes.includes('USD') || 
@@ -688,21 +691,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`💰 Total time entries cost: $${totalWorkedCost.toFixed(2)} ARS`);
       }
       
-      // 4.5 Obtener y agregar costos directos de Excel MAESTRO
-      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
-      
       // Calcular costos directos usando la moneda correcta
       const totalDirectCosts = projectDirectCosts.reduce((total, cost) => {
         if (isUSDProject) {
-          // Para proyectos con pricing en USD, calcular la conversión manualmente
-          if (cost.tipoCambio && cost.tipoCambio > 0) {
-            // Si tenemos tipo de cambio, convertir ARS a USD
+          // Para proyectos USD, usar directamente el monto USD convertido de la columna R
+          if (cost.montoTotalUsd && cost.montoTotalUsd > 0) {
+            console.log(`💰 Using pre-converted USD amount: $${cost.montoTotalUsd} USD (from column R)`);
+            return total + cost.montoTotalUsd;
+          } else if (cost.tipoCambio && cost.tipoCambio > 0) {
+            // Fallback: convertir manualmente si no hay monto USD pero sí tipo de cambio
             const convertedUSD = (cost.costoTotal || 0) / cost.tipoCambio;
-            console.log(`💱 Converting ARS to USD: $${cost.costoTotal} ARS ÷ ${cost.tipoCambio} = $${convertedUSD.toFixed(2)} USD`);
+            console.log(`💱 Manual conversion fallback: $${cost.costoTotal} ARS ÷ ${cost.tipoCambio} = $${convertedUSD.toFixed(2)} USD`);
             return total + convertedUSD;
           } else {
-            // Fallback: usar el costo en ARS (no ideal, pero mejor que datos incorrectos)
-            console.log(`⚠️ No exchange rate available, using ARS cost: $${cost.costoTotal} ARS`);
+            // Último fallback: usar costo ARS
+            console.log(`⚠️ No USD or exchange rate data, using ARS cost: $${cost.costoTotal} ARS`);
             return total + (cost.costoTotal || 0);
           }
         } else {
