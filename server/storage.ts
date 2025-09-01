@@ -2048,6 +2048,26 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Función auxiliar para convertir nombres de mes a números
+  private getMonthNumber(monthName: string): string {
+    const monthMap: { [key: string]: string } = {
+      'enero': '01', 'ene': '01', '01 ene': '01',
+      'febrero': '02', 'feb': '02', '02 feb': '02', 
+      'marzo': '03', 'mar': '03', '03 mar': '03',
+      'abril': '04', 'abr': '04', '04 abr': '04',
+      'mayo': '05', 'may': '05', '05 may': '05',
+      'junio': '06', 'jun': '06', '06 jun': '06',
+      'julio': '07', 'jul': '07', '07 jul': '07',
+      'agosto': '08', 'ago': '08', '08 ago': '08',
+      'septiembre': '09', 'sep': '09', '09 sep': '09',
+      'octubre': '10', 'oct': '10', '10 oct': '10',
+      'noviembre': '11', 'nov': '11', '11 nov': '11',
+      'diciembre': '12', 'dic': '12', '12 dic': '12'
+    };
+    
+    return monthMap[monthName.toLowerCase()] || '01';
+  }
+
   async getProjectCostSummary(projectId: number): Promise<any> {
     try {
       const project = await this.getActiveProject(projectId);
@@ -2074,12 +2094,29 @@ export class DatabaseStorage implements IStorage {
       const costByPersonMonth = new Map<string, number>();
       const operationalByPersonMonth = new Map<string, number>();
 
-      // PASO 1: Procesar costos directos del Excel MAESTRO
+      // PASO 1: Procesar costos directos del Excel MAESTRO como time entries sintéticos
+      const syntheticTimeEntries = [];
       for (const directCost of excelDirectCosts) {
-        if (directCost.montoTotalUSD && directCost.montoTotalUSD > 0) {
+        if (directCost.montoTotalUSD && directCost.montoTotalUSD > 0 && directCost.horasRealesAsana > 0) {
           directCostsFromExcel += directCost.montoTotalUSD;
           
-          // Mapear por persona y mes para consolidación
+          // Crear time entry sintético para integrar con el sistema existente
+          const syntheticEntry = {
+            id: `excel-${directCost.id}`,
+            projectId: projectId,
+            personnelId: directCost.personnelId || null,
+            hours: directCost.horasRealesAsana,
+            date: new Date(`${directCost.año}-${this.getMonthNumber(directCost.mes)}-15`), // Día 15 del mes
+            billable: true,
+            description: `Excel MAESTRO: ${directCost.persona} - ${directCost.mes} ${directCost.año}`,
+            hourlyRateAtTime: directCost.valorHoraPersona || 0,
+            costInUSD: directCost.montoTotalUSD,
+            isFromExcel: true // Marcador para distinguir
+          };
+          
+          syntheticTimeEntries.push(syntheticEntry);
+          
+          // Mapear por persona y mes para consolidación (usando nombre ya que personnelId puede ser null)
           const year = directCost.año;
           const monthName = directCost.mes;
           const personKey = `excel-${directCost.persona}-${year}-${monthName}`;
@@ -2089,12 +2126,27 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      console.log(`💰 Direct costs calculation for project ${projectId}: { directCostsFromExcel: ${directCostsFromExcel}, directCostsCount: ${excelDirectCosts.length} }`);
+      console.log(`💰 Direct costs calculation for project ${projectId}: { 
+        directCostsFromExcel: ${directCostsFromExcel}, 
+        directCostsCount: ${excelDirectCosts.length},
+        syntheticTimeEntries: ${syntheticTimeEntries.length}
+      }`);
 
-      // PASO 2: Procesar time entries tradicionales
-      for (const entry of entries) {
+      // PASO 2: Combinar time entries reales con los sintéticos del Excel MAESTRO
+      const allEntries = [...entries, ...syntheticTimeEntries];
+      
+      for (const entry of allEntries) {
         if (!entry.billable) continue;
 
+        // Manejar entries sintéticos del Excel MAESTRO
+        if ((entry as any).isFromExcel) {
+          // Para entries del Excel, ya tenemos el costo calculado en USD
+          const costInUSD = (entry as any).costInUSD || 0;
+          // Los entries sintéticos ya fueron procesados en el PASO 1, solo saltamos para evitar duplicación
+          continue;
+        }
+
+        // Procesar time entries tradicionales
         const person = allPersonnel.find(p => p.id === entry.personnelId);
         if (!person || !person.includeInRealCosts) continue;
 
@@ -2121,7 +2173,7 @@ export class DatabaseStorage implements IStorage {
             const monthField = getHistoricalMonthField(year, month, 'hourly');
             const historicalRate = person[monthField as keyof Personnel] as number || person.hourlyRate;
             
-            // Sumar todas las horas de esa persona en ese mes
+            // Sumar todas las horas de esa persona en ese mes (solo time entries tradicionales)
             const monthlyHours = entries
               .filter(e => {
                 const eDate = new Date(e.date);
@@ -2144,7 +2196,6 @@ export class DatabaseStorage implements IStorage {
       operationalCost = Array.from(operationalByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
       
       console.log(`💰 Direct costs calculation for project ${projectId}: {
-        projectCurrency: '${project.currency || 'USD'}',
         timeEntriesCost: ${totalRealCost - directCostsFromExcel},
         directCostsFromExcel: ${directCostsFromExcel},
         totalCombinedCost: ${totalRealCost},
@@ -2176,7 +2227,11 @@ export class DatabaseStorage implements IStorage {
         })
         .filter(person => person.realCost > 0 || person.operationalCost > 0);
 
-      console.log(`💰 Proyecto ${projectId} - Real: $${totalRealCost.toFixed(2)} | Operacional: $${operationalCost.toFixed(2)} | Presupuesto: $${budget.toFixed(2)}`);
+      // Calcular horas totales (time entries + Excel MAESTRO)
+      const totalWorkedHours = entries.reduce((sum, entry) => sum + entry.hours, 0) + 
+                              excelDirectCosts.reduce((sum, dc) => sum + dc.horasRealesAsana, 0);
+
+      console.log(`💰 Proyecto ${projectId} - Real: $${totalRealCost.toFixed(2)} | Operacional: $${operationalCost.toFixed(2)} | Presupuesto: $${budget.toFixed(2)} | Horas: ${totalWorkedHours.toFixed(1)}`);
 
       return {
         projectId,
@@ -2185,12 +2240,15 @@ export class DatabaseStorage implements IStorage {
         budget,
         variance: budget - totalRealCost,
         percentageUsed: budget ? (totalRealCost / budget) * 100 : 0,
+        totalWorkedHours, // NUEVO: Horas totales (time entries + Excel MAESTRO)
         costByPerson, // Desglose por persona
         costBreakdown: {
           realCost: totalRealCost,
           operationalCost: operationalCost,
           directCostsFromExcel: directCostsFromExcel, // NUEVO: Costos del Excel MAESTRO
           timeEntriesCost: totalRealCost - directCostsFromExcel, // NUEVO: Costos de time entries
+          timeEntriesHours: entries.reduce((sum, entry) => sum + entry.hours, 0), // NUEVO: Horas de time entries
+          excelMaestroHours: excelDirectCosts.reduce((sum, dc) => sum + dc.horasRealesAsana, 0), // NUEVO: Horas del Excel
           personnelCount: allPersonnelIds.length,
           excelDirectCostsCount: excelDirectCosts.length // NUEVO: Cantidad de registros del Excel
         },
