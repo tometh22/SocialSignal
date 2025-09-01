@@ -2314,7 +2314,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`🔍 FORCED DEBUG - Excel personnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
       }
 
-      // Combinar ambos grupos
+      // CORRECCIÓN CRÍTICA: Combinar costByPerson con excelOnlyPersonnel inmediatamente
       costByPerson.push(...excelOnlyPersonnel);
       
       console.log(`🔍 DEBUG costByPerson for project ${projectId}:`, {
