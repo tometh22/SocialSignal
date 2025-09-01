@@ -667,9 +667,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Calcular costos directos usando la moneda correcta
       const totalDirectCosts = projectDirectCosts.reduce((total, cost) => {
-        if (isUSDProject && cost.montoTotalUSD) {
-          // Para proyectos con pricing en USD, usar el monto ya convertido
-          return total + cost.montoTotalUSD;
+        if (isUSDProject) {
+          // Para proyectos con pricing en USD, calcular la conversión manualmente
+          if (cost.tipoCambio && cost.tipoCambio > 0) {
+            // Si tenemos tipo de cambio, convertir ARS a USD
+            const convertedUSD = (cost.costoTotal || 0) / cost.tipoCambio;
+            console.log(`💱 Converting ARS to USD: $${cost.costoTotal} ARS ÷ ${cost.tipoCambio} = $${convertedUSD.toFixed(2)} USD`);
+            return total + convertedUSD;
+          } else {
+            // Fallback: usar el costo en ARS (no ideal, pero mejor que datos incorrectos)
+            console.log(`⚠️ No exchange rate available, using ARS cost: $${cost.costoTotal} ARS`);
+            return total + (cost.costoTotal || 0);
+          }
         } else {
           // Para proyectos con pricing en ARS, usar el costo en ARS
           return total + (cost.costoTotal || 0);

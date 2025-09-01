@@ -1144,8 +1144,8 @@ class GoogleSheetsWorkingService {
       tipoProyecto: 8, // Columna I - Tipo de Proyecto
       cliente: 9, // Columna J - Cliente
       horasRealesAsana: 12, // Columna M - Cantidad de horas reales Asana
-      tipoCambio: 15, // Columna P - Tipo Cambio
-      montoTotalUSD: 16 // Columna Q - Monto Total USD
+      montoTotalUSD: 15, // Columna P - Monto Total USD  
+      tipoCambio: 16 // Columna Q - Tipo Cambio
     };
 
     console.log('🗺️ Mapeo de columnas costos directos:', columnMap);
@@ -1165,6 +1165,18 @@ class GoogleSheetsWorkingService {
 
         const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
+
+        // Debug: Log the raw values from Excel to verify mapping
+        if (persona === 'Sol Ayala' && this.getCellValue(row, columnMap.mes).includes('jul')) {
+          console.log(`🔍 EXCEL RAW VALUES DEBUG - Sol Ayala julio:`, {
+            persona,
+            mes: this.getCellValue(row, columnMap.mes),
+            columnP_montoTotalUSD: montoTotalUSDRaw,
+            columnQ_tipoCambio: tipoCambioRaw,
+            horasAsana: horasRealesAsana,
+            fullRow: row.slice(0, 20) // First 20 columns for debugging
+          });
+        }
 
         const costoData: CostoDirectoExcel = {
           persona: persona,
