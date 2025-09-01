@@ -1051,13 +1051,22 @@ class GoogleSheetsWorkingService {
         try {
           // Obtener valor hora de la persona para el mes/año
           const valorHora = await this.getPersonnelHourlyRate(storage, costo.persona, costo.mes, costo.año);
-          if (!valorHora) {
-            console.log(`⚠️ No se encontró valor hora para ${costo.persona} en ${costo.mes} ${costo.año}`);
+          
+          // Calcular costo total - NUEVO: usar monto USD si no hay valor hora
+          let costoTotal: number;
+          
+          if (valorHora && costo.horasRealesAsana > 0) {
+            // Cálculo tradicional por horas x tarifa
+            costoTotal = costo.horasRealesAsana * valorHora;
+          } else if (costo.montoTotalUSD && costo.montoTotalUSD > 0) {
+            // Usar monto USD directo del Excel cuando no hay tarifa horaria
+            costoTotal = costo.montoTotalUSD;
+            console.log(`💰 Usando monto USD directo para ${costo.persona} - ${costo.proyecto}: $${costoTotal}`);
+          } else {
+            // No hay datos suficientes, saltar
+            console.log(`⚠️ No se encontró valor hora ni monto USD para ${costo.persona} en ${costo.mes} ${costo.año}`);
             continue;
           }
-
-          // Calcular costo total
-          const costoTotal = costo.horasRealesAsana * valorHora;
 
           // Crear unique key para control de duplicados
           const uniqueKey = `${costo.persona}_${costo.proyecto}_${costo.cliente}_${costo.mes}_${costo.año}`.replace(/\s+/g, '_').toLowerCase();
@@ -1076,7 +1085,7 @@ class GoogleSheetsWorkingService {
             tipoProyecto: costo.tipoProyecto,
             cliente: costo.cliente,
             horasRealesAsana: costo.horasRealesAsana,
-            valorHoraPersona: valorHora,
+            valorHoraPersona: valorHora || 0, // Usar 0 cuando no hay tarifa horaria (se usa monto USD directo)
             costoTotal: costoTotal,
             tipoCambio: costo.tipoCambio, // Nuevo: tipo de cambio desde Excel
             montoTotalUSD: costo.montoTotalUSD, // Nuevo: monto convertido a USD
@@ -1162,32 +1171,22 @@ class GoogleSheetsWorkingService {
         const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
+        const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
+        const montoUSDValue = montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : 0;
 
         // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS
         if (tipoGasto !== 'Directo') continue;
         
         // Solo procesar filas válidas con datos esenciales
-        if (!persona || !cliente || !proyecto || horasRealesAsana <= 0) continue;
+        if (!persona || !cliente || !proyecto) continue;
+        
+        // Verificar que tenga al menos horas O monto USD válido
+        if (horasRealesAsana <= 0 && montoUSDValue <= 0) continue;
 
         const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
-        const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
         const montoOriginalARSRaw = this.getCellValue(row, columnMap.montoOriginalARS) || '';
 
-        // Debug: Log para verificar el mapeo correcto
-        if (persona === 'Sol Ayala' && this.getCellValue(row, columnMap.mes).includes('jul')) {
-          console.log(`🔍 NUEVO MAPEO DEBUG - Sol Ayala julio:`, {
-            persona,
-            tipoGasto,
-            cliente,
-            proyecto,
-            mes: this.getCellValue(row, columnMap.mes),
-            horasAsana: horasRealesAsana,
-            montoOriginalARS: montoOriginalARSRaw,
-            montoTotalUSD: montoTotalUSDRaw,
-            tipoCambio: tipoCambioRaw,
-            fullRow: row.slice(0, 20) // Primeras 20 columnas para debug
-          });
-        }
+
 
         const costoData: CostoDirectoExcel = {
           persona: persona,

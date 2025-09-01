@@ -67,12 +67,18 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
 ## Recent Implementation (Sep 2025)
-- **Corrección Completa de Costos Directos (Sep 1, 2025)**: Rediseñada completamente la importación de costos directos desde Excel MAESTRO:
+- **Corrección Completa de Costos Directos - RESUELTA (Sep 1, 2025)**: Sistema completamente corregido para importar múltiples registros por proyecto:
+  - **Problema Identificado**: Solo se importaba 1 persona por proyecto (ej: Solo Sol Ayala para Huggies) cuando debían ser 8+ personas
+  - **Causa Raíz**: Filtro rechazaba registros sin tarifas horarias definidas, aunque tuvieran montos USD válidos
+  - **Solución Implementada**: 
+    - Lógica híbrida: Usar tarifas horarias cuando disponibles, montos USD directos cuando no
+    - Procesamiento de todos los registros válidos del Excel MAESTRO
+    - Mantener integridad usando valores pre-convertidos a USD (columna R)
+  - **Resultado Verificado**: Fee Huggies junio 2025 ahora muestra 8 personas (vs 1 anterior): Aylu Tamer, Mati Gonzalez, Sol Ayala, To Merello, Tomi Facio, Trini Petreigne, Vanu Lanza, Vicky Achabal
+  - **Impacto**: 242 registros nuevos importados correctamente en primera sincronización post-corrección
   - **Filtrado Crítico**: Solo procesar filas con tipo "DIRECTO" (columna E)
   - **Mapeo Corregido**: Cliente (col J) + Proyecto (col I) para identificación correcta
-  - **Datos Precisos**: Horas reales (col L) + Costo USD ya convertido (col R)
   - **Estructura Temporal**: Cada fila representa un mes de trabajo de una persona específica
-  - **Eliminación de Datos Incorrectos**: Limpieza de registros que mezclaban costos directos/indirectos
   - **Sincronización Automática**: Integrada con ciclo de 30 minutos para mantener datos actualizados
 
 ## Previous Implementation (Aug 2025)
