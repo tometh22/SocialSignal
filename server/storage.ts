@@ -2068,16 +2068,38 @@ export class DatabaseStorage implements IStorage {
     return monthMap[monthName.toLowerCase()] || '01';
   }
 
-  async getProjectCostSummary(projectId: number): Promise<any> {
+  async getProjectCostSummary(projectId: number, dateRange?: { startDate: Date; endDate: Date }): Promise<any> {
     try {
       const project = await this.getActiveProject(projectId);
       if (!project) return null;
 
-      const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
+      // Obtener ALL time entries para el proyecto
+      let entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
       
-      // NUEVA INTEGRACIÓN: Obtener costos directos del Excel MAESTRO
-      const excelDirectCosts = await this.getDirectCostsByProject(projectId);
-      console.log(`💰 Direct costs from Excel MAESTRO for project ${projectId}: ${excelDirectCosts.length} records`);
+      // Aplicar filtro temporal a time entries si está especificado
+      if (dateRange) {
+        entries = entries.filter(entry => {
+          const entryDate = new Date(entry.date);
+          return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
+        });
+        console.log(`📊 Filtered time entries for cost summary: ${entries.length} entries in range ${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}`);
+      }
+      
+      // NUEVA INTEGRACIÓN: Obtener costos directos del Excel MAESTRO con filtros temporales
+      let excelDirectCosts = await this.getDirectCostsByProject(projectId);
+      
+      // Aplicar filtro temporal a costos directos si está especificado
+      if (dateRange) {
+        excelDirectCosts = excelDirectCosts.filter(cost => {
+          // Construir fecha desde año y mes del Excel
+          const monthNumber = this.getMonthNumber(cost.mes);
+          const costDate = new Date(`${cost.año}-${monthNumber}-15`); // Día 15 del mes
+          return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+        });
+        console.log(`📊 Filtered Excel direct costs for cost summary: ${excelDirectCosts.length} costs in range`);
+      }
+      
+      console.log(`💰 Direct costs from Excel MAESTRO for project ${projectId}: ${excelDirectCosts.length} records (filtered: ${dateRange ? 'YES' : 'NO'})`);
       
       // Obtener personal involucrado en el proyecto (timeEntries + directCosts)
       const timeEntryPersonnelIds = Array.from(new Set(entries.map(e => e.personnelId)));
@@ -2205,16 +2227,16 @@ export class DatabaseStorage implements IStorage {
 
       const budget = parseFloat(String(project.deliverableBudget || 0));
 
-      // Crear resumen por persona
+      // Crear resumen por persona (incluye personal del Excel MAESTRO)
       const costByPerson = allPersonnel
         .filter(person => person.includeInRealCosts)
         .map(person => {
           const personRealCost = Array.from(costByPersonMonth.entries())
-            .filter(([key]) => key.startsWith(`${person.id}-`))
+            .filter(([key]) => key.startsWith(`${person.id}-`) || key.includes(person.name))
             .reduce((sum, [, cost]) => sum + cost, 0);
             
           const personOperationalCost = Array.from(operationalByPersonMonth.entries())
-            .filter(([key]) => key.startsWith(`${person.id}-`))
+            .filter(([key]) => key.startsWith(`${person.id}-`) || key.includes(person.name))
             .reduce((sum, [, cost]) => sum + cost, 0);
 
           return {
@@ -2226,6 +2248,32 @@ export class DatabaseStorage implements IStorage {
           };
         })
         .filter(person => person.realCost > 0 || person.operationalCost > 0);
+
+      // Agregar personal del Excel MAESTRO que no está en el sistema de personnel
+      const excelOnlyPersonnel = excelDirectCosts
+        .filter(cost => !allPersonnel.find(p => p.name === cost.persona))
+        .reduce((acc, cost) => {
+          const existing = acc.find(p => p.name === cost.persona);
+          if (existing) {
+            existing.realCost += cost.montoTotalUSD || 0;
+            existing.operationalCost += cost.montoTotalUSD || 0;
+            existing.hours += cost.horasRealesAsana || 0;
+          } else {
+            acc.push({
+              personnelId: null,
+              name: cost.persona,
+              contractType: 'external',
+              realCost: cost.montoTotalUSD || 0,
+              operationalCost: cost.montoTotalUSD || 0,
+              hours: cost.horasRealesAsana || 0,
+              isFromExcel: true
+            });
+          }
+          return acc;
+        }, [] as any[]);
+
+      // Combinar ambos grupos
+      costByPerson.push(...excelOnlyPersonnel);
 
       // Calcular horas totales (time entries + Excel MAESTRO)
       const totalWorkedHours = entries.reduce((sum, entry) => sum + entry.hours, 0) + 

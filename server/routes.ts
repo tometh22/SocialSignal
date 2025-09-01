@@ -712,12 +712,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 💰 NUEVA INTEGRACIÓN: Usar getProjectCostSummary con filtros temporales para obtener horas y costos integrados
       console.log(`📊 Getting integrated cost summary for project ${id} with time filter: ${timeFilter}`);
       
-      const costSummary = await storage.getProjectCostSummary(id);
+      const costSummary = await storage.getProjectCostSummary(id, dateRange);
       console.log(`📊 Cost summary received:`, {
         totalWorkedHours: costSummary?.totalWorkedHours || 0,
         totalWorkedCost: costSummary?.totalCost || 0,
         directCostsFromExcel: costSummary?.costBreakdown?.directCostsFromExcel || 0,
-        timeEntriesCost: costSummary?.costBreakdown?.timeEntriesCost || 0
+        timeEntriesCost: costSummary?.costBreakdown?.timeEntriesCost || 0,
+        dateRangeApplied: dateRange ? `${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}` : 'NO_FILTER'
       });
 
       // Usar datos integrados (incluye time entries + Excel MAESTRO)
