@@ -2392,7 +2392,11 @@ const ProjectDetailsPage = () => {
                           Total Costos Directos:
                         </span>
                         <span className="text-lg font-bold text-emerald-900">
-                          ${unifiedData.directCosts.reduce((sum, cost) => sum + (cost.montoTotalUsd || cost.costoTotal || 0), 0).toLocaleString()}
+                          ${unifiedData.directCosts.reduce((sum, cost) => {
+                            // Solo usar montos USD convertidos, nunca ARS
+                            const usdAmount = cost.montoTotalUsd || 0;
+                            return sum + usdAmount;
+                          }, 0).toLocaleString()} USD
                         </span>
                       </div>
                       <div className="text-xs text-emerald-600 mt-1">
@@ -2403,10 +2407,10 @@ const ProjectDetailsPage = () => {
                     {/* Lista de personal con costos */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {unifiedData.directCosts
-                        .sort((a, b) => (b.montoTotalUsd || b.costoTotal || 0) - (a.montoTotalUsd || a.costoTotal || 0))
+                        .filter(cost => cost.montoTotalUsd && cost.montoTotalUsd > 0) // Solo mostrar registros con USD válidos
+                        .sort((a, b) => (b.montoTotalUsd || 0) - (a.montoTotalUsd || 0))
                         .map((cost, index) => {
-                          const amount = cost.montoTotalUsd || (cost.costoTotal || 0);
-                          const isUSD = cost.montoTotalUsd !== undefined && cost.montoTotalUsd > 0;
+                          const amount = cost.montoTotalUsd || 0; // Solo usar USD
                           return (
                             <div 
                               key={`${cost.persona}-${cost.mes}-${index}`}
@@ -2422,8 +2426,8 @@ const ProjectDetailsPage = () => {
                                   </p>
                                 </div>
                                 <div className="text-right">
-                                  <p className={`text-sm font-bold ${isUSD ? 'text-green-600' : 'text-orange-600'}`}>
-                                    ${amount.toLocaleString()} {isUSD ? 'USD' : 'ARS'}
+                                  <p className="text-sm font-bold text-green-600">
+                                    ${amount.toLocaleString()} USD
                                   </p>
                                   {cost.horasRealesAsana > 0 && (
                                     <p className="text-xs text-gray-500">
