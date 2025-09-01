@@ -2288,6 +2288,14 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Agregar personal del Excel MAESTRO que no está en el sistema de personnel
+      if (projectId === 39) {
+        console.log(`🔍 DEBUG Excel personnel matching for project 39:`);
+        excelDirectCosts.forEach(cost => {
+          const matchedPersonnel = allPersonnel.find(p => p.name === cost.persona);
+          console.log(`  - ${cost.persona}: ${matchedPersonnel ? 'MATCHED with ID ' + matchedPersonnel.id : 'NOT MATCHED - will be excelOnly'}`);
+        });
+      }
+
       const excelOnlyPersonnel = excelDirectCosts
         .filter(cost => !allPersonnel.find(p => p.name === cost.persona))
         .reduce((acc, cost) => {
@@ -2309,6 +2317,10 @@ export class DatabaseStorage implements IStorage {
           }
           return acc;
         }, [] as any[]);
+      
+      if (projectId === 39) {
+        console.log(`🔍 DEBUG excelOnlyPersonnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
+      }
 
       // Combinar ambos grupos
       costByPerson.push(...excelOnlyPersonnel);
