@@ -700,7 +700,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let timeEntries = await storage.getTimeEntriesByProject(id);
       
       // Aplicar filtro temporal si está especificado (usando la función exportada)
+      console.log(`🔍 DEBUG: Calling getDateRangeForFilter with timeFilter: "${timeFilter}"`);
       const dateRange = getDateRangeForFilter(timeFilter);
+      console.log(`🔍 DEBUG: getDateRangeForFilter returned:`, dateRange);
       if (dateRange) {
         timeEntries = timeEntries.filter(entry => {
           const entryDate = new Date(entry.date);
