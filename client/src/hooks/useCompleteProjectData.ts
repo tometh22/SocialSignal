@@ -102,6 +102,20 @@ interface CompleteProjectData {
       criticalPerformers: number;
     };
   };
+  directCosts: Array<{
+    id: number;
+    persona: string;
+    mes: string;
+    año: number;
+    proyecto: string;
+    cliente: string;
+    horasRealesAsana: number;
+    costoTotal: number;
+    montoTotalUsd?: number;
+    valorHoraPersona: number;
+    projectId?: number;
+    personnelId?: number;
+  }>;
 }
 
 export const useCompleteProjectData = (projectId: number, timeFilter: string = 'all') => {

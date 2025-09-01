@@ -2371,6 +2371,81 @@ const ProjectDetailsPage = () => {
             </div>
             </TooltipProvider>
 
+            {/* SECCIÓN 1.5: Costos Directos del Excel MAESTRO */}
+            {unifiedData?.directCosts && unifiedData.directCosts.length > 0 && (
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-emerald-700">
+                    <Users className="h-5 w-5 text-emerald-600" />
+                    Costos Directos por Persona
+                  </CardTitle>
+                  <CardDescription>
+                    Datos importados desde Excel MAESTRO - Período: {dateFilter.label}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="space-y-4">
+                    {/* Resumen total */}
+                    <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-emerald-700">
+                          Total Costos Directos:
+                        </span>
+                        <span className="text-lg font-bold text-emerald-900">
+                          ${unifiedData.directCosts.reduce((sum, cost) => sum + (cost.montoTotalUsd || cost.costoTotal || 0), 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-xs text-emerald-600 mt-1">
+                        {unifiedData.directCosts.length} registros de personal
+                      </div>
+                    </div>
+
+                    {/* Lista de personal con costos */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {unifiedData.directCosts
+                        .sort((a, b) => (b.montoTotalUsd || b.costoTotal || 0) - (a.montoTotalUsd || a.costoTotal || 0))
+                        .map((cost, index) => {
+                          const amount = cost.montoTotalUsd || (cost.costoTotal || 0);
+                          const isUSD = cost.montoTotalUsd !== undefined && cost.montoTotalUsd > 0;
+                          return (
+                            <div 
+                              key={`${cost.persona}-${cost.mes}-${index}`}
+                              className="p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-medium text-gray-900 truncate">
+                                    {cost.persona}
+                                  </h4>
+                                  <p className="text-xs text-gray-500">
+                                    {cost.mes} {cost.año}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`text-sm font-bold ${isUSD ? 'text-green-600' : 'text-orange-600'}`}>
+                                    ${amount.toLocaleString()} {isUSD ? 'USD' : 'ARS'}
+                                  </p>
+                                  {cost.horasRealesAsana > 0 && (
+                                    <p className="text-xs text-gray-500">
+                                      {cost.horasRealesAsana.toFixed(1)}h
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {cost.valorHoraPersona > 0 && (
+                                <div className="text-xs text-gray-400 border-t pt-2">
+                                  Tarifa: ${cost.valorHoraPersona.toFixed(2)}/h
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* SECCIÓN 2: Análisis Avanzado - Grid Profesional 2x2 */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               
