@@ -728,17 +728,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Mantener backward compatibility para directCosts
       const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
       
-      // Generate team breakdown from filtered time entries
+      // 💰 NUEVA INTEGRACIÓN: Generar team breakdown desde cost summary integrado (incluye Excel MAESTRO)
       const teamBreakdown: { [personnelId: string]: any } = {};
-      for (const entry of timeEntries) {
-        const personnelId = entry.personnelId.toString();
-        if (!teamBreakdown[personnelId]) {
-          // Find estimated hours for this personnel from quotation team
-          const quotationMember = quotationTeam.find(m => m.personnelId === entry.personnelId);
+      
+      // Usar las personas y costos del cost summary que ya incluye Excel MAESTRO
+      if (costSummary?.costByPerson && costSummary.costByPerson.length > 0) {
+        console.log(`📊 Using integrated team data from cost summary: ${costSummary.costByPerson.length} members`);
+        
+        for (const personCost of costSummary.costByPerson) {
+          const personnelId = personCost.personnelId || `excel-${personCost.name}`;
+          
+          // Buscar datos estimados de la cotización si existe
+          const quotationMember = quotationTeam.find(m => m.personnelId === personCost.personnelId);
           let estimatedHours = quotationMember ? quotationMember.hours : 0;
           const isQuoted = quotationMember !== undefined;
           
-          // Aplicar ajustes de horas mensuales según el tipo de filtro
+          // Usar role real de su perfil o del Excel MAESTRO
+          let actualRole = personCost.name === 'External' ? 'Freelancer Excel' : 'Sin Rol';
+          let actualRate = quotationMember?.rate || 0;
+          
+          teamBreakdown[personnelId] = {
+            personnelId: personCost.personnelId,
+            name: personCost.name,
+            role: actualRole,
+            email: '',
+            estimatedHours: estimatedHours,
+            actualHours: personCost.hours || 0, // Horas del Excel MAESTRO integradas
+            actualCost: personCost.realCost || personCost.operationalCost || 0,
+            rate: actualRate,
+            efficiency: estimatedHours > 0 ? Math.round(((personCost.hours || 0) / estimatedHours) * 100) : 0,
+            isQuoted: isQuoted,
+            contractType: personCost.contractType || 'external',
+            isFromExcel: !personCost.personnelId // Marcador para entries del Excel
+          };
+        }
+      } else {
+        // Fallback: usar time entries tradicionales si no hay cost summary
+        console.log(`📊 Fallback: Using traditional time entries: ${timeEntries.length} entries`);
+        for (const entry of timeEntries) {
+          const personnelId = entry.personnelId.toString();
+          if (!teamBreakdown[personnelId]) {
+            // Find estimated hours for this personnel from quotation team
+            const quotationMember = quotationTeam.find(m => m.personnelId === entry.personnelId);
+            let estimatedHours = quotationMember ? quotationMember.hours : 0;
+            const isQuoted = quotationMember !== undefined;
+            
+            // Aplicar ajustes de horas mensuales según el tipo de filtro
           if (dateRange) {
             if (timeFilter.includes('may_2025')) {
               const originalHours = estimatedHours;
@@ -804,15 +839,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isQuoted: isQuoted, // NUEVO: Marca si el personal estaba en cotización original
             isUnquoted: !isQuoted // NUEVO: Marca si el personal NO estaba cotizado originalmente
           };
-        }
-        teamBreakdown[personnelId].hours += entry.hours || 0;
-        teamBreakdown[personnelId].cost += entry.totalCost || 0;
-        teamBreakdown[personnelId].entries += 1;
+          }
+          teamBreakdown[personnelId].hours += entry.hours || 0;
+          teamBreakdown[personnelId].cost += entry.totalCost || 0;
+          teamBreakdown[personnelId].entries += 1;
         
-        // Update last activity if this entry is more recent
-        const entryDate = new Date(entry.date);
-        if (!teamBreakdown[personnelId].lastActivity || entryDate > new Date(teamBreakdown[personnelId].lastActivity)) {
-          teamBreakdown[personnelId].lastActivity = entryDate.toISOString();
+          // Update last activity if this entry is more recent
+          const entryDate = new Date(entry.date);
+          if (!teamBreakdown[personnelId].lastActivity || entryDate > new Date(teamBreakdown[personnelId].lastActivity)) {
+            teamBreakdown[personnelId].lastActivity = entryDate.toISOString();
+          }
         }
       }
       

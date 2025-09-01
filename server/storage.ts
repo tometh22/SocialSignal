@@ -2239,15 +2239,29 @@ export class DatabaseStorage implements IStorage {
             .filter(([key]) => key.startsWith(`${person.id}-`) || key.includes(person.name))
             .reduce((sum, [, cost]) => sum + cost, 0);
 
+          // Calcular horas trabajadas para esta persona (time entries + Excel MAESTRO)
+          const personHours = allEntries
+            .filter(entry => {
+              if ((entry as any).isFromExcel) {
+                // Para entries del Excel, buscar por nombre de persona
+                return (entry as any).description?.includes(person.name);
+              } else {
+                // Para time entries tradicionales, buscar por personnelId
+                return entry.personnelId === person.id;
+              }
+            })
+            .reduce((sum, entry) => sum + (entry.hours || 0), 0);
+
           return {
             personnelId: person.id,
             name: person.name,
             contractType: person.contractType,
             realCost: personRealCost,
-            operationalCost: personOperationalCost
+            operationalCost: personOperationalCost,
+            hours: personHours
           };
         })
-        .filter(person => person.realCost > 0 || person.operationalCost > 0);
+        .filter(person => person.realCost > 0 || person.operationalCost > 0 || person.hours > 0);
 
       // Agregar personal del Excel MAESTRO que no está en el sistema de personnel
       const excelOnlyPersonnel = excelDirectCosts
