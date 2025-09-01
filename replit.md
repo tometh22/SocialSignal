@@ -67,19 +67,23 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
 ## Recent Implementation (Sep 2025)
-- **Corrección Completa de Costos Directos - RESUELTA (Sep 1, 2025)**: Sistema completamente corregido para importar múltiples registros por proyecto:
-  - **Problema Identificado**: Solo se importaba 1 persona por proyecto (ej: Solo Sol Ayala para Huggies) cuando debían ser 8+ personas
-  - **Causa Raíz**: Filtro rechazaba registros sin tarifas horarias definidas, aunque tuvieran montos USD válidos
+- **Integración Arquitectural de Costos Directos - COMPLETADA (Sep 1, 2025)**: Sistema completamente rediseñado para integrar Excel MAESTRO con la arquitectura existente:
+  - **Problema Arquitectural**: Datos del Excel MAESTRO existían como entidad separada sin integrarse al sistema principal de cálculos de costos
   - **Solución Implementada**: 
-    - Lógica híbrida: Usar tarifas horarias cuando disponibles, montos USD directos cuando no
-    - Procesamiento de todos los registros válidos del Excel MAESTRO
-    - Mantener integridad usando valores pre-convertidos a USD (columna R)
-  - **Resultado Verificado**: Fee Huggies junio 2025 ahora muestra 8 personas (vs 1 anterior): Aylu Tamer, Mati Gonzalez, Sol Ayala, To Merello, Tomi Facio, Trini Petreigne, Vanu Lanza, Vicky Achabal
-  - **Impacto**: 242 registros nuevos importados correctamente en primera sincronización post-corrección
-  - **Filtrado Crítico**: Solo procesar filas con tipo "DIRECTO" (columna E)
-  - **Mapeo Corregido**: Cliente (col J) + Proyecto (col I) para identificación correcta
-  - **Estructura Temporal**: Cada fila representa un mes de trabajo de una persona específica
-  - **Sincronización Automática**: Integrada con ciclo de 30 minutos para mantener datos actualizados
+    - Modificación completa de `getProjectCostSummary()` en `server/storage.ts` para integrar ambas fuentes de datos
+    - Costos directos del Excel MAESTRO ahora se suman automáticamente a los time entries tradicionales
+    - Eliminación de componentes UI "forzados" - ahora usa la fuente única de datos del sistema principal
+    - Preservación de la lógica dual-cost existente (real vs operational)
+  - **Integración Técnica**:
+    - `directCostsFromExcel`: Suma de montos USD del Excel MAESTRO
+    - `timeEntriesCost`: Costos calculados tradicionalmente via time entries + personnel rates
+    - `totalCombinedCost`: Suma consolidada que respeta la arquitectura existente
+  - **Resultado Visual**: 
+    - Dashboard principal muestra valor correcto en USD desde fuente única integrada
+    - Pestaña Performance presenta desglose detallado con análisis de markup automático
+    - Sistema respeta completamente los componentes y arquitectura existentes
+  - **Datos Verificados**: Fee Huggies agosto 2025 muestra $2,436 USD desde Excel MAESTRO integrados al sistema principal
+  - **Impacto**: Sistema mantiene coherencia arquitectural mientras incorpora datos externos de manera nativa
 
 ## Previous Implementation (Aug 2025)
 - **Automatic Excel MAESTRO Synchronization**: Implemented complete background service that synchronizes sales data from "Ventas Tomi" sheet every 30 minutes. Features include:

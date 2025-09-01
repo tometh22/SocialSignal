@@ -2055,17 +2055,43 @@ export class DatabaseStorage implements IStorage {
 
       const entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
       
-      // Obtener personal involucrado en el proyecto
-      const personnelIds = Array.from(new Set(entries.map(e => e.personnelId)));
-      const allPersonnel = await db.select().from(personnel).where(inArray(personnel.id, personnelIds));
+      // NUEVA INTEGRACIÓN: Obtener costos directos del Excel MAESTRO
+      const excelDirectCosts = await this.getDirectCostsByProject(projectId);
+      console.log(`💰 Direct costs from Excel MAESTRO for project ${projectId}: ${excelDirectCosts.length} records`);
+      
+      // Obtener personal involucrado en el proyecto (timeEntries + directCosts)
+      const timeEntryPersonnelIds = Array.from(new Set(entries.map(e => e.personnelId)));
+      const directCostPersonnelIds = Array.from(new Set(excelDirectCosts.map(dc => dc.personnelId).filter(id => id !== null)));
+      const allPersonnelIds = Array.from(new Set([...timeEntryPersonnelIds, ...directCostPersonnelIds]));
+      const allPersonnel = allPersonnelIds.length > 0 ? 
+        await db.select().from(personnel).where(inArray(personnel.id, allPersonnelIds)) : [];
 
       let totalRealCost = 0;
       let operationalCost = 0;
+      let directCostsFromExcel = 0;
       
       // Calcular costos reales por persona y mes
       const costByPersonMonth = new Map<string, number>();
       const operationalByPersonMonth = new Map<string, number>();
 
+      // PASO 1: Procesar costos directos del Excel MAESTRO
+      for (const directCost of excelDirectCosts) {
+        if (directCost.montoTotalUSD && directCost.montoTotalUSD > 0) {
+          directCostsFromExcel += directCost.montoTotalUSD;
+          
+          // Mapear por persona y mes para consolidación
+          const year = directCost.año;
+          const monthName = directCost.mes;
+          const personKey = `excel-${directCost.persona}-${year}-${monthName}`;
+          
+          costByPersonMonth.set(personKey, (costByPersonMonth.get(personKey) || 0) + directCost.montoTotalUSD);
+          operationalByPersonMonth.set(personKey, (operationalByPersonMonth.get(personKey) || 0) + directCost.montoTotalUSD);
+        }
+      }
+
+      console.log(`💰 Direct costs calculation for project ${projectId}: { directCostsFromExcel: ${directCostsFromExcel}, directCostsCount: ${excelDirectCosts.length} }`);
+
+      // PASO 2: Procesar time entries tradicionales
       for (const entry of entries) {
         if (!entry.billable) continue;
 
@@ -2113,9 +2139,18 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Sumar todos los costos reales y operacionales
+      // CONSOLIDACIÓN FINAL: Sumar todos los costos (time entries + Excel MAESTRO)
       totalRealCost = Array.from(costByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
       operationalCost = Array.from(operationalByPersonMonth.values()).reduce((sum, cost) => sum + cost, 0);
+      
+      console.log(`💰 Direct costs calculation for project ${projectId}: {
+        projectCurrency: '${project.currency || 'USD'}',
+        timeEntriesCost: ${totalRealCost - directCostsFromExcel},
+        directCostsFromExcel: ${directCostsFromExcel},
+        totalCombinedCost: ${totalRealCost},
+        directCostsCount: ${excelDirectCosts.length},
+        usingUSDConversion: true
+      }`);
 
       const budget = parseFloat(String(project.deliverableBudget || 0));
 
@@ -2145,7 +2180,7 @@ export class DatabaseStorage implements IStorage {
 
       return {
         projectId,
-        totalCost: totalRealCost, // Costo real para rentabilidad
+        totalCost: totalRealCost, // Costo real para rentabilidad (incluye Excel MAESTRO)
         operationalCost, // Costo operacional para análisis de productividad
         budget,
         variance: budget - totalRealCost,
@@ -2154,8 +2189,21 @@ export class DatabaseStorage implements IStorage {
         costBreakdown: {
           realCost: totalRealCost,
           operationalCost: operationalCost,
-          personnelCount: personnelIds.length
-        }
+          directCostsFromExcel: directCostsFromExcel, // NUEVO: Costos del Excel MAESTRO
+          timeEntriesCost: totalRealCost - directCostsFromExcel, // NUEVO: Costos de time entries
+          personnelCount: allPersonnelIds.length,
+          excelDirectCostsCount: excelDirectCosts.length // NUEVO: Cantidad de registros del Excel
+        },
+        // NUEVO: Datos detallados del Excel MAESTRO para análisis
+        excelDirectCosts: excelDirectCosts.map(dc => ({
+          persona: dc.persona,
+          mes: dc.mes,
+          año: dc.año,
+          horasRealesAsana: dc.horasRealesAsana,
+          montoTotalUSD: dc.montoTotalUSD,
+          costoTotal: dc.costoTotal,
+          valorHoraPersona: dc.valorHoraPersona
+        }))
       };
     } catch (error) {
       console.error("Error al obtener resumen de costos del proyecto:", error);

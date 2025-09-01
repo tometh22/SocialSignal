@@ -1741,11 +1741,11 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-sm font-medium text-orange-800">⚙️ Costos Directos</p>
                       <p className="text-lg font-bold text-orange-900">
-                        ${(unifiedData?.directCosts?.reduce((sum, cost) => sum + (cost.montoTotalUSD || 0), 0) || 0).toLocaleString()} USD
+                        ${(unifiedData?.actuals?.costBreakdown?.directCostsFromExcel || 0).toLocaleString()} USD
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs text-orange-600 mt-1">Desde Excel MAESTRO (período filtrado)</p>
+                  <p className="text-xs text-orange-600 mt-1">Excel MAESTRO integrado al sistema principal</p>
                 </div>
                 
               </div>
@@ -2371,20 +2371,7 @@ const ProjectDetailsPage = () => {
             </div>
             </TooltipProvider>
 
-            {/* Nota sobre costos directos importados */}
-            {unifiedData?.directCosts && unifiedData.directCosts.length > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm text-blue-800 font-medium">
-                    Costos directos importados desde Excel MAESTRO ({unifiedData.directCosts.length} registros)
-                  </span>
-                </div>
-                <p className="text-xs text-blue-600 mt-1">
-                  Ver desglose detallado en la pestaña "Performance"
-                </p>
-              </div>
-            )}
+            {/* Integración exitosa: costos directos ya integrados al sistema principal */}
 
             {/* SECCIÓN 2: Análisis Avanzado - Grid Profesional 2x2 */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -2704,43 +2691,50 @@ const ProjectDetailsPage = () => {
               />
             </div>
 
-            {/* COSTOS DIRECTOS DEL EXCEL MAESTRO - Sección detallada */}
-            {unifiedData?.directCosts && unifiedData.directCosts.length > 0 && (
+            {/* COSTOS DIRECTOS INTEGRADOS - Sistema principal */}
+            {unifiedData?.actuals?.excelDirectCosts && unifiedData.actuals.excelDirectCosts.length > 0 && (
               <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-emerald-700">
                     <Database className="h-5 w-5 text-emerald-600" />
-                    Costos Directos por Persona - Excel MAESTRO
+                    Costos Directos por Persona - Sistema Integrado
                   </CardTitle>
                   <CardDescription>
-                    Datos importados automáticamente - Período: {dateFilter.label} | {unifiedData.directCosts.length} registros
+                    Excel MAESTRO integrado al cálculo principal - Período: {dateFilter.label} | {unifiedData.actuals.costBreakdown?.excelDirectCostsCount || 0} registros
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
                   <div className="space-y-4">
-                    {/* Resumen total */}
-                    <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-emerald-700">
-                          Total Costos Directos (período filtrado):
-                        </span>
-                        <span className="text-lg font-bold text-emerald-900">
-                          ${unifiedData.directCosts.reduce((sum, cost) => sum + (cost.montoTotalUSD || 0), 0).toLocaleString()} USD
-                        </span>
+                    {/* Resumen integrado */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <div className="text-xs text-emerald-600">Excel MAESTRO</div>
+                        <div className="text-lg font-bold text-emerald-900">
+                          ${(unifiedData.actuals.costBreakdown?.directCostsFromExcel || 0).toLocaleString()} USD
+                        </div>
                       </div>
-                      <div className="text-xs text-emerald-600 mt-1">
-                        Cotejo con ventas del período para análisis de markup
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="text-xs text-blue-600">Time Entries</div>
+                        <div className="text-lg font-bold text-blue-900">
+                          ${(unifiedData.actuals.costBreakdown?.timeEntriesCost || 0).toLocaleString()} USD
+                        </div>
+                      </div>
+                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div className="text-xs text-purple-600">Total Combinado</div>
+                        <div className="text-lg font-bold text-purple-900">
+                          ${(unifiedData.actuals.totalWorkedCost || 0).toLocaleString()} USD
+                        </div>
                       </div>
                     </div>
 
-                    {/* Análisis comparativo */}
+                    {/* Análisis de markup usando datos integrados */}
                     {(unifiedData as any)?.googleSheetsSales && (unifiedData as any).googleSheetsSales.length > 0 && (
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h4 className="text-sm font-medium text-blue-800 mb-2">Análisis Costo vs Ingreso</h4>
+                      <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                        <h4 className="text-sm font-medium text-indigo-800 mb-2">Análisis Financiero Integrado</h4>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <span className="text-xs text-blue-600">Ingresos período:</span>
-                            <div className="text-lg font-bold text-blue-900">
+                            <span className="text-xs text-indigo-600">Ingresos reales período:</span>
+                            <div className="text-lg font-bold text-indigo-900">
                               ${(() => {
                                 const realRevenue = (unifiedData as any).googleSheetsSales
                                   .filter((sale: any) => sale.status !== 'proyectada')
@@ -2750,13 +2744,13 @@ const ProjectDetailsPage = () => {
                             </div>
                           </div>
                           <div>
-                            <span className="text-xs text-blue-600">Markup período:</span>
-                            <div className="text-lg font-bold text-blue-900">
+                            <span className="text-xs text-indigo-600">Markup total:</span>
+                            <div className="text-lg font-bold text-indigo-900">
                               {(() => {
                                 const realRevenue = (unifiedData as any).googleSheetsSales
                                   .filter((sale: any) => sale.status !== 'proyectada')
                                   .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0);
-                                const totalCosts = unifiedData.directCosts.reduce((sum, cost) => sum + (cost.montoTotalUSD || 0), 0);
+                                const totalCosts = unifiedData.actuals.totalWorkedCost || 0;
                                 const markup = totalCosts > 0 ? (realRevenue / totalCosts) : 0;
                                 return markup.toFixed(2) + 'x';
                               })()}
@@ -2766,46 +2760,43 @@ const ProjectDetailsPage = () => {
                       </div>
                     )}
 
-                    {/* Lista detallada de personal */}
+                    {/* Lista detallada usando datos integrados */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {unifiedData.directCosts
-                        .filter(cost => cost.montoTotalUSD && cost.montoTotalUSD > 0)
-                        .sort((a, b) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
-                        .map((cost, index) => {
-                          const amount = cost.montoTotalUSD || 0;
-                          return (
-                            <div 
-                              key={`${cost.persona}-${cost.mes}-${index}`}
-                              className="p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-                            >
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium text-gray-900 truncate">
-                                    {cost.persona}
-                                  </h4>
-                                  <p className="text-xs text-gray-500">
-                                    {cost.mes} {cost.año}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-sm font-bold text-green-600">
-                                    ${amount.toLocaleString()} USD
-                                  </p>
-                                  {cost.horasRealesAsana > 0 && (
-                                    <p className="text-xs text-gray-500">
-                                      {cost.horasRealesAsana.toFixed(1)}h
-                                    </p>
-                                  )}
-                                </div>
+                      {unifiedData.actuals.excelDirectCosts
+                        .filter((cost: any) => cost.montoTotalUSD && cost.montoTotalUSD > 0)
+                        .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
+                        .map((cost: any, index: number) => (
+                          <div 
+                            key={`${cost.persona}-${cost.mes}-${index}`}
+                            className="p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
+                          >
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1">
+                                <h4 className="text-sm font-medium text-gray-900 truncate">
+                                  {cost.persona}
+                                </h4>
+                                <p className="text-xs text-gray-500">
+                                  {cost.mes} {cost.año}
+                                </p>
                               </div>
-                              {cost.valorHoraPersona > 0 && (
-                                <div className="text-xs text-gray-400 border-t pt-2">
-                                  Tarifa: ${cost.valorHoraPersona.toFixed(2)}/h
-                                </div>
-                              )}
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-green-600">
+                                  ${(cost.montoTotalUSD || 0).toLocaleString()} USD
+                                </p>
+                                {cost.horasRealesAsana > 0 && (
+                                  <p className="text-xs text-gray-500">
+                                    {cost.horasRealesAsana.toFixed(1)}h
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })}
+                            {cost.valorHoraPersona > 0 && (
+                              <div className="text-xs text-gray-400 border-t pt-2">
+                                Tarifa: ${cost.valorHoraPersona.toFixed(2)}/h
+                              </div>
+                            )}
+                          </div>
+                        ))}
                     </div>
                   </div>
                 </CardContent>
