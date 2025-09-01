@@ -658,16 +658,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 4.5 Obtener y agregar costos directos de Excel MAESTRO
       const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
-      const totalDirectCosts = projectDirectCosts.reduce((total, cost) => total + (cost.costoTotal || 0), 0);
+      
+      // Determinar si el proyecto tiene pricing en USD o ARS
+      const projectNotes = project.notes || '';
+      const isUSDProject = projectNotes.includes('USD') || 
+                           projectNotes.includes('$ USD') ||
+                           (project.budget && project.budget > 0 && !projectNotes.includes('ARS'));
+      
+      // Calcular costos directos usando la moneda correcta
+      const totalDirectCosts = projectDirectCosts.reduce((total, cost) => {
+        if (isUSDProject && cost.montoTotalUSD) {
+          // Para proyectos con pricing en USD, usar el monto ya convertido
+          return total + cost.montoTotalUSD;
+        } else {
+          // Para proyectos con pricing en ARS, usar el costo en ARS
+          return total + (cost.costoTotal || 0);
+        }
+      }, 0);
       
       // Agregar costos directos al costo total trabajado
       totalWorkedCost += totalDirectCosts;
       
       console.log(`💰 Direct costs calculation for project ${id}:`, {
+        projectCurrency: isUSDProject ? 'USD' : 'ARS',
         timeEntriesCost: totalWorkedCost - totalDirectCosts,
         directCostsFromExcel: totalDirectCosts,
         totalCombinedCost: totalWorkedCost,
-        directCostsCount: projectDirectCosts.length
+        directCostsCount: projectDirectCosts.length,
+        usingUSDConversion: isUSDProject
       });
       
       // Generate team breakdown from filtered time entries
