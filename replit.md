@@ -67,6 +67,18 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
 ## Recent Implementation (Sep 2025)
+- **Unificación de Fuente de Datos - COMPLETADA (Sep 1, 2025)**: Sistema completamente unificado para tomar TODOS los datos del Excel MAESTRO:
+  - **Problema Anterior**: Duplicación de fuentes - ventas desde Google Sheets y costos desde Excel MAESTRO
+  - **Solución Implementada**: 
+    - Nueva función `syncUnifiedExcelData()` que toma ventas + costos del mismo Excel MAESTRO
+    - Eliminación de `syncSales()` y `syncDirectCosts()` separados
+    - Una sola fuente de verdad para precio mensual y costo mensual
+    - Gestión temporal unificada con filtros coherentes
+  - **Arquitectura Simplificada**:
+    - AutoSyncService → Excel MAESTRO "Ventas Tomi" → precios + costos
+    - getProjectCostSummary() con filtros temporales integrados
+    - Dashboard utiliza datos coherentes del mismo período
+  - **Datos Verificados**: Sistema procesa correctamente precios e inflación desde la misma fuente temporal
 - **Integración Arquitectural de Costos Directos - COMPLETADA (Sep 1, 2025)**: Sistema completamente rediseñado para integrar Excel MAESTRO con la arquitectura existente:
   - **Problema Arquitectural**: Datos del Excel MAESTRO existían como entidad separada sin integrarse al sistema principal de cálculos de costos
   - **Solución Implementada**: 

@@ -60,17 +60,14 @@ export class AutoSyncService {
     try {
       console.log('📊 Iniciando sincronización con Excel MAESTRO...');
 
-      // 1. Sincronizar ventas desde "Ventas Tomi"
-      const salesResult = await this.syncSales();
+      // 1. UNIFICADO: Sincronizar TODO desde Excel MAESTRO (ventas + costos)
+      const unifiedResult = await this.syncUnifiedExcelData();
       
-      // 2. Sincronizar con proyectos activos
+      // 2. Vincular con proyectos activos (ahora trabajando con datos unificados)
       const projectSyncResult = await this.syncSalesWithProjects();
 
-      // 3. Importar costos directos desde Excel MAESTRO
-      const directCostsResult = await this.syncDirectCosts();
-
       const duration = Date.now() - startTime;
-      const message = `Sincronización completada en ${duration}ms: ${salesResult.imported} ventas importadas, ${salesResult.updated} actualizadas, ${projectSyncResult.linked} vinculadas con proyectos, ${directCostsResult.imported} costos directos importados, ${directCostsResult.updated} costos actualizados`;
+      const message = `Sincronización completada en ${duration}ms: ${unifiedResult.salesImported} ventas importadas, ${unifiedResult.salesUpdated} actualizadas, ${projectSyncResult.linked} vinculadas con proyectos, ${unifiedResult.costsImported} costos directos importados, ${unifiedResult.costsUpdated} costos actualizados`;
       
       console.log(`✅ ${message}`);
       
@@ -78,9 +75,8 @@ export class AutoSyncService {
         success: true,
         message,
         data: {
-          sales: salesResult,
+          unified: unifiedResult,
           projectSync: projectSyncResult,
-          directCosts: directCostsResult,
           duration
         }
       };
@@ -97,35 +93,61 @@ export class AutoSyncService {
   }
 
   /**
-   * Sincronizar datos de ventas desde Google Sheets
+   * NUEVA FUNCIÓN UNIFICADA: Sincronizar ventas + costos desde Excel MAESTRO
    */
-  private async syncSales(): Promise<{ imported: number; updated: number; errors: string[] }> {
+  private async syncUnifiedExcelData(): Promise<{ 
+    salesImported: number; 
+    salesUpdated: number; 
+    costsImported: number; 
+    costsUpdated: number; 
+    errors: string[] 
+  }> {
     try {
-      console.log('📈 Sincronizando ventas desde "Ventas Tomi"...');
+      console.log('📊 UNIFICADO: Sincronizando ventas + costos desde Excel MAESTRO...');
 
-      // Obtener datos de ventas desde Google Sheets
+      // 1. Obtener datos de ventas desde Excel MAESTRO "Ventas Tomi"
       const salesData = await googleSheetsWorkingService.getVentasTomi();
+      let salesResult = { imported: 0, updated: 0, errors: [] };
       
-      if (salesData.length === 0) {
-        console.log('⚠️ No se encontraron datos de ventas');
-        return { imported: 0, updated: 0, errors: [] };
+      if (salesData.length > 0) {
+        console.log(`📈 Procesando ${salesData.length} registros de ventas...`);
+        salesResult = await storage.importSalesFromGoogleSheets(salesData);
+        console.log(`✅ Ventas sincronizadas: ${salesResult.imported} nuevas, ${salesResult.updated} actualizadas`);
+      } else {
+        console.log('⚠️ No se encontraron datos de ventas en Excel MAESTRO');
       }
 
-      console.log(`📊 Procesando ${salesData.length} registros de ventas...`);
+      // 2. Obtener costos directos desde Excel MAESTRO "Ventas Tomi" (misma fuente)
+      const costsResult = await googleSheetsWorkingService.importDirectCosts(storage);
+      
+      if (costsResult.success) {
+        console.log(`💰 Costos sincronizados: ${costsResult.costsImported} importados, ${costsResult.costsUpdated} actualizados`);
+      } else {
+        console.log('⚠️ Error sincronizando costos:', costsResult.errors);
+      }
 
-      // Importar usando el storage
-      const result = await storage.importSalesFromGoogleSheets(salesData);
-      
-      console.log(`✅ Ventas sincronizadas: ${result.imported} nuevas, ${result.updated} actualizadas`);
-      
-      return result;
+      // 3. Combinar resultados
+      const combinedErrors = [
+        ...salesResult.errors,
+        ...(costsResult.success ? [] : costsResult.errors)
+      ];
+
+      return {
+        salesImported: salesResult.imported,
+        salesUpdated: salesResult.updated,
+        costsImported: costsResult.success ? costsResult.costsImported : 0,
+        costsUpdated: costsResult.success ? costsResult.costsUpdated : 0,
+        errors: combinedErrors
+      };
 
     } catch (error: any) {
-      console.error('❌ Error sincronizando ventas:', error);
+      console.error('❌ Error en sincronización unificada:', error);
       return { 
-        imported: 0, 
-        updated: 0, 
-        errors: [`Error sincronizando ventas: ${error.message}`] 
+        salesImported: 0, 
+        salesUpdated: 0,
+        costsImported: 0,
+        costsUpdated: 0,
+        errors: [`Error en sincronización unificada: ${error.message}`] 
       };
     }
   }
@@ -262,41 +284,7 @@ export class AutoSyncService {
     return monthMap[month.toLowerCase()] || 1;
   }
 
-  /**
-   * Sincronizar costos directos desde Excel MAESTRO
-   */
-  private async syncDirectCosts(): Promise<{ imported: number; updated: number; errors: string[] }> {
-    try {
-      console.log('💰 Sincronizando costos directos desde Excel MAESTRO...');
-
-      // Usar el servicio de Google Sheets para importar costos directos
-      const result = await googleSheetsWorkingService.importDirectCosts(storage);
-      
-      if (result.success) {
-        console.log(`✅ Costos directos sincronizados: ${result.costsImported} importados, ${result.costsUpdated} actualizados`);
-        return {
-          imported: result.costsImported,
-          updated: result.costsUpdated,
-          errors: result.errors
-        };
-      } else {
-        console.error('❌ Error sincronizando costos directos:', result.errors);
-        return {
-          imported: 0,
-          updated: 0,
-          errors: result.errors
-        };
-      }
-
-    } catch (error: any) {
-      console.error('❌ Error sincronizando costos directos:', error);
-      return { 
-        imported: 0, 
-        updated: 0, 
-        errors: [`Error sincronizando costos directos: ${error.message}`] 
-      };
-    }
-  }
+  // FUNCIÓN ELIMINADA: syncDirectCosts - Ahora se maneja en syncUnifiedExcelData
 
   /**
    * Obtener estado de la sincronización
