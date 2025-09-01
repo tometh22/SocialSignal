@@ -1086,6 +1086,7 @@ class GoogleSheetsWorkingService {
             proyecto: costo.proyecto,
             tipoProyecto: costo.tipoProyecto,
             cliente: costo.cliente,
+            horasObjetivo: costo.horasObjetivo || 0, // NUEVO: Horas objetivo del Excel MAESTRO
             horasRealesAsana: costo.horasRealesAsana,
             valorHoraPersona: valorHora || 0, // Usar 0 cuando no hay tarifa horaria (se usa monto USD directo)
             costoTotal: costoTotal,

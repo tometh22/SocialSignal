@@ -2516,18 +2516,28 @@ const ProjectDetailsPage = () => {
                       <div className="text-xs text-gray-500 mt-1">total del período</div>
                     </div>
 
-                    {/* Eficiencia del Equipo */}
+                    {/* Eficiencia del Equipo vs Objetivo */}
                     <div className="text-center p-4 bg-white rounded-xl border border-purple-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
                         <Target className="h-6 w-6 text-purple-600" />
                       </div>
                       <div className="text-3xl font-bold text-purple-600 mb-1">
-                        {costSummary?.targetHours && costSummary?.filteredHours 
-                          ? ((costSummary.filteredHours / costSummary.targetHours) * 100).toFixed(0)
-                          : '0'}%
+                        {(() => {
+                          // Calcular horas objetivo total del Excel MAESTRO para el proyecto
+                          const excelTargetHours = unifiedData?.actuals?.teamBreakdown?.reduce((sum: number, member: any) => {
+                            return sum + (member.targetHours || 0);
+                          }, 0) || 0;
+                          
+                          const workedHours = costSummary?.filteredHours || 0;
+                          
+                          if (excelTargetHours === 0) return 'N/A';
+                          
+                          const efficiency = (workedHours / excelTargetHours) * 100;
+                          return `${efficiency.toFixed(0)}%`;
+                        })()}
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Eficiencia del Equipo</div>
-                      <div className="text-xs text-gray-500 mt-1">horas reales vs estimadas</div>
+                      <div className="text-sm font-medium text-gray-600">Eficiencia vs Objetivo</div>
+                      <div className="text-xs text-gray-500 mt-1">horas reales vs Excel MAESTRO</div>
                     </div>
 
                     {/* Costo Real del Equipo */}
@@ -2784,9 +2794,14 @@ const ProjectDetailsPage = () => {
                                   ${(cost.montoTotalUSD || 0).toLocaleString()} USD
                                 </p>
                                 {cost.horasRealesAsana > 0 && (
-                                  <p className="text-xs text-gray-500">
-                                    {cost.horasRealesAsana.toFixed(1)}h
-                                  </p>
+                                  <div className="text-xs text-gray-500">
+                                    <p>{cost.horasRealesAsana.toFixed(1)}h trabajadas</p>
+                                    {cost.horasObjetivo > 0 && (
+                                      <p className={`${cost.horasRealesAsana > cost.horasObjetivo ? 'text-red-500' : 'text-green-500'}`}>
+                                        {cost.horasObjetivo.toFixed(1)}h objetivo
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
