@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 💰 NUEVA INTEGRACIÓN: Usar getProjectCostSummary con filtros temporales para obtener horas y costos integrados
       console.log(`📊 Getting integrated cost summary for project ${id} with time filter: ${timeFilter}`);
       
-      const costSummary = await storage.getProjectCostSummary(id, dateRange);
+      const costSummary = await storage.getProjectCostSummary(id, dateRange || undefined);
       console.log(`📊 Cost summary received:`, {
         totalWorkedHours: costSummary?.totalWorkedHours || 0,
         totalWorkedCost: costSummary?.totalCost || 0,
@@ -734,6 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Usar las personas y costos del cost summary que ya incluye Excel MAESTRO
       if (costSummary?.costByPerson && costSummary.costByPerson.length > 0) {
         console.log(`📊 Using integrated team data from cost summary: ${costSummary.costByPerson.length} members`);
+        console.log(`🔍 Sample costByPerson data:`, costSummary.costByPerson.slice(0, 3));
         
         for (const personCost of costSummary.costByPerson) {
           const personnelId = personCost.personnelId || `excel-${personCost.name}`;
@@ -809,7 +810,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (!isQuoted) {
             // Buscar datos de personal no cotizado para este proyecto
-            const unquotedData = await storage.getUnquotedPersonnelByProject(parseInt(id));
+            const unquotedData = await storage.getUnquotedPersonnelByProject(id);
             const unquotedEntry = unquotedData.find(up => up.personnelId === entry.personnelId);
             
             if (unquotedEntry) {

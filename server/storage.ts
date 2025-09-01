@@ -2091,10 +2091,21 @@ export class DatabaseStorage implements IStorage {
       // Aplicar filtro temporal a costos directos si está especificado
       if (dateRange) {
         excelDirectCosts = excelDirectCosts.filter(cost => {
-          // Construir fecha desde año y mes del Excel
-          const monthNumber = this.getMonthNumber(cost.mes);
+          // Manejar diferentes formatos de mes en el Excel MAESTRO
+          let monthNumber;
+          if (cost.mes.includes(' ')) {
+            // Formato "08 ago", "05 may", etc.
+            monthNumber = parseInt(cost.mes.substring(0, 2));
+          } else {
+            // Formato "Agosto", "Mayo", etc.
+            monthNumber = this.getMonthNumber(cost.mes);
+          }
           const costDate = new Date(`${cost.año}-${monthNumber}-15`); // Día 15 del mes
-          return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+          const isInRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+          if (projectId === 39) {
+            console.log(`🔍 Excel cost filter: ${cost.persona} ${cost.mes} ${cost.año} -> Month ${monthNumber} -> ${costDate.toISOString()} -> In range: ${isInRange}`);
+          }
+          return isInRange;
         });
         console.log(`📊 Filtered Excel direct costs for cost summary: ${excelDirectCosts.length} costs in range`);
       }
@@ -2288,6 +2299,15 @@ export class DatabaseStorage implements IStorage {
 
       // Combinar ambos grupos
       costByPerson.push(...excelOnlyPersonnel);
+      
+      console.log(`🔍 DEBUG costByPerson for project ${projectId}:`, {
+        traditionalPersonnel: costByPerson.length - excelOnlyPersonnel.length,
+        excelOnlyPersonnel: excelOnlyPersonnel.length,
+        totalCostByPerson: costByPerson.length,
+        excelDirectCostsCount: excelDirectCosts.length,
+        allPersonnelCount: allPersonnel.length,
+        dateRangeApplied: !!dateRange
+      });
 
       // Calcular horas totales (time entries + Excel MAESTRO)
       const totalWorkedHours = entries.reduce((sum, entry) => sum + entry.hours, 0) + 
