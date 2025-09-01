@@ -62,6 +62,8 @@ interface CostoDirectoExcel {
   horasRealesAsana: number;
   valorHoraPersona?: number;
   costoTotal?: number;
+  tipoCambio?: number; // Columna P del Excel
+  montoTotalUSD?: number; // Columna Q del Excel
 }
 
 class GoogleSheetsWorkingService {
@@ -1018,7 +1020,7 @@ class GoogleSheetsWorkingService {
       const sheets = this.createSheetsClientFromJSON();
       
       // Leer datos de la pestaña "Costos directos e indirectos"
-      const range = 'Costos directos e indirectos!A:M';
+      const range = 'Costos directos e indirectos!A:Q'; // Extendido a Q para incluir tipo de cambio y USD
       console.log('📋 Range:', range);
       
       const response = await sheets.spreadsheets.values.get({
@@ -1076,6 +1078,8 @@ class GoogleSheetsWorkingService {
             horasRealesAsana: costo.horasRealesAsana,
             valorHoraPersona: valorHora,
             costoTotal: costoTotal,
+            tipoCambio: costo.tipoCambio, // Nuevo: tipo de cambio desde Excel
+            montoTotalUSD: costo.montoTotalUSD, // Nuevo: monto convertido a USD
             projectId: projectId,
             personnelId: personnelId,
             importBatch: importBatch,
@@ -1139,7 +1143,9 @@ class GoogleSheetsWorkingService {
       proyecto: 7, // Columna H - Proyecto
       tipoProyecto: 8, // Columna I - Tipo de Proyecto
       cliente: 9, // Columna J - Cliente
-      horasRealesAsana: 12 // Columna M - Cantidad de horas reales Asana
+      horasRealesAsana: 12, // Columna M - Cantidad de horas reales Asana
+      tipoCambio: 15, // Columna P - Tipo Cambio
+      montoTotalUSD: 16 // Columna Q - Monto Total USD
     };
 
     console.log('🗺️ Mapeo de columnas costos directos:', columnMap);
@@ -1157,6 +1163,9 @@ class GoogleSheetsWorkingService {
         // Solo procesar filas válidas
         if (!persona || horasRealesAsana <= 0) continue;
 
+        const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
+        const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
+
         const costoData: CostoDirectoExcel = {
           persona: persona,
           mes: this.getCellValue(row, columnMap.mes) || '',
@@ -1166,7 +1175,9 @@ class GoogleSheetsWorkingService {
           proyecto: this.getCellValue(row, columnMap.proyecto) || '',
           tipoProyecto: this.getCellValue(row, columnMap.tipoProyecto) || '',
           cliente: this.getCellValue(row, columnMap.cliente) || '',
-          horasRealesAsana: horasRealesAsana
+          horasRealesAsana: horasRealesAsana,
+          tipoCambio: tipoCambioRaw ? parseFloat(tipoCambioRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined,
+          montoTotalUSD: montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined
         };
 
         result.push(costoData);

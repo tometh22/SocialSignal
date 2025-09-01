@@ -1666,6 +1666,10 @@ export const directCosts = pgTable("direct_costs", {
   valorHoraPersona: doublePrecision("valor_hora_persona").notNull(), // Obtenido de personnel histórico
   costoTotal: doublePrecision("costo_total").notNull(), // horas * valor_hora
   
+  // Conversión de moneda desde Excel MAESTRO
+  tipoCambio: doublePrecision("tipo_cambio"), // Columna P: Tipo de cambio del momento
+  montoTotalUSD: doublePrecision("monto_total_usd"), // Columna Q: Monto ya convertido a USD
+  
   // Referencias al sistema (null si no existe match)
   projectId: integer("project_id").references(() => activeProjects.id),
   personnelId: integer("personnel_id").references(() => personnel.id),
