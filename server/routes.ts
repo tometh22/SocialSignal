@@ -361,6 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return monthMap[monthName.toLowerCase()] || 1;
   };
 
+
   // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
@@ -654,16 +655,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
-      let totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
       
-      // 4.5 Obtener y agregar costos directos de Excel MAESTRO
-      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
-      
-      // Determinar si el proyecto tiene pricing en USD o ARS
+      // 🚨 CRITICAL FIX: Apply currency conversion for USD projects to time entries
       const projectNotes = project.notes || '';
       const isUSDProject = projectNotes.includes('USD') || 
                            projectNotes.includes('$ USD') ||
                            (project.budget && project.budget > 0 && !projectNotes.includes('ARS'));
+      
+      let totalWorkedCost = 0;
+      
+      if (isUSDProject) {
+        // For USD projects, convert time entry costs using available exchange rate
+        console.log(`💱 USD project detected - Converting time entry costs for ${timeEntries.length} entries`);
+        
+        // Get most recent exchange rate from direct costs for this project
+        const recentDirectCost = projectDirectCosts.find(cost => cost.tipoCambio && cost.tipoCambio > 0);
+        const exchangeRate = recentDirectCost?.tipoCambio || 1.32; // Fallback to 1.32 if no rate available
+        
+        totalWorkedCost = timeEntries.reduce((total, entry) => {
+          if (entry.totalCost && exchangeRate > 0) {
+            const convertedUSD = entry.totalCost / exchangeRate;
+            console.log(`💱 Time entry conversion: $${entry.totalCost} ARS ÷ ${exchangeRate} = $${convertedUSD.toFixed(2)} USD`);
+            return total + convertedUSD;
+          }
+          return total + (entry.totalCost || 0);
+        }, 0);
+        
+        console.log(`💱 Total time entries cost: $${totalWorkedCost.toFixed(2)} USD (converted from ARS)`);
+      } else {
+        // For ARS projects, use original ARS costs
+        totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
+        console.log(`💰 Total time entries cost: $${totalWorkedCost.toFixed(2)} ARS`);
+      }
+      
+      // 4.5 Obtener y agregar costos directos de Excel MAESTRO
+      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
       
       // Calcular costos directos usando la moneda correcta
       const totalDirectCosts = projectDirectCosts.reduce((total, cost) => {
