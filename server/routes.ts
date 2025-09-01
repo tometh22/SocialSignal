@@ -9721,5 +9721,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ENDPOINT TEMPORAL DE DIAGNÓSTICO ====================
+  
+  // Endpoint de diagnóstico para verificar costos directos específicos
+  app.get('/api/debug/direct-costs/:projectId', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const timeFilter = req.query.timeFilter as string || 'june_2025';
+      
+      console.log(`🔥 DEBUG ENDPOINT - Project: ${projectId}, Filter: ${timeFilter}`);
+      
+      // Obtener datos directos de la base de datos
+      const allDirectCosts = await storage.getDirectCostsByProject(projectId);
+      
+      // Aplicar filtro manual para junio 2025
+      const filteredCosts = allDirectCosts.filter(cost => {
+        if (cost.mes === '06 jun' && cost.año === 2025) {
+          return true;
+        }
+        return false;
+      });
+      
+      const result = {
+        projectId,
+        timeFilter,
+        totalDirectCosts: allDirectCosts.length,
+        filteredDirectCosts: filteredCosts.length,
+        rawDatabaseData: allDirectCosts.slice(0, 10), // Primeros 10 registros
+        filteredData: filteredCosts,
+        databaseQuery: `SELECT * FROM direct_costs WHERE project_id = ${projectId}`,
+        generatedAt: new Date().toISOString()
+      };
+      
+      console.log(`🔥 DEBUG RESULT:`, JSON.stringify(result, null, 2));
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error in debug endpoint:", error);
+      res.status(500).json({ message: "Debug endpoint failed", error: error.message });
+    }
+  });
+
   return httpServer;
 }
