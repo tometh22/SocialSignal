@@ -770,10 +770,10 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                 {/* Costo más discreto */}
                 <div className="text-right min-w-[70px]">
                   <div className={`text-sm font-semibold ${cardStyle.nameColor}`}>
-                    ${(workedHours * (member.actualRate || 0)).toFixed(0)}
+                    ${(member.actualCost || (workedHours * (member.actualRate || 0))).toFixed(0)}
                   </div>
                   <div className="text-xs text-gray-500">
-                    ${member.actualRate || 0}/h
+                    ${member.actualCost && workedHours > 0 ? (member.actualCost / workedHours).toFixed(0) : member.actualRate || 0}/h
                   </div>
                 </div>
               </div>
