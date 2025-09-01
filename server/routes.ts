@@ -709,77 +709,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📊 Filtered time entries for project ${id}:`, timeEntries.length, 'entries (from', dateRange.startDate.toISOString(), 'to', dateRange.endDate.toISOString(), ')');
       }
 
-      const totalWorkedHours = timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
+      // 💰 NUEVA INTEGRACIÓN: Usar getProjectCostSummary con filtros temporales para obtener horas y costos integrados
+      console.log(`📊 Getting integrated cost summary for project ${id} with time filter: ${timeFilter}`);
       
-      // 4.5 Obtener y agregar costos directos de Excel MAESTRO PRIMERO
-      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
-      
-      // 🚨 CRITICAL FIX: Apply currency conversion for USD projects to time entries
-      const projectNotes = project.notes || '';
-      const isUSDProject = projectNotes.includes('USD') || 
-                           projectNotes.includes('$ USD') ||
-                           (project.budget && project.budget > 0 && !projectNotes.includes('ARS'));
-      
-      let totalWorkedCost = 0;
-      
-      if (isUSDProject) {
-        // For USD projects, convert time entry costs using available exchange rate
-        console.log(`💱 USD project detected - Converting time entry costs for ${timeEntries.length} entries`);
-        
-        // Get most recent exchange rate from direct costs for this project
-        const recentDirectCost = projectDirectCosts.find(cost => cost.tipoCambio && cost.tipoCambio > 0);
-        const exchangeRate = recentDirectCost?.tipoCambio || 1.32; // Fallback to 1.32 if no rate available
-        
-        totalWorkedCost = timeEntries.reduce((total, entry) => {
-          if (entry.totalCost && exchangeRate > 0) {
-            const convertedUSD = entry.totalCost / exchangeRate;
-            console.log(`💱 Time entry conversion: $${entry.totalCost} ARS ÷ ${exchangeRate} = $${convertedUSD.toFixed(2)} USD`);
-            return total + convertedUSD;
-          }
-          return total + (entry.totalCost || 0);
-        }, 0);
-        
-        console.log(`💱 Total time entries cost: $${totalWorkedCost.toFixed(2)} USD (converted from ARS)`);
-      } else {
-        // For ARS projects, use original ARS costs
-        totalWorkedCost = timeEntries.reduce((total, entry) => total + (entry.totalCost || 0), 0);
-        console.log(`💰 Total time entries cost: $${totalWorkedCost.toFixed(2)} ARS`);
-      }
-      
-      // Calcular costos directos usando la moneda correcta
-      const totalDirectCosts = projectDirectCosts.reduce((total, cost) => {
-        if (isUSDProject) {
-          // Para proyectos USD, usar directamente el monto USD convertido de la columna R
-          if (cost.montoTotalUsd && cost.montoTotalUsd > 0) {
-            console.log(`💰 Using pre-converted USD amount: $${cost.montoTotalUsd} USD (from column R)`);
-            return total + cost.montoTotalUsd;
-          } else if (cost.tipoCambio && cost.tipoCambio > 0) {
-            // Fallback: convertir manualmente si no hay monto USD pero sí tipo de cambio
-            const convertedUSD = (cost.costoTotal || 0) / cost.tipoCambio;
-            console.log(`💱 Manual conversion fallback: $${cost.costoTotal} ARS ÷ ${cost.tipoCambio} = $${convertedUSD.toFixed(2)} USD`);
-            return total + convertedUSD;
-          } else {
-            // Último fallback: usar costo ARS
-            console.log(`⚠️ No USD or exchange rate data, using ARS cost: $${cost.costoTotal} ARS`);
-            return total + (cost.costoTotal || 0);
-          }
-        } else {
-          // Para proyectos con pricing en ARS, usar el costo en ARS
-          return total + (cost.costoTotal || 0);
-        }
-      }, 0);
-      
-      // Agregar costos directos al costo total trabajado
-      totalWorkedCost += totalDirectCosts;
-      
-      console.log(`💰 Direct costs calculation for project ${id}:`, {
-        projectCurrency: isUSDProject ? 'USD' : 'ARS',
-        timeEntriesCost: totalWorkedCost - totalDirectCosts,
-        directCostsFromExcel: totalDirectCosts,
-        totalCombinedCost: totalWorkedCost,
-        directCostsCount: projectDirectCosts.length,
-        usingUSDConversion: isUSDProject
+      const costSummary = await storage.getProjectCostSummary(id);
+      console.log(`📊 Cost summary received:`, {
+        totalWorkedHours: costSummary?.totalWorkedHours || 0,
+        totalWorkedCost: costSummary?.totalCost || 0,
+        directCostsFromExcel: costSummary?.costBreakdown?.directCostsFromExcel || 0,
+        timeEntriesCost: costSummary?.costBreakdown?.timeEntriesCost || 0
       });
+
+      // Usar datos integrados (incluye time entries + Excel MAESTRO)
+      const totalWorkedHours = costSummary?.totalWorkedHours || timeEntries.reduce((total, entry) => total + (entry.hours || 0), 0);
+      const totalWorkedCost = costSummary?.totalCost || 0;
+
+      // Mantener backward compatibility para directCosts
+      const projectDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
       
       // Generate team breakdown from filtered time entries
       const teamBreakdown: { [personnelId: string]: any } = {};
