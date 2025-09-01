@@ -294,6 +294,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint - Verificar mapeo de costos directos 
+  app.get('/api/debug/costs-mapping/:projectId', requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    console.log(`🔍 DEBUG - Verificando mapeo de costos para proyecto ${projectId}`);
+    
+    try {
+      // Obtener costos directos de la base
+      const directCosts = await storage.getDirectCostsByProject(projectId);
+      console.log(`📊 Total costos en base: ${directCosts?.length || 0}`);
+      
+      // Mostrar estructura de los primeros registros
+      const sample = directCosts?.slice(0, 5) || [];
+      console.log(`📋 Muestra de datos completos:`, sample);
+      
+      res.json({
+        projectId,
+        totalCosts: directCosts?.length || 0,
+        allCosts: directCosts || [],
+        sampleData: sample,
+        summary: {
+          hasUSDAmounts: directCosts?.filter(c => c.montoTotalUsd && c.montoTotalUsd > 0).length || 0,
+          hasARSAmounts: directCosts?.filter(c => c.costoTotal && c.costoTotal > 0).length || 0,
+          hasHours: directCosts?.filter(c => c.horasRealesAsana && c.horasRealesAsana > 0).length || 0
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error en debug de costos:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Función auxiliar para filtrar ventas de Google Sheets por período temporal
   const getFilteredGoogleSheetsSales = async (projectId: number, timeFilter: string, dateRange: any) => {
     try {

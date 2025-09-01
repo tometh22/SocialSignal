@@ -2394,7 +2394,7 @@ const ProjectDetailsPage = () => {
                         <span className="text-lg font-bold text-emerald-900">
                           ${unifiedData.directCosts.reduce((sum, cost) => {
                             // Solo usar montos USD convertidos, nunca ARS
-                            const usdAmount = cost.montoTotalUsd || 0;
+                            const usdAmount = cost.montoTotalUSD || 0; // Corregido: USD en mayúsculas
                             return sum + usdAmount;
                           }, 0).toLocaleString()} USD
                         </span>
@@ -2407,10 +2407,10 @@ const ProjectDetailsPage = () => {
                     {/* Lista de personal con costos */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {unifiedData.directCosts
-                        .filter(cost => cost.montoTotalUsd && cost.montoTotalUsd > 0) // Solo mostrar registros con USD válidos
-                        .sort((a, b) => (b.montoTotalUsd || 0) - (a.montoTotalUsd || 0))
+                        .filter(cost => cost.montoTotalUSD && cost.montoTotalUSD > 0) // Solo mostrar registros con USD válidos
+                        .sort((a, b) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
                         .map((cost, index) => {
-                          const amount = cost.montoTotalUsd || 0; // Solo usar USD
+                          const amount = cost.montoTotalUSD || 0; // Solo usar USD
                           return (
                             <div 
                               key={`${cost.persona}-${cost.mes}-${index}`}

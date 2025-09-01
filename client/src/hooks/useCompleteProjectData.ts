@@ -111,7 +111,7 @@ interface CompleteProjectData {
     cliente: string;
     horasRealesAsana: number;
     costoTotal: number;
-    montoTotalUsd?: number;
+    montoTotalUSD?: number; // Corregido: USD en mayúsculas como en schema
     valorHoraPersona: number;
     projectId?: number;
     personnelId?: number;
