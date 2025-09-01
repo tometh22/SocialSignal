@@ -758,6 +758,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             estimatedHours: estimatedHours,
             actualHours: personCost.hours || 0, // Horas del Excel MAESTRO integradas
             actualCost: personCost.realCost || personCost.operationalCost || 0,
+            hours: personCost.hours || 0, // CORRECCIÓN: Usar también 'hours' para compatibilidad con filtros
+            cost: personCost.realCost || personCost.operationalCost || 0, // CORRECCIÓN: Usar también 'cost'
             rate: actualRate,
             efficiency: estimatedHours > 0 ? Math.round(((personCost.hours || 0) / estimatedHours) * 100) : 0,
             isQuoted: isQuoted,
