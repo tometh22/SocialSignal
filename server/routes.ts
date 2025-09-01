@@ -270,6 +270,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // TEMPORARY FORCE SYNC ENDPOINT
+  app.get('/api/debug/force-sync', async (req, res) => {
+    try {
+      console.log('🚀 Force sync triggered via debug endpoint');
+      
+      const { GoogleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      const googleSheetsService = new GoogleSheetsWorkingService();
+      
+      const result = await googleSheetsService.importDirectCosts(storage);
+      
+      res.json({ 
+        success: true, 
+        message: 'Direct costs sync completed',
+        result: result
+      });
+    } catch (error: any) {
+      console.error('❌ Force sync failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
+
   // Función auxiliar para filtrar ventas de Google Sheets por período temporal
   const getFilteredGoogleSheetsSales = async (projectId: number, timeFilter: string, dateRange: any) => {
     try {
