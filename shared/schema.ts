@@ -1662,7 +1662,8 @@ export const directCosts = pgTable("direct_costs", {
   cliente: text("cliente"), // Warner, Uber, Epical, etc.
   
   // Datos de horas y costos
-  horasRealesAsana: doublePrecision("horas_reales_asana").notNull(), // Columna M
+  horasObjetivo: doublePrecision("horas_objetivo"), // Columna K: Cantidad de horas objetivo
+  horasRealesAsana: doublePrecision("horas_reales_asana").notNull(), // Columna L: Cantidad de horas reales Asana
   valorHoraPersona: doublePrecision("valor_hora_persona").notNull(), // Obtenido de personnel histórico
   costoTotal: doublePrecision("costo_total").notNull(), // horas * valor_hora
   

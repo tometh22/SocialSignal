@@ -59,6 +59,7 @@ interface CostoDirectoExcel {
   proyecto: string;
   tipoProyecto: string;
   cliente: string;
+  horasObjetivo?: number; // Columna K: Cantidad de horas objetivo
   horasRealesAsana: number;
   valorHoraPersona?: number;
   costoTotal?: number;
@@ -1152,6 +1153,7 @@ class GoogleSheetsWorkingService {
       especificacion: 5, // Columna F - Especificación
       proyecto: 8, // Columna I - Nombre del proyecto
       cliente: 9, // Columna J - Cliente
+      horasObjetivo: 10, // Columna K - Cantidad de horas objetivo
       horasRealesAsana: 11, // Columna L - Cantidad de horas reales Asana
       montoOriginalARS: 14, // Columna O - Moneda Original ARS
       montoTotalUSD: 17, // Columna R - Monto Total USD (ya convertido)
@@ -1169,6 +1171,7 @@ class GoogleSheetsWorkingService {
       try {
         const persona = this.getCellValue(row, columnMap.persona);
         const tipoGasto = this.getCellValue(row, columnMap.tipoGasto);
+        const horasObjetivo = parseFloat(this.getCellValue(row, columnMap.horasObjetivo)) || 0;
         const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
@@ -1198,6 +1201,7 @@ class GoogleSheetsWorkingService {
           proyecto: proyecto,
           tipoProyecto: '', // No usado en la nueva estructura
           cliente: cliente,
+          horasObjetivo: horasObjetivo, // NUEVO: Horas objetivo de la columna K
           horasRealesAsana: horasRealesAsana,
           tipoCambio: tipoCambioRaw ? parseFloat(tipoCambioRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined,
           montoTotalUSD: montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined
