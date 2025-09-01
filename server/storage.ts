@@ -2134,12 +2134,21 @@ export class DatabaseStorage implements IStorage {
           directCostsFromExcel += directCost.montoTotalUSD;
           
           // Crear time entry sintético para integrar con el sistema existente
+          let monthNumber;
+          if (directCost.mes.includes(' ')) {
+            // Formato "08 ago", "05 may", etc.
+            monthNumber = parseInt(directCost.mes.substring(0, 2));
+          } else {
+            // Formato "Agosto", "Mayo", etc.
+            monthNumber = this.getMonthNumber(directCost.mes);
+          }
+          
           const syntheticEntry = {
             id: `excel-${directCost.id}`,
             projectId: projectId,
             personnelId: directCost.personnelId || null,
             hours: directCost.horasRealesAsana,
-            date: new Date(`${directCost.año}-${this.getMonthNumber(directCost.mes)}-15`), // Día 15 del mes
+            date: new Date(`${directCost.año}-${monthNumber}-15`), // Día 15 del mes
             billable: true,
             description: `Excel MAESTRO: ${directCost.persona} - ${directCost.mes} ${directCost.año}`,
             hourlyRateAtTime: directCost.valorHoraPersona || 0,
@@ -2273,6 +2282,10 @@ export class DatabaseStorage implements IStorage {
           };
         })
         .filter(person => person.realCost > 0 || person.operationalCost > 0 || person.hours > 0);
+
+      if (projectId === 39) {
+        console.log(`🔍 DEBUG costByPerson for project 39 (traditional personnel):`, costByPerson.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
+      }
 
       // Agregar personal del Excel MAESTRO que no está en el sistema de personnel
       const excelOnlyPersonnel = excelDirectCosts
