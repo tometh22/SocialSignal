@@ -2287,18 +2287,10 @@ export class DatabaseStorage implements IStorage {
         console.log(`🔍 DEBUG costByPerson for project 39 (traditional personnel):`, costByPerson.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
       }
 
-      // Agregar personal del Excel MAESTRO que no está en el sistema de personnel
-      if (projectId === 39) {
-        console.log(`🔍 DEBUG Excel personnel matching for project 39:`);
-        excelDirectCosts.forEach(cost => {
-          const matchedPersonnel = allPersonnel.find(p => p.name === cost.persona);
-          console.log(`  - ${cost.persona}: ${matchedPersonnel ? 'MATCHED with ID ' + matchedPersonnel.id : 'NOT MATCHED - will be excelOnly'}`);
-        });
-      }
-
+      // CORRECCIÓN CRÍTICA: Forzar inclusión de datos del Excel MAESTRO para proyectos filtrados
       const excelOnlyPersonnel = excelDirectCosts
-        .filter(cost => !allPersonnel.find(p => p.name === cost.persona))
         .reduce((acc, cost) => {
+          // Buscar si ya existe una entrada para esta persona
           const existing = acc.find(p => p.name === cost.persona);
           if (existing) {
             existing.realCost += cost.montoTotalUSD || 0;
@@ -2318,8 +2310,8 @@ export class DatabaseStorage implements IStorage {
           return acc;
         }, [] as any[]);
       
-      if (projectId === 39) {
-        console.log(`🔍 DEBUG excelOnlyPersonnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
+      if (projectId === 39 && dateRange) {
+        console.log(`🔍 FORCED DEBUG - Excel personnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
       }
 
       // Combinar ambos grupos
