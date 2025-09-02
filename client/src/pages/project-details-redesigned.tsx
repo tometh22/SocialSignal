@@ -726,11 +726,20 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                     {workedHours.toFixed(1)}h
                   </div>
                   <div className="text-xs text-gray-500">
-                    de {estimatedHours.toFixed(0)}h {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
-                    {member.targetHours > 0 && (
-                      <span className="text-blue-600 ml-1">
-                        | Objetivo: {member.targetHours}h
-                      </span>
+                    {/* Mostrar horas objetivo si están disponibles, sino estimadas de cotización */}
+                    {member.targetHours > 0 ? (
+                      <>
+                        de {member.targetHours}h objetivo {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
+                        {estimatedHours > 0 && (
+                          <span className="text-gray-400 ml-1">
+                            | {estimatedHours}h cotización
+                          </span>
+                        )}
+                      </>
+                    ) : estimatedHours > 0 ? (
+                      <>de {estimatedHours.toFixed(0)}h estimadas {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}</>
+                    ) : (
+                      <span className="text-orange-500">Sin horas asignadas</span>
                     )}
                   </div>
                 </div>
@@ -753,16 +762,29 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                   <TooltipContent>
                     <div className="text-sm">
                       <div>Trabajadas: {workedHours.toFixed(1)}h</div>
-                      <div>Estimadas (cotización): {estimatedHours}h</div>
-                      {member.targetHours > 0 && (
-                        <div className="text-blue-600 font-medium">
-                          Objetivo (Excel): {member.targetHours}h
-                        </div>
-                      )}
-                      <div>Progreso vs {member.targetHours > 0 ? 'objetivo' : 'estimado'}: {progressPercent}%</div>
-                      {member.targetHours > 0 && (
-                        <div className="text-orange-600">
-                          Eficiencia vs objetivo: {((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0)}%
+                      {member.targetHours > 0 ? (
+                        <>
+                          <div className="text-blue-600 font-medium">
+                            Objetivo (Excel MAESTRO): {member.targetHours}h
+                          </div>
+                          {estimatedHours > 0 && (
+                            <div className="text-gray-500">
+                              Estimadas (cotización): {estimatedHours}h
+                            </div>
+                          )}
+                          <div>Progreso vs objetivo: {progressPercent}%</div>
+                          <div className="text-orange-600">
+                            Eficiencia: {((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0)}%
+                          </div>
+                        </>
+                      ) : estimatedHours > 0 ? (
+                        <>
+                          <div>Estimadas (cotización): {estimatedHours}h</div>
+                          <div>Progreso: {progressPercent}%</div>
+                        </>
+                      ) : (
+                        <div className="text-orange-500">
+                          ⚠️ Sin horas de referencia asignadas
                         </div>
                       )}
                     </div>
