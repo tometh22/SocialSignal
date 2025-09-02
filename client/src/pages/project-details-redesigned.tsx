@@ -159,7 +159,11 @@ function TimeRangeFilter({
     
     switch (filterValue) {
       case "all":
-        return { startDate: null, endDate: null, label: "Todos los períodos" };
+        return { 
+          startDate: new Date(2020, 0, 1), 
+          endDate: new Date(2030, 11, 31), 
+          label: "Todos los períodos" 
+        };
       case "this-month":
         return {
           startDate: new Date(currentYear, currentMonth, 1),
@@ -309,7 +313,11 @@ function TimeRangeFilter({
           label: "Diciembre"
         };
       default:
-        return { startDate: new Date(2025, 0, 1), endDate: new Date(2025, 11, 31), label: "Todos los períodos" };
+        return { 
+          startDate: new Date(2020, 0, 1), 
+          endDate: new Date(2030, 11, 31), 
+          label: "Todos los períodos" 
+        };
     }
   };
 
@@ -317,8 +325,8 @@ function TimeRangeFilter({
     const dateRange = getDateRangeFromFilter(filterValue);
     onFilterChange({
       type: 'custom',
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate,
+      startDate: dateRange.startDate || new Date(2020, 0, 1),
+      endDate: dateRange.endDate || new Date(2030, 11, 31),
       label: dateRange.label
     });
   };
@@ -979,8 +987,8 @@ const ProjectDetailsPage = () => {
     dateFilterLabel: dateFilter.label, 
     mappedTimeFilter: timeFilterForHook,
     dateFilterDates: {
-      start: dateFilter.startDate?.toISOString(),
-      end: dateFilter.endDate?.toISOString()
+      start: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+      end: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
     }
   });
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
@@ -2454,8 +2462,8 @@ const ProjectDetailsPage = () => {
                   projectId={parseInt(projectId!)} 
                   timeFilter={timeFilterForHook}
                   dateFilter={{
-                    startDate: dateFilter.startDate.toISOString(),
-                    endDate: dateFilter.endDate.toISOString()
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                   }}
                   onNavigateToTab={setActiveTab}
                 />
@@ -2467,8 +2475,8 @@ const ProjectDetailsPage = () => {
                   projectId={parseInt(projectId!)} 
                   timeFilter={timeFilterForHook}
                   dateFilter={{
-                    startDate: dateFilter.startDate.toISOString(),
-                    endDate: dateFilter.endDate.toISOString()
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                   }}
                 />
               </div>
@@ -2480,8 +2488,8 @@ const ProjectDetailsPage = () => {
               <TrendCharts 
                 projectId={parseInt(projectId!)} 
                 dateFilter={{
-                  startDate: dateFilter.startDate.toISOString(),
-                  endDate: dateFilter.endDate.toISOString()
+                  startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                  endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                 }}
               />
             </div>
@@ -2645,8 +2653,8 @@ const ProjectDetailsPage = () => {
                     projectId={parseInt(projectId!)} 
                     timeFilter={timeFilterForHook}
                     dateFilter={{
-                      startDate: dateFilter.startDate.toISOString(),
-                      endDate: dateFilter.endDate.toISOString()
+                      startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                      endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                     }}
                   />
                 </CardContent>
