@@ -131,20 +131,11 @@ export function getDateRangeForFilter(filter: string) {
       break;
     case 'last_quarter':
     case 'last-quarter':
-      // Para proyectos que empezaron en Q2 2025, "trimestre pasado" debería incluir el período Mayo-Julio
-      // que es cuando hubo mayor actividad en proyectos como Huggies
-      if (now.getMonth() >= 8 && now.getFullYear() === 2025) {
-        // Si estamos en septiembre 2025 o después, "trimestre pasado" = Mayo-Julio 2025
-        startDate = new Date(2025, 4, 1); // Mayo 2025  
-        endDate = new Date(2025, 6, 31);   // Julio 2025
-      } else {
-        // Lógica original para otros casos
-        const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
-        const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
-        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-        startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
-        endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
-      }
+      const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+      const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+      const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+      startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
+      endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
       break;
     case 'current_semester':
     case 'this-semester':
@@ -185,10 +176,56 @@ export function getDateRangeForFilter(filter: string) {
       startDate = new Date(now.getFullYear(), 9, 1); // Q4: Octubre-Diciembre del año actual
       endDate = new Date(now.getFullYear(), 11, 31);
       break;
+    case 'huggies_period':
+    case 'mayo_julio_2025':
+      // Período específico para proyectos como Huggies: Mayo-Julio 2025
+      startDate = new Date(2025, 4, 1); // Mayo 2025
+      endDate = new Date(2025, 6, 31);  // Julio 2025
+      break;
     case 'all':
       return null; // Sin filtro temporal - mostrar todo
     default:
-      // Para filtros personalizados o no reconocidos
+      // Soporte para rangos de fechas personalizados: "YYYY-MM-DD_to_YYYY-MM-DD"
+      if (filter.includes('_to_')) {
+        const [startStr, endStr] = filter.split('_to_');
+        const customStartDate = new Date(startStr);
+        const customEndDate = new Date(endStr);
+        
+        if (!isNaN(customStartDate.getTime()) && !isNaN(customEndDate.getTime())) {
+          startDate = customStartDate;
+          endDate = customEndDate;
+          break;
+        }
+      }
+      
+      // Soporte para meses específicos: "mayo_2025", "june_2025", etc.
+      const monthMatch = filter.match(/^([a-z]+)_(\d{4})$/i);
+      if (monthMatch) {
+        const [, monthName, year] = monthMatch;
+        const monthNames = {
+          'enero': 0, 'january': 0, 'jan': 0,
+          'febrero': 1, 'february': 1, 'feb': 1,
+          'marzo': 2, 'march': 2, 'mar': 2,
+          'abril': 3, 'april': 3, 'apr': 3,
+          'mayo': 4, 'may': 4,
+          'junio': 5, 'june': 5, 'jun': 5,
+          'julio': 6, 'july': 6, 'jul': 6,
+          'agosto': 7, 'august': 7, 'aug': 7,
+          'septiembre': 8, 'september': 8, 'sep': 8,
+          'octubre': 9, 'october': 9, 'oct': 9,
+          'noviembre': 10, 'november': 10, 'nov': 10,
+          'diciembre': 11, 'december': 11, 'dec': 11
+        };
+        
+        const monthIndex = monthNames[monthName.toLowerCase()];
+        if (monthIndex !== undefined) {
+          startDate = new Date(parseInt(year), monthIndex, 1);
+          endDate = new Date(parseInt(year), monthIndex + 1, 0);
+          break;
+        }
+      }
+      
+      // Para filtros no reconocidos
       return null;
   }
 
