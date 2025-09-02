@@ -118,9 +118,10 @@ export function EconomicRankings({
     return <span className="w-4 h-4 flex items-center justify-center text-xs font-medium text-gray-500">#{rank}</span>;
   };
 
-  const getScoreBadge = (score: number) => {
-    if (score >= 70) return 'bg-green-100 text-green-800 border-green-200';
-    if (score >= 40) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  const getScoreBadge = (score: number, type: RankingType) => {
+    const thresholds = RANKING_CONFIG.thresholds[type];
+    if (score >= thresholds.excellent) return 'bg-green-100 text-green-800 border-green-200';
+    if (score >= thresholds.good) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     return 'bg-red-100 text-red-800 border-red-200';
   };
 
@@ -216,7 +217,7 @@ export function EconomicRankings({
                 <div className="font-bold text-lg text-gray-900">
                   {score < 0.1 && score > 0 ? score.toFixed(3) : score.toFixed(1)}
                 </div>
-                <Badge variant="outline" className={getScoreBadge(score)}>
+                <Badge variant="outline" className={getScoreBadge(score, rankingType)}>
                   {getScoreLabel(score, rankingType)}
                 </Badge>
               </div>
