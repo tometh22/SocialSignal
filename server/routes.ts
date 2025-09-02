@@ -764,7 +764,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             efficiency: estimatedHours > 0 ? Math.round(((personCost.hours || 0) / estimatedHours) * 100) : 0,
             isQuoted: isQuoted,
             contractType: personCost.contractType || 'external',
-            isFromExcel: !personCost.personnelId // Marcador para entries del Excel
+            isFromExcel: !personCost.personnelId, // Marcador para entries del Excel
+            targetHours: personCost.targetHours || null // NUEVO: Horas objetivo del Excel MAESTRO
           };
         }
       } else {
@@ -842,7 +843,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             estimatedHours: estimatedHours,
             rate: actualRate,
             isQuoted: isQuoted, // NUEVO: Marca si el personal estaba en cotización original
-            isUnquoted: !isQuoted // NUEVO: Marca si el personal NO estaba cotizado originalmente
+            isUnquoted: !isQuoted, // NUEVO: Marca si el personal NO estaba cotizado originalmente
+            targetHours: null // NUEVO: Horas objetivo del Excel MAESTRO (inicialmente null para time entries)
           };
           }
           teamBreakdown[personnelId].hours += entry.hours || 0;
@@ -905,7 +907,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             estimatedHours: estimatedHours, // Adjusted hours
             rate: quotationMember.rate || 0,
             isQuoted: true,
-            isUnquoted: false
+            isUnquoted: false,
+            targetHours: null // NUEVO: Horas objetivo del Excel MAESTRO (inicialmente null para miembros de cotización sin datos)
           };
         }
       }
