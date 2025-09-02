@@ -158,22 +158,22 @@ export function getDateRangeForFilter(filter: string) {
       break;
     case 'q1':
     case 'q1_2025':
-      startDate = new Date(now.getFullYear(), 0, 1); // Q1: Enero-Marzo del año actual
+      startDate = new Date(now.getFullYear(), 0, 1); // Q1: Enero-Marzo
       endDate = new Date(now.getFullYear(), 2, 31);
       break;
     case 'q2':
     case 'q2_2025':
-      startDate = new Date(now.getFullYear(), 3, 1); // Q2: Abril-Junio del año actual
+      startDate = new Date(now.getFullYear(), 3, 1); // Q2: Abril-Mayo-Junio
       endDate = new Date(now.getFullYear(), 5, 30);
       break;
     case 'q3':
     case 'q3_2025':
-      startDate = new Date(now.getFullYear(), 6, 1); // Q3: Julio-Septiembre del año actual
+      startDate = new Date(now.getFullYear(), 6, 1); // Q3: Julio-Agosto-Septiembre
       endDate = new Date(now.getFullYear(), 8, 30);
       break;
     case 'q4':
     case 'q4_2025':
-      startDate = new Date(now.getFullYear(), 9, 1); // Q4: Octubre-Diciembre del año actual
+      startDate = new Date(now.getFullYear(), 9, 1); // Q4: Octubre-Noviembre-Diciembre
       endDate = new Date(now.getFullYear(), 11, 31);
       break;
     case 'huggies_period':
