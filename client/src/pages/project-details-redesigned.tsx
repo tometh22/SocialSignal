@@ -3067,9 +3067,18 @@ const ProjectDetailsPage = () => {
                   </div>
                   <div className="space-y-1">
                     {(() => {
+                      // Horas trabajadas del período filtrado
                       const workedHours = costSummary?.filteredHours || 0;
-                      const estimatedHours = completeData?.quotation?.estimatedHours || 0; // Backend ya envía valor escalado
-                      const percentage = estimatedHours > 0 ? (workedHours / estimatedHours) * 100 : 0;
+                      
+                      // Horas objetivo del Excel MAESTRO para el mismo período
+                      const targetHoursFromExcel = costSummary?.directCostsFromExcel?.reduce((total: number, cost: any) => {
+                        return total + (parseFloat(cost.horasObjetivo) || 0);
+                      }, 0) || 0;
+                      
+                      // Si no hay datos del Excel MAESTRO, usar horas estimadas de cotización como fallback
+                      const targetHours = targetHoursFromExcel > 0 ? targetHoursFromExcel : (completeData?.quotation?.estimatedHours || 0);
+                      
+                      const percentage = targetHours > 0 ? (workedHours / targetHours) * 100 : 0;
                       
                       return (
                         <>
@@ -3077,7 +3086,7 @@ const ProjectDetailsPage = () => {
                             {percentage.toFixed(2)}%
                           </p>
                           <p className="text-xs text-gray-500">
-                            de {estimatedHours.toFixed(0)}h estimadas
+                            de {targetHours.toFixed(0)}h objetivo {targetHoursFromExcel > 0 ? '(Excel MAESTRO)' : '(cotización)'}
                           </p>
                         </>
                       );
