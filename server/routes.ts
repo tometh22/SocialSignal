@@ -1352,8 +1352,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
 
       
-      // Preparar datos del equipo para rankings - SOLO MIEMBROS CON TIME ENTRIES
-      const teamRankingData = Object.values(teamBreakdown)
+      // Preparar datos del equipo para rankings - DEDUPLICAR POR NOMBRE NORMALIZADO
+      const uniqueTeamMembers = new Map();
+      
+      // Consolidar miembros con nombres similares (ej: Sol vs Sol Ayala)
+      Object.entries(teamBreakdown).forEach(([key, member]) => {
+        const normalizedName = member.name?.toLowerCase().split(' ')[0] || key;
+        
+        if (uniqueTeamMembers.has(normalizedName)) {
+          // Ya existe, combinar datos
+          const existing = uniqueTeamMembers.get(normalizedName);
+          existing.hours += (member.hours || 0);
+          existing.cost += (member.cost || 0);
+          existing.targetHours = Math.max(existing.targetHours || 0, member.targetHours || 0);
+          existing.estimatedHours = Math.max(existing.estimatedHours || 0, member.estimatedHours || 0);
+          existing.rate = Math.max(existing.rate || 0, member.rate || 0); // Usar la tarifa más alta
+          console.log(`🔗 Consolidated duplicate: "${member.name}" into "${existing.name}"`);
+        } else {
+          // Primera vez viendo este nombre, agregar
+          uniqueTeamMembers.set(normalizedName, { ...member });
+        }
+      });
+      
+      const teamRankingData = Array.from(uniqueTeamMembers.values())
         .filter(member => (member.hours || 0) > 0) // Solo incluir miembros con horas trabajadas
         .map(member => {
           // PRIORIZAR horas objetivo del Excel MAESTRO sobre estimaciones de cotización

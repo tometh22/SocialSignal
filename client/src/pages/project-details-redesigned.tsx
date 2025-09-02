@@ -2927,22 +2927,25 @@ const ProjectDetailsPage = () => {
                 </CardHeader>
                 <CardContent className="p-6">
                   {(() => {
-                    // Use completeData.actuals.teamBreakdown which has the filtered team member information
-                    const teamMembers = completeData?.actuals?.teamBreakdown || [];
-
+                    // Use rankings data which already has deduplicated team members
+                    const economicRankings = completeData?.analytics?.economicRankings || [];
                     
-                    if (!teamMembers || !Array.isArray(teamMembers) || teamMembers.length === 0) {
+                    if (!economicRankings || !Array.isArray(economicRankings) || economicRankings.length === 0) {
                       return (
                         <div className="text-center py-8 text-gray-500">
                           <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
                           <p className="text-sm">No hay datos del equipo disponibles</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Los rankings económicos están siendo calculados...
+                          </p>
                         </div>
                       );
                     }
                     
-                    // Create a grid-based heat map - show ALL members who worked on the project
-                    const gridCols = 4;
-                    const displayMembers = teamMembers.filter(member => member.hours > 0); // Only show members with actual hours
+                    // Use deduplicated rankings data for heat map
+                    const displayMembers = economicRankings.filter(member => 
+                      (member.actualHours || member.hours || 0) > 0
+                    );
                     
                     return (
                       <div className="space-y-4">
@@ -2967,20 +2970,20 @@ const ProjectDetailsPage = () => {
                         </div>
                         
                         {/* Heat Map Grid - Full width version */}
-                        <div className="grid grid-cols-8 gap-3">
+                        <div className="grid grid-cols-6 gap-3">
                           {displayMembers.map((member: any, index: number) => {
-                            const name = member.name || member.personnelName || `Miembro ${index + 1}`;
-                            const hourlyRate = member.hourlyRate || member.rate || 10;
+                            const name = member.personnelName || member.name || `Miembro ${index + 1}`;
+                            // Use data from rankings which already has correct calculations
+                            const He = member.estimatedHours || 0;
+                            const Hr = member.actualHours || member.hours || 0;
+                            const Ce = member.estimatedCost || 0;
+                            const Cr = member.actualCost || 0;
                             
                             // DATOS BASE NUEVAS MÉTRICAS (P, Ce, Cr, He, Hr)
                             const P = completeData?.quotation?.totalAmount || 0;
-                            const Ce = member.estimatedHours * hourlyRate;
-                            const Cr = member.hours * hourlyRate;
-                            const He = member.estimatedHours || 0;
-                            const Hr = member.hours || 0;
                             
-                            // CÁLCULO DE α Y MÉTRICAS
-                            const Ce_total = displayMembers.reduce((sum, m) => sum + (m.estimatedHours * (m.hourlyRate || m.rate || 10)), 0);
+                            // CÁLCULO DE α Y MÉTRICAS - Using rankings data
+                            const Ce_total = displayMembers.reduce((sum, m) => sum + (m.estimatedCost || 0), 0);
                             const alpha = Ce_total > 0 ? Ce / Ce_total : 0;
                             const precioAsignado = P * alpha;
                             
@@ -3011,7 +3014,7 @@ const ProjectDetailsPage = () => {
                             
                             return (
                               <div 
-                                key={member.personnelId || index}
+                                key={`${member.personnelId || member.personnelName || index}-heatmap`}
                                 className={`relative h-20 w-full ${bgColor} rounded-lg p-2 hover:scale-105 transition-transform cursor-pointer group`}
                                 style={{ opacity: intensity / 100 }}
                                 title={`${name}: ${Hr.toFixed(1)}h trabajadas / ${He.toFixed(1)}h estimadas`}
