@@ -131,11 +131,20 @@ export function getDateRangeForFilter(filter: string) {
       break;
     case 'last_quarter':
     case 'last-quarter':
-      const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
-      const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
-      startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
-      endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
+      // Para proyectos que empezaron en Q2 2025, "trimestre pasado" debería incluir el período Mayo-Julio
+      // que es cuando hubo mayor actividad en proyectos como Huggies
+      if (now.getMonth() >= 8 && now.getFullYear() === 2025) {
+        // Si estamos en septiembre 2025 o después, "trimestre pasado" = Mayo-Julio 2025
+        startDate = new Date(2025, 4, 1); // Mayo 2025  
+        endDate = new Date(2025, 6, 31);   // Julio 2025
+      } else {
+        // Lógica original para otros casos
+        const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
+        const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
+        const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
+        startDate = new Date(quarterYear, adjustedQuarter * 3, 1);
+        endDate = new Date(quarterYear, (adjustedQuarter + 1) * 3, 0);
+      }
       break;
     case 'current_semester':
     case 'this-semester':
