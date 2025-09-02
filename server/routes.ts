@@ -1087,15 +1087,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Si el miembro no tiene rate, buscar en base de datos de personnel
           if (!teamBreakdown[teamMemberKey].rate || teamBreakdown[teamMemberKey].rate === 0) {
             const personnelData = await storage.getPersonnel();
-            const matchingPersonnel = personnelData.find(p => 
-              p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
-              personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
-            );
+            // Mejorar la coincidencia de nombres con apodos comunes
+            const normalizePersonnelName = (name: string) => {
+              const nameMap = {
+                'vicky': 'victoria',
+                'victoria': 'victoria',
+                'trini': 'trinidad', 
+                'trinidad': 'trinidad',
+                'tomi': 'tomas',
+                'tomas': 'tomas',
+                'male': 'malena',
+                'malena': 'malena',
+                'vanu': 'vanina',
+                'vanina': 'vanina',
+                'gast': 'gastón',
+                'gaston': 'gastón',
+                'gastón': 'gastón'
+              };
+              const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
+              return nameMap[normalized] || normalized;
+            };
+            
+            const matchingPersonnel = personnelData.find(p => {
+              const personnelFirstName = normalizePersonnelName(personnelName);
+              const dbFirstName = normalizePersonnelName(p.name || '');
+              return personnelFirstName === dbFirstName ||
+                     p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+                     personnelName.toLowerCase().includes(p.name?.toLowerCase() || '');
+            });
             
             if (matchingPersonnel && matchingPersonnel.hourlyRate) {
               teamBreakdown[teamMemberKey].rate = matchingPersonnel.hourlyRate;
               teamBreakdown[teamMemberKey].hourlyRate = matchingPersonnel.hourlyRate;
-              console.log(`💰 Updated rate for ${personnelName}: $${matchingPersonnel.hourlyRate}/h`);
+              console.log(`💰 Updated rate for ${personnelName}: $${matchingPersonnel.hourlyRate}/h (matched with ${matchingPersonnel.name})`);
+            } else {
+              console.log(`⚠️ No rate found for ${personnelName}. Tried matching with personnel names.`);
             }
           }
           
@@ -1104,12 +1130,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Crear nuevo miembro del equipo para datos del Excel MAESTRO que no están en time entries
           // Buscar datos de personnel por nombre para obtener la tarifa
           const personnelData = await storage.getPersonnel();
-          const matchingPersonnel = personnelData.find(p => 
-            p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
-            personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
-          );
+          // Mejorar la coincidencia de nombres con apodos comunes
+          const normalizePersonnelName = (name: string) => {
+            const nameMap = {
+              'vicky': 'victoria',
+              'victoria': 'victoria',
+              'trini': 'trinidad', 
+              'trinidad': 'trinidad',
+              'tomi': 'tomas',
+              'tomas': 'tomas',
+              'male': 'malena',
+              'malena': 'malena',
+              'vanu': 'vanina',
+              'vanina': 'vanina',
+              'gast': 'gastón',
+              'gaston': 'gastón',
+              'gastón': 'gastón'
+            };
+            const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
+            return nameMap[normalized] || normalized;
+          };
+          
+          const matchingPersonnel = personnelData.find(p => {
+            const personnelFirstName = normalizePersonnelName(personnelName);
+            const dbFirstName = normalizePersonnelName(p.name || '');
+            return personnelFirstName === dbFirstName ||
+                   p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+                   personnelName.toLowerCase().includes(p.name?.toLowerCase() || '');
+          });
           
           const hourlyRate = matchingPersonnel ? matchingPersonnel.hourlyRate || 0 : 0;
+          
+          if (matchingPersonnel) {
+            console.log(`💰 Found personnel match for ${personnelName}: ${matchingPersonnel.name} with rate $${hourlyRate}/h`);
+          } else {
+            console.log(`⚠️ No personnel match found for ${personnelName}`);
+          }
           
           const newKey = `excel_${personnelName.replace(/\s+/g, '_').toLowerCase()}`;
           teamBreakdown[newKey] = {
