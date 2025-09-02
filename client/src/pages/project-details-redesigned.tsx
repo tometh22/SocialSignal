@@ -576,9 +576,11 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
 
 
 
-  const getProgressPercentage = (workedHours: number, estimatedHours: number) => {
-    if (estimatedHours === 0) return 0;
-    return Math.round((workedHours / estimatedHours) * 100);
+  const getProgressPercentage = (workedHours: number, estimatedHours: number, targetHours?: number) => {
+    // Usar horas objetivo del Excel MAESTRO si están disponibles, si no, usar estimadas de la cotización
+    const referenceHours = (targetHours && targetHours > 0) ? targetHours : estimatedHours;
+    if (referenceHours === 0) return 0;
+    return Math.round((workedHours / referenceHours) * 100);
   };
 
   if (teamLoading) {
@@ -625,9 +627,11 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
         {completeTeam.map((member: any, index: number) => {
           const workedHours = member.actualHours || 0;
           const estimatedHours = member.estimatedHours || 0;
-          const progressPercent = getProgressPercentage(workedHours, estimatedHours);
-          const remainingHours = Math.max(0, estimatedHours - workedHours);
-          const isOverBudget = workedHours > estimatedHours;
+          const progressPercent = getProgressPercentage(workedHours, estimatedHours, member.targetHours);
+          // Usar horas objetivo para calcular presupuesto restante y estado de exceso
+          const referenceHours = (member.targetHours && member.targetHours > 0) ? member.targetHours : estimatedHours;
+          const remainingHours = Math.max(0, referenceHours - workedHours);
+          const isOverBudget = workedHours > referenceHours;
           
           // Definir colores y estilos basados en el estado del miembro
           const getCardStyle = () => {
@@ -723,12 +727,12 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                   </div>
                   <div className="text-xs text-gray-500">
                     de {estimatedHours.toFixed(0)}h {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
+                    {member.targetHours > 0 && (
+                      <span className="text-blue-600 ml-1">
+                        | Objetivo: {member.targetHours}h
+                      </span>
+                    )}
                   </div>
-                  {member.targetHours > 0 && (
-                    <div className="text-xs text-blue-600 font-medium mt-0.5">
-                      📊 {member.targetHours}h objetivo
-                    </div>
-                  )}
                 </div>
 
                 {/* Barra de progreso más sutil */}
@@ -749,14 +753,16 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                   <TooltipContent>
                     <div className="text-sm">
                       <div>Trabajadas: {workedHours.toFixed(1)}h</div>
-                      <div>Estimadas: {estimatedHours}h</div>
+                      <div>Estimadas (cotización): {estimatedHours}h</div>
                       {member.targetHours > 0 && (
-                        <div className="text-blue-600 font-medium">Objetivo (Excel): {member.targetHours}h</div>
+                        <div className="text-blue-600 font-medium">
+                          Objetivo (Excel): {member.targetHours}h
+                        </div>
                       )}
-                      <div>Progreso: {progressPercent}%</div>
+                      <div>Progreso vs {member.targetHours > 0 ? 'objetivo' : 'estimado'}: {progressPercent}%</div>
                       {member.targetHours > 0 && (
                         <div className="text-orange-600">
-                          Eficiencia: {member.targetHours > 0 ? ((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0) : 0}%
+                          Eficiencia vs objetivo: {((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0)}%
                         </div>
                       )}
                     </div>
