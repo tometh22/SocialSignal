@@ -631,9 +631,12 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
           // Usar horas objetivo para calcular presupuesto restante y estado de exceso
           const referenceHours = (member.targetHours && member.targetHours > 0) ? member.targetHours : estimatedHours;
           const remainingHours = Math.max(0, referenceHours - workedHours);
-          const isOverBudget = workedHours > referenceHours;
           
-          // Definir colores y estilos basados en el estado del miembro
+          // Umbral más realista para "excedido": 15% de tolerancia corporativa
+          const toleranceThreshold = referenceHours * 0.15; // 15% de tolerancia
+          const isOverBudget = workedHours > (referenceHours + toleranceThreshold);
+          
+          // Definir colores y estilos basados en el estado del miembro con umbrales corporativos realistas
           const getCardStyle = () => {
             if (workedHours === 0) {
               return {
@@ -645,6 +648,7 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                 roleColor: "text-gray-500"
               };
             } else if (isOverBudget) {
+              // Rojo: Exceso crítico (>15% sobre objetivo)
               return {
                 bgGradient: "bg-gradient-to-r from-red-50 to-red-100",
                 borderColor: "border-red-300",
@@ -653,16 +657,28 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                 nameColor: "text-red-900",
                 roleColor: "text-red-600"
               };
-            } else if (progressPercent >= 80) {
+            } else if (progressPercent >= 110) {
+              // Naranja: Advertencia (entre 100% y 115% - dentro de tolerancia pero elevado)
               return {
-                bgGradient: "bg-gradient-to-r from-yellow-50 to-orange-100",
+                bgGradient: "bg-gradient-to-r from-orange-50 to-orange-100",
+                borderColor: "border-orange-300",
+                textColor: "text-orange-700",
+                avatarBg: "bg-gradient-to-br from-orange-500 to-orange-600",
+                nameColor: "text-orange-900",
+                roleColor: "text-orange-700"
+              };
+            } else if (progressPercent >= 85) {
+              // Amarillo: Cerca del objetivo (85-100%)
+              return {
+                bgGradient: "bg-gradient-to-r from-yellow-50 to-yellow-100",
                 borderColor: "border-yellow-300",
                 textColor: "text-yellow-700",
-                avatarBg: "bg-gradient-to-br from-yellow-500 to-orange-500",
+                avatarBg: "bg-gradient-to-br from-yellow-500 to-yellow-600",
                 nameColor: "text-yellow-900",
                 roleColor: "text-yellow-700"
               };
             } else if (progressPercent > 0) {
+              // Verde: En progreso normal
               return {
                 bgGradient: "bg-gradient-to-r from-green-50 to-emerald-100",
                 borderColor: "border-green-300",

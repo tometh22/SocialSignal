@@ -739,7 +739,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`🔍 Sample costByPerson data:`, costSummary.costByPerson.slice(0, 3));
         
         for (const personCost of costSummary.costByPerson) {
-          const personnelId = personCost.personnelId || `excel-${personCost.name}`;
+          const personnelId = personCost.personnelId || `excel-${personCost.name?.replace(/\s+/g, '_').toLowerCase()}`;
+          
+          // Evitar duplicaciones: verificar si ya existe
+          if (teamBreakdown[personnelId]) {
+            console.log(`⚠️ Evitando duplicación para personnelId: ${personnelId}, name: ${personCost.name}`);
+            continue;
+          }
           
           // Buscar datos estimados de la cotización si existe
           const quotationMember = quotationTeam.find(m => m.personnelId === personCost.personnelId);
@@ -859,10 +865,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // 4.5. Agregar miembros del equipo de cotización que no tienen time entries en este período
+      // 4.5. Agregar miembros del equipo de cotización que no tienen time entries en este período (solo si no están ya)
       for (const quotationMember of quotationTeam) {
         const personnelId = quotationMember.personnelId.toString();
         if (!teamBreakdown[personnelId]) {
+          console.log(`📊 Adding quotation member ${quotationMember.personnelName} (ID: ${personnelId}) - not found in cost summary`);
           let estimatedHours = quotationMember.hours || 0;
           
           // Aplicar ajustes de horas mensuales según el tipo de filtro
@@ -917,6 +924,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 Total worked hours:`, totalWorkedHours);
       console.log(`📊 Total worked cost:`, totalWorkedCost);
       console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members (including quotation team)`);
+      console.log(`🔍 Final team breakdown keys:`, Object.keys(teamBreakdown).map(key => ({
+        key, 
+        name: teamBreakdown[key].name, 
+        personnelId: teamBreakdown[key].personnelId,
+        actualHours: teamBreakdown[key].actualHours || teamBreakdown[key].hours,
+        targetHours: teamBreakdown[key].targetHours
+      })));
 
       // Función para calcular meses reales con datos
       function calculateActualMonthsWithData(entries: any[], dateRange: any): number {
