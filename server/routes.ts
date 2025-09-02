@@ -1071,11 +1071,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const actualHours = directCost.horasRealesAsana || 0;
         
         // Buscar el miembro del equipo por nombre (ya que Excel MAESTRO puede no tener personnelId)
+        // Usar la misma lógica de normalización para evitar duplicados
+        const normalizePersonnelName = (name: string) => {
+          const nameMap = {
+            'vicky': 'victoria',
+            'victoria': 'victoria',
+            'trini': 'trinidad', 
+            'trinidad': 'trinidad',
+            'tomi': 'tomas',
+            'tomas': 'tomas',
+            'male': 'malena',
+            'malena': 'malena',
+            'vanu': 'vanina',
+            'vanina': 'vanina',
+            'gast': 'gastón',
+            'gaston': 'gastón',
+            'gastón': 'gastón',
+            'aylu': 'aylen',
+            'aylen': 'aylen',
+            'sol': 'sol',
+            'to': 'rosario',
+            'ro': 'rosario',
+            'rosario': 'rosario',
+            'santi': 'santiago',
+            'santiago': 'santiago',
+            'xavi': 'xavier',
+            'xavier': 'xavier',
+            'mati': 'matías',
+            'matias': 'matías',
+            'ina': 'ina',
+            'cata': 'cata'
+          };
+          const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
+          return nameMap[normalized] || normalized;
+        };
+
         let teamMemberKey = null;
+        const normalizedPersonnelName = normalizePersonnelName(personnelName);
+        
         for (const [key, member] of Object.entries(teamBreakdown)) {
-          if (member.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+          const normalizedMemberName = normalizePersonnelName(member.name || '');
+          
+          // Usar coincidencia normalizada MÁS coincidencia de texto para mejor precisión
+          if (normalizedPersonnelName === normalizedMemberName ||
+              member.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
               personnelName.toLowerCase().includes(member.name?.toLowerCase() || '')) {
             teamMemberKey = key;
+            console.log(`🔗 Found team member match: "${personnelName}" → "${member.name}" (key: ${key})`);
             break;
           }
         }
