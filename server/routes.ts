@@ -6883,6 +6883,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotation = await storage.getQuotation(project.quotationId);
       const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
       
+      // NUEVO: Obtener costos directos del Excel MAESTRO para horas objetivo
+      let excelDirectCosts = await storage.getDirectCostsByProject(projectId);
+      
+      // Aplicar filtro temporal a costos directos si está especificado
+      if (startDate && endDate) {
+        excelDirectCosts = excelDirectCosts.filter(cost => {
+          // Manejar diferentes formatos de mes en el Excel MAESTRO
+          let monthNumber;
+          if (cost.mes.includes(' ')) {
+            // Formato "08 ago", "05 may", etc.
+            monthNumber = parseInt(cost.mes.substring(0, 2));
+          } else {
+            // Formato "Agosto", "Mayo", etc.
+            monthNumber = storage.getMonthNumber(cost.mes);
+          }
+          const costDate = new Date(`${cost.año}-${monthNumber}-15`); // Día 15 del mes
+          const filterStartDate = new Date(startDate as string);
+          const filterEndDate = new Date(endDate as string);
+          return costDate >= filterStartDate && costDate <= filterEndDate;
+        });
+      }
+      
+      console.log(`📊 Found ${excelDirectCosts.length} Excel MAESTRO cost records for deviation analysis`);
+      
       // Construir condiciones de filtro
       const whereConditions = [eq(timeEntries.projectId, projectId)];
       
@@ -6942,9 +6966,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sum + entry.hours, 0);
         const actualCost = memberTimeEntries.reduce((sum, entry) => 
           sum + (entry.hours * (entry.hourlyRateAtTime || member.rate)), 0);
+        
+        // NUEVO: Obtener horas objetivo del Excel MAESTRO para este miembro
+        const memberExcelCosts = excelDirectCosts.filter(cost => cost.persona === memberPersonnel?.name);
+        const targetHours = memberExcelCosts.reduce((sum, cost) => sum + (cost.horasObjetivo || 0), 0);
+        
+        console.log(`📊 Deviation Analysis - ${memberPersonnel?.name}: Estimated: ${member.hours}h, Target: ${targetHours}h, Actual: ${actualHours}h`);
 
         const hoursVariance = actualHours - member.hours;
         const costVariance = actualCost - member.cost;
+        
+        // NUEVO: Calcular desviación vs horas objetivo del Excel MAESTRO
+        const targetVariance = targetHours > 0 ? actualHours - targetHours : 0;
+        const targetVariancePercentage = targetHours > 0 ? (targetVariance / targetHours) * 100 : 0;
+        
+        // NUEVO: Calcular eficiencia (horas objetivo vs trabajadas)
+        const efficiency = targetHours > 0 && actualHours > 0 ? (targetHours / actualHours) * 100 : 0;
 
         return {
           personnelId: member.personnelId,
@@ -6958,11 +6995,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hours: actualHours,
             cost: actualCost
           },
+          // NUEVO: Agregar información de horas objetivo del Excel MAESTRO
+          target: {
+            hours: targetHours,
+            efficiency: efficiency
+          },
           variance: {
             hours: hoursVariance,
             cost: costVariance,
             hoursPercentage: member.hours > 0 ? (hoursVariance / member.hours) * 100 : 0,
-            costPercentage: member.cost > 0 ? (costVariance / member.cost) * 100 : 0
+            costPercentage: member.cost > 0 ? (costVariance / member.cost) * 100 : 0,
+            // NUEVO: Desviación vs horas objetivo
+            targetHours: targetVariance,
+            targetHoursPercentage: targetVariancePercentage
           }
         };
       });
