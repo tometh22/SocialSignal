@@ -193,7 +193,10 @@ export function EconomicRankings({
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
-                      {(member.pricePercentage * 100).toFixed(1)}%
+                      {member.pricePercentage < 0.001 && member.pricePercentage > 0 
+                        ? (member.pricePercentage * 100).toFixed(3) + '%'
+                        : (member.pricePercentage * 100).toFixed(1) + '%'
+                      }
                     </span>
                   </div>
                 </div>
@@ -201,7 +204,7 @@ export function EconomicRankings({
 
               <div className="text-right">
                 <div className="font-bold text-lg text-gray-900">
-                  {score.toFixed(1)}
+                  {score < 0.1 && score > 0 ? score.toFixed(3) : score.toFixed(1)}
                 </div>
                 <Badge variant="outline" className={getScoreBadge(score)}>
                   {score >= 70 ? 'Excelente' : score >= 40 ? 'Bueno' : 'Crítico'}
