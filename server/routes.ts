@@ -1207,17 +1207,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const teamRankingData = Object.values(teamBreakdown)
         .filter(member => (member.hours || 0) > 0) // Solo incluir miembros con horas trabajadas
         .map(member => {
-          // NO ESCALAR las horas estimadas individuales - mantener valores base de cotización
-          const baseEstimatedHours = member.estimatedHours || 0;
+          // PRIORIZAR horas objetivo del Excel MAESTRO sobre estimaciones de cotización
+          const baseEstimatedHours = member.targetHours || member.estimatedHours || 0;
           const baseEstimatedCost = baseEstimatedHours * (member.rate || 0);
+          
+          console.log(`📊 Rankings - Member ${member.name}: targetHours=${member.targetHours}, estimatedHours=${member.estimatedHours}, using=${baseEstimatedHours}`);
           
           return {
             personnelId: member.personnelId,
             name: member.name || `Miembro ${member.personnelId}`,
             personnelName: member.name || `Miembro ${member.personnelId}`,
-            estimatedHours: baseEstimatedHours, // HORAS BASE SIN ESCALAMIENTO
+            estimatedHours: baseEstimatedHours, // USAR HORAS OBJETIVO DEL EXCEL MAESTRO PRIMERO
             actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
-            estimatedCost: baseEstimatedCost, // COSTO BASE SIN ESCALAMIENTO
+            estimatedCost: baseEstimatedCost, // COSTO BASADO EN HORAS OBJETIVO
             actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
           };
         });
