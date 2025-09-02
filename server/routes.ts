@@ -1132,8 +1132,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return monthsSet.size;
       }
 
+      // 5. RECALCULAR horas estimadas totales DESPUÉS de integrar Excel MAESTRO
+      // Sumar todas las horas objetivo del Excel MAESTRO + horas estimadas de cotización
+      const totalEstimatedHoursFromTeam = Object.values(teamBreakdown).reduce((sum, member) => {
+        const memberEstimated = member.targetHours || member.estimatedHours || 0;
+        console.log(`📊 Member ${member.name}: estimatedHours=${member.estimatedHours}, targetHours=${member.targetHours}, using=${memberEstimated}`);
+        return sum + memberEstimated;
+      }, 0);
+      
+      console.log(`📊 RECALCULATED estimatedHours: original=${estimatedHours}, fromTeamBreakdown=${totalEstimatedHoursFromTeam}`);
+      
       // 5. Ajustar horas estimadas según tipo de proyecto y filtro temporal
-      let adjustedEstimatedHours = estimatedHours;
+      let adjustedEstimatedHours = totalEstimatedHoursFromTeam > 0 ? totalEstimatedHoursFromTeam : estimatedHours;
       let adjustedBaseCost = baseCost;
       let adjustedTotalAmount = totalAmount;
       
