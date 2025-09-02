@@ -1083,26 +1083,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (teamMemberKey) {
           // Actualizar horas objetivo del Excel MAESTRO
           teamBreakdown[teamMemberKey].targetHours = (teamBreakdown[teamMemberKey].targetHours || 0) + targetHours;
-          console.log(`💰 Updated ${personnelName}: targetHours=${teamBreakdown[teamMemberKey].targetHours}`);
+          
+          // Si el miembro no tiene rate, buscar en base de datos de personnel
+          if (!teamBreakdown[teamMemberKey].rate || teamBreakdown[teamMemberKey].rate === 0) {
+            const personnelData = await storage.getAllPersonnel();
+            const matchingPersonnel = personnelData.find(p => 
+              p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+              personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
+            );
+            
+            if (matchingPersonnel && matchingPersonnel.hourlyRate) {
+              teamBreakdown[teamMemberKey].rate = matchingPersonnel.hourlyRate;
+              teamBreakdown[teamMemberKey].hourlyRate = matchingPersonnel.hourlyRate;
+              console.log(`💰 Updated rate for ${personnelName}: $${matchingPersonnel.hourlyRate}/h`);
+            }
+          }
+          
+          console.log(`💰 Updated ${personnelName}: targetHours=${teamBreakdown[teamMemberKey].targetHours}, rate=${teamBreakdown[teamMemberKey].rate}`);
         } else {
           // Crear nuevo miembro del equipo para datos del Excel MAESTRO que no están en time entries
+          // Buscar datos de personnel por nombre para obtener la tarifa
+          const personnelData = await storage.getAllPersonnel();
+          const matchingPersonnel = personnelData.find(p => 
+            p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+            personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
+          );
+          
+          const hourlyRate = matchingPersonnel ? matchingPersonnel.hourlyRate || 0 : 0;
+          
           const newKey = `excel_${personnelName.replace(/\s+/g, '_').toLowerCase()}`;
           teamBreakdown[newKey] = {
-            personnelId: null,
+            personnelId: matchingPersonnel?.id || null,
             name: personnelName,
             roleName: 'Excel MAESTRO',
-            hourlyRate: 0,
+            hourlyRate: hourlyRate,
             hours: actualHours,
             cost: directCost.montoTotalUSD || 0,
             entries: 1,
             lastActivity: new Date().toISOString(),
             estimatedHours: 0,
-            rate: 0,
+            rate: hourlyRate, // USAR TARIFA DEL PERSONAL
             isQuoted: false,
             isUnquoted: true,
             targetHours: targetHours // HORAS OBJETIVO DEL EXCEL MAESTRO
           };
-          console.log(`💰 Created new team member from Excel MAESTRO: ${personnelName} with ${targetHours} target hours`);
+          console.log(`💰 Created new team member from Excel MAESTRO: ${personnelName} with ${targetHours} target hours and rate $${hourlyRate}/h`);
         }
       }
 
