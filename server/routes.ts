@@ -1061,10 +1061,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // 4.6. INTEGRAR DATOS DEL EXCEL MAESTRO AL TEAM BREAKDOWN
+      const directCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
+      console.log(`💰 Integrating ${directCosts.length} direct costs from Excel MAESTRO into team breakdown`);
+      
+      for (const directCost of directCosts) {
+        const personnelName = directCost.persona;
+        const targetHours = directCost.horasObjetivo || 0;
+        const actualHours = directCost.horasRealesAsana || 0;
+        
+        // Buscar el miembro del equipo por nombre (ya que Excel MAESTRO puede no tener personnelId)
+        let teamMemberKey = null;
+        for (const [key, member] of Object.entries(teamBreakdown)) {
+          if (member.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
+              personnelName.toLowerCase().includes(member.name?.toLowerCase() || '')) {
+            teamMemberKey = key;
+            break;
+          }
+        }
+        
+        if (teamMemberKey) {
+          // Actualizar horas objetivo del Excel MAESTRO
+          teamBreakdown[teamMemberKey].targetHours = (teamBreakdown[teamMemberKey].targetHours || 0) + targetHours;
+          console.log(`💰 Updated ${personnelName}: targetHours=${teamBreakdown[teamMemberKey].targetHours}`);
+        } else {
+          // Crear nuevo miembro del equipo para datos del Excel MAESTRO que no están en time entries
+          const newKey = `excel_${personnelName.replace(/\s+/g, '_').toLowerCase()}`;
+          teamBreakdown[newKey] = {
+            personnelId: null,
+            name: personnelName,
+            roleName: 'Excel MAESTRO',
+            hourlyRate: 0,
+            hours: actualHours,
+            cost: directCost.montoTotalUSD || 0,
+            entries: 1,
+            lastActivity: new Date().toISOString(),
+            estimatedHours: 0,
+            rate: 0,
+            isQuoted: false,
+            isUnquoted: true,
+            targetHours: targetHours // HORAS OBJETIVO DEL EXCEL MAESTRO
+          };
+          console.log(`💰 Created new team member from Excel MAESTRO: ${personnelName} with ${targetHours} target hours`);
+        }
+      }
+
       console.log(`📊 Time entries for project ${id}:`, timeEntries.length, 'entries');
       console.log(`📊 Total worked hours:`, totalWorkedHours);
       console.log(`📊 Total worked cost:`, totalWorkedCost);
-      console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members (including quotation team)`);
+      console.log(`📊 Team breakdown created for ${Object.keys(teamBreakdown).length} members (including quotation team + Excel MAESTRO)`);
       console.log(`🔍 Final team breakdown keys:`, Object.keys(teamBreakdown).map(key => ({
         key, 
         name: teamBreakdown[key].name, 
