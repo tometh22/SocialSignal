@@ -1183,77 +1183,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`💰 Updated ${personnelName}: targetHours=${teamBreakdown[teamMemberKey].targetHours}, rate=${teamBreakdown[teamMemberKey].rate}`);
         } else {
-          // Crear nuevo miembro del equipo para datos del Excel MAESTRO que no están en time entries
-          // Buscar datos de personnel por nombre para obtener la tarifa
-          const personnelData = await storage.getPersonnel();
-          // Mejorar la coincidencia de nombres con apodos comunes
-          const normalizePersonnelName = (name: string) => {
-            const nameMap = {
-              'vicky': 'victoria',
-              'victoria': 'victoria',
-              'trini': 'trinidad', 
-              'trinidad': 'trinidad',
-              'tomi': 'tomas',
-              'tomas': 'tomas',
-              'male': 'malena',
-              'malena': 'malena',
-              'vanu': 'vanina',
-              'vanina': 'vanina',
-              'gast': 'gastón',
-              'gaston': 'gastón',
-              'gastón': 'gastón',
-              'aylu': 'aylen',
-              'aylen': 'aylen',
-              'sol': 'sol',
-              'to': 'rosario',
-              'ro': 'rosario',
-              'rosario': 'rosario',
-              'santi': 'santiago',
-              'santiago': 'santiago',
-              'xavi': 'xavier',
-              'xavier': 'xavier',
-              'mati': 'matías',
-              'matias': 'matías',
-              'ina': 'ina',
-              'cata': 'cata'
-            };
-            const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
-            return nameMap[normalized] || normalized;
-          };
-          
-          const matchingPersonnel = personnelData.find(p => {
-            const personnelFirstName = normalizePersonnelName(personnelName);
-            const dbFirstName = normalizePersonnelName(p.name || '');
-            return personnelFirstName === dbFirstName ||
-                   p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
-                   personnelName.toLowerCase().includes(p.name?.toLowerCase() || '');
-          });
-          
-          const hourlyRate = matchingPersonnel ? matchingPersonnel.hourlyRate || 0 : 0;
-          
-          if (matchingPersonnel) {
-            console.log(`💰 Found personnel match for ${personnelName}: ${matchingPersonnel.name} with rate $${hourlyRate}/h`);
-          } else {
-            console.log(`⚠️ No personnel match found for ${personnelName}`);
-          }
-          
-          const newKey = `excel_${personnelName.replace(/\s+/g, '_').toLowerCase()}`;
-          teamBreakdown[newKey] = {
-            personnelId: matchingPersonnel?.id || null,
-            name: personnelName,
-            roleName: 'Excel MAESTRO',
-            hourlyRate: hourlyRate,
-            hours: actualHours,
-            cost: directCost.montoTotalUSD || 0,
-            entries: 1,
-            lastActivity: new Date().toISOString(),
-            estimatedHours: 0,
-            rate: hourlyRate, // USAR TARIFA DEL PERSONAL
-            isQuoted: false,
-            isUnquoted: true,
-            targetHours: targetHours // HORAS OBJETIVO DEL EXCEL MAESTRO
-          };
-          console.log(`💰 Created new team member from Excel MAESTRO: ${personnelName} with ${targetHours} target hours and rate $${hourlyRate}/h`);
+          console.log(`⚠️ No team member match found for "${personnelName}" from Excel MAESTRO - skipping to avoid duplicates`);
+          console.log(`📋 Available team members: ${Object.values(teamBreakdown).map(m => `"${m.name}"`).join(', ')}`);
         }
       }
 
