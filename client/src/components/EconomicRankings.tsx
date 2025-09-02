@@ -4,8 +4,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings } from "lucide-react";
-import { RankingType, PersonnelMetrics } from "@shared/ranking-config";
-import { sortByRankingType, calculateTeamRankings } from "@shared/ranking-utils";
+import { RankingType, PersonnelMetrics, RANKING_CONFIG } from "@shared/ranking-config";
+import { sortByRankingType, calculateTeamRankings, getPerformanceColor } from "@shared/ranking-utils";
 import { useState, useMemo } from "react";
 
 interface EconomicRankingsProps {
@@ -23,6 +23,14 @@ export function EconomicRankings({
 }: EconomicRankingsProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [impactWeight, setImpactWeight] = useState(50); // Por defecto 50% impacto, 50% eficiencia
+  
+  // Helper function to get score label based on type-specific thresholds
+  const getScoreLabel = (score: number, type: RankingType): string => {
+    const thresholds = RANKING_CONFIG.thresholds[type];
+    if (score >= thresholds.excellent) return 'Excelente';
+    if (score >= thresholds.good) return 'Bueno';
+    return 'Crítico';
+  };
   
   // Recalcular rankings dinámicamente cuando cambia el slider
   const dynamicRankings = useMemo(() => {
@@ -137,7 +145,8 @@ export function EconomicRankings({
     rankKey, 
     icon: IconComponent,
     color,
-    tooltipType
+    tooltipType,
+    rankingType = 'efficiency'
   }: { 
     title: string; 
     description: string; 
@@ -147,6 +156,7 @@ export function EconomicRankings({
     icon: any;
     color: string;
     tooltipType: string;
+    rankingType?: RankingType;
   }) => (
     <div className="flex-1">
       <div className={`p-4 rounded-lg ${color} mb-4`}>
@@ -207,7 +217,7 @@ export function EconomicRankings({
                   {score < 0.1 && score > 0 ? score.toFixed(3) : score.toFixed(1)}
                 </div>
                 <Badge variant="outline" className={getScoreBadge(score)}>
-                  {score >= 70 ? 'Excelente' : score >= 40 ? 'Bueno' : 'Crítico'}
+                  {getScoreLabel(score, rankingType)}
                 </Badge>
               </div>
             </div>
@@ -237,17 +247,50 @@ export function EconomicRankings({
             Interpretación de Scores
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Badge className="bg-green-100 text-green-800 border-green-200">Excelente</Badge>
-              <span className="text-gray-600">70+ puntos</span>
+            <div className="space-y-2">
+              <div className="font-medium text-gray-700">Eficiencia:</div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-100 text-green-800">Excelente</Badge>
+                <span className="text-gray-600">70+ puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-yellow-100 text-yellow-800">Bueno</Badge>
+                <span className="text-gray-600">50-69 puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-red-100 text-red-800">Crítico</Badge>
+                <span className="text-gray-600">&lt;50 puntos</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Bueno</Badge>
-              <span className="text-gray-600">40-69 puntos</span>
+            <div className="space-y-2">
+              <div className="font-medium text-gray-700">Impacto:</div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-100 text-green-800">Excelente</Badge>
+                <span className="text-gray-600">15+ puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-yellow-100 text-yellow-800">Bueno</Badge>
+                <span className="text-gray-600">8-14 puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-red-100 text-red-800">Crítico</Badge>
+                <span className="text-gray-600">&lt;8 puntos</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-red-100 text-red-800 border-red-200">Crítico</Badge>
-              <span className="text-gray-600">Menos de 40 puntos</span>
+            <div className="space-y-2">
+              <div className="font-medium text-gray-700">Unificado:</div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-green-100 text-green-800">Excelente</Badge>
+                <span className="text-gray-600">70+ puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-yellow-100 text-yellow-800">Bueno</Badge>
+                <span className="text-gray-600">50-69 puntos</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-red-100 text-red-800">Crítico</Badge>
+                <span className="text-gray-600">&lt;50 puntos</span>
+              </div>
             </div>
           </div>
         </div>
@@ -332,6 +375,7 @@ export function EconomicRankings({
             scoreKey="efficiencyScore"
             rankKey="efficiencyRank"
             icon={Target}
+            rankingType="efficiency"
             color="bg-blue-50 border border-blue-200"
             tooltipType="efficiency"
           />
@@ -343,6 +387,7 @@ export function EconomicRankings({
             scoreKey="impactScore"
             rankKey="impactRank"
             icon={DollarSign}
+            rankingType="impact"
             color="bg-green-50 border border-green-200"
             tooltipType="impact"
           />
@@ -354,6 +399,7 @@ export function EconomicRankings({
             scoreKey="unifiedScore"
             rankKey="unifiedRank"
             icon={BarChart3}
+            rankingType="unified"
             color="bg-purple-50 border border-purple-200"
             tooltipType="unified"
           />

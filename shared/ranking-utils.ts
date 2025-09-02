@@ -153,8 +153,8 @@ export function assignRankings(scores: number[]): number[] {
 /**
  * Determina el color del semáforo basado en el puntaje
  */
-export function getPerformanceColor(score: number): 'green' | 'yellow' | 'red' {
-  const thresholds = RANKING_CONFIG.thresholds;
+export function getPerformanceColor(score: number, type: 'efficiency' | 'impact' | 'unified' = 'efficiency'): 'green' | 'yellow' | 'red' {
+  const thresholds = RANKING_CONFIG.thresholds[type];
   
   if (score >= thresholds.excellent) return 'green';
   if (score >= thresholds.good) return 'yellow';
@@ -215,7 +215,7 @@ export function calculateTeamRankings(
     efficiencyRank: efficiencyRanks[index],
     impactRank: impactRanks[index],
     unifiedRank: unifiedRanks[index],
-    performanceColor: getPerformanceColor(efficiencyScores[index])
+    performanceColor: getPerformanceColor(unifiedScores[index], 'unified') // Usar unified score para color general
   }));
 }
 

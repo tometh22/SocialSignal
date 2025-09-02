@@ -20,9 +20,21 @@ export const RANKING_CONFIG = {
   
   // Umbrales para semáforos (en escala 0-100)
   thresholds: {
-    excellent: 70,    // Verde: > 70
-    good: 50,         // Amarillo: 50-70  
-    critical: 50      // Rojo: < 50
+    efficiency: {
+      excellent: 70,  // Verde: > 70
+      good: 50,       // Amarillo: 50-70  
+      critical: 50    // Rojo: < 50
+    },
+    impact: {
+      excellent: 15,  // Verde: > 15 (ajustado para la escala de impacto)
+      good: 8,        // Amarillo: 8-15  
+      critical: 8     // Rojo: < 8
+    },
+    unified: {
+      excellent: 70,  // Verde: > 70
+      good: 50,       // Amarillo: 50-70  
+      critical: 50    // Rojo: < 50
+    }
   }
 };
 
