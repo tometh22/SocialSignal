@@ -1102,7 +1102,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'vanina': 'vanina',
                 'gast': 'gastón',
                 'gaston': 'gastón',
-                'gastón': 'gastón'
+                'gastón': 'gastón',
+                'aylu': 'aylen',
+                'aylen': 'aylen',
+                'sol': 'sol',
+                'romi': 'rosario',
+                'rosario': 'rosario',
+                'to': 'rosario',
+                'merello': 'rosario',
+                'santi': 'santiago',
+                'santiago': 'santiago',
+                'xavi': 'xavier',
+                'xavier': 'xavier',
+                'mati': 'matías',
+                'matias': 'matías',
+                'ina': 'ina',
+                'cata': 'cata'
               };
               const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
               return nameMap[normalized] || normalized;
@@ -1145,7 +1160,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               'vanina': 'vanina',
               'gast': 'gastón',
               'gaston': 'gastón',
-              'gastón': 'gastón'
+              'gastón': 'gastón',
+              'aylu': 'aylen',
+              'aylen': 'aylen',
+              'sol': 'sol',
+              'romi': 'rosario',
+              'rosario': 'rosario',
+              'to': 'rosario',
+              'merello': 'rosario',
+              'santi': 'santiago',
+              'santiago': 'santiago',
+              'xavi': 'xavier',
+              'xavier': 'xavier',
+              'mati': 'matías',
+              'matias': 'matías',
+              'ina': 'ina',
+              'cata': 'cata'
             };
             const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
             return nameMap[normalized] || normalized;
