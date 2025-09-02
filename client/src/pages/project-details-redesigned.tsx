@@ -3067,12 +3067,12 @@ const ProjectDetailsPage = () => {
                   </div>
                   <div className="space-y-1">
                     {(() => {
-                      // Horas trabajadas del período filtrado
+                      // Horas trabajadas del período filtrado (usar costSummary.filteredHours)
                       const workedHours = costSummary?.filteredHours || 0;
                       
-                      // Horas objetivo del Excel MAESTRO para el mismo período
-                      const targetHoursFromExcel = costSummary?.directCostsFromExcel?.reduce((total: number, cost: any) => {
-                        return total + (parseFloat(cost.horasObjetivo) || 0);
+                      // Horas objetivo del Excel MAESTRO desde teamStats (ya integradas por el backend)
+                      const targetHoursFromExcel = teamStats?.reduce((total: number, member: any) => {
+                        return total + (member.targetHours || 0);
                       }, 0) || 0;
                       
                       // Si no hay datos del Excel MAESTRO, usar horas estimadas de cotización como fallback
