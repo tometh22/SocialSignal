@@ -2928,7 +2928,15 @@ const ProjectDetailsPage = () => {
                 <CardContent className="p-6">
                   {(() => {
                     // Use rankings data which already has deduplicated team members
-                    const economicRankings = completeData?.analytics?.economicRankings || [];
+                    const economicRankings = completeData?.rankings?.economicMetrics || [];
+                    
+                    console.log('🔍 Heat map data check:', {
+                      hasCompleteData: !!completeData,
+                      hasRankings: !!completeData?.rankings,
+                      hasEconomicMetrics: !!completeData?.rankings?.economicMetrics,
+                      rankingsLength: economicRankings.length,
+                      sampleRanking: economicRankings[0]
+                    });
                     
                     if (!economicRankings || !Array.isArray(economicRankings) || economicRankings.length === 0) {
                       return (
@@ -2937,6 +2945,13 @@ const ProjectDetailsPage = () => {
                           <p className="text-sm">No hay datos del equipo disponibles</p>
                           <p className="text-xs text-gray-400 mt-1">
                             Los rankings económicos están siendo calculados...
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Debug: {JSON.stringify({
+                              hasCompleteData: !!completeData,
+                              hasRankings: !!completeData?.rankings,
+                              keys: completeData ? Object.keys(completeData) : []
+                            })}
                           </p>
                         </div>
                       );

@@ -1522,7 +1522,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workedHours: totalWorkedHours,
         efficiency: completeData.metrics.efficiency,
         timeFilter: timeFilter,
-        isAlwaysOn: project.quotation?.projectType === 'always-on'
+        isAlwaysOn: project.quotation?.projectType === 'always-on',
+        economicRankingsCount: economicRankings.length
       });
 
       res.json(responseData);

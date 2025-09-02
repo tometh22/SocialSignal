@@ -67,6 +67,14 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
 ## Recent Implementation (Sep 2025)
+- **Arreglo Sol Ayala Duplicados y Mapa de Calor (Sep 2, 2025)**: Sistema completamente corregido:
+  - **Deduplicación Automática**: Map-based consolidation usando nombres normalizados elimina duplicados
+  - **Mapa de Calor Funcional**: Corregido path de `analytics.economicRankings` a `rankings.economicMetrics`
+  - **Algoritmo de Scoring Robusto**: Normalización usando percentiles 10-90 para manejar outliers extremos
+  - **Curva de Suavizado**: Scores aplicando curva exponencial (x^0.8) para mayor realismo
+  - **Rango Calibrado**: Scores limitados a 5-95 puntos para evitar valores irreales
+  - **Sistema Verificado**: Sol Ayala aparece una sola vez, mapa de calor muestra datos deduplicados
+  - **Interpretación de Colores**: Verde >70, Amarillo 40-69, Rojo <40 puntos
 - **Sistema de Filtros Temporales Completo (Sep 2, 2025)**: Sistema completamente flexible para cualquier período temporal:
   - **Filtros Estándar**: Q1-Q4 con trimestres fiscales correctos (Q1: Ene-Mar, Q2: Abr-May-Jun, Q3: Jul-Ago-Sep, Q4: Oct-Nov-Dic)
   - **Rangos Personalizados**: "YYYY-MM-DD_to_YYYY-MM-DD" para cualquier período específico

@@ -40,20 +40,31 @@ export function calculatePersonnelMetrics(
 }
 
 /**
- * Normaliza un array de valores a escala 0-100
+ * Normaliza un array de valores a escala 0-100 usando percentiles robustos
+ * Esto maneja mejor los outliers extremos
  */
 function normalizeToScale(values: number[], min = 0, max = 100): number[] {
   if (values.length === 0) return [];
   
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const range = maxValue - minValue;
+  // Ordenar valores para calcular percentiles
+  const sorted = [...values].sort((a, b) => a - b);
+  const len = sorted.length;
+  
+  // Usar percentiles 10-90 para evitar outliers extremos
+  const p10Index = Math.floor(len * 0.1);
+  const p90Index = Math.floor(len * 0.9);
+  const p10Value = sorted[p10Index];
+  const p90Value = sorted[p90Index];
+  
+  const range = p90Value - p10Value;
   
   if (range === 0) return values.map(() => (min + max) / 2);
   
-  return values.map(value => 
-    min + ((value - minValue) / range) * (max - min)
-  );
+  return values.map(value => {
+    // Clamp values to percentile range to handle outliers
+    const clampedValue = Math.max(p10Value, Math.min(p90Value, value));
+    return min + ((clampedValue - p10Value) / range) * (max - min);
+  });
 }
 
 /**
@@ -84,7 +95,9 @@ export function calculateEfficiencyScores(metrics: Omit<PersonnelMetrics, 'effic
       normalizedMargin[index] * weights.marginPerHour +
       normalizedBilling[index] * weights.billingEfficiency;
     
-    return Math.max(0, Math.min(100, score)); // Asegurar rango 0-100
+    // Aplicar una curva más suave para evitar scores extremos
+    const smoothedScore = Math.pow(score / 100, 0.8) * 100;
+    return Math.max(5, Math.min(95, smoothedScore)); // Rango 5-95 para mayor realismo
   });
 }
 
