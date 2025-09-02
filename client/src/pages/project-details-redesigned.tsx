@@ -1357,15 +1357,28 @@ const ProjectDetailsPage = () => {
   const teamStats = useMemo(() => {
     if (!unifiedData?.actuals?.teamBreakdown) return [];
     
-    // Convert team breakdown from backend into format expected by UI
-    return Object.entries((unifiedData as any).actuals.teamBreakdown).map(([personnelId, data]: [string, any]) => ({
-      id: parseInt(personnelId),
-      personnelId: parseInt(personnelId),
+    // teamBreakdown comes as an array from backend, not an object
+    const teamBreakdownArray = Array.isArray(unifiedData.actuals.teamBreakdown) 
+      ? unifiedData.actuals.teamBreakdown 
+      : [];
+    
+    console.log('🔍 DEBUG teamStats processing:', {
+      teamBreakdownArray: teamBreakdownArray.slice(0, 3),
+      isArray: Array.isArray(unifiedData.actuals.teamBreakdown),
+      length: teamBreakdownArray.length
+    });
+    
+    // Convert team breakdown from backend into format expected by UI (includes targetHours)
+    return teamBreakdownArray.map((data: any) => ({
+      id: data.personnelId || 0,
+      personnelId: data.personnelId || 0,
       name: data.name,
-      hours: data.hours,
-      cost: data.cost,
+      hours: data.hours || 0,
+      cost: data.cost || 0,
       entries: data.entries || 0,
-      lastActivity: data.lastActivity || null
+      lastActivity: data.lastActivity || null,
+      targetHours: data.targetHours || 0, // NUEVO: Horas objetivo del Excel MAESTRO
+      isFromExcel: data.isFromExcel || false
     }));
   }, [unifiedData?.actuals?.teamBreakdown]);
 
