@@ -878,6 +878,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (costSummary?.costByPerson && costSummary.costByPerson.length > 0) {
         console.log(`📊 Using integrated team data from cost summary: ${costSummary.costByPerson.length} members`);
         console.log(`🔍 Sample costByPerson data:`, costSummary.costByPerson.slice(0, 3));
+        console.log(`🔍 DEBUG: costByPerson full for project ${id}:`, JSON.stringify(costSummary.costByPerson, null, 2));
         
         for (const personCost of costSummary.costByPerson) {
           const personnelId = personCost.personnelId || `excel-${personCost.name?.replace(/\s+/g, '_').toLowerCase()}`;
@@ -918,6 +919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         // Fallback: usar time entries tradicionales si no hay cost summary
         console.log(`📊 Fallback: Using traditional time entries: ${timeEntries.length} entries`);
+        console.log(`📊 DEBUG: costSummary is null or empty - costSummary:`, !!costSummary, 'costByPerson length:', costSummary?.costByPerson?.length || 0);
         for (const entry of timeEntries) {
           const personnelId = entry.personnelId.toString();
           if (!teamBreakdown[personnelId]) {
@@ -1523,6 +1525,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         efficiency: completeData.metrics.efficiency,
         timeFilter: timeFilter,
         isAlwaysOn: project.quotation?.projectType === 'always-on',
+        teamBreakdownLength: Object.values(teamBreakdown).length,
+        teamBreakdownKeys: Object.keys(teamBreakdown),
+        teamBreakdownSample: Object.values(teamBreakdown).slice(0, 2),
         economicRankingsCount: economicRankings.length
       });
 
