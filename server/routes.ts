@@ -1109,6 +1109,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let teamMemberKey = null;
         const normalizedPersonnelName = normalizePersonnelName(personnelName);
         
+        // Debug: mostrar todos los miembros disponibles
+        console.log(`🔍 Looking for match for "${personnelName}" (normalized: "${normalizedPersonnelName}")`);
+        console.log(`📋 Available team members:`, Object.entries(teamBreakdown).map(([key, member]) => ({
+          key,
+          name: member.name,
+          normalized: normalizePersonnelName(member.name || '')
+        })));
+        
         for (const [key, member] of Object.entries(teamBreakdown)) {
           const normalizedMemberName = normalizePersonnelName(member.name || '');
           
@@ -1120,6 +1128,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`🔗 Found team member match: "${personnelName}" → "${member.name}" (key: ${key})`);
             break;
           }
+        }
+        
+        if (!teamMemberKey) {
+          console.log(`❌ NO MATCH FOUND for "${personnelName}" - this will cause duplicates!`);
         }
         
         if (teamMemberKey) {
