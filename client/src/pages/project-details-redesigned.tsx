@@ -2766,15 +2766,15 @@ const ProjectDetailsPage = () => {
             {/* RANKINGS ECONÓMICOS - SISTEMA NUEVO */}
             <div className="grid grid-cols-1 gap-6">
               <EconomicRankings 
-                rankings={unifiedData?.rankings?.economicMetrics || []}
+                rankings={(unifiedData as any)?.rankings?.economicMetrics || []}
                 loading={!unifiedData}
-                projectTotalPrice={unifiedData?.quotation?.totalAmount || 100000}
+                projectTotalPrice={(unifiedData as any)?.quotation?.totalAmount || 100000}
                 timeFilter={timeFilterForHook}
               />
             </div>
 
             {/* COSTOS DIRECTOS INTEGRADOS - Sistema principal */}
-            {unifiedData?.actuals?.excelDirectCosts && unifiedData.actuals.excelDirectCosts.length > 0 && (
+            {(unifiedData as any)?.actuals?.excelDirectCosts && (unifiedData as any).actuals.excelDirectCosts.length > 0 && (
               <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white shadow-sm hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-emerald-700">
@@ -2782,7 +2782,7 @@ const ProjectDetailsPage = () => {
                     Costos Directos por Persona - Sistema Integrado
                   </CardTitle>
                   <CardDescription>
-                    Excel MAESTRO integrado al cálculo principal - Período: {dateFilter.label} | {unifiedData.actuals.costBreakdown?.excelDirectCostsCount || 0} registros
+                    Excel MAESTRO integrado al cálculo principal - Período: {dateFilter.label} | {(unifiedData as any).actuals.costBreakdown?.excelDirectCostsCount || 0} registros
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
@@ -2792,19 +2792,19 @@ const ProjectDetailsPage = () => {
                       <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                         <div className="text-xs text-emerald-600">Excel MAESTRO</div>
                         <div className="text-lg font-bold text-emerald-900">
-                          ${(unifiedData.actuals.costBreakdown?.directCostsFromExcel || 0).toLocaleString()} USD
+                          ${((unifiedData as any).actuals.costBreakdown?.directCostsFromExcel || 0).toLocaleString()} USD
                         </div>
                       </div>
                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="text-xs text-blue-600">Time Entries</div>
                         <div className="text-lg font-bold text-blue-900">
-                          ${(unifiedData.actuals.costBreakdown?.timeEntriesCost || 0).toLocaleString()} USD
+                          ${((unifiedData as any).actuals.costBreakdown?.timeEntriesCost || 0).toLocaleString()} USD
                         </div>
                       </div>
                       <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
                         <div className="text-xs text-purple-600">Total Combinado</div>
                         <div className="text-lg font-bold text-purple-900">
-                          ${(unifiedData.actuals.totalWorkedCost || 0).toLocaleString()} USD
+                          ${((unifiedData as any).actuals.totalWorkedCost || 0).toLocaleString()} USD
                         </div>
                       </div>
                     </div>
@@ -2832,7 +2832,7 @@ const ProjectDetailsPage = () => {
                                 const realRevenue = (unifiedData as any).googleSheetsSales
                                   .filter((sale: any) => sale.status !== 'proyectada')
                                   .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0);
-                                const totalCosts = unifiedData.actuals.totalWorkedCost || 0;
+                                const totalCosts = (unifiedData as any).actuals.totalWorkedCost || 0;
                                 const markup = totalCosts > 0 ? (realRevenue / totalCosts) : 0;
                                 return markup.toFixed(2) + 'x';
                               })()}
@@ -2844,7 +2844,7 @@ const ProjectDetailsPage = () => {
 
                     {/* Lista detallada usando datos integrados */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {unifiedData.actuals.excelDirectCosts
+                      {((unifiedData as any).actuals.excelDirectCosts || [])
                         .filter((cost: any) => cost.montoTotalUSD && cost.montoTotalUSD > 0)
                         .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
                         .map((cost: any, index: number) => (
@@ -3361,10 +3361,10 @@ const ProjectDetailsPage = () => {
                       variant="outline"
                       onClick={() => {
                         const teamData = teamStats?.map(member => ({
-                          Nombre: member.personnel?.name || 'Sin nombre',
+                          Nombre: member.name || 'Sin nombre',
                           Horas: member.hours?.toFixed(2) || '0.00',
                           Costo: `$${member.cost?.toFixed(2) || '0.00'}`,
-                          Progreso: `${Math.round((member.hours / (member.estimatedHours || 1)) * 100)}%`
+                          Progreso: `${Math.round((member.hours / (member.targetHours || 1)) * 100)}%`
                         })) || [];
                         
                         const csvContent = [
@@ -4049,7 +4049,7 @@ const ProjectDetailsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {unifiedData?.salesData && unifiedData.salesData.length > 0 ? (
+                {(unifiedData as any)?.googleSheetsSales && (unifiedData as any).googleSheetsSales.length > 0 ? (
                   <div className="space-y-4">
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse">
@@ -4064,7 +4064,7 @@ const ProjectDetailsPage = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {unifiedData.salesData.map((sale: any, index: number) => (
+                          {((unifiedData as any).googleSheetsSales || []).map((sale: any, index: number) => (
                             <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
                               <td className="p-3 text-sm">
                                 {sale.month && sale.year ? `${sale.month} ${sale.year}` : 'Sin fecha'}
@@ -4095,21 +4095,21 @@ const ProjectDetailsPage = () => {
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Total Ingresos USD</p>
                           <p className="text-lg font-bold text-green-600">
-                            ${unifiedData.salesData.reduce((sum: number, sale: any) => 
+                            ${((unifiedData as any).googleSheetsSales || []).reduce((sum: number, sale: any) => 
                               sum + (parseFloat(sale.amountUsd) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Total Ingresos ARS</p>
                           <p className="text-lg font-bold text-green-600">
-                            ${unifiedData.salesData.reduce((sum: number, sale: any) => 
+                            ${((unifiedData as any).googleSheetsSales || []).reduce((sum: number, sale: any) => 
                               sum + (parseFloat(sale.amountArs) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Registros</p>
                           <p className="text-lg font-bold text-blue-600">
-                            {unifiedData.salesData.length}
+                            {((unifiedData as any).googleSheetsSales || []).length}
                           </p>
                         </div>
                       </div>
