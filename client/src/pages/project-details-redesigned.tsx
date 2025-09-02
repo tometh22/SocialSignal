@@ -538,6 +538,8 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
       estimatedHours: scaledEstimatedHours,
       baseEstimatedHours: baseEstimatedHours, // Para debugging
       timeMultiplier: multiplier, // Para debugging
+      // NUEVO: Horas objetivo del Excel MAESTRO (ya vienen filtradas del backend)
+      targetHours: member.targetHours || 0,
       // Flags de estado (ya vienen del backend)
       isQuoted: member.isQuoted || false,
       isUnquoted: member.isUnquoted || false
@@ -715,13 +717,18 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
               
               <div className="flex items-center gap-3">
                 {/* Información de horas más compacta */}
-                <div className="text-center min-w-[60px]">
+                <div className="text-center min-w-[80px]">
                   <div className={`text-sm font-bold ${cardStyle.textColor}`}>
                     {workedHours.toFixed(1)}h
                   </div>
                   <div className="text-xs text-gray-500">
                     de {estimatedHours.toFixed(0)}h {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
                   </div>
+                  {member.targetHours > 0 && (
+                    <div className="text-xs text-blue-600 font-medium mt-0.5">
+                      📊 {member.targetHours}h objetivo
+                    </div>
+                  )}
                 </div>
 
                 {/* Barra de progreso más sutil */}
@@ -743,7 +750,15 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                     <div className="text-sm">
                       <div>Trabajadas: {workedHours.toFixed(1)}h</div>
                       <div>Estimadas: {estimatedHours}h</div>
+                      {member.targetHours > 0 && (
+                        <div className="text-blue-600 font-medium">Objetivo (Excel): {member.targetHours}h</div>
+                      )}
                       <div>Progreso: {progressPercent}%</div>
+                      {member.targetHours > 0 && (
+                        <div className="text-orange-600">
+                          Eficiencia: {member.targetHours > 0 ? ((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0) : 0}%
+                        </div>
+                      )}
                     </div>
                   </TooltipContent>
                 </Tooltip>

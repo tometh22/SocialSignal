@@ -2272,13 +2272,19 @@ export class DatabaseStorage implements IStorage {
             })
             .reduce((sum, entry) => sum + (entry.hours || 0), 0);
 
+          // Calcular horas objetivo para esta persona del Excel MAESTRO
+          const personTargetHours = excelDirectCosts
+            .filter(cost => cost.persona === person.name)
+            .reduce((sum, cost) => sum + (cost.horasObjetivo || 0), 0);
+
           return {
             personnelId: person.id,
             name: person.name,
             contractType: person.contractType,
             realCost: personRealCost,
             operationalCost: personOperationalCost,
-            hours: personHours
+            hours: personHours,
+            targetHours: personTargetHours // NUEVO: Horas objetivo del Excel MAESTRO
           };
         })
         .filter(person => person.realCost > 0 || person.operationalCost > 0 || person.hours > 0);
@@ -2296,6 +2302,7 @@ export class DatabaseStorage implements IStorage {
             existing.realCost += cost.montoTotalUSD || 0;
             existing.operationalCost += cost.montoTotalUSD || 0;
             existing.hours += cost.horasRealesAsana || 0;
+            existing.targetHours += cost.horasObjetivo || 0; // NUEVO: Agregar horas objetivo
           } else {
             acc.push({
               personnelId: null,
@@ -2304,6 +2311,7 @@ export class DatabaseStorage implements IStorage {
               realCost: cost.montoTotalUSD || 0,
               operationalCost: cost.montoTotalUSD || 0,
               hours: cost.horasRealesAsana || 0,
+              targetHours: cost.horasObjetivo || 0, // NUEVO: Horas objetivo del Excel MAESTRO
               isFromExcel: true
             });
           }
