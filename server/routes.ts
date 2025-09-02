@@ -1086,7 +1086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Si el miembro no tiene rate, buscar en base de datos de personnel
           if (!teamBreakdown[teamMemberKey].rate || teamBreakdown[teamMemberKey].rate === 0) {
-            const personnelData = await storage.getAllPersonnel();
+            const personnelData = await storage.getPersonnel();
             const matchingPersonnel = personnelData.find(p => 
               p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
               personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
@@ -1103,7 +1103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Crear nuevo miembro del equipo para datos del Excel MAESTRO que no están en time entries
           // Buscar datos de personnel por nombre para obtener la tarifa
-          const personnelData = await storage.getAllPersonnel();
+          const personnelData = await storage.getPersonnel();
           const matchingPersonnel = personnelData.find(p => 
             p.name?.toLowerCase().includes(personnelName.toLowerCase()) || 
             personnelName.toLowerCase().includes(p.name?.toLowerCase() || '')
