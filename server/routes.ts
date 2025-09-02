@@ -1256,7 +1256,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const baseEstimatedHours = member.targetHours || member.estimatedHours || 0;
           const baseEstimatedCost = baseEstimatedHours * (member.rate || 0);
           
-          console.log(`📊 Rankings - Member ${member.name}: targetHours=${member.targetHours}, estimatedHours=${member.estimatedHours}, using=${baseEstimatedHours}`);
+          console.log(`📊 Rankings - Member ${member.name}:`);
+          console.log(`  - targetHours: ${member.targetHours}`);
+          console.log(`  - estimatedHours: ${member.estimatedHours}`);
+          console.log(`  - using baseEstimatedHours: ${baseEstimatedHours}`);
+          console.log(`  - rate: ${member.rate}`);
+          console.log(`  - baseEstimatedCost: ${baseEstimatedCost}`);
+          console.log(`  - actualHours: ${member.hours}`);
+          console.log(`  - actualCost: ${member.cost}`);
           
           return {
             personnelId: member.personnelId,
@@ -1276,7 +1283,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       
       // Calcular rankings con datos reales del proyecto - solo si hay miembros con horas
+      console.log(`📊 About to calculate rankings with adjustedTotalAmount: $${adjustedTotalAmount}`);
+      console.log(`📊 Total estimatedCost for rankings: $${teamRankingData.reduce((sum, m) => sum + (m.estimatedCost || 0), 0)}`);
       const economicRankings = teamRankingData.length > 0 ? calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
+      console.log(`📊 Rankings result:`, economicRankings.map(r => ({
+        name: r.personnelName,
+        impactScore: r.impactScore,
+        pricePercentage: r.pricePercentage,
+        estimatedCost: r.estimatedCost
+      })));
 
       console.log(`📊 Economic rankings calculated for ${economicRankings.length} team members`);
       
