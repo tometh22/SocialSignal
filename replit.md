@@ -67,13 +67,18 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
 
 ## Recent Implementation (Sep 2025)
-- **Sistema de Filtros Temporales Mejorado (Sep 2, 2025)**: Expandido sistema de filtros para mayor flexibilidad:
-  - **Filtros Estándar**: Q1-Q4 funcionan con trimestres fiscales correctos (Ene-Mar, Abr-Jun, Jul-Sep, Oct-Dic)
-  - **Filtros Personalizados**: Soporte para rangos "YYYY-MM-DD_to_YYYY-MM-DD" 
-  - **Meses Específicos**: Formatos como "mayo_2025", "june_2025" en español e inglés
-  - **Períodos Especiales**: "huggies_period" para mayo-julio 2025 donde hubo mayor actividad
-  - **Problema Identificado**: Filtro "trimestre pasado" excluía julio 2025 donde Huggies tuvo 330h de actividad vs solo 111h mostradas
-  - **Solución**: Sistema robusto que permite cualquier rango temporal personalizado para análisis precisos
+- **Sistema de Filtros Temporales Completo (Sep 2, 2025)**: Sistema completamente flexible para cualquier período temporal:
+  - **Filtros Estándar**: Q1-Q4 con trimestres fiscales correctos (Q1: Ene-Mar, Q2: Abr-May-Jun, Q3: Jul-Ago-Sep, Q4: Oct-Nov-Dic)
+  - **Rangos Personalizados**: "YYYY-MM-DD_to_YYYY-MM-DD" para cualquier período específico
+  - **Meses Individuales**: "mayo_2025", "june_2025", "january_2024" (español e inglés)
+  - **Bimestres**: "bimestre_1_2025" (Ene-Feb), "bimestre_2_2025" (Mar-Abr), hasta "bimestre_6_2025" (Nov-Dic)
+  - **Semestres**: "semestre_1_2025" (Ene-Jun), "semestre_2_2025" (Jul-Dic)
+  - **Años Completos**: "año_2024", "year_2025"
+  - **Períodos Múltiples**: "ene_mar_2025", "jul_sep_2025" (rangos de meses abreviados)
+  - **Períodos Relativos**: "ultimos_3_meses", "last_6_months", "ultimos_30_dias", "last_90_days"
+  - **Trimestres Específicos**: "q1_2024", "q2_2023" (cualquier año)
+  - **Períodos Especiales**: "huggies_period" para casos específicos de análisis
+  - **Problema Resuelto**: Sistema acepta cualquier combinación temporal que el usuario necesite
 - **Umbrales Corporativos de Alertas (Sep 2, 2025)**: Ajustados umbrales de exceso presupuestario:
   - **15% tolerancia** antes de marcar como "excedido crítico" (rojo)
   - **Niveles graduales**: Verde (normal), Amarillo (85-100%), Naranja (100-115%), Rojo (>115%)

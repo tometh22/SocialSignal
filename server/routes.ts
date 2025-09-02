@@ -225,7 +225,102 @@ export function getDateRangeForFilter(filter: string) {
         }
       }
       
+      // Soporte para bimestres: "bimestre_1_2025", "bimestre_2_2025", etc.
+      const bimestreMatch = filter.match(/^bimestre_(\d)_(\d{4})$/i);
+      if (bimestreMatch) {
+        const [, bimestreNum, year] = bimestreMatch;
+        const bimestre = parseInt(bimestreNum);
+        if (bimestre >= 1 && bimestre <= 6) {
+          const startMonth = (bimestre - 1) * 2;
+          startDate = new Date(parseInt(year), startMonth, 1);
+          endDate = new Date(parseInt(year), startMonth + 2, 0);
+          break;
+        }
+      }
+      
+      // Soporte para trimestres específicos de años: "q1_2024", "q2_2023", etc.
+      const quarterYearMatch = filter.match(/^q(\d)_(\d{4})$/i);
+      if (quarterYearMatch) {
+        const [, quarterNum, year] = quarterYearMatch;
+        const quarter = parseInt(quarterNum);
+        if (quarter >= 1 && quarter <= 4) {
+          const startMonth = (quarter - 1) * 3;
+          startDate = new Date(parseInt(year), startMonth, 1);
+          endDate = new Date(parseInt(year), startMonth + 3, 0);
+          break;
+        }
+      }
+      
+      // Soporte para semestres: "semestre_1_2025", "semestre_2_2025"
+      const semestreMatch = filter.match(/^semestre_(\d)_(\d{4})$/i);
+      if (semestreMatch) {
+        const [, semestreNum, year] = semestreMatch;
+        const semestre = parseInt(semestreNum);
+        if (semestre === 1) {
+          startDate = new Date(parseInt(year), 0, 1); // Enero
+          endDate = new Date(parseInt(year), 5, 30); // Junio
+          break;
+        } else if (semestre === 2) {
+          startDate = new Date(parseInt(year), 6, 1); // Julio
+          endDate = new Date(parseInt(year), 11, 31); // Diciembre
+          break;
+        }
+      }
+      
+      // Soporte para períodos de múltiples meses: "ene_mar_2025", "jul_sep_2025", etc.
+      const multiMonthMatch = filter.match(/^([a-z]{3})_([a-z]{3})_(\d{4})$/i);
+      if (multiMonthMatch) {
+        const [, startMonthName, endMonthName, year] = multiMonthMatch;
+        const shortMonthNames = {
+          'ene': 0, 'jan': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'apr': 3,
+          'may': 4, 'jun': 5, 'jul': 6, 'ago': 7, 'aug': 7,
+          'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11, 'dec': 11
+        };
+        
+        const startMonthIndex = shortMonthNames[startMonthName.toLowerCase()];
+        const endMonthIndex = shortMonthNames[endMonthName.toLowerCase()];
+        
+        if (startMonthIndex !== undefined && endMonthIndex !== undefined) {
+          startDate = new Date(parseInt(year), startMonthIndex, 1);
+          endDate = new Date(parseInt(year), endMonthIndex + 1, 0);
+          break;
+        }
+      }
+      
+      // Soporte para años completos: "año_2024", "year_2025", etc.
+      const yearMatch = filter.match(/^(año|year)_(\d{4})$/i);
+      if (yearMatch) {
+        const [, , year] = yearMatch;
+        startDate = new Date(parseInt(year), 0, 1);
+        endDate = new Date(parseInt(year), 11, 31);
+        break;
+      }
+      
+      // Soporte para últimos N meses: "ultimos_3_meses", "last_6_months"
+      const lastMonthsMatch = filter.match(/^(ultimos|last)_(\d+)_(meses|months)$/i);
+      if (lastMonthsMatch) {
+        const [, , monthsCount] = lastMonthsMatch;
+        const months = parseInt(monthsCount);
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - months);
+        startDate.setDate(1); // Primer día del mes
+        break;
+      }
+      
+      // Soporte para días específicos: "ultimos_30_dias", "last_90_days"
+      const lastDaysMatch = filter.match(/^(ultimos|last)_(\d+)_(dias|days)$/i);
+      if (lastDaysMatch) {
+        const [, , daysCount] = lastDaysMatch;
+        const days = parseInt(daysCount);
+        endDate = new Date();
+        startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        break;
+      }
+      
       // Para filtros no reconocidos
+      console.log(`⚠️ Filtro temporal no reconocido: ${filter}`);
       return null;
   }
 
