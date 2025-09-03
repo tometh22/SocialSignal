@@ -178,11 +178,21 @@ export function calculateTeamRankings(
 ): PersonnelMetrics[] {
   if (teamData.length === 0) return [];
   
-  // Calcular costo total estimado del equipo
-  const totalEstimatedCost = teamData.reduce((sum, member) => sum + member.estimatedCost, 0);
+  // FILTRO CRÍTICO: Solo incluir miembros con datos reales (horas > 0 O costo > 0)
+  const filteredTeamData = teamData.filter(member => 
+    (member.actualHours > 0 || member.actualCost > 0) && 
+    (member.estimatedHours > 0 || member.estimatedCost > 0)
+  );
   
-  // Calcular métricas base para cada persona
-  const baseMetrics = teamData.map(member => 
+  console.log(`📊 Rankings filter: ${teamData.length} → ${filteredTeamData.length} members with actual data`);
+  
+  if (filteredTeamData.length === 0) return [];
+  
+  // Calcular costo total estimado del equipo (solo miembros con datos)
+  const totalEstimatedCost = filteredTeamData.reduce((sum, member) => sum + member.estimatedCost, 0);
+  
+  // Calcular métricas base para cada persona (usando datos filtrados)
+  const baseMetrics = filteredTeamData.map(member => 
     calculatePersonnelMetrics(
       member.personnelId,
       member.personnelName,
