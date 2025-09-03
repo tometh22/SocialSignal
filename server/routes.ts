@@ -1405,6 +1405,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const markup = totalWorkedCost > 0 ? totalRealRevenue / totalWorkedCost : 0;
       const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
+      
+      console.log(`🔢 MARKUP CALCULATION DEBUG for project ${id} (${timeFilter}):`);
+      console.log(`   Total Real Revenue: $${totalRealRevenue}`);
+      console.log(`   Total Worked Cost: $${totalWorkedCost}`);
+      console.log(`   Calculated Markup: ${markup.toFixed(3)}x`);
+      console.log(`   Expected 5.5x? ${markup > 5.0 ? 'YES' : 'NO - Issue detected'}`);
 
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
