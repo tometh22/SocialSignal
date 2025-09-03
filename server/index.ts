@@ -123,7 +123,72 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       console.log(`📊 Sample personnel:`, personnel[0]);
     }
 
+    // 🔥 INTEGRACIÓN EXCEL MAESTRO: Si no hay time entries, buscar datos del Excel MAESTRO
     if (filteredTimeEntries.length === 0) {
+      console.log(`⚠️ No time entries found, checking Excel MAESTRO data for project ${projectId}`);
+      
+      try {
+        // Usar la misma lógica del endpoint complete-data para obtener datos del Excel MAESTRO
+        const { getProjectCostSummary } = await import('./storage');
+        const costSummary = await getProjectCostSummary(projectId, timeFilter);
+        
+        if (costSummary && costSummary.teamBreakdown && Object.keys(costSummary.teamBreakdown).length > 0) {
+          console.log(`📊 Excel MAESTRO found ${Object.keys(costSummary.teamBreakdown).length} team members`);
+          
+          // Convertir datos del Excel MAESTRO a formato de análisis de desviaciones
+          const deviationByRole = Object.values(costSummary.teamBreakdown).map((member: any) => {
+            const budgetedHours = member.targetHours || member.estimatedHours || 0;
+            const actualHours = member.actualHours || 0;
+            const budgetedCost = member.estimatedCost || 0;
+            const actualCost = member.actualCost || 0;
+            
+            const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
+            const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
+            
+            return {
+              personnelId: member.personnelId || null,
+              personnelName: member.name,
+              role: member.role || 'Excel MAESTRO',
+              budgetedHours,
+              actualHours,
+              budgetedCost,
+              actualCost,
+              hoursDeviation,
+              costDeviation,
+              deviationPercentage: hoursDeviation,
+              severity: Math.abs(hoursDeviation) > 50 ? 'critical' : 
+                       Math.abs(hoursDeviation) > 25 ? 'high' : 
+                       Math.abs(hoursDeviation) > 10 ? 'medium' : 'low'
+            };
+          }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
+          
+          const membersOverBudget = deviationByRole.filter((m: any) => m.deviationPercentage > 10).length;
+          const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationPercentage < -10).length;
+          
+          console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget`);
+          
+          return res.json({
+            deviationByRole,
+            totalVariance: { variance: deviationByRole.reduce((sum: number, m: any) => sum + Math.abs(m.deviationPercentage), 0) },
+            summary: { membersOverBudget, membersUnderBudget },
+            majorDeviations: deviationByRole.filter((m: any) => Math.abs(m.deviationPercentage) > 25),
+            analysis: deviationByRole,
+            debug: {
+              projectId,
+              startDate,
+              endDate,
+              message: 'Data from Excel MAESTRO integration',
+              source: 'Excel MAESTRO',
+              timeEntriesTotal: 0,
+              excelMembersTotal: deviationByRole.length
+            }
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error fetching Excel MAESTRO data for deviation analysis:', error);
+      }
+      
+      // Fallback si no hay datos en ninguna fuente
       return res.json({
         deviationByRole: [],
         totalVariance: { variance: 0 },
@@ -134,7 +199,7 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
           projectId,
           startDate,
           endDate,
-          message: 'No time entries found for this period',
+          message: 'No time entries or Excel MAESTRO data found for this period',
           timeEntriesTotal: allTimeEntries.filter(e => e.projectId === projectId).length
         }
       });
