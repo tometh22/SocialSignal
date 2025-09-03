@@ -603,6 +603,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const monthlyHourAdjustments = await storage.getMonthlyHourAdjustments(id);
       console.log(`📊 Monthly hour adjustments for project ${id}:`, monthlyHourAdjustments.length, 'adjustments');
 
+      // 2.6. Obtener información de personnel y roles para mapeo correcto
+      const allPersonnel = await storage.getAllPersonnel();
+      const allRoles = await storage.getAllRoles();
+      console.log(`👥 Retrieved ${allPersonnel.length} personnel and ${allRoles.length} roles for role mapping`);
+
+      // Helper function para obtener el rol real de una persona
+      const getRoleForPerson = (personnelId: number | null, personName: string): string => {
+        if (!personnelId) {
+          // Para personas del Excel MAESTRO sin personnelId, buscar por nombre exacto
+          const matchedPersonnel = allPersonnel.find(p => p.name === personName);
+          if (matchedPersonnel) {
+            const role = allRoles.find(r => r.id === matchedPersonnel.roleId);
+            return role?.name || 'Sin Rol';
+          }
+          return 'Freelancer Excel'; // Para external del Excel MAESTRO
+        } else {
+          // Para personnel con ID, buscar directamente
+          const personnel = allPersonnel.find(p => p.id === personnelId);
+          if (personnel) {
+            const role = allRoles.find(r => r.id === personnel.roleId);
+            return role?.name || 'Sin Rol';
+          }
+          return 'Sin Rol';
+        }
+      };
+
       // Función para obtener horas estimadas ajustadas por mes/año
       const getAdjustedHours = (personnelId: number, originalHours: number, targetYear?: number, targetMonth?: number) => {
         if (!targetYear || !targetMonth) return originalHours;
@@ -905,7 +931,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const isQuoted = quotationMember !== undefined;
           
           // Usar role real de su perfil o del Excel MAESTRO
-          let actualRole = personCost.name === 'External' ? 'Freelancer Excel' : 'Sin Rol';
+          let actualRole = getRoleForPerson(personCost.personnelId, personCost.name);
           let actualRate = quotationMember?.rate || 0;
           
           teamBreakdown[personnelId] = {
@@ -969,7 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Usar el rol REAL del personal desde su perfil, no el rol de la cotización
-          let actualRole = 'Sin Rol';
+          let actualRole = getRoleForPerson(entry.personnelId, '');
           let actualRate = quotationMember?.rate || 0;
           
           if (!isQuoted) {
