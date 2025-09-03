@@ -324,6 +324,16 @@ export function getDateRangeForFilter(filter: string) {
       return null;
   }
 
+  // Asegurar que startDate y endDate son objetos Date válidos
+  if (!(startDate instanceof Date) || isNaN(startDate.getTime())) {
+    console.warn(`⚠️ Invalid startDate for filter ${filter}, using fallback`);
+    startDate = new Date(2020, 0, 1);
+  }
+  if (!(endDate instanceof Date) || isNaN(endDate.getTime())) {
+    console.warn(`⚠️ Invalid endDate for filter ${filter}, using fallback`);
+    endDate = new Date(2030, 11, 31);
+  }
+  
   console.log(`📅 Date range for filter ${filter}:`, startDate.toISOString(), 'to', endDate.toISOString());
   return { startDate, endDate };
 }
