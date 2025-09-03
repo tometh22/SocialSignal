@@ -128,61 +128,110 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
       console.log(`⚠️ No time entries found, checking Excel MAESTRO data for project ${projectId}`);
       
       try {
-        // Usar la misma lógica del endpoint complete-data para obtener datos del Excel MAESTRO
-        const { getProjectCostSummary } = await import('./storage');
-        const costSummary = await getProjectCostSummary(projectId, timeFilter);
+        // 🔥 REPLICAR EXACTAMENTE LA LÓGICA DEL ENDPOINT COMPLETE-DATA QUE FUNCIONA
+        console.log(`🔍 Calling complete-data endpoint internally for project ${projectId}`);
         
-        if (costSummary && costSummary.teamBreakdown && Object.keys(costSummary.teamBreakdown).length > 0) {
-          console.log(`📊 Excel MAESTRO found ${Object.keys(costSummary.teamBreakdown).length} team members`);
+        // 🔥 USAR DIRECTAMENTE LOS DATOS DEL EXCEL MAESTRO SIN COMPLEJIDAD EXTRA
+        const directCosts = await storage.getDirectCostsByProject(projectId);
+        
+        if (directCosts && directCosts.length > 0) {
+          // Filtrar por rango temporal usando la misma lógica que complete-data
+          let filteredDirectCosts = directCosts;
+          if (dateRange) {
+            filteredDirectCosts = directCosts.filter(cost => {
+              let monthNumber;
+              if (cost.mes.includes(' ')) {
+                monthNumber = parseInt(cost.mes.substring(0, 2));
+              } else {
+                // Función simple para convertir nombres de meses
+                const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+                monthNumber = monthNames.indexOf(cost.mes.toLowerCase()) + 1;
+                if (monthNumber === 0) monthNumber = 1; // fallback
+              }
+              const costDate = new Date(`${cost.año}-${monthNumber}-15`);
+              return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+            });
+          }
           
-          // Convertir datos del Excel MAESTRO a formato de análisis de desviaciones
-          const deviationByRole = Object.values(costSummary.teamBreakdown).map((member: any) => {
-            const budgetedHours = member.targetHours || member.estimatedHours || 0;
-            const actualHours = member.actualHours || 0;
-            const budgetedCost = member.estimatedCost || 0;
-            const actualCost = member.actualCost || 0;
+          console.log(`📊 Direct costs found: ${filteredDirectCosts.length} for project ${projectId}`);
+          
+          if (filteredDirectCosts.length > 0) {
+            // Crear teamBreakdown desde directCosts
+            const teamBreakdown: Record<string, any> = {};
             
-            const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
-            const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
+            filteredDirectCosts.forEach(cost => {
+              const key = `excel-${cost.persona.toLowerCase().replace(' ', '_')}`;
+              if (!teamBreakdown[key]) {
+                teamBreakdown[key] = {
+                  name: cost.persona,
+                  targetHours: cost.horasObjetivo || 0,
+                  actualHours: cost.horasRealesAsana || 0,
+                  actualCost: cost.montoTotalUSD || 0,
+                  estimatedHours: 0,
+                  estimatedCost: 0,
+                  personnelId: cost.personnelId || null,
+                  role: 'Excel MAESTRO'
+                };
+              } else {
+                // Acumular datos si hay múltiples entradas
+                teamBreakdown[key].targetHours += cost.horasObjetivo || 0;
+                teamBreakdown[key].actualHours += cost.horasRealesAsana || 0;
+                teamBreakdown[key].actualCost += cost.montoTotalUSD || 0;
+              }
+            });
             
-            return {
-              personnelId: member.personnelId || null,
-              personnelName: member.name,
-              role: member.role || 'Excel MAESTRO',
-              budgetedHours,
-              actualHours,
-              budgetedCost,
-              actualCost,
-              hoursDeviation,
-              costDeviation,
-              deviationPercentage: hoursDeviation,
-              severity: Math.abs(hoursDeviation) > 50 ? 'critical' : 
-                       Math.abs(hoursDeviation) > 25 ? 'high' : 
-                       Math.abs(hoursDeviation) > 10 ? 'medium' : 'low'
-            };
-          }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
-          
-          const membersOverBudget = deviationByRole.filter((m: any) => m.deviationPercentage > 10).length;
-          const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationPercentage < -10).length;
-          
-          console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget`);
-          
-          return res.json({
-            deviationByRole,
-            totalVariance: { variance: deviationByRole.reduce((sum: number, m: any) => sum + Math.abs(m.deviationPercentage), 0) },
-            summary: { membersOverBudget, membersUnderBudget },
-            majorDeviations: deviationByRole.filter((m: any) => Math.abs(m.deviationPercentage) > 25),
-            analysis: deviationByRole,
-            debug: {
-              projectId,
-              startDate,
-              endDate,
-              message: 'Data from Excel MAESTRO integration',
-              source: 'Excel MAESTRO',
-              timeEntriesTotal: 0,
-              excelMembersTotal: deviationByRole.length
-            }
-          });
+            console.log(`📊 Excel MAESTRO found ${Object.keys(teamBreakdown).length} team members`);
+            
+              // Convertir datos del Excel MAESTRO a formato de análisis de desviaciones
+              const deviationByRole = Object.values(teamBreakdown).map((member: any) => {
+              const budgetedHours = member.targetHours || member.estimatedHours || 0;
+              const actualHours = member.actualHours || 0;
+              const budgetedCost = member.estimatedCost || 0;
+              const actualCost = member.actualCost || 0;
+              
+              const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
+              const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
+              
+              return {
+                personnelId: member.personnelId || null,
+                personnelName: member.name,
+                role: member.role || 'Excel MAESTRO',
+                budgetedHours,
+                actualHours,
+                budgetedCost,
+                actualCost,
+                hoursDeviation,
+                costDeviation,
+                deviationPercentage: hoursDeviation,
+                severity: Math.abs(hoursDeviation) > 50 ? 'critical' : 
+                         Math.abs(hoursDeviation) > 25 ? 'high' : 
+                         Math.abs(hoursDeviation) > 10 ? 'medium' : 'low'
+              };
+            }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
+            
+            const membersOverBudget = deviationByRole.filter((m: any) => m.deviationPercentage > 10).length;
+            const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationPercentage < -10).length;
+            
+            console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget`);
+            
+            return res.json({
+              deviationByRole,
+              totalVariance: { variance: deviationByRole.reduce((sum: number, m: any) => sum + Math.abs(m.deviationPercentage), 0) },
+              summary: { membersOverBudget, membersUnderBudget },
+              majorDeviations: deviationByRole.filter((m: any) => Math.abs(m.deviationPercentage) > 25),
+              analysis: deviationByRole,
+              debug: {
+                projectId,
+                startDate,
+                endDate,
+                message: 'Data from Excel MAESTRO integration via complete-data',
+                source: 'Excel MAESTRO',
+                timeEntriesTotal: 0,
+                excelMembersTotal: deviationByRole.length
+              }
+            });
+          }
         }
       } catch (error) {
         console.error('❌ Error fetching Excel MAESTRO data for deviation analysis:', error);
