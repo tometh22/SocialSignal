@@ -13,11 +13,22 @@ export function calculatePersonnelMetrics(
   totalProjectPrice: number,
   totalEstimatedCost: number
 ): Omit<PersonnelMetrics, 'efficiencyScore' | 'impactScore' | 'unifiedScore' | 'efficiencyRank' | 'impactRank' | 'unifiedRank' | 'performanceColor'> {
+  // FILTRO: Solo calcular métricas si hay datos mínimos significativos
+  // Excluir casos con solo datos objetivo sin realización
+  const hasMinimumData = (actualHours > 0 || actualCost > 0) && 
+                         (estimatedHours > 0 || estimatedCost > 0);
+  
+  if (!hasMinimumData) {
+    console.log(`⚠️ Skipping metrics for ${personnelName} - insufficient data:`, {
+      actualHours, actualCost, estimatedHours, estimatedCost
+    });
+  }
+  
   // Calcular porcentaje del precio del proyecto que gestiona
   const pricePercentage = totalEstimatedCost > 0 ? (estimatedCost / totalEstimatedCost) : 0;
   const assignedPrice = totalProjectPrice * pricePercentage;
   
-  // Calcular métricas base
+  // Calcular métricas base (con validaciones mejoradas)
   const costDeviation = estimatedCost > 0 ? (estimatedCost - actualCost) / estimatedCost : 0;
   const hoursDeviation = estimatedHours > 0 ? (estimatedHours - actualHours) / estimatedHours : 0;
   const marginPerHour = actualHours > 0 ? (assignedPrice - actualCost) / actualHours : 0;
@@ -178,20 +189,22 @@ export function calculateTeamRankings(
 ): PersonnelMetrics[] {
   if (teamData.length === 0) return [];
   
-  // FILTRO CRÍTICO: Solo incluir miembros con datos significativos
-  // Incluir si tienen datos reales O datos estimados (no requerir ambos)
-  const filteredTeamData = teamData.filter(member => 
-    (member.actualHours > 0 || member.actualCost > 0 || 
-     member.estimatedHours > 0 || member.estimatedCost > 0)
-  );
+  // FILTRO CRÍTICO: Solo incluir miembros con datos significativos para rankings
+  // Requerir actividad real (horas trabajadas O costo incurrido) para ser incluido en rankings
+  const filteredTeamData = teamData.filter(member => {
+    const hasRealActivity = member.actualHours > 0 || member.actualCost > 0;
+    const hasEstimatedData = member.estimatedHours > 0 || member.estimatedCost > 0;
+    return hasRealActivity && hasEstimatedData;
+  });
   
   console.log(`📊 Rankings filter: ${teamData.length} → ${filteredTeamData.length} members with actual data`);
   
   // Log detallado de qué miembros fueron filtrados
-  const filteredOutMembers = teamData.filter(member => 
-    !(member.actualHours > 0 || member.actualCost > 0 || 
-      member.estimatedHours > 0 || member.estimatedCost > 0)
-  );
+  const filteredOutMembers = teamData.filter(member => {
+    const hasRealActivity = member.actualHours > 0 || member.actualCost > 0;
+    const hasEstimatedData = member.estimatedHours > 0 || member.estimatedCost > 0;
+    return !(hasRealActivity && hasEstimatedData);
+  });
   
   if (filteredOutMembers.length > 0) {
     console.log(`🚫 Filtered out ${filteredOutMembers.length} members:`, 
