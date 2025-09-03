@@ -80,27 +80,49 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
   };
 
   const getSeverityScore = (deviation: Deviation) => {
-    // Si no hay horas registradas, dar la puntuación más baja
-    if (deviation.actualHours === 0) return -1;
+    // Si no hay actividad, excluir del análisis (ya filtrado en getSortedData)
+    if ((deviation.actualHours || 0) === 0 && (deviation.actualCost || 0) === 0) return -1;
     
-    const absPercentage = Math.abs(deviation.deviationPercentage);
-    if (absPercentage >= 100) return 4; // Crítico
-    if (absPercentage >= 50) return 3;  // Alto
-    if (absPercentage >= 20) return 2;  // Atención
+    // 🏢 CRITERIOS CORPORATIVOS DE SEVERIDAD
+    const { severity, alertType, deviationType } = deviation;
+    
+    // Usar los criterios del backend si están disponibles
+    if (alertType === 'budget_overrun' || alertType === 'estimation_issue') return 5; // Crítico
+    if (alertType === 'efficiency_review') return 4; // Para revisión
+    if (alertType === 'healthy_savings') return 3; // Subcosto saludable
+    if (alertType === 'on_target') return 2; // Óptimo
+    if (alertType === 'within_tolerance') return 1; // Tolerado
+    
+    // Fallback a lógica anterior si no hay criterios del backend
+    const absPercentage = Math.abs(deviation.deviationPercentage || 0);
+    if (absPercentage >= 100) return 5; // Crítico
+    if (absPercentage >= 50) return 4;  // Alto
+    if (absPercentage >= 25) return 3;  // Medio
+    if (absPercentage >= 10) return 2;  // Atención
     return 1; // Normal
   };
 
   const getSortedData = () => {
     if (!deviationData?.deviationByRole) return [];
     
-    const data = [...deviationData.deviationByRole];
+    // 🔍 FILTRAR SOLO MIEMBROS CON ACTIVIDAD REAL
+    const filteredData = deviationData.deviationByRole.filter(member => {
+      // Solo mostrar miembros que tengan horas trabajadas O costo real
+      return member.actualHours > 0 || member.actualCost > 0;
+    });
     
-    return data.sort((a, b) => {
+    console.log('🎯 FILTRO DEBUG:', {
+      totalMembers: deviationData.deviationByRole.length,
+      membersWithActivity: filteredData.length,
+      filtered: deviationData.deviationByRole.filter(m => m.actualHours === 0 && m.actualCost === 0).map(m => m.personnelName)
+    });
+    
+    return filteredData.sort((a, b) => {
       let valueA: number, valueB: number;
       
       switch (sortField) {
         case 'deviation':
-          // Primero ordenar por severidad, luego por porcentaje absoluto
+          // Ordenar por criticidad corporativa primero
           const severityA = getSeverityScore(a);
           const severityB = getSeverityScore(b);
           
@@ -109,16 +131,16 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           }
           
           // Si tienen la misma severidad, ordenar por porcentaje absoluto
-          valueA = Math.abs(a.deviationPercentage);
-          valueB = Math.abs(b.deviationPercentage);
+          valueA = Math.abs(a.deviationPercentage || 0);
+          valueB = Math.abs(b.deviationPercentage || 0);
           break;
         case 'cost':
           valueA = a.actualCost || 0;
           valueB = b.actualCost || 0;
           break;
         case 'hours':
-          valueA = a.actualHours;
-          valueB = b.actualHours;
+          valueA = a.actualHours || 0;
+          valueB = b.actualHours || 0;
           break;
         default:
           return 0;
@@ -219,7 +241,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           </div>
           <div className="text-2xl font-bold text-red-600">
             {deviationData.deviationByRole.filter(d => 
-              d.severity === 'critical' || d.alertType === 'budget_overrun' || d.alertType === 'estimation_issue'
+              (d.actualHours > 0 || d.actualCost > 0) && 
+              (d.severity === 'critical' || d.alertType === 'budget_overrun' || d.alertType === 'estimation_issue')
             ).length}
           </div>
           <div className="text-xs text-red-600">sobrecosto crítico/subutilización</div>
@@ -232,7 +255,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           </div>
           <div className="text-2xl font-bold text-blue-600">
             {deviationData.deviationByRole.filter(d => 
-              d.alertType === 'efficiency_review' || d.deviationType === 'eficiencia_alta'
+              (d.actualHours > 0 || d.actualCost > 0) && 
+              (d.alertType === 'efficiency_review' || d.deviationType === 'eficiencia_alta')
             ).length}
           </div>
           <div className="text-xs text-blue-600">alta eficiencia/análisis procesos</div>
@@ -245,7 +269,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           </div>
           <div className="text-2xl font-bold text-green-600">
             {deviationData.deviationByRole.filter(d => 
-              d.deviationType === 'subcosto_saludable' || d.alertType === 'healthy_savings'
+              (d.actualHours > 0 || d.actualCost > 0) && 
+              (d.deviationType === 'subcosto_saludable' || d.alertType === 'healthy_savings')
             ).length}
           </div>
           <div className="text-xs text-green-600">ahorros dentro del rango</div>
@@ -258,7 +283,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           </div>
           <div className="text-2xl font-bold text-purple-600">
             {deviationData.deviationByRole.filter(d => 
-              d.deviationType === 'ejecucion_optima' || d.alertType === 'on_target'
+              (d.actualHours > 0 || d.actualCost > 0) && 
+              (d.deviationType === 'ejecucion_optima' || d.alertType === 'on_target')
             ).length}
           </div>
           <div className="text-xs text-purple-600">±15% del objetivo</div>
