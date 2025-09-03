@@ -1697,13 +1697,13 @@ const ProjectDetailsPage = () => {
           <TabsContent value="dashboard" className="space-y-6">
             
             {/* DASHBOARD OPERACIONAL PRINCIPAL */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               
               {/* Métrica Principal: Markup */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-1">
                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 rounded-lg p-6 h-full">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-blue-900">📈 Markup del Proyecto</h3>
+                    <h3 className="text-base font-semibold text-blue-900">📈 Rentabilidad</h3>
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${(() => {
                       const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
                       const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
@@ -1784,61 +1784,70 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Métricas Complementarias */}
-              <div className="lg:col-span-2 space-y-4">
-                
-                {/* Ingresos */}
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-800">💰 Ingresos</p>
-                      <p className="text-lg font-bold text-green-900">
-                        ${(() => {
-                          const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                          if (isLegacyProject) {
-                            const realRevenue = (unifiedData as any)?.googleSheetsSales
-                              ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
-                              ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
-                            return realRevenue.toLocaleString();
-                          } else {
-                            return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
-                          }
-                        })()}
-                      </p>
-                    </div>
+              {/* Ingresos */}
+              <div className="lg:col-span-1">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 h-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-green-800">💰 Ingresos</h3>
                   </div>
-                  <p className="text-xs text-green-600 mt-1">
-                    {(() => {
-                      const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                      return isLegacyProject ? 'Revenue real del período' : 'Valor cotizado';
-                    })()}
-                  </p>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-green-900 mb-2">
+                      ${(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        if (isLegacyProject) {
+                          const realRevenue = (unifiedData as any)?.googleSheetsSales
+                            ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
+                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                          return realRevenue.toLocaleString();
+                        } else {
+                          return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
+                        }
+                      })()}
+                    </div>
+                    <p className="text-sm text-green-700 font-medium">
+                      {(() => {
+                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
+                        return isLegacyProject ? 'Revenue facturado' : 'Valor cotizado';
+                      })()}
+                    </p>
+                  </div>
                 </div>
+              </div>
 
-                {/* Costos */}
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-orange-800">⚙️ Costos Directos</p>
-                      <p className="text-lg font-bold text-orange-900">
-                        ${(unifiedData?.actuals?.costBreakdown?.directCostsFromExcel || 0).toLocaleString()} USD
-                      </p>
-                    </div>
+              {/* Costos */}
+              <div className="lg:col-span-1">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 h-full">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-base font-semibold text-orange-800">⚙️ Costos</h3>
                   </div>
-                  <p className="text-xs text-orange-600 mt-1">Excel MAESTRO integrado al sistema principal</p>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-orange-900 mb-2">
+                      ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                    </div>
+                    <p className="text-sm text-orange-700 font-medium">
+                      Costo real trabajado
+                    </p>
+                  </div>
                 </div>
-                
               </div>
             </div>
 
-            {/* Explicación Simple */}
-            <div className="bg-gray-50 border rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-gray-900 mb-2">📋 ¿Qué significa el Markup?</h4>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p>• <strong>Markup = Ingresos ÷ Costos:</strong> Muestra cuántos dólares genera cada dólar invertido</p>
-                <p>• <strong>2.0x o más:</strong> Excelente rentabilidad - el proyecto genera el doble de lo invertido</p>
-                <p>• <strong>1.5x - 2.0x:</strong> Buena rentabilidad - ganancia saludable</p>
-                <p>• <strong>Menos de 1.5x:</strong> Necesita mejoras - poca ganancia o pérdida</p>
+            {/* Explicación Clara */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-blue-900 mb-3">📊 Cómo interpretar estos números</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <h5 className="font-medium text-blue-800 mb-1">💰 Ingresos</h5>
+                  <p className="text-blue-700 text-xs">Dinero que entra por el proyecto</p>
+                </div>
+                <div>
+                  <h5 className="font-medium text-blue-800 mb-1">⚙️ Costos</h5>
+                  <p className="text-blue-700 text-xs">Dinero gastado en hacer el trabajo</p>
+                </div>
+                <div>
+                  <h5 className="font-medium text-blue-800 mb-1">📈 Rentabilidad</h5>
+                  <p className="text-blue-700 text-xs">Cuánto ganamos por cada dólar gastado</p>
+                </div>
               </div>
             </div>
 
@@ -2453,35 +2462,6 @@ const ProjectDetailsPage = () => {
 
             {/* Integración exitosa: costos directos ya integrados al sistema principal */}
 
-            {/* SECCIÓN 2: Análisis Avanzado - Grid Profesional 2x2 */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              
-              {/* Análisis de Desviaciones */}
-              <div className="space-y-4">
-                <DeviationAnalysis 
-                  projectId={parseInt(projectId!)} 
-                  timeFilter={timeFilterForHook}
-                  dateFilter={{
-                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
-                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
-                  }}
-                  onNavigateToTab={setActiveTab}
-                />
-              </div>
-              
-              {/* Recomendaciones Automáticas */}
-              <div className="space-y-4">
-                <Recommendations 
-                  projectId={parseInt(projectId!)} 
-                  timeFilter={timeFilterForHook}
-                  dateFilter={{
-                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
-                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
-                  }}
-                />
-              </div>
-              
-            </div>
 
             {/* SECCIÓN 3: Gráficos de Tendencias - Full Width */}
             <div className="w-full">
@@ -3949,75 +3929,58 @@ const ProjectDetailsPage = () => {
               </Card>
             </div>
 
-            {/* Economic Recommendations */}
-            <Card className="bg-gradient-to-r from-indigo-50 to-purple-50 border-indigo-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-indigo-900">
-                  <Lightbulb className="h-5 w-5 text-indigo-600" />
-                  Recomendaciones Económicas
+            {/* Análisis Simplificado - Sin recomendaciones duplicadas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Análisis de Desviaciones Compacto */}
+              <div className="space-y-4">
+                <DeviationAnalysis 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                  onNavigateToTab={setActiveTab}
+                />
+              </div>
+              
+              {/* Recomendaciones Unificadas */}
+              <div className="space-y-4">
+                <Recommendations 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                />
+              </div>
+              
+            </div>
+            
+            {/* Análisis Detallado del Equipo */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                  Análisis de Desviaciones del Equipo
                 </CardTitle>
+                <CardDescription className="text-base">
+                  Comparativa de rendimiento vs. objetivos presupuestados
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {(() => {
-                    const recommendations = [];
-                    const markup = unifiedData?.metrics?.markup || 1;
-                    const budgetUtil = unifiedData?.metrics?.budgetUtilization || 100;
-                    const efficiency = unifiedData?.metrics?.efficiency || 0;
-
-                    if (markup < 1.5) {
-                      recommendations.push({
-                        type: 'warning',
-                        title: 'Optimizar Rentabilidad',
-                        message: 'El markup actual está por debajo del objetivo. Considerar ajustar tarifas o reducir costos.',
-                        icon: AlertTriangle,
-                        color: 'text-yellow-600'
-                      });
-                    }
-
-                    if (budgetUtil > 110) {
-                      recommendations.push({
-                        type: 'danger',
-                        title: 'Control de Costos',
-                        message: 'Los costos exceden el presupuesto. Revisar asignación de recursos y eficiencia del equipo.',
-                        icon: TrendingDown,
-                        color: 'text-red-600'
-                      });
-                    }
-
-                    if (efficiency < 80) {
-                      recommendations.push({
-                        type: 'info',
-                        title: 'Mejorar Productividad',
-                        message: 'El equipo podría optimizar tiempos. Considerar capacitación o redistribución de tareas.',
-                        icon: Target,
-                        color: 'text-blue-600'
-                      });
-                    }
-
-                    if (recommendations.length === 0) {
-                      recommendations.push({
-                        type: 'success',
-                        title: 'Rendimiento Óptimo',
-                        message: 'El proyecto mantiene excelentes indicadores financieros y económicos.',
-                        icon: CheckCircle,
-                        color: 'text-green-600'
-                      });
-                    }
-
-                    return recommendations.map((rec, index) => (
-                      <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="flex items-start gap-3">
-                          <rec.icon className={`h-5 w-5 ${rec.color} mt-0.5`} />
-                          <div>
-                            <h4 className="font-medium text-gray-900">{rec.title}</h4>
-                            <p className="text-sm text-gray-600 mt-1">{rec.message}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
+                <TeamDeviationAnalysis 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                />
               </CardContent>
             </Card>
             </TooltipProvider>
