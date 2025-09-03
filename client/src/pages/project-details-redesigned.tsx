@@ -1737,16 +1737,16 @@ const ProjectDetailsPage = () => {
 
                     {/* Team Performance */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Team Velocity</div>
+                      <div className="text-sm text-slate-300 mb-1">Velocidad del Equipo</div>
                       <div className="text-2xl font-bold text-purple-400">
-                        {Math.round(unifiedData?.workedHours || 0 / 7)} h/week
+                        {Math.round(unifiedData?.workedHours || 0 / 7)} h/sem
                       </div>
-                      <div className="text-xs text-slate-400">Current sprint</div>
+                      <div className="text-xs text-slate-400">Sprint actual</div>
                     </div>
 
                     {/* Budget Status */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Budget Health</div>
+                      <div className="text-sm text-slate-300 mb-1">Estado Presupuesto</div>
                       <div className={`text-2xl font-bold ${(() => {
                         const efficiency = unifiedData?.metrics?.efficiency || 0;
                         return efficiency > 80 ? "text-red-400" : efficiency > 60 ? "text-yellow-400" : "text-green-400";
@@ -1754,11 +1754,11 @@ const ProjectDetailsPage = () => {
                         {(() => {
                           const efficiency = unifiedData?.metrics?.efficiency || 0;
                           const remaining = Math.max(0, 100 - efficiency);
-                          return remaining > 40 ? "Healthy" : remaining > 20 ? "Watch" : "Critical";
+                          return remaining > 40 ? "Saludable" : remaining > 20 ? "Atención" : "Crítico";
                         })()}
                       </div>
                       <div className="text-xs text-slate-400">
-                        {Math.max(0, 100 - (unifiedData?.metrics?.efficiency || 0)).toFixed(0)}% remaining
+                        {Math.max(0, 100 - (unifiedData?.metrics?.efficiency || 0)).toFixed(0)}% restante
                       </div>
                     </div>
                   </div>
@@ -1768,14 +1768,14 @@ const ProjectDetailsPage = () => {
                 <div className="lg:col-span-2">
                   <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <DollarSign className="h-5 w-5" />
-                    Financial Performance
+                    Rendimiento Financiero
                   </h3>
                   
                   <div className="space-y-4">
                     {/* Revenue & Cost Breakdown */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                       <div className="flex justify-between items-center mb-3">
-                        <span className="text-slate-300">Revenue Generated</span>
+                        <span className="text-slate-300">Ingresos Generados</span>
                         <span className="text-2xl font-bold text-green-400">
                           ${(() => {
                             const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
@@ -1807,19 +1807,19 @@ const ProjectDetailsPage = () => {
                         <div className="text-lg font-bold text-blue-400">
                           {(unifiedData?.metrics?.markup || 0).toFixed(1)}x
                         </div>
-                        <div className="text-xs text-slate-400">Revenue Multiple</div>
+                        <div className="text-xs text-slate-400">Multiplicador</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-purple-400">
                           {(unifiedData?.workedHours || 0)}h
                         </div>
-                        <div className="text-xs text-slate-400">Total Worked</div>
+                        <div className="text-xs text-slate-400">Total Trabajado</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-cyan-400">
                           {(unifiedData?.metrics?.efficiency || 0).toFixed(0)}%
                         </div>
-                        <div className="text-xs text-slate-400">Budget Used</div>
+                        <div className="text-xs text-slate-400">Presupuesto Usado</div>
                       </div>
                     </div>
                   </div>
@@ -1836,7 +1836,7 @@ const ProjectDetailsPage = () => {
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       <Users className="h-5 w-5 text-blue-600" />
-                      Team Performance
+                      Rendimiento del Equipo
                     </h3>
                     <Badge variant="outline" className="text-xs">
                       {Object.values(unifiedData?.actuals?.teamBreakdown || {}).length} miembros
@@ -1849,7 +1849,7 @@ const ProjectDetailsPage = () => {
                     {/* Top Performers */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-green-50 rounded-lg p-4">
-                        <div className="text-sm text-green-700 mb-1">Top Performer</div>
+                        <div className="text-sm text-green-700 mb-1">Mejor Rendimiento</div>
                         <div className="font-bold text-green-900">
                           {(() => {
                             const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
@@ -1869,7 +1869,7 @@ const ProjectDetailsPage = () => {
                       </div>
                       
                       <div className="bg-blue-50 rounded-lg p-4">
-                        <div className="text-sm text-blue-700 mb-1">Team Velocity</div>
+                        <div className="text-sm text-blue-700 mb-1">Velocidad Equipo</div>
                         <div className="font-bold text-blue-900">
                           {Math.round((unifiedData?.workedHours || 0) / 4)}h
                         </div>
@@ -1901,60 +1901,112 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Recent Activity & Timeline (from Tiempo tab) */}
+              {/* Recomendaciones Automáticas */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-purple-600" />
-                      Actividad Reciente
+                      <Target className="h-5 w-5 text-orange-600" />
+                      Recomendaciones Automáticas
                     </h3>
                     <Badge variant="outline" className="text-xs">
-                      {unifiedData?.timeEntries?.length || 0} registros
+                      IA Analytics
                     </Badge>
                   </div>
                 </div>
                 
                 <div className="p-6">
-                  {unifiedData?.timeEntries && unifiedData.timeEntries.length > 0 ? (
-                    <div className="space-y-3">
-                      {unifiedData.timeEntries.slice(0, 5).map((entry: any, index: number) => (
-                        <div key={entry.id || index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-medium text-purple-700">
-                                {(entry.personnelName || 'U').charAt(0)}
-                              </span>
-                            </div>
+                  <div className="space-y-4">
+                    {(() => {
+                      const efficiency = unifiedData?.metrics?.efficiency || 0;
+                      const markup = unifiedData?.metrics?.markup || 0;
+                      const recommendations = [];
+
+                      // Recomendación basada en eficiencia
+                      if (efficiency > 80) {
+                        recommendations.push({
+                          type: 'warning',
+                          icon: '⚠️',
+                          title: 'Riesgo de Sobrecarga',
+                          description: 'El equipo está usando más del 80% del presupuesto. Considera redistribuir tareas.',
+                          color: 'text-red-700',
+                          bg: 'bg-red-50'
+                        });
+                      } else if (efficiency < 40) {
+                        recommendations.push({
+                          type: 'opportunity',
+                          icon: '💡',
+                          title: 'Oportunidad de Optimización',
+                          description: 'Baja utilización del presupuesto. Podrías acelerar entregables.',
+                          color: 'text-blue-700',
+                          bg: 'bg-blue-50'
+                        });
+                      }
+
+                      // Recomendación basada en markup
+                      if (markup < 1.5) {
+                        recommendations.push({
+                          type: 'financial',
+                          icon: '💰',
+                          title: 'Mejorar Rentabilidad',
+                          description: 'Markup bajo. Revisa costos operacionales y ajusta pricing futuro.',
+                          color: 'text-orange-700',
+                          bg: 'bg-orange-50'
+                        });
+                      } else if (markup > 3) {
+                        recommendations.push({
+                          type: 'success',
+                          icon: '🎯',
+                          title: 'Proyecto Altamente Rentable',
+                          description: 'Excelente performance financiera. Replicar estrategia en proyectos similares.',
+                          color: 'text-green-700',
+                          bg: 'bg-green-50'
+                        });
+                      }
+
+                      // Recomendación de equipo
+                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                      const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80);
+                      if (overworkedMembers.length > 0) {
+                        recommendations.push({
+                          type: 'team',
+                          icon: '👥',
+                          title: 'Balancear Carga de Trabajo',
+                          description: `${overworkedMembers.length} miembro(s) con alta carga. Considera redistribuir tareas.`,
+                          color: 'text-purple-700',
+                          bg: 'bg-purple-50'
+                        });
+                      }
+
+                      // Si no hay recomendaciones específicas, mostrar recomendación general
+                      if (recommendations.length === 0) {
+                        recommendations.push({
+                          type: 'general',
+                          icon: '✅',
+                          title: 'Proyecto en Buen Estado',
+                          description: 'Métricas dentro de rangos saludables. Continúa con el plan actual.',
+                          color: 'text-green-700',
+                          bg: 'bg-green-50'
+                        });
+                      }
+
+                      return recommendations.slice(0, 3).map((rec, index) => (
+                        <div key={index} className={`${rec.bg} rounded-lg p-4 border-l-4 ${rec.color.includes('red') ? 'border-red-400' : rec.color.includes('blue') ? 'border-blue-400' : rec.color.includes('orange') ? 'border-orange-400' : rec.color.includes('purple') ? 'border-purple-400' : 'border-green-400'}`}>
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg">{rec.icon}</span>
                             <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {entry.personnelName || 'Usuario'}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {entry.description || 'Trabajo realizado'}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-gray-900">
-                              {entry.hours}h
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {entry.date}
+                              <h4 className={`font-semibold text-sm ${rec.color}`}>
+                                {rec.title}
+                              </h4>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {rec.description}
+                              </p>
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                      <div className="text-sm text-gray-500">Sin actividad reciente</div>
-                      <div className="text-xs text-gray-400">
-                        No hay registros de tiempo en el período seleccionado
-                      </div>
-                    </div>
-                  )}
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
             </div>
@@ -2016,49 +2068,65 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Revenue Tracking */}
+              {/* Actividad Reciente */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-4 border-b border-gray-100">
                   <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-green-600" />
-                    Ingresos
+                    <Clock className="h-4 w-4 text-purple-600" />
+                    Actividad Reciente
                   </h4>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-900">
-                      ${(() => {
-                        const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                        if (isLegacyProject) {
-                          return ((unifiedData as any)?.googleSheetsSales
-                            ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
-                            ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0).toLocaleString();
-                        } else {
-                          return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
-                        }
-                      })()}
+                  {unifiedData?.timeEntries && unifiedData.timeEntries.length > 0 ? (
+                    <div className="space-y-2">
+                      {unifiedData.timeEntries.slice(0, 3).map((entry: any, index: number) => (
+                        <div key={entry.id || index} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
+                              <span className="text-xs font-medium text-purple-700">
+                                {(entry.personnelName || 'U').charAt(0)}
+                              </span>
+                            </div>
+                            <span className="font-medium text-gray-900">
+                              {entry.personnelName || 'Usuario'}
+                            </span>
+                          </div>
+                          <span className="text-gray-600">{entry.hours}h</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-xs text-gray-500">revenue generado</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-lg font-bold ${
-                      (unifiedData?.metrics?.markup || 0) >= 2 ? 'text-green-600' : 
-                      (unifiedData?.metrics?.markup || 0) >= 1.5 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {(unifiedData?.metrics?.markup || 0).toFixed(1)}x
+                  ) : (
+                    <div className="text-center py-4">
+                      <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                      <div className="text-xs text-gray-500">Sin actividad reciente</div>
                     </div>
-                    <div className="text-xs text-gray-500">multiplier</div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {/* Quality Score */}
+              {/* Puntuación de Calidad */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-4 border-b border-gray-100">
-                  <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-600" />
-                    Quality Score
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <Star className="h-4 w-4 text-yellow-600" />
+                      Puntuación de Calidad
+                    </h4>
+                    <div className="group relative">
+                      <Info className="h-4 w-4 text-gray-400 cursor-help" />
+                      <div className="absolute bottom-6 right-0 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-3 w-64 z-10">
+                        <div className="font-semibold mb-2">¿Cómo se calcula?</div>
+                        <div className="space-y-1">
+                          <div>• 40% - Eficiencia presupuestaria</div>
+                          <div>• 35% - Rentabilidad (markup)</div>
+                          <div>• 25% - Distribución del equipo</div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-300">
+                          Fórmula: ((100-eficiencia)*0.4 + (markup-1)*35 + factorEquipo*25)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-4 space-y-3">
                   <div className="text-center">
@@ -2066,25 +2134,68 @@ const ProjectDetailsPage = () => {
                       {(() => {
                         const efficiency = unifiedData?.metrics?.efficiency || 0;
                         const markup = unifiedData?.metrics?.markup || 0;
-                        const score = ((100 - efficiency) * 0.4 + (markup - 1) * 40) * 0.6;
-                        return Math.max(0, Math.min(100, score)).toFixed(0);
+                        const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                        
+                        // Factor de distribución del equipo (penaliza sobrecarga)
+                        const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
+                        const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
+                        
+                        // Fórmula mejorada y documentada
+                        const budgetScore = (100 - efficiency) * 0.4; // Mejor si usa menos presupuesto
+                        const profitabilityScore = Math.min(100, (markup - 1) * 35); // Mejor markup = mejor score
+                        const teamScore = teamFactor * 0.25; // Penaliza equipo sobrecargado
+                        
+                        const totalScore = budgetScore + profitabilityScore + teamScore;
+                        return Math.max(0, Math.min(100, totalScore)).toFixed(0);
                       })()}
                     </div>
                     <div className="text-xs text-gray-500">de 100 puntos</div>
                   </div>
                   <div className="flex justify-center">
                     <div className="flex gap-1">
-                      {[1,2,3,4,5].map(star => (
-                        <Star 
-                          key={star} 
-                          className={`h-4 w-4 ${
-                            star <= Math.ceil(((unifiedData?.metrics?.efficiency || 0) + (unifiedData?.metrics?.markup || 0) * 20) / 40) 
-                              ? 'text-yellow-400 fill-current' 
-                              : 'text-gray-300'
-                          }`} 
-                        />
-                      ))}
+                      {[1,2,3,4,5].map(star => {
+                        const efficiency = unifiedData?.metrics?.efficiency || 0;
+                        const markup = unifiedData?.metrics?.markup || 0;
+                        const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                        const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
+                        const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
+                        const budgetScore = (100 - efficiency) * 0.4;
+                        const profitabilityScore = Math.min(100, (markup - 1) * 35);
+                        const teamScore = teamFactor * 0.25;
+                        const totalScore = budgetScore + profitabilityScore + teamScore;
+                        const finalScore = Math.max(0, Math.min(100, totalScore));
+                        
+                        return (
+                          <Star 
+                            key={star} 
+                            className={`h-4 w-4 ${
+                              star <= Math.ceil(finalScore / 20) 
+                                ? 'text-yellow-400 fill-current' 
+                                : 'text-gray-300'
+                            }`} 
+                          />
+                        );
+                      })}
                     </div>
+                  </div>
+                  <div className="text-xs text-center text-gray-500">
+                    {(() => {
+                      const efficiency = unifiedData?.metrics?.efficiency || 0;
+                      const markup = unifiedData?.metrics?.markup || 0;
+                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                      const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
+                      const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
+                      const budgetScore = (100 - efficiency) * 0.4;
+                      const profitabilityScore = Math.min(100, (markup - 1) * 35);
+                      const teamScore = teamFactor * 0.25;
+                      const totalScore = budgetScore + profitabilityScore + teamScore;
+                      const finalScore = Math.max(0, Math.min(100, totalScore));
+                      
+                      if (finalScore >= 80) return 'Excelente calidad del proyecto';
+                      if (finalScore >= 60) return 'Buena calidad del proyecto';
+                      if (finalScore >= 40) return 'Calidad aceptable';
+                      return 'Necesita mejoras';
+                    })()}
                   </div>
                 </div>
               </div>
