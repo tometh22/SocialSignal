@@ -1526,7 +1526,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timeFilter: timeFilter,
         isAlwaysOn: project.quotation?.projectType === 'always-on',
         // Agregar salesData para compatibilidad con frontend
-        salesData: completeData.googleSheetsSales
+        salesData: completeData.googleSheetsSales,
+        // AGREGAR timeEntries para mostrar actividad reciente en frontend
+        timeEntries: timeEntries.map(entry => ({
+          id: entry.id,
+          personnelId: entry.personnelId,
+          personnelName: entry.personnelName || 'Sin nombre',
+          date: entry.date,
+          hours: entry.hours,
+          description: entry.description,
+          roleName: entry.roleName || 'Sin rol'
+        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Ordenar por fecha descendente
       };
 
       console.log(`📊 Complete data prepared for project ${id}:`, {
@@ -1538,7 +1548,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamBreakdownLength: Object.values(teamBreakdown).length,
         teamBreakdownKeys: Object.keys(teamBreakdown),
         teamBreakdownSample: Object.values(teamBreakdown).slice(0, 2),
-        economicRankingsCount: economicRankings.length
+        economicRankingsCount: economicRankings.length,
+        timeEntriesCount: timeEntries.length,
+        recentTimeEntriesSample: timeEntries.slice(0, 3).map(e => ({
+          personnelName: e.personnelName,
+          date: e.date,
+          hours: e.hours
+        }))
       });
 
       res.json(responseData);
