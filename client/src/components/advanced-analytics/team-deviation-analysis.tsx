@@ -128,7 +128,10 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
     });
   };
 
-  const getVarianceBadge = (percentage: number, actualHours: number, budgetedHours: number) => {
+  // Helper function to get corporate badge for variance analysis
+  const getCorporateBadge = (deviation: any) => {
+    const { deviationType, alertType, severity, deviationPercentage, actualHours } = deviation;
+    
     // Si no hay horas registradas, mostrar estado especial
     if (actualHours === 0) {
       return { 
@@ -137,24 +140,28 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
         className: 'bg-gray-400 text-white'
       };
     }
-
-    const absPercentage = Math.abs(percentage);
-    const minHoursThreshold = budgetedHours * 0.3;
     
-    // Lógica clara y descriptiva de clasificación
-    if (absPercentage > 50 && actualHours > minHoursThreshold) {
-      // Sobrecosto crítico: trabajó mucho Y excedió presupuesto significativamente
+    // 🏢 CRITERIOS CORPORATIVOS
+    if (alertType === 'budget_overrun' || (deviationType === 'sobrecosto' && severity === 'critical')) {
       return { variant: 'destructive' as const, label: 'Sobrecosto Crítico', className: 'bg-red-600 text-white' };
-    } else if (absPercentage > 50 && actualHours <= minHoursThreshold) {
-      // Subrendimiento: gran desviación pero por trabajar muy poco
-      return { variant: 'secondary' as const, label: 'Subrendimiento', className: 'bg-purple-500 text-white' };
-    } else if (absPercentage >= 25) {
-      // Alto riesgo: desviación considerable
-      return { variant: 'destructive' as const, label: 'Alto Riesgo', className: 'bg-orange-500 text-white' };
-    } else if (absPercentage >= 10) {
-      return { variant: 'outline' as const, label: 'Atención', className: 'bg-yellow-500 text-white' };
+    } else if (alertType === 'estimation_issue' || deviationType === 'subutilizacion_critica') {
+      return { variant: 'destructive' as const, label: 'Subutilización Crítica', className: 'bg-red-600 text-white' };
+    } else if (alertType === 'efficiency_review' || deviationType === 'eficiencia_alta') {
+      return { variant: 'secondary' as const, label: 'Eficiencia Alta', className: 'bg-blue-500 text-white' };
+    } else if (alertType === 'healthy_savings' || deviationType === 'subcosto_saludable') {
+      return { variant: 'secondary' as const, label: 'Subcosto Saludable', className: 'bg-green-500 text-white' };
+    } else if (alertType === 'on_target' || deviationType === 'ejecucion_optima') {
+      return { variant: 'secondary' as const, label: 'Ejecución Óptima', className: 'bg-purple-500 text-white' };
+    } else if (alertType === 'within_tolerance' || deviationType === 'sobrecosto_tolerado') {
+      return { variant: 'outline' as const, label: 'Sobrecosto Tolerado', className: 'bg-yellow-500 text-white' };
     } else {
-      return { variant: 'secondary' as const, label: 'Normal', className: 'bg-green-500 text-white' };
+      // Fallback para compatibilidad
+      const absVariance = Math.abs(deviationPercentage || 0);
+      if (absVariance > 50) {
+        return { variant: 'destructive' as const, label: 'Desviación Alta', className: 'bg-orange-500 text-white' };
+      } else {
+        return { variant: 'secondary' as const, label: 'Normal', className: 'bg-gray-500 text-white' };
+      }
     }
   };
 
@@ -203,48 +210,58 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
 
   return (
     <div className="space-y-4">
-      {/* Resumen General */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* Resumen General - Criterios Corporativos */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="h-4 w-4 text-red-600" />
-            <span className="text-sm font-medium text-red-800">Críticas</span>
+            <span className="text-sm font-medium text-red-800">Requieren Atención</span>
           </div>
           <div className="text-2xl font-bold text-red-600">
-            {(() => {
-              // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
-              const criticalCount = deviationData.deviationByRole.filter(d => {
-                const absDeviation = Math.abs(d.deviationPercentage);
-                const minHoursThreshold = d.budgetedHours * 0.3;
-                return absDeviation > 50 && d.actualHours > minHoursThreshold;
-              }).length;
-              console.log('🎯 TEAM TeamDeviationAnalysis - Críticas en resumen (lógica inteligente):', criticalCount);
-              return criticalCount;
-            })()}
+            {deviationData.deviationByRole.filter(d => 
+              d.severity === 'critical' || d.alertType === 'budget_overrun' || d.alertType === 'estimation_issue'
+            ).length}
           </div>
-          <div className="text-xs text-red-600">desviaciones &gt;50%</div>
+          <div className="text-xs text-red-600">sobrecosto crítico/subutilización</div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-orange-600" />
-            <span className="text-sm font-medium text-orange-800">Altas</span>
+            <CheckCircle2 className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">Para Revisión</span>
           </div>
-          <div className="text-2xl font-bold text-orange-600">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) >= 25 && Math.abs(d.deviationPercentage) <= 50).length}
+          <div className="text-2xl font-bold text-blue-600">
+            {deviationData.deviationByRole.filter(d => 
+              d.alertType === 'efficiency_review' || d.deviationType === 'eficiencia_alta'
+            ).length}
           </div>
-          <div className="text-xs text-orange-600">desviaciones 25-50%</div>
+          <div className="text-xs text-blue-600">alta eficiencia/análisis procesos</div>
         </div>
 
         <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
           <div className="flex items-center gap-2 mb-2">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
-            <span className="text-sm font-medium text-green-800">Normales</span>
+            <span className="text-sm font-medium text-green-800">Subcostos Saludables</span>
           </div>
           <div className="text-2xl font-bold text-green-600">
-            {deviationData.deviationByRole.filter(d => d.actualHours > 0 && Math.abs(d.deviationPercentage) < 10).length}
+            {deviationData.deviationByRole.filter(d => 
+              d.deviationType === 'subcosto_saludable' || d.alertType === 'healthy_savings'
+            ).length}
           </div>
-          <div className="text-xs text-green-600">desviaciones &lt;10%</div>
+          <div className="text-xs text-green-600">ahorros dentro del rango</div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+          <div className="flex items-center gap-2 mb-2">
+            <CheckCircle2 className="h-4 w-4 text-purple-600" />
+            <span className="text-sm font-medium text-purple-800">Ejecución Óptima</span>
+          </div>
+          <div className="text-2xl font-bold text-purple-600">
+            {deviationData.deviationByRole.filter(d => 
+              d.deviationType === 'ejecucion_optima' || d.alertType === 'on_target'
+            ).length}
+          </div>
+          <div className="text-xs text-purple-600">±15% del objetivo</div>
         </div>
       </div>
 
@@ -311,7 +328,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <tbody className="bg-white divide-y divide-gray-200">
               {getSortedData()
                 .map((deviation, index) => {
-                  const badge = getVarianceBadge(deviation.deviationPercentage, deviation.actualHours, deviation.budgetedHours);
+                  const badge = getCorporateBadge(deviation);
                   const progressPercentage = deviation.budgetedHours > 0 ? (deviation.actualHours / deviation.budgetedHours) * 100 : 0;
                   
                   return (
