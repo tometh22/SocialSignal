@@ -485,6 +485,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Debug endpoint para investigar discrepancia de costos
+  app.get('/api/debug/costs-filtered/:projectId', requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.projectId);
+    const timeFilter = req.query.timeFilter as string || '2025-05-01_to_2025-08-31';
+    
+    try {
+      console.log(`🔍 DEBUG COSTOS FILTRADOS - Proyecto ${projectId}, Filtro: ${timeFilter}`);
+      
+      // Obtener todos los costos sin filtro
+      const allCosts = await storage.getDirectCostsByProject(projectId);
+      console.log(`📊 Total costos en base: ${allCosts?.length || 0}`);
+      
+      // Aplicar filtro temporal
+      const dateRange = parseTimeFilter(timeFilter);
+      const filteredCosts = allCosts?.filter(cost => {
+        const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
+        const inRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+        
+        console.log(`💰 Costo: ${cost.nombre} - ${cost.mes} ${cost.año} = $${cost.montoTotalUsd} USD, En rango: ${inRange}`);
+        return inRange;
+      }) || [];
+      
+      // Calcular totales
+      const totalUSD = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.montoTotalUsd as string) || 0), 0);
+      const totalARS = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.costoTotal as string) || 0), 0);
+      
+      console.log(`💰 RESULTADO: ${filteredCosts.length} costos filtrados = $${totalUSD} USD`);
+      
+      res.json({
+        projectId,
+        timeFilter,
+        dateRange: {
+          start: dateRange.startDate.toISOString(),
+          end: dateRange.endDate.toISOString()
+        },
+        allCosts: allCosts?.length || 0,
+        filteredCosts: filteredCosts.length,
+        totals: {
+          usd: totalUSD,
+          ars: totalARS
+        },
+        detailedCosts: filteredCosts.map(cost => ({
+          nombre: cost.nombre,
+          mes: cost.mes,
+          año: cost.año,
+          montoUSD: cost.montoTotalUsd,
+          montoARS: cost.costoTotal,
+          tipo: cost.tipoGasto
+        }))
+      });
+    } catch (error) {
+      console.error('❌ Error en debug de costos filtrados:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Función auxiliar para filtrar ventas de Google Sheets por período temporal
   const getFilteredGoogleSheetsSales = async (projectId: number, timeFilter: string, dateRange: any) => {
     try {
