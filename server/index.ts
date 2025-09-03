@@ -269,9 +269,9 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
                 actualHours,
                 budgetedCost,
                 actualCost,
-                hoursDeviation,
+                hourDeviation: actualHours - budgetedHours, // Diferencia absoluta en horas
                 costDeviation,
-                deviationPercentage: hoursDeviation,
+                deviationPercentage: hoursDeviation, // Porcentaje de desviación
                 severity,
                 deviationType,
                 alertType,
@@ -411,7 +411,11 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
         hourDeviation,
         costDeviation,
         deviationPercentage,
-        isQuoted
+        isQuoted,
+        // Add missing fields for consistency with Excel MAESTRO path
+        severity: 'medium',
+        deviationType: 'normal',
+        alertType: 'none'
       };
 
       deviationByRole.push(deviation);

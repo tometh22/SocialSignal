@@ -27,6 +27,8 @@ interface Deviation {
   costDeviation: number;
   deviationPercentage: number;
   severity?: 'critical' | 'high' | 'medium' | 'low';
+  alertType?: string;
+  deviationType?: string;
 }
 
 interface DeviationAnalysisData {
@@ -440,7 +442,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
                             {deviation.deviationPercentage > 0 ? '+' : ''}{Math.abs(deviation.deviationPercentage || 0).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
-                            {deviation.hourDeviation > 0 ? '+' : ''}{(deviation.hourDeviation || 0).toFixed(1)}h diferencia
+                            {(deviation.hourDeviation || 0) > 0 ? '+' : ''}{(deviation.hourDeviation || 0).toFixed(1)}h diferencia
                           </div>
                         </div>
                       </td>
