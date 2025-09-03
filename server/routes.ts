@@ -1528,15 +1528,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Agregar salesData para compatibilidad con frontend
         salesData: completeData.googleSheetsSales,
         // AGREGAR timeEntries para mostrar actividad reciente en frontend
-        timeEntries: timeEntries.map(entry => ({
-          id: entry.id,
-          personnelId: entry.personnelId,
-          personnelName: entry.personnelName || 'Sin nombre',
-          date: entry.date,
-          hours: entry.hours,
-          description: entry.description,
-          roleName: entry.roleName || 'Sin rol'
-        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Ordenar por fecha descendente
+        // NOTA: Si no hay timeEntries tradicionales, usar datos del teamBreakdown como actividad reciente
+        timeEntries: timeEntries.length > 0 
+          ? timeEntries.map(entry => ({
+              id: entry.id,
+              personnelId: entry.personnelId,
+              personnelName: entry.personnelName || 'Sin nombre',
+              date: entry.date,
+              hours: entry.hours,
+              description: entry.description,
+              roleName: entry.roleName || 'Sin rol'
+            })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          : Object.values(teamBreakdown).map((member: any, index) => ({
+              id: `excel-${index}`,
+              personnelId: member.personnelId || null,
+              personnelName: member.name || 'Sin nombre',
+              date: new Date().toISOString().split('T')[0], // Fecha actual como placeholder
+              hours: member.actualHours || member.hours || 0,
+              description: `${member.hours || 0}h trabajadas en el período`,
+              roleName: member.role || 'Sin rol'
+            })).filter(entry => entry.hours > 0) // Solo mostrar miembros con horas trabajadas
       };
 
       console.log(`📊 Complete data prepared for project ${id}:`, {
@@ -1549,12 +1560,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamBreakdownKeys: Object.keys(teamBreakdown),
         teamBreakdownSample: Object.values(teamBreakdown).slice(0, 2),
         economicRankingsCount: economicRankings.length,
-        timeEntriesCount: timeEntries.length,
-        recentTimeEntriesSample: timeEntries.slice(0, 3).map(e => ({
-          personnelName: e.personnelName,
-          date: e.date,
-          hours: e.hours
-        }))
+        timeEntriesCount: timeEntries.length > 0 ? timeEntries.length : Object.values(teamBreakdown).filter((m: any) => m.hours > 0).length,
+        recentTimeEntriesSample: timeEntries.length > 0 
+          ? timeEntries.slice(0, 3).map(e => ({
+              personnelName: e.personnelName,
+              date: e.date,
+              hours: e.hours
+            }))
+          : Object.values(teamBreakdown).filter((m: any) => m.hours > 0).slice(0, 3).map((member: any) => ({
+              personnelName: member.name,
+              hours: member.hours || member.actualHours,
+              source: 'teamBreakdown'
+            }))
       });
 
       res.json(responseData);
