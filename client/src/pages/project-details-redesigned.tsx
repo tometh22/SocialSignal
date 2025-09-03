@@ -2463,16 +2463,6 @@ const ProjectDetailsPage = () => {
             {/* Integración exitosa: costos directos ya integrados al sistema principal */}
 
 
-            {/* SECCIÓN 3: Gráficos de Tendencias - Full Width */}
-            <div className="w-full">
-              <TrendCharts 
-                projectId={parseInt(projectId!)} 
-                dateFilter={{
-                  startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
-                  endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
-                }}
-              />
-            </div>
 
             {/* SECCIÓN 4: Actividad Reciente - Optimizada */}
             <Card className="border-l-4 border-l-indigo-500 shadow-sm">
@@ -3957,6 +3947,18 @@ const ProjectDetailsPage = () => {
                 />
               </div>
               
+            </div>
+            
+            {/* Gráficos de Tendencias */}
+            <div className="w-full">
+              <TrendCharts 
+                projectId={parseInt(projectId!)} 
+                timeFilter={timeFilterForHook}
+                dateFilter={{
+                  startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                  endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                }}
+              />
             </div>
             
             {/* Análisis Detallado del Equipo */}
