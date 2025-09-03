@@ -3252,11 +3252,9 @@ export class DatabaseStorage implements IStorage {
         adjustedHours: monthlyHourAdjustments.adjustedHours,
         reason: monthlyHourAdjustments.reason,
         createdBy: monthlyHourAdjustments.createdBy,
-        createdAt: monthlyHourAdjustments.createdAt,
-        personnelName: personnel.name
+        createdAt: monthlyHourAdjustments.createdAt
       })
       .from(monthlyHourAdjustments)
-      .leftJoin(personnel, eq(monthlyHourAdjustments.personnelId, personnel.id))
       .where(eq(monthlyHourAdjustments.projectId, projectId));
 
       return result;
@@ -3370,11 +3368,9 @@ export class DatabaseStorage implements IStorage {
         approvalDate: projectPriceAdjustments.approvalDate,
         notes: projectPriceAdjustments.notes,
         createdBy: projectPriceAdjustments.createdBy,
-        createdAt: projectPriceAdjustments.createdAt,
-        createdByName: users.name
+        createdAt: projectPriceAdjustments.createdAt
       })
       .from(projectPriceAdjustments)
-      .leftJoin(users, eq(projectPriceAdjustments.createdBy, users.id))
       .where(eq(projectPriceAdjustments.projectId, projectId))
       .orderBy(desc(projectPriceAdjustments.effectiveDate));
 
