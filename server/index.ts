@@ -216,26 +216,49 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
               const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
               const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
               
-              // 🔥 LÓGICA CORREGIDA: Diferenciar SOBRECOSTO vs SUBCOSTO
+              // 🏢 CRITERIOS CORPORATIVOS DE DESVIACIÓN: Análisis empresarial sofisticado
               let severity = 'low';
               let deviationType = 'normal';
+              let alertType = 'none';
               
-              if (hoursDeviation > 0) {
-                // SOBRECOSTO: Usó más horas de las asignadas
+              const absoluteDeviation = Math.abs(hoursDeviation);
+              
+              if (hoursDeviation > 15) {
+                // 🚨 SOBRECOSTO CRÍTICO: Exceso presupuestario
                 deviationType = 'sobrecosto';
+                alertType = 'budget_overrun';
                 severity = hoursDeviation > 50 ? 'critical' : 
-                          hoursDeviation > 25 ? 'high' : 
-                          hoursDeviation > 10 ? 'medium' : 'low';
-              } else if (hoursDeviation < -10) {
-                // SUBCOSTO: Usó significativamente menos horas (ahorro importante)
-                deviationType = 'subcosto';
-                const absoluteDeviation = Math.abs(hoursDeviation);
-                severity = absoluteDeviation > 50 ? 'excellent' : 
-                          absoluteDeviation > 25 ? 'good' : 'normal';
-              } else {
-                // Normal: Desviación menor al 10%
-                deviationType = 'normal';
+                          hoursDeviation > 30 ? 'high' : 'medium';
+                          
+              } else if (hoursDeviation > 0 && hoursDeviation <= 15) {
+                // ⚠️ SOBRECOSTO CONTROLADO: Dentro de tolerancia corporativa
+                deviationType = 'sobrecosto_tolerado';
+                alertType = 'within_tolerance';
                 severity = 'low';
+                
+              } else if (hoursDeviation < -70) {
+                // 🔍 SUBUTILIZACIÓN CRÍTICA: Posible problema de estimación o productividad
+                deviationType = 'subutilizacion_critica';
+                alertType = 'estimation_issue';
+                severity = 'critical'; // Requiere investigación
+                
+              } else if (hoursDeviation < -40) {
+                // 📊 EFICIENCIA ALTA: Ahorro significativo pero requiere análisis
+                deviationType = 'eficiencia_alta';
+                alertType = 'efficiency_review';
+                severity = 'good'; // Positivo pero revisar procesos
+                
+              } else if (hoursDeviation < -15) {
+                // ✅ SUBCOSTO SALUDABLE: Ahorro dentro de parámetros normales
+                deviationType = 'subcosto_saludable';
+                alertType = 'healthy_savings';
+                severity = 'excellent';
+                
+              } else {
+                // 🎯 EJECUCIÓN ÓPTIMA: Dentro del rango objetivo ±15%
+                deviationType = 'ejecucion_optima';
+                alertType = 'on_target';
+                severity = 'optimal';
               }
               
               return {
@@ -251,15 +274,29 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
                 deviationPercentage: hoursDeviation,
                 severity,
                 deviationType,
+                alertType,
+                corporateAnalysis: {
+                  budgetImpact: hoursDeviation > 0 ? 'negative' : 'positive',
+                  requiresReview: ['critical', 'estimation_issue', 'efficiency_review'].includes(alertType),
+                  performanceLevel: severity === 'optimal' ? 'target' : 
+                                   severity === 'excellent' ? 'above_target' : 
+                                   severity === 'good' ? 'efficient' : 
+                                   severity === 'critical' ? 'needs_attention' : 'acceptable'
+                },
                 isSubcost: member.isSubcost || false,
                 costType: member.costType || 'Directo'
               };
             }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
             
-            const membersOverBudget = deviationByRole.filter((m: any) => m.deviationType === 'sobrecosto').length;
-            const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationType === 'subcosto').length;
+            // 📊 MÉTRICAS CORPORATIVAS
+            const membersOverBudget = deviationByRole.filter((m: any) => 
+              m.deviationType === 'sobrecosto' || m.alertType === 'budget_overrun').length;
+            const membersUnderBudget = deviationByRole.filter((m: any) => 
+              ['subcosto_saludable', 'eficiencia_alta'].includes(m.deviationType)).length;
+            const membersRequiringReview = deviationByRole.filter((m: any) => 
+              m.corporateAnalysis?.requiresReview).length;
             
-            console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget`);
+            console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget, ${membersRequiringReview} requiring review`);
             
             return res.json({
               deviationByRole,
