@@ -4498,19 +4498,19 @@ const ProjectDetailsPage = () => {
 
           {/* Nueva pestaña: Costos Detallados */}
           <TabsContent value="cost-details" className="space-y-6">
-            <div className="bg-gradient-to-r from-red-50 to-rose-50 rounded-xl p-6 border border-red-100">
+            <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-6 border border-slate-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-red-600 p-2 rounded-lg">
+                <div className="bg-slate-600 p-2 rounded-lg">
                   <DollarSign className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-red-900">Costos Reales Detallados</h2>
-                  <p className="text-red-700">Registros mensuales de costos importados desde Excel MAESTRO</p>
+                  <h2 className="text-2xl font-bold text-slate-800">Costos Reales Detallados</h2>
+                  <p className="text-slate-600">Registros mensuales de costos importados desde Excel MAESTRO</p>
                 </div>
               </div>
             </div>
 
-            <Card className="shadow-sm border border-red-100">
+            <Card className="shadow-sm border border-slate-200">
               <CardContent className="p-6">
                 {unifiedData && (unifiedData as any).directCosts && (unifiedData as any).directCosts.length > 0 ? (
                   <div className="space-y-6">
@@ -4518,66 +4518,94 @@ const ProjectDetailsPage = () => {
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-red-100 bg-red-50">
-                            <th className="text-left p-3 font-semibold text-red-800">Miembro</th>
-                            <th className="text-left p-3 font-semibold text-red-800">Mes</th>
-                            <th className="text-left p-3 font-semibold text-red-800">Año</th>
-                            <th className="text-right p-3 font-semibold text-red-800">Costo USD</th>
-                            <th className="text-right p-3 font-semibold text-red-800">Costo ARS</th>
-                            <th className="text-center p-3 font-semibold text-red-800">Tipo</th>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="text-left p-3 font-semibold text-slate-700">Miembro</th>
+                            <th className="text-left p-3 font-semibold text-slate-700">Mes</th>
+                            <th className="text-left p-3 font-semibold text-slate-700">Año</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Monto USD</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Costo Total USD</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Horas Reales</th>
+                            <th className="text-center p-3 font-semibold text-slate-700">Tipo</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {((unifiedData as any).directCosts || []).map((cost: any, index: number) => (
-                            <tr key={index} className="border-b border-gray-100 hover:bg-red-50/50">
-                              <td className="p-3 font-medium text-gray-900">{cost.nombre}</td>
-                              <td className="p-3 text-gray-700 capitalize">{cost.mes}</td>
-                              <td className="p-3 text-gray-700">{cost.año}</td>
-                              <td className="p-3 text-right font-mono">
-                                <span className="text-red-700 font-semibold">
-                                  ${(cost.montoTotalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right font-mono">
-                                <span className="text-red-600">
-                                  ${(cost.costoTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </span>
-                              </td>
-                              <td className="p-3 text-center">
-                                <Badge 
-                                  variant={cost.tipoGasto === 'Directo' ? 'destructive' : 'outline'}
-                                  className="text-xs"
-                                >
-                                  {cost.tipoGasto || 'N/A'}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))}
+                          {((unifiedData as any).directCosts || []).map((cost: any, index: number) => {
+                            const valorHora = (cost.horasRealesAsana && cost.horasRealesAsana > 0) 
+                              ? (parseFloat(cost.montoTotalUsd) || 0) / parseFloat(cost.horasRealesAsana)
+                              : 0;
+                            return (
+                              <tr key={index} className="border-b border-gray-100 hover:bg-slate-50/50">
+                                <td className="p-3 font-medium text-gray-900">{cost.nombre}</td>
+                                <td className="p-3 text-gray-700 capitalize">{cost.mes}</td>
+                                <td className="p-3 text-gray-700">{cost.año}</td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-slate-800 font-semibold">
+                                    ${(cost.montoOriginalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-slate-900 font-bold">
+                                    ${(cost.montoTotalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-blue-700 font-semibold">
+                                    ${valorHora.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-gray-600">
+                                    {(cost.horasRealesAsana || 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                  </span>
+                                </td>
+                                <td className="p-3 text-center">
+                                  <Badge 
+                                    variant={cost.tipoGasto === 'Directo' ? 'default' : 'outline'}
+                                    className="text-xs"
+                                  >
+                                    {cost.tipoGasto || 'N/A'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
 
                     {/* Resumen de costos */}
-                    <div className="bg-red-50 rounded-lg p-6 border border-red-100">
+                    <div className="bg-slate-50 rounded-lg p-6 border border-slate-200">
                       <h4 className="font-semibold text-gray-900 mb-3">Resumen del Período</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Total Costos USD</p>
-                          <p className="text-lg font-bold text-red-600">
+                          <p className="text-lg font-bold text-slate-800">
                             ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
                               sum + (parseFloat(cost.montoTotalUsd) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Total Costos ARS</p>
-                          <p className="text-lg font-bold text-red-600">
-                            ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
-                              sum + (parseFloat(cost.costoTotal) || 0), 0).toLocaleString()}
+                          <p className="text-sm text-gray-600">Total Horas</p>
+                          <p className="text-lg font-bold text-blue-700">
+                            {((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
+                              sum + (parseFloat(cost.horasRealesAsana) || 0), 0).toLocaleString()}h
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Valor Hora Promedio</p>
+                          <p className="text-lg font-bold text-green-600">
+                            ${(() => {
+                              const costs = (unifiedData as any).directCosts || [];
+                              const totalCosto = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUsd) || 0), 0);
+                              const totalHoras = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                              return totalHoras > 0 ? (totalCosto / totalHoras).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
+                            })()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Registros</p>
-                          <p className="text-lg font-bold text-blue-600">
+                          <p className="text-lg font-bold text-slate-600">
                             {((unifiedData as any).directCosts || []).length}
                           </p>
                         </div>
