@@ -789,7 +789,7 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                       {member.targetHours > 0 ? (
                         <>
                           <div className="text-blue-600 font-medium">
-                            Objetivo (Excel MAESTRO): {member.targetHours}h
+                            Objetivo estimado: {member.targetHours}h
                           </div>
                           {estimatedHours > 0 && (
                             <div className="text-gray-500">
@@ -2617,7 +2617,7 @@ const ProjectDetailsPage = () => {
                         })()}
                       </div>
                       <div className="text-sm font-medium text-gray-600">Eficiencia vs Objetivo</div>
-                      <div className="text-xs text-gray-500 mt-1">horas reales vs Excel MAESTRO</div>
+                      <div className="text-xs text-gray-500 mt-1">horas reales vs objetivo estimado</div>
                     </div>
 
                     {/* Costo Real del Equipo */}
@@ -3125,7 +3125,7 @@ const ProjectDetailsPage = () => {
                             {percentage.toFixed(2)}%
                           </p>
                           <p className="text-xs text-gray-500">
-                            de {targetHours.toFixed(0)}h objetivo {targetHoursFromExcel > 0 ? '(Excel MAESTRO)' : '(cotización)'}
+                            de {targetHours.toFixed(0)}h objetivo {targetHoursFromExcel > 0 ? '(actualizado)' : '(estimado)'}
                           </p>
                         </>
                       );
