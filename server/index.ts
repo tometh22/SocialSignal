@@ -216,17 +216,26 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
               const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
               const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
               
-              // 🔥 LÓGICA ESPECIAL PARA SUBCONTRATOS: No aplicar análisis de desviación crítica
+              // 🔥 LÓGICA CORREGIDA: Diferenciar SOBRECOSTO vs SUBCOSTO
               let severity = 'low';
-              if (!member.isSubcost) {
-                // Solo para personal interno aplicar criterios estrictos
-                severity = Math.abs(hoursDeviation) > 50 ? 'critical' : 
-                          Math.abs(hoursDeviation) > 25 ? 'high' : 
-                          Math.abs(hoursDeviation) > 10 ? 'medium' : 'low';
+              let deviationType = 'normal';
+              
+              if (hoursDeviation > 0) {
+                // SOBRECOSTO: Usó más horas de las asignadas
+                deviationType = 'sobrecosto';
+                severity = hoursDeviation > 50 ? 'critical' : 
+                          hoursDeviation > 25 ? 'high' : 
+                          hoursDeviation > 10 ? 'medium' : 'low';
+              } else if (hoursDeviation < -10) {
+                // SUBCOSTO: Usó significativamente menos horas (ahorro importante)
+                deviationType = 'subcosto';
+                const absoluteDeviation = Math.abs(hoursDeviation);
+                severity = absoluteDeviation > 50 ? 'excellent' : 
+                          absoluteDeviation > 25 ? 'good' : 'normal';
               } else {
-                // Para subcontratos, criterios más flexibles
-                severity = Math.abs(hoursDeviation) > 100 ? 'high' : 
-                          Math.abs(hoursDeviation) > 50 ? 'medium' : 'low';
+                // Normal: Desviación menor al 10%
+                deviationType = 'normal';
+                severity = 'low';
               }
               
               return {
@@ -241,13 +250,14 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
                 costDeviation,
                 deviationPercentage: hoursDeviation,
                 severity,
+                deviationType,
                 isSubcost: member.isSubcost || false,
                 costType: member.costType || 'Directo'
               };
             }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
             
-            const membersOverBudget = deviationByRole.filter((m: any) => m.deviationPercentage > 10).length;
-            const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationPercentage < -10).length;
+            const membersOverBudget = deviationByRole.filter((m: any) => m.deviationType === 'sobrecosto').length;
+            const membersUnderBudget = deviationByRole.filter((m: any) => m.deviationType === 'subcosto').length;
             
             console.log(`📊 Excel MAESTRO analysis: ${deviationByRole.length} members, ${membersOverBudget} over budget`);
             
