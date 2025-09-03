@@ -508,8 +508,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filtrar por fechas según el período temporal
       const filteredSales = allSales.filter(sale => {
-        // Crear fecha del primer día del mes de la venta
-        const saleDate = new Date(sale.year, sale.monthNumber - 1, 1);
+        // Crear fecha del primer día del mes de la venta usando getMonthNumber
+        const monthNum = getMonthNumber(sale.month);
+        const saleDate = new Date(sale.year, monthNum - 1, 1);
+        
+        console.log(`🗓️ Sale: ${sale.month} ${sale.year} → Month ${monthNum} → Date ${saleDate.toISOString()}`);
+        console.log(`🗓️ Filter range: ${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}`);
+        console.log(`🗓️ Sale in range? ${saleDate >= dateRange.startDate && saleDate <= dateRange.endDate}`);
         
         // Comparar con el rango de fechas del filtro
         return saleDate >= dateRange.startDate && saleDate <= dateRange.endDate;
