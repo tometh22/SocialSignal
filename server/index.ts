@@ -162,6 +162,22 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
             
             filteredDirectCosts.forEach(cost => {
               const key = `excel-${cost.persona.toLowerCase().replace(' ', '_')}`;
+              
+              // 🔍 DETERMINAR TIPO DE COSTO: Personal vs Subcosto
+              // Verificar si es freelancer/subcosto por nombre o datos específicos
+              const freelancerNames = ['aylu tamer', 'gast guntren', 'male quiroga']; // Lista conocida de freelancers
+              const isKnownFreelancer = freelancerNames.includes(cost.persona.toLowerCase());
+              
+              const isSubcost = cost.tipoGasto && (
+                cost.tipoGasto.toLowerCase().includes('subcosto') ||
+                cost.tipoGasto.toLowerCase().includes('indirecto') ||
+                cost.especificacion?.toLowerCase().includes('subcosto') ||
+                cost.especificacion?.toLowerCase().includes('freelance') ||
+                cost.especificacion?.toLowerCase().includes('subcontrato')
+              ) || isKnownFreelancer;
+              
+              console.log(`🔍 Checking cost type for ${cost.persona}: tipo_gasto="${cost.tipoGasto}", isKnownFreelancer=${isKnownFreelancer}, isSubcost=${isSubcost}`);
+              
               if (!teamBreakdown[key]) {
                 teamBreakdown[key] = {
                   name: cost.persona,
@@ -171,13 +187,20 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
                   estimatedHours: 0,
                   estimatedCost: 0,
                   personnelId: cost.personnelId || null,
-                  role: 'Excel MAESTRO'
+                  role: isSubcost ? 'Subcosto/Freelance' : 'Excel MAESTRO',
+                  isSubcost: isSubcost,
+                  costType: cost.tipoGasto || 'Directo'
                 };
               } else {
                 // Acumular datos si hay múltiples entradas
                 teamBreakdown[key].targetHours += cost.horasObjetivo || 0;
                 teamBreakdown[key].actualHours += cost.horasRealesAsana || 0;
                 teamBreakdown[key].actualCost += cost.montoTotalUSD || 0;
+                // Mantener el tipo más específico
+                if (isSubcost) {
+                  teamBreakdown[key].role = 'Subcosto/Freelance';
+                  teamBreakdown[key].isSubcost = true;
+                }
               }
             });
             
@@ -193,6 +216,19 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
               const hoursDeviation = budgetedHours > 0 ? ((actualHours - budgetedHours) / budgetedHours) * 100 : 0;
               const costDeviation = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
               
+              // 🔥 LÓGICA ESPECIAL PARA SUBCONTRATOS: No aplicar análisis de desviación crítica
+              let severity = 'low';
+              if (!member.isSubcost) {
+                // Solo para personal interno aplicar criterios estrictos
+                severity = Math.abs(hoursDeviation) > 50 ? 'critical' : 
+                          Math.abs(hoursDeviation) > 25 ? 'high' : 
+                          Math.abs(hoursDeviation) > 10 ? 'medium' : 'low';
+              } else {
+                // Para subcontratos, criterios más flexibles
+                severity = Math.abs(hoursDeviation) > 100 ? 'high' : 
+                          Math.abs(hoursDeviation) > 50 ? 'medium' : 'low';
+              }
+              
               return {
                 personnelId: member.personnelId || null,
                 personnelName: member.name,
@@ -204,9 +240,9 @@ app.get("/api/projects/:id/deviation-analysis", async (req, res) => {
                 hoursDeviation,
                 costDeviation,
                 deviationPercentage: hoursDeviation,
-                severity: Math.abs(hoursDeviation) > 50 ? 'critical' : 
-                         Math.abs(hoursDeviation) > 25 ? 'high' : 
-                         Math.abs(hoursDeviation) > 10 ? 'medium' : 'low'
+                severity,
+                isSubcost: member.isSubcost || false,
+                costType: member.costType || 'Directo'
               };
             }).filter((member: any) => member.actualHours > 0 || member.actualCost > 0);
             
