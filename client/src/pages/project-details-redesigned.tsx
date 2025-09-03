@@ -4541,7 +4541,7 @@ const ProjectDetailsPage = () => {
                                 <td className="p-3 text-gray-700">{cost.año}</td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-800 font-semibold">
-                                    ${(cost.montoOriginalARS || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${((cost.montoTotalUSD || 0) * (cost.tipoCambio || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
