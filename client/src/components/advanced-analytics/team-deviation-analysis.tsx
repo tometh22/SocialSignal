@@ -137,12 +137,18 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           valueB = Math.abs(b.deviationPercentage || 0);
           break;
         case 'cost':
-          valueA = a.actualCost || 0;
-          valueB = b.actualCost || 0;
+          // Ordenar por eficiencia de costo (costo por hora)
+          const costEfficiencyA = (a.actualHours || 0) > 0 ? (a.actualCost || 0) / (a.actualHours || 1) : (a.actualCost || 0);
+          const costEfficiencyB = (b.actualHours || 0) > 0 ? (b.actualCost || 0) / (b.actualHours || 1) : (b.actualCost || 0);
+          valueA = costEfficiencyA;
+          valueB = costEfficiencyB;
           break;
         case 'hours':
-          valueA = a.actualHours || 0;
-          valueB = b.actualHours || 0;
+          // Ordenar por productividad de horas (desviación de horas trabajadas vs estimadas)
+          const hoursProductivityA = (a.budgetedHours || 0) > 0 ? (a.actualHours || 0) / (a.budgetedHours || 1) : (a.actualHours || 0);
+          const hoursProductivityB = (b.budgetedHours || 0) > 0 ? (b.actualHours || 0) / (b.budgetedHours || 1) : (b.actualHours || 0);
+          valueA = hoursProductivityA;
+          valueB = hoursProductivityB;
           break;
         default:
           return 0;
@@ -300,7 +306,11 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <div>
               <h3 className="text-lg font-semibold text-gray-800">Análisis Detallado por Miembro</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Ordenado por {sortField === 'deviation' ? 'Criticidad' : sortField === 'cost' ? 'Costo' : 'Horas'} 
+                Ordenado por {
+                  sortField === 'deviation' ? 'Criticidad' : 
+                  sortField === 'cost' ? 'Eficiencia de Costo ($/hora)' : 
+                  'Productividad de Horas (real/estimado)'
+                } 
                 ({sortDirection === 'desc' ? 'Mayor a Menor' : 'Menor a Mayor'})
               </p>
             </div>
