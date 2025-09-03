@@ -178,13 +178,32 @@ export function calculateTeamRankings(
 ): PersonnelMetrics[] {
   if (teamData.length === 0) return [];
   
-  // FILTRO CRÍTICO: Solo incluir miembros con datos reales (horas > 0 O costo > 0)
+  // FILTRO CRÍTICO: Solo incluir miembros con datos significativos
+  // Incluir si tienen datos reales O datos estimados (no requerir ambos)
   const filteredTeamData = teamData.filter(member => 
-    (member.actualHours > 0 || member.actualCost > 0) && 
-    (member.estimatedHours > 0 || member.estimatedCost > 0)
+    (member.actualHours > 0 || member.actualCost > 0 || 
+     member.estimatedHours > 0 || member.estimatedCost > 0)
   );
   
   console.log(`📊 Rankings filter: ${teamData.length} → ${filteredTeamData.length} members with actual data`);
+  
+  // Log detallado de qué miembros fueron filtrados
+  const filteredOutMembers = teamData.filter(member => 
+    !(member.actualHours > 0 || member.actualCost > 0 || 
+      member.estimatedHours > 0 || member.estimatedCost > 0)
+  );
+  
+  if (filteredOutMembers.length > 0) {
+    console.log(`🚫 Filtered out ${filteredOutMembers.length} members:`, 
+      filteredOutMembers.map(m => ({
+        name: m.personnelName,
+        actualHours: m.actualHours,
+        actualCost: m.actualCost,
+        estimatedHours: m.estimatedHours,
+        estimatedCost: m.estimatedCost
+      }))
+    );
+  }
   
   if (filteredTeamData.length === 0) return [];
   
@@ -217,7 +236,7 @@ export function calculateTeamRankings(
   const unifiedRanks = assignRankings(unifiedScores);
   
   // Combinar todo en el resultado final
-  return baseMetrics.map((base, index) => ({
+  const finalResults = baseMetrics.map((base, index) => ({
     ...base,
     efficiencyScore: efficiencyScores[index],
     impactScore: impactScores[index],
@@ -227,6 +246,26 @@ export function calculateTeamRankings(
     unifiedRank: unifiedRanks[index],
     performanceColor: getPerformanceColor(unifiedScores[index], 'unified') // Usar unified score para color general
   }));
+
+  // Log final de rankings problemáticos (scores en 0 con color crítico)
+  const problematicRankings = finalResults.filter(r => 
+    r.performanceColor === 'red' && (r.actualHours === 0 && r.actualCost === 0)
+  );
+  
+  if (problematicRankings.length > 0) {
+    console.log(`🚨 Found ${problematicRankings.length} problematic rankings (red with zero data):`,
+      problematicRankings.map(r => ({
+        name: r.personnelName,
+        unifiedScore: r.unifiedScore,
+        actualHours: r.actualHours,
+        actualCost: r.actualCost,
+        estimatedHours: r.estimatedHours,
+        estimatedCost: r.estimatedCost
+      }))
+    );
+  }
+
+  return finalResults;
 }
 
 /**
