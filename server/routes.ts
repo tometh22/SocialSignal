@@ -604,8 +604,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 Monthly hour adjustments for project ${id}:`, monthlyHourAdjustments.length, 'adjustments');
 
       // 2.6. Obtener información de personnel y roles para mapeo correcto
-      const allPersonnel = await storage.getAllPersonnel();
-      const allRoles = await storage.getAllRoles();
+      const allPersonnel = await storage.getPersonnel();
+      const allRoles = await storage.getRoles();
       console.log(`👥 Retrieved ${allPersonnel.length} personnel and ${allRoles.length} roles for role mapping`);
 
       // Helper function para obtener el rol real de una persona
