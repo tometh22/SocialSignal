@@ -933,6 +933,18 @@ const ProjectDetailsPage = () => {
         const monthNames = ['january_2025', 'february_2025', 'march_2025', 'april_2025', 'may_2025', 'june_2025', 'july_2025', 'august_2025', 'september_2025', 'october_2025', 'november_2025', 'december_2025'];
         return monthNames[startMonth - 1];
       }
+      
+      // Para rangos de múltiples meses, usar formato YYYY-MM-DD_to_YYYY-MM-DD
+      const formatDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const customRange = `${formatDate(filter.startDate)}_to_${formatDate(filter.endDate)}`;
+      console.log(`📅 Generated custom range filter: ${customRange}`);
+      return customRange;
     }
     
     console.log('🚨 UNMAPPED FILTER LABEL:', label, '- using "all" as fallback');
