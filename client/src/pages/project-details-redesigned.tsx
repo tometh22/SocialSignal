@@ -1922,71 +1922,103 @@ const ProjectDetailsPage = () => {
                       const markup = unifiedData?.metrics?.markup || 0;
                       const recommendations = [];
 
-                      // Recomendación basada en eficiencia
-                      if (efficiency > 80) {
+                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                      const totalBudget = unifiedData?.estimatedCost || 1;
+                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const remainingBudget = totalBudget - actualCost;
+                      
+                      // Recomendación específica basada en eficiencia con datos reales
+                      if (efficiency > 85) {
+                        const overspend = actualCost - totalBudget;
                         recommendations.push({
                           type: 'warning',
-                          icon: '⚠️',
-                          title: 'Riesgo de Sobrecarga',
-                          description: 'El equipo está usando más del 80% del presupuesto. Considera redistribuir tareas.',
+                          icon: '🚨',
+                          title: 'Presupuesto Excedido en $' + overspend.toLocaleString(),
+                          description: `Ya gastaste $${actualCost.toLocaleString()} de $${totalBudget.toLocaleString()}. Renegocia con el cliente o reduce scope.`,
                           color: 'text-red-700',
                           bg: 'bg-red-50'
                         });
-                      } else if (efficiency < 40) {
+                      } else if (efficiency > 75) {
+                        recommendations.push({
+                          type: 'warning',
+                          icon: '⚠️',
+                          title: 'Quedan Solo $' + remainingBudget.toLocaleString() + ' de Presupuesto',
+                          description: `Con ${efficiency.toFixed(0)}% usado, prioriza tareas críticas. Estima ${Math.ceil(remainingBudget / 100)} horas máximas restantes.`,
+                          color: 'text-orange-700',
+                          bg: 'bg-orange-50'
+                        });
+                      } else if (efficiency < 30) {
+                        const monthsElapsed = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
                         recommendations.push({
                           type: 'opportunity',
-                          icon: '💡',
-                          title: 'Oportunidad de Optimización',
-                          description: 'Baja utilización del presupuesto. Podrías acelerar entregables.',
+                          icon: '📈',
+                          title: `Solo ${efficiency.toFixed(0)}% Usado en ${monthsElapsed} Mes(es)`,
+                          description: `Puedes acelerar ${Math.floor(remainingBudget / 150)} días adicionales de trabajo. Considera ampliar scope.`,
                           color: 'text-blue-700',
                           bg: 'bg-blue-50'
                         });
                       }
 
-                      // Recomendación basada en markup
-                      if (markup < 1.5) {
+                      // Recomendación específica basada en markup con números reales
+                      if (markup < 1.3) {
+                        const loss = actualCost - (actualCost / markup);
                         recommendations.push({
                           type: 'financial',
-                          icon: '💰',
-                          title: 'Mejorar Rentabilidad',
-                          description: 'Markup bajo. Revisa costos operacionales y ajusta pricing futuro.',
-                          color: 'text-orange-700',
-                          bg: 'bg-orange-50'
+                          icon: '💸',
+                          title: `Markup ${markup.toFixed(1)}x = Pérdida de $${loss.toLocaleString()}`,
+                          description: `Para próximos proyectos similares, cotiza mín. $${(actualCost * 1.8).toLocaleString()} (markup 1.8x).`,
+                          color: 'text-red-700',
+                          bg: 'bg-red-50'
                         });
-                      } else if (markup > 3) {
+                      } else if (markup > 2.5) {
+                        const profit = (actualCost * markup) - actualCost;
                         recommendations.push({
                           type: 'success',
                           icon: '🎯',
-                          title: 'Proyecto Altamente Rentable',
-                          description: 'Excelente performance financiera. Replicar estrategia en proyectos similares.',
+                          title: `Ganancia Excepcional: $${profit.toLocaleString()}`,
+                          description: `Markup ${markup.toFixed(1)}x significa ${((markup-1)*100).toFixed(0)}% ganancia. Aplica esta estrategia a clientes similares.`,
                           color: 'text-green-700',
                           bg: 'bg-green-50'
                         });
                       }
 
-                      // Recomendación de equipo
-                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                      // Recomendaciones específicas de equipo con nombres reales
+                      const topPerformer = team.reduce((max: any, member: any) => 
+                        (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
                       const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80);
+                      
                       if (overworkedMembers.length > 0) {
+                        const names = overworkedMembers.map((m: any) => m.name).join(', ');
+                        const totalOvertime = overworkedMembers.reduce((sum: number, m: any) => sum + Math.max(0, (m.hours || 0) - 80), 0);
                         recommendations.push({
                           type: 'team',
                           icon: '👥',
-                          title: 'Balancear Carga de Trabajo',
-                          description: `${overworkedMembers.length} miembro(s) con alta carga. Considera redistribuir tareas.`,
+                          title: `${names} Sobrecargado(s) - ${totalOvertime}h Extra`,
+                          description: `Redistribuir ${Math.ceil(totalOvertime/2)}h a otros miembros o contratar soporte temporal.`,
                           color: 'text-purple-700',
                           bg: 'bg-purple-50'
                         });
-                      }
-
-                      // Si no hay recomendaciones específicas, mostrar recomendación general
-                      if (recommendations.length === 0) {
+                      } else if (topPerformer.name && topPerformer.hours > 40) {
                         recommendations.push({
-                          type: 'general',
-                          icon: '✅',
-                          title: 'Proyecto en Buen Estado',
-                          description: 'Métricas dentro de rangos saludables. Continúa con el plan actual.',
+                          type: 'team',
+                          icon: '⭐',
+                          title: `${topPerformer.name} Lidera con ${topPerformer.hours}h`,
+                          description: `Top performer del proyecto. Considera asignarle más responsabilidades o rol de mentor.`,
                           color: 'text-green-700',
                           bg: 'bg-green-50'
+                        });
+                      }
+
+                      // Si muy pocas recomendaciones, agregar recomendación de próximos pasos
+                      if (recommendations.length < 2) {
+                        const daysActive = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
+                        recommendations.push({
+                          type: 'general',
+                          icon: '📋',
+                          title: `Proyecto Activo ${daysActive} Días - Revisar Hitos`,
+                          description: `Con ${efficiency.toFixed(0)}% progreso, programa check-in semanal y revisa deliverables pendientes.`,
+                          color: 'text-blue-700',
+                          bg: 'bg-blue-50'
                         });
                       }
 
@@ -2068,39 +2100,50 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Actividad Reciente */}
+              {/* Timeline del Proyecto */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-4 border-b border-gray-100">
                   <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-purple-600" />
-                    Actividad Reciente
+                    <Calendar className="h-4 w-4 text-indigo-600" />
+                    Timeline del Proyecto
                   </h4>
                 </div>
                 <div className="p-4 space-y-3">
-                  {unifiedData?.timeEntries && unifiedData.timeEntries.length > 0 ? (
-                    <div className="space-y-2">
-                      {unifiedData.timeEntries.slice(0, 3).map((entry: any, index: number) => (
-                        <div key={entry.id || index} className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-medium text-purple-700">
-                                {(entry.personnelName || 'U').charAt(0)}
-                              </span>
-                            </div>
-                            <span className="font-medium text-gray-900">
-                              {entry.personnelName || 'Usuario'}
-                            </span>
-                          </div>
-                          <span className="text-gray-600">{entry.hours}h</span>
+                  <div className="space-y-2">
+                    {(() => {
+                      const projectStart = new Date(unifiedData?.project?.startDate || Date.now());
+                      const monthsActive = Math.ceil((Date.now() - projectStart.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                      const efficiency = unifiedData?.metrics?.efficiency || 0;
+                      
+                      return [
+                        {
+                          date: projectStart.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
+                          event: 'Proyecto iniciado',
+                          status: 'completed'
+                        },
+                        {
+                          date: 'Ago 25',
+                          event: `${efficiency.toFixed(0)}% presupuesto usado`,
+                          status: efficiency > 80 ? 'warning' : 'active'
+                        },
+                        {
+                          date: 'Sep 25',
+                          event: `${Math.max(0, 100 - efficiency).toFixed(0)}% restante estimado`,
+                          status: 'pending'
+                        }
+                      ].map((item, index) => (
+                        <div key={index} className="flex items-center gap-3 text-xs">
+                          <div className={`w-2 h-2 rounded-full ${
+                            item.status === 'completed' ? 'bg-green-500' :
+                            item.status === 'warning' ? 'bg-red-500' :
+                            item.status === 'active' ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}></div>
+                          <span className="text-gray-500 w-12">{item.date}</span>
+                          <span className="font-medium text-gray-900">{item.event}</span>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                      <div className="text-xs text-gray-500">Sin actividad reciente</div>
-                    </div>
-                  )}
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
 
