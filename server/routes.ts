@@ -1382,7 +1382,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 6. Calcular métricas consolidadas (ÚNICA FUENTE)
       const efficiency = adjustedEstimatedHours > 0 ? (totalWorkedHours / adjustedEstimatedHours) * 100 : 0;
-      const markup = totalWorkedCost > 0 ? adjustedTotalAmount / totalWorkedCost : 0;
+      
+      // Para "todos los períodos", usar ingresos reales del Excel MAESTRO
+      let totalRealRevenue = adjustedTotalAmount;
+      if (timeFilter === 'all') {
+        const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
+        totalRealRevenue = salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd) || 0), 0);
+        console.log(`💰 Using real revenue for "all" periods: $${totalRealRevenue} from ${salesData.length} sales records`);
+      }
+      
+      const markup = totalWorkedCost > 0 ? totalRealRevenue / totalWorkedCost : 0;
       const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
 
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
