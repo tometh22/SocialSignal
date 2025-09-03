@@ -62,7 +62,10 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
       const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
       console.log(`🔥 Response status:`, response.status);
       const data = await response.json();
-      console.log(`📊 Response data:`, data);
+      console.log(`📊 Deviation Response data:`, data);
+      if (!data || !data.deviationByRole) {
+        console.warn(`⚠️ No deviation data received:`, data);
+      }
       return data;
     },
     enabled: !!projectId

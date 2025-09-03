@@ -82,9 +82,19 @@ export function Recommendations({ projectId, dateFilter, timeFilter }: Recommend
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
     : '';
     
-  const { data: recommendationsData, isLoading } = useQuery<RecommendationsData>({
+  const { data: recommendationsData, isLoading, error } = useQuery<RecommendationsData>({
     queryKey: [`/api/projects/${projectId}/recommendations`, timeFilter || dateFilter],
-    queryFn: () => fetch(`/api/projects/${projectId}/recommendations${queryParams}`).then(res => res.json()),
+    queryFn: async () => {
+      console.log(`🌐 Making request to: /api/projects/${projectId}/recommendations${queryParams}`);
+      const response = await fetch(`/api/projects/${projectId}/recommendations${queryParams}`);
+      console.log(`🔥 Recommendations response status:`, response.status);
+      const data = await response.json();
+      console.log(`📊 Recommendations data:`, data);
+      if (!data || !data.recommendations) {
+        console.warn(`⚠️ No recommendations data received:`, data);
+      }
+      return data;
+    },
     enabled: !!projectId
   });
 
