@@ -4522,7 +4522,7 @@ const ProjectDetailsPage = () => {
                             <th className="text-left p-3 font-semibold text-slate-700">Miembro</th>
                             <th className="text-left p-3 font-semibold text-slate-700">Mes</th>
                             <th className="text-left p-3 font-semibold text-slate-700">Año</th>
-                            <th className="text-right p-3 font-semibold text-slate-700">Monto USD</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Monto ARS</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Costo Total USD</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Valor Hora</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Horas Reales</th>
@@ -4541,7 +4541,7 @@ const ProjectDetailsPage = () => {
                                 <td className="p-3 text-gray-700">{cost.año}</td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-800 font-semibold">
-                                    ${(cost.costoTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${(cost.montoOriginalARS || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
