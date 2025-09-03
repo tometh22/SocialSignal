@@ -4532,21 +4532,21 @@ const ProjectDetailsPage = () => {
                         <tbody>
                           {((unifiedData as any).directCosts || []).map((cost: any, index: number) => {
                             const valorHora = (cost.horasRealesAsana && cost.horasRealesAsana > 0) 
-                              ? (parseFloat(cost.montoTotalUsd) || 0) / parseFloat(cost.horasRealesAsana)
+                              ? (parseFloat(cost.montoTotalUSD) || 0) / parseFloat(cost.horasRealesAsana)
                               : 0;
                             return (
                               <tr key={index} className="border-b border-gray-100 hover:bg-slate-50/50">
-                                <td className="p-3 font-medium text-gray-900">{cost.nombre}</td>
+                                <td className="p-3 font-medium text-gray-900">{cost.persona}</td>
                                 <td className="p-3 text-gray-700 capitalize">{cost.mes}</td>
                                 <td className="p-3 text-gray-700">{cost.año}</td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-800 font-semibold">
-                                    ${(cost.montoOriginalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${(cost.costoTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-900 font-bold">
-                                    ${(cost.montoTotalUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${(cost.montoTotalUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
@@ -4582,7 +4582,7 @@ const ProjectDetailsPage = () => {
                           <p className="text-sm text-gray-600">Total Costos USD</p>
                           <p className="text-lg font-bold text-slate-800">
                             ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
-                              sum + (parseFloat(cost.montoTotalUsd) || 0), 0).toLocaleString()}
+                              sum + (parseFloat(cost.montoTotalUSD) || 0), 0).toLocaleString()}
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
@@ -4597,7 +4597,7 @@ const ProjectDetailsPage = () => {
                           <p className="text-lg font-bold text-green-600">
                             ${(() => {
                               const costs = (unifiedData as any).directCosts || [];
-                              const totalCosto = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUsd) || 0), 0);
+                              const totalCosto = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
                               const totalHoras = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
                               return totalHoras > 0 ? (totalCosto / totalHoras).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
                             })()}
