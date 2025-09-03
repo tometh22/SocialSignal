@@ -1383,12 +1383,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 6. Calcular métricas consolidadas (ÚNICA FUENTE)
       const efficiency = adjustedEstimatedHours > 0 ? (totalWorkedHours / adjustedEstimatedHours) * 100 : 0;
       
-      // Para "todos los períodos", usar ingresos reales del Excel MAESTRO
-      let totalRealRevenue = adjustedTotalAmount;
-      if (timeFilter === 'all') {
-        const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
-        totalRealRevenue = salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd) || 0), 0);
-        console.log(`💰 Using real revenue for "all" periods: $${totalRealRevenue} from ${salesData.length} sales records`);
+      // SIEMPRE usar ingresos reales del Excel MAESTRO para cálculos de markup (excepto cuando no hay datos)
+      const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
+      const totalRealRevenue = salesData.length > 0 
+        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd) || 0), 0)
+        : adjustedTotalAmount; // Fallback a cotización solo si no hay datos reales
+      
+      console.log(`💰 Using real revenue for filter "${timeFilter}": $${totalRealRevenue} from ${salesData.length} sales records (fallback to quotation: ${salesData.length === 0})`);
+      if (salesData.length > 0) {
+        console.log(`📊 Sales breakdown:`, salesData.map(s => ({ month: s.month, year: s.year, amount: s.amountUsd })));
       }
       
       const markup = totalWorkedCost > 0 ? totalRealRevenue / totalWorkedCost : 0;

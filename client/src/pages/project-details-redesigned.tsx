@@ -1782,12 +1782,13 @@ const ProjectDetailsPage = () => {
                         <span className="text-slate-300">Ingresos Generados</span>
                         <span className="text-2xl font-bold text-green-400">
                           ${(() => {
-                            const isLegacyProject = new Date(unifiedData?.project?.startDate || 0) < new Date('2025-09-01');
-                            if (isLegacyProject) {
-                              return ((unifiedData as any)?.googleSheetsSales
-                                ?.filter((sale: any) => sale.status === 'completada' || sale.status === 'activa')
-                                ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0).toLocaleString();
+                            // SIEMPRE usar datos reales del Excel MAESTRO si están disponibles
+                            const realSales = (unifiedData as any)?.googleSheetsSales || [];
+                            if (realSales.length > 0) {
+                              return (realSales
+                                .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0) || 0).toLocaleString();
                             } else {
+                              // Fallback a cotización solo si no hay datos reales
                               return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
                             }
                           })()}
