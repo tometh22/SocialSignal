@@ -906,20 +906,19 @@ const ProjectDetailsPage = () => {
     if (label.includes('q3') || label.includes('jul-sep')) return 'q3_2025';
     if (label.includes('q4') || label.includes('oct-dic')) return 'q4_2025';
     
-    // Meses específicos
-    if (label.includes('enero')) return 'january_2025';
-    if (label.includes('febrero')) return 'february_2025';
-    if (label.includes('agosto')) return 'august_2025';
-    if (label.includes('marzo')) return 'march_2025';
-    if (label.includes('abril')) return 'april_2025';
-    if (label.includes('mayo')) return 'may_2025';
-    if (label.includes('junio')) return 'june_2025';
-    if (label.includes('julio')) return 'july_2025';
-    if (label.includes('agosto')) return 'august_2025';
-    if (label.includes('septiembre')) return 'september_2025';
-    if (label.includes('octubre')) return 'october_2025';
-    if (label.includes('noviembre')) return 'november_2025';
-    if (label.includes('diciembre')) return 'december_2025';
+    // Meses específicos - mapear tanto español como inglés
+    if (label.includes('enero') || label.includes('january')) return 'january_2025';
+    if (label.includes('febrero') || label.includes('february')) return 'february_2025';
+    if (label.includes('marzo') || label.includes('march')) return 'march_2025';
+    if (label.includes('abril') || label.includes('april')) return 'april_2025';
+    if (label.includes('mayo') || label.includes('may')) return 'may_2025';
+    if (label.includes('junio') || label.includes('june')) return 'june_2025';
+    if (label.includes('julio') || label.includes('july')) return 'july_2025';
+    if (label.includes('agosto') || label.includes('august')) return 'august_2025';
+    if (label.includes('septiembre') || label.includes('september')) return 'september_2025';
+    if (label.includes('octubre') || label.includes('october')) return 'october_2025';
+    if (label.includes('noviembre') || label.includes('november')) return 'november_2025';
+    if (label.includes('diciembre') || label.includes('december')) return 'december_2025';
     
     // FALLBACK: Para rangos personalizados, detectar por fechas
     if (filter.type === 'custom' && filter.startDate && filter.endDate) {

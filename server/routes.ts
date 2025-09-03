@@ -112,14 +112,23 @@ export function getDateRangeForFilter(filter: string) {
       endDate = new Date(now.getFullYear(), now.getMonth(), 0);
       break;
     case 'may_2025':
+    case 'may':
+    case 'mayo_2025':
+    case 'mayo':
       startDate = new Date(2025, 4, 1); // Mayo 2025
       endDate = new Date(2025, 4, 31);
       break;
     case 'june_2025':
+    case 'june':  
+    case 'junio_2025':
+    case 'junio':
       startDate = new Date(2025, 5, 1); // Junio 2025
       endDate = new Date(2025, 5, 30);
       break;
     case 'july_2025':
+    case 'july':
+    case 'julio_2025': 
+    case 'julio':
       startDate = new Date(2025, 6, 1); // Julio 2025
       endDate = new Date(2025, 6, 31);
       break;
