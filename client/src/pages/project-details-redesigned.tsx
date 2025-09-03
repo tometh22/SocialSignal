@@ -72,7 +72,6 @@ import { TrendCharts } from "@/components/advanced-analytics/trend-charts";
 import { TeamDeviationAnalysis } from "@/components/advanced-analytics/team-deviation-analysis";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { EconomicRankings } from "@/components/EconomicRankings";
-import { ProjectPriceAdjustments } from "@/components/project/ProjectPriceAdjustments";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
@@ -1676,13 +1675,6 @@ const ProjectDetailsPage = () => {
             >
               <Timer className="h-4 w-4" />
               Tiempo
-            </TabsTrigger>
-            <TabsTrigger 
-              value="price-adjustments" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:shadow-sm"
-            >
-              <Settings className="h-4 w-4" />
-              Ajustes de Precio
             </TabsTrigger>
             <TabsTrigger 
               value="income-details" 
@@ -4381,13 +4373,6 @@ const ProjectDetailsPage = () => {
             </TooltipProvider>
           </TabsContent>
 
-          {/* AJUSTES DE PRECIO DEL PROYECTO */}
-          <TabsContent value="price-adjustments" className="space-y-6">
-            <ProjectPriceAdjustments 
-              projectId={Number(projectId)} 
-              currentPrice={quotationData?.totalAmount} 
-            />
-          </TabsContent>
 
           {/* INGRESOS DETALLADOS */}
           <TabsContent value="income-details" className="space-y-6">
