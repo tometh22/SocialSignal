@@ -37,9 +37,15 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
       if (filters.projectName) params.append('projectName', filters.projectName);
       if (filters.monthKey) params.append('monthKey', filters.monthKey);
       
+      console.log('🔍 IncomeDashboard - Fetching with params:', params.toString());
       const response = await fetch(`/api/income-dashboard?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch income data');
-      return response.json();
+      if (!response.ok) {
+        console.error('❌ IncomeDashboard - API error:', response.status, response.statusText);
+        throw new Error('Failed to fetch income data');
+      }
+      const data = await response.json();
+      console.log('📊 IncomeDashboard - Received data:', data);
+      return data;
     },
   });
 
@@ -120,7 +126,7 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los clientes</SelectItem>
-              {uniqueClients.map(client => (
+              {uniqueClients.map((client: string) => (
                 <SelectItem key={client} value={client}>{client}</SelectItem>
               ))}
             </SelectContent>
@@ -135,7 +141,7 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los proyectos</SelectItem>
-              {uniqueProjects.map(project => (
+              {uniqueProjects.map((project: string) => (
                 <SelectItem key={project} value={project}>{project}</SelectItem>
               ))}
             </SelectContent>
@@ -150,7 +156,7 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los meses</SelectItem>
-              {uniqueMonths.map(month => (
+              {uniqueMonths.map((month: string) => (
                 <SelectItem key={month} value={month}>{month}</SelectItem>
               ))}
             </SelectContent>
