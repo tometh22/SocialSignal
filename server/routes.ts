@@ -11209,77 +11209,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("📊 INCOME DASHBOARD API called with params:", req.query);
       
-      // Simple test response first
-      const testData = [
-        {
-          id: 1,
-          projectName: "Fee Marketing",
-          clientName: "Warner", 
-          monthKey: "2025-08",
-          revenueType: "fee",
-          amountUsd: 13450,
-          status: "emitido",
-          confirmed: "SI",
-          notes: "Test data"
-        }
-      ];
-      
-      res.json(testData);
-      return;
-      
       const { projectId, clientName, projectName, monthKey } = req.query;
       
-      // Build WHERE conditions
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let paramCount = 1;
+      // Use Drizzle ORM to query google_sheets_sales
+      let query = db
+        .select({
+          id: googleSheetsSales.id,
+          projectName: googleSheetsSales.projectName,
+          clientName: googleSheetsSales.clientName,
+          monthKey: googleSheetsSales.monthKey,
+          revenueType: googleSheetsSales.revenueType,
+          amountUsd: googleSheetsSales.amountUsd,
+          status: googleSheetsSales.status,
+          confirmed: googleSheetsSales.confirmed,
+          notes: googleSheetsSales.notes
+        })
+        .from(googleSheetsSales);
       
-      if (projectId) {
-        console.log(`🎯 Filtering by projectId: ${projectId}`);
-        // We'll need to add project filtering logic here when needed
-      }
+      // Apply filters
+      const filters: any[] = [];
       
       if (clientName) {
-        conditions.push(`gs.client_name = $${paramCount++}`);
-        params.push(clientName);
+        filters.push(eq(googleSheetsSales.clientName, clientName as string));
       }
       
       if (projectName) {
-        conditions.push(`gs.project_name = $${paramCount++}`);
-        params.push(projectName);
+        filters.push(eq(googleSheetsSales.projectName, projectName as string));
       }
       
       if (monthKey) {
-        conditions.push(`gs.month_key = $${paramCount++}`);
-        params.push(monthKey);
+        filters.push(eq(googleSheetsSales.monthKey, monthKey as string));
       }
-
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
       
-      const query = `
-        SELECT 
-          gs.id,
-          gs.project_name as "projectName",
-          gs.client_name as "clientName", 
-          gs.month_key as "monthKey",
-          gs.revenue_type as "revenueType",
-          COALESCE(gs.amount_usd, 0) as "amountUsd",
-          gs.status,
-          gs.confirmed,
-          gs.notes
-        FROM google_sheets_sales gs
-        ${whereClause}
-        ORDER BY gs.month_key DESC, gs.client_name, gs.project_name
-      `;
+      if (filters.length > 0) {
+        query = query.where(and(...filters));
+      }
       
-      console.log(`📊 Query: ${query}`);
-      console.log(`📊 Params: ${JSON.stringify(params)}`);
+      query = query.orderBy(desc(googleSheetsSales.monthKey), googleSheetsSales.clientName, googleSheetsSales.projectName);
       
-      const result = await db.execute(query, params);
+      console.log(`📊 Executing Drizzle query for income dashboard`);
       
-      console.log(`📊 Found ${result.rows.length} income records`);
+      const result = await query;
       
-      res.json(result.rows);
+      console.log(`📊 Found ${result.length} income records`);
+      
+      res.json(result);
     } catch (error) {
       console.error("❌ Error in income dashboard:", error);
       res.status(500).json({ error: "Failed to fetch income data" });
