@@ -1658,7 +1658,7 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-5xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-8 w-full max-w-6xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -1700,6 +1700,20 @@ const ProjectDetailsPage = () => {
             >
               <DollarSign className="h-4 w-4" />
               Costos
+            </TabsTrigger>
+            <TabsTrigger 
+              value="operational-analysis" 
+              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
+            >
+              <Target className="h-4 w-4" />
+              Operacional
+            </TabsTrigger>
+            <TabsTrigger 
+              value="financial-analysis" 
+              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Financiero
             </TabsTrigger>
           </TabsList>
 
@@ -5062,6 +5076,364 @@ const ProjectDetailsPage = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* NUEVA PESTAÑA: ANÁLISIS OPERACIONAL */}
+          <TabsContent value="operational-analysis" className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <Target className="h-6 w-6" />
+                    </div>
+                    Análisis Operacional
+                  </h2>
+                  <p className="text-blue-200 text-sm">Eficiencia del equipo: Horas Objetivo vs Horas Reales - Período: {dateFilter.label}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-blue-300 mb-1">Excel MAESTRO</div>
+                  <div className="text-lg font-bold">{(unifiedData as any)?.actuals?.excelDirectCosts?.length || 0} registros</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen Operacional General */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Resumen de Eficiencia
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                    const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                    const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                    const efficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-blue-50 rounded-lg border">
+                            <div className="text-sm text-blue-700 mb-1">Horas Objetivo (Columna K)</div>
+                            <div className="text-2xl font-bold text-blue-900">{totalTargetHours.toFixed(1)}h</div>
+                            <div className="text-xs text-blue-600">Planificación inicial</div>
+                          </div>
+                          <div className="p-4 bg-indigo-50 rounded-lg border">
+                            <div className="text-sm text-indigo-700 mb-1">Horas Reales (Columna L)</div>
+                            <div className="text-2xl font-bold text-indigo-900">{totalRealHours.toFixed(1)}h</div>
+                            <div className="text-xs text-indigo-600">Trabajo efectivo</div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg border">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Eficiencia Operacional</span>
+                            <span className={`text-xl font-bold ${
+                              efficiency <= 100 ? 'text-green-600' : 
+                              efficiency <= 120 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {efficiency.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div 
+                              className={`h-3 rounded-full transition-all ${
+                                efficiency <= 100 ? 'bg-gradient-to-r from-green-400 to-green-600' : 
+                                efficiency <= 120 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : 
+                                'bg-gradient-to-r from-red-400 to-red-600'
+                              }`}
+                              style={{ width: `${Math.min(efficiency, 150)}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-center text-gray-600 mt-2">
+                            {efficiency <= 100 ? '✅ Dentro del presupuesto operacional' : 
+                             efficiency <= 120 ? '⚠️ Moderadamente por encima del presupuesto' : 
+                             '🚨 Significativamente por encima del presupuesto'}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Panel de Alertas */}
+              <div className="bg-white rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Status Operacional
+                </h3>
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                  const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                  const efficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                  
+                  let statusColor = "bg-green-100 text-green-800";
+                  let statusIcon = "✅";
+                  let statusMessage = "Proyecto dentro del presupuesto operacional";
+                  
+                  if (efficiency > 120) {
+                    statusColor = "bg-red-100 text-red-800";
+                    statusIcon = "🚨";
+                    statusMessage = "Se excedió significativamente el presupuesto de horas";
+                  } else if (efficiency > 100) {
+                    statusColor = "bg-yellow-100 text-yellow-800";
+                    statusIcon = "⚠️";
+                    statusMessage = "Moderadamente por encima del presupuesto";
+                  }
+                  
+                  return (
+                    <div className={`p-4 rounded-lg ${statusColor}`}>
+                      <div className="text-2xl mb-2">{statusIcon}</div>
+                      <div className="font-medium text-sm">{statusMessage}</div>
+                      <div className="text-xs mt-2">
+                        Diferencia: {(totalRealHours - totalTargetHours).toFixed(1)}h
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Detalle por Persona - Análisis Operacional */}
+            <div className="bg-white rounded-lg p-6 border border-blue-200">
+              <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Eficiencia por Persona (Excel MAESTRO)
+              </h3>
+              <div className="space-y-3">
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const personData = excelCosts
+                    .filter((cost: any) => (cost.horasObjetivo || 0) > 0 || (cost.horasRealesAsana || 0) > 0)
+                    .map((cost: any) => ({
+                      name: cost.persona,
+                      targetHours: cost.horasObjetivo || 0,
+                      realHours: cost.horasRealesAsana || 0,
+                      efficiency: cost.horasObjetivo > 0 ? ((cost.horasRealesAsana || 0) / cost.horasObjetivo) * 100 : 0,
+                      mes: cost.mes,
+                      año: cost.año
+                    }))
+                    .sort((a, b) => b.realHours - a.realHours);
+                  
+                  return personData.map((person, index) => (
+                    <div key={`${person.name}-${person.mes}-${index}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                      <div>
+                        <div className="font-medium text-gray-900">{person.name}</div>
+                        <div className="text-sm text-gray-500">{person.mes} {person.año}</div>
+                        <div className="text-xs text-gray-400">
+                          {person.realHours.toFixed(1)}h trabajadas / {person.targetHours.toFixed(1)}h objetivo
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {person.targetHours > 0 && (
+                          <div className={`text-lg font-bold px-3 py-1 rounded ${
+                            person.efficiency <= 100 ? 'bg-green-100 text-green-800' : 
+                            person.efficiency <= 120 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {person.efficiency.toFixed(0)}%
+                          </div>
+                        )}
+                        {person.targetHours === 0 && person.realHours > 0 && (
+                          <div className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            Sin objetivo
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* NUEVA PESTAÑA: ANÁLISIS FINANCIERO */}
+          <TabsContent value="financial-analysis" className="space-y-6">
+            <div className="bg-gradient-to-r from-green-900 to-emerald-900 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                    Análisis Financiero
+                  </h2>
+                  <p className="text-green-200 text-sm">Costos reales pre-convertidos a USD (Columna R) - Período: {dateFilter.label}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-green-300 mb-1">Excel MAESTRO</div>
+                  <div className="text-lg font-bold">{(unifiedData as any)?.actuals?.excelDirectCosts?.length || 0} registros</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen Financiero General */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Resumen de Costos
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                    const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                    const totalBillableHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasFacturables || cost.horasRealesAsana || 0), 0);
+                    const averageHourlyRate = totalBillableHours > 0 ? totalFinancialCost / totalBillableHours : 0;
+                    
+                    // Obtener ingresos reales
+                    const realRevenue = (unifiedData as any)?.googleSheetsSales
+                      ?.filter((sale: any) => sale.status !== 'proyectada')
+                      ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                    
+                    const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="p-4 bg-green-50 rounded-lg border">
+                            <div className="text-sm text-green-700 mb-1">Costo Total USD</div>
+                            <div className="text-xl font-bold text-green-900">${totalFinancialCost.toLocaleString()}</div>
+                            <div className="text-xs text-green-600">Columna R</div>
+                          </div>
+                          <div className="p-4 bg-emerald-50 rounded-lg border">
+                            <div className="text-sm text-emerald-700 mb-1">Horas Totales</div>
+                            <div className="text-xl font-bold text-emerald-900">{totalBillableHours.toFixed(1)}h</div>
+                            <div className="text-xs text-emerald-600">Facturables</div>
+                          </div>
+                          <div className="p-4 bg-teal-50 rounded-lg border">
+                            <div className="text-sm text-teal-700 mb-1">Tarifa Promedio</div>
+                            <div className="text-xl font-bold text-teal-900">${averageHourlyRate.toFixed(0)}</div>
+                            <div className="text-xs text-teal-600">USD/hora</div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg border">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Markup del Proyecto</span>
+                            <span className={`text-xl font-bold ${
+                              markup >= 2.5 ? 'text-green-600' : 
+                              markup >= 2.0 ? 'text-blue-600' : 
+                              markup >= 1.5 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {markup.toFixed(2)}x
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 text-center">
+                            Ingresos: ${realRevenue.toLocaleString()} / Costos: ${totalFinancialCost.toLocaleString()}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Panel de Rentabilidad */}
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                  <Gauge className="h-5 w-5" />
+                  Status Financiero
+                </h3>
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                  const realRevenue = (unifiedData as any)?.googleSheetsSales
+                    ?.filter((sale: any) => sale.status !== 'proyectada')
+                    ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                  const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                  
+                  let statusColor = "bg-green-100 text-green-800";
+                  let statusIcon = "✅";
+                  let statusMessage = "Rentabilidad excelente";
+                  
+                  if (markup < 1.5) {
+                    statusColor = "bg-red-100 text-red-800";
+                    statusIcon = "🚨";
+                    statusMessage = "Rentabilidad crítica";
+                  } else if (markup < 2.0) {
+                    statusColor = "bg-yellow-100 text-yellow-800";
+                    statusIcon = "⚠️";
+                    statusMessage = "Rentabilidad por debajo del objetivo";
+                  } else if (markup < 2.5) {
+                    statusColor = "bg-blue-100 text-blue-800";
+                    statusIcon = "📊";
+                    statusMessage = "Rentabilidad dentro del objetivo";
+                  }
+                  
+                  return (
+                    <div className={`p-4 rounded-lg ${statusColor}`}>
+                      <div className="text-2xl mb-2">{statusIcon}</div>
+                      <div className="font-medium text-sm">{statusMessage}</div>
+                      <div className="text-xs mt-2">
+                        Objetivo Epical: 2.0x mínimo
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Detalle por Persona - Análisis Financiero */}
+            <div className="bg-white rounded-lg p-6 border border-green-200">
+              <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Costos por Persona (Excel MAESTRO)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  return excelCosts
+                    .filter((cost: any) => (cost.montoTotalUSD || 0) > 0)
+                    .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
+                    .map((cost: any, index: number) => (
+                      <div 
+                        key={`${cost.persona}-${cost.mes}-${index}`}
+                        className="p-4 bg-gray-50 rounded-lg border hover:shadow-sm transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {cost.persona}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              {cost.mes} {cost.año}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-600">Costo Total:</span>
+                            <span className="text-sm font-bold text-green-600">
+                              ${(cost.montoTotalUSD || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          {(cost.horasRealesAsana || 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-xs text-gray-600">Horas:</span>
+                              <span className="text-xs text-gray-700">
+                                {(cost.horasRealesAsana || 0).toFixed(1)}h
+                              </span>
+                            </div>
+                          )}
+                          {(cost.valorHoraPersona || 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-xs text-gray-600">Tarifa:</span>
+                              <span className="text-xs text-gray-700">
+                                ${(cost.valorHoraPersona || 0).toFixed(0)}/h
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ));
+                })()}
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
