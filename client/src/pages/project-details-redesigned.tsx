@@ -1895,19 +1895,23 @@ const ProjectDetailsPage = () => {
                       <div className="text-xs text-gray-500 mb-2">Pasa el mouse sobre cada inicial para ver detalles</div>
                       <div className="grid grid-cols-6 gap-1">
                         {Object.values(unifiedData?.actuals?.teamBreakdown || {}).slice(0, 6).map((member: any, index) => (
-                          <Tooltip key={index}>
-                            <TooltipTrigger asChild>
-                              <div 
-                                className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help ${
-                                  (member.hours || 0) > 80 ? 'bg-red-500' : 
-                                  (member.hours || 0) > 50 ? 'bg-yellow-500' : 
-                                  (member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
-                                }`}
-                              >
-                                {(member.name || '?').charAt(0)}
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-xs">
+                          <div 
+                            key={index}
+                            className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help relative group ${
+                              (member.hours || 0) > 80 ? 'bg-red-500' : 
+                              (member.hours || 0) > 50 ? 'bg-yellow-500' : 
+                              (member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
+                            }`}
+                            title={`${member.name}: ${member.hours || 0}h trabajadas - $${(member.cost || 0).toLocaleString()} - Estado: ${
+                              (member.hours || 0) > 80 ? 'Sobrecarga' : 
+                              (member.hours || 0) > 50 ? 'Intenso' : 
+                              (member.hours || 0) > 20 ? 'Normal' : 'Bajo'
+                            }`}
+                          >
+                            {(member.name || '?').charAt(0)}
+                            
+                            {/* Custom Tooltip */}
+                            <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 min-w-max">
                               <div className="space-y-1">
                                 <p className="font-semibold">{member.name}</p>
                                 <p className="text-xs">🕐 {member.hours || 0} horas trabajadas</p>
@@ -1920,8 +1924,10 @@ const ProjectDetailsPage = () => {
                                   }
                                 </p>
                               </div>
-                            </TooltipContent>
-                          </Tooltip>
+                              {/* Arrow */}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                            </div>
+                          </div>
                         ))}
                       </div>
                       <div className="text-xs text-gray-500">Verde: Normal • Amarillo: Intenso • Rojo: Sobrecarga</div>
