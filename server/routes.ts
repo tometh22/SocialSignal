@@ -10447,6 +10447,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== ANÁLISIS DE EQUIPO SEGÚN DATA CONTRACT ====================
+  // Endpoint que implementa exactamente las métricas del data contract
+  app.get('/api/projects/:projectId/team-analysis', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const timeFilter = req.query.timeFilter as string || 'august_2025';
+      
+      console.log(`👥 TEAM ANALYSIS - Project: ${projectId}, Filter: ${timeFilter}`);
+      
+      // Helper para parsear filtros temporales (igual que executive summary)
+      const parseTimeFilter = (filter: string) => {
+        switch (filter) {
+          case 'august_2025': return '2025-08';
+          case 'may_2025': return '2025-05';
+          case 'june_2025': return '2025-06';
+          case 'july_2025': return '2025-07';
+          default: return '2025-08';
+        }
+      };
+      
+      const monthKey = parseTimeFilter(timeFilter);
+      console.log(`👥 Filtering by month_key: ${monthKey}`);
+      
+      // 1. BASE DATA - Consulta directa desde storage
+      const allDirectCosts = await storage.getDirectCosts();
+      const filteredCosts = allDirectCosts.filter(cost => 
+        cost.projectId === projectId && cost.monthKey === monthKey
+      );
+      
+      console.log(`👥 Found ${filteredCosts.length} cost records for project ${projectId} in ${monthKey}`);
+      
+      // Agrupar y calcular métricas por persona
+      const baseData = filteredCosts.reduce((acc, row) => {
+        const persona = row.persona;
+        if (!acc[persona]) {
+          acc[persona] = {
+            persona,
+            hrs_obj: 0,
+            hrs_real: 0,
+            cost_real: 0,
+            cost_pres: 0
+          };
+        }
+        
+        acc[persona].hrs_obj += row.horasObjetivo || 0;
+        acc[persona].hrs_real += Number(row.horasRealesAsana) || 0;
+        acc[persona].cost_real += row.montoTotalUSD || 0;
+        
+        // Calcular costo presupuestado: horas_objetivo * valor_hora_persona / tipo_cambio
+        if (row.horasObjetivo && row.valorHoraPersona && row.tipoCambio) {
+          acc[persona].cost_pres += (row.horasObjetivo * Number(row.valorHoraPersona)) / row.tipoCambio;
+        }
+        
+        return acc;
+      }, {});
+      
+      // Convertir a array y agregar métricas de desviación
+      const baseDataArray = Object.values(baseData).map((member: any) => ({
+        ...member,
+        desv_hrs_pct: member.hrs_obj > 0 ? (member.hrs_real / member.hrs_obj - 1.0) : null,
+        desv_cost_pct: member.cost_pres > 0 ? (member.cost_real / member.cost_pres - 1.0) : null
+      }));
+      console.log(`👥 Base data: ${baseDataArray.length} team members found`);
+      
+      // 2. CARDS SUPERIORES - Resumen Operativo del Equipo
+      const summaryCards = {
+        miembrosActivos: baseDataArray.filter(member => member.hrs_real > 0).length,
+        horasTrabajadas: baseDataArray.reduce((sum, member) => sum + (member.hrs_real || 0), 0),
+        eficienciaVsObjetivo: (() => {
+          const totalObj = baseDataArray.reduce((sum, member) => sum + (member.hrs_obj || 0), 0);
+          const totalReal = baseDataArray.reduce((sum, member) => sum + (member.hrs_real || 0), 0);
+          return totalObj > 0 ? totalReal / totalObj : null;
+        })(),
+        costoRealEquipo: baseDataArray.reduce((sum, member) => sum + (member.cost_real || 0), 0)
+      };
+      
+      // 3. ANÁLISIS DE DESVIACIONES - Clasificación según umbrales
+      const classifyMember = (member) => {
+        const { desv_hrs_pct, desv_cost_pct, hrs_obj, hrs_real } = member;
+        
+        // Umbrales del data contract
+        const ATTENTION_THRESHOLD = 0.15;  // 15%
+        const REVIEW_THRESHOLD = 0.05;     // 5%
+        const OPTIMAL_THRESHOLD = 0.02;    // 2%
+        
+        // Requieren Atención (rojo)
+        if (desv_hrs_pct >= ATTENTION_THRESHOLD || 
+            desv_cost_pct >= ATTENTION_THRESHOLD || 
+            (hrs_obj === 0 && hrs_real > 0)) {
+          return 'attention';
+        }
+        
+        // Para Revisión (azul)
+        if ((desv_hrs_pct >= REVIEW_THRESHOLD && desv_hrs_pct < ATTENTION_THRESHOLD) ||
+            (desv_cost_pct >= REVIEW_THRESHOLD && desv_cost_pct < ATTENTION_THRESHOLD) ||
+            (desv_hrs_pct <= -REVIEW_THRESHOLD && desv_hrs_pct >= -ATTENTION_THRESHOLD)) {
+          return 'review';
+        }
+        
+        // Ejecución Óptima (lila)
+        if (Math.abs(desv_hrs_pct || 0) <= OPTIMAL_THRESHOLD && 
+            Math.abs(desv_cost_pct || 0) <= OPTIMAL_THRESHOLD && 
+            hrs_obj > 0) {
+          return 'optimal';
+        }
+        
+        // Subcostos Saludables (verde) - default
+        return 'healthy';
+      };
+      
+      // 4. ANÁLISIS DETALLADO POR MIEMBRO
+      const teamMembers = baseDataArray.map(member => {
+        const classification = classifyMember(member);
+        
+        // Criticidad para ordenamiento (ponderación del data contract)
+        const criticidad = 
+          70 * Math.max(member.desv_cost_pct || 0, 0) +
+          30 * Math.max(member.desv_hrs_pct || 0, 0) +
+          10 * (member.hrs_obj === 0 && member.hrs_real > 0 ? 1 : 0);
+        
+        return {
+          persona: member.persona,
+          horas: {
+            real: member.hrs_real || 0,
+            objetivo: member.hrs_obj || 0,
+            progreso: member.hrs_obj > 0 ? (member.hrs_real || 0) / member.hrs_obj : null,
+            diferencia: (member.hrs_real || 0) - (member.hrs_obj || 0)
+          },
+          costo: {
+            real: member.cost_real || 0,
+            presupuesto: member.cost_pres || 0
+          },
+          desviacion: {
+            horas_pct: member.desv_hrs_pct,
+            costo_pct: member.desv_cost_pct,
+            primary: member.cost_pres > 0 ? member.desv_cost_pct : member.desv_hrs_pct
+          },
+          estado: classification,
+          criticidad: Math.round(criticidad * 100) / 100
+        };
+      });
+      
+      // Ordenar por criticidad DESC (default del data contract)
+      teamMembers.sort((a, b) => b.criticidad - a.criticidad);
+      
+      // 5. CONTEOS POR CATEGORÍA (las 4 tarjetas de desviaciones)
+      const deviationCounts = {
+        attention: teamMembers.filter(m => m.estado === 'attention').length,
+        review: teamMembers.filter(m => m.estado === 'review').length,
+        healthy: teamMembers.filter(m => m.estado === 'healthy').length,
+        optimal: teamMembers.filter(m => m.estado === 'optimal').length
+      };
+      
+      // 6. VALIDACIONES Y ALERTAS
+      const validations = {
+        dataQuality: {
+          lowCostAlerts: teamMembers.filter(m => m.costo.real > 0 && m.costo.real < 10).length,
+          missingFxAlerts: 0, // TODO: implementar si necesario
+          zeroRateAlerts: 0   // TODO: implementar si necesario
+        },
+        reconciliation: {
+          totalCostReal: teamMembers.reduce((sum, m) => sum + m.costo.real, 0),
+          matchesSummary: Math.abs(
+            teamMembers.reduce((sum, m) => sum + m.costo.real, 0) - 
+            summaryCards.costoRealEquipo
+          ) < 0.01
+        }
+      };
+      
+      const result = {
+        projectId,
+        timeFilter,
+        monthKey,
+        
+        // Cards superiores
+        summary: {
+          miembrosActivos: summaryCards.miembrosActivos,
+          horasTrabajadas: Math.round(summaryCards.horasTrabajadas * 10) / 10,
+          eficienciaVsObjetivo: summaryCards.eficienciaVsObjetivo ? 
+            Math.round(summaryCards.eficienciaVsObjetivo * 1000) / 10 : null, // % con 1 decimal
+          costoRealEquipo: Math.round(summaryCards.costoRealEquipo * 100) / 100
+        },
+        
+        // Conteos de desviaciones (4 tarjetas)
+        deviations: deviationCounts,
+        
+        // Tabla detallada por miembro
+        teamMembers: teamMembers.map(member => ({
+          ...member,
+          horas: {
+            ...member.horas,
+            progreso: member.horas.progreso ? Math.round(member.horas.progreso * 1000) / 10 : null
+          },
+          desviacion: {
+            ...member.desviacion,
+            primary: member.desviacion.primary ? Math.round(member.desviacion.primary * 1000) / 10 : null,
+            horas_pct: member.desviacion.horas_pct ? Math.round(member.desviacion.horas_pct * 1000) / 10 : null,
+            costo_pct: member.desviacion.costo_pct ? Math.round(member.desviacion.costo_pct * 1000) / 10 : null
+          }
+        })),
+        
+        // Validaciones
+        validations,
+        
+        generatedAt: new Date().toISOString()
+      };
+      
+      console.log(`👥 TEAM ANALYSIS RESULT: ${teamMembers.length} members, ${deviationCounts.attention} attention, ${deviationCounts.optimal} optimal`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error("❌ Error in team analysis:", error);
+      res.status(500).json({ message: "Team analysis failed", error: error.message });
+    }
+  });
+
   // ==================== ENDPOINT TEMPORAL DE DIAGNÓSTICO ====================
   
   // Endpoint de diagnóstico para verificar costos directos específicos

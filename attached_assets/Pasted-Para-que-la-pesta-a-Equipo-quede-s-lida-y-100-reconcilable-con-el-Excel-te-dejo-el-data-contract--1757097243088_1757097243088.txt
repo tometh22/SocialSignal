@@ -1,0 +1,110 @@
+Para que la pestaña Equipo quede sólida y 100% reconcilable con el Excel, te dejo el data contract, fórmulas y reglas de clasificación que alimentan exactamente lo que se ve en tu UI.
+1) Inputs necesarios (por proyecto y mes)
+De tu Excel Costos (la hoja que vimos):
+persona (A)
+cliente, proyecto, nro_proyecto
+año (D), mes (C) → normalizá a month_key = YYYY-MM
+horas_objetivo (K)
+horas_reales_asana (L)
+horas_para_facturacion (M) (si la tenés, úsala para “Realización” en otras vistas)
+valor_hora_ars (N)
+cotizacion_fx (Q)
+monto_total_usd (R) (o bien calcúlalo: horas_reales_asana * valor_hora_ars / cotizacion_fx)
+Dimensiones opcionales (muy útiles):
+rol de la persona
+equipo/squad
+costo_hora_usd (derivado: valor_hora_ars / cotizacion_fx)
+Importante: parseo AR/ES ($1.624,54 → 1624.54) antes de convertir a número.
+2) Cards superiores (Resumen Operativo del Equipo)
+Miembros Activos
+COUNT(DISTINCT persona) con horas_reales_asana > 0.
+Horas Trabajadas (total del período)
+SUM(horas_reales_asana).
+Eficiencia vs Objetivo
+Texto del UI: “horas reales vs objetivo estimado”.
+eficiencia_pct = SUM(horas_reales_asana) / NULLIF(SUM(horas_objetivo),0).
+Costo Real del Equipo (USD)
+SUM(monto_total_usd).
+Todos los agregados filtrados por project_id/cliente y month_key.
+3) Análisis de Desviaciones (las 4 tarjetas)
+Calculás por persona y luego resumís conteos.
+Métricas por persona
+hrs_obj = SUM(horas_objetivo)
+hrs_real = SUM(horas_reales_asana)
+desv_hrs = hrs_real - hrs_obj
+desv_hrs_pct = CASE WHEN hrs_obj>0 THEN (hrs_real/hrs_obj - 1) ELSE NULL END
+cost_real = SUM(monto_total_usd)
+cost_pres = SUM(horas_objetivo * valor_hora_ars / cotizacion_fx)
+desv_cost_pct = CASE WHEN cost_pres>0 THEN (cost_real/cost_pres - 1) ELSE NULL END
+Reglas de clasificación (umbrales sugeridos; ponelos en “Configurar”)
+Requieren Atención (rojo)
+desv_hrs_pct >= +15% o desv_cost_pct >= +15% o hrs_obj=0 AND hrs_real>0.
+Para Revisión (azul)
++5% ≤ desv_hrs_pct < +15% o +5% ≤ desv_cost_pct < +15%
+o -15% ≤ desv_hrs_pct < -5% (podría ser subutilización relevante).
+Subcostos Saludables (verde)
+-5% ≤ desv_hrs_pct ≤ +5% y -5% ≤ desv_cost_pct ≤ +5%.
+Ejecución Óptima (lila)
+|desv_hrs_pct| ≤ 2% y |desv_cost_pct| ≤ 2% y hrs_obj > 0.
+Manejo de bordes: si hrs_obj=0 y hrs_real=0 → “sin actividad” (no cuenta).
+Si cost_pres=0 pero hrs_obj>0 → mostrás desvío por horas; desv_cost_pct queda NULL.
+Las tarjetas muestran el conteo de personas en cada categoría.
+4) Tabla “Análisis Detallado por Miembro”
+Columnas
+Miembro: persona (y opcional rol)
+Horas: hrs_real / hrs_obj con barra de progreso
+subtítulo: “X% progreso” y texto de diferencia (±N.h)
+Costo:
+cost_real (grande)
+“Presup: $cost_pres” (chico)
+Desviación:
+priorizá costos: desv_cost_pct (si cost_pres>0)
+fallback a horas: desv_hrs_pct
+Estado (badge): la categoría de la sección 3
+Criticidad (score para ordenar):
+criticidad = 
+    70 * max(desv_cost_pct, 0) +
+    30 * max(desv_hrs_pct, 0) +
+    10 * I(hrs_obj=0 AND hrs_real>0)
+(ajustable; ponderás sobrecostos por encima de horas)
+Ordenamiento: por criticidad DESC (default), y toggles Costo / Horas.
+5) SQL de referencia (agregados por persona)
+WITH base AS (
+  SELECT
+    project_id,
+    month_key,
+    persona,
+    SUM(horas_objetivo) AS hrs_obj,
+    SUM(horas_reales_asana) AS hrs_real,
+    SUM(monto_total_usd) AS cost_real,
+    SUM(horas_objetivo * valor_hora_ars / cotizacion_fx) AS cost_pres
+  FROM direct_costs
+  WHERE project_id = :project_id AND month_key = :month_key
+  GROUP BY 1,2,3
+),
+calc AS (
+  SELECT *,
+    CASE WHEN hrs_obj>0 THEN (hrs_real/hrs_obj - 1.0) END AS desv_hrs_pct,
+    CASE WHEN cost_pres>0 THEN (cost_real/cost_pres - 1.0) END AS desv_cost_pct
+  FROM base
+)
+SELECT * FROM calc;
+Cards superiores:
+SELECT
+  COUNT(DISTINCT persona) AS miembros_activos,
+  SUM(hrs_real)          AS horas_trabajadas,
+  ROUND(SUM(hrs_real)/NULLIF(SUM(hrs_obj),0),4) AS eficiencia_vs_obj,
+  SUM(cost_real)         AS costo_real_usd
+FROM base;
+Conteos por categoría: aplica las reglas del punto 3 en un CASE y COUNT(*) por label.
+6) Validaciones y bordes (para no romper)
+Si SUM(hrs_obj)=0 → Eficiencia vs Objetivo muestra “—” y tooltip “sin objetivo definido”.
+Redondeos: muestra porcentajes con una cifra (58.1%).
+Totales de tabla deben reconciliar:
+Σ cost_real (personas) = Costo Real del Equipo.
+Alertas de datos:
+monto_total_usd < 10 si el texto tenía miles → probable error de locale.
+fx = 0 o valor_hora_ars = 0 con horas > 0 → error de input.
+7) Filtros y configuración
+Filtros: mes, cliente/proyecto, rol, squad.
+Config (editable en UI): umbrales (+15/+5/±2), ponderaciones del score, mostrar desvío por Costo o Horas como default.
