@@ -139,8 +139,8 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los clientes</SelectItem>
-              {uniqueClients.map((client: string) => (
-                <SelectItem key={client} value={client}>{client}</SelectItem>
+              {uniqueClients.map((client) => (
+                <SelectItem key={String(client)} value={String(client)}>{String(client)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -154,8 +154,8 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los proyectos</SelectItem>
-              {uniqueProjects.map((project: string) => (
-                <SelectItem key={project} value={project}>{project}</SelectItem>
+              {uniqueProjects.map((project) => (
+                <SelectItem key={String(project)} value={String(project)}>{String(project)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -169,8 +169,8 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">Todos los meses</SelectItem>
-              {uniqueMonths.map((month: string) => (
-                <SelectItem key={month} value={month}>{month}</SelectItem>
+              {uniqueMonths.map((month) => (
+                <SelectItem key={String(month)} value={String(month)}>{String(month)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
