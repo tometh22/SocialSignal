@@ -166,6 +166,7 @@ function AppRoutes() {
                   {/* Legacy Redirects */}
                   <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
                   <ProtectedRoute path="/project-details/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
+                  <ProtectedRoute path="/project/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/projects/${params.id}`} />} />
                   
                   <Route component={NotFound} />
                 </Switch>
