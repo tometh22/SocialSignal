@@ -49,25 +49,37 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
     },
   });
 
-  // Get unique values for filters with fallbacks for different column names
+  // Get unique values for filters with robust handling
   const uniqueClients = useMemo(() => {
-    const clientSet = new Set(incomeData.map((record: any) => 
-      record.clientName || record.client_name || "N/A"
-    ));
+    const clientSet = new Set();
+    incomeData.forEach((record: any) => {
+      const client = record.clientName || record.client_name;
+      if (client && client !== "N/A" && typeof client === 'string' && client.trim()) {
+        clientSet.add(client.trim());
+      }
+    });
     return Array.from(clientSet).sort();
   }, [incomeData]);
 
   const uniqueProjects = useMemo(() => {
-    const projectSet = new Set(incomeData.map((record: any) => 
-      record.projectName || record.project_name || "N/A"
-    ));
+    const projectSet = new Set();
+    incomeData.forEach((record: any) => {
+      const project = record.projectName || record.project_name;
+      if (project && project !== "N/A" && typeof project === 'string' && project.trim()) {
+        projectSet.add(project.trim());
+      }
+    });
     return Array.from(projectSet).sort();
   }, [incomeData]);
 
   const uniqueMonths = useMemo(() => {
-    const monthSet = new Set(incomeData.map((record: any) => 
-      record.monthKey || record.month_key || "N/A"
-    ));
+    const monthSet = new Set();
+    incomeData.forEach((record: any) => {
+      const month = record.monthKey || record.month_key;
+      if (month && month !== "N/A" && typeof month === 'string' && month.trim()) {
+        monthSet.add(month.trim());
+      }
+    });
     return Array.from(monthSet).sort().reverse();
   }, [incomeData]);
 
@@ -128,52 +140,49 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
           </Badge>
         </div>
 
-        {/* Filtros */}
+        {/* Filtros Simplificados */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-          <Select 
-            value={filters.clientName || ''} 
-            onValueChange={(value) => setFilters(prev => ({ ...prev, clientName: value || undefined }))}
-          >
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Todos los clientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todos los clientes</SelectItem>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-600">Cliente</label>
+            <select 
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              value={filters.clientName || ""}
+              onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
+            >
+              <option value="">Todos los clientes</option>
               {uniqueClients.map((client) => (
-                <SelectItem key={String(client)} value={String(client)}>{String(client)}</SelectItem>
+                <option key={client as string} value={client as string}>{client as string}</option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+          </div>
 
-          <Select 
-            value={filters.projectName || ''} 
-            onValueChange={(value) => setFilters(prev => ({ ...prev, projectName: value || undefined }))}
-          >
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Todos los proyectos" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todos los proyectos</SelectItem>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-600">Proyecto</label>
+            <select 
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              value={filters.projectName || ""}
+              onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
+            >
+              <option value="">Todos los proyectos</option>
               {uniqueProjects.map((project) => (
-                <SelectItem key={String(project)} value={String(project)}>{String(project)}</SelectItem>
+                <option key={project as string} value={project as string}>{project as string}</option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+          </div>
 
-          <Select 
-            value={filters.monthKey || ''} 
-            onValueChange={(value) => setFilters(prev => ({ ...prev, monthKey: value || undefined }))}
-          >
-            <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Todos los meses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Todos los meses</SelectItem>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-600">Mes</label>
+            <select 
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              value={filters.monthKey || ""}
+              onChange={(e) => setFilters(prev => ({ ...prev, monthKey: e.target.value || undefined }))}
+            >
+              <option value="">Todos los meses</option>
               {uniqueMonths.map((month) => (
-                <SelectItem key={String(month)} value={String(month)}>{String(month)}</SelectItem>
+                <option key={month as string} value={month as string}>{month as string}</option>
               ))}
-            </SelectContent>
-          </Select>
+            </select>
+          </div>
 
           <Button 
             variant="outline" 
