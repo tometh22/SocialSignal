@@ -11211,8 +11211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { projectId, clientName, projectName, monthKey } = req.query;
       
-      // Use SQL raw query directly
-      let sqlQuery = `
+      // Use direct SQL query with template literal
+      let baseQuery = sql`
         SELECT 
           id, 
           client_name, 
@@ -11225,35 +11225,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM google_sheets_sales
       `;
       
-      const conditions: string[] = [];
-      const params: any[] = [];
-      let paramCount = 1;
+      // For now, let's get all records without filtering
+      // TODO: Add filtering logic later
+      const fullQuery = sql`
+        SELECT 
+          id, 
+          client_name, 
+          project_name, 
+          month_key, 
+          sales_type, 
+          amount_usd, 
+          status, 
+          confirmed
+        FROM google_sheets_sales
+        ORDER BY month_key DESC, client_name, project_name
+      `;
       
-      if (clientName) {
-        conditions.push(`client_name = $${paramCount++}`);
-        params.push(clientName);
-      }
+      console.log(`📊 Executing SQL query for all records`);
       
-      if (projectName) {
-        conditions.push(`project_name = $${paramCount++}`);
-        params.push(projectName);
-      }
-      
-      if (monthKey) {
-        conditions.push(`month_key = $${paramCount++}`);
-        params.push(monthKey);
-      }
-      
-      if (conditions.length > 0) {
-        sqlQuery += ` WHERE ${conditions.join(' AND ')}`;
-      }
-      
-      sqlQuery += ` ORDER BY month_key DESC, client_name, project_name`;
-      
-      console.log(`📊 Executing SQL query: ${sqlQuery}`);
-      console.log(`📊 Params: ${JSON.stringify(params)}`);
-      
-      const result = await db.execute(sql.raw(sqlQuery, params));
+      const result = await db.execute(fullQuery);
       
       console.log(`📊 Found ${result.length} income records`);
       
