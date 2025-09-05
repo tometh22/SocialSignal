@@ -137,18 +137,18 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="w-6 h-6 text-blue-600" />
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <div className="p-1.5 bg-blue-100 rounded-md">
+                <Clock className="w-4 h-4 text-blue-600" />
               </div>
               Análisis de Tiempo
             </h2>
-            <p className="text-gray-500 mt-2">
+            <p className="text-gray-500 mt-1 text-sm">
               Período: <span className="font-medium">{timeFilter.replace('_', ' ').toUpperCase()}</span> • 
               Solo datos de tiempo (sin información financiera)
             </p>
@@ -203,31 +203,31 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
       )}
 
       {/* Métricas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Progreso General */}
         <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-white" />
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-600 rounded-md">
+                  <BarChart3 className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Progreso Total</h3>
+                  <h3 className="font-medium text-gray-900 text-sm">Progreso Total</h3>
                   <p className="text-xs text-gray-600">vs objetivo</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold text-blue-600">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-blue-600">
                 {cards.totalRegistrado.porcentajeRegistrado}%
               </div>
-              <div className="text-sm text-gray-700">
+              <div className="text-xs text-gray-700">
                 {cards.totalRegistrado.horasRegistradas}h de {cards.totalRegistrado.horasObjetivo}h
               </div>
               <Progress 
                 value={Math.min(cards.totalRegistrado.porcentajeRegistrado, 100)} 
-                className="h-2 bg-gray-200"
+                className="h-1.5 bg-gray-200"
               />
             </div>
           </CardContent>
@@ -235,28 +235,28 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
         {/* Equipo Activo */}
         <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-emerald-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-600 rounded-lg">
-                  <Users className="w-5 h-5 text-white" />
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-600 rounded-md">
+                  <Users className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Equipo Activo</h3>
+                  <h3 className="font-medium text-gray-900 text-sm">Equipo Activo</h3>
                   <p className="text-xs text-gray-600">miembros trabajando</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold text-emerald-600">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-emerald-600">
                 {cards.miembrosActivos.activos}
               </div>
-              <div className="text-sm text-gray-700">
+              <div className="text-xs text-gray-700">
                 de {cards.miembrosActivos.asignados} asignados
               </div>
               <Progress 
                 value={(cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100} 
-                className="h-2 bg-gray-200 [&>div]:bg-emerald-500"
+                className="h-1.5 bg-gray-200 [&>div]:bg-emerald-500"
               />
             </div>
           </CardContent>
@@ -264,23 +264,23 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
         {/* Horas Totales */}
         <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-600 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-white" />
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-orange-600 rounded-md">
+                  <TrendingUp className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Horas Trabajadas</h3>
+                  <h3 className="font-medium text-gray-900 text-sm">Horas Trabajadas</h3>
                   <p className="text-xs text-gray-600">total del período</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold text-orange-600">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-orange-600">
                 {cards.horasTrabajadas.horas}h
               </div>
-              <div className="text-sm text-gray-700">
+              <div className="text-xs text-gray-700">
                 de {cards.horasTrabajadas.estimadas}h estimadas
               </div>
             </div>
@@ -289,23 +289,23 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
         {/* Promedio Diario */}
         <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-600 rounded-lg">
-                  <Calendar className="w-5 h-5 text-white" />
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-600 rounded-md">
+                  <Calendar className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Promedio Diario</h3>
+                  <h3 className="font-medium text-gray-900 text-sm">Promedio Diario</h3>
                   <p className="text-xs text-gray-600">por miembro activo</p>
                 </div>
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="text-3xl font-bold text-purple-600">
+            <div className="space-y-2">
+              <div className="text-2xl font-bold text-purple-600">
                 {cards.promedioDiario.promedio}h
               </div>
-              <div className="text-sm text-gray-700">
+              <div className="text-xs text-gray-700">
                 en {configuracion.diasTranscurridos} días hábiles
               </div>
             </div>
@@ -315,10 +315,10 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
       {/* Lista de miembros */}
       <Card className="border-0 shadow-lg">
-        <CardHeader className="pb-4">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-xl text-gray-900">Detalle por Miembro</CardTitle>
+              <CardTitle className="text-lg text-gray-900">Detalle por Miembro</CardTitle>
               <p className="text-sm text-gray-500 mt-1">{miembros.length} miembros en el equipo</p>
             </div>
             <div className="flex items-center gap-3">
@@ -343,25 +343,25 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
               return (
                 <div
                   key={`${miembro.persona}-${index}`}
-                  className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-center justify-between">
                     {/* Información del miembro */}
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className={`p-3 rounded-full bg-${memberStatus.color}-100`}>
-                        <StatusIcon className={`w-5 h-5 text-${memberStatus.color}-600`} />
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`p-2 rounded-full bg-${memberStatus.color}-100`}>
+                        <StatusIcon className={`w-4 h-4 text-${memberStatus.color}-600`} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <h4 className="font-semibold text-gray-900 text-lg">{miembro.persona}</h4>
+                            <h4 className="font-semibold text-gray-900 text-base">{miembro.persona}</h4>
                             {miembro.rol && (
                               <p className="text-sm text-gray-600">{miembro.rol}</p>
                             )}
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-900">{miembro.hrs_real}h</div>
-                            <div className="text-sm text-gray-500">trabajadas</div>
+                            <div className="text-xl font-bold text-gray-900">{miembro.hrs_real}h</div>
+                            <div className="text-xs text-gray-500">trabajadas</div>
                           </div>
                         </div>
                         
@@ -377,7 +377,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                           </div>
                           <Progress 
                             value={Math.min(miembro.porcentaje_progreso, 100)}
-                            className={`h-3 bg-gray-200 [&>div]:bg-${memberStatus.color}-500`}
+                            className={`h-2 bg-gray-200 [&>div]:bg-${memberStatus.color}-500`}
                           />
                           
                           {/* Indicadores adicionales */}
@@ -417,22 +417,22 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           </div>
 
           {miembros.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Sin registros de tiempo</h3>
-              <p className="text-gray-500">No se encontraron registros para este período</p>
+            <div className="text-center py-8">
+              <Users className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+              <h3 className="text-base font-medium text-gray-900 mb-2">Sin registros de tiempo</h3>
+              <p className="text-sm text-gray-500">No se encontraron registros para este período</p>
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* Footer */}
-      <div className="text-center text-sm text-gray-500 py-4">
-        <div className="flex items-center justify-center gap-4">
+      <div className="text-center text-xs text-gray-500 py-3">
+        <div className="flex items-center justify-center gap-3">
           <span>Generado: {new Date(timeData.generatedAt).toLocaleString()}</span>
           <span>•</span>
           <span className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
+            <Clock className="w-3 h-3" />
             Análisis exclusivo de tiempo
           </span>
         </div>
