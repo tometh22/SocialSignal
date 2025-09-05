@@ -3169,7 +3169,424 @@ const ProjectDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="performance-analysis" className="space-y-6">
-            {/* RANKINGS ECONÓMICOS - SISTEMA NUEVO */}
+            {/* HEADER PRINCIPAL DEL ANÁLISIS DUAL */}
+            <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                      <Flame className="h-6 w-6" />
+                    </div>
+                    Análisis de Performance Dual
+                  </h2>
+                  <p className="text-indigo-200 text-sm">Análisis operacional vs rentabilidad financiera - Período: {dateFilter.label}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-indigo-300 mb-1">Excel MAESTRO</div>
+                  <div className="text-lg font-bold">{(unifiedData as any)?.actuals?.excelDirectCosts?.length || 0} registros</div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 1: ANÁLISIS OPERACIONAL */}
+            <div className="bg-blue-50 rounded-xl p-6 border border-blue-200">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-blue-900 mb-2 flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-600" />
+                  1. Análisis Operacional
+                </h3>
+                <p className="text-blue-700 text-sm">Eficiencia del equipo: Horas Objetivo (Col. K) vs Horas Reales (Col. L)</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Resumen Operacional */}
+                <div className="bg-white rounded-lg p-5 border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Resumen de Eficiencia
+                  </h4>
+                  <div className="space-y-4">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                      const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                      const efficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
+                            <span className="text-sm text-blue-700">Horas Objetivo (K)</span>
+                            <span className="font-bold text-blue-900">{totalTargetHours.toFixed(1)}h</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-indigo-50 rounded">
+                            <span className="text-sm text-indigo-700">Horas Reales (L)</span>
+                            <span className="font-bold text-indigo-900">{totalRealHours.toFixed(1)}h</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gradient-to-r from-blue-100 to-indigo-100 rounded border">
+                            <span className="text-sm font-medium">Eficiencia Operacional</span>
+                            <span className={`font-bold text-lg ${
+                              efficiency <= 100 ? 'text-green-600' : 
+                              efficiency <= 120 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {efficiency.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div 
+                              className={`h-3 rounded-full transition-all ${
+                                efficiency <= 100 ? 'bg-gradient-to-r from-green-400 to-green-600' : 
+                                efficiency <= 120 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : 
+                                'bg-gradient-to-r from-red-400 to-red-600'
+                              }`}
+                              style={{ width: `${Math.min(efficiency, 150)}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-center text-gray-600">
+                            {efficiency <= 100 ? '✅ Dentro del presupuesto operacional' : 
+                             efficiency <= 120 ? '⚠️ Moderadamente por encima del presupuesto' : 
+                             '🚨 Significativamente por encima del presupuesto'}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Top 5 Eficiencia Operacional por Persona */}
+                <div className="bg-white rounded-lg p-5 border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Eficiencia por Persona
+                  </h4>
+                  <div className="space-y-3">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      const personData = excelCosts
+                        .filter((cost: any) => (cost.horasObjetivo || 0) > 0 && (cost.horasRealesAsana || 0) > 0)
+                        .map((cost: any) => ({
+                          name: cost.persona,
+                          targetHours: cost.horasObjetivo || 0,
+                          realHours: cost.horasRealesAsana || 0,
+                          efficiency: ((cost.horasRealesAsana || 0) / (cost.horasObjetivo || 1)) * 100
+                        }))
+                        .sort((a, b) => a.efficiency - b.efficiency)
+                        .slice(0, 5);
+                      
+                      return personData.map((person, index) => (
+                        <div key={person.name} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                          <div>
+                            <div className="font-medium text-sm text-gray-900">{person.name}</div>
+                            <div className="text-xs text-gray-500">{person.realHours}h / {person.targetHours}h</div>
+                          </div>
+                          <div className={`text-sm font-bold px-2 py-1 rounded ${
+                            person.efficiency <= 100 ? 'bg-green-100 text-green-800' : 
+                            person.efficiency <= 120 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {person.efficiency.toFixed(0)}%
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 2: ANÁLISIS DE RENTABILIDAD */}
+            <div className="bg-green-50 rounded-xl p-6 border border-green-200">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-green-900 mb-2 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-green-600" />
+                  2. Análisis de Rentabilidad
+                </h3>
+                <p className="text-green-700 text-sm">Impacto financiero: Horas Facturables (Col. M) × Tarifa (Col. N)</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Resumen Financiero */}
+                <div className="bg-white rounded-lg p-5 border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Resumen Financiero
+                  </h4>
+                  <div className="space-y-4">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      const totalBillableHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasFacturables || cost.horasRealesAsana || 0), 0);
+                      const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                      const averageHourlyRate = totalBillableHours > 0 ? totalFinancialCost / totalBillableHours : 0;
+                      
+                      // Obtener ingresos reales
+                      const realRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status !== 'proyectada')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      
+                      const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                            <span className="text-sm text-green-700">Horas Facturables (M)</span>
+                            <span className="font-bold text-green-900">{totalBillableHours.toFixed(1)}h</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-emerald-50 rounded">
+                            <span className="text-sm text-emerald-700">Costo Total (M×N)</span>
+                            <span className="font-bold text-emerald-900">${totalFinancialCost.toLocaleString()} USD</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-teal-50 rounded">
+                            <span className="text-sm text-teal-700">Tarifa Promedio</span>
+                            <span className="font-bold text-teal-900">${averageHourlyRate.toFixed(2)}/h</span>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-gradient-to-r from-green-100 to-emerald-100 rounded border">
+                            <span className="text-sm font-medium">Markup Real</span>
+                            <span className={`font-bold text-lg ${
+                              markup >= 2.5 ? 'text-green-600' : 
+                              markup >= 2.0 ? 'text-blue-600' : 
+                              markup >= 1.5 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {markup.toFixed(2)}x
+                            </span>
+                          </div>
+                          <div className="text-xs text-center text-gray-600">
+                            Ingresos Reales: ${realRevenue.toLocaleString()} USD
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Top 5 Costo por Persona */}
+                <div className="bg-white rounded-lg p-5 border border-green-200">
+                  <h4 className="font-semibold text-green-900 mb-4 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" />
+                    Costo por Persona
+                  </h4>
+                  <div className="space-y-3">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      const personCosts = excelCosts
+                        .filter((cost: any) => (cost.montoTotalUSD || 0) > 0)
+                        .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
+                        .slice(0, 5);
+                      
+                      return personCosts.map((cost: any, index) => (
+                        <div key={cost.persona} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                          <div>
+                            <div className="font-medium text-sm text-gray-900">{cost.persona}</div>
+                            <div className="text-xs text-gray-500">
+                              {(cost.horasFacturables || cost.horasRealesAsana || 0).toFixed(1)}h facturables
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-green-600">
+                              ${(cost.montoTotalUSD || 0).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ${((cost.montoTotalUSD || 0) / Math.max(cost.horasFacturables || cost.horasRealesAsana || 1, 1)).toFixed(0)}/h
+                            </div>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 3: COMPARACIÓN DIRECTA OPERACIONAL vs FINANCIERO */}
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-6 border border-purple-200">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold text-purple-900 mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-purple-600" />
+                  3. Comparación Directa: Operacional vs Financiero
+                </h3>
+                <p className="text-purple-700 text-sm">Análisis cruzado para detectar desviaciones entre eficiencia y rentabilidad</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Panel de Comparación */}
+                <div className="lg:col-span-2 bg-white rounded-lg p-5 border border-purple-200">
+                  <h4 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Resumen Comparativo
+                  </h4>
+                  <div className="space-y-4">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      
+                      // Métricas operacionales
+                      const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                      const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                      const operationalEfficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                      
+                      // Métricas financieras
+                      const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                      const realRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status !== 'proyectada')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                      
+                      // Detección de alertas
+                      const operationalAlert = operationalEfficiency > 120;
+                      const financialAlert = markup < 2.0;
+                      const criticalAlert = operationalAlert && financialAlert;
+                      
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className={`p-4 rounded-lg border ${
+                              operationalAlert ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'
+                            }`}>
+                              <div className="text-sm text-gray-600 mb-1">Eficiencia Operacional</div>
+                              <div className={`text-xl font-bold ${
+                                operationalAlert ? 'text-red-700' : 'text-blue-700'
+                              }`}>
+                                {operationalEfficiency.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {totalRealHours.toFixed(0)}h / {totalTargetHours.toFixed(0)}h objetivo
+                              </div>
+                            </div>
+                            
+                            <div className={`p-4 rounded-lg border ${
+                              financialAlert ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'
+                            }`}>
+                              <div className="text-sm text-gray-600 mb-1">Rentabilidad Financiera</div>
+                              <div className={`text-xl font-bold ${
+                                financialAlert ? 'text-red-700' : 'text-green-700'
+                              }`}>
+                                {markup.toFixed(2)}x
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                ${realRevenue.toLocaleString()} / ${totalFinancialCost.toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Alerta crítica */}
+                          {criticalAlert && (
+                            <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-4 w-4 text-red-600" />
+                                <span className="font-semibold text-red-800">Alerta Crítica</span>
+                              </div>
+                              <p className="text-sm text-red-700">
+                                Proyecto con baja eficiencia operacional Y baja rentabilidad. 
+                                Se excedió {(operationalEfficiency - 100).toFixed(0)}% en horas y markup por debajo de 2x.
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Recomendaciones específicas */}
+                          {!criticalAlert && (operationalAlert || financialAlert) && (
+                            <div className="p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                                <span className="font-semibold text-yellow-800">Recomendaciones</span>
+                              </div>
+                              <div className="text-sm text-yellow-700 space-y-1">
+                                {operationalAlert && !financialAlert && (
+                                  <p>• Revisar estimaciones de tiempo - se excedió en {(operationalEfficiency - 100).toFixed(0)}% pero rentabilidad es buena</p>
+                                )}
+                                {financialAlert && !operationalAlert && (
+                                  <p>• Revisar estructura de precios - eficiencia operacional buena pero markup bajo ({markup.toFixed(2)}x)</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {!operationalAlert && !financialAlert && (
+                            <div className="p-4 bg-green-100 border border-green-300 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <span className="font-semibold text-green-800">Proyecto Saludable</span>
+                              </div>
+                              <p className="text-sm text-green-700">
+                                Excelente balance entre eficiencia operacional y rentabilidad financiera.
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Matriz de Riesgo */}
+                <div className="bg-white rounded-lg p-5 border border-purple-200">
+                  <h4 className="font-semibold text-purple-900 mb-4 flex items-center gap-2">
+                    <Gauge className="h-4 w-4" />
+                    Matriz de Riesgo
+                  </h4>
+                  <div className="space-y-3">
+                    {(() => {
+                      const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                      const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                      const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                      const operationalEfficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                      
+                      const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                      const realRevenue = (unifiedData as any)?.googleSheetsSales
+                        ?.filter((sale: any) => sale.status !== 'proyectada')
+                        ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                      const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                      
+                      // Clasificar riesgo
+                      let riskLevel = "Bajo";
+                      let riskColor = "text-green-700";
+                      let riskBg = "bg-green-100";
+                      
+                      if (operationalEfficiency > 120 && markup < 2.0) {
+                        riskLevel = "Crítico";
+                        riskColor = "text-red-700";
+                        riskBg = "bg-red-100";
+                      } else if (operationalEfficiency > 120 || markup < 2.0) {
+                        riskLevel = "Medio";
+                        riskColor = "text-yellow-700";
+                        riskBg = "bg-yellow-100";
+                      }
+                      
+                      return (
+                        <>
+                          <div className={`p-3 rounded ${riskBg}`}>
+                            <div className="text-sm font-medium">Nivel de Riesgo</div>
+                            <div className={`text-lg font-bold ${riskColor}`}>{riskLevel}</div>
+                          </div>
+                          
+                          <div className="space-y-2 text-xs">
+                            <div className={`flex items-center justify-between p-2 rounded ${
+                              operationalEfficiency <= 100 ? 'bg-green-50 text-green-700' : 
+                              operationalEfficiency <= 120 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'
+                            }`}>
+                              <span>Riesgo Operacional</span>
+                              <span className="font-bold">
+                                {operationalEfficiency <= 100 ? 'Bajo' : 
+                                 operationalEfficiency <= 120 ? 'Medio' : 'Alto'}
+                              </span>
+                            </div>
+                            
+                            <div className={`flex items-center justify-between p-2 rounded ${
+                              markup >= 2.5 ? 'bg-green-50 text-green-700' : 
+                              markup >= 2.0 ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-700'
+                            }`}>
+                              <span>Riesgo Financiero</span>
+                              <span className="font-bold">
+                                {markup >= 2.5 ? 'Bajo' : 
+                                 markup >= 2.0 ? 'Medio' : 'Alto'}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RANKINGS ECONÓMICOS - MANTENIDO COMO SECCIÓN 4 */}
             <div className="grid grid-cols-1 gap-6">
               <EconomicRankings 
                 rankings={(unifiedData as any)?.rankings?.economicMetrics || []}
