@@ -4,14 +4,14 @@ import {
   Clock, 
   Users, 
   TrendingUp, 
-  DollarSign, 
   Calendar,
   Settings,
   AlertTriangle,
   CheckCircle,
   XCircle,
   Info,
-  BarChart3
+  BarChart3,
+  Gauge
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -86,7 +86,7 @@ interface TimeTrackingData {
 
 export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProps) {
   const [showConfig, setShowConfig] = useState(false);
-  const [sortMode, setSortMode] = useState<'brecha' | 'costo'>('brecha');
+  const [sortMode, setSortMode] = useState<'brecha' | 'porcentaje'>('brecha');
 
   const { data: timeData, isLoading, error } = useQuery<TimeTrackingData>({
     queryKey: [`/api/projects/${projectId}/time-tracking?timeFilter=${timeFilter}`, timeFilter],
@@ -153,7 +153,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
     if (sortMode === 'brecha') {
       return b.brecha_objetivo - a.brecha_objetivo; // Por brecha descendente
     } else {
-      return b.costo_usd - a.costo_usd; // Por costo descendente
+      return b.porcentaje_progreso - a.porcentaje_progreso; // Por porcentaje descendente
     }
   });
 
@@ -165,7 +165,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           Registro de Tiempo - {timeFilter.replace('_', ' ').toUpperCase()}
         </CardTitle>
         <p className="text-sm text-gray-600">
-          Datos de tiempo trabajado y objetivos según Excel MAESTRO y Asana
+          Análisis exclusivo de tiempo trabajado vs objetivos (sin costos)
         </p>
       </CardHeader>
 
@@ -337,58 +337,20 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             </CardContent>
           </Card>
 
-          {/* Costo Real */}
-          <Card className={`border-l-4 ${
-            (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
-              ? 'border-l-red-500 bg-gradient-to-br from-red-50 to-red-25'
-              : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
-                ? 'border-l-yellow-500 bg-gradient-to-br from-yellow-50 to-yellow-25'
-                : 'border-l-green-500 bg-gradient-to-br from-green-50 to-green-25'
-          } shadow-sm hover:shadow-md transition-shadow`}>
+          {/* Eficiencia de Tiempo */}
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <DollarSign className={`w-4 h-4 ${
-                    (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
-                      ? 'text-red-600'
-                      : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
-                        ? 'text-yellow-600'
-                        : 'text-green-600'
-                  }`} />
-                  <span className="text-sm font-medium">Costo Real</span>
-                </div>
-                {(cards.costoReal.real / cards.costoReal.estimado) >= 1.15 && (
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
-                )}
+              <div className="flex items-center gap-2 mb-2">
+                <Gauge className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm font-medium">Eficiencia Promedio</span>
               </div>
-              <div className="space-y-2">
-                <div className={`text-2xl font-bold ${
-                  (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
-                    ? 'text-red-700'
-                    : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
-                      ? 'text-yellow-700'
-                      : 'text-green-700'
-                }`}>
-                  ${cards.costoReal.real.toLocaleString()}
+              <div className="space-y-1">
+                <div className="text-2xl font-bold text-indigo-700">
+                  {Math.round(miembros.reduce((acc, m) => acc + m.porcentaje_progreso, 0) / miembros.length || 0)}%
                 </div>
                 <div className="text-xs text-gray-600">
-                  de ${cards.costoReal.estimado.toLocaleString()} estimado
+                  promedio del equipo
                 </div>
-                <Progress 
-                  value={Math.min((cards.costoReal.real / cards.costoReal.estimado) * 100, 100)}
-                  className={`h-3 ${
-                    (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
-                      ? '[&>div]:bg-red-500'
-                      : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
-                        ? '[&>div]:bg-yellow-500'
-                        : '[&>div]:bg-green-500'
-                  }`}
-                />
-                {(cards.costoReal.real / cards.costoReal.estimado) >= 1.15 && (
-                  <div className="text-xs text-red-600 font-medium">
-                    💰 Sobrecosto crítico: +{((cards.costoReal.real / cards.costoReal.estimado - 1) * 100).toFixed(1)}%
-                  </div>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -446,11 +408,11 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             <select
               id="sort-mode"
               value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as 'brecha' | 'costo')}
+              onChange={(e) => setSortMode(e.target.value as 'brecha' | 'porcentaje')}
               className="px-3 py-1 border rounded text-sm"
             >
               <option value="brecha">Brecha a objetivo</option>
-              <option value="costo">Costo USD</option>
+              <option value="porcentaje">Porcentaje completado</option>
             </select>
           </div>
         </div>
@@ -559,14 +521,12 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="font-bold text-lg">
-                      ${miembro.costo_usd.toLocaleString()}
+                    <div className="font-bold text-lg text-gray-700">
+                      {miembro.hrs_real}h
                     </div>
-                    {configuracion.mostrarRate && miembro.rate_usd > 0 && (
-                      <div className="text-xs text-gray-500">
-                        ${miembro.rate_usd.toFixed(2)}/h
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-500">
+                      trabajadas
+                    </div>
                   </div>
                   
                   <div className="flex flex-col gap-1">
@@ -584,10 +544,10 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                       {miembro.estado === 'parcial' && '⏳ Parcial'}
                       {miembro.estado === 'sin_registro' && '❌ Sin registro'}
                     </Badge>
-                    {/* Badge adicional para alertas críticas */}
+                    {/* Badge adicional para alertas de tiempo */}
                     {isOverBudget && (
                       <Badge variant="destructive" className="text-xs">
-                        🚨 Sobrecosto
+                        🚨 Exceso tiempo
                       </Badge>
                     )}
                   </div>
@@ -613,8 +573,8 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
               <span className={validaciones.conciliacionHoras ? 'text-green-600' : 'text-red-600'}>
                 ✓ Conciliación horas: {validaciones.conciliacionHoras ? 'OK' : 'Error'}
               </span>
-              <span className={validaciones.conciliacionCosto ? 'text-green-600' : 'text-red-600'}>
-                ✓ Conciliación costos: {validaciones.conciliacionCosto ? 'OK' : 'Error'}
+              <span className="text-blue-600">
+                📊 Análisis solo tiempo
               </span>
             </div>
           </div>
