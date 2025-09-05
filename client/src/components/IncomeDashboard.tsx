@@ -49,36 +49,49 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
     },
   });
 
-  // Get unique values for filters
+  // Get unique values for filters with fallbacks for different column names
   const uniqueClients = useMemo(() => {
-    const clientSet = new Set(incomeData.map((record: IncomeRecord) => record.clientName));
+    const clientSet = new Set(incomeData.map((record: any) => 
+      record.clientName || record.client_name || "N/A"
+    ));
     return Array.from(clientSet).sort();
   }, [incomeData]);
 
   const uniqueProjects = useMemo(() => {
-    const projectSet = new Set(incomeData.map((record: IncomeRecord) => record.projectName));
+    const projectSet = new Set(incomeData.map((record: any) => 
+      record.projectName || record.project_name || "N/A"
+    ));
     return Array.from(projectSet).sort();
   }, [incomeData]);
 
   const uniqueMonths = useMemo(() => {
-    const monthSet = new Set(incomeData.map((record: IncomeRecord) => record.monthKey));
+    const monthSet = new Set(incomeData.map((record: any) => 
+      record.monthKey || record.month_key || "N/A"
+    ));
     return Array.from(monthSet).sort().reverse();
   }, [incomeData]);
 
-  // Calculate total income
+  // Calculate total income with fallbacks for different column names
   const totalIncome = useMemo(() => 
     incomeData
-      .filter((record: IncomeRecord) => record.confirmed === 'SI')
-      .reduce((sum: number, record: IncomeRecord) => sum + (record.amountUsd || 0), 0),
+      .filter((record: any) => record.confirmed === 'SI' || record.confirmed === 'Si')
+      .reduce((sum: number, record: any) => {
+        const amount = parseFloat(record.amountUsd || record.amount_usd || "0");
+        return sum + amount;
+      }, 0),
     [incomeData]
   );
 
-  // Filter data based on current filters
+  // Filter data based on current filters with fallbacks
   const filteredData = useMemo(() => {
-    return incomeData.filter((record: IncomeRecord) => {
-      if (filters.clientName && record.clientName !== filters.clientName) return false;
-      if (filters.projectName && record.projectName !== filters.projectName) return false;
-      if (filters.monthKey && record.monthKey !== filters.monthKey) return false;
+    return incomeData.filter((record: any) => {
+      const clientName = record.clientName || record.client_name;
+      const projectName = record.projectName || record.project_name;
+      const monthKey = record.monthKey || record.month_key;
+      
+      if (filters.clientName && clientName !== filters.clientName) return false;
+      if (filters.projectName && projectName !== filters.projectName) return false;
+      if (filters.monthKey && monthKey !== filters.monthKey) return false;
       return true;
     });
   }, [incomeData, filters]);
@@ -227,35 +240,46 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
                     </td>
                   </tr>
                 ) : (
-                  filteredData.map((record: IncomeRecord) => (
-                    <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="p-3 text-sm text-gray-900 font-medium">{record.projectName}</td>
-                      <td className="p-3 text-sm text-gray-700">{record.clientName}</td>
-                      <td className="p-3 text-sm text-gray-700 font-mono">{record.monthKey}</td>
-                      <td className="p-3 text-sm">
-                        <Badge variant={
-                          record.revenueType === 'fee' ? 'default' : 
-                          record.revenueType === 'tm' ? 'secondary' : 'outline'
-                        } className="text-xs">
-                          {record.revenueType.toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-sm text-right font-mono font-medium text-green-600">
-                        ${(record.amountUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-3 text-sm">
-                        <Badge 
-                          variant={record.confirmed === 'SI' ? 'default' : 'outline'}
-                          className={`text-xs ${record.confirmed === 'SI' ? 'bg-green-100 text-green-700' : ''}`}
-                        >
-                          {record.status}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-sm text-gray-600 max-w-xs truncate">
-                        {record.notes || '—'}
-                      </td>
-                    </tr>
-                  ))
+                  filteredData.map((record: any) => {
+                    const projectName = record.projectName || record.project_name || "N/A";
+                    const clientName = record.clientName || record.client_name || "N/A";
+                    const monthKey = record.monthKey || record.month_key || "N/A";
+                    const salesType = record.salesType || record.sales_type || record.revenueType || "N/A";
+                    const amountUsd = parseFloat(record.amountUsd || record.amount_usd || "0");
+                    const status = record.status || "N/A";
+                    const confirmed = record.confirmed || "NO";
+                    const notes = record.notes || "—";
+                    
+                    return (
+                      <tr key={record.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="p-3 text-sm text-gray-900 font-medium">{projectName}</td>
+                        <td className="p-3 text-sm text-gray-700">{clientName}</td>
+                        <td className="p-3 text-sm text-gray-700 font-mono">{monthKey}</td>
+                        <td className="p-3 text-sm">
+                          <Badge variant={
+                            salesType.toLowerCase() === 'fee' ? 'default' : 
+                            salesType.toLowerCase() === 'tm' ? 'secondary' : 'outline'
+                          } className="text-xs">
+                            {salesType.toUpperCase()}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-sm text-right font-mono font-medium text-green-600">
+                          ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-3 text-sm">
+                          <Badge 
+                            variant={confirmed === 'SI' || confirmed === 'Si' ? 'default' : 'outline'}
+                            className={`text-xs ${confirmed === 'SI' || confirmed === 'Si' ? 'bg-green-100 text-green-700' : ''}`}
+                          >
+                            {status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-sm text-gray-600 max-w-xs truncate">
+                          {notes}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

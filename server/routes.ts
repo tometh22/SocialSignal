@@ -11211,45 +11211,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { projectId, clientName, projectName, monthKey } = req.query;
       
-      // Use Drizzle ORM to query google_sheets_sales
-      let query = db
-        .select({
-          id: googleSheetsSales.id,
-          projectName: googleSheetsSales.projectName,
-          clientName: googleSheetsSales.clientName,
-          monthKey: googleSheetsSales.monthKey,
-          revenueType: googleSheetsSales.salesType, // salesType in schema
-          amountUsd: googleSheetsSales.amountUsd,
-          status: googleSheetsSales.status,
-          confirmed: googleSheetsSales.confirmed,
-          notes: sql<string>`''` // notes doesn't exist in schema
-        })
-        .from(googleSheetsSales);
+      // Use SQL raw query directly
+      let sqlQuery = `
+        SELECT 
+          id, 
+          client_name, 
+          project_name, 
+          month_key, 
+          sales_type, 
+          amount_usd, 
+          status, 
+          confirmed
+        FROM google_sheets_sales
+      `;
       
-      // Apply filters
-      const filters: any[] = [];
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramCount = 1;
       
       if (clientName) {
-        filters.push(eq(googleSheetsSales.clientName, clientName as string));
+        conditions.push(`client_name = $${paramCount++}`);
+        params.push(clientName);
       }
       
       if (projectName) {
-        filters.push(eq(googleSheetsSales.projectName, projectName as string));
+        conditions.push(`project_name = $${paramCount++}`);
+        params.push(projectName);
       }
       
       if (monthKey) {
-        filters.push(eq(googleSheetsSales.monthKey, monthKey as string));
+        conditions.push(`month_key = $${paramCount++}`);
+        params.push(monthKey);
       }
       
-      if (filters.length > 0) {
-        query = query.where(and(...filters));
+      if (conditions.length > 0) {
+        sqlQuery += ` WHERE ${conditions.join(' AND ')}`;
       }
       
-      query = query.orderBy(desc(googleSheetsSales.monthKey), asc(googleSheetsSales.clientName), asc(googleSheetsSales.projectName));
+      sqlQuery += ` ORDER BY month_key DESC, client_name, project_name`;
       
-      console.log(`📊 Executing Drizzle query for income dashboard`);
+      console.log(`📊 Executing SQL query: ${sqlQuery}`);
+      console.log(`📊 Params: ${JSON.stringify(params)}`);
       
-      const result = await query;
+      const result = await db.execute(sql.raw(sqlQuery, params));
       
       console.log(`📊 Found ${result.length} income records`);
       
