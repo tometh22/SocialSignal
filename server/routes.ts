@@ -10320,6 +10320,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           case 'july_2025':
             monthKey = '2025-07';
             break;
+          case 'september_2025':
+            monthKey = '2025-09';
+            break;
           default:
             monthKey = '2025-08'; // Default agosto 2025
         }
@@ -10712,6 +10715,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return cost.mes === '07 jul' && cost.año === 2025;
         }
         
+        if (timeFilter === 'september_2025') {
+          return cost.mes === '09 sep' && cost.año === 2025;
+        }
+        
         // Default: agosto 2025
         return cost.mes === '08 ago' && cost.año === 2025;
       });
@@ -10751,8 +10758,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`🏆 Project income for period: $${ingresos_proyecto_usd}`);
       
-      // 4. CÁLCULO DE SCORES SEGÚN FÓRMULAS DEL DATA CONTRACT
-      const teamMembers = Object.values(baseData).map((member: any) => {
+      // 4. FILTRAR SOLO MIEMBROS CON DATOS REALES DEL PERÍODO
+      const validMembers = Object.values(baseData).filter((member: any) => {
+        // Solo incluir miembros que tengan al menos horas reales O costo en el período
+        return (member.hrs_real > 0 || member.cost_usd > 0) && member.hrs_obj > 0;
+      });
+
+      console.log(`🏆 Valid team members with real data: ${validMembers.length}`);
+
+      if (validMembers.length === 0) {
+        return res.json({
+          projectId,
+          timeFilter,
+          monthKey,
+          configuracion: {
+            balance_eficiencia: 50,
+            balance_impacto: 50,
+            modo_impacto: 'ingresos',
+            reparto_fee: 'hrs_fact'
+          },
+          proyecto: {
+            ingresos_periodo: ingresos_proyecto_usd,
+            miembros_activos: 0,
+            horas_totales: 0,
+            participacion_reconciliada: false
+          },
+          rankings: [],
+          validaciones: {
+            participacionTotal: 0,
+            datosCompletos: 0,
+            sinObjetivo: 0,
+            sinIngresos: ingresos_proyecto_usd === 0,
+            noDataForPeriod: true
+          },
+          generatedAt: new Date().toISOString()
+        });
+      }
+
+      // 5. CÁLCULO DE SCORES SEGÚN FÓRMULAS DEL DATA CONTRACT
+      const teamMembers = validMembers.map((member: any) => {
         // === EFICIENCIA SCORE (0-100) ===
         const r = member.hrs_obj > 0 ? member.hrs_real / member.hrs_obj : null;
         const score_ef = r !== null ? 
