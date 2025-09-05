@@ -1,0 +1,54 @@
+s la pestaña Ingresos tiene que ser el “numerador limpio” para comparar contra Costos y calcular Markup, Margen y Ganancia. Te dejo el diseño mínimo, bien simple y robusto.
+Qué muestra (UI)
+Filtros: Cliente, Proyecto, month_key (YYYY-MM).
+Card única: Ingresos Totales (USD) del período filtrado.
+Tabla “Ingresos por Proyecto” (granularidad proyecto-mes):
+Proyecto | Cliente | Mes (YYYY-MM) | Tipo (Fee/T&M) | Ingresos_USD | Notas
+(Nada más. Las comparaciones con costos se hacen en las otras pestañas.)
+Data contract (lo mínimo para que todo cuadre)
+Tabla sales (o vista ingresos):
+project_id (FK)
+client_id (FK)
+month_key TEXT ‘YYYY-MM’ ← clave de unión con costos
+revenue_type ENUM('fee','tm','ajuste') (opcional, útil para mix)
+amount_usd NUMERIC(14,2) ← obligatorio
+confirmed BOOL (true/false; opcional)
+notes TEXT (opcional)
+Restricción: UNIQUE(project_id, month_key, revenue_type)
+(si no usás revenue_type, entonces UNIQUE(project_id, month_key)).
+ETL desde tu sheet Ventas: parseo de moneda locale-safe, y month_key desde Mes/Año.
+Cómo habilita las comparaciones (JOIN con Costos)
+Costos agregados por proyecto-mes (vista costos_pm):
+SELECT project_id, month_key, SUM(monto_total_usd) AS cost_usd
+FROM direct_costs
+GROUP BY 1,2;
+Comparativos (vista ingresos_vs_costos):
+WITH ing AS (
+  SELECT project_id, month_key, SUM(amount_usd) AS rev_usd
+  FROM sales
+  WHERE COALESCE(confirmed, TRUE)  -- si usás “Confirmado”
+  GROUP BY 1,2
+)
+SELECT
+  i.project_id,
+  i.month_key,
+  i.rev_usd,
+  COALESCE(c.cost_usd,0) AS cost_usd,
+  CASE WHEN COALESCE(c.cost_usd,0)>0 THEN i.rev_usd/c.cost_usd END AS markup,
+  (i.rev_usd - COALESCE(c.cost_usd,0))               AS ganancia_usd,
+  CASE WHEN i.rev_usd>0 THEN (i.rev_usd-COALESCE(c.cost_usd,0))/i.rev_usd END AS margen_pct
+FROM ing i
+LEFT JOIN costos_pm c USING(project_id, month_key);
+Validaciones mínimas (para no repetir el error de $1.624,54)
+Moneda: eliminar $ y puntos de miles, cambiar , por . antes de convertir.
+Si el texto tiene miles y amount_usd < 10 → rechazar y loggear.
+month_key siempre YYYY-MM (no “Julio/Agosto”).
+Duplicados: bloquear violación de UNIQUE.
+amount_usd ≥ 0.
+Checklist rápido
+ Crear/usar sales con los campos arriba.
+ Generar month_key en el ETL desde Excel.
+ Mantener direct_costs con la misma clave (project_id, month_key).
+ Exponer en la pestaña Ingresos: una tabla simple + total.
+ Usar la vista ingresos_vs_costos en Dashboard/Financiero para Markup, Margen y Ganancia.
+Con esto, Ingresos queda minimalista pero 100% funcional como fuente para todos los comparativos financieros. Si querés, te paso los headers exactos para tu sheet Ventas y la función de parseo que ya usamos para evitar errores de locale.

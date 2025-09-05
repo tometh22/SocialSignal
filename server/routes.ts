@@ -11204,5 +11204,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== INCOME DASHBOARD ====================
+  app.get("/api/income-dashboard", requireAuth, async (req, res) => {
+    try {
+      console.log("📊 INCOME DASHBOARD API called");
+      
+      const { projectId, clientName, projectName, monthKey } = req.query;
+      
+      // Build WHERE conditions
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramCount = 1;
+      
+      if (projectId) {
+        console.log(`🎯 Filtering by projectId: ${projectId}`);
+        // We'll need to add project filtering logic here when needed
+      }
+      
+      if (clientName) {
+        conditions.push(`gs.client_name = $${paramCount++}`);
+        params.push(clientName);
+      }
+      
+      if (projectName) {
+        conditions.push(`gs.project_name = $${paramCount++}`);
+        params.push(projectName);
+      }
+      
+      if (monthKey) {
+        conditions.push(`gs.month_key = $${paramCount++}`);
+        params.push(monthKey);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      
+      const query = `
+        SELECT 
+          gs.id,
+          gs.project_name as "projectName",
+          gs.client_name as "clientName", 
+          gs.month_key as "monthKey",
+          gs.revenue_type as "revenueType",
+          COALESCE(gs.amount_usd, 0) as "amountUsd",
+          gs.status,
+          gs.confirmed,
+          gs.notes
+        FROM google_sheets_sales gs
+        ${whereClause}
+        ORDER BY gs.month_key DESC, gs.client_name, gs.project_name
+      `;
+      
+      console.log(`📊 Query: ${query}`);
+      console.log(`📊 Params: ${JSON.stringify(params)}`);
+      
+      const result = await storage.db.execute(query, params);
+      
+      console.log(`📊 Found ${result.rows.length} income records`);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("❌ Error in income dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch income data" });
+    }
+  });
+
   return httpServer;
 }

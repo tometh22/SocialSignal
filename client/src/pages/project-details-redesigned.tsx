@@ -73,6 +73,7 @@ import { TeamDeviationAnalysis } from "@/components/advanced-analytics/team-devi
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { EconomicRankings } from "@/components/EconomicRankings";
 import TimeTracking from "@/components/TimeTracking";
+import IncomeDashboard from "@/components/IncomeDashboard";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
@@ -3205,17 +3206,7 @@ const ProjectDetailsPage = () => {
 
 
           <TabsContent value="income-details" className="space-y-6">
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="bg-green-600 p-2 rounded-lg">
-                  <FileSpreadsheet className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-green-900">Ingresos Reales Detallados</h2>
-                  <p className="text-green-700">Registros mensuales de ventas importados desde Excel MAESTRO</p>
-                </div>
-              </div>
-            </div>
+            <IncomeDashboard projectId={unifiedData?.project?.id} />
           </TabsContent>
 
 
