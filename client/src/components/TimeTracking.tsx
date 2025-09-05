@@ -121,7 +121,8 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
   // Función para obtener estado del miembro
   const getMemberStatus = (porcentaje: number) => {
-    if (porcentaje >= 100) return { status: 'exceso', color: 'red', icon: AlertTriangle };
+    if (porcentaje > 100) return { status: 'exceso', color: 'red', icon: AlertTriangle };
+    if (porcentaje === 100) return { status: 'perfecto', color: 'emerald', icon: CheckCircle };
     if (porcentaje >= 85) return { status: 'riesgo', color: 'amber', icon: Clock };
     if (porcentaje >= 70) return { status: 'bien', color: 'emerald', icon: CheckCircle };
     return { status: 'bajo', color: 'blue', icon: Info };
@@ -390,9 +391,14 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                                 {miembro.estado === 'parcial' && '⏳ Parcial'}
                                 {miembro.estado === 'sin_registro' && '❌ Sin registro'}
                               </Badge>
-                              {miembro.porcentaje_progreso >= 100 && (
+                              {miembro.porcentaje_progreso > 100 && (
                                 <Badge className="bg-red-500 text-white">
                                   🚨 Exceso tiempo
+                                </Badge>
+                              )}
+                              {miembro.porcentaje_progreso === 100 && (
+                                <Badge className="bg-emerald-500 text-white">
+                                  ✅ Objetivo cumplido
                                 </Badge>
                               )}
                             </div>
