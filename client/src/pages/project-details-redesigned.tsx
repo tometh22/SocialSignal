@@ -1724,7 +1724,7 @@ const ProjectDetailsPage = () => {
                       <div className="text-sm text-slate-300 mb-1">Markup del Proyecto</div>
                       <div className={`text-2xl font-bold ${(() => {
                         const markup = unifiedData?.metrics?.markup || 0;
-                        return markup >= 3 ? "text-green-400" : markup >= 2 ? "text-blue-400" : markup >= 1.5 ? "text-yellow-400" : "text-red-400";
+                        return markup >= 3 ? "text-green-400" : markup >= 2.5 ? "text-blue-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
                       })()}`}>
                         {(() => {
                           const markup = unifiedData?.metrics?.markup || 0;
