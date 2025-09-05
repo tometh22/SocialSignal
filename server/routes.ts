@@ -10664,6 +10664,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== PERFORMANCE RANKINGS SEGÚN DATA CONTRACT ====================
+  // Implementa Eficiencia, Impacto y Unificado con fórmulas exactas del documento
+  app.get('/api/projects/:projectId/performance-rankings', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const timeFilter = req.query.timeFilter as string || 'august_2025';
+      
+      console.log(`🏆 PERFORMANCE RANKINGS - Project: ${projectId}, Filter: ${timeFilter}`);
+      
+      // Helper para parsear filtros temporales
+      const parseTimeFilter = (filter: string) => {
+        switch (filter) {
+          case 'august_2025': return '2025-08';
+          case 'may_2025': return '2025-05';
+          case 'june_2025': return '2025-06';
+          case 'july_2025': return '2025-07';
+          default: return '2025-08';
+        }
+      };
+      
+      const monthKey = parseTimeFilter(timeFilter);
+      console.log(`🏆 Filtering by month_key: ${monthKey}`);
+      
+      // 1. BASE DATA - Costos directos del Excel MAESTRO
+      const allDirectCosts = await storage.getDirectCosts();
+      const filteredCosts = allDirectCosts.filter(cost => 
+        cost.projectId === projectId && cost.monthKey === monthKey
+      );
+      
+      console.log(`🏆 Found ${filteredCosts.length} cost records for performance calculation`);
+      
+      // 2. AGREGACIÓN POR PERSONA - según data contract
+      const baseData = filteredCosts.reduce((acc, row) => {
+        const persona = row.persona;
+        if (!acc[persona]) {
+          acc[persona] = {
+            persona,
+            hrs_obj: 0,
+            hrs_real: 0,
+            hrs_fact: 0,  // horas_para_facturacion para cálculo de impacto
+            cost_usd: 0
+          };
+        }
+        
+        acc[persona].hrs_obj += row.horasObjetivo || 0;
+        acc[persona].hrs_real += Number(row.horasRealesAsana) || 0;
+        acc[persona].hrs_fact += Number(row.horasParaFacturacion) || 0;
+        acc[persona].cost_usd += row.montoTotalUSD || 0;
+        
+        return acc;
+      }, {});
+      
+      // 3. OBTENER INGRESOS DEL PROYECTO (para cálculo de Impacto)
+      const allSales = await storage.getUnifiedExcelSales();
+      const projectSales = allSales.filter(sale => 
+        sale.projectId === projectId && sale.monthKey === monthKey
+      );
+      
+      const ingresos_proyecto_usd = projectSales.reduce((sum, sale) => 
+        sum + (sale.montoUsd || 0), 0
+      );
+      
+      console.log(`🏆 Project income for period: $${ingresos_proyecto_usd}`);
+      
+      // 4. CÁLCULO DE SCORES SEGÚN FÓRMULAS DEL DATA CONTRACT
+      const teamMembers = Object.values(baseData).map((member: any) => {
+        // === EFICIENCIA SCORE (0-100) ===
+        const r = member.hrs_obj > 0 ? member.hrs_real / member.hrs_obj : null;
+        const score_ef = r !== null ? 
+          Math.max(0, Math.min(100, 100 - Math.abs(r - 1) * 100)) : 70; // 70 = neutro sin objetivo
+        
+        // === IMPACTO SCORE (puntos económicos) ===
+        // Participación económica: repartir ingresos por horas facturadas
+        const total_hrs_fact = Object.values(baseData).reduce((sum: number, m: any) => 
+          sum + (m.hrs_fact || 0), 0
+        );
+        
+        const ingresos_i = total_hrs_fact > 0 && ingresos_proyecto_usd > 0 ? 
+          ingresos_proyecto_usd * (member.hrs_fact / total_hrs_fact) : 0;
+        
+        const econ_share_pct = ingresos_proyecto_usd > 0 ? 
+          100 * ingresos_i / ingresos_proyecto_usd : 0;
+        
+        const score_imp = Math.round((score_ef / 100.0) * econ_share_pct * 10) / 10;
+        
+        // === UNIFICADO SCORE (0-100) ===
+        const w_ef = 0.5;  // 50% Eficiencia
+        const w_imp = 0.5; // 50% Impacto (escalado a 0-100)
+        const score_uni = Math.round(
+          w_ef * score_ef + w_imp * (score_imp * 100 / 30) * 10
+        ) / 10;
+        
+        // === CLASIFICACIONES ===
+        const getEficienciaClass = (score) => {
+          if (score >= 70) return { label: 'Excelente', color: 'green' };
+          if (score >= 50) return { label: 'Bueno', color: 'yellow' };
+          return { label: 'Crítico', color: 'red' };
+        };
+        
+        const getImpactoClass = (score) => {
+          if (score >= 15) return { label: 'Excelente', color: 'green' };
+          if (score >= 8) return { label: 'Bueno', color: 'yellow' };
+          return { label: 'Crítico', color: 'red' };
+        };
+        
+        const getUnificadoClass = (score) => {
+          if (score >= 70) return { label: 'Excelente', color: 'green' };
+          if (score >= 50) return { label: 'Bueno', color: 'yellow' };
+          return { label: 'Crítico', color: 'red' };
+        };
+        
+        return {
+          persona: member.persona,
+          
+          // Datos base
+          horas: {
+            objetivo: member.hrs_obj,
+            real: member.hrs_real,
+            facturacion: member.hrs_fact,
+            ratio: r,
+            diferencia: member.hrs_real - member.hrs_obj
+          },
+          
+          economia: {
+            costo_usd: member.cost_usd,
+            ingresos_asignados: ingresos_i,
+            participacion_pct: econ_share_pct
+          },
+          
+          // Scores principales
+          eficiencia: {
+            score: Math.round(score_ef * 10) / 10,
+            clasificacion: getEficienciaClass(score_ef),
+            display: r !== null ? `${member.hrs_real}h / ${member.hrs_obj}h | ${Math.round((r - 1) * 100)}%` : 'Sin objetivo'
+          },
+          
+          impacto: {
+            score: score_imp,
+            clasificacion: getImpactoClass(score_imp),
+            display: `${score_imp} pts | ${Math.round(econ_share_pct)}%`
+          },
+          
+          unificado: {
+            score: score_uni,
+            clasificacion: getUnificadoClass(score_uni),
+            display: `${score_uni} pts`
+          }
+        };
+      });
+      
+      // 5. ORDENAMIENTO POR SCORE UNIFICADO (default)
+      teamMembers.sort((a, b) => b.unificado.score - a.unificado.score);
+      
+      // 6. VALIDACIONES SEGÚN DATA CONTRACT
+      const validations = {
+        participacionTotal: Math.round(
+          teamMembers.reduce((sum, m) => sum + m.economia.participacion_pct, 0) * 10
+        ) / 10,
+        datosCompletos: teamMembers.filter(m => 
+          m.horas.objetivo > 0 && m.horas.facturacion > 0
+        ).length,
+        sinObjetivo: teamMembers.filter(m => m.horas.objetivo === 0).length,
+        sinIngresos: ingresos_proyecto_usd === 0
+      };
+      
+      const result = {
+        projectId,
+        timeFilter,
+        monthKey,
+        
+        // Configuración actual (para UI)
+        configuracion: {
+          balance_eficiencia: 50,
+          balance_impacto: 50,
+          modo_impacto: 'ingresos', // vs 'margen'
+          reparto_fee: 'hrs_fact'   // vs 'hrs_real'
+        },
+        
+        // Métricas del proyecto
+        proyecto: {
+          ingresos_periodo: ingresos_proyecto_usd,
+          miembros_activos: teamMembers.filter(m => m.horas.real > 0).length,
+          horas_totales: teamMembers.reduce((sum, m) => sum + m.horas.real, 0),
+          participacion_reconciliada: Math.abs(validations.participacionTotal - 100) < 0.5
+        },
+        
+        // Rankings detallados
+        rankings: teamMembers,
+        
+        // Validaciones del data contract
+        validaciones: validations,
+        
+        generatedAt: new Date().toISOString()
+      };
+      
+      console.log(`🏆 PERFORMANCE RANKINGS RESULT: ${teamMembers.length} members, avg unified: ${
+        Math.round(teamMembers.reduce((sum, m) => sum + m.unificado.score, 0) / teamMembers.length * 10) / 10
+      }`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error("❌ Error in performance rankings:", error);
+      res.status(500).json({ message: "Performance rankings failed", error: error.message });
+    }
+  });
+
   // ==================== ENDPOINT TEMPORAL DE DIAGNÓSTICO ====================
   
   // Endpoint de diagnóstico para verificar costos directos específicos

@@ -1,0 +1,120 @@
+Vamos con Performance! La idea es que esta pestaña ranquee a cada miembro con tres scores: Eficiencia, Impacto y Unificado, exactamente como en tu mock. Acá tenés el data-contract, las fórmulas y las reglas para que quede 100% reconciliado con el Excel.
+Data contract (inputs mínimos)
+Desde Hoja “Costos” (tu Excel MAESTRO):
+persona, rol (opcional pero útil)
+cliente, proyecto, nro_proyecto
+año, mes → normalizar a month_key = YYYY-MM
+horas_objetivo (K)
+horas_reales_asana (L)
+horas_para_facturacion (M) ⟵ imprescindible para Performance
+valor_hora_ars (N), cotizacion_fx (Q)
+monto_total_usd (R) (o calc: L * N / Q)
+Desde “Sales/Contratos” (otra hoja o tabla):
+project_id, month_key, ingresos_usd, tipo_contrato (fee | T&M)
+Desde “Rates” (solo para T&M):
+client_id | rol, rate_usd, vigencia_desde/hasta
+Cálculos por persona (por project_id, month_key)
+hrs_obj   = SUM(horas_objetivo)
+hrs_real  = SUM(horas_reales_asana)
+hrs_fact  = SUM(horas_para_facturacion)
+cost_usd  = SUM(monto_total_usd)
+1) Eficiencia (score 0–100)
+Concepto: cumplimiento del plan individual penalizando tanto sobre como subutilización.
+r = CASE WHEN hrs_obj > 0 THEN hrs_real / hrs_obj ELSE NULL END
+score_ef = 
+  CASE 
+    WHEN r IS NULL THEN 70            -- sin objetivo → score neutro
+    ELSE GREATEST(0, LEAST(100, 100 - ABS(r - 1)*100))
+  END
+r=1 → 100 pts; r=0.95 u 1.05 → 95 pts; r=0.7 o 1.3 → 70 pts.
+Lo que se muestra en la card: "<hrs_real>h / <hrs_obj>h | <Δ%>".
+2) Impacto (score en “puntos”, escala típica 0–30)
+Concepto del mock: “Eficiencia ponderada por valor económico”
+Fórmula que reproduce ejemplos como 24.7 = 95 × 26%:
+Participación económica (econ_share_pct)
+Fee: repartir ingresos por horas facturadas:
+ingresos_i = ingresos_proyecto_usd * (hrs_fact_i / SUM(hrs_fact))
+T&M: ingresos_i = hrs_fact_i * rate_usd(rol)
+Margen_i (opcional): ingresos_i - cost_usd_i
+Si querés ponderar por margen en vez de ingresos: usar max(margen_i,0).
+econ_share_pct = 100 * ingresos_i / SUM(ingresos_i) (o del margen si elegís margen)
+Score Impacto (puntos)
+score_imp = ROUND( (score_ef/100.0) * econ_share_pct , 1 )
+Con participaciones típicas de 10–35% vas a ver rangos de 10–30 puntos, que calzan con los umbrales del mock.
+Umbrales sugeridos (como en tu UI)
+Excelente: ≥ 15 puntos
+Bueno: 8 – 14
+Crítico: < 8
+3) Unificado (score 0–100 configurable)
+Balance configurable (default 50% Eficiencia + 50% Impacto):
+w_ef = 0.5
+w_imp = 0.5
+score_uni = ROUND( w_ef*score_ef + w_imp*(score_imp), 1 )
+Si preferís que el unificado quede en 0–100 “duro”, escalá score_imp a 0–100:
+score_uni = 0.5*score_ef + 0.5*(score_imp*100/30) y ajustá umbrales.
+Interpretación y etiquetas (UI)
+Eficiencia
+Excelente: ≥ 70
+Bueno: 50–69
+Crítico: < 50
+Impacto (puntos)
+Excelente: ≥ 15
+Bueno: 8–14
+Crítico: < 8
+Unificado (si queda 0–100)
+Excelente: ≥ 70
+Bueno: 50–69
+Crítico: < 50
+SQL de referencia (esqueleto)
+WITH base AS (
+  SELECT project_id, month_key, persona, rol,
+         SUM(horas_objetivo) AS hrs_obj,
+         SUM(horas_reales_asana) AS hrs_real,
+         SUM(horas_para_facturacion) AS hrs_fact,
+         SUM(monto_total_usd) AS cost_usd
+  FROM direct_costs
+  WHERE project_id=:project_id AND month_key=:month_key
+  GROUP BY 1,2,3,4
+),
+ingresos AS (
+  SELECT project_id, month_key, SUM(ingresos_usd) AS ingresos_usd
+  FROM sales
+  WHERE project_id=:project_id AND month_key=:month_key
+  GROUP BY 1,2
+),
+ingresos_persona AS (
+  -- Fee: prorrateo por horas facturadas
+  SELECT b.project_id, b.month_key, b.persona,
+         CASE 
+           WHEN i.ingresos_usd IS NULL THEN 0
+           WHEN SUM(b.hrs_fact) OVER (PARTITION BY b.project_id,b.month_key)=0 THEN 0
+           ELSE i.ingresos_usd * b.hrs_fact
+              / SUM(b.hrs_fact) OVER (PARTITION BY b.project_id,b.month_key)
+         END AS ingresos_i
+  FROM base b
+  LEFT JOIN ingresos i USING(project_id, month_key)
+),
+sum_ing AS (
+  SELECT project_id, month_key, SUM(ingresos_i) AS ingresos_tot
+  FROM ingresos_persona GROUP BY 1,2
+)
+SELECT b.persona, b.rol, b.hrs_real, b.hrs_obj, b.cost_usd,
+       CASE WHEN b.hrs_obj>0 THEN b.hrs_real/b.hrs_obj ELSE NULL END AS r,
+       GREATEST(0, LEAST(100, 100 - ABS(COALESCE(b.hrs_real/b.hrs_obj,1)-1)*100)) AS score_ef,
+       100.0 * ip.ingresos_i / NULLIF(si.ingresos_tot,0) AS econ_share_pct,
+       ROUND( (GREATEST(0, LEAST(100, 100 - ABS(COALESCE(b.hrs_real/b.hrs_obj,1)-1)*100))/100.0)
+              * (100.0 * ip.ingresos_i / NULLIF(si.ingresos_tot,0)), 1) AS score_imp
+FROM base b
+LEFT JOIN ingresos_persona ip USING(project_id, month_key, persona)
+LEFT JOIN sum_ing si USING(project_id, month_key);
+Para T&M, reemplazá ingresos_i por hrs_fact * rate_usd(rol) (JOIN a rates por rol/cliente y vigencia).
+Validaciones anti-errores (clave)
+Locale moneda ya solucionado: si monto_total_usd < 10 y el string tenía miles “.” → levantar error.
+SUM(econ_share_pct) ≈ 100% (±0.5). Si no, revisar horas_fact o ingresos.
+Si hrs_obj = 0 → mostrar score_ef = 70 (neutro) y badge “sin objetivo”.
+Si ingresos_usd = 0 → score_imp = 0 y tooltip “sin ingresos asignables”.
+Configuración en UI
+Balance del Unificado (slider 0–100).
+Modo Impacto: Ingresos o Margen.
+Umbrales: editar rangos de Excelente/Bueno/Crítico.
+Modo reparto Fee: por hrs_fact (default) o hrs_real (fallback si M no existe).

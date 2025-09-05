@@ -3,105 +3,115 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings } from "lucide-react";
-import { RankingType, PersonnelMetrics, RANKING_CONFIG } from "@shared/ranking-config";
-import { sortByRankingType, calculateTeamRankings, getPerformanceColor } from "@shared/ranking-utils";
-import { useState, useMemo } from "react";
+import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 interface EconomicRankingsProps {
-  rankings: PersonnelMetrics[];
+  projectId: number;
+  timeFilter?: string;
   loading?: boolean;
-  projectTotalPrice?: number; // Necesario para recalcular rankings dinámicamente
-  timeFilter?: string; // Para identificar el período seleccionado
 }
 
 export function EconomicRankings({ 
-  rankings, 
-  loading = false, 
-  projectTotalPrice = 100000, 
-  timeFilter = 'current_month'
+  projectId,
+  timeFilter = 'august_2025',
+  loading = false
 }: EconomicRankingsProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [impactWeight, setImpactWeight] = useState(50); // Por defecto 50% impacto, 50% eficiencia
+
+  // Fetch performance rankings data
+  const { data: performanceData, isLoading, error } = useQuery({
+    queryKey: ['/api/projects', projectId, 'performance-rankings', timeFilter],
+    queryFn: async () => {
+      const response = await fetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${timeFilter}`);
+      if (!response.ok) throw new Error('Failed to fetch performance rankings');
+      return response.json();
+    },
+    enabled: !!projectId
+  });
   
-  // Helper function to get score label based on type-specific thresholds
-  const getScoreLabel = (score: number, type: RankingType): string => {
-    const thresholds = RANKING_CONFIG.thresholds[type];
-    if (score >= thresholds.excellent) return 'Excelente';
-    if (score >= thresholds.good) return 'Bueno';
-    return 'Crítico';
-  };
+  // Consolidate loading state
+  const isLoadingData = loading || isLoading;
   
-  // Recalcular rankings dinámicamente cuando cambia el slider
-  const dynamicRankings = useMemo(() => {
-    if (!rankings || rankings.length === 0) return [];
+  // Get team members from API response
+  const teamMembers = performanceData?.rankings || [];
+  const validaciones = performanceData?.validaciones || {};
+  const configuracion = performanceData?.configuracion || {};
+  
+  // Helper function to get performance badge color
+  const getPerformanceBadgeColor = (clasificacion: any) => {
+    if (!clasificacion) return 'bg-gray-100 text-gray-800';
     
-    // Crear datos base para recalcular
-    const teamData = rankings.map(member => ({
-      personnelId: member.personnelId,
-      name: member.personnelName,
-      personnelName: member.personnelName,
-      estimatedHours: member.estimatedHours,
-      actualHours: member.actualHours,
-      estimatedCost: member.estimatedCost,
-      actualCost: member.actualCost
-    }));
-    
-    // Usar la nueva configuración de peso
-    const customConfig = {
-      impact: impactWeight / 100,
-      efficiency: (100 - impactWeight) / 100
-    };
-    
-    try {
-      // Recalcular con nueva configuración
-      return calculateTeamRankings(teamData, projectTotalPrice, customConfig);
-    } catch (error) {
-      console.warn('Error recalculando rankings:', error);
-      return rankings; // Fallback a rankings originales
+    switch(clasificacion.color) {
+      case 'green': return 'bg-green-100 text-green-800 border-green-200';
+      case 'yellow': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'red': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800';
     }
-  }, [rankings, impactWeight, projectTotalPrice]);
-  if (loading) {
+  };
+  if (isLoadingData) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" />
-            Rankings Económicos
+            <Trophy className="w-5 h-5" />
+            Performance Rankings - Vista Completa
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-sm text-gray-500 mt-2">Calculando rankings...</p>
+            <p className="text-sm text-gray-500 mt-2">Calculando rankings de performance...</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  if (!rankings || rankings.length === 0) {
+  if (error) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" />
-            Rankings Económicos
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            Error en Rankings
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <p className="text-gray-500">No hay datos suficientes para calcular rankings</p>
+            <p className="text-red-500">Error cargando datos de performance</p>
+            <p className="text-sm text-gray-500 mt-1">{error.message}</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Preparar los tres rankings diferentes usando rankings dinámicos
-  const efficiencyRanking = sortByRankingType(dynamicRankings, 'efficiency');
-  const impactRanking = sortByRankingType(dynamicRankings, 'impact');
-  const unifiedRanking = sortByRankingType(dynamicRankings, 'unified');
+  if (!teamMembers || teamMembers.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="w-5 h-5" />
+            Performance Rankings - Vista Completa
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-gray-500">No hay datos suficientes para calcular rankings de performance</p>
+            <p className="text-sm text-gray-400 mt-1">Período: {timeFilter}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Preparar los tres rankings diferentes usando los datos del nuevo API
+  const efficiencyRanking = [...teamMembers].sort((a, b) => b.eficiencia.score - a.eficiencia.score);
+  const impactRanking = [...teamMembers].sort((a, b) => b.impacto.score - a.impacto.score);
+  const unifiedRanking = [...teamMembers].sort((a, b) => b.unificado.score - a.unificado.score);
   
   // Función para obtener la configuración actual
   const getCurrentConfig = () => {
@@ -118,11 +128,18 @@ export function EconomicRankings({
     return <span className="w-4 h-4 flex items-center justify-center text-xs font-medium text-gray-500">#{rank}</span>;
   };
 
-  const getScoreBadge = (score: number, type: RankingType) => {
-    const thresholds = RANKING_CONFIG.thresholds[type];
-    if (score >= thresholds.excellent) return 'bg-green-100 text-green-800 border-green-200';
-    if (score >= thresholds.good) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    return 'bg-red-100 text-red-800 border-red-200';
+  // Función para obtener tooltip según tipo de métrica
+  const getMetricTooltip = (type: string) => {
+    switch (type) {
+      case 'efficiency':
+        return "Eficiencia individual: cumplimiento del plan (hrs_real/hrs_objetivo). Score 70-100 = Excelente, 50-69 = Bueno, <50 = Crítico. Sin objetivo = 70 pts (neutro).";
+      case 'impact':
+        return "Impacto económico: eficiencia ponderada por participación en ingresos del proyecto. Rango típico 8-30 puntos. ≥15 = Excelente, 8-14 = Bueno, <8 = Crítico.";
+      case 'unified':
+        return "Score unificado: 50% Eficiencia + 50% Impacto (escalado). Balance configurable entre cumplimiento individual y valor económico del equipo.";
+      default:
+        return "";
+    }
   };
 
   const getTooltipContent = (type: string) => {
@@ -138,26 +155,23 @@ export function EconomicRankings({
     }
   };
 
-  const RankingColumn = ({ 
+  // Nuevo componente para las columnas usando la estructura del nuevo API
+  const NewRankingColumn = ({ 
     title, 
     description, 
     rankings, 
-    scoreKey, 
-    rankKey, 
+    metricType,
     icon: IconComponent,
     color,
-    tooltipType,
-    rankingType = 'efficiency'
+    tooltipType
   }: { 
     title: string; 
     description: string; 
-    rankings: PersonnelMetrics[]; 
-    scoreKey: keyof PersonnelMetrics; 
-    rankKey: keyof PersonnelMetrics;
+    rankings: any[]; 
+    metricType: 'eficiencia' | 'impacto' | 'unificado';
     icon: any;
     color: string;
     tooltipType: string;
-    rankingType?: RankingType;
   }) => (
     <div className="flex-1">
       <div className={`p-4 rounded-lg ${color} mb-4`}>
@@ -170,7 +184,7 @@ export function EconomicRankings({
                 <Info className="w-4 h-4 text-gray-400 hover:text-gray-600" />
               </TooltipTrigger>
               <TooltipContent className="max-w-sm">
-                <p>{getTooltipContent(tooltipType)}</p>
+                <p>{getMetricTooltip(tooltipType)}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -179,15 +193,13 @@ export function EconomicRankings({
       </div>
       
       <div className="space-y-2">
-        {rankings.slice(0, 8).map((member) => {
-          const score = member[scoreKey] as number;
-          const rank = member[rankKey] as number;
-          // Obtener el nombre del miembro
-          const memberName = member.personnelName || `Miembro ${member.personnelId}`;
+        {rankings.slice(0, 8).map((member, index) => {
+          const metric = member[metricType];
+          const rank = index + 1;
           
           return (
             <div
-              key={`${scoreKey}-${member.personnelId}`}
+              key={`${metricType}-${member.persona}`}
               className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-3">
@@ -196,29 +208,29 @@ export function EconomicRankings({
                 </div>
                 
                 <div className="min-w-0 flex-1">
-                  <h4 className="font-medium text-gray-900 truncate">{memberName}</h4>
+                  <h4 className="font-medium text-gray-900 truncate">{member.persona}</h4>
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {member.actualHours.toFixed(0)}h / {member.estimatedHours.toFixed(0)}h
+                      {member.horas.real}h / {member.horas.objetivo}h
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
-                      {member.pricePercentage < 0.001 && member.pricePercentage > 0 
-                        ? (member.pricePercentage * 100).toFixed(3) + '%'
-                        : (member.pricePercentage * 100).toFixed(1) + '%'
-                      }
+                      {member.economia.participacion_pct.toFixed(1)}%
                     </span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {metric.display}
                   </div>
                 </div>
               </div>
 
               <div className="text-right">
                 <div className="font-bold text-lg text-gray-900">
-                  {score < 0.1 && score > 0 ? score.toFixed(3) : score.toFixed(1)}
+                  {metric.score}
                 </div>
-                <Badge variant="outline" className={getScoreBadge(score, rankingType)}>
-                  {getScoreLabel(score, rankingType)}
+                <Badge variant="outline" className={getPerformanceBadgeColor(metric.clasificacion)}>
+                  {metric.clasificacion.label}
                 </Badge>
               </div>
             </div>
@@ -368,42 +380,72 @@ export function EconomicRankings({
           </div>
         </div>
 
+        {/* Validaciones y alertas */}
+        {validaciones.sinIngresos && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="font-medium">Sin ingresos detectados para el período</span>
+            </div>
+            <p className="text-sm text-yellow-700 mt-1">
+              Los scores de Impacto serán cero. Verifica datos del período {timeFilter}.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <RankingColumn
+          <NewRankingColumn
             title="Eficiencia"
             description="Cumplimiento del plan individual"
             rankings={efficiencyRanking}
-            scoreKey="efficiencyScore"
-            rankKey="efficiencyRank"
+            metricType="eficiencia"
             icon={Target}
-            rankingType="efficiency"
             color="bg-blue-50 border border-blue-200"
             tooltipType="efficiency"
           />
           
-          <RankingColumn
+          <NewRankingColumn
             title="Impacto"
             description="Eficiencia ponderada por valor económico"
             rankings={impactRanking}
-            scoreKey="impactScore"
-            rankKey="impactRank"
+            metricType="impacto"
             icon={DollarSign}
-            rankingType="impact"
             color="bg-green-50 border border-green-200"
             tooltipType="impact"
           />
           
-          <RankingColumn
+          <NewRankingColumn
             title="Unificado"
             description="Balance entre eficiencia e impacto"
             rankings={unifiedRanking}
-            scoreKey="unifiedScore"
-            rankKey="unifiedRank"
-            icon={BarChart3}
-            rankingType="unified"
+            metricType="unificado"
+            icon={Trophy}
             color="bg-purple-50 border border-purple-200"
             tooltipType="unified"
           />
+        </div>
+
+        {/* Información de validación */}
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2">Información del período</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-gray-600">Miembros con datos:</span>
+              <div className="font-medium">{validaciones.datosCompletos || 0}</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Sin objetivo:</span>
+              <div className="font-medium">{validaciones.sinObjetivo || 0}</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Participación total:</span>
+              <div className="font-medium">{validaciones.participacionTotal}%</div>
+            </div>
+            <div>
+              <span className="text-gray-600">Período:</span>
+              <div className="font-medium">{timeFilter}</div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
