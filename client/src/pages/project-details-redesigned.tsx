@@ -4978,7 +4978,7 @@ const ProjectDetailsPage = () => {
                             <th className="text-left p-3 font-semibold text-slate-700">Año</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Monto ARS</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Costo Total USD</th>
-                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora USD</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Horas Reales</th>
                             <th className="text-center p-3 font-semibold text-slate-700">Tipo</th>
                           </tr>
@@ -4995,7 +4995,7 @@ const ProjectDetailsPage = () => {
                                 <td className="p-3 text-gray-700">{cost.año}</td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-800 font-semibold">
-                                    ${((cost.montoTotalUSD || 0) * (cost.tipoCambio || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    ${((cost.montoTotalUSD || 0) * (cost.tipoCambio || 1)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
@@ -5047,7 +5047,7 @@ const ProjectDetailsPage = () => {
                           </p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Valor Hora Promedio</p>
+                          <p className="text-sm text-gray-600">Valor Hora Promedio USD</p>
                           <p className="text-lg font-bold text-green-600">
                             ${(() => {
                               const costs = (unifiedData as any).directCosts || [];
