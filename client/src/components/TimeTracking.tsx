@@ -198,66 +198,79 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           </div>
         )}
 
-        {/* Cards superiores según data contract */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {/* Métricas principales */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {/* Total Registrado */}
-          <Card className={`border-l-4 ${
+          <Card className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
             cards.totalRegistrado.porcentajeRegistrado >= 100 
-              ? 'border-l-red-500 bg-gradient-to-br from-red-50 to-red-25'
+              ? 'bg-gradient-to-br from-red-50 to-red-100 border-t-4 border-t-red-500'
               : cards.totalRegistrado.porcentajeRegistrado >= 85
-                ? 'border-l-yellow-500 bg-gradient-to-br from-yellow-50 to-yellow-25'
+                ? 'bg-gradient-to-br from-amber-50 to-amber-100 border-t-4 border-t-amber-500'
                 : cards.totalRegistrado.porcentajeRegistrado >= 70
-                  ? 'border-l-green-500 bg-gradient-to-br from-green-50 to-green-25'
-                  : 'border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-25'
-          } shadow-sm hover:shadow-md transition-shadow`}>
+                  ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-t-4 border-t-emerald-500'
+                  : 'bg-gradient-to-br from-blue-50 to-blue-100 border-t-4 border-t-blue-500'
+          }`}>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className={`w-4 h-4 ${
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
                     cards.totalRegistrado.porcentajeRegistrado >= 100 
-                      ? 'text-red-600'
+                      ? 'bg-red-100'
                       : cards.totalRegistrado.porcentajeRegistrado >= 85
-                        ? 'text-yellow-600'
+                        ? 'bg-amber-100'
                         : cards.totalRegistrado.porcentajeRegistrado >= 70
-                          ? 'text-green-600'
-                          : 'text-blue-600'
-                  }`} />
-                  <span className="text-sm font-medium">Total Registrado</span>
+                          ? 'bg-emerald-100'
+                          : 'bg-blue-100'
+                  }`}>
+                    <BarChart3 className={`w-5 h-5 ${
+                      cards.totalRegistrado.porcentajeRegistrado >= 100 
+                        ? 'text-red-600'
+                        : cards.totalRegistrado.porcentajeRegistrado >= 85
+                          ? 'text-amber-600'
+                          : cards.totalRegistrado.porcentajeRegistrado >= 70
+                            ? 'text-emerald-600'
+                            : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Total Registrado</h3>
+                    <p className="text-xs text-gray-500">vs objetivo</p>
+                  </div>
                 </div>
                 {cards.totalRegistrado.porcentajeRegistrado >= 100 && (
-                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
                 )}
               </div>
-              <div className="space-y-2">
-                <div className={`text-2xl font-bold ${
+              <div className="space-y-3">
+                <div className={`text-3xl font-bold ${
                   cards.totalRegistrado.porcentajeRegistrado >= 100 
-                    ? 'text-red-700'
+                    ? 'text-red-600'
                     : cards.totalRegistrado.porcentajeRegistrado >= 85
-                      ? 'text-yellow-700'
+                      ? 'text-amber-600'
                       : cards.totalRegistrado.porcentajeRegistrado >= 70
-                        ? 'text-green-700'
-                        : 'text-blue-700'
+                        ? 'text-emerald-600'
+                        : 'text-blue-600'
                 }`}>
                   {cards.totalRegistrado.porcentajeRegistrado}%
                 </div>
-                <div className="text-xs text-gray-600">
-                  {cards.totalRegistrado.horasRegistradas}h / {cards.totalRegistrado.horasObjetivo}h
+                <div className="text-sm font-medium text-gray-700">
+                  {cards.totalRegistrado.horasRegistradas}h de {cards.totalRegistrado.horasObjetivo}h
                 </div>
                 <Progress 
                   value={Math.min(cards.totalRegistrado.porcentajeRegistrado, 100)} 
-                  className={`h-3 ${
+                  className={`h-2 bg-gray-200 ${
                     cards.totalRegistrado.porcentajeRegistrado >= 100 
                       ? '[&>div]:bg-red-500'
                       : cards.totalRegistrado.porcentajeRegistrado >= 85
-                        ? '[&>div]:bg-yellow-500'
+                        ? '[&>div]:bg-amber-500'
                         : cards.totalRegistrado.porcentajeRegistrado >= 70
-                          ? '[&>div]:bg-green-500'
+                          ? '[&>div]:bg-emerald-500'
                           : '[&>div]:bg-blue-500'
                   }`}
                 />
                 {cards.totalRegistrado.porcentajeRegistrado >= 100 && (
-                  <div className="text-xs text-red-600 font-medium">
-                    ⚠️ Exceso de {(cards.totalRegistrado.porcentajeRegistrado - 100).toFixed(1)}%
+                  <div className="text-xs text-red-600 font-semibold bg-red-50 px-2 py-1 rounded">
+                    ⚠️ Exceso: +{(cards.totalRegistrado.porcentajeRegistrado - 100).toFixed(1)}%
                   </div>
                 )}
               </div>
@@ -265,42 +278,54 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           </Card>
 
           {/* Miembros Activos */}
-          <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-green-25 shadow-sm hover:shadow-md transition-shadow">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-50 to-emerald-100 border-t-4 border-t-emerald-500">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-medium">Miembros Activos</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-100">
+                    <Users className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Miembros Activos</h3>
+                    <p className="text-xs text-gray-500">del equipo</p>
+                  </div>
                 </div>
-                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold">
                   {Math.round((cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100)}%
                 </Badge>
               </div>
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-green-700">
+              <div className="space-y-3">
+                <div className="text-3xl font-bold text-emerald-600">
                   {cards.miembrosActivos.activos}
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-sm font-medium text-gray-700">
                   de {cards.miembrosActivos.asignados} asignados
                 </div>
                 <Progress 
                   value={(cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100} 
-                  className="h-2 [&>div]:bg-green-500"
+                  className="h-2 bg-gray-200 [&>div]:bg-emerald-500"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Promedio Diario */}
-          <Card>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-purple-50 to-purple-100 border-t-4 border-t-purple-500">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium">Promedio Diario</span>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-100">
+                    <Calendar className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Promedio Diario</h3>
+                    <p className="text-xs text-gray-500">por miembro</p>
+                  </div>
+                </div>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
-                      <Info className="w-3 h-3 text-gray-400" />
+                      <Info className="w-4 h-4 text-gray-400 hover:text-gray-600" />
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Modo {configuracion.modoPromedio}: h_trab / (miembros_activos × días_transcurridos)</p>
@@ -308,29 +333,34 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">
+              <div className="space-y-3">
+                <div className="text-3xl font-bold text-purple-600">
                   {cards.promedioDiario.promedio}h
                 </div>
-                <div className="text-xs text-gray-600">
-                  por miembro ({configuracion.diasTranscurridos}d hábiles)
+                <div className="text-sm font-medium text-gray-700">
+                  en {configuracion.diasTranscurridos} días hábiles
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Horas Trabajadas */}
-          <Card>
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-50 to-orange-100 border-t-4 border-t-orange-500">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-orange-600" />
-                <span className="text-sm font-medium">Horas Trabajadas</span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <TrendingUp className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Horas Trabajadas</h3>
+                  <p className="text-xs text-gray-500">total del equipo</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">
+              <div className="space-y-3">
+                <div className="text-3xl font-bold text-orange-600">
                   {cards.horasTrabajadas.horas}
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-sm font-medium text-gray-700">
                   de {cards.horasTrabajadas.estimadas} estimadas
                 </div>
               </div>
@@ -338,18 +368,23 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           </Card>
 
           {/* Eficiencia de Tiempo */}
-          <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-indigo-50 to-indigo-100 border-t-4 border-t-indigo-500">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Gauge className="w-4 h-4 text-indigo-600" />
-                <span className="text-sm font-medium">Eficiencia Promedio</span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-indigo-100">
+                  <Gauge className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Eficiencia Promedio</h3>
+                  <p className="text-xs text-gray-500">del equipo</p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold text-indigo-700">
+              <div className="space-y-3">
+                <div className="text-3xl font-bold text-indigo-600">
                   {Math.round(miembros.reduce((acc, m) => acc + m.porcentaje_progreso, 0) / miembros.length || 0)}%
                 </div>
-                <div className="text-xs text-gray-600">
-                  promedio del equipo
+                <div className="text-sm font-medium text-gray-700">
+                  eficiencia general
                 </div>
               </div>
             </CardContent>
@@ -357,16 +392,22 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
         </div>
 
         {/* Panel de configuración */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-8 p-6 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-medium text-gray-900 flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Configuración de Tiempo
-            </h4>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Settings className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="text-lg font-semibold text-gray-900">Configuración de Tiempo</h4>
+                <p className="text-sm text-gray-500">Parámetros del análisis</p>
+              </div>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowConfig(!showConfig)}
+              className="bg-white hover:bg-gray-50 border-gray-300"
             >
               {showConfig ? 'Ocultar' : 'Configurar'}
             </Button>
@@ -401,15 +442,18 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
         </div>
 
         {/* Controles de lista */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Registro por Miembro</h3>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="sort-mode" className="text-sm">Ordenar por:</Label>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Registro por Miembro</h3>
+            <p className="text-sm text-gray-500 mt-1">{miembros.length} miembros del equipo</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Label htmlFor="sort-mode" className="text-sm font-medium text-gray-700">Ordenar por:</Label>
             <select
               id="sort-mode"
               value={sortMode}
               onChange={(e) => setSortMode(e.target.value as 'brecha' | 'porcentaje')}
-              className="px-3 py-1 border rounded text-sm"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="brecha">Brecha a objetivo</option>
               <option value="porcentaje">Porcentaje completado</option>
@@ -418,7 +462,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
         </div>
 
         {/* Lista de miembros */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {miembrosOrdenados.map((miembro, index) => {
             const isOverBudget = miembro.porcentaje_progreso >= 100;
             const isAtRisk = miembro.porcentaje_progreso >= 85 && miembro.porcentaje_progreso < 100;
@@ -428,15 +472,15 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             return (
               <div
                 key={`${miembro.persona}-${index}`}
-                className={`flex items-center justify-between p-4 border-l-4 rounded-lg transition-all hover:shadow-md ${
+                className={`flex items-center justify-between p-6 rounded-xl border transition-all hover:shadow-lg hover:scale-[1.02] duration-300 ${
                   isOverBudget 
-                    ? 'border-l-red-500 bg-gradient-to-r from-red-50 to-white border border-red-200'
+                    ? 'bg-gradient-to-r from-red-50 via-red-25 to-white border-red-200 shadow-red-100'
                     : isAtRisk
-                      ? 'border-l-yellow-500 bg-gradient-to-r from-yellow-50 to-white border border-yellow-200'
+                      ? 'bg-gradient-to-r from-amber-50 via-amber-25 to-white border-amber-200 shadow-amber-100'
                       : isOnTrack
-                        ? 'border-l-green-500 bg-gradient-to-r from-green-50 to-white border border-green-200'
-                        : 'border-l-blue-500 bg-gradient-to-r from-blue-50 to-white border border-blue-200'
-                }`}
+                        ? 'bg-gradient-to-r from-emerald-50 via-emerald-25 to-white border-emerald-200 shadow-emerald-100'
+                        : 'bg-gradient-to-r from-blue-50 via-blue-25 to-white border-blue-200 shadow-blue-100'
+                } shadow-lg`}
               >
                 <div className="flex items-center gap-4 flex-1">
                   <div className="flex items-center gap-3">
