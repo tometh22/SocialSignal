@@ -11275,7 +11275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 Query: ${query}`);
       console.log(`📊 Params: ${JSON.stringify(params)}`);
       
-      const result = await storage.db.execute(query, params);
+      const result = await db.execute(query, params);
       
       console.log(`📊 Found ${result.rows.length} income records`);
       
