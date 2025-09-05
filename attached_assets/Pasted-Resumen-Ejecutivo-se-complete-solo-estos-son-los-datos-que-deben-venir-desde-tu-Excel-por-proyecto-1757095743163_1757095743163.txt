@@ -1,0 +1,45 @@
+Resumen Ejecutivo se complete solo, estos son los datos que deben venir desde tu Excel (por proyecto/mes) y cómo se usan en cada card.
+Qué leer del Excel (hoja de costos)
+De tu hoja que vimos (A–R):
+Cliente (I), Proyecto (H), Nro Proyecto (F), Mes (C), Año (D), Tipo de costo (E), Persona (A)
+Horas objetivo (K)
+Horas reales Asana (L)
+Horas para facturación (M)
+Valor hora AR$ (N)
+Monto AR$ (O) (opcional si ya está)
+Cotización (Q)
+Monto Total USD (R)
+Importante: parsear moneda AR/ES ($1.624,54 → 1624.54) antes de sumar.
+Mapeo UI ↔ Excel (y fórmula)
+Rendimiento Financiero
+Ingresos Generados (USD) → no viene de esa hoja de costos. Traelo de una tabla Ventas Tomi (o nueva hoja) con fee_mensual_usd por proyecto/mes.
+Cost (USD) → SUM(R) filtrado por cliente/proyecto/mes.
+Total trabajado (h) → SUM(L) (Horas reales Asana) del período.
+% Presupuesto Usado → Cost / Ingresos.
+Multiplicador (Markup) → Ingresos / Cost.
+Resumen Ejecutivo
+Markup del Proyecto → Ingresos / Cost (mismo que arriba).
+ROI Performance → compara contra una base de proyección (tabla proyeccion_inicial: costo/ingreso esperado). Ej.: ((MargenReal - MargenBase)/MargenBase)*100.
+Velocidad del Equipo (h/sem) → SUM(L) / semanas_del_mes.
+Estado Presupuesto (restante) → 1 - (Cost/Ingresos).
+Rendimiento del Equipo
+Mejor rendimiento (persona + h) → persona con mayor SUM(L) en el mes.
+Velocidad equipo (promedio semanal) → idem “Velocidad del Equipo”.
+Carga por miembro → L por persona vs su capacidad (traer capacidad semanal por persona desde otra hoja “Capacidades”, o asumir 40h/sem).
+Performance
+Eficiencia (%) → SUM(M) / SUM(L) (horas facturadas / horas reales).
+Presupuesto (card)
+Usado → Cost = SUM(R)
+De → Presupuesto = fee_mensual_usd (tabla Contratos).
+Timeline del Proyecto
+Fechas hitos → no salen del Excel de costos. Cárgalas desde hoja “Proyectos” (start_date, go_live, etc.) o Asana.
+Puntuación de Calidad
+Métrica propia (NPS/QA/SLAs). No viene de costos. Si querés, puede calcularse con % on-time desde Asana.
+Mínimo que te pido en Excel para que todo cierre
+Costos (la hoja actual):
+cliente, proyecto, nro_proyecto, año, mes, persona, horas_objetivo(K), horas_reales(L), horas_facturadas(M), valor_hora_ars(N), cotizacion(Q), monto_usd(R)
+Contratos (nueva hoja):
+cliente, proyecto, año, mes, fee_mensual_usd, moneda_fee, start_date, end_date
+Capacidades (opcional):
+persona, horas_capacidad_semana
+Con eso, tu dashboard calcula todo lo que se ve en las capturas y queda totalmente reconciliado con Excel. Si querés, te armo un CSV/plantilla con los headers exactos.
