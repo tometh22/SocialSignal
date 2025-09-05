@@ -3189,7 +3189,7 @@ const ProjectDetailsPage = () => {
             {/* RANKINGS ECONÓMICOS - VISTA COMPLETA */}
             <div className="grid grid-cols-1 gap-6">
               <EconomicRankings 
-                projectId={projectId}
+                projectId={Number(projectId)}
                 timeFilter={timeFilterForHook}
                 loading={!unifiedData}
               />
