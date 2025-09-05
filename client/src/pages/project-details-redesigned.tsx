@@ -1891,20 +1891,37 @@ const ProjectDetailsPage = () => {
                     
                     {/* Team Efficiency Heatmap */}
                     <div className="space-y-2">
-                      <div className="text-sm font-medium text-gray-700">Distribución del equipo</div>
+                      <div className="text-sm font-medium text-gray-700">Carga de trabajo por miembro</div>
+                      <div className="text-xs text-gray-500 mb-2">Pasa el mouse sobre cada inicial para ver detalles</div>
                       <div className="grid grid-cols-6 gap-1">
                         {Object.values(unifiedData?.actuals?.teamBreakdown || {}).slice(0, 6).map((member: any, index) => (
-                          <div 
-                            key={index}
-                            className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium ${
-                              (member.hours || 0) > 80 ? 'bg-red-500' : 
-                              (member.hours || 0) > 50 ? 'bg-yellow-500' : 
-                              (member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
-                            }`}
-                            title={`${member.name}: ${member.hours || 0}h`}
-                          >
-                            {(member.name || '?').charAt(0)}
-                          </div>
+                          <Tooltip key={index}>
+                            <TooltipTrigger asChild>
+                              <div 
+                                className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help ${
+                                  (member.hours || 0) > 80 ? 'bg-red-500' : 
+                                  (member.hours || 0) > 50 ? 'bg-yellow-500' : 
+                                  (member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
+                                }`}
+                              >
+                                {(member.name || '?').charAt(0)}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs">
+                              <div className="space-y-1">
+                                <p className="font-semibold">{member.name}</p>
+                                <p className="text-xs">🕐 {member.hours || 0} horas trabajadas</p>
+                                <p className="text-xs">💰 ${(member.cost || 0).toLocaleString()} costo total</p>
+                                <p className="text-xs">
+                                  📊 Estado: {
+                                    (member.hours || 0) > 80 ? 'Sobrecarga' : 
+                                    (member.hours || 0) > 50 ? 'Intenso' : 
+                                    (member.hours || 0) > 20 ? 'Normal' : 'Bajo'
+                                  }
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         ))}
                       </div>
                       <div className="text-xs text-gray-500">Verde: Normal • Amarillo: Intenso • Rojo: Sobrecarga</div>
