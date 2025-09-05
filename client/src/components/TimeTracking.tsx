@@ -89,7 +89,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
   const [sortMode, setSortMode] = useState<'brecha' | 'costo'>('brecha');
 
   const { data: timeData, isLoading, error } = useQuery<TimeTrackingData>({
-    queryKey: ['/api/projects', projectId, 'time-tracking', timeFilter],
+    queryKey: [`/api/projects/${projectId}/time-tracking?timeFilter=${timeFilter}`, timeFilter],
     enabled: !!projectId
   });
 
