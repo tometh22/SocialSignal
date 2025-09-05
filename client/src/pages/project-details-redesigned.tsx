@@ -1715,13 +1715,13 @@ const ProjectDetailsPage = () => {
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                       <Gauge className="h-6 w-6" />
                     </div>
-                    Executive Summary
+                    Resumen Ejecutivo
                   </h2>
                   
                   <div className="grid grid-cols-2 gap-4">
                     {/* Project Health Score */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Project Health</div>
+                      <div className="text-sm text-slate-300 mb-1">Estado del Proyecto</div>
                       <div className="text-2xl font-bold text-green-400">
                         {(() => {
                           const efficiency = unifiedData?.metrics?.efficiency || 0;
@@ -1730,7 +1730,7 @@ const ProjectDetailsPage = () => {
                           return score > 75 ? "95%" : score > 50 ? "78%" : "62%";
                         })()}
                       </div>
-                      <div className="text-xs text-slate-400">Above industry avg</div>
+                      <div className="text-xs text-slate-400">Sobre promedio del sector</div>
                     </div>
 
                     {/* ROI Indicator */}
@@ -1742,7 +1742,7 @@ const ProjectDetailsPage = () => {
                           return markup > 2 ? "+185%" : markup > 1.5 ? "+145%" : "+89%";
                         })()}
                       </div>
-                      <div className="text-xs text-slate-400">vs initial projection</div>
+                      <div className="text-xs text-slate-400">vs proyección inicial</div>
                     </div>
 
                     {/* Team Performance */}
@@ -1751,7 +1751,7 @@ const ProjectDetailsPage = () => {
                       <div className="text-2xl font-bold text-purple-400">
                         {Math.round(unifiedData?.workedHours || 0 / 7)} h/sem
                       </div>
-                      <div className="text-xs text-slate-400">Sprint actual</div>
+                      <div className="text-xs text-slate-400">Período actual</div>
                     </div>
 
                     {/* Budget Status */}
