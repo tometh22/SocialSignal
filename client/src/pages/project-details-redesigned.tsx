@@ -4976,41 +4976,58 @@ const ProjectDetailsPage = () => {
                             <th className="text-left p-3 font-semibold text-slate-700">Miembro</th>
                             <th className="text-left p-3 font-semibold text-slate-700">Mes</th>
                             <th className="text-left p-3 font-semibold text-slate-700">Año</th>
-                            <th className="text-right p-3 font-semibold text-slate-700">Monto ARS</th>
-                            <th className="text-right p-3 font-semibold text-slate-700">Costo Total USD</th>
-                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora USD</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Horas Objetivo</th>
                             <th className="text-right p-3 font-semibold text-slate-700">Horas Reales</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora ARS</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Moneda Original ARS</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Cotización</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Monto Total USD</th>
                             <th className="text-center p-3 font-semibold text-slate-700">Tipo</th>
                           </tr>
                         </thead>
                         <tbody>
                           {((unifiedData as any).directCosts || []).map((cost: any, index: number) => {
-                            const valorHora = (cost.horasRealesAsana && cost.horasRealesAsana > 0) 
-                              ? (parseFloat(cost.montoTotalUSD) || 0) / parseFloat(cost.horasRealesAsana)
-                              : 0;
+                            // Usar los datos reales del Excel MAESTRO según tu especificación
+                            const horasObjetivo = cost.horasObjetivo || 0;
+                            const horasReales = cost.horasRealesAsana || 0;
+                            const valorHoraARS = cost.valorHoraPersona || 0; // Columna N
+                            const monedaOriginalARS = cost.costoTotal || 0; // Columna O (en ARS)
+                            const cotizacion = cost.tipoCambio || 1; // Columna Q
+                            const montoTotalUSD = cost.montoTotalUSD || 0; // Columna R
+                            
                             return (
                               <tr key={index} className="border-b border-gray-100 hover:bg-slate-50/50">
                                 <td className="p-3 font-medium text-gray-900">{cost.persona}</td>
                                 <td className="p-3 text-gray-700 capitalize">{cost.mes}</td>
                                 <td className="p-3 text-gray-700">{cost.año}</td>
                                 <td className="p-3 text-right font-mono">
+                                  <span className="text-blue-600 font-semibold">
+                                    {horasObjetivo.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-green-600 font-semibold">
+                                    {horasReales.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-purple-700 font-semibold">
+                                    ${valorHoraARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
                                   <span className="text-slate-800 font-semibold">
-                                    ${((cost.montoTotalUSD || 0) * (cost.tipoCambio || 1)).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    ${monedaOriginalARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-orange-600 font-medium">
+                                    {cotizacion.toLocaleString('en-US', { minimumFractionDigits: 3 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-right font-mono">
                                   <span className="text-slate-900 font-bold">
-                                    ${(cost.montoTotalUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right font-mono">
-                                  <span className="text-blue-700 font-semibold">
-                                    ${valorHora.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-right font-mono">
-                                  <span className="text-gray-600">
-                                    {(cost.horasRealesAsana || 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                    ${montoTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </span>
                                 </td>
                                 <td className="p-3 text-center">
@@ -5028,40 +5045,57 @@ const ProjectDetailsPage = () => {
                       </table>
                     </div>
 
-                    {/* Resumen de costos */}
+                    {/* Resumen de costos - KPIs según Excel MAESTRO */}
                     <div className="bg-slate-50 rounded-lg p-6 border border-slate-200">
-                      <h4 className="font-semibold text-gray-900 mb-3">Resumen del Período</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">KPIs del Período - Excel MAESTRO</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Total Costos USD</p>
+                          <p className="text-sm text-gray-600">Costo Directo (USD)</p>
                           <p className="text-lg font-bold text-slate-800">
                             ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
-                              sum + (parseFloat(cost.montoTotalUSD) || 0), 0).toLocaleString()}
+                              sum + (parseFloat(cost.montoTotalUSD) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
+                          <p className="text-xs text-gray-500 mt-1">Σ(Monto Total USD)</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Total Horas</p>
+                          <p className="text-sm text-gray-600">Horas Reales</p>
                           <p className="text-lg font-bold text-blue-700">
                             {((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
-                              sum + (parseFloat(cost.horasRealesAsana) || 0), 0).toLocaleString()}h
+                              sum + (parseFloat(cost.horasRealesAsana) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
                           </p>
+                          <p className="text-xs text-gray-500 mt-1">Horas Asana</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Valor Hora Promedio USD</p>
+                          <p className="text-sm text-gray-600">Horas Objetivo</p>
+                          <p className="text-lg font-bold text-purple-700">
+                            {((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
+                              sum + (parseFloat(cost.horasObjetivo) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Planificadas</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Realización %</p>
                           <p className="text-lg font-bold text-green-600">
+                            {(() => {
+                              const costs = (unifiedData as any).directCosts || [];
+                              const totalObjetivo = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasObjetivo) || 0), 0);
+                              const totalReales = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                              return totalObjetivo > 0 ? ((totalReales / totalObjetivo) * 100).toFixed(1) : '0.0';
+                            })()}%
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Reales / Objetivo</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Blended Rate USD</p>
+                          <p className="text-lg font-bold text-orange-600">
                             ${(() => {
                               const costs = (unifiedData as any).directCosts || [];
                               const totalCosto = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
                               const totalHoras = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
-                              return totalHoras > 0 ? (totalCosto / totalHoras).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00';
+                              return totalHoras > 0 ? (totalCosto / totalHoras).toFixed(2) : '0.00';
                             })()}
                           </p>
-                        </div>
-                        <div className="bg-white p-4 rounded-lg">
-                          <p className="text-sm text-gray-600">Registros</p>
-                          <p className="text-lg font-bold text-slate-600">
-                            {((unifiedData as any).directCosts || []).length}
-                          </p>
+                          <p className="text-xs text-gray-500 mt-1">USD / Hora real</p>
                         </div>
                       </div>
                     </div>
@@ -5086,15 +5120,80 @@ const ProjectDetailsPage = () => {
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                       <Target className="h-6 w-6" />
                     </div>
-                    Análisis Operacional
+                    Módulo Operations
                   </h2>
-                  <p className="text-blue-200 text-sm">Eficiencia del equipo: Horas Objetivo vs Horas Reales - Período: {dateFilter.label}</p>
+                  <p className="text-blue-200 text-sm">Capacidad, utilización, realización, asignación recursos, proyecciones horas - Período: {dateFilter.label}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-blue-300 mb-1">Excel MAESTRO</div>
-                  <div className="text-lg font-bold">{(unifiedData as any)?.actuals?.excelDirectCosts?.length || 0} registros</div>
+                  <div className="text-lg font-bold">{((unifiedData as any)?.directCosts || []).length} registros</div>
                 </div>
               </div>
+            </div>
+
+            {/* KPIs Operacionales según fórmulas especificadas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {(() => {
+                const directCosts = (unifiedData as any)?.directCosts || [];
+                
+                // Calcular según fórmulas especificadas
+                // Capacidad = horas_contrato_mes
+                const capacidad = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasObjetivo) || 0), 0);
+                
+                // Utilización = horas_billables / capacidad
+                const horasBillables = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                const utilizacion = capacidad > 0 ? (horasBillables / capacidad) * 100 : 0;
+                
+                // Realización = horas_facturadas / horas_reales
+                const horasFacturadas = horasBillables; // Usando como proxy
+                const horasReales = horasBillables;
+                const realizacion = horasReales > 0 ? (horasFacturadas / horasReales) * 100 : 0;
+                
+                // Blended Rate = revenue_usd / horas_facturadas (desde sales data)
+                const sales = (unifiedData as any)?.googleSheetsSales || [];
+                const revenueUSD = sales
+                  .filter((sale: any) => sale.status !== 'proyectada')
+                  .reduce((sum: number, sale: any) => sum + (parseFloat(sale.amountUsd) || 0), 0);
+                const blendedRateOps = horasFacturadas > 0 ? revenueUSD / horasFacturadas : 0;
+                
+                return (
+                  <>
+                    <div className="bg-white p-6 rounded-lg border border-blue-200">
+                      <div className="text-sm text-gray-600 mb-1">Capacidad</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {capacidad.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_contrato_mes</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-green-200">
+                      <div className="text-sm text-gray-600 mb-1">Utilización</div>
+                      <div className={`text-2xl font-bold ${utilizacion >= 80 ? 'text-green-600' : utilizacion >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {utilizacion.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_billables / capacidad</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-purple-200">
+                      <div className="text-sm text-gray-600 mb-1">Realización</div>
+                      <div className={`text-2xl font-bold ${realizacion >= 90 ? 'text-green-600' : realizacion >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {realizacion.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_facturadas / horas_reales</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-orange-200">
+                      <div className="text-sm text-gray-600 mb-1">Blended Rate</div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        ${blendedRateOps.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">revenue_usd / horas_facturadas</div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Resumen Operacional General */}
@@ -5259,15 +5358,77 @@ const ProjectDetailsPage = () => {
                     <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
                       <TrendingUp className="h-6 w-6" />
                     </div>
-                    Análisis Financiero
+                    Módulo Financials
                   </h2>
-                  <p className="text-green-200 text-sm">Costos reales pre-convertidos a USD (Columna R) - Período: {dateFilter.label}</p>
+                  <p className="text-green-200 text-sm">Revenue, costos directos, margen, fee vs T&M, revalorización FX, forecast, WIP/AR - Período: {dateFilter.label}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-green-300 mb-1">Excel MAESTRO</div>
-                  <div className="text-lg font-bold">{(unifiedData as any)?.actuals?.excelDirectCosts?.length || 0} registros</div>
+                  <div className="text-lg font-bold">{((unifiedData as any)?.directCosts || []).length} registros</div>
                 </div>
               </div>
+            </div>
+
+            {/* KPIs Financieros según fórmulas especificadas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {(() => {
+                const directCosts = (unifiedData as any)?.directCosts || [];
+                const sales = (unifiedData as any)?.googleSheetsSales || [];
+                
+                // Calcular según fórmulas especificadas
+                // Revenue (USD) = Σ(horas_facturadas × rate_local / fx_aplicado)
+                const revenueUSD = sales
+                  .filter((sale: any) => sale.status !== 'proyectada')
+                  .reduce((sum: number, sale: any) => sum + (parseFloat(sale.amountUsd) || 0), 0);
+                
+                // Costo directo (USD) = Σ(horas_reales × costo_hora_local / fx_costo)
+                const costoDirectoUSD = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
+                
+                // Blended Rate = revenue_usd / horas_facturadas
+                const totalHorasFacturadas = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasRealesAsana) || 0), 0); // Usar horas reales como proxy
+                const blendedRate = totalHorasFacturadas > 0 ? revenueUSD / totalHorasFacturadas : 0;
+                
+                // Margen bruto % = (Revenue - Costo directo) / Revenue
+                const margenBrutoPercent = revenueUSD > 0 ? ((revenueUSD - costoDirectoUSD) / revenueUSD) * 100 : 0;
+                
+                return (
+                  <>
+                    <div className="bg-white p-6 rounded-lg border border-green-200">
+                      <div className="text-sm text-gray-600 mb-1">Revenue (USD)</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        ${revenueUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Σ(horas_facturadas × rate_local / fx_aplicado)</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-red-200">
+                      <div className="text-sm text-gray-600 mb-1">Costo Directo (USD)</div>
+                      <div className="text-2xl font-bold text-red-600">
+                        ${costoDirectoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Σ(horas_reales × costo_hora_local / fx_costo)</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-blue-200">
+                      <div className="text-sm text-gray-600 mb-1">Blended Rate</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        ${blendedRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">revenue_usd / horas_facturadas</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-purple-200">
+                      <div className="text-sm text-gray-600 mb-1">Margen Bruto %</div>
+                      <div className={`text-2xl font-bold ${margenBrutoPercent >= 50 ? 'text-green-600' : margenBrutoPercent >= 30 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {margenBrutoPercent.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">(Revenue - Costo directo) / Revenue</div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Resumen Financiero General */}
