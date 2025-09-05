@@ -3205,6 +3205,833 @@ const ProjectDetailsPage = () => {
 
 
           <TabsContent value="income-details" className="space-y-6">
+                    </div>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-xs">
+                      vs estimadas
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {(() => {
+                      const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                      const estimatedHours = unifiedData?.quotation?.estimatedHours || 0; // Backend ya envía valor escalado
+                      const percentage = estimatedHours > 0 ? (workedHours / estimatedHours) * 100 : 0;
+                      
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {workedHours.toFixed(1)}h
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            de {estimatedHours.toFixed(0)}h estimadas
+                          </p>
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full transition-all duration-300 ${
+                                  percentage > 100 
+                                    ? 'bg-red-500' 
+                                    : percentage > 80 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-blue-500'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(percentage, 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Nueva Card: Costo Total vs Estimado - CON ESCALAMIENTO TEMPORAL */}
+              <Card className="border-l-4 border-l-indigo-600 bg-gradient-to-br from-indigo-50 via-indigo-25 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <span className="text-sm font-medium text-indigo-700">Costo Real</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 text-xs">
+                      vs estimado
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {(() => {
+                      const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const baseEstimatedCost = unifiedData?.quotation?.baseCost || 0;
+                      const multiplier = getTemporalMultiplier(timeFilterForHook);
+                      const scaledEstimatedCost = baseEstimatedCost * multiplier;
+                      const percentage = scaledEstimatedCost > 0 ? (workedCost / scaledEstimatedCost) * 100 : 0;
+                      
+
+                      
+                      return (
+                        <>
+                          <p className="text-2xl font-bold text-gray-900">
+                            ${workedCost.toFixed(0)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            de ${scaledEstimatedCost.toFixed(0)} estimado {multiplier > 1 ? `(x${multiplier})` : ''}
+                          </p>
+                          <div className="mt-2">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full transition-all duration-300 ${
+                                  percentage > 100 
+                                    ? 'bg-red-500' 
+                                    : percentage > 80 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-indigo-500'
+                                }`}
+                                style={{ 
+                                  width: `${Math.min(percentage, 100)}%` 
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* SECCIÓN 2: Acciones Rápidas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="border-l-4 border-l-emerald-600 bg-gradient-to-br from-emerald-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-emerald-100 rounded-lg">
+                        <History className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <span className="text-sm font-medium text-emerald-700">Historial Completo</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setLocation(`/time-entries/project/${projectId}`)}
+                      className="border-emerald-200 hover:bg-emerald-50 h-8"
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Ver Todo
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Ver, editar y administrar todos los registros de tiempo
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-emerald-600">Registros: </span>
+                    <span className="text-gray-500">
+                      {unifiedData?.actuals?.totalEntries || 0} en {dateFilter.label}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-blue-600 bg-gradient-to-br from-blue-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-blue-700">Registrar Tiempo</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowQuickRegister(true)}
+                      className="border-blue-200 hover:bg-blue-50 h-8"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Nuevo
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Agregar horas trabajadas por equipo
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-blue-600">Última entrada: </span>
+                    <span className="text-gray-500">
+                      {(unifiedData?.actuals?.totalEntries || 0) > 0 ? 'Activo' : 'Sin registros'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-amber-600 bg-gradient-to-br from-amber-50 to-white shadow-sm hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <Download className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <span className="text-sm font-medium text-amber-700">Exportar Datos</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const teamData = teamStats?.map(member => ({
+                          Nombre: member.name || 'Sin nombre',
+                          Horas: member.hours?.toFixed(2) || '0.00',
+                          Costo: `$${member.cost?.toFixed(2) || '0.00'}`,
+                          Progreso: `${Math.round((member.hours / (member.targetHours || 1)) * 100)}%`
+                        })) || [];
+                        
+                        const csvContent = [
+                          Object.keys(teamData[0] || {}).join(','),
+                          ...teamData.map(row => Object.values(row).join(','))
+                        ].join('\n');
+                        
+                        const blob = new Blob([csvContent], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `equipo-proyecto-${projectId}-${dateFilter.label}.csv`;
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                      }}
+                      className="border-amber-200 hover:bg-amber-50 h-8"
+                    >
+                      <FileSpreadsheet className="h-3 w-3 mr-1" />
+                      CSV
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Descargar reporte del periodo actual
+                  </p>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-amber-600">Período: </span>
+                    <span className="text-gray-500">
+                      {dateFilter.label}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* SECCIÓN 3: Equipo del Proyecto - Vista de Registro */}
+            <Card className="border-l-4 border-l-gray-400 bg-white shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Users className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        Registro de Tiempo por Miembro
+                      </CardTitle>
+                      <CardDescription className="text-sm text-gray-700">
+                        Estado de registro de horas y progreso individual del equipo
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-gray-100 text-gray-800 text-xs">
+                      {teamStats?.filter(member => member.hours > 0).length || 0} activos
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <ProjectTeamSection 
+                  projectId={projectId!} 
+                  unifiedData={unifiedData}
+                  timeFilter={timeFilterForHook}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ANÁLISIS FINANCIERO Y ECONÓMICO */}
+          <TabsContent value="details" className="space-y-6">
+            <TooltipProvider>
+              {/* Header Section - Financial Overview */}
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="bg-indigo-600 p-2 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-indigo-900">Análisis Financiero y Económico</h2>
+                    <p className="text-indigo-700">Indicadores de rentabilidad, ROI y eficiencia económica</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial KPIs Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* ROI Card */}
+              <Card className="bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-emerald-600 p-2 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                        ROI
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-emerald-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Margen de Ganancia</div>
+                            <div>Porcentaje del precio de venta que representa ganancia neta después de cubrir todos los costos operativos.</div>
+                            <div className="text-xs text-gray-600">
+                              Fórmula: (Precio Cliente - Costo Real) ÷ Precio Cliente × 100<br/>
+                              • Verde (&gt;40%): Margen excelente<br/>
+                              • Amarillo (20-40%): Margen saludable<br/>
+                              • Rojo (&lt;20%): Margen bajo o pérdidas
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-emerald-900">
+                      {unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ? 
+                        `${((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100).toFixed(1)}%` : 
+                        '0.0%'
+                      }
+                    </h3>
+                    <p className="text-xs text-emerald-700">Margen de ganancia</p>
+                    <div className="w-full bg-emerald-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-emerald-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
+                              ((((unifiedData as any).quotation.totalAmount - (unifiedData as any).actuals.totalWorkedCost) / (unifiedData as any).quotation.totalAmount) * 100) :
+                              0
+                          ))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profit Margin Card */}
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-blue-600 p-2 rounded-lg">
+                      <Percent className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                        Margen
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-blue-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Markup (Multiplicador)</div>
+                            <div>Relación entre el precio de venta y el costo operativo. Indica cuántas veces el costo se multiplica para obtener el precio.</div>
+                            <div className="text-xs text-gray-600">
+                              Fórmula: Precio Cliente ÷ Costo Real<br/>
+                              • &gt;2.5x: Markup excelente<br/>
+                              • 1.8x-2.5x: Markup muy bueno<br/>
+                              • 1.2x-1.8x: Markup aceptable<br/>
+                              • &lt;1.2x: Markup crítico
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-blue-900">
+                      {unifiedData?.metrics?.markup ? 
+                        `${unifiedData.metrics.markup.toFixed(1)}x` : 
+                        '0.0x'
+                      }
+                    </h3>
+                    <p className="text-xs text-blue-700">Markup (Precio/Costo)</p>
+                    <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.metrics?.markup ?
+                              (unifiedData.metrics.markup / 3) * 100 : // Dividido por 3 para escalar (3x = 100%)
+                              0
+                          ))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Efficiency Card */}
+              <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-purple-600 p-2 rounded-lg">
+                      <Gauge className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                        Eficiencia
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-purple-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Eficiencia de Costos</div>
+                            <div>Mide qué tan bien se están controlando los gastos respecto al presupuesto estimado.</div>
+                            <div className="text-xs text-gray-600">
+                              • &gt;95%: Excelente control de costos<br/>
+                              • 85-95%: Buen control<br/>
+                              • 70-85%: Control regular<br/>
+                              • &lt;70%: Sobrecostos críticos
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-purple-900">
+                      {unifiedData?.metrics?.budgetUtilization ? 
+                        `${(100 - Math.max(0, (unifiedData as any).metrics.budgetUtilization - 100)).toFixed(1)}%` : 
+                        '100.0%'
+                      }
+                    </h3>
+                    <p className="text-xs text-purple-700">Eficiencia de costos</p>
+                    <div className="w-full bg-purple-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500"
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, 
+                            unifiedData?.metrics?.budgetUtilization ? 
+                              (100 - Math.max(0, (unifiedData as any).metrics.budgetUtilization - 100)) : 
+                              100
+                          ))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Revenue per Hour Card */}
+              <Card className="bg-gradient-to-br from-amber-50 to-yellow-100 border-amber-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="bg-amber-600 p-2 rounded-lg">
+                      <Timer className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                        $/Hora
+                      </Badge>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-amber-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs p-3">
+                          <div className="space-y-2 text-sm">
+                            <div className="font-semibold">Ingresos por Hora</div>
+                            <div>Valor promedio que genera cada hora trabajada en el proyecto, calculado dividiendo el precio total entre las horas reales trabajadas.</div>
+                            <div className="text-xs text-gray-600">
+                              Fórmula: Precio Total ÷ Horas Trabajadas<br/>
+                              Útil para evaluar la productividad y valor del tiempo invertido en el proyecto.
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-amber-900">
+                      ${unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedHours ? 
+                        ((unifiedData as any).quotation.totalAmount / (unifiedData as any).actuals.totalWorkedHours).toFixed(0) : 
+                        '0'
+                      }
+                    </h3>
+                    <p className="text-xs text-amber-700">Ingresos por hora</p>
+                    <div className="w-full bg-amber-200 rounded-full h-2 mt-2">
+                      <div 
+                        className="bg-amber-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: '75%' }}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cost Distribution Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Cost Distribution by Role */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <Users className="h-5 w-5 text-blue-600" />
+                    Distribución de Costos por Rol
+                  </CardTitle>
+                  <CardDescription>
+                    Análisis de gastos según roles del equipo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={(() => {
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            // Agrupar costos por rol
+                            const roleMap = new Map();
+                            (unifiedData as any).actuals.teamBreakdown.forEach((member: any) => {
+                              const role = member.roleName || 'Sin rol';
+                              const currentCost = roleMap.get(role) || 0;
+                              roleMap.set(role, currentCost + (member.cost || 0));
+                            });
+                            
+                            // Convertir a array y ordenar por costo
+                            const roleData = Array.from(roleMap.entries())
+                              .map(([role, cost]) => ({ name: role, value: cost }))
+                              .sort((a, b) => b.value - a.value);
+                            
+                            return roleData;
+                          })()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                          labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                        >
+                          {(() => {
+                            const colors = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#6B7280'];
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            const roleMap = new Map();
+                            (unifiedData as any).actuals.teamBreakdown.forEach((member: any) => {
+                              const role = member.roleName || 'Sin rol';
+                              const currentCost = roleMap.get(role) || 0;
+                              roleMap.set(role, currentCost + (member.cost || 0));
+                            });
+                            
+                            return Array.from(roleMap.entries()).map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ));
+                          })()}
+                        </Pie>
+                        <RechartsTooltip 
+                          formatter={(value: number) => [`$${value.toFixed(0)}`, 'Costo']}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cost Distribution by Person */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <User className="h-5 w-5 text-green-600" />
+                    Distribución de Costos por Persona
+                  </CardTitle>
+                  <CardDescription>
+                    Top 8 colaboradores con mayor costo en el período
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-96">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={(() => {
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            // Obtener los top 8 por costo
+                            const sortedMembers = [...(unifiedData as any).actuals.teamBreakdown]
+                              .filter((member: any) => member.cost > 0)
+                              .sort((a: any, b: any) => b.cost - a.cost)
+                              .slice(0, 8);
+                            
+                            return sortedMembers.map((member: any) => ({
+                              name: member.name.split(' ')[0], // Solo primer nombre
+                              value: member.cost,
+                              fullName: member.name
+                            }));
+                          })()}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          dataKey="value"
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                          labelLine={{ stroke: "#666", strokeWidth: 1 }}
+                        >
+                          {(() => {
+                            const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6B7280', '#14B8A6'];
+                            if (!unifiedData?.actuals?.teamBreakdown) return [];
+                            
+                            const sortedMembers = [...(unifiedData as any).actuals.teamBreakdown]
+                              .filter((member: any) => member.cost > 0)
+                              .sort((a: any, b: any) => b.cost - a.cost)
+                              .slice(0, 8);
+                            
+                            return sortedMembers.map((_, index) => (
+                              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ));
+                          })()}
+                        </Pie>
+                        <RechartsTooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `$${value.toFixed(0)}`, 
+                            props.payload.fullName || name
+                          ]}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Financial Analysis Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Cost Breakdown Analysis */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <BarChart3 className="h-5 w-5 text-indigo-600" />
+                    Desglose de Costos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Cost vs Revenue Bar */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Costo Real</span>
+                        <span className="font-medium">${unifiedData?.actuals?.totalWorkedCost?.toFixed(0) || '0'}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-red-500 h-3 rounded-full"
+                          style={{ 
+                            width: `${Math.min(100, 
+                              unifiedData?.quotation?.totalAmount && unifiedData?.actuals?.totalWorkedCost ?
+                                ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.totalAmount) * 100 :
+                                0
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Ingreso Cliente</span>
+                        <span className="font-medium">${unifiedData?.quotation?.totalAmount?.toFixed(0) || '0'}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div className="bg-green-500 h-3 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Ganancia Bruta</span>
+                        <span className="font-medium text-green-600">
+                          ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toFixed(0)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-green-600 h-3 rounded-full"
+                          style={{ 
+                            width: `${Math.max(0, 
+                              unifiedData?.quotation?.totalAmount ?
+                                ((((unifiedData as any).quotation.totalAmount - (unifiedData?.actuals?.totalWorkedCost || 0)) / (unifiedData as any).quotation.totalAmount) * 100) :
+                                0
+                            )}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Profitability Trends */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-900">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
+                    Indicadores de Rentabilidad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Financial Health Score */}
+                    <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
+                      <div className="text-3xl font-bold text-green-700 mb-1">
+                        {(() => {
+                          // Evaluar salud financiera basada en margen de ganancia empresarial
+                          const totalAmount = unifiedData?.quotation?.totalAmount || 0;
+                          const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const margin = totalAmount > 0 ? ((totalAmount - workedCost) / totalAmount) * 100 : 0;
+                          
+                          if (margin >= 60) return "Excelente";
+                          if (margin >= 40) return "Bueno";
+                          if (margin >= 20) return "Regular";
+                          return "Crítico";
+                        })()}
+                      </div>
+                      <p className="text-sm text-green-600">Score de Salud Financiera</p>
+                    </div>
+
+                    {/* Key Financial Metrics */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-lg font-bold text-blue-700">
+                          {unifiedData?.metrics?.markup?.toFixed(2) || '0.00'}x
+                        </div>
+                        <p className="text-xs text-blue-600">Multiplicador</p>
+                      </div>
+                      
+                      <div className="text-center p-3 bg-purple-50 rounded-lg">
+                        <div className="text-lg font-bold text-purple-700">
+                          {unifiedData?.metrics?.budgetUtilization?.toFixed(1) || '0.0'}%
+                        </div>
+                        <p className="text-xs text-purple-600">Uso Budget</p>
+                      </div>
+                    </div>
+
+                    {/* Economic Indicators */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Costo por Hora Promedio</span>
+                        <span className="font-medium">
+                          ${unifiedData?.actuals?.totalWorkedHours ? 
+                            ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).actuals.totalWorkedHours).toFixed(0) : 
+                            '0'
+                          }/h
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Break-even Point</span>
+                        <span className="font-medium">
+                          {unifiedData?.quotation?.baseCost && unifiedData?.actuals?.totalWorkedHours ?
+                            `${((unifiedData as any).quotation.baseCost / ((unifiedData as any).actuals.totalWorkedHours / (unifiedData as any).actuals.totalWorkedHours || 1)).toFixed(0)}h` :
+                            '0h'
+                          }
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Productividad</span>
+                        <span className="font-medium text-green-600">
+                          {unifiedData?.metrics?.efficiency?.toFixed(1) || '0.0'}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Análisis Simplificado - Sin recomendaciones duplicadas */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Análisis de Desviaciones Compacto */}
+              <div className="space-y-4">
+                <DeviationAnalysis 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                  onNavigateToTab={setActiveTab}
+                />
+              </div>
+              
+              {/* Recomendaciones Unificadas */}
+              <div className="space-y-4">
+                <Recommendations 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                />
+              </div>
+              
+            </div>
+            
+            {/* Gráficos de Tendencias */}
+            <div className="w-full">
+              <TrendCharts 
+                projectId={parseInt(projectId!)} 
+                dateFilter={{
+                  startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                  endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                }}
+              />
+            </div>
+            
+            {/* Análisis Detallado del Equipo */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="h-6 w-6 text-red-600" />
+                  </div>
+                  Análisis de Desviaciones del Equipo
+                </CardTitle>
+                <CardDescription className="text-base">
+                  Comparativa de rendimiento vs. objetivos presupuestados
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TeamDeviationAnalysis 
+                  projectId={parseInt(projectId!)} 
+                  timeFilter={timeFilterForHook}
+                  dateFilter={{
+                    startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                    endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                  }}
+                />
+              </CardContent>
+            </Card>
+            </TooltipProvider>
+          </TabsContent>
+
+
+          {/* INGRESOS DETALLADOS */}
+          <TabsContent value="income-details" className="space-y-6">
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-green-600 p-2 rounded-lg">
@@ -3216,15 +4043,740 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Tabla de ingresos mensuales */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  Historial de Ingresos por Período
+                </CardTitle>
+                <CardDescription>
+                  Datos sincronizados automáticamente desde Google Sheets
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(unifiedData as any)?.googleSheetsSales && (unifiedData as any).googleSheetsSales.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b-2 border-gray-200">
+                            <th className="text-left p-3 font-semibold text-gray-700">Fecha</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Cliente</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Servicio</th>
+                            <th className="text-right p-3 font-semibold text-gray-700">Monto USD</th>
+                            <th className="text-right p-3 font-semibold text-gray-700">Monto ARS</th>
+                            <th className="text-left p-3 font-semibold text-gray-700">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {((unifiedData as any).googleSheetsSales || []).map((sale: any, index: number) => (
+                            <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="p-3 text-sm">
+                                {sale.month && sale.year ? `${sale.month} ${sale.year}` : 'Sin fecha'}
+                              </td>
+                              <td className="p-3 text-sm font-medium">{sale.clientName || 'N/A'}</td>
+                              <td className="p-3 text-sm">{sale.projectName || sale.salesType || 'N/A'}</td>
+                              <td className="p-3 text-sm text-right font-medium">
+                                {sale.amountUsd ? `$${parseFloat(sale.amountUsd).toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-3 text-sm text-right font-medium">
+                                {sale.amountArs ? `$${parseFloat(sale.amountArs).toLocaleString()}` : '-'}
+                              </td>
+                              <td className="p-3 text-sm">
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  {sale.status || 'Activo'}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Resumen financiero */}
+                    <div className="bg-gray-50 rounded-lg p-4 mt-6">
+                      <h4 className="font-semibold text-gray-900 mb-3">Resumen del Período</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Total Ingresos USD</p>
+                          <p className="text-lg font-bold text-green-600">
+                            ${((unifiedData as any).googleSheetsSales || []).reduce((sum: number, sale: any) => 
+                              sum + (parseFloat(sale.amountUsd) || 0), 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Total Ingresos ARS</p>
+                          <p className="text-lg font-bold text-green-600">
+                            ${((unifiedData as any).googleSheetsSales || []).reduce((sum: number, sale: any) => 
+                              sum + (parseFloat(sale.amountArs) || 0), 0).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Registros</p>
+                          <p className="text-lg font-bold text-blue-600">
+                            {((unifiedData as any).googleSheetsSales || []).length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileSpreadsheet className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>No hay datos de ingresos para el período seleccionado</p>
+                    <p className="text-sm mt-1">Los datos se sincronizan automáticamente cada 30 minutos</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
+          {/* Nueva pestaña: Costos Detallados */}
+          <TabsContent value="cost-details" className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-6 border border-slate-200">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-slate-600 p-2 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Costos Reales Detallados</h2>
+                  <p className="text-slate-600">Registros mensuales de costos importados desde Excel MAESTRO</p>
+                </div>
+              </div>
+            </div>
 
-          {/* GESTIÓN TEMPORAL - TIME ENTRIES POR PROYECTO */}
-          <TabsContent value="time-entries" className="space-y-6">
-            <div className="text-center py-20">
-              <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900">Gestión de Tiempo</h3>
-              <p className="text-gray-500">Sección en desarrollo</p>
+            <Card className="shadow-sm border border-slate-200">
+              <CardContent className="p-6">
+                {unifiedData && (unifiedData as any).directCosts && (unifiedData as any).directCosts.length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Tabla de costos */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50">
+                            <th className="text-left p-3 font-semibold text-slate-700">Miembro</th>
+                            <th className="text-left p-3 font-semibold text-slate-700">Mes</th>
+                            <th className="text-left p-3 font-semibold text-slate-700">Año</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Horas Objetivo</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Horas Reales</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Valor Hora ARS</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Moneda Original ARS</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Cotización</th>
+                            <th className="text-right p-3 font-semibold text-slate-700">Monto Total USD</th>
+                            <th className="text-center p-3 font-semibold text-slate-700">Tipo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {((unifiedData as any).directCosts || []).map((cost: any, index: number) => {
+                            // Usar los datos reales del Excel MAESTRO según tu especificación
+                            const horasObjetivo = cost.horasObjetivo || 0;
+                            const horasReales = cost.horasRealesAsana || 0;
+                            const valorHoraARS = cost.valorHoraPersona || 0; // Columna N
+                            const monedaOriginalARS = cost.costoTotal || 0; // Columna O (en ARS)
+                            const cotizacion = cost.tipoCambio || 1; // Columna Q
+                            // VERIFICAR: Usar directamente montoTotalUSD que ya está convertido
+                            const montoTotalUSD = cost.montoTotalUSD || 0;
+                            
+                            return (
+                              <tr key={index} className="border-b border-gray-100 hover:bg-slate-50/50">
+                                <td className="p-3 font-medium text-gray-900">{cost.persona}</td>
+                                <td className="p-3 text-gray-700 capitalize">{cost.mes}</td>
+                                <td className="p-3 text-gray-700">{cost.año}</td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-blue-600 font-semibold">
+                                    {horasObjetivo.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-green-600 font-semibold">
+                                    {horasReales.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-purple-700 font-semibold">
+                                    ${valorHoraARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-slate-800 font-semibold">
+                                    ${monedaOriginalARS.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-orange-600 font-medium">
+                                    {cotizacion.toLocaleString('en-US', { minimumFractionDigits: 3 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  <span className="text-slate-900 font-bold">
+                                    ${montoTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-center">
+                                  <Badge 
+                                    variant={cost.tipoGasto === 'Directo' ? 'default' : 'outline'}
+                                    className="text-xs"
+                                  >
+                                    {cost.tipoGasto || 'N/A'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Resumen de costos - KPIs según Excel MAESTRO */}
+                    <div className="bg-slate-50 rounded-lg p-6 border border-slate-200">
+                      <h4 className="font-semibold text-gray-900 mb-3">KPIs del Período - Excel MAESTRO</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Costo Directo (USD)</p>
+                          <p className="text-lg font-bold text-slate-800">
+                            ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
+                              sum + (parseFloat(cost.montoTotalUSD) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Σ(Monto Total USD)</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Horas Reales</p>
+                          <p className="text-lg font-bold text-blue-700">
+                            {((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
+                              sum + (parseFloat(cost.horasRealesAsana) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Horas Asana</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Horas Objetivo</p>
+                          <p className="text-lg font-bold text-purple-700">
+                            {((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
+                              sum + (parseFloat(cost.horasObjetivo) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Planificadas</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Realización %</p>
+                          <p className="text-lg font-bold text-green-600">
+                            {(() => {
+                              const costs = (unifiedData as any).directCosts || [];
+                              const totalObjetivo = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasObjetivo) || 0), 0);
+                              const totalReales = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                              return totalObjetivo > 0 ? ((totalReales / totalObjetivo) * 100).toFixed(1) : '0.0';
+                            })()}%
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">Reales / Objetivo</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                          <p className="text-sm text-gray-600">Blended Rate USD</p>
+                          <p className="text-lg font-bold text-orange-600">
+                            ${(() => {
+                              const costs = (unifiedData as any).directCosts || [];
+                              const totalCostoUSD = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
+                              const totalHoras = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                              return totalHoras > 0 ? (totalCostoUSD / totalHoras).toFixed(2) : '0.00';
+                            })()}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">USD / Hora real</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p>No hay datos de costos para el período seleccionado</p>
+                    <p className="text-sm mt-1">Los datos se sincronizan automáticamente cada 30 minutos</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* NUEVA PESTAÑA: ANÁLISIS OPERACIONAL */}
+          <TabsContent value="operational-analysis" className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <Target className="h-6 w-6" />
+                    </div>
+                    Módulo Operations
+                  </h2>
+                  <p className="text-blue-200 text-sm">Capacidad, utilización, realización, asignación recursos, proyecciones horas - Período: {dateFilter.label}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-blue-300 mb-1">Excel MAESTRO</div>
+                  <div className="text-lg font-bold">{((unifiedData as any)?.directCosts || []).length} registros</div>
+                </div>
+              </div>
+            </div>
+
+            {/* KPIs Operacionales según fórmulas especificadas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {(() => {
+                const directCosts = (unifiedData as any)?.directCosts || [];
+                
+                // Calcular según fórmulas especificadas
+                // Capacidad = horas_contrato_mes
+                const capacidad = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasObjetivo) || 0), 0);
+                
+                // Utilización = horas_billables / capacidad
+                const horasBillables = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
+                const utilizacion = capacidad > 0 ? (horasBillables / capacidad) * 100 : 0;
+                
+                // Realización = horas_facturadas / horas_reales
+                const horasFacturadas = horasBillables; // Usando como proxy
+                const horasReales = horasBillables;
+                const realizacion = horasReales > 0 ? (horasFacturadas / horasReales) * 100 : 0;
+                
+                // Blended Rate = revenue_usd / horas_facturadas (desde sales data)
+                const sales = (unifiedData as any)?.googleSheetsSales || [];
+                const revenueUSD = sales
+                  .filter((sale: any) => sale.status !== 'proyectada')
+                  .reduce((sum: number, sale: any) => sum + (parseFloat(sale.amountUsd) || 0), 0);
+                const blendedRateOps = horasFacturadas > 0 ? revenueUSD / horasFacturadas : 0;
+                
+                return (
+                  <>
+                    <div className="bg-white p-6 rounded-lg border border-blue-200">
+                      <div className="text-sm text-gray-600 mb-1">Capacidad</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {capacidad.toLocaleString('en-US', { minimumFractionDigits: 1 })}h
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_contrato_mes</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-green-200">
+                      <div className="text-sm text-gray-600 mb-1">Utilización</div>
+                      <div className={`text-2xl font-bold ${utilizacion >= 80 ? 'text-green-600' : utilizacion >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {utilizacion.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_billables / capacidad</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-purple-200">
+                      <div className="text-sm text-gray-600 mb-1">Realización</div>
+                      <div className={`text-2xl font-bold ${realizacion >= 90 ? 'text-green-600' : realizacion >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {realizacion.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">horas_facturadas / horas_reales</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-orange-200">
+                      <div className="text-sm text-gray-600 mb-1">Blended Rate</div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        ${blendedRateOps.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">revenue_usd / horas_facturadas</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Resumen Operacional General */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Resumen de Eficiencia
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                    const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                    const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                    const efficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-blue-50 rounded-lg border">
+                            <div className="text-sm text-blue-700 mb-1">Horas Objetivo (Columna K)</div>
+                            <div className="text-2xl font-bold text-blue-900">{totalTargetHours.toFixed(1)}h</div>
+                            <div className="text-xs text-blue-600">Planificación inicial</div>
+                          </div>
+                          <div className="p-4 bg-indigo-50 rounded-lg border">
+                            <div className="text-sm text-indigo-700 mb-1">Horas Reales (Columna L)</div>
+                            <div className="text-2xl font-bold text-indigo-900">{totalRealHours.toFixed(1)}h</div>
+                            <div className="text-xs text-indigo-600">Trabajo efectivo</div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-lg border">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Eficiencia Operacional</span>
+                            <span className={`text-xl font-bold ${
+                              efficiency <= 100 ? 'text-green-600' : 
+                              efficiency <= 120 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {efficiency.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div 
+                              className={`h-3 rounded-full transition-all ${
+                                efficiency <= 100 ? 'bg-gradient-to-r from-green-400 to-green-600' : 
+                                efficiency <= 120 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' : 
+                                'bg-gradient-to-r from-red-400 to-red-600'
+                              }`}
+                              style={{ width: `${Math.min(efficiency, 150)}%` }}
+                            ></div>
+                          </div>
+                          <div className="text-xs text-center text-gray-600 mt-2">
+                            {efficiency <= 100 ? '✅ Dentro del presupuesto operacional' : 
+                             efficiency <= 120 ? '⚠️ Moderadamente por encima del presupuesto' : 
+                             '🚨 Significativamente por encima del presupuesto'}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Panel de Alertas */}
+              <div className="bg-white rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5" />
+                  Status Operacional
+                </h3>
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const totalTargetHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+                  const totalRealHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+                  const efficiency = totalTargetHours > 0 ? (totalRealHours / totalTargetHours) * 100 : 0;
+                  
+                  let statusColor = "bg-green-100 text-green-800";
+                  let statusIcon = "✅";
+                  let statusMessage = "Proyecto dentro del presupuesto operacional";
+                  
+                  if (efficiency > 120) {
+                    statusColor = "bg-red-100 text-red-800";
+                    statusIcon = "🚨";
+                    statusMessage = "Se excedió significativamente el presupuesto de horas";
+                  } else if (efficiency > 100) {
+                    statusColor = "bg-yellow-100 text-yellow-800";
+                    statusIcon = "⚠️";
+                    statusMessage = "Moderadamente por encima del presupuesto";
+                  }
+                  
+                  return (
+                    <div className={`p-4 rounded-lg ${statusColor}`}>
+                      <div className="text-2xl mb-2">{statusIcon}</div>
+                      <div className="font-medium text-sm">{statusMessage}</div>
+                      <div className="text-xs mt-2">
+                        Diferencia: {(totalRealHours - totalTargetHours).toFixed(1)}h
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Detalle por Persona - Análisis Operacional */}
+            <div className="bg-white rounded-lg p-6 border border-blue-200">
+              <h3 className="text-lg font-bold text-blue-900 mb-4 flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Eficiencia por Persona (Excel MAESTRO)
+              </h3>
+              <div className="space-y-3">
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const personData = excelCosts
+                    .filter((cost: any) => (cost.horasObjetivo || 0) > 0 || (cost.horasRealesAsana || 0) > 0)
+                    .map((cost: any) => ({
+                      name: cost.persona,
+                      targetHours: cost.horasObjetivo || 0,
+                      realHours: cost.horasRealesAsana || 0,
+                      efficiency: cost.horasObjetivo > 0 ? ((cost.horasRealesAsana || 0) / cost.horasObjetivo) * 100 : 0,
+                      mes: cost.mes,
+                      año: cost.año
+                    }))
+                    .sort((a: any, b: any) => b.realHours - a.realHours);
+                  
+                  return personData.map((person: any, index: number) => (
+                    <div key={`${person.name}-${person.mes}-${index}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                      <div>
+                        <div className="font-medium text-gray-900">{person.name}</div>
+                        <div className="text-sm text-gray-500">{person.mes} {person.año}</div>
+                        <div className="text-xs text-gray-400">
+                          {person.realHours.toFixed(1)}h trabajadas / {person.targetHours.toFixed(1)}h objetivo
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {person.targetHours > 0 && (
+                          <div className={`text-lg font-bold px-3 py-1 rounded ${
+                            person.efficiency <= 100 ? 'bg-green-100 text-green-800' : 
+                            person.efficiency <= 120 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {person.efficiency.toFixed(0)}%
+                          </div>
+                        )}
+                        {person.targetHours === 0 && person.realHours > 0 && (
+                          <div className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                            Sin objetivo
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* NUEVA PESTAÑA: ANÁLISIS FINANCIERO */}
+          <TabsContent value="financial-analysis" className="space-y-6">
+            <div className="bg-gradient-to-r from-green-900 to-emerald-900 rounded-xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2 flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                    Módulo Financials
+                  </h2>
+                  <p className="text-green-200 text-sm">Revenue, costos directos, margen, fee vs T&M, revalorización FX, forecast, WIP/AR - Período: {dateFilter.label}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-green-300 mb-1">Excel MAESTRO</div>
+                  <div className="text-lg font-bold">{((unifiedData as any)?.directCosts || []).length} registros</div>
+                </div>
+              </div>
+            </div>
+
+            {/* KPIs Financieros según fórmulas especificadas */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {(() => {
+                const directCosts = (unifiedData as any)?.directCosts || [];
+                const sales = (unifiedData as any)?.googleSheetsSales || [];
+                
+                // Calcular según fórmulas especificadas
+                // Revenue (USD) = Σ(horas_facturadas × rate_local / fx_aplicado)
+                const revenueUSD = sales
+                  .filter((sale: any) => sale.status !== 'proyectada')
+                  .reduce((sum: number, sale: any) => sum + (parseFloat(sale.amountUsd) || 0), 0);
+                
+                // Costo directo (USD) = Σ(montoTotalUSD) - Ya convertido
+                const costoDirectoUSD = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
+                
+                // Blended Rate = revenue_usd / horas_facturadas
+                const totalHorasFacturadas = directCosts.reduce((sum: number, cost: any) => 
+                  sum + (parseFloat(cost.horasRealesAsana) || 0), 0); // Usar horas reales como proxy
+                const blendedRate = totalHorasFacturadas > 0 ? revenueUSD / totalHorasFacturadas : 0;
+                
+                // Margen bruto % = (Revenue - Costo directo) / Revenue
+                const margenBrutoPercent = revenueUSD > 0 ? ((revenueUSD - costoDirectoUSD) / revenueUSD) * 100 : 0;
+                
+                return (
+                  <>
+                    <div className="bg-white p-6 rounded-lg border border-green-200">
+                      <div className="text-sm text-gray-600 mb-1">Revenue (USD)</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        ${revenueUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Σ(horas_facturadas × rate_local / fx_aplicado)</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-red-200">
+                      <div className="text-sm text-gray-600 mb-1">Costo Directo (USD)</div>
+                      <div className="text-2xl font-bold text-red-600">
+                        ${costoDirectoUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Σ(horas_reales × costo_hora_local / fx_costo)</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-blue-200">
+                      <div className="text-sm text-gray-600 mb-1">Blended Rate</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        ${blendedRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">revenue_usd / horas_facturadas</div>
+                    </div>
+                    
+                    <div className="bg-white p-6 rounded-lg border border-purple-200">
+                      <div className="text-sm text-gray-600 mb-1">Margen Bruto %</div>
+                      <div className={`text-2xl font-bold ${margenBrutoPercent >= 50 ? 'text-green-600' : margenBrutoPercent >= 30 ? 'text-yellow-600' : 'text-red-600'}`}>
+                        {margenBrutoPercent.toFixed(1)}%
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">(Revenue - Costo directo) / Revenue</div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Resumen Financiero General */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Resumen de Costos
+                </h3>
+                <div className="space-y-4">
+                  {(() => {
+                    const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                    const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                    const totalBillableHours = excelCosts.reduce((sum: number, cost: any) => sum + (cost.horasFacturables || cost.horasRealesAsana || 0), 0);
+                    const averageHourlyRate = totalBillableHours > 0 ? totalFinancialCost / totalBillableHours : 0;
+                    
+                    // Obtener ingresos reales
+                    const realRevenue = (unifiedData as any)?.googleSheetsSales
+                      ?.filter((sale: any) => sale.status !== 'proyectada')
+                      ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                    
+                    const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                    
+                    return (
+                      <>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="p-4 bg-green-50 rounded-lg border">
+                            <div className="text-sm text-green-700 mb-1">Costo Total USD</div>
+                            <div className="text-xl font-bold text-green-900">${totalFinancialCost.toLocaleString()}</div>
+                            <div className="text-xs text-green-600">Columna R</div>
+                          </div>
+                          <div className="p-4 bg-emerald-50 rounded-lg border">
+                            <div className="text-sm text-emerald-700 mb-1">Horas Totales</div>
+                            <div className="text-xl font-bold text-emerald-900">{totalBillableHours.toFixed(1)}h</div>
+                            <div className="text-xs text-emerald-600">Facturables</div>
+                          </div>
+                          <div className="p-4 bg-teal-50 rounded-lg border">
+                            <div className="text-sm text-teal-700 mb-1">Tarifa Promedio</div>
+                            <div className="text-xl font-bold text-teal-900">${averageHourlyRate.toFixed(0)}</div>
+                            <div className="text-xs text-teal-600">USD/hora</div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-gradient-to-r from-green-100 to-emerald-100 rounded-lg border">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Markup del Proyecto</span>
+                            <span className={`text-xl font-bold ${
+                              markup >= 2.5 ? 'text-green-600' : 
+                              markup >= 2.0 ? 'text-blue-600' : 
+                              markup >= 1.5 ? 'text-yellow-600' : 'text-red-600'
+                            }`}>
+                              {markup.toFixed(2)}x
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 text-center">
+                            Ingresos: ${realRevenue.toLocaleString()} / Costos: ${totalFinancialCost.toLocaleString()}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Panel de Rentabilidad */}
+              <div className="bg-white rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                  <Gauge className="h-5 w-5" />
+                  Status Financiero
+                </h3>
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  const totalFinancialCost = excelCosts.reduce((sum: number, cost: any) => sum + (cost.montoTotalUSD || 0), 0);
+                  const realRevenue = (unifiedData as any)?.googleSheetsSales
+                    ?.filter((sale: any) => sale.status !== 'proyectada')
+                    ?.reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || sale.amountArs || 0), 0) || 0;
+                  const markup = totalFinancialCost > 0 ? realRevenue / totalFinancialCost : 0;
+                  
+                  let statusColor = "bg-green-100 text-green-800";
+                  let statusIcon = "✅";
+                  let statusMessage = "Rentabilidad excelente";
+                  
+                  if (markup < 1.5) {
+                    statusColor = "bg-red-100 text-red-800";
+                    statusIcon = "🚨";
+                    statusMessage = "Rentabilidad crítica";
+                  } else if (markup < 2.0) {
+                    statusColor = "bg-yellow-100 text-yellow-800";
+                    statusIcon = "⚠️";
+                    statusMessage = "Rentabilidad por debajo del objetivo";
+                  } else if (markup < 2.5) {
+                    statusColor = "bg-blue-100 text-blue-800";
+                    statusIcon = "📊";
+                    statusMessage = "Rentabilidad dentro del objetivo";
+                  }
+                  
+                  return (
+                    <div className={`p-4 rounded-lg ${statusColor}`}>
+                      <div className="text-2xl mb-2">{statusIcon}</div>
+                      <div className="font-medium text-sm">{statusMessage}</div>
+                      <div className="text-xs mt-2">
+                        Objetivo Epical: 2.0x mínimo
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Detalle por Persona - Análisis Financiero */}
+            <div className="bg-white rounded-lg p-6 border border-green-200">
+              <h3 className="text-lg font-bold text-green-900 mb-4 flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Costos por Persona (Excel MAESTRO)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {(() => {
+                  const excelCosts = (unifiedData as any)?.actuals?.excelDirectCosts || [];
+                  return excelCosts
+                    .filter((cost: any) => (cost.montoTotalUSD || 0) > 0)
+                    .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
+                    .map((cost: any, index: number) => (
+                      <div 
+                        key={`${cost.persona}-${cost.mes}-${index}`}
+                        className="p-4 bg-gray-50 rounded-lg border hover:shadow-sm transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {cost.persona}
+                            </h4>
+                            <p className="text-xs text-gray-500">
+                              {cost.mes} {cost.año}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-600">Costo Total:</span>
+                            <span className="text-sm font-bold text-green-600">
+                              ${(cost.montoTotalUSD || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          {(cost.horasRealesAsana || 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-xs text-gray-600">Horas:</span>
+                              <span className="text-xs text-gray-700">
+                                {(cost.horasRealesAsana || 0).toFixed(1)}h
+                              </span>
+                            </div>
+                          )}
+                          {(cost.valorHoraPersona || 0) > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-xs text-gray-600">Tarifa:</span>
+                              <span className="text-xs text-gray-700">
+                                ${(cost.valorHoraPersona || 0).toFixed(0)}/h
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ));
+                })()}
+              </div>
             </div>
           </TabsContent>
         </Tabs>
@@ -3269,6 +4821,3 @@ const ProjectDetailsPage = () => {
 };
 
 export default ProjectDetailsPage;
-                      <div className="p-2 bg-emerald-100 rounded-lg">
-                        <History className="h-4 w-4 text-emerald-600" />
-                      </div>

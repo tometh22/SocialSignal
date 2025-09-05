@@ -10667,6 +10667,231 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TIME TRACKING SEGÚN DATA CONTRACT ====================
+  // Implementa pestaña Tiempo con cards, miembros y validaciones según especificaciones
+  app.get('/api/projects/:projectId/time-tracking', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const timeFilter = req.query.timeFilter as string || 'august_2025';
+      
+      console.log(`🕐 TIME TRACKING - Project: ${projectId}, Filter: ${timeFilter}`);
+      
+      // 1. OBTENER DATOS BASE - Costos directos del Excel MAESTRO
+      const allDirectCosts = await storage.getDirectCosts();
+      
+      // Filtrar por proyecto y período
+      const filteredCosts = allDirectCosts.filter(cost => {
+        if (cost.projectId !== projectId) return false;
+        
+        // Usar la misma lógica de filtrado temporal que performance rankings
+        if (timeFilter === 'august_2025') {
+          return cost.mes === '08 ago' && cost.año === 2025;
+        }
+        if (timeFilter === 'may_2025') {
+          return cost.mes === '05 may' && cost.año === 2025;
+        }
+        if (timeFilter === 'june_2025') {
+          return cost.mes === '06 jun' && cost.año === 2025;
+        }
+        if (timeFilter === 'july_2025') {
+          return cost.mes === '07 jul' && cost.año === 2025;
+        }
+        if (timeFilter === 'september_2025') {
+          return cost.mes === '09 sep' && cost.año === 2025;
+        }
+        
+        // Default: agosto 2025
+        return cost.mes === '08 ago' && cost.año === 2025;
+      });
+      
+      console.log(`🕐 Found ${filteredCosts.length} time records for tracking calculation`);
+      
+      if (filteredCosts.length === 0) {
+        return res.json({
+          projectId,
+          timeFilter,
+          cards: {
+            totalRegistrado: { horasRegistradas: 0, horasObjetivo: 0, porcentajeRegistrado: 0 },
+            miembrosActivos: { activos: 0, asignados: 0 },
+            promedioDiario: { promedio: 0, modo: 'calendario' },
+            horasTrabajadas: { horas: 0, estimadas: 0 },
+            costoReal: { real: 0, estimado: 0 }
+          },
+          miembros: [],
+          configuracion: {
+            modoPromedio: 'calendario',
+            umbralCompleto: 95,
+            diasHabilesMes: 22,
+            diasTranscurridos: 22,
+            mostrarRate: true
+          },
+          validaciones: {
+            noDataForPeriod: true,
+            conciliacionCosto: true,
+            conciliacionHoras: true
+          },
+          generatedAt: new Date().toISOString()
+        });
+      }
+      
+      // 2. AGREGACIÓN POR PERSONA según data contract SQL
+      const memberData = {};
+      filteredCosts.forEach(cost => {
+        const persona = cost.persona;
+        if (!memberData[persona]) {
+          memberData[persona] = {
+            persona,
+            hrs_obj: 0,
+            hrs_real: 0,
+            hrs_fact: 0,
+            cost_real: 0,
+            cost_est: 0,
+            valor_hora_total: 0,
+            cotizacion_total: 0,
+            registros: 0
+          };
+        }
+        
+        const member = memberData[persona];
+        member.hrs_obj += cost.horasObjetivo || 0;
+        member.hrs_real += cost.horasRealesAsana || 0;
+        member.hrs_fact += cost.horasParaFacturacion || 0;
+        member.cost_real += cost.montoTotalUSD || 0;
+        
+        // Calcular costo estimado: horas_objetivo × valor_hora_ars / cotizacion_fx
+        const valorHora = cost.valorHoraPersona || 0;
+        const tipoCambio = cost.tipoCambio || 1;
+        member.cost_est += (cost.horasObjetivo || 0) * valorHora / tipoCambio;
+        
+        member.valor_hora_total += valorHora;
+        member.cotizacion_total += tipoCambio;
+        member.registros += 1;
+      });
+      
+      const miembros = Object.values(memberData);
+      
+      // 3. CONFIGURACIÓN DE CALENDARIO
+      const diasHabilesMes = 22; // Por defecto, puede ser configurable
+      const hoy = new Date();
+      const añoMes = timeFilter.includes('2025') ? 2025 : 2024;
+      const mesNum = timeFilter.includes('august') ? 8 : 
+                   timeFilter.includes('september') ? 9 :
+                   timeFilter.includes('may') ? 5 :
+                   timeFilter.includes('june') ? 6 :
+                   timeFilter.includes('july') ? 7 : 8;
+      
+      const fechaFiltro = new Date(añoMes, mesNum - 1, 1);
+      const esPeríodoActual = 
+        hoy.getFullYear() === añoMes && hoy.getMonth() === (mesNum - 1);
+      
+      const diasTranscurridos = esPeríodoActual ? 
+        Math.min(hoy.getDate(), diasHabilesMes) : diasHabilesMes;
+      
+      // 4. CÁLCULO DE CARDS según data contract
+      const miembrosActivos = miembros.filter(m => m.hrs_real > 0).length;
+      const totalHorasRegistradas = miembros.reduce((sum, m) => sum + m.hrs_real, 0);
+      const totalHorasObjetivo = miembros.reduce((sum, m) => sum + m.hrs_obj, 0);
+      const totalCostoReal = miembros.reduce((sum, m) => sum + m.cost_real, 0);
+      const totalCostoEstimado = miembros.reduce((sum, m) => sum + m.cost_est, 0);
+      
+      // Promedio diario modo calendario (recomendado)
+      const promedioDiarioCalendario = miembrosActivos > 0 ? 
+        totalHorasRegistradas / (miembrosActivos * diasTranscurridos) : 0;
+      
+      const cards = {
+        totalRegistrado: {
+          horasRegistradas: totalHorasRegistradas,
+          horasObjetivo: totalHorasObjetivo,
+          porcentajeRegistrado: totalHorasObjetivo > 0 ? 
+            Math.round((totalHorasRegistradas / totalHorasObjetivo) * 100) : 0
+        },
+        miembrosActivos: {
+          activos: miembrosActivos,
+          asignados: miembros.length // Total de miembros con asignación
+        },
+        promedioDiario: {
+          promedio: Math.round(promedioDiarioCalendario * 10) / 10,
+          modo: 'calendario'
+        },
+        horasTrabajadas: {
+          horas: totalHorasRegistradas,
+          estimadas: totalHorasObjetivo
+        },
+        costoReal: {
+          real: Math.round(totalCostoReal * 100) / 100,
+          estimado: Math.round(totalCostoEstimado * 100) / 100
+        }
+      };
+      
+      // 5. LISTA DE MIEMBROS con cálculos según data contract
+      const miembrosConEstado = miembros.map(member => {
+        const porcentajeProgreso = member.hrs_obj > 0 ? 
+          Math.round((member.hrs_real / member.hrs_obj) * 100) : 0;
+        
+        // Badge de estado según especificaciones
+        let estado = 'sin_registro';
+        if (member.hrs_real === 0) {
+          estado = 'sin_registro';
+        } else if (porcentajeProgreso >= 95) {
+          estado = 'completo';
+        } else {
+          estado = 'parcial';
+        }
+        
+        // Rate aproximado USD
+        const rateAproxUsd = member.registros > 0 ? 
+          (member.valor_hora_total / member.registros) / (member.cotizacion_total / member.registros) : 0;
+        
+        return {
+          persona: member.persona,
+          rol: '', // Puede agregarse después si está disponible
+          hrs_real: member.hrs_real,
+          hrs_obj: member.hrs_obj,
+          porcentaje_progreso: porcentajeProgreso,
+          estado: estado,
+          costo_usd: Math.round(member.cost_real * 100) / 100,
+          rate_usd: Math.round(rateAproxUsd * 100) / 100,
+          brecha_objetivo: member.hrs_obj - member.hrs_real
+        };
+      });
+      
+      // Ordenar por brecha a objetivo (desc) como recomienda el data contract
+      miembrosConEstado.sort((a, b) => b.brecha_objetivo - a.brecha_objetivo);
+      
+      // 6. VALIDACIONES DE CONCILIACIÓN
+      const sumaCostosLista = miembrosConEstado.reduce((sum, m) => sum + m.costo_usd, 0);
+      const sumaHorasLista = miembrosConEstado.reduce((sum, m) => sum + m.hrs_real, 0);
+      
+      const validaciones = {
+        noDataForPeriod: false,
+        conciliacionCosto: Math.abs(sumaCostosLista - totalCostoReal) < 0.01,
+        conciliacionHoras: Math.abs(sumaHorasLista - totalHorasRegistradas) < 0.01
+      };
+      
+      console.log(`🕐 TIME TRACKING RESULT: ${miembrosActivos} active members, ${totalHorasRegistradas}h worked`);
+      
+      res.json({
+        projectId,
+        timeFilter,
+        cards,
+        miembros: miembrosConEstado,
+        configuracion: {
+          modoPromedio: 'calendario',
+          umbralCompleto: 95,
+          diasHabilesMes: diasHabilesMes,
+          diasTranscurridos: diasTranscurridos,
+          mostrarRate: true
+        },
+        validaciones,
+        generatedAt: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('🕐 Error in time tracking endpoint:', error);
+      res.status(500).json({ error: 'Error retrieving time tracking data' });
+    }
+  });
+
   // ==================== PERFORMANCE RANKINGS SEGÚN DATA CONTRACT ====================
   // Implementa Eficiencia, Impacto y Unificado con fórmulas exactas del documento
   app.get('/api/projects/:projectId/performance-rankings', requireAuth, async (req, res) => {

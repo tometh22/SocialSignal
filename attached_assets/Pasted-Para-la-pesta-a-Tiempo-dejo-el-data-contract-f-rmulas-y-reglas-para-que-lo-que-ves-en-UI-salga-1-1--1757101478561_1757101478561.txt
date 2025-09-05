@@ -1,0 +1,100 @@
+Para la pestaña Tiempo dejo el data-contract, fórmulas y reglas para que lo que ves en UI salga 1:1 de tu Excel/Asana.
+Qué datos necesito (por proyecto y mes)
+Hoja Costos (MAESTRO)
+persona
+año, mes → month_key = YYYY-MM
+horas_objetivo (K)
+horas_reales_asana (L)
+horas_para_facturacion (M) (opcional aquí, útil p/otros módulos)
+valor_hora_ars (N), cotizacion_fx (Q)
+monto_total_usd (R) (o calc = L × N / Q)
+Opcional / recomendado
+Timesheet granular (desde Asana o nueva hoja time_entries):
+date, persona, task_id/opcional, horas_reales, horas_facturables, source.
+Config del período
+dias_habiles_mes (auto por calendario local)
+dias_transcurridos_habiles (hasta hoy, si el período está en curso)
+Cards superiores (cómo se calculan)
+Total Registrado
+Horas registradas: H_trab = SUM(horas_reales_asana)
+Horas objetivo: H_obj = SUM(horas_objetivo)
+% registrado: H_trab / NULLIF(H_obj,0)
+Miembros Activos
+COUNT(DISTINCT persona) con horas_reales_asana > 0 en el período.
+(Opcional: mostrar “activos / asignados” si tenés lista de asignados).
+Promedio Diario (h por miembro) (elige modo en Configurar)
+Modo calendario (recomendado):
+Prom = H_trab / (miembros_activos * dias_transcurridos_habiles)
+Modo actividad (alternativo):
+Prom = H_trab / SUM_por_persona(días_con_registro)
+(no penaliza días sin carga; útil si hay registros esporádicos)
+Horas Trabajadas
+Valor grande: H_trab
+Subtítulo “de H_obj estimadas”.
+Costo Real
+C_real = SUM(monto_total_usd)
+Subtítulo “de C_est estimado”, donde C_est =
+SUM(horas_objetivo × valor_hora_ars / cotizacion_fx).
+Nota: si no querés recalcular C_est, podés traerlo de una hoja “Presupuesto”.
+Registro de Tiempo por Miembro (lista)
+Campos por fila
+Nombre (y rol si lo tenés)
+Barra de progreso: hrs_reales / hrs_objetivo
+Badge de estado:
+Completo si hrs_reales ≥ 95% de hrs_objetivo
+Parcial si 0 < hrs_reales < 95%
+Sin registro si hrs_reales = 0
+$ costo: costo_persona = SUM(monto_total_usd)
+$/h: rate_usd = valor_hora_ars / cotizacion_fx (mostrar en chico)
+Orden: por brecha a objetivo (desc) o por costo (toggle).
+Estructura de tablas en la app
+direct_costs (ya la tenés)
+project_id, month_key, persona, horas_objetivo, horas_reales_asana, horas_para_facturacion, valor_hora_ars, cotizacion_fx, monto_total_usd
+time_entries (opcional, si querés granularidad diaria)
+id, project_id, persona, date, horas_reales, horas_facturables, source, created_at
+calendar_config
+month_key, dias_habiles_mes, feriados_json
+SQL de referencia
+Totales para las cards
+WITH d AS (
+  SELECT persona,
+         SUM(horas_objetivo) AS hrs_obj,
+         SUM(horas_reales_asana) AS hrs_real,
+         SUM(monto_total_usd) AS cost_real,
+         SUM(horas_objetivo * valor_hora_ars / cotizacion_fx) AS cost_est
+  FROM direct_costs
+  WHERE project_id=:project_id AND month_key=:month_key
+  GROUP BY persona
+)
+SELECT
+  COUNT(*) FILTER (WHERE hrs_real > 0) AS miembros_activos,
+  SUM(hrs_real)  AS horas_trab,
+  SUM(hrs_obj)   AS horas_obj,
+  SUM(cost_real) AS costo_real,
+  SUM(cost_est)  AS costo_estimado
+FROM d;
+Listado por miembro
+SELECT
+  persona,
+  SUM(horas_reales_asana)  AS hrs_real,
+  SUM(horas_objetivo)      AS hrs_obj,
+  SUM(monto_total_usd)     AS costo_usd,
+  SUM(valor_hora_ars)/NULLIF(COUNT(*),0)/AVG(cotizacion_fx) AS rate_aprox_usd
+FROM direct_costs
+WHERE project_id=:project_id AND month_key=:month_key
+GROUP BY persona
+ORDER BY (SUM(horas_objetivo) - SUM(horas_reales_asana)) DESC;
+Validaciones (para que no se rompa)
+Locale moneda: $1.624,54 → 1624.54 antes de sumar.
+Horas negativas / >24 por día (si usás time_entries) → bloquear.
+Duplicados por persona, date, source → consolidar.
+Si H_obj = 0 → mostrar “—” en % y progreso, badge “sin objetivo”.
+Verificación de conciliación:
+Σ costo_usd (lista) == Costo Real (card).
+Σ hrs_real (lista) == Horas Trabajadas.
+Configurar (desde la UI)
+Modo Promedio Diario: calendario vs actividad.
+Umbral “Completo” (default 95%).
+Días hábiles del mes (auto + editable por feriados locales).
+Mostrar $/h: sí/no.
+Con esto, la pestaña Tiempo queda completamente atada a tu Excel y a Asana, y los números de las cards se reconcilian con la lista y con el resto del dashboard. ¿Querés que te pase una plantilla CSV para time_entries por si cargan horas manuales?
