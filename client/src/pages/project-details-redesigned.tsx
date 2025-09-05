@@ -4993,7 +4993,8 @@ const ProjectDetailsPage = () => {
                             const valorHoraARS = cost.valorHoraPersona || 0; // Columna N
                             const monedaOriginalARS = cost.costoTotal || 0; // Columna O (en ARS)
                             const cotizacion = cost.tipoCambio || 1; // Columna Q
-                            const montoTotalUSD = cost.montoTotalUSD || 0; // Columna R
+                            // CORREGIDO: Convertir ARS a USD correctamente
+                            const montoTotalUSD = monedaOriginalARS > 0 && cotizacion > 0 ? monedaOriginalARS / cotizacion : 0; // Columna R calculada
                             
                             return (
                               <tr key={index} className="border-b border-gray-100 hover:bg-slate-50/50">
@@ -5052,10 +5053,14 @@ const ProjectDetailsPage = () => {
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Costo Directo (USD)</p>
                           <p className="text-lg font-bold text-slate-800">
-                            ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => 
-                              sum + (parseFloat(cost.montoTotalUSD) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            ${((unifiedData as any).directCosts || []).reduce((sum: number, cost: any) => {
+                              const costoARS = parseFloat(cost.costoTotal) || 0;
+                              const tipoCambio = parseFloat(cost.tipoCambio) || 1;
+                              const costoUSD = costoARS > 0 && tipoCambio > 0 ? costoARS / tipoCambio : 0;
+                              return sum + costoUSD;
+                            }, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">Σ(Monto Total USD)</p>
+                          <p className="text-xs text-gray-500 mt-1">Σ(ARS / Tipo Cambio)</p>
                         </div>
                         <div className="bg-white p-4 rounded-lg">
                           <p className="text-sm text-gray-600">Horas Reales</p>
@@ -5090,9 +5095,14 @@ const ProjectDetailsPage = () => {
                           <p className="text-lg font-bold text-orange-600">
                             ${(() => {
                               const costs = (unifiedData as any).directCosts || [];
-                              const totalCosto = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
+                              const totalCostoUSD = costs.reduce((sum: number, cost: any) => {
+                                const costoARS = parseFloat(cost.costoTotal) || 0;
+                                const tipoCambio = parseFloat(cost.tipoCambio) || 1;
+                                const costoUSD = costoARS > 0 && tipoCambio > 0 ? costoARS / tipoCambio : 0;
+                                return sum + costoUSD;
+                              }, 0);
                               const totalHoras = costs.reduce((sum: number, cost: any) => sum + (parseFloat(cost.horasRealesAsana) || 0), 0);
-                              return totalHoras > 0 ? (totalCosto / totalHoras).toFixed(2) : '0.00';
+                              return totalHoras > 0 ? (totalCostoUSD / totalHoras).toFixed(2) : '0.00';
                             })()}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">USD / Hora real</p>
@@ -5382,8 +5392,12 @@ const ProjectDetailsPage = () => {
                   .reduce((sum: number, sale: any) => sum + (parseFloat(sale.amountUsd) || 0), 0);
                 
                 // Costo directo (USD) = Σ(horas_reales × costo_hora_local / fx_costo)
-                const costoDirectoUSD = directCosts.reduce((sum: number, cost: any) => 
-                  sum + (parseFloat(cost.montoTotalUSD) || 0), 0);
+                const costoDirectoUSD = directCosts.reduce((sum: number, cost: any) => {
+                  const costoARS = parseFloat(cost.costoTotal) || 0;
+                  const tipoCambio = parseFloat(cost.tipoCambio) || 1;
+                  const costoUSD = costoARS > 0 && tipoCambio > 0 ? costoARS / tipoCambio : 0;
+                  return sum + costoUSD;
+                }, 0);
                 
                 // Blended Rate = revenue_usd / horas_facturadas
                 const totalHorasFacturadas = directCosts.reduce((sum: number, cost: any) => 
