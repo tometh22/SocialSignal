@@ -294,15 +294,15 @@ export function EconomicRankings({
               <div className="font-medium text-gray-700">Unificado:</div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-green-100 text-green-800">Excelente</Badge>
-                <span className="text-gray-600">70+ puntos</span>
+                <span className="text-gray-600">20+ puntos</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-yellow-100 text-yellow-800">Bueno</Badge>
-                <span className="text-gray-600">50-69 puntos</span>
+                <span className="text-gray-600">12-19 puntos</span>
               </div>
               <div className="flex items-center gap-2">
                 <Badge className="bg-red-100 text-red-800">Crítico</Badge>
-                <span className="text-gray-600">&lt;50 puntos</span>
+                <span className="text-gray-600">&lt;12 puntos</span>
               </div>
             </div>
           </div>

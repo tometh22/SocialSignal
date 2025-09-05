@@ -10837,8 +10837,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         
         const getUnificadoClass = (score) => {
-          if (score >= 70) return { label: 'Excelente', color: 'green' };
-          if (score >= 50) return { label: 'Bueno', color: 'yellow' };
+          if (score >= 20) return { label: 'Excelente', color: 'green' };
+          if (score >= 12) return { label: 'Bueno', color: 'yellow' };
           return { label: 'Crítico', color: 'red' };
         };
         
