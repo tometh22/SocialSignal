@@ -11218,11 +11218,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           projectName: googleSheetsSales.projectName,
           clientName: googleSheetsSales.clientName,
           monthKey: googleSheetsSales.monthKey,
-          revenueType: googleSheetsSales.revenueType,
+          revenueType: googleSheetsSales.salesType, // salesType in schema
           amountUsd: googleSheetsSales.amountUsd,
           status: googleSheetsSales.status,
           confirmed: googleSheetsSales.confirmed,
-          notes: googleSheetsSales.notes
+          notes: sql<string>`''` // notes doesn't exist in schema
         })
         .from(googleSheetsSales);
       
@@ -11245,7 +11245,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query = query.where(and(...filters));
       }
       
-      query = query.orderBy(desc(googleSheetsSales.monthKey), googleSheetsSales.clientName, googleSheetsSales.projectName);
+      query = query.orderBy(desc(googleSheetsSales.monthKey), asc(googleSheetsSales.clientName), asc(googleSheetsSales.projectName));
       
       console.log(`📊 Executing Drizzle query for income dashboard`);
       
