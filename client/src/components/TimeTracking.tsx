@@ -201,41 +201,92 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
         {/* Cards superiores según data contract */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           {/* Total Registrado */}
-          <Card>
+          <Card className={`border-l-4 ${
+            cards.totalRegistrado.porcentajeRegistrado >= 100 
+              ? 'border-l-red-500 bg-gradient-to-br from-red-50 to-red-25'
+              : cards.totalRegistrado.porcentajeRegistrado >= 85
+                ? 'border-l-yellow-500 bg-gradient-to-br from-yellow-50 to-yellow-25'
+                : cards.totalRegistrado.porcentajeRegistrado >= 70
+                  ? 'border-l-green-500 bg-gradient-to-br from-green-50 to-green-25'
+                  : 'border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-25'
+          } shadow-sm hover:shadow-md transition-shadow`}>
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium">Total Registrado</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className={`w-4 h-4 ${
+                    cards.totalRegistrado.porcentajeRegistrado >= 100 
+                      ? 'text-red-600'
+                      : cards.totalRegistrado.porcentajeRegistrado >= 85
+                        ? 'text-yellow-600'
+                        : cards.totalRegistrado.porcentajeRegistrado >= 70
+                          ? 'text-green-600'
+                          : 'text-blue-600'
+                  }`} />
+                  <span className="text-sm font-medium">Total Registrado</span>
+                </div>
+                {cards.totalRegistrado.porcentajeRegistrado >= 100 && (
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                )}
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">
+              <div className="space-y-2">
+                <div className={`text-2xl font-bold ${
+                  cards.totalRegistrado.porcentajeRegistrado >= 100 
+                    ? 'text-red-700'
+                    : cards.totalRegistrado.porcentajeRegistrado >= 85
+                      ? 'text-yellow-700'
+                      : cards.totalRegistrado.porcentajeRegistrado >= 70
+                        ? 'text-green-700'
+                        : 'text-blue-700'
+                }`}>
                   {cards.totalRegistrado.porcentajeRegistrado}%
                 </div>
                 <div className="text-xs text-gray-600">
                   {cards.totalRegistrado.horasRegistradas}h / {cards.totalRegistrado.horasObjetivo}h
                 </div>
                 <Progress 
-                  value={cards.totalRegistrado.porcentajeRegistrado} 
-                  className="h-2"
+                  value={Math.min(cards.totalRegistrado.porcentajeRegistrado, 100)} 
+                  className={`h-3 ${
+                    cards.totalRegistrado.porcentajeRegistrado >= 100 
+                      ? '[&>div]:bg-red-500'
+                      : cards.totalRegistrado.porcentajeRegistrado >= 85
+                        ? '[&>div]:bg-yellow-500'
+                        : cards.totalRegistrado.porcentajeRegistrado >= 70
+                          ? '[&>div]:bg-green-500'
+                          : '[&>div]:bg-blue-500'
+                  }`}
                 />
+                {cards.totalRegistrado.porcentajeRegistrado >= 100 && (
+                  <div className="text-xs text-red-600 font-medium">
+                    ⚠️ Exceso de {(cards.totalRegistrado.porcentajeRegistrado - 100).toFixed(1)}%
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* Miembros Activos */}
-          <Card>
+          <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-green-50 to-green-25 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium">Miembros Activos</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-green-600" />
+                  <span className="text-sm font-medium">Miembros Activos</span>
+                </div>
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  {Math.round((cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100)}%
+                </Badge>
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-green-700">
                   {cards.miembrosActivos.activos}
                 </div>
                 <div className="text-xs text-gray-600">
                   de {cards.miembrosActivos.asignados} asignados
                 </div>
+                <Progress 
+                  value={(cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100} 
+                  className="h-2 [&>div]:bg-green-500"
+                />
               </div>
             </CardContent>
           </Card>
@@ -287,19 +338,57 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           </Card>
 
           {/* Costo Real */}
-          <Card>
+          <Card className={`border-l-4 ${
+            (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
+              ? 'border-l-red-500 bg-gradient-to-br from-red-50 to-red-25'
+              : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
+                ? 'border-l-yellow-500 bg-gradient-to-br from-yellow-50 to-yellow-25'
+                : 'border-l-green-500 bg-gradient-to-br from-green-50 to-green-25'
+          } shadow-sm hover:shadow-md transition-shadow`}>
             <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-red-600" />
-                <span className="text-sm font-medium">Costo Real</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <DollarSign className={`w-4 h-4 ${
+                    (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
+                      ? 'text-red-600'
+                      : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
+                        ? 'text-yellow-600'
+                        : 'text-green-600'
+                  }`} />
+                  <span className="text-sm font-medium">Costo Real</span>
+                </div>
+                {(cards.costoReal.real / cards.costoReal.estimado) >= 1.15 && (
+                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                )}
               </div>
-              <div className="space-y-1">
-                <div className="text-2xl font-bold">
+              <div className="space-y-2">
+                <div className={`text-2xl font-bold ${
+                  (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
+                    ? 'text-red-700'
+                    : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
+                      ? 'text-yellow-700'
+                      : 'text-green-700'
+                }`}>
                   ${cards.costoReal.real.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-600">
                   de ${cards.costoReal.estimado.toLocaleString()} estimado
                 </div>
+                <Progress 
+                  value={Math.min((cards.costoReal.real / cards.costoReal.estimado) * 100, 100)}
+                  className={`h-3 ${
+                    (cards.costoReal.real / cards.costoReal.estimado) >= 1.15
+                      ? '[&>div]:bg-red-500'
+                      : (cards.costoReal.real / cards.costoReal.estimado) >= 1.0
+                        ? '[&>div]:bg-yellow-500'
+                        : '[&>div]:bg-green-500'
+                  }`}
+                />
+                {(cards.costoReal.real / cards.costoReal.estimado) >= 1.15 && (
+                  <div className="text-xs text-red-600 font-medium">
+                    💰 Sobrecosto crítico: +{((cards.costoReal.real / cards.costoReal.estimado - 1) * 100).toFixed(1)}%
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -368,54 +457,144 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
 
         {/* Lista de miembros */}
         <div className="space-y-3">
-          {miembrosOrdenados.map((miembro, index) => (
-            <div
-              key={`${miembro.persona}-${index}`}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-4 flex-1">
-                <div className="flex items-center gap-2">
-                  {getStatusIcon(miembro.estado)}
-                  <div>
-                    <h4 className="font-medium text-gray-900">{miembro.persona}</h4>
-                    {miembro.rol && (
-                      <p className="text-sm text-gray-500">{miembro.rol}</p>
+          {miembrosOrdenados.map((miembro, index) => {
+            const isOverBudget = miembro.porcentaje_progreso >= 100;
+            const isAtRisk = miembro.porcentaje_progreso >= 85 && miembro.porcentaje_progreso < 100;
+            const isOnTrack = miembro.porcentaje_progreso >= 70 && miembro.porcentaje_progreso < 85;
+            const isUnderPerforming = miembro.porcentaje_progreso < 70;
+            
+            return (
+              <div
+                key={`${miembro.persona}-${index}`}
+                className={`flex items-center justify-between p-4 border-l-4 rounded-lg transition-all hover:shadow-md ${
+                  isOverBudget 
+                    ? 'border-l-red-500 bg-gradient-to-r from-red-50 to-white border border-red-200'
+                    : isAtRisk
+                      ? 'border-l-yellow-500 bg-gradient-to-r from-yellow-50 to-white border border-yellow-200'
+                      : isOnTrack
+                        ? 'border-l-green-500 bg-gradient-to-r from-green-50 to-white border border-green-200'
+                        : 'border-l-blue-500 bg-gradient-to-r from-blue-50 to-white border border-blue-200'
+                }`}
+              >
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full ${
+                      isOverBudget 
+                        ? 'bg-red-100'
+                        : isAtRisk
+                          ? 'bg-yellow-100'
+                          : isOnTrack
+                            ? 'bg-green-100'
+                            : 'bg-blue-100'
+                    }`}>
+                      {getStatusIcon(miembro.estado)}
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                        {miembro.persona}
+                        {isOverBudget && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                        {isAtRisk && <Clock className="w-4 h-4 text-yellow-600" />}
+                      </h4>
+                      {miembro.rol && (
+                        <p className="text-sm text-gray-500">{miembro.rol}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 max-w-xs">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className={`font-medium ${
+                        isOverBudget 
+                          ? 'text-red-700'
+                          : isAtRisk
+                            ? 'text-yellow-700'
+                            : isOnTrack
+                              ? 'text-green-700'
+                              : 'text-blue-700'
+                      }`}>
+                        {miembro.hrs_real}h / {miembro.hrs_obj}h
+                      </span>
+                      <span className={`font-bold ${
+                        isOverBudget 
+                          ? 'text-red-700'
+                          : isAtRisk
+                            ? 'text-yellow-700'
+                            : isOnTrack
+                              ? 'text-green-700'
+                              : 'text-blue-700'
+                      }`}>
+                        {miembro.porcentaje_progreso}%
+                      </span>
+                    </div>
+                    <Progress 
+                      value={Math.min(miembro.porcentaje_progreso, 100)}
+                      className={`h-3 ${
+                        isOverBudget 
+                          ? '[&>div]:bg-red-500'
+                          : isAtRisk
+                            ? '[&>div]:bg-yellow-500'
+                            : isOnTrack
+                              ? '[&>div]:bg-green-500'
+                              : '[&>div]:bg-blue-500'
+                      }`}
+                    />
+                    {/* Indicador de exceso */}
+                    {isOverBudget && (
+                      <div className="text-xs text-red-600 font-medium mt-1">
+                        ⚠️ Exceso: +{(miembro.porcentaje_progreso - 100).toFixed(1)}%
+                      </div>
+                    )}
+                    {/* Indicador de brecha */}
+                    {miembro.brecha_objetivo !== 0 && (
+                      <div className={`text-xs mt-1 font-medium ${
+                        miembro.brecha_objetivo > 0 
+                          ? 'text-red-600' 
+                          : 'text-green-600'
+                      }`}>
+                        {miembro.brecha_objetivo > 0 ? '↗️' : '↙️'} Brecha: {miembro.brecha_objetivo > 0 ? '+' : ''}{miembro.brecha_objetivo}h
+                      </div>
                     )}
                   </div>
                 </div>
 
-                <div className="flex-1 max-w-xs">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                    <span>{miembro.hrs_real}h / {miembro.hrs_obj}h</span>
-                    <span>{miembro.porcentaje_progreso}%</span>
-                  </div>
-                  <Progress 
-                    value={Math.min(miembro.porcentaje_progreso, 100)}
-                    className="h-2"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="font-bold text-lg">
-                    ${miembro.costo_usd.toLocaleString()}
-                  </div>
-                  {configuracion.mostrarRate && miembro.rate_usd > 0 && (
-                    <div className="text-xs text-gray-500">
-                      ${miembro.rate_usd.toFixed(2)}/h
+                <div className="flex items-center gap-4">
+                  <div className="text-right">
+                    <div className="font-bold text-lg">
+                      ${miembro.costo_usd.toLocaleString()}
                     </div>
-                  )}
+                    {configuracion.mostrarRate && miembro.rate_usd > 0 && (
+                      <div className="text-xs text-gray-500">
+                        ${miembro.rate_usd.toFixed(2)}/h
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <Badge 
+                      variant={getBadgeVariantByStatus(miembro.estado)}
+                      className={`${
+                        miembro.estado === 'completo' 
+                          ? 'bg-green-100 text-green-800 border-green-300'
+                          : miembro.estado === 'parcial'
+                            ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                            : 'bg-red-100 text-red-800 border-red-300'
+                      }`}
+                    >
+                      {miembro.estado === 'completo' && '✅ Completo'}
+                      {miembro.estado === 'parcial' && '⏳ Parcial'}
+                      {miembro.estado === 'sin_registro' && '❌ Sin registro'}
+                    </Badge>
+                    {/* Badge adicional para alertas críticas */}
+                    {isOverBudget && (
+                      <Badge variant="destructive" className="text-xs">
+                        🚨 Sobrecosto
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                
-                <Badge variant={getBadgeVariantByStatus(miembro.estado)}>
-                  {miembro.estado === 'completo' && 'Completo'}
-                  {miembro.estado === 'parcial' && 'Parcial'}
-                  {miembro.estado === 'sin_registro' && 'Sin registro'}
-                </Badge>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {miembros.length === 0 && !validaciones.noDataForPeriod && (
