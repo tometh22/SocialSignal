@@ -1719,18 +1719,19 @@ const ProjectDetailsPage = () => {
                   </h2>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Project Health Score */}
+                    {/* Markup Real */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Estado del Proyecto</div>
-                      <div className="text-2xl font-bold text-green-400">
+                      <div className="text-sm text-slate-300 mb-1">Markup del Proyecto</div>
+                      <div className={`text-2xl font-bold ${(() => {
+                        const markup = unifiedData?.metrics?.markup || 0;
+                        return markup >= 3 ? "text-green-400" : markup >= 2 ? "text-blue-400" : markup >= 1.5 ? "text-yellow-400" : "text-red-400";
+                      })()}`}>
                         {(() => {
-                          const efficiency = unifiedData?.metrics?.efficiency || 0;
                           const markup = unifiedData?.metrics?.markup || 0;
-                          const score = (efficiency + markup * 20) / 2;
-                          return score > 75 ? "95%" : score > 50 ? "78%" : "62%";
+                          return markup > 0 ? `${markup.toFixed(1)}x` : "N/A";
                         })()}
                       </div>
-                      <div className="text-xs text-slate-400">Sobre promedio del sector</div>
+                      <div className="text-xs text-slate-400">Factor de ganancia real</div>
                     </div>
 
                     {/* ROI Indicator */}
