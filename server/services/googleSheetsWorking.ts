@@ -1177,7 +1177,7 @@ class GoogleSheetsWorkingService {
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
-        const montoUSDValue = montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : 0;
+        const montoUSDValue = montoTotalUSDRaw ? this.parseMoneyValue(montoTotalUSDRaw) : 0;
 
         // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS
         if (tipoGasto !== 'Directo') continue;
@@ -1204,8 +1204,8 @@ class GoogleSheetsWorkingService {
           cliente: cliente,
           horasObjetivo: horasObjetivo, // NUEVO: Horas objetivo de la columna K
           horasRealesAsana: horasRealesAsana,
-          tipoCambio: tipoCambioRaw ? parseFloat(tipoCambioRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined,
-          montoTotalUSD: montoTotalUSDRaw ? parseFloat(montoTotalUSDRaw.replace(/[^\d.,]/g, '').replace(',', '.')) : undefined
+          tipoCambio: tipoCambioRaw ? this.parseMoneyValue(tipoCambioRaw) : undefined,
+          montoTotalUSD: montoTotalUSDRaw ? this.parseMoneyValue(montoTotalUSDRaw) : undefined
         };
 
         result.push(costoData);
