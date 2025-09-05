@@ -1528,19 +1528,32 @@ export const projectFinancialSummary = pgTable("project_financial_summary", {
 export const googleSheetsSales = pgTable("google_sheets_sales", {
   id: serial("id").primaryKey(),
   
+  // Clave temporal única (YYYY-MM) para simplificar JOINs
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // "2025-08"
+  
   // Datos desde Google Sheets
   clientName: varchar("client_name", { length: 200 }).notNull(),
   projectName: varchar("project_name", { length: 200 }).notNull(),
   month: varchar("month", { length: 50 }).notNull(), // "Enero", "Febrero", etc.
   year: integer("year").notNull(),
   salesType: varchar("sales_type", { length: 50 }).notNull(), // "Fee", "One Shot"
-  amountArs: numeric("amount_ars", { precision: 15, scale: 2 }),
+  
+  // Monedas y FX mejorados
+  amountLocal: numeric("amount_local", { precision: 15, scale: 2 }),
+  currency: varchar("currency", { length: 3 }).notNull().default('ARS'),
+  fxApplied: numeric("fx_applied", { precision: 10, scale: 4 }),
   amountUsd: numeric("amount_usd", { precision: 12, scale: 2 }),
+  fxSource: varchar("fx_source", { length: 50 }), // "Excel", "Manual", "API"
+  fxAt: timestamp("fx_at"),
+  
+  // Revenue vs cobro
+  revenueType: varchar("revenue_type", { length: 20 }).notNull().default('fee'), // "fee", "T&M", "credito"
+  status: varchar("status", { length: 20 }).notNull().default('emitido'), // "proyectado", "emitido", "cobrado"
+  recognizedMonth: varchar("recognized_month", { length: 7 }), // Month when revenue is recognized
   confirmed: varchar("confirmed", { length: 10 }).notNull().default('SI'), // "SI", "NO"
   
   // Campos calculados automáticamente
   monthNumber: integer("month_number"), // 1-12
-  status: varchar("status", { length: 20 }), // "completada", "activa", "proyectada"
   
   // Referencias al sistema (null si no existe match)
   clientId: integer("client_id").references(() => clients.id),
@@ -1651,6 +1664,9 @@ export const projectFinancialTransactionsRelations = relations(projectFinancialT
 export const directCosts = pgTable("direct_costs", {
   id: serial("id").primaryKey(),
   
+  // Clave temporal única (YYYY-MM) para simplificar JOINs
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // "2025-08"
+  
   // Datos desde Excel "Costos directos e indirectos"
   persona: text("persona").notNull(),
   mes: text("mes").notNull(),
@@ -1661,15 +1677,18 @@ export const directCosts = pgTable("direct_costs", {
   tipoProyecto: text("tipo_proyecto"), // Fee mensual, Especial
   cliente: text("cliente"), // Warner, Uber, Epical, etc.
   
-  // Datos de horas y costos
+  // Datos de horas y costos - INCLUYENDO COLUMNA M
   horasObjetivo: doublePrecision("horas_objetivo"), // Columna K: Cantidad de horas objetivo
   horasRealesAsana: doublePrecision("horas_reales_asana").notNull(), // Columna L: Cantidad de horas reales Asana
+  horasParaFacturacion: doublePrecision("horas_para_facturacion"), // Columna M: NUEVO - horas para facturación
+  valorHoraLocalCurrency: numeric("valor_hora_local_currency", { precision: 10, scale: 2 }), // Valor hora en moneda local
   valorHoraPersona: doublePrecision("valor_hora_persona").notNull(), // Obtenido de personnel histórico
   costoTotal: doublePrecision("costo_total").notNull(), // horas * valor_hora
   
-  // Conversión de moneda desde Excel MAESTRO
-  tipoCambio: doublePrecision("tipo_cambio"), // Columna P: Tipo de cambio del momento
-  montoTotalUSD: doublePrecision("monto_total_usd"), // Columna Q: Monto ya convertido a USD
+  // Conversión de moneda desde Excel MAESTRO mejorada
+  tipoCambio: numeric("tipo_cambio", { precision: 10, scale: 4 }), // Columna P: Tipo de cambio del momento
+  fxCost: numeric("fx_cost", { precision: 10, scale: 4 }), // Costo de conversión
+  montoTotalUSD: numeric("monto_total_usd", { precision: 12, scale: 2 }), // Columna Q: Monto ya convertido a USD
   
   // Referencias al sistema (null si no existe match)
   projectId: integer("project_id").references(() => activeProjects.id),

@@ -10293,6 +10293,160 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== RESUMEN EJECUTIVO CONSOLIDADO ====================
+  // Endpoint que integra datos del Excel MAESTRO para el dashboard ejecutivo
+  app.get('/api/executive-summary', requireAuth, async (req, res) => {
+    try {
+      const timeFilter = req.query.timeFilter as string || 'august_2025';
+      const projectId = req.query.projectId ? parseInt(req.query.projectId as string) : null;
+      
+      console.log(`📊 EXECUTIVE SUMMARY - Filter: ${timeFilter}, Project: ${projectId}`);
+      
+      // Helper para parsear filtros temporales  
+      const parseTimeFilter = (filter: string) => {
+        const now = new Date();
+        let monthKey: string;
+        
+        switch (filter) {
+          case 'august_2025':
+            monthKey = '2025-08';
+            break;
+          case 'may_2025':
+            monthKey = '2025-05';
+            break;
+          case 'june_2025':
+            monthKey = '2025-06';
+            break;
+          case 'july_2025':
+            monthKey = '2025-07';
+            break;
+          default:
+            monthKey = '2025-08'; // Default agosto 2025
+        }
+        return monthKey;
+      };
+      
+      const monthKey = parseTimeFilter(timeFilter);
+      console.log(`📊 Filtering by month_key: ${monthKey}`);
+      
+      // 1. INGRESOS desde google_sheets_sales
+      const allSales = await storage.getGoogleSheetsSales();
+      const salesForPeriod = allSales.filter(sale => 
+        sale.monthKey === monthKey && 
+        sale.confirmed === 'SI' &&
+        (!projectId || sale.projectId === projectId)
+      );
+      
+      const totalRevenue = salesForPeriod.reduce((sum, sale) => 
+        sum + parseFloat(sale.amountUsd || '0'), 0
+      );
+      
+      console.log(`📊 Revenue data: ${salesForPeriod.length} sales, $${totalRevenue} USD`);
+      
+      // 2. COSTOS desde direct_costs  
+      const allDirectCosts = await storage.getDirectCosts();
+      const costsForPeriod = allDirectCosts.filter(cost =>
+        cost.monthKey === monthKey &&
+        (!projectId || cost.projectId === projectId)
+      );
+      
+      const totalCosts = costsForPeriod.reduce((sum, cost) => 
+        sum + (cost.montoTotalUSD || 0), 0
+      );
+      
+      const totalHoursReal = costsForPeriod.reduce((sum, cost) => 
+        sum + (cost.horasRealesAsana || 0), 0
+      );
+      
+      const totalHoursBillable = costsForPeriod.reduce((sum, cost) => 
+        sum + (cost.horasParaFacturacion || 0), 0
+      );
+      
+      console.log(`💰 Cost data: ${costsForPeriod.length} costs, $${totalCosts} USD, ${totalHoursReal}h real`);
+      
+      // 3. CÁLCULOS KPI según el review
+      const markup = totalCosts > 0 ? totalRevenue / totalCosts : 0;
+      const profitMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+      const budgetUsed = totalRevenue > 0 ? (totalCosts / totalRevenue) * 100 : 0;
+      const efficiency = totalHoursReal > 0 && totalHoursBillable > 0 ? 
+        (totalHoursBillable / totalHoursReal) * 100 : 0;
+      
+      // 4. ANÁLISIS POR EQUIPO (top performers)
+      const teamAnalysis = costsForPeriod.reduce((acc, cost) => {
+        const persona = cost.persona;
+        if (!acc[persona]) {
+          acc[persona] = {
+            persona,
+            totalHours: 0,
+            totalCost: 0,
+            avgRate: 0
+          };
+        }
+        
+        acc[persona].totalHours += cost.horasRealesAsana || 0;
+        acc[persona].totalCost += cost.montoTotalUSD || 0;
+        
+        return acc;
+      }, {} as Record<string, any>);
+      
+      const topPerformers = Object.values(teamAnalysis)
+        .sort((a: any, b: any) => b.totalHours - a.totalHours)
+        .slice(0, 5)
+        .map((member: any) => ({
+          ...member,
+          avgRate: member.totalHours > 0 ? member.totalCost / member.totalHours : 0
+        }));
+      
+      // 5. VALIDACIONES según review
+      const validations = {
+        revenueDataSource: 'Excel MAESTRO - Ventas Tomi',
+        costDataSource: 'Excel MAESTRO - Costos Directos',
+        dataConsistency: totalRevenue > 0 && totalCosts > 0,
+        parseValidation: totalCosts > 10 ? 'OK' : 'POSIBLE ERROR DE PARSING',
+        markupValidation: markup > 0.5 ? 'OK' : 'MARKUP BAJO'
+      };
+      
+      const result = {
+        period: monthKey,
+        timeFilter,
+        projectId,
+        
+        // KPIs principales  
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalCosts: Math.round(totalCosts * 100) / 100,
+        markup: Math.round(markup * 100) / 100,
+        profitMargin: Math.round(profitMargin * 10) / 10,
+        budgetUsed: Math.round(budgetUsed * 10) / 10,
+        
+        // Métricas de equipo
+        totalHoursReal,
+        totalHoursBillable,
+        efficiency: Math.round(efficiency * 10) / 10,
+        
+        // Team insights
+        topPerformers,
+        teamSize: Object.keys(teamAnalysis).length,
+        
+        // Data sources y validaciones
+        dataSources: {
+          salesCount: salesForPeriod.length,
+          costsCount: costsForPeriod.length,
+          monthKey
+        },
+        validations,
+        
+        generatedAt: new Date().toISOString()
+      };
+      
+      console.log(`📊 EXECUTIVE SUMMARY RESULT:`, JSON.stringify(result, null, 2));
+      
+      res.json(result);
+    } catch (error) {
+      console.error("❌ Error in executive summary:", error);
+      res.status(500).json({ message: "Executive summary failed", error: error.message });
+    }
+  });
+
   // ==================== ENDPOINT TEMPORAL DE DIAGNÓSTICO ====================
   
   // Endpoint de diagnóstico para verificar costos directos específicos

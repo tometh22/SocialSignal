@@ -60,7 +60,8 @@ interface CostoDirectoExcel {
   tipoProyecto: string;
   cliente: string;
   horasObjetivo?: number; // Columna K: Cantidad de horas objetivo
-  horasRealesAsana: number;
+  horasRealesAsana: number; // Columna L: Cantidad de horas reales Asana
+  horasParaFacturacion?: number; // Columna M: Cantidad de horas para facturación - NUEVO
   valorHoraPersona?: number;
   costoTotal?: number;
   tipoCambio?: number; // Columna P del Excel
@@ -1077,7 +1078,12 @@ class GoogleSheetsWorkingService {
           const projectId = await this.findProjectByName(storage, costo.cliente, costo.proyecto);
           const personnelId = await this.findPersonnelByName(storage, costo.persona);
 
+          // Generar month_key (YYYY-MM) 
+          const monthNumber = this.parseMonthFromSpanish(costo.mes);
+          const monthKey = `${costo.año}-${String(monthNumber).padStart(2, '0')}`;
+          
           const directCostData = {
+            monthKey: monthKey, // NUEVO: Clave temporal única
             persona: costo.persona,
             mes: costo.mes,
             año: costo.año,
@@ -1086,17 +1092,26 @@ class GoogleSheetsWorkingService {
             proyecto: costo.proyecto,
             tipoProyecto: costo.tipoProyecto,
             cliente: costo.cliente,
-            horasObjetivo: costo.horasObjetivo || 0, // NUEVO: Horas objetivo del Excel MAESTRO
+            horasObjetivo: costo.horasObjetivo || 0,
             horasRealesAsana: costo.horasRealesAsana,
-            valorHoraPersona: valorHora || 0, // Usar 0 cuando no hay tarifa horaria (se usa monto USD directo)
+            horasParaFacturacion: costo.horasParaFacturacion || 0, // NUEVO: Columna M
+            valorHoraPersona: valorHora || 0,
             costoTotal: costoTotal,
-            tipoCambio: costo.tipoCambio, // Nuevo: tipo de cambio desde Excel
-            montoTotalUSD: costo.montoTotalUSD, // Nuevo: monto convertido a USD
+            tipoCambio: costo.tipoCambio,
+            montoTotalUSD: costo.montoTotalUSD,
             projectId: projectId,
             personnelId: personnelId,
             importBatch: importBatch,
             uniqueKey: uniqueKey
           };
+          
+          // 🚨 VALIDACIÓN ADICIONAL: Revisar totales  
+          if (costo.montoTotalUSD && costo.montoTotalUSD > 0 && costo.horasRealesAsana > 0) {
+            const costoHora = costo.montoTotalUSD / costo.horasRealesAsana;
+            if (costoHora > 500) { // Más de $500/hora podría ser error
+              console.log(`⚠️ ALERTA COSTO ALTO: ${costo.persona} - $${costoHora.toFixed(2)}/hora`);
+            }
+          }
 
           // Verificar si ya existe un registro
           const existingCost = await storage.getDirectCostByUniqueKey(uniqueKey);
@@ -1156,6 +1171,7 @@ class GoogleSheetsWorkingService {
       cliente: 9, // Columna J - Cliente
       horasObjetivo: 10, // Columna K - Cantidad de horas objetivo
       horasRealesAsana: 11, // Columna L - Cantidad de horas reales Asana
+      horasParaFacturacion: 12, // Columna M - Cantidad de horas para facturación - NUEVO
       montoOriginalARS: 14, // Columna O - Moneda Original ARS
       montoTotalUSD: 17, // Columna R - Monto Total USD (ya convertido)
       tipoCambio: 16 // Columna Q - Tipo Cambio (para referencia)
@@ -1174,10 +1190,16 @@ class GoogleSheetsWorkingService {
         const tipoGasto = this.getCellValue(row, columnMap.tipoGasto);
         const horasObjetivo = parseFloat(this.getCellValue(row, columnMap.horasObjetivo)) || 0;
         const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
+        const horasParaFacturacion = parseFloat(this.getCellValue(row, columnMap.horasParaFacturacion)) || 0; // NUEVO: Columna M
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
         const montoUSDValue = montoTotalUSDRaw ? this.parseMoneyValue(montoTotalUSDRaw) : 0;
+        
+        // 🚨 VALIDACIÓN ANTI-ERRORES: Verificar parsing de moneda
+        if (montoTotalUSDRaw && montoUSDValue < 10 && montoTotalUSDRaw.includes('.')) {
+          console.log(`⚠️ ALERTA PARSING: ${montoTotalUSDRaw} parseado como ${montoUSDValue} - posible error de locale`);
+        }
 
         // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS
         if (tipoGasto !== 'Directo') continue;
@@ -1202,8 +1224,9 @@ class GoogleSheetsWorkingService {
           proyecto: proyecto,
           tipoProyecto: '', // No usado en la nueva estructura
           cliente: cliente,
-          horasObjetivo: horasObjetivo, // NUEVO: Horas objetivo de la columna K
-          horasRealesAsana: horasRealesAsana,
+          horasObjetivo: horasObjetivo, // Columna K: Horas objetivo
+          horasRealesAsana: horasRealesAsana, // Columna L: Horas reales
+          horasParaFacturacion: horasParaFacturacion, // Columna M: Horas para facturación - NUEVO
           tipoCambio: tipoCambioRaw ? this.parseMoneyValue(tipoCambioRaw) : undefined,
           montoTotalUSD: montoTotalUSDRaw ? this.parseMoneyValue(montoTotalUSDRaw) : undefined
         };

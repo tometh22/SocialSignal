@@ -1,0 +1,78 @@
+Me gusta mucho el mapeo. Está bien orientado y ejecutable. Te dejo un review rápido por bloques con ajustes finos para que no vuelvas a tener gaps como el de los $4.035.
+✅ Bien planteado (dejalo así)
+Separar Ingresos (sales) de Costos (direct_costs) y calcular KPI arriba.
+Cards y KPIs correctos: Markup, % presupuesto usado, horas, eficiencia (M/L).
+Hojas nuevas “Capacidades” y “Proyecciones”: totalmente necesarias.
+Plan por fases (primero lo que ya tenés; luego completar columnas/hojas).
+⚠️ Ajustes que haría ahora
+Clave temporal única
+Guardá month_key = YYYY-MM (p.ej. 2025-08) en todas las tablas.
+Evita nombres tipo “07 jul”. Te simplifica JOINs y elimina LIKE.
+Monedas y FX
+En google_sheets_sales: amount_local, currency, fx_applied, amount_usd, fx_source, fx_at.
+En direct_costs: valor_hora_local_currency, fx_cost, monto_total_usd calculado.
+Tipo NUMERIC/DECIMAL, no float.
+Normalización de texto
+Cliente/Proyecto con IDs canónicos (client_id, project_id). El nombre va aparte. Evita espacios/acentos distintos.
+Horas de facturación
+Importá columna M (horas_para_facturación). Tu “Eficiencia” depende de eso.
+Renombrá el KPI a Realización (M/L) para evitar confusión con “eficiencia” técnica.
+Revenue vs. cobro
+En google_sheets_sales agrega revenue_type (fee, T&M, crédito), status (proyectado, emitido, cobrado) y recognized_month.
+Así podés mostrar AR aging y no confundir ingresos “planeados” con “reconocidos”.
+ROI Performance (definición)
+Define explícito:
+Margen real % = (Ingresos − Costos) / Ingresos.
+Margen base % (de “Proyecciones”).
+ROI Perf = (Margen real − Margen base) / |Margen base|.
+Manejá bordes: base = 0 o negativa.
+Capacidades
+Guardá por semana o por month_key (si semanal es mucho): hours_capacity_week y valid_from/valid_to.
+Permite vacaciones/feriados (puede decrementar capacidad real).
+Validaciones anti-errores (muy clave)
+Si texto tiene miles (puntos) y número parseado < 10 → log de error (el caso $1.624,54).
+Sumas por persona/mes: Excel vs DB: si difiere >1% → alerta.
+monto_total_usd > 0 y horas >= 0.
+Markup solo si Costos > 0; si no, mostrar “—”.
+JOINs que no filtren
+Usa LEFT JOIN desde costos/ventas a dimensiones; logs cuando falte FK (no perder filas por INNER).
+Nombres de hojas
+“Ventas Tomi” → “Sales” (neutral) y documenta columnas (data contract).
+➕ Cosas para sumar (rápidas y de alto valor)
+Widget de conciliación: Excel vs DB por project_id, month_key (diferencia y %).
+Top contribución a margen por persona: SUM(monto_usd_persona) − costo_usd_persona. Es mejor que “mejor rendimiento = más horas”.
+Costo por rol (rate blending): te ayuda a pricing.
+Alertas: realización <90%, markup <1.3x, % presupuesto usado >80% a mitad de mes, brecha FX >5%.
+Snapshots de cierre: guarda una tabla monthly_closings(project_id, month_key, totals…) para histórico.
+SQL de referencia (esqueleto)
+-- Totales mes
+SELECT
+  project_id, month_key,
+  SUM(amount_usd) AS ingresos_usd
+FROM google_sheets_sales
+WHERE confirmed = 'SI'
+GROUP BY 1,2;
+
+SELECT
+  project_id, month_key,
+  SUM(monto_total_usd) AS costos_usd,
+  SUM(horas_reales_asana) AS horas_reales,
+  SUM(horas_para_facturacion) AS horas_fact
+FROM direct_costs
+GROUP BY 1,2;
+
+-- KPIs
+SELECT
+  i.project_id, i.month_key,
+  i.ingresos_usd,
+  c.costos_usd,
+  CASE WHEN c.costos_usd>0 THEN i.ingresos_usd/c.costos_usd END AS markup,
+  CASE WHEN i.ingresos_usd>0 THEN (i.ingresos_usd-c.costos_usd)/i.ingresos_usd END AS margen_pct,
+  c.horas_reales, c.horas_fact,
+  CASE WHEN c.horas_reales>0 THEN c.horas_fact/c.horas_reales END AS realizacion
+FROM ingresos i
+LEFT JOIN costos c USING(project_id, month_key);
+Estado de tu plan
+Fase 1: con lo que tenés, el dashboard queda muy bien (80% real).
+Fase 2 (corta): importar M, crear “Capacidades” y “Proyecciones”, y ya llegás al 100%.
+Si querés, te paso el data contract (headers exactos para las tres hojas) y las reglas de validación que podés correr antes de cargar a la DB.

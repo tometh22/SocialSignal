@@ -4473,18 +4473,25 @@ export class DatabaseStorage implements IStorage {
         // Crear clave única para evitar duplicados
         const uniqueKey = `${clientName}_${projectName}_${monthNumber}_${year}_${salesType}`.toLowerCase();
 
+        // Generar month_key (YYYY-MM)
+        const monthKey = `${year}-${String(monthNumber).padStart(2, '0')}`;
+        
         // Preparar datos para inserción
         const salesRecord: InsertGoogleSheetsSales = {
+          monthKey: monthKey, // NUEVO: Clave temporal única
           clientName,
           projectName,
           month: monthName,
           year,
           salesType,
           amountArs: amountArs ? String(amountArs) : null,
+          // currency: 'ARS', // NUEVO: Moneda por defecto (comentado hasta migración)
           amountUsd: amountUsd ? String(amountUsd) : null,
           confirmed,
           monthNumber,
           status,
+          // revenueType: salesType.toLowerCase() === 'fee' ? 'fee' : 'credit', // NUEVO (comentado hasta migración)
+          // recognizedMonth: monthKey, // NUEVO: Mes de reconocimiento (comentado hasta migración)
           clientId: client?.id || null,
           projectId: project?.id || null,
           rowNumber: i + 1,
