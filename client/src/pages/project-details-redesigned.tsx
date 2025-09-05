@@ -3300,7 +3300,7 @@ const ProjectDetailsPage = () => {
                   <DollarSign className="h-5 w-5 text-green-600" />
                   2. Análisis de Rentabilidad
                 </h3>
-                <p className="text-green-700 text-sm">Impacto financiero: Horas Facturables (Col. M) × Tarifa (Col. N)</p>
+                <p className="text-green-700 text-sm">Impacto financiero: Valores pre-convertidos a USD (Col. R) del Excel MAESTRO</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -3331,8 +3331,8 @@ const ProjectDetailsPage = () => {
                             <span className="font-bold text-green-900">{totalBillableHours.toFixed(1)}h</span>
                           </div>
                           <div className="flex justify-between items-center p-3 bg-emerald-50 rounded">
-                            <span className="text-sm text-emerald-700">Costo Total (M×N)</span>
-                            <span className="font-bold text-emerald-900">${totalFinancialCost.toLocaleString()} USD</span>
+                            <span className="text-sm text-emerald-700">Costo Total USD (Col. R)</span>
+                            <span className="font-bold text-emerald-900">${totalFinancialCost.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between items-center p-3 bg-teal-50 rounded">
                             <span className="text-sm text-teal-700">Tarifa Promedio</span>
@@ -3402,7 +3402,7 @@ const ProjectDetailsPage = () => {
                   <BarChart3 className="h-5 w-5 text-purple-600" />
                   3. Comparación Directa: Operacional vs Financiero
                 </h3>
-                <p className="text-purple-700 text-sm">Análisis cruzado para detectar desviaciones entre eficiencia y rentabilidad</p>
+                <p className="text-purple-700 text-sm">Análisis cruzado: Eficiencia operacional (K vs L) vs Costos reales USD (Col. R)</p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
