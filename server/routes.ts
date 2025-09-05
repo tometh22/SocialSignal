@@ -10689,9 +10689,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 1. BASE DATA - Costos directos del Excel MAESTRO
       const allDirectCosts = await storage.getDirectCosts();
-      const filteredCosts = allDirectCosts.filter(cost => 
-        cost.projectId === projectId && cost.monthKey === monthKey
-      );
+      
+      // Filtrar por proyecto y período (usando mes y año en lugar de monthKey)
+      const filteredCosts = allDirectCosts.filter(cost => {
+        if (cost.projectId !== projectId) return false;
+        
+        // Para agosto 2025: buscar mes='08 ago' y año=2025
+        if (timeFilter === 'august_2025') {
+          return cost.mes === '08 ago' && cost.año === 2025;
+        }
+        
+        // Agregar otros filtros temporales según sea necesario
+        if (timeFilter === 'may_2025') {
+          return cost.mes === '05 may' && cost.año === 2025;
+        }
+        
+        if (timeFilter === 'june_2025') {
+          return cost.mes === '06 jun' && cost.año === 2025;
+        }
+        
+        if (timeFilter === 'july_2025') {
+          return cost.mes === '07 jul' && cost.año === 2025;
+        }
+        
+        // Default: agosto 2025
+        return cost.mes === '08 ago' && cost.año === 2025;
+      });
       
       console.log(`🏆 Found ${filteredCosts.length} cost records for performance calculation`);
       
@@ -10717,13 +10740,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }, {});
       
       // 3. OBTENER INGRESOS DEL PROYECTO (para cálculo de Impacto)
-      const allSales = await storage.getUnifiedExcelSales();
+      const allSales = await storage.getGoogleSheetsSales();
       const projectSales = allSales.filter(sale => 
         sale.projectId === projectId && sale.monthKey === monthKey
       );
       
       const ingresos_proyecto_usd = projectSales.reduce((sum, sale) => 
-        sum + (sale.montoUsd || 0), 0
+        sum + (sale.amountUsd || 0), 0
       );
       
       console.log(`🏆 Project income for period: $${ingresos_proyecto_usd}`);
