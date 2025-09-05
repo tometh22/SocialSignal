@@ -2927,11 +2927,11 @@ const ProjectDetailsPage = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
                   {recentTimeEntries && recentTimeEntries.length > 0 ? (
-                    recentTimeEntries.slice(0, 12).map((entry, index) => (
+                    recentTimeEntries.slice(0, 12).map((entry: any, index: number) => (
                       <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
                         <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
                           <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700 font-semibold">
-                            {entry.personnelName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {entry.personnelName.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
@@ -3283,10 +3283,10 @@ const ProjectDetailsPage = () => {
                           realHours: cost.horasRealesAsana || 0,
                           efficiency: ((cost.horasRealesAsana || 0) / (cost.horasObjetivo || 1)) * 100
                         }))
-                        .sort((a, b) => a.efficiency - b.efficiency)
+                        .sort((a: any, b: any) => a.efficiency - b.efficiency)
                         .slice(0, 5);
                       
-                      return personData.map((person, index) => (
+                      return personData.map((person: any, index: number) => (
                         <div key={person.name} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                           <div>
                             <div className="font-medium text-sm text-gray-900">{person.name}</div>
@@ -3385,7 +3385,7 @@ const ProjectDetailsPage = () => {
                         .sort((a: any, b: any) => (b.montoTotalUSD || 0) - (a.montoTotalUSD || 0))
                         .slice(0, 5);
                       
-                      return personCosts.map((cost: any, index) => (
+                      return personCosts.map((cost: any, index: number) => (
                         <div key={cost.persona} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                           <div>
                             <div className="font-medium text-sm text-gray-900">{cost.persona}</div>
@@ -4812,7 +4812,6 @@ const ProjectDetailsPage = () => {
             <div className="w-full">
               <TrendCharts 
                 projectId={parseInt(projectId!)} 
-                timeFilter={timeFilterForHook}
                 dateFilter={{
                   startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
                   endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
@@ -5217,9 +5216,9 @@ const ProjectDetailsPage = () => {
                       mes: cost.mes,
                       año: cost.año
                     }))
-                    .sort((a, b) => b.realHours - a.realHours);
+                    .sort((a: any, b: any) => b.realHours - a.realHours);
                   
-                  return personData.map((person, index) => (
+                  return personData.map((person: any, index: number) => (
                     <div key={`${person.name}-${person.mes}-${index}`} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                       <div>
                         <div className="font-medium text-gray-900">{person.name}</div>
