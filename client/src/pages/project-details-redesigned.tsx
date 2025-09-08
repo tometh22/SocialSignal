@@ -3998,7 +3998,27 @@ const ProjectDetailsPage = () => {
                     {(() => {
                       const totalHours = unifiedData?.actuals?.totalWorkedHours || 0;
                       const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
-                      const weeksElapsed = 4; // Simplificado para el ejemplo
+                      const timeFilter = unifiedData?.timeFilter || '';
+                      
+                      // Detectar si es un período histórico (pasado)
+                      const now = new Date();
+                      const currentMonth = now.getMonth() + 1; // 1-12
+                      const currentYear = now.getFullYear();
+                      
+                      let isHistoricalPeriod = false;
+                      
+                      // Verificar diferentes formatos de filtro temporal
+                      if (timeFilter.includes('august_2025') || timeFilter.includes('agosto_2025')) {
+                        isHistoricalPeriod = currentMonth > 8 || currentYear > 2025;
+                      } else if (timeFilter.includes('july_2025') || timeFilter.includes('julio_2025')) {
+                        isHistoricalPeriod = currentMonth > 7 || currentYear > 2025;
+                      } else if (timeFilter.includes('september_2025') || timeFilter.includes('septiembre_2025')) {
+                        isHistoricalPeriod = currentMonth > 9 || currentYear > 2025;
+                      } else if (timeFilter.includes('2024')) {
+                        isHistoricalPeriod = currentYear > 2024;
+                      }
+                      
+                      const weeksElapsed = 4;
                       const weeklyVelocity = totalHours / weeksElapsed;
                       const remainingHours = Math.max(0, estimatedHours - totalHours);
                       
@@ -4009,11 +4029,20 @@ const ProjectDetailsPage = () => {
                             <div className="text-xs text-blue-600">Velocidad Semanal</div>
                           </div>
                           <div className="text-center p-3 bg-green-50 rounded-lg border">
-                            <div className="text-xl font-bold text-green-700">{Math.ceil(remainingHours / weeklyVelocity)}</div>
-                            <div className="text-xs text-green-600">Semanas Restantes</div>
+                            {isHistoricalPeriod ? (
+                              <>
+                                <div className="text-xl font-bold text-green-700">✓</div>
+                                <div className="text-xs text-green-600">Período Completado</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-xl font-bold text-green-700">{weeklyVelocity > 0 ? Math.ceil(remainingHours / weeklyVelocity) : 0}</div>
+                                <div className="text-xs text-green-600">Semanas Restantes</div>
+                              </>
+                            )}
                           </div>
                           <div className="text-center p-3 bg-purple-50 rounded-lg border">
-                            <div className="text-xl font-bold text-purple-700">{((totalHours / estimatedHours) * 100).toFixed(0)}%</div>
+                            <div className="text-xl font-bold text-purple-700">{estimatedHours > 0 ? ((totalHours / estimatedHours) * 100).toFixed(0) : 0}%</div>
                             <div className="text-xs text-purple-600">Progreso</div>
                           </div>
                         </>
