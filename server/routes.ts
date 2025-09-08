@@ -11667,7 +11667,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return acc; 
       }, {}));
       
-      console.log(`💰 Returning ${uniqueData.length} cost records`);
+      console.log(`💰 AFTER dedup: ${uniqueData.length} cost records`);
+      console.log(`💰 AFTER dedup by type:`, uniqueData.reduce((acc: any, curr: any) => { 
+        acc[curr.cost_type] = (acc[curr.cost_type] || 0) + 1; 
+        return acc; 
+      }, {}));
+      
       console.log(`💰 Sample data:`, uniqueData.slice(0, 2));
 
       res.json(uniqueData);
