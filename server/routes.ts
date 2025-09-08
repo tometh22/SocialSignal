@@ -11445,7 +11445,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // También incluir datos del Excel MAESTRO si están disponibles
+        // FALLBACK: Si no hay costSummary, usar datos directos del Excel MAESTRO
+        if (!costSummary || !costSummary.costByPerson) {
+          console.log(`💰 No costSummary available for project ${projectId}, using direct Excel data`);
+          try {
+            const directCosts = await storage.getDirectCostsByProject(parseInt(projectId as string));
+            
+            if (directCosts && directCosts.length > 0) {
+              // Aplicar filtro temporal si es necesario
+              let filteredCosts = directCosts;
+              if (dateRange) {
+                filteredCosts = directCosts.filter(cost => {
+                  let monthNumber;
+                  if (cost.mes.includes(' ')) {
+                    monthNumber = parseInt(cost.mes.substring(0, 2));
+                  } else {
+                    monthNumber = parseInt(getMonthNumber(cost.mes));
+                  }
+                  const costDate = new Date(`${cost.año}-${monthNumber}-15`);
+                  return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+                });
+              }
+              
+              // Agrupar por persona para crear registros únicos
+              const personMap = new Map();
+              filteredCosts.forEach(cost => {
+                const key = cost.persona;
+                if (!personMap.has(key)) {
+                  personMap.set(key, {
+                    name: cost.persona,
+                    realCost: 0,
+                    operationalCost: 0,
+                    hours: 0
+                  });
+                }
+                const person = personMap.get(key);
+                person.realCost += cost.montoTotalUSD || 0;
+                person.operationalCost += cost.montoTotalUSD || 0; // Para Excel, real = operacional
+                person.hours += cost.horasRealesAsana || 0;
+              });
+              
+              // Convertir a formato esperado por el frontend
+              let recordIndex = 0;
+              personMap.forEach(person => {
+                const monthKey = dateRange ? 
+                  `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
+                  new Date().toISOString().slice(0, 7);
+                
+                // Registro real
+                costRecords.push({
+                  id: recordIndex * 2 + 1,
+                  member_name: person.name,
+                  hours_worked: person.hours,
+                  hourly_rate: person.realCost / (person.hours || 1),
+                  total_cost: person.realCost,
+                  month_key: monthKey,
+                  cost_type: "real",
+                  status: "confirmed", 
+                  confirmed: "SI"
+                });
+                
+                // Registro operacional
+                costRecords.push({
+                  id: recordIndex * 2 + 2,
+                  member_name: person.name,
+                  hours_worked: person.hours,
+                  hourly_rate: person.operationalCost / (person.hours || 1),
+                  total_cost: person.operationalCost,
+                  month_key: monthKey,
+                  cost_type: "operational",
+                  status: "confirmed",
+                  confirmed: "SI"
+                });
+                
+                recordIndex++;
+              });
+              
+              console.log(`💰 Using fallback Excel data: ${costRecords.length} records generated`);
+            }
+          } catch (fallbackError) {
+            console.error(`💰 Fallback Excel data failed for project ${projectId}:`, fallbackError.message);
+          }
+        }
+
+        // También incluir datos del Excel MAESTRO si están disponibles en costSummary
         if (costSummary && costSummary.excelDirectCosts) {
           const excelRecords = costSummary.excelDirectCosts.map((record: any, index: number) => {
             return {
