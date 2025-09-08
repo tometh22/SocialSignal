@@ -1664,7 +1664,7 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-8 w-full max-w-6xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-8 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -1712,7 +1712,14 @@ const ProjectDetailsPage = () => {
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
               <TrendingUp className="h-4 w-4" />
-              Análisis Financiero
+              Financiero
+            </TabsTrigger>
+            <TabsTrigger 
+              value="operational-analysis" 
+              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:shadow-sm"
+            >
+              <Settings className="h-4 w-4" />
+              Operacional
             </TabsTrigger>
           </TabsList>
 
