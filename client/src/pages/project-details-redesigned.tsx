@@ -3246,7 +3246,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Revenue per Employee</p>
                       <p className="text-2xl font-bold">
-                        ${Math.round((unifiedData?.totalRevenue || 0) / Math.max(unifiedData?.teamBreakdown?.length || 1, 1)).toLocaleString()}
+                        $0
                       </p>
                     </div>
                     <Users className="h-6 w-6 text-violet-200" />
@@ -3272,7 +3272,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Monthly Burn Rate</p>
                       <p className="text-2xl font-bold">
-                        ${Math.round((unifiedData?.totalCosts || 0) / 1).toLocaleString()}
+                        $0
                       </p>
                     </div>
                     <Flame className="h-6 w-6 text-violet-200" />
@@ -3341,7 +3341,7 @@ const ProjectDetailsPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {unifiedData?.teamBreakdown?.slice(0, 6).map((member, index) => {
+                  {[].map((member: any, index: number) => {
                     const efficiency = member.actualHours > 0 ? (member.estimatedHours / member.actualHours * 100) : 0;
                     const performanceColor = efficiency > 90 ? 'bg-green-500' : efficiency > 70 ? 'bg-yellow-500' : 'bg-red-500';
                     
@@ -3405,7 +3405,7 @@ const ProjectDetailsPage = () => {
               <div className="bg-white rounded-xl border shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 bg-purple-100 rounded-lg">
-                    <Shield className="h-5 w-5 text-purple-600" />
+                    <Target className="h-5 w-5 text-purple-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Financial Health</h3>
@@ -3414,7 +3414,7 @@ const ProjectDetailsPage = () => {
                 </div>
 
                 {(() => {
-                  const profitMargin = unifiedData?.profitMargin || 0;
+                  const profitMargin = 0;
                   const efficiency = unifiedData?.efficiency || 0;
                   const healthScore = Math.round((profitMargin * 100 * 0.6) + (efficiency * 0.4));
                   const healthColor = healthScore > 80 ? 'text-green-600' : healthScore > 60 ? 'text-yellow-600' : 'text-red-600';
@@ -3453,17 +3453,17 @@ const ProjectDetailsPage = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Ingresos Actuales</span>
-                    <span className="font-semibold">${(unifiedData?.totalRevenue || 0).toLocaleString()}</span>
+                    <span className="font-semibold">$0</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Costos Totales</span>
-                    <span className="font-semibold">${(unifiedData?.totalCosts || 0).toLocaleString()}</span>
+                    <span className="font-semibold">$0</span>
                   </div>
                   <div className="border-t pt-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Break-even Status</span>
-                      <span className={`font-semibold ${(unifiedData?.totalRevenue || 0) > (unifiedData?.totalCosts || 0) ? 'text-green-600' : 'text-red-600'}`}>
-                        {(unifiedData?.totalRevenue || 0) > (unifiedData?.totalCosts || 0) ? 'Alcanzado' : 'Pendiente'}
+                      <span className="font-semibold text-red-600">
+                        Pendiente
                       </span>
                     </div>
                   </div>
@@ -3491,7 +3491,7 @@ const ProjectDetailsPage = () => {
                     <span className="text-sm font-medium text-green-700">Ingresos Proyectados</span>
                   </div>
                   <div className="text-2xl font-bold text-green-800">
-                    ${Math.round((unifiedData?.totalRevenue || 0) * 1.15).toLocaleString()}
+                    $0
                   </div>
                   <div className="text-xs text-green-600">+15% estimado</div>
                 </div>
@@ -3518,7 +3518,7 @@ const ProjectDetailsPage = () => {
                     <span className="text-sm font-medium text-purple-700">Client LTV</span>
                   </div>
                   <div className="text-2xl font-bold text-purple-800">
-                    ${Math.round((unifiedData?.totalRevenue || 0) * 2.3).toLocaleString()}
+                    $0
                   </div>
                   <div className="text-xs text-purple-600">Valor estimado</div>
                 </div>
