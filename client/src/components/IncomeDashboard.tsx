@@ -149,9 +149,6 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
           <h2 className="text-lg font-bold text-gray-900">
             {projectId ? 'Ingresos del Proyecto' : 'Ingresos - Numerador Limpio'}
           </h2>
-          <Badge variant="outline" className="text-xs">
-            {projectId ? 'Solo ingresos confirmados de este proyecto' : 'Solo ingresos confirmados para cálculos financieros'}
-          </Badge>
         </div>
 
         {/* Filtros contextuales compactos */}
