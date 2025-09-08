@@ -74,6 +74,7 @@ import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { EconomicRankings } from "@/components/EconomicRankings";
 import TimeTracking from "@/components/TimeTracking";
 import IncomeDashboard from "@/components/IncomeDashboard";
+import { CostDashboard } from "@/components/CostDashboard";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
@@ -3212,6 +3213,12 @@ const ProjectDetailsPage = () => {
             />
           </TabsContent>
 
+          <TabsContent value="cost-details" className="space-y-6">
+            <CostDashboard 
+              projectId={unifiedData?.project?.id} 
+              timeFilter={timeFilterForHook}
+            />
+          </TabsContent>
 
           {/* GESTIÓN TEMPORAL - TIME ENTRIES POR PROYECTO */}
           <TabsContent value="time-entries" className="space-y-6">

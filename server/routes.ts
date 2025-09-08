@@ -11322,5 +11322,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cost Dashboard API - Análisis de costos por proyecto
+  app.get('/api/cost-dashboard', async (req, res) => {
+    try {
+      const { projectId, timeFilter, memberName, costType, status } = req.query;
+      
+      console.log(`💰 COST DASHBOARD API called with params:`, { projectId, timeFilter, memberName, costType, status });
+
+      // Por ahora, crear datos de ejemplo para la demostración
+      // TODO: Implementar lógica real basada en time entries y personnel rates
+      
+      const mockCostData = [
+        {
+          id: 1,
+          member_name: "Tomas Criado",
+          hours_worked: 45.5,
+          hourly_rate: 35,
+          total_cost: 1592.5,
+          month_key: "2025-08",
+          cost_type: "operational",
+          status: "confirmed",
+          confirmed: "SI"
+        },
+        {
+          id: 2,
+          member_name: "Sol Ayala",
+          hours_worked: 32.0,
+          hourly_rate: 28,
+          total_cost: 896.0,
+          month_key: "2025-08",
+          cost_type: "operational",
+          status: "confirmed",
+          confirmed: "SI"
+        },
+        {
+          id: 3,
+          member_name: "Freelancer Ext",
+          hours_worked: 15.0,
+          hourly_rate: 45,
+          total_cost: 675.0,
+          month_key: "2025-08",
+          cost_type: "real",
+          status: "confirmed",
+          confirmed: "SI"
+        },
+        {
+          id: 4,
+          member_name: "Tomas Criado",
+          hours_worked: 50.0,
+          hourly_rate: 35,
+          total_cost: 1750.0,
+          month_key: "2025-07",
+          cost_type: "operational",
+          status: "confirmed",
+          confirmed: "SI"
+        },
+        {
+          id: 5,
+          member_name: "Sol Ayala",
+          hours_worked: 28.5,
+          hourly_rate: 28,
+          total_cost: 798.0,
+          month_key: "2025-07",
+          cost_type: "operational",
+          status: "confirmed",
+          confirmed: "SI"
+        }
+      ];
+
+      // Aplicar filtros básicos
+      let filteredData = mockCostData;
+
+      // Filtro temporal básico
+      if (timeFilter && timeFilter !== 'all_time') {
+        try {
+          if (timeFilter === 'august_2025') {
+            filteredData = filteredData.filter(record => record.month_key === '2025-08');
+          } else if (timeFilter === 'july_2025') {
+            filteredData = filteredData.filter(record => record.month_key === '2025-07');
+          }
+          // Agregar más filtros temporales según sea necesario
+        } catch (error) {
+          console.warn(`💰 Error applying timeFilter '${timeFilter}':`, error.message);
+        }
+      }
+
+      // Filtro por miembro
+      if (memberName) {
+        filteredData = filteredData.filter(record => 
+          record.member_name.toLowerCase().includes(memberName.toLowerCase())
+        );
+      }
+
+      // Filtro por tipo de costo
+      if (costType) {
+        filteredData = filteredData.filter(record => record.cost_type === costType);
+      }
+
+      // Filtro por estado
+      if (status) {
+        filteredData = filteredData.filter(record => record.status === status);
+      }
+
+      console.log(`💰 Returning ${filteredData.length} cost records`);
+      console.log(`💰 Sample data:`, filteredData.slice(0, 2));
+
+      res.json(filteredData);
+    } catch (error) {
+      console.error('Error fetching cost dashboard data:', error);
+      res.status(500).json({ error: 'Error fetching cost dashboard data' });
+    }
+  });
+
   return httpServer;
 }
