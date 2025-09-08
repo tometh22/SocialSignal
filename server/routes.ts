@@ -11249,10 +11249,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: googleSheetsSales.status,
           confirmed: googleSheetsSales.confirmed
         })
-        .from(googleSheetsSales)
-        .where(eq(googleSheetsSales.confirmed, 'SI'));
+        .from(googleSheetsSales);
 
-      // Apply additional filters if provided
+      // Build combined conditions array
+      const conditions = [eq(googleSheetsSales.confirmed, 'SI')];
+
+      // Add time filter conditions
       if (timeFilter && timeFilter !== 'all_time') {
         console.log(`📊 Applying timeFilter: ${timeFilter}`);
         try {
@@ -11260,11 +11262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (startDate && endDate) {
             const startMonth = startDate.toISOString().slice(0, 7);
             const endMonth = endDate.toISOString().slice(0, 7);
-            query = query.where(and(
-              eq(googleSheetsSales.confirmed, 'SI'),
-              gte(googleSheetsSales.monthKey, startMonth),
-              lte(googleSheetsSales.monthKey, endMonth)
-            ));
+            conditions.push(gte(googleSheetsSales.monthKey, startMonth));
+            conditions.push(lte(googleSheetsSales.monthKey, endMonth));
             console.log(`📊 Applied time filter: ${startMonth} to ${endMonth}`);
           }
         } catch (error) {
@@ -11272,33 +11271,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Apply project-specific filters (either from projectId lookup or direct filters)
+      // Add project-specific filter conditions
       if (projectClientName && projectProjectName) {
-        query = query.where(and(
-          eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.clientName, projectClientName),
-          eq(googleSheetsSales.projectName, projectProjectName)
-        ));
+        conditions.push(eq(googleSheetsSales.clientName, projectClientName));
+        conditions.push(eq(googleSheetsSales.projectName, projectProjectName));
         console.log(`📊 Applied project-specific filter: ${projectClientName} - ${projectProjectName}`);
       } else if (projectClientName) {
-        query = query.where(and(
-          eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.clientName, projectClientName)
-        ));
+        conditions.push(eq(googleSheetsSales.clientName, projectClientName));
         console.log(`📊 Applied client filter: ${projectClientName}`);
       } else if (projectProjectName) {
-        query = query.where(and(
-          eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.projectName, projectProjectName)
-        ));
+        conditions.push(eq(googleSheetsSales.projectName, projectProjectName));
         console.log(`📊 Applied project filter: ${projectProjectName}`);
       }
 
+      // Rebuild query with combined conditions to avoid Drizzle issues
+      query = db
+        .select({
+          id: googleSheetsSales.id,
+          client_name: googleSheetsSales.clientName,
+          project_name: googleSheetsSales.projectName,
+          month_key: googleSheetsSales.monthKey,
+          sales_type: googleSheetsSales.salesType,
+          amount_usd: googleSheetsSales.amountUsd,
+          status: googleSheetsSales.status,
+          confirmed: googleSheetsSales.confirmed
+        })
+        .from(googleSheetsSales)
+        .where(and(...conditions));
+      
+      console.log(`📊 Final conditions applied: ${conditions.length} conditions`);
+
       if (monthKey) {
-        query = query.where(and(
-          eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.monthKey, monthKey as string)
-        ));
+        conditions.push(eq(googleSheetsSales.monthKey, monthKey as string));
+        query = query.where(and(...conditions));
       }
 
       query = query.orderBy(desc(googleSheetsSales.monthKey), googleSheetsSales.clientName, googleSheetsSales.projectName);
