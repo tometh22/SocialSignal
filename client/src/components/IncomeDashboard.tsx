@@ -234,7 +234,23 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
             <FileSpreadsheet className="w-5 h-5 text-green-600" />
             Ingresos por Proyecto
           </CardTitle>
-          <p className="text-sm text-gray-500">{filteredData.length} registros • Granularidad proyecto-mes</p>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">{filteredData.length} registros • Granularidad proyecto-mes</p>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 bg-gray-50 p-2 rounded-md">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-orange-200 rounded-full"></span>
+                <span>🔮 Proyectada: Ingresos futuros estimados</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-blue-200 rounded-full"></span>
+                <span>⚡ Activa: Ingresos del período actual</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-200 rounded-full"></span>
+                <span>✅ Completada: Ingresos confirmados del pasado</span>
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
