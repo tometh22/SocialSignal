@@ -11403,6 +11403,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`💰 Getting cost data for project ${projectId}`);
         const costSummary = await storage.getProjectCostSummary(parseInt(projectId as string), dateRange);
         
+        console.log(`💰 DEBUG: costSummary exists: ${!!costSummary}, costByPerson exists: ${!!(costSummary?.costByPerson)}, costByPerson length: ${costSummary?.costByPerson?.length || 0}`);
+        
         if (costSummary && costSummary.costByPerson) {
           // Transformar los datos al formato esperado por el frontend
           // Crear registros separados para costos reales y operacionales
@@ -11428,14 +11430,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               });
             }
             
-            // Registro de costo operacional (si es diferente del real)
-            if (person.operationalCost > 0) {
+            // Registro de costo operacional (SIEMPRE generar, usar realCost si no hay operationalCost)
+            const operationalCost = person.operationalCost || person.realCost || 0;
+            if (operationalCost > 0) {
               costRecords.push({
                 id: index * 2 + 2,
                 member_name: person.name,
                 hours_worked: person.hours || 0,
-                hourly_rate: person.operationalCost / (person.hours || 1),
-                total_cost: person.operationalCost || 0,
+                hourly_rate: operationalCost / (person.hours || 1),
+                total_cost: operationalCost,
                 month_key: monthKey,
                 cost_type: "operational",
                 status: "confirmed",
@@ -11576,14 +11579,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   });
                 }
                 
-                // Registro de costo operacional
-                if (person.operationalCost > 0) {
+                // Registro de costo operacional (SIEMPRE generar, usar realCost si no hay operationalCost)
+                const operationalCost = person.operationalCost || person.realCost || 0;
+                if (operationalCost > 0) {
                   costRecords.push({
                     id: project.id * 1000 + index * 2 + 2,
                     member_name: person.name,
                     hours_worked: person.hours || 0,
-                    hourly_rate: person.operationalCost / (person.hours || 1),
-                    total_cost: person.operationalCost || 0,
+                    hourly_rate: operationalCost / (person.hours || 1),
+                    total_cost: operationalCost,
                     month_key: monthKey,
                     cost_type: "operational",
                     status: "confirmed",
