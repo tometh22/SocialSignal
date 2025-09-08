@@ -227,7 +227,7 @@ export function getDateRangeForFilter(filter: string) {
           'diciembre': 11, 'december': 11, 'dec': 11
         };
         
-        const monthIndex = monthNames[monthName.toLowerCase()];
+        const monthIndex = (monthNames as any)[monthName.toLowerCase()];
         if (monthIndex !== undefined) {
           startDate = new Date(parseInt(year), monthIndex, 1);
           endDate = new Date(parseInt(year), monthIndex + 1, 0);
@@ -287,8 +287,8 @@ export function getDateRangeForFilter(filter: string) {
           'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11, 'dec': 11
         };
         
-        const startMonthIndex = shortMonthNames[startMonthName.toLowerCase()];
-        const endMonthIndex = shortMonthNames[endMonthName.toLowerCase()];
+        const startMonthIndex = (shortMonthNames as any)[startMonthName.toLowerCase()];
+        const endMonthIndex = (shortMonthNames as any)[endMonthName.toLowerCase()];
         
         if (startMonthIndex !== undefined && endMonthIndex !== undefined) {
           startDate = new Date(parseInt(year), startMonthIndex, 1);
@@ -404,6 +404,51 @@ import { upload, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import path from 'path';
 
+// Helper function to parse time filters
+function parseTimeFilter(filter: string) {
+  const now = new Date();
+  let startDate = new Date(now.getFullYear(), 0, 1);
+  let endDate = new Date(now.getFullYear(), 11, 31);
+
+  switch (filter) {
+    case 'q1':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = new Date(now.getFullYear(), 2, 31);
+      break;
+    case 'q2':
+      startDate = new Date(now.getFullYear(), 3, 1);
+      endDate = new Date(now.getFullYear(), 5, 30);
+      break;
+    case 'q3':
+      startDate = new Date(now.getFullYear(), 6, 1);
+      endDate = new Date(now.getFullYear(), 8, 30);
+      break;
+    case 'q4':
+      startDate = new Date(now.getFullYear(), 9, 1);
+      endDate = new Date(now.getFullYear(), 11, 31);
+      break;
+    case 'ytd':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      endDate = now;
+      break;
+    case 'all':
+      return { startDate: new Date(2020, 0, 1), endDate: new Date(2030, 11, 31) };
+    default:
+      if (filter.includes('_to_')) {
+        const [startStr, endStr] = filter.split('_to_');
+        const customStartDate = new Date(startStr);
+        const customEndDate = new Date(endStr);
+        
+        if (!isNaN(customStartDate.getTime()) && !isNaN(customEndDate.getTime())) {
+          return { startDate: customStartDate, endDate: customEndDate };
+        }
+      }
+      break;
+  }
+  
+  return { startDate, endDate };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create the HTTP server
   const httpServer = createServer(app);
@@ -475,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allCosts: directCosts || [],
         sampleData: sample,
         summary: {
-          hasUSDAmounts: directCosts?.filter(c => c.montoTotalUsd && c.montoTotalUsd > 0).length || 0,
+          hasUSDAmounts: directCosts?.filter(c => c.montoTotalUSD && c.montoTotalUSD > 0).length || 0,
           hasARSAmounts: directCosts?.filter(c => c.costoTotal && c.costoTotal > 0).length || 0,
           hasHours: directCosts?.filter(c => c.horasRealesAsana && c.horasRealesAsana > 0).length || 0
         }
@@ -504,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
         const inRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
         
-        console.log(`💰 Costo: ${cost.nombre} - ${cost.mes} ${cost.año} = $${cost.montoTotalUsd} USD, En rango: ${inRange}`);
+        console.log(`💰 Costo: ${cost.projectName} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
         return inRange;
       }) || [];
       
@@ -1212,7 +1257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             'cata': 'cata'
           };
           const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
-          return nameMap[normalized] || normalized;
+          return (nameMap as any)[normalized] || normalized;
         };
 
         let teamMemberKey = null;
@@ -1282,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 'cata': 'cata'
               };
               const normalized = name.toLowerCase().split(' ')[0]; // Solo primer nombre
-              return nameMap[normalized] || normalized;
+              return (nameMap as any)[normalized] || normalized;
             };
             
             const matchingPersonnel = personnelData.find(p => {
