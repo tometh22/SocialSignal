@@ -3602,7 +3602,7 @@ const ProjectDetailsPage = () => {
                       roleGroups[roleName].count += 1;
                     });
                     
-                    // Convertir a array y agregar margen de beneficio
+                    // Convertir a array (SOLO roles de personal)
                     const categories = Object.entries(roleGroups).map(([name, data]) => ({
                       name,
                       cost: data.cost,
@@ -3610,12 +3610,7 @@ const ProjectDetailsPage = () => {
                       count: data.count
                     }));
                     
-                    categories.push({
-                      name: 'Margen de Beneficio',
-                      cost: Math.max(0, totalRevenue - totalCost),
-                      color: 'bg-emerald-500',
-                      count: 1
-                    });
+                    // REMOVIDO: Margen de Beneficio no es un rol
                     
                     return categories.map((category, index) => {
                       const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
@@ -3627,9 +3622,7 @@ const ProjectDetailsPage = () => {
                               <div className={`w-4 h-4 rounded ${category.color}`}></div>
                               <div>
                                 <span className="text-sm font-medium text-gray-900">{category.name}</span>
-                                {category.name !== 'Margen de Beneficio' && (
-                                  <span className="text-xs text-gray-500 ml-2">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
-                                )}
+                                <span className="text-xs text-gray-500 ml-2">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
                               </div>
                             </div>
                             <div className="text-right">
@@ -3667,14 +3660,7 @@ const ProjectDetailsPage = () => {
                       subtitle: member.role || member.roleName || 'Sin rol asignado'
                     }));
                     
-                    // Agregar margen de beneficio
-                    categories.push({
-                      name: 'Margen de Beneficio',
-                      cost: Math.max(0, totalRevenue - totalCost),
-                      color: 'bg-emerald-500',
-                      count: 1,
-                      subtitle: 'Beneficio total del proyecto'
-                    });
+                    // REMOVIDO: Margen de Beneficio no es una persona
                     
                     return categories.map((category, index) => {
                       const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
