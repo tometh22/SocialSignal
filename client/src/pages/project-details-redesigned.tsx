@@ -51,7 +51,8 @@ import {
   Rocket,
   Heart,
   Brain,
-  XCircle
+  XCircle,
+  Cog
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1718,7 +1719,7 @@ const ProjectDetailsPage = () => {
               value="operational-analysis" 
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:shadow-sm"
             >
-              <Settings className="h-4 w-4" />
+              <Cog className="h-4 w-4" />
               Operacional
             </TabsTrigger>
           </TabsList>
@@ -3877,6 +3878,447 @@ const ProjectDetailsPage = () => {
                 </div>
               </div>
             </div>
+
+          </TabsContent>
+
+          <TabsContent value="operational-analysis" className="space-y-6">
+            {/* ANÁLISIS OPERACIONAL PROFUNDO */}
+            <div className="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-xl p-8 text-white">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional Profundo</h2>
+                  <p className="text-cyan-100">Métricas avanzadas de eficiencia, productividad y optimización operativa</p>
+                </div>
+                <div className="bg-white/20 rounded-lg p-4">
+                  <Cog className="h-8 w-8" />
+                </div>
+              </div>
+              
+              {/* MÉTRICAS OPERACIONALES CLAVE */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Eficiencia del Equipo */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-cyan-100 text-sm">Eficiencia del Equipo</p>
+                      <p className="text-2xl font-bold">
+                        {unifiedData?.actuals ? `${((unifiedData.actuals.workedHours / unifiedData.quotation.totalHours) * 100).toFixed(1)}%` : '0%'}
+                      </p>
+                    </div>
+                    <Activity className="h-6 w-6 text-cyan-200" />
+                  </div>
+                  <p className="text-xs text-cyan-200 mt-2">
+                    {unifiedData?.actuals?.workedHours || 0}h trabajadas de {unifiedData?.quotation?.totalHours || 0}h estimadas
+                  </p>
+                </div>
+
+                {/* Velocidad de Entrega */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-cyan-100 text-sm">Velocidad de Entrega</p>
+                      <p className="text-2xl font-bold">
+                        {unifiedData?.deliverables ? `${(unifiedData.deliverables.completed / Math.max(1, unifiedData.deliverables.total) * 100).toFixed(0)}%` : '0%'}
+                      </p>
+                    </div>
+                    <Rocket className="h-6 w-6 text-cyan-200" />
+                  </div>
+                  <p className="text-xs text-cyan-200 mt-2">
+                    {unifiedData?.deliverables?.completed || 0} de {unifiedData?.deliverables?.total || 0} deliverables
+                  </p>
+                </div>
+
+                {/* Capacidad Utilizada */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-cyan-100 text-sm">Capacidad Utilizada</p>
+                      <p className="text-2xl font-bold">
+                        {unifiedData?.teamBreakdown ? `${Math.round((unifiedData.teamBreakdown.filter(m => m.actualHours > 0).length / unifiedData.teamBreakdown.length) * 100)}%` : '0%'}
+                      </p>
+                    </div>
+                    <Database className="h-6 w-6 text-cyan-200" />
+                  </div>
+                  <p className="text-xs text-cyan-200 mt-2">
+                    {unifiedData?.teamBreakdown?.filter(m => m.actualHours > 0).length || 0} miembros activos
+                  </p>
+                </div>
+
+                {/* Índice de Calidad */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-cyan-100 text-sm">Índice de Calidad</p>
+                      <p className="text-2xl font-bold">
+                        {unifiedData?.deliverables?.quality || 'N/A'}
+                      </p>
+                    </div>
+                    <Star className="h-6 w-6 text-cyan-200" />
+                  </div>
+                  <p className="text-xs text-cyan-200 mt-2">
+                    Basado en deliverables completados
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ANÁLISIS DE PRODUCTIVIDAD Y PROCESOS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              
+              {/* Análisis de Productividad por Rol */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    Productividad por Rol
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Análisis de eficiencia y costo por hora trabajada según el rol del equipo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {unifiedData?.teamBreakdown && (() => {
+                      // Agrupar por rol y calcular métricas
+                      const roleGroups = {};
+                      unifiedData.teamBreakdown.forEach(member => {
+                        if (member.actualHours > 0) {
+                          const role = member.role || 'Sin Rol';
+                          if (!roleGroups[role]) {
+                            roleGroups[role] = {
+                              totalHours: 0,
+                              totalCost: 0,
+                              members: 0,
+                              avgEfficiency: 0
+                            };
+                          }
+                          roleGroups[role].totalHours += member.actualHours;
+                          roleGroups[role].totalCost += member.actualCost;
+                          roleGroups[role].members += 1;
+                          roleGroups[role].avgEfficiency += (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100;
+                        }
+                      });
+
+                      return Object.entries(roleGroups).map(([role, data]) => {
+                        const avgCostPerHour = data.totalCost / data.totalHours;
+                        const efficiency = data.avgEfficiency / data.members;
+                        
+                        return (
+                          <div key={role} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-gray-900">{role}</h4>
+                                <Badge variant="secondary" className="text-xs">
+                                  {data.members} {data.members === 1 ? 'persona' : 'personas'}
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {data.totalHours.toFixed(1)}h trabajadas • ${avgCostPerHour.toFixed(0)}/hora
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-lg font-semibold">${data.totalCost.toLocaleString()}</div>
+                              <div className={`text-sm ${efficiency >= 100 ? 'text-green-600' : efficiency >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {efficiency.toFixed(1)}% eficiencia
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })() || <p className="text-gray-500">No hay datos de equipo disponibles</p>}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análisis de Capacidad y Carga de Trabajo */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Zap className="h-5 w-5 text-yellow-600" />
+                    Capacidad y Carga de Trabajo
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Análisis de distribución de carga y identificación de recursos subutilizados o sobrecargados</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {unifiedData?.teamBreakdown?.slice(0, 6).map((member, index) => {
+                      const utilizationRate = member.actualHours > 0 ? 
+                        (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100 : 0;
+                      
+                      let statusColor = 'bg-gray-200';
+                      let statusText = 'Sin actividad';
+                      
+                      if (utilizationRate > 0) {
+                        if (utilizationRate >= 120) {
+                          statusColor = 'bg-red-500';
+                          statusText = 'Sobrecargado';
+                        } else if (utilizationRate >= 100) {
+                          statusColor = 'bg-orange-500';
+                          statusText = 'Capacidad máxima';
+                        } else if (utilizationRate >= 80) {
+                          statusColor = 'bg-green-500';
+                          statusText = 'Óptimo';
+                        } else if (utilizationRate >= 50) {
+                          statusColor = 'bg-yellow-500';
+                          statusText = 'Subutilizado';
+                        } else {
+                          statusColor = 'bg-blue-500';
+                          statusText = 'Baja utilización';
+                        }
+                      }
+
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-3 h-3 rounded-full ${statusColor}`}></div>
+                              <span className="font-medium text-gray-900">{member.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {member.role || 'Sin rol'}
+                              </Badge>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">{member.actualHours}h</div>
+                              <div className="text-xs text-gray-500">{statusText}</div>
+                            </div>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${statusColor}`}
+                              style={{ width: `${Math.min(100, utilizationRate)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    }) || <p className="text-gray-500">No hay datos del equipo disponibles</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* MÉTRICAS AVANZADAS DE PROCESOS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Análisis de Eficiencia Temporal */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Timer className="h-5 w-5 text-purple-600" />
+                    Eficiencia Temporal
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Tiempo Planificado</span>
+                      <span className="font-semibold">{unifiedData?.quotation?.totalHours || 0}h</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Tiempo Trabajado</span>
+                      <span className="font-semibold">{unifiedData?.actuals?.workedHours || 0}h</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Tiempo Restante</span>
+                      <span className="font-semibold">
+                        {Math.max(0, (unifiedData?.quotation?.totalHours || 0) - (unifiedData?.actuals?.workedHours || 0))}h
+                      </span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Velocidad Promedio</span>
+                        <span className="font-semibold">
+                          {unifiedData?.actuals?.workedHours ? 
+                            `${((unifiedData.actuals.workedHours / 30) * 7).toFixed(1)}h/semana` : 
+                            '0h/semana'
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análisis de Costos Operacionales */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                    Costos Operacionales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Costo por Hora</span>
+                      <span className="font-semibold">
+                        ${unifiedData?.actuals?.workedHours ? 
+                          ((unifiedData.actuals.totalWorkedCost) / unifiedData.actuals.workedHours).toFixed(0) : 
+                          '0'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Costo por Deliverable</span>
+                      <span className="font-semibold">
+                        ${unifiedData?.deliverables?.completed ? 
+                          ((unifiedData.actuals?.totalWorkedCost || 0) / unifiedData.deliverables.completed).toFixed(0) : 
+                          '0'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Eficiencia de Costo</span>
+                      <span className={`font-semibold ${
+                        (unifiedData?.actuals?.totalWorkedCost || 0) <= (unifiedData?.quotation?.totalCost || 0) ? 
+                        'text-green-600' : 'text-red-600'
+                      }`}>
+                        {unifiedData?.quotation?.totalCost ? 
+                          `${(((unifiedData.quotation.totalCost) / (unifiedData.actuals?.totalWorkedCost || 1)) * 100).toFixed(1)}%` : 
+                          '0%'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Predicciones y Recomendaciones */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Brain className="h-5 w-5 text-pink-600" />
+                    Predicciones
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {(() => {
+                      const workedHours = unifiedData?.actuals?.workedHours || 0;
+                      const totalHours = unifiedData?.quotation?.totalHours || 0;
+                      const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const quotedCost = unifiedData?.quotation?.totalCost || 0;
+                      
+                      const timeCompletion = totalHours > 0 ? (workedHours / totalHours) * 100 : 0;
+                      const projectedFinalCost = workedHours > 0 ? (workedCost / workedHours) * totalHours : workedCost;
+                      const projectedOverrun = Math.max(0, projectedFinalCost - quotedCost);
+                      
+                      return (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Progreso Estimado</span>
+                            <span className="font-semibold">{timeCompletion.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Costo Final Proyectado</span>
+                            <span className="font-semibold">${projectedFinalCost.toLocaleString()}</span>
+                          </div>
+                          {projectedOverrun > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-red-600">Exceso Proyectado</span>
+                              <span className="font-semibold text-red-600">+${projectedOverrun.toLocaleString()}</span>
+                            </div>
+                          )}
+                          <div className="border-t pt-3">
+                            <div className="bg-blue-50 p-3 rounded-lg">
+                              <h4 className="text-sm font-medium text-blue-900 mb-2">Recomendación</h4>
+                              <p className="text-xs text-blue-700">
+                                {timeCompletion > 100 ? 
+                                  'Proyecto excedido en tiempo. Revisar scope y optimizar procesos.' :
+                                  timeCompletion > 80 ?
+                                  'Proyecto en fase final. Mantener calidad y controlar costos.' :
+                                  'Proyecto en desarrollo normal. Continuar monitoreando métricas.'
+                                }
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* MAPA DE CALOR DE ACTIVIDAD */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="h-5 w-5 text-orange-600" />
+                  Mapa de Calor de Actividad del Equipo
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Visualización de la actividad y productividad del equipo en tiempo real</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {unifiedData?.teamBreakdown?.filter(member => member.actualHours > 0).map((member, index) => {
+                    const intensity = member.actualHours / Math.max(...(unifiedData.teamBreakdown.map(m => m.actualHours)));
+                    const productivityScore = (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100;
+                    
+                    return (
+                      <div key={index} className="relative group">
+                        <div 
+                          className={`p-4 rounded-lg border-2 transition-all duration-300 hover:scale-105 ${
+                            intensity >= 0.8 ? 'bg-red-100 border-red-300' :
+                            intensity >= 0.6 ? 'bg-orange-100 border-orange-300' :
+                            intensity >= 0.4 ? 'bg-yellow-100 border-yellow-300' :
+                            intensity >= 0.2 ? 'bg-green-100 border-green-300' :
+                            'bg-blue-100 border-blue-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-gray-900 truncate">{member.name}</h4>
+                            <div className={`w-3 h-3 rounded-full ${
+                              productivityScore >= 100 ? 'bg-green-500' :
+                              productivityScore >= 80 ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}></div>
+                          </div>
+                          <div className="text-sm text-gray-600 mb-1">{member.role || 'Sin rol'}</div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-bold">{member.actualHours}h</span>
+                            <span className="text-sm text-gray-500">${member.actualCost.toLocaleString()}</span>
+                          </div>
+                          
+                          {/* Tooltip con información adicional */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                            <div className="bg-gray-900 text-white text-xs rounded-lg p-3 whitespace-nowrap">
+                              <div>Productividad: {productivityScore.toFixed(1)}%</div>
+                              <div>Costo/hora: ${(member.actualCost / member.actualHours).toFixed(0)}</div>
+                              <div>Intensidad: {(intensity * 100).toFixed(0)}%</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }) || <p className="text-gray-500 col-span-full text-center py-8">No hay datos de actividad disponibles</p>}
+                </div>
+              </CardContent>
+            </Card>
 
           </TabsContent>
 
