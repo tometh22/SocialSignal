@@ -11409,14 +11409,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (costSummary && costSummary.costByPerson) {
           const peopleArray = Array.isArray(costSummary.costByPerson) ? costSummary.costByPerson : Object.values(costSummary.costByPerson);
-          console.log(`💰 DEBUG: peopleArray length: ${peopleArray.length}, first person:`, peopleArray[0]);
-          
+            
           if (peopleArray.length > 0) {
             // Transformar los datos al formato esperado por el frontend
             // Crear registros separados para costos reales y operacionales
             costRecords = [];
-            console.log(`💰 MAIN PROCESSING: About to process ${peopleArray.length} people`);
-          
+            
             peopleArray.forEach((person: any, index: number) => {
             console.log(`💰 Person ${index}:`, {
               name: person.name,
