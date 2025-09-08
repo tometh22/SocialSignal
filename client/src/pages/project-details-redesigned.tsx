@@ -3222,6 +3222,215 @@ const ProjectDetailsPage = () => {
             </div>
           </TabsContent>
 
+          <TabsContent value="financial-analysis" className="space-y-6">
+            {/* FINANCIAL EXECUTIVE DASHBOARD */}
+            <div className="bg-gradient-to-r from-green-600 to-emerald-700 rounded-xl p-8 text-white">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">Análisis Financiero Ejecutivo</h2>
+                  <p className="text-green-100">Rentabilidad y performance económica del proyecto</p>
+                </div>
+                <div className="bg-white/20 rounded-lg p-4">
+                  <TrendingUp className="h-8 w-8" />
+                </div>
+              </div>
+              
+              {unifiedData?.project && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  {/* Total Revenue */}
+                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-sm">Ingresos Totales</p>
+                        <p className="text-2xl font-bold">
+                          ${(unifiedData.financialSummary?.totalRevenue || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <DollarSign className="h-6 w-6 text-green-200" />
+                    </div>
+                  </div>
+
+                  {/* Total Costs */}
+                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-sm">Costos Totales</p>
+                        <p className="text-2xl font-bold">
+                          ${(unifiedData.financialSummary?.totalCosts || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <TrendingDown className="h-6 w-6 text-green-200" />
+                    </div>
+                  </div>
+
+                  {/* Profit Margin */}
+                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-sm">Margen de Beneficio</p>
+                        <p className="text-2xl font-bold">
+                          {((unifiedData.financialSummary?.profitMargin || 0) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                      <Percent className="h-6 w-6 text-green-200" />
+                    </div>
+                  </div>
+
+                  {/* ROI */}
+                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-sm">ROI</p>
+                        <p className="text-2xl font-bold">
+                          {((unifiedData.financialSummary?.roi || 0) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                      <Target className="h-6 w-6 text-green-200" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* FINANCIAL COMPONENTS GRID */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Income Analysis */}
+              <div className="bg-white rounded-xl border shadow-sm">
+                <div className="p-6 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Análisis de Ingresos</h3>
+                      <p className="text-sm text-gray-500">Revenue performance y proyecciones</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <IncomeDashboard 
+                    projectId={unifiedData?.project?.id} 
+                    timeFilter={timeFilterForHook}
+                  />
+                </div>
+              </div>
+
+              {/* Cost Analysis */}
+              <div className="bg-white rounded-xl border shadow-sm">
+                <div className="p-6 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <TrendingDown className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Análisis de Costos</h3>
+                      <p className="text-sm text-gray-500">Estructura de costos y eficiencia</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <CostDashboard 
+                    projectId={unifiedData?.project?.id} 
+                    timeFilter={timeFilterForHook}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* FINANCIAL METRICS DASHBOARD */}
+            <div className="bg-white rounded-xl border shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Métricas Financieras Detalladas</h3>
+                  <p className="text-sm text-gray-500">KPIs y análisis de rentabilidad</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {/* Budget vs Actual */}
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ${(unifiedData?.project?.budget || 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-500">Presupuesto</div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ${(unifiedData?.financialSummary?.actualSpent || 0).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-500">Gastado Real</div>
+                </div>
+
+                {/* Efficiency Metrics */}
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {(unifiedData?.efficiency || 0).toFixed(1)}%
+                  </div>
+                  <div className="text-sm text-gray-500">Eficiencia</div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    ${((unifiedData?.financialSummary?.totalRevenue || 0) - (unifiedData?.financialSummary?.totalCosts || 0)).toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-500">Beneficio Neto</div>
+                </div>
+
+                {/* Time Metrics */}
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {unifiedData?.estimatedHours || 0}h
+                  </div>
+                  <div className="text-sm text-gray-500">Horas Estimadas</div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {unifiedData?.workedHours || 0}h
+                  </div>
+                  <div className="text-sm text-gray-500">Horas Trabajadas</div>
+                </div>
+              </div>
+
+              {/* Performance Indicators */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-green-700 font-medium">Status Financiero</p>
+                      <p className="text-2xl font-bold text-green-800">
+                        {(unifiedData?.financialSummary?.profitMargin || 0) > 0.2 ? 'Excelente' : 
+                         (unifiedData?.financialSummary?.profitMargin || 0) > 0.1 ? 'Bueno' : 'Requiere Atención'}
+                      </p>
+                    </div>
+                    <div className="text-green-600">
+                      {(unifiedData?.financialSummary?.profitMargin || 0) > 0.2 ? 
+                        <CheckCircle className="h-8 w-8" /> : 
+                        <AlertTriangle className="h-8 w-8" />}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-blue-700 font-medium">Cumplimiento Presupuesto</p>
+                      <p className="text-2xl font-bold text-blue-800">
+                        {((unifiedData?.financialSummary?.actualSpent || 0) / (unifiedData?.project?.budget || 1) * 100).toFixed(0)}%
+                      </p>
+                    </div>
+                    <div className="text-blue-600">
+                      <Gauge className="h-8 w-8" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
 
         </Tabs>
       </div>
