@@ -3230,39 +3230,55 @@ const ProjectDetailsPage = () => {
             <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Inteligencia de Negocios y Analítica</h2>
-                  <p className="text-violet-100">Métricas avanzadas y proyecciones financieras</p>
+                  <h2 className="text-2xl font-bold mb-2">Análisis Financiero del Proyecto</h2>
+                  <p className="text-violet-100">Métricas clave de rentabilidad y desempeño financiero</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
                   <BarChart3 className="h-8 w-8" />
                 </div>
               </div>
               
-              {/* STARTUP METRICS GRID */}
+              {/* FINANCIAL METRICS GRID */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Revenue per Employee */}
+                {/* Markup */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Ingresos por Empleado</p>
+                      <p className="text-violet-100 text-sm">Markup</p>
                       <p className="text-2xl font-bold">
-                        ${Math.round((unifiedData?.quotation?.totalAmount || 0) / Math.max(Object.values(unifiedData?.actuals?.teamBreakdown || {}).length, 1)).toLocaleString()}
+                        {(() => {
+                          const revenue = unifiedData?.quotation?.totalAmount || 0;
+                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const markup = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
+                          return markup.toFixed(1);
+                        })()}%
+                      </p>
+                      <p className="text-xs text-violet-200">
+                        ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()} sobre costo
                       </p>
                     </div>
-                    <Users className="h-6 w-6 text-violet-200" />
+                    <DollarSign className="h-6 w-6 text-violet-200" />
                   </div>
                 </div>
 
-                {/* Utilization Rate */}
+                {/* Margen Operativo */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Tasa de Utilización</p>
+                      <p className="text-violet-100 text-sm">Margen Operativo</p>
                       <p className="text-2xl font-bold">
-                        {((unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1) * 100).toFixed(1)}%
+                        {(() => {
+                          const revenue = unifiedData?.quotation?.totalAmount || 0;
+                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const margin = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
+                          return margin.toFixed(1);
+                        })()}%
+                      </p>
+                      <p className="text-xs text-violet-200">
+                        ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()} beneficio
                       </p>
                     </div>
-                    <Zap className="h-6 w-6 text-violet-200" />
+                    <TrendingUp className="h-6 w-6 text-violet-200" />
                   </div>
                 </div>
 
@@ -3270,26 +3286,46 @@ const ProjectDetailsPage = () => {
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Tasa de Quema Mensual</p>
+                      <p className="text-violet-100 text-sm">Burn Rate</p>
                       <p className="text-2xl font-bold">
-                        ${Math.round(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                        ${(() => {
+                          const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const workedHours = unifiedData?.workedHours || 1;
+                          const estimatedHours = unifiedData?.estimatedHours || 1;
+                          const projectProgress = workedHours / estimatedHours;
+                          const monthlyBurn = projectProgress > 0 ? totalCost / Math.max(projectProgress * 12, 1) : 0;
+                          return Math.round(monthlyBurn).toLocaleString();
+                        })()}
                       </p>
+                      <p className="text-xs text-violet-200">por mes estimado</p>
                     </div>
                     <Flame className="h-6 w-6 text-violet-200" />
                   </div>
                 </div>
 
-                {/* Project Velocity */}
+                {/* ROI */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Project Velocity</p>
+                      <p className="text-violet-100 text-sm">ROI del Proyecto</p>
                       <p className="text-2xl font-bold">
-                        {Math.round((unifiedData?.actuals?.totalWorkedHours || unifiedData?.workedHours || 0) / Math.max(Math.ceil(((unifiedData?.quotation?.totalAmount || 0) / 1000)), 1))}
+                        {(() => {
+                          const revenue = unifiedData?.quotation?.totalAmount || 0;
+                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const roi = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
+                          return roi.toFixed(0);
+                        })()}%
                       </p>
-                      <p className="text-xs text-violet-200">hours/week</p>
+                      <p className="text-xs text-violet-200">
+                        {(() => {
+                          const revenue = unifiedData?.quotation?.totalAmount || 0;
+                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                          const roi = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
+                          return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
+                        })()} retorno
+                      </p>
                     </div>
-                    <Rocket className="h-6 w-6 text-violet-200" />
+                    <Target className="h-6 w-6 text-violet-200" />
                   </div>
                 </div>
               </div>
