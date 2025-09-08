@@ -726,6 +726,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Helper function para obtener el rol real de una persona
       const getRoleForPerson = (personnelId: number | null, personName: string): string => {
+        console.log(`🔍 Mapeando rol para: personnelId=${personnelId}, personName="${personName}"`);
+        
         if (!personnelId) {
           // Para personas del Excel MAESTRO sin personnelId, buscar por nombre exacto o similar
           const matchedPersonnel = allPersonnel.find(p => 
@@ -735,8 +737,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           if (matchedPersonnel) {
             const role = allRoles.find(r => r.id === matchedPersonnel.roleId);
-            return role?.name || 'Sin Rol';
+            const roleName = role?.name || 'Sin Rol';
+            console.log(`✅ Encontrado: ${personName} → ${matchedPersonnel.name} → ${roleName}`);
+            return roleName;
           }
+          console.log(`❌ No encontrado en personnel: ${personName} → Freelancer Excel`);
+          console.log(`📋 Personnel disponible: ${allPersonnel.map(p => p.name).join(', ')}`);
           // Si no se encuentra en la configuración, usar rol por defecto según el contexto
           return 'Freelancer Excel'; // Para external del Excel MAESTRO sin configuración
         } else {
@@ -744,8 +750,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const personnel = allPersonnel.find(p => p.id === personnelId);
           if (personnel) {
             const role = allRoles.find(r => r.id === personnel.roleId);
-            return role?.name || 'Sin Rol';
+            const roleName = role?.name || 'Sin Rol';
+            console.log(`✅ Personnel con ID: ${personnelId} → ${personnel.name} → ${roleName}`);
+            return roleName;
           }
+          console.log(`❌ Personnel con ID no encontrado: ${personnelId}`);
           return 'Sin Rol';
         }
       };
@@ -1140,7 +1149,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           teamBreakdown[personnelId] = {
             personnelId: entry.personnelId,
             name: 'Personnel Name',
-            roleName: actualRole,
+            role: actualRole, // UNIFICADO: usar 'role' consistentemente
+            roleName: actualRole, // MANTENER: para compatibilidad
             hourlyRate: actualRate,
             hours: 0,
             cost: 0,
