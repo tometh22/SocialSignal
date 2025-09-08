@@ -3228,6 +3228,15 @@ const ProjectDetailsPage = () => {
               <p className="text-gray-500">Sección en desarrollo</p>
             </div>
           </TabsContent>
+
+          <TabsContent value="operational-analysis" className="space-y-6">
+            <CostDashboard 
+              projectId={unifiedData?.project?.id} 
+              timeFilter={timeFilterForHook}
+              defaultCostType="operational"
+            />
+          </TabsContent>
+
         </Tabs>
       </div>
 
