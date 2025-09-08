@@ -3246,7 +3246,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Revenue per Employee</p>
                       <p className="text-2xl font-bold">
-                        $0
+                        ${Math.round((unifiedData?.quotation?.totalAmount || 0) / Math.max(Object.values(unifiedData?.actuals?.teamBreakdown || {}).length, 1)).toLocaleString()}
                       </p>
                     </div>
                     <Users className="h-6 w-6 text-violet-200" />
@@ -3272,7 +3272,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Monthly Burn Rate</p>
                       <p className="text-2xl font-bold">
-                        $0
+                        ${Math.round(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
                       </p>
                     </div>
                     <Flame className="h-6 w-6 text-violet-200" />
@@ -3341,7 +3341,7 @@ const ProjectDetailsPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {[].map((member: any, index: number) => {
+                  {Object.values(unifiedData?.actuals?.teamBreakdown || {}).slice(0, 6).map((member: any, index: number) => {
                     const efficiency = member.actualHours > 0 ? (member.estimatedHours / member.actualHours * 100) : 0;
                     const performanceColor = efficiency > 90 ? 'bg-green-500' : efficiency > 70 ? 'bg-yellow-500' : 'bg-red-500';
                     
@@ -3414,7 +3414,9 @@ const ProjectDetailsPage = () => {
                 </div>
 
                 {(() => {
-                  const profitMargin = 0;
+                  const revenue = unifiedData?.quotation?.totalAmount || 0;
+                  const costs = unifiedData?.actuals?.totalWorkedCost || 0;
+                  const profitMargin = revenue > 0 && costs > 0 ? (revenue - costs) / revenue : 0;
                   const efficiency = unifiedData?.efficiency || 0;
                   const healthScore = Math.round((profitMargin * 100 * 0.6) + (efficiency * 0.4));
                   const healthColor = healthScore > 80 ? 'text-green-600' : healthScore > 60 ? 'text-yellow-600' : 'text-red-600';
@@ -3453,17 +3455,17 @@ const ProjectDetailsPage = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Ingresos Actuales</span>
-                    <span className="font-semibold">$0</span>
+                    <span className="font-semibold">${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Costos Totales</span>
-                    <span className="font-semibold">$0</span>
+                    <span className="font-semibold">${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}</span>
                   </div>
                   <div className="border-t pt-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Break-even Status</span>
-                      <span className="font-semibold text-red-600">
-                        Pendiente
+                      <span className={`font-semibold ${(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'text-green-600' : 'text-red-600'}`}>
+                        {(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'Alcanzado' : 'Pendiente'}
                       </span>
                     </div>
                   </div>
