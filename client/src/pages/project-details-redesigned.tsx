@@ -3522,18 +3522,48 @@ const ProjectDetailsPage = () => {
                     const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
                     const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
                     
-                    // Agrupar por tipo de contrato
-                    const fullTimeTeam = teamBreakdown.filter((member: any) => member.contractType === 'full-time');
-                    const externalTeam = teamBreakdown.filter((member: any) => member.contractType === 'external' || member.isFromExcel);
+                    // Agrupar por roles configurados en la app
+                    const roleGroups: { [key: string]: { cost: number, count: number, color: string } } = {};
                     
-                    const fullTimeCost = fullTimeTeam.reduce((sum: number, member: any) => sum + (member.actualCost || member.cost || 0), 0);
-                    const externalCost = externalTeam.reduce((sum: number, member: any) => sum + (member.actualCost || member.cost || 0), 0);
+                    teamBreakdown.forEach((member: any) => {
+                      const roleName = member.role || member.roleName || 'Sin Rol Asignado';
+                      if (!roleGroups[roleName]) {
+                        // Asignar colores diferentes según el tipo de rol
+                        const colorMap: { [key: string]: string } = {
+                          'Analista Senior': 'bg-blue-500',
+                          'Project Manager': 'bg-green-500', 
+                          'Creative Director': 'bg-purple-500',
+                          'Account Manager': 'bg-orange-500',
+                          'Developer': 'bg-cyan-500',
+                          'Designer': 'bg-pink-500',
+                          'Freelancer Excel': 'bg-yellow-500',
+                          'Sin Rol Asignado': 'bg-gray-500'
+                        };
+                        roleGroups[roleName] = {
+                          cost: 0,
+                          count: 0,
+                          color: colorMap[roleName] || 'bg-indigo-500'
+                        };
+                      }
+                      roleGroups[roleName].cost += (member.actualCost || member.cost || 0);
+                      roleGroups[roleName].count += 1;
+                    });
                     
-                    const categories = [
-                      { name: 'Equipo Interno', cost: fullTimeCost, color: 'bg-blue-500', count: fullTimeTeam.length },
-                      { name: 'Colaboradores Externos', cost: externalCost, color: 'bg-green-500', count: externalTeam.length },
-                      { name: 'Margen de Beneficio', cost: Math.max(0, totalRevenue - totalCost), color: 'bg-purple-500', count: 1 }
-                    ];
+                    // Convertir a array y agregar margen de beneficio
+                    const categories = Object.entries(roleGroups).map(([name, data]) => ({
+                      name,
+                      cost: data.cost,
+                      color: data.color,
+                      count: data.count
+                    }));
+                    
+                    // Agregar margen de beneficio al final
+                    categories.push({
+                      name: 'Margen de Beneficio',
+                      cost: Math.max(0, totalRevenue - totalCost),
+                      color: 'bg-emerald-500',
+                      count: 1
+                    });
                     
                     return categories.map((category, index) => {
                       const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
