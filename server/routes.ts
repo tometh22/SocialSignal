@@ -11404,13 +11404,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costSummary = await storage.getProjectCostSummary(parseInt(projectId as string), dateRange);
         
         console.log(`💰 DEBUG: costSummary exists: ${!!costSummary}, costByPerson exists: ${!!(costSummary?.costByPerson)}, costByPerson length: ${costSummary?.costByPerson?.length || 0}`);
+        console.log(`💰 DEBUG: costByPerson type: ${typeof costSummary?.costByPerson}, isArray: ${Array.isArray(costSummary?.costByPerson)}`);
+        console.log(`💰 DEBUG: costByPerson value:`, costSummary?.costByPerson);
         
         if (costSummary && costSummary.costByPerson) {
-          // Transformar los datos al formato esperado por el frontend
-          // Crear registros separados para costos reales y operacionales
-          costRecords = [];
+          const peopleArray = Array.isArray(costSummary.costByPerson) ? costSummary.costByPerson : Object.values(costSummary.costByPerson);
+          console.log(`💰 DEBUG: peopleArray length: ${peopleArray.length}, first person:`, peopleArray[0]);
           
-          costSummary.costByPerson.forEach((person: any, index: number) => {
+          if (peopleArray.length > 0) {
+            // Transformar los datos al formato esperado por el frontend
+            // Crear registros separados para costos reales y operacionales
+            costRecords = [];
+            console.log(`💰 MAIN PROCESSING: About to process ${peopleArray.length} people`);
+          
+            peopleArray.forEach((person: any, index: number) => {
+            console.log(`💰 Person ${index}:`, {
+              name: person.name,
+              realCost: person.realCost,
+              operationalCost: person.operationalCost,
+              hours: person.hours
+            });
+            console.log(`💰 PROCESSING Person ${index}: Will create records for real: ${!!person.realCost}, operational: ${!!(person.operationalCost || person.realCost)}`);
             const monthKey = dateRange ? 
               `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
               new Date().toISOString().slice(0, 7);
@@ -11432,8 +11446,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Registro de costo operacional (SIEMPRE generar, usar realCost si no hay operationalCost)
             const operationalCost = person.operationalCost || person.realCost || 0;
+            console.log(`💰 OPERATIONAL LOGIC: Person ${person.name}, operationalCost: ${operationalCost}, will create: ${operationalCost > 0}`);
             if (operationalCost > 0) {
-              costRecords.push({
+              const operationalRecord = {
                 id: index * 2 + 2,
                 member_name: person.name,
                 hours_worked: person.hours || 0,
@@ -11443,14 +11458,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 cost_type: "operational",
                 status: "confirmed",
                 confirmed: "SI"
-              });
+              };
+              console.log(`💰 CREATING OPERATIONAL RECORD:`, operationalRecord);
+              costRecords.push(operationalRecord);
             }
           });
+          }
         }
 
         // FALLBACK: Si no hay costSummary, usar datos directos del Excel MAESTRO
         if (!costSummary || !costSummary.costByPerson) {
-          console.log(`💰 No costSummary available for project ${projectId}, using direct Excel data`);
+          console.log(`💰 FALLBACK TRIGGERED: No costSummary available for project ${projectId}, using direct Excel data`);
           try {
             const directCosts = await storage.getDirectCostsByProject(parseInt(projectId as string));
             
@@ -11642,7 +11660,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return acc;
       }, []);
 
-      console.log(`💰 Returning ${uniqueData.length} real cost records`);
+      console.log(`💰 BEFORE dedup: ${filteredData.length} records total`);
+      console.log(`💰 BEFORE dedup by type:`, filteredData.reduce((acc: any, curr: any) => { 
+        acc[curr.cost_type] = (acc[curr.cost_type] || 0) + 1; 
+        return acc; 
+      }, {}));
+      
+      console.log(`💰 Returning ${uniqueData.length} cost records`);
       console.log(`💰 Sample data:`, uniqueData.slice(0, 2));
 
       res.json(uniqueData);
