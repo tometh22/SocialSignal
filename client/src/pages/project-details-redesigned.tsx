@@ -3230,7 +3230,7 @@ const ProjectDetailsPage = () => {
             <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Business Intelligence & Analytics</h2>
+                  <h2 className="text-2xl font-bold mb-2">Inteligencia de Negocios y Analítica</h2>
                   <p className="text-violet-100">Métricas avanzadas y proyecciones financieras</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
@@ -3244,7 +3244,7 @@ const ProjectDetailsPage = () => {
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Revenue per Employee</p>
+                      <p className="text-violet-100 text-sm">Ingresos por Empleado</p>
                       <p className="text-2xl font-bold">
                         ${Math.round((unifiedData?.quotation?.totalAmount || 0) / Math.max(Object.values(unifiedData?.actuals?.teamBreakdown || {}).length, 1)).toLocaleString()}
                       </p>
@@ -3257,7 +3257,7 @@ const ProjectDetailsPage = () => {
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Utilization Rate</p>
+                      <p className="text-violet-100 text-sm">Tasa de Utilización</p>
                       <p className="text-2xl font-bold">
                         {((unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1) * 100).toFixed(1)}%
                       </p>
@@ -3270,7 +3270,7 @@ const ProjectDetailsPage = () => {
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-violet-100 text-sm">Monthly Burn Rate</p>
+                      <p className="text-violet-100 text-sm">Tasa de Quema Mensual</p>
                       <p className="text-2xl font-bold">
                         ${Math.round(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
                       </p>
@@ -3428,8 +3428,20 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-orange-100 rounded-lg">
                     <Activity className="h-5 w-5 text-orange-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Performance Heatmap</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">Mapa de Rendimiento</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">Muestra la eficiencia de cada miembro del equipo comparando las horas trabajadas contra las horas objetivo. Verde = &gt;80%, Amarillo = 60-80%, Rojo = &lt;60%</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <p className="text-sm text-gray-500">Eficiencia por miembro del equipo</p>
                   </div>
                 </div>
@@ -3466,8 +3478,20 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-green-100 rounded-lg">
                     <Gauge className="h-5 w-5 text-green-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Resource Efficiency</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">Eficiencia de Recursos</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">Mide qué tan eficientemente se están utilizando los recursos del proyecto. Cálculo: (Horas Trabajadas / Horas Estimadas) * 100. Un valor óptimo está entre 85-100%</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <p className="text-sm text-gray-500">Optimización de recursos</p>
                   </div>
                 </div>
@@ -3514,8 +3538,20 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-purple-100 rounded-lg">
                     <Target className="h-5 w-5 text-purple-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Financial Health</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">Salud Financiera</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">Evalúa la rentabilidad del proyecto combinando margen de beneficio (70%) y eficiencia operacional (30%). Fórmula: [(Ingresos - Costos) / Ingresos] * 0.7 + [Eficiencia] * 0.3</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <p className="text-sm text-gray-500">Puntuación de salud financiera</p>
                   </div>
                 </div>
@@ -3556,8 +3592,20 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-indigo-100 rounded-lg">
                     <Target className="h-5 w-5 text-indigo-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Break-even Analysis</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">Análisis de Punto de Equilibrio</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">Compara los ingresos del proyecto contra los costos totales para determinar si el proyecto ha alcanzado su punto de equilibrio financiero</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <p className="text-sm text-gray-500">Punto de equilibrio</p>
                   </div>
                 </div>
