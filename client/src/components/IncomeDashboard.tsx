@@ -24,7 +24,7 @@ interface IncomeFilters {
   monthKey?: string;
 }
 
-export default function IncomeDashboard({ projectId }: { projectId?: number }) {
+export default function IncomeDashboard({ projectId, timeFilter }: { projectId?: number; timeFilter?: string }) {
   const [filters, setFilters] = useState<IncomeFilters>({});
 
   // Fetch income data
@@ -150,12 +150,12 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
           </Badge>
         </div>
 
-        {/* Filtros Simplificados */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+        {/* Filtros Alineados */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-600">Cliente</label>
+            <label className="text-xs font-medium text-gray-700">Cliente</label>
             <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={filters.clientName || ""}
               onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
             >
@@ -167,9 +167,9 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-600">Proyecto</label>
+            <label className="text-xs font-medium text-gray-700">Proyecto</label>
             <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={filters.projectName || ""}
               onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
             >
@@ -181,9 +181,9 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-600">Mes</label>
+            <label className="text-xs font-medium text-gray-700">Mes</label>
             <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               value={filters.monthKey || ""}
               onChange={(e) => setFilters(prev => ({ ...prev, monthKey: e.target.value || undefined }))}
             >
@@ -194,15 +194,18 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
             </select>
           </div>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={clearFilters}
-            className="flex items-center gap-1"
-          >
-            <Filter className="w-4 h-4" />
-            Limpiar
-          </Button>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-gray-700">Acciones</label>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={clearFilters}
+              className="flex items-center gap-2 h-[38px]"
+            >
+              <Filter className="w-4 h-4" />
+              Limpiar
+            </Button>
+          </div>
         </div>
 
         {/* Total Income Card */}
@@ -287,10 +290,18 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
                         </td>
                         <td className="p-3 text-sm">
                           <Badge 
-                            variant={confirmed === 'SI' || confirmed === 'Si' ? 'default' : 'outline'}
-                            className={`text-xs ${confirmed === 'SI' || confirmed === 'Si' ? 'bg-green-100 text-green-700' : ''}`}
+                            variant="outline"
+                            className={`text-xs ${
+                              status === 'proyectada' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                              status === 'activa' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                              status === 'completada' ? 'bg-green-100 text-green-700 border-green-300' :
+                              'bg-gray-100 text-gray-700 border-gray-300'
+                            }`}
                           >
-                            {status}
+                            {status === 'proyectada' ? '🔮 Proyectada' :
+                             status === 'activa' ? '⚡ Activa' :
+                             status === 'completada' ? '✅ Completada' :
+                             status}
                           </Badge>
                         </td>
                         <td className="p-3 text-sm text-gray-600 max-w-xs truncate">

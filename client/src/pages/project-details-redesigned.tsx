@@ -3206,7 +3206,10 @@ const ProjectDetailsPage = () => {
 
 
           <TabsContent value="income-details" className="space-y-6">
-            <IncomeDashboard projectId={unifiedData?.project?.id} />
+            <IncomeDashboard 
+              projectId={unifiedData?.project?.id} 
+              timeFilter={timeFilterForHook}
+            />
           </TabsContent>
 
 

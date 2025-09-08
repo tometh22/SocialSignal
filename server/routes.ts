@@ -11209,10 +11209,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("📊 INCOME DASHBOARD API called with params:", req.query);
       
-      const { projectId, clientName, projectName, monthKey } = req.query;
+      const { projectId, clientName, projectName, monthKey, timeFilter } = req.query;
       
-      // Use direct SQL query with template literal
-      let baseQuery = sql`
+      // Build dynamic query based on filters
+      let conditions = ['confirmed = $1'];
+      let params = ['SI']; // Always filter for confirmed records
+      let paramCount = 2;
+      
+      // Add timeFilter logic if provided
+      if (timeFilter && timeFilter !== 'all_time') {
+        console.log(`📊 Applying timeFilter: ${timeFilter}`);
+        try {
+          const { startDate, endDate } = getDateRangeForFilter(timeFilter);
+          if (startDate && endDate) {
+            // Convert dates to YYYY-MM format for month_key comparison
+            const startMonth = startDate.toISOString().slice(0, 7); // YYYY-MM
+            const endMonth = endDate.toISOString().slice(0, 7); // YYYY-MM
+            conditions.push(`month_key >= $${paramCount++}`);
+            conditions.push(`month_key <= $${paramCount++}`);
+            params.push(startMonth, endMonth);
+            console.log(`📊 Applied time filter: ${startMonth} to ${endMonth}`);
+          }
+        } catch (error) {
+          console.warn(`📊 Error applying timeFilter '${timeFilter}':`, error.message);
+        }
+      }
+      
+      // Add other filters
+      if (clientName) {
+        conditions.push(`client_name = $${paramCount++}`);
+        params.push(clientName);
+      }
+      
+      if (projectName) {
+        conditions.push(`project_name = $${paramCount++}`);
+        params.push(projectName);
+      }
+      
+      if (monthKey) {
+        conditions.push(`month_key = $${paramCount++}`);
+        params.push(monthKey);
+      }
+      
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      
+      const sqlQuery = `
         SELECT 
           id, 
           client_name, 
@@ -11223,27 +11264,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status, 
           confirmed
         FROM google_sheets_sales
-      `;
-      
-      // For now, let's get all records without filtering
-      // TODO: Add filtering logic later
-      const fullQuery = sql`
-        SELECT 
-          id, 
-          client_name, 
-          project_name, 
-          month_key, 
-          sales_type, 
-          amount_usd, 
-          status, 
-          confirmed
-        FROM google_sheets_sales
+        ${whereClause}
         ORDER BY month_key DESC, client_name, project_name
       `;
       
-      console.log(`📊 Executing SQL query for all records`);
+      console.log(`📊 Executing SQL query:`, sqlQuery);
+      console.log(`📊 Params:`, params);
       
-      const result = await db.execute(fullQuery);
+      const result = await db.execute(sql.raw(sqlQuery, ...params));
       
       // Extract rows from result object
       const rows = result.rows || result || [];
