@@ -63,7 +63,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
 
   // Obtener valores únicos para filtros
   const uniqueMembers = useMemo(() => {
-    return [...new Set(costData.map((record: CostRecord) => record.member_name))];
+    return Array.from(new Set(costData.map((record: CostRecord) => record.member_name)));
   }, [costData]);
 
   const clearFilters = () => {
