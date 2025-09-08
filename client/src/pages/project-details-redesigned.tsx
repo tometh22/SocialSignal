@@ -3940,7 +3940,7 @@ const ProjectDetailsPage = () => {
                       <p className="text-purple-600 text-sm font-medium">Dependencias</p>
                       <p className="text-2xl font-bold text-purple-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.role || 'Sin Rol'));
+                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.roleName || 'Sin Rol'));
                           return uniqueRoles.size;
                         })() : 0}
                       </p>
@@ -4088,9 +4088,9 @@ const ProjectDetailsPage = () => {
                       
                       return activeMembers.map((member, index) => {
                         const workIntensity = member.hours / Math.max(...activeMembers.map(m => m.hours));
-                        const collaborationType = member.role === 'Analista Senior' ? 'Ejecutor Principal' :
-                                                 member.role === 'Operations Lead' ? 'Coordinador' :
-                                                 member.role === 'Project Manager' ? 'Supervisor' : 'Especialista';
+                        const collaborationType = member.roleName === 'Analista Senior' ? 'Ejecutor Principal' :
+                                                 member.roleName === 'Operations Lead' ? 'Coordinador' :
+                                                 member.roleName === 'Project Manager' ? 'Supervisor' : 'Especialista';
                         
                         return (
                           <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
