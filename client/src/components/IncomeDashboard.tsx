@@ -21,6 +21,8 @@ interface IncomeRecord {
 interface IncomeFilters {
   clientName?: string;
   projectName?: string;
+  salesType?: string;
+  status?: string;
 }
 
 export default function IncomeDashboard({ projectId, timeFilter }: { projectId?: number; timeFilter?: string }) {
@@ -103,14 +105,20 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
     return incomeData.filter((record: any) => {
       const clientName = record.clientName || record.client_name;
       const projectName = record.projectName || record.project_name;
-      const monthKey = record.monthKey || record.month_key;
+      const salesType = record.salesType || record.sales_type;
+      const status = record.status;
       
       if (filters.clientName && clientName !== filters.clientName) return false;
       // Only apply project filter if we're NOT in project context
       if (!projectId && filters.projectName && projectName !== filters.projectName) return false;
+      
+      // Project-specific filters
+      if (filters.salesType && salesType !== filters.salesType) return false;
+      if (filters.status && status !== filters.status) return false;
+      
       return true;
     });
-  }, [incomeData, filters]);
+  }, [incomeData, filters, projectId]);
 
   const clearFilters = () => {
     setFilters({});
@@ -192,17 +200,47 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
             </div>
           </div>
         ) : (
-          // Vista de proyecto específico - sin filtros (ya está filtrado por proyecto)
-          <div className="mb-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-center gap-2 text-blue-700">
-                <span className="text-sm font-medium">
-                  📊 Mostrando datos filtrados automáticamente para este proyecto
-                </span>
-              </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Los ingresos se filtran automáticamente usando el filtro de tiempo global
-              </p>
+          // Vista de proyecto específico - filtros para análisis de ESTE proyecto
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Tipo de Venta</label>
+              <select 
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.salesType || ""}
+                onChange={(e) => setFilters(prev => ({ ...prev, salesType: e.target.value || undefined }))}
+              >
+                <option value="">Todos los tipos</option>
+                <option value="Fee">Fee</option>
+                <option value="One Shot">One Shot</option>
+                <option value="Bonus">Bonus</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Estado</label>
+              <select 
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.status || ""}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value || undefined }))}
+              >
+                <option value="">Todos los estados</option>
+                <option value="completada">Completada</option>
+                <option value="activa">Activa</option>
+                <option value="proyectada">Proyectada</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Acciones</label>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                className="flex items-center gap-2 h-[38px]"
+              >
+                <Filter className="w-4 h-4" />
+                Limpiar
+              </Button>
             </div>
           </div>
         )}
