@@ -724,27 +724,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allRoles = await storage.getRoles();
       console.log(`👥 Retrieved ${allPersonnel.length} personnel and ${allRoles.length} roles for role mapping`);
 
+      // Mapeo corregido de nombres del Excel MAESTRO a nombres en BD
+      const nameMapping: { [key: string]: string } = {
+        // CORRECCIÓN: Vicky Achabal y Vicky Puricelli son personas DIFERENTES
+        'vicky achabal': 'victoria achabal',    // Vicky Achabal (Excel) → Victoria Achabal (BD)
+        'victoria achabal': 'victoria achabal', // Nombre completo directo
+        'vicky puricelli': 'vicky puricelli',   // Persona completamente diferente
+        'trini petreigne': 'trinidad petreigne', 
+        'trinidad petreigne': 'trinidad petreigne',
+        'tomi facio': 'tomas facio',
+        'tomas facio': 'tomas facio',
+        'vanu lanza': 'vanina lanza',
+        'vanina lanza': 'vanina lanza',
+        'aylu tamer': 'aylen magali',
+        'aylen magali': 'aylen magali',
+        'gast guntren': 'gastón guntren',
+        'gastón guntren': 'gastón guntren',
+        'lola camara': 'dolores camara',
+        'dolores camara': 'dolores camara',
+        'male quiroga': 'malena quiroga',
+        'malena quiroga': 'malena quiroga'
+      };
+
       // Helper function para obtener el rol real de una persona
       const getRoleForPerson = (personnelId: number | null, personName: string): string => {
         console.log(`🔍 Mapeando rol para: personnelId=${personnelId}, personName="${personName}"`);
         
         if (!personnelId) {
-          // Para personas del Excel MAESTRO sin personnelId, buscar por nombre exacto o similar
-          const matchedPersonnel = allPersonnel.find(p => 
-            p.name === personName || 
-            p.name.toLowerCase().includes(personName.toLowerCase()) ||
-            personName.toLowerCase().includes(p.name.toLowerCase())
-          );
+          // Normalizar nombre para búsqueda
+          const normalizedExcelName = personName.toLowerCase().trim();
+          const mappedName = nameMapping[normalizedExcelName] || normalizedExcelName;
+          
+          console.log(`🔄 Nombre normalizado: "${normalizedExcelName}" → "${mappedName}"`);
+          
+          // Buscar por nombre mapeado o coincidencia parcial
+          const matchedPersonnel = allPersonnel.find(p => {
+            const dbName = p.name.toLowerCase().trim();
+            return dbName === mappedName || 
+                   dbName.includes(mappedName) ||
+                   mappedName.includes(dbName) ||
+                   // Buscar por primer nombre
+                   dbName.split(' ')[0] === mappedName.split(' ')[0];
+          });
+          
           if (matchedPersonnel) {
             const role = allRoles.find(r => r.id === matchedPersonnel.roleId);
             const roleName = role?.name || 'Sin Rol';
-            console.log(`✅ Encontrado: ${personName} → ${matchedPersonnel.name} → ${roleName}`);
+            console.log(`✅ MATCH: "${personName}" → "${matchedPersonnel.name}" → "${roleName}"`);
             return roleName;
           }
-          console.log(`❌ No encontrado en personnel: ${personName} → Freelancer Excel`);
-          console.log(`📋 Personnel disponible: ${allPersonnel.map(p => p.name).join(', ')}`);
-          // Si no se encuentra en la configuración, usar rol por defecto según el contexto
-          return 'Freelancer Excel'; // Para external del Excel MAESTRO sin configuración
+          
+          console.log(`❌ No encontrado: "${personName}"`);
+          console.log(`📋 Personnel disponible: ${allPersonnel.map(p => p.name).slice(0, 10).join(', ')}...`);
+          return 'Freelancer Excel';
         } else {
           // Para personnel con ID, buscar directamente
           const personnel = allPersonnel.find(p => p.id === personnelId);
