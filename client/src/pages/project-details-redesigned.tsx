@@ -3285,7 +3285,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Project Velocity</p>
                       <p className="text-2xl font-bold">
-                        {Math.round((unifiedData?.workedHours || 0) / 4)}
+                        {Math.round((unifiedData?.actuals?.totalWorkedHours || unifiedData?.workedHours || 0) / Math.max(Math.ceil(((unifiedData?.quotation?.totalAmount || 0) / 1000)), 1))}
                       </p>
                       <p className="text-xs text-violet-200">hours/week</p>
                     </div>
@@ -3493,7 +3493,7 @@ const ProjectDetailsPage = () => {
                     <span className="text-sm font-medium text-green-700">Ingresos Proyectados</span>
                   </div>
                   <div className="text-2xl font-bold text-green-800">
-                    $0
+                    ${Math.round((unifiedData?.quotation?.totalAmount || 0) * 1.15).toLocaleString()}
                   </div>
                   <div className="text-xs text-green-600">+15% estimado</div>
                 </div>
@@ -3520,7 +3520,7 @@ const ProjectDetailsPage = () => {
                     <span className="text-sm font-medium text-purple-700">Client LTV</span>
                   </div>
                   <div className="text-2xl font-bold text-purple-800">
-                    $0
+                    ${Math.round((unifiedData?.quotation?.totalAmount || 0) * 2.3).toLocaleString()}
                   </div>
                   <div className="text-xs text-purple-600">Valor estimado</div>
                 </div>
