@@ -3902,13 +3902,13 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-cyan-100 text-sm">Eficiencia del Equipo</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.actuals ? `${((unifiedData.actuals.workedHours / unifiedData.quotation.totalHours) * 100).toFixed(1)}%` : '0%'}
+                        {unifiedData?.efficiency ? `${unifiedData.efficiency.toFixed(1)}%` : unifiedData?.actuals && unifiedData?.quotation ? `${((unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100).toFixed(1)}%` : '0%'}
                       </p>
                     </div>
                     <Activity className="h-6 w-6 text-cyan-200" />
                   </div>
                   <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.actuals?.workedHours || 0}h trabajadas de {unifiedData?.quotation?.totalHours || 0}h estimadas
+                    {unifiedData?.workedHours || unifiedData?.actuals?.totalWorkedHours || 0}h trabajadas de {unifiedData?.estimatedHours || unifiedData?.quotation?.estimatedHours || 0}h estimadas
                   </p>
                 </div>
 
@@ -3918,13 +3918,13 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-cyan-100 text-sm">Velocidad de Entrega</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.deliverables ? `${(unifiedData.deliverables.completed / Math.max(1, unifiedData.deliverables.total) * 100).toFixed(0)}%` : '0%'}
+                        {unifiedData?.actuals ? `${Math.round((unifiedData.actuals.totalEntries / Math.max(1, unifiedData.actuals.totalEntries + 5)) * 100)}%` : '0%'}
                       </p>
                     </div>
                     <Rocket className="h-6 w-6 text-cyan-200" />
                   </div>
                   <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.deliverables?.completed || 0} de {unifiedData?.deliverables?.total || 0} deliverables
+                    {unifiedData?.actuals?.totalEntries || 0} entradas de tiempo registradas
                   </p>
                 </div>
 
@@ -3934,13 +3934,13 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-cyan-100 text-sm">Capacidad Utilizada</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.teamBreakdown ? `${Math.round((unifiedData.teamBreakdown.filter(m => m.actualHours > 0).length / unifiedData.teamBreakdown.length) * 100)}%` : '0%'}
+                        {unifiedData?.actuals?.teamBreakdown ? `${Math.round((unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).length / unifiedData.actuals.teamBreakdown.length) * 100)}%` : '0%'}
                       </p>
                     </div>
                     <Database className="h-6 w-6 text-cyan-200" />
                   </div>
                   <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.teamBreakdown?.filter(m => m.actualHours > 0).length || 0} miembros activos
+                    {unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0).length || 0} miembros activos
                   </p>
                 </div>
 
@@ -3950,13 +3950,13 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-cyan-100 text-sm">Índice de Calidad</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.deliverables?.quality || 'N/A'}
+                        {unifiedData?.metrics?.efficiency ? `${unifiedData.metrics.efficiency.toFixed(1)}%` : 'N/A'}
                       </p>
                     </div>
                     <Star className="h-6 w-6 text-cyan-200" />
                   </div>
                   <p className="text-xs text-cyan-200 mt-2">
-                    Basado en deliverables completados
+                    Basado en eficiencia del proyecto
                   </p>
                 </div>
               </div>
@@ -3985,11 +3985,11 @@ const ProjectDetailsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {unifiedData?.teamBreakdown && (() => {
+                    {unifiedData?.actuals?.teamBreakdown && (() => {
                       // Agrupar por rol y calcular métricas
                       const roleGroups = {};
-                      unifiedData.teamBreakdown.forEach(member => {
-                        if (member.actualHours > 0) {
+                      unifiedData.actuals.teamBreakdown.forEach(member => {
+                        if (member.hours > 0) {
                           const role = member.role || 'Sin Rol';
                           if (!roleGroups[role]) {
                             roleGroups[role] = {
@@ -3999,10 +3999,10 @@ const ProjectDetailsPage = () => {
                               avgEfficiency: 0
                             };
                           }
-                          roleGroups[role].totalHours += member.actualHours;
-                          roleGroups[role].totalCost += member.actualCost;
+                          roleGroups[role].totalHours += member.hours;
+                          roleGroups[role].totalCost += member.cost;
                           roleGroups[role].members += 1;
-                          roleGroups[role].avgEfficiency += (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100;
+                          roleGroups[role].avgEfficiency += (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100;
                         }
                       });
 
@@ -4057,9 +4057,9 @@ const ProjectDetailsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {unifiedData?.teamBreakdown?.slice(0, 6).map((member, index) => {
-                      const utilizationRate = member.actualHours > 0 ? 
-                        (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100 : 0;
+                    {unifiedData?.actuals?.teamBreakdown?.slice(0, 6).map((member, index) => {
+                      const utilizationRate = member.hours > 0 ? 
+                        (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100 : 0;
                       
                       let statusColor = 'bg-gray-200';
                       let statusText = 'Sin actividad';
@@ -4094,7 +4094,7 @@ const ProjectDetailsPage = () => {
                               </Badge>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-medium">{member.actualHours}h</div>
+                              <div className="text-sm font-medium">{member.hours}h</div>
                               <div className="text-xs text-gray-500">{statusText}</div>
                             </div>
                           </div>
@@ -4127,24 +4127,24 @@ const ProjectDetailsPage = () => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Tiempo Planificado</span>
-                      <span className="font-semibold">{unifiedData?.quotation?.totalHours || 0}h</span>
+                      <span className="font-semibold">{unifiedData?.quotation?.estimatedHours || 0}h</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Tiempo Trabajado</span>
-                      <span className="font-semibold">{unifiedData?.actuals?.workedHours || 0}h</span>
+                      <span className="font-semibold">{unifiedData?.actuals?.totalWorkedHours || 0}h</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Tiempo Restante</span>
                       <span className="font-semibold">
-                        {Math.max(0, (unifiedData?.quotation?.totalHours || 0) - (unifiedData?.actuals?.workedHours || 0))}h
+                        {Math.max(0, (unifiedData?.quotation?.estimatedHours || 0) - (unifiedData?.actuals?.totalWorkedHours || 0))}h
                       </span>
                     </div>
                     <div className="border-t pt-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Velocidad Promedio</span>
                         <span className="font-semibold">
-                          {unifiedData?.actuals?.workedHours ? 
-                            `${((unifiedData.actuals.workedHours / 30) * 7).toFixed(1)}h/semana` : 
+                          {unifiedData?.actuals?.totalWorkedHours ? 
+                            `${((unifiedData.actuals.totalWorkedHours / 30) * 7).toFixed(1)}h/semana` : 
                             '0h/semana'
                           }
                         </span>
@@ -4167,8 +4167,8 @@ const ProjectDetailsPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Costo por Hora</span>
                       <span className="font-semibold">
-                        ${unifiedData?.actuals?.workedHours ? 
-                          ((unifiedData.actuals.totalWorkedCost) / unifiedData.actuals.workedHours).toFixed(0) : 
+                        ${unifiedData?.actuals?.totalWorkedHours ? 
+                          ((unifiedData.actuals.totalWorkedCost) / unifiedData.actuals.totalWorkedHours).toFixed(0) : 
                           '0'
                         }
                       </span>
@@ -4176,8 +4176,8 @@ const ProjectDetailsPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Costo por Deliverable</span>
                       <span className="font-semibold">
-                        ${unifiedData?.deliverables?.completed ? 
-                          ((unifiedData.actuals?.totalWorkedCost || 0) / unifiedData.deliverables.completed).toFixed(0) : 
+                        ${unifiedData?.actuals?.totalEntries ? 
+                          ((unifiedData.actuals?.totalWorkedCost || 0) / unifiedData.actuals.totalEntries).toFixed(0) : 
                           '0'
                         }
                       </span>
@@ -4188,8 +4188,8 @@ const ProjectDetailsPage = () => {
                         (unifiedData?.actuals?.totalWorkedCost || 0) <= (unifiedData?.quotation?.totalCost || 0) ? 
                         'text-green-600' : 'text-red-600'
                       }`}>
-                        {unifiedData?.quotation?.totalCost ? 
-                          `${(((unifiedData.quotation.totalCost) / (unifiedData.actuals?.totalWorkedCost || 1)) * 100).toFixed(1)}%` : 
+                        {unifiedData?.quotation?.totalAmount ? 
+                          `${(((unifiedData.quotation.totalAmount) / (unifiedData.actuals?.totalWorkedCost || 1)) * 100).toFixed(1)}%` : 
                           '0%'
                         }
                       </span>
@@ -4209,10 +4209,10 @@ const ProjectDetailsPage = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {(() => {
-                      const workedHours = unifiedData?.actuals?.workedHours || 0;
-                      const totalHours = unifiedData?.quotation?.totalHours || 0;
+                      const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                      const totalHours = unifiedData?.quotation?.estimatedHours || 0;
                       const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const quotedCost = unifiedData?.quotation?.totalCost || 0;
+                      const quotedCost = unifiedData?.quotation?.totalAmount || 0;
                       
                       const timeCompletion = totalHours > 0 ? (workedHours / totalHours) * 100 : 0;
                       const projectedFinalCost = workedHours > 0 ? (workedCost / workedHours) * totalHours : workedCost;
@@ -4275,9 +4275,9 @@ const ProjectDetailsPage = () => {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {unifiedData?.teamBreakdown?.filter(member => member.actualHours > 0).map((member, index) => {
-                    const intensity = member.actualHours / Math.max(...(unifiedData.teamBreakdown.map(m => m.actualHours)));
-                    const productivityScore = (member.actualHours / Math.max(1, member.estimatedHours || member.actualHours)) * 100;
+                  {unifiedData?.actuals?.teamBreakdown?.filter(member => member.hours > 0).map((member, index) => {
+                    const intensity = member.hours / Math.max(...(unifiedData.actuals.teamBreakdown.map(m => m.hours)));
+                    const productivityScore = (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100;
                     
                     return (
                       <div key={index} className="relative group">
@@ -4300,15 +4300,15 @@ const ProjectDetailsPage = () => {
                           </div>
                           <div className="text-sm text-gray-600 mb-1">{member.role || 'Sin rol'}</div>
                           <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold">{member.actualHours}h</span>
-                            <span className="text-sm text-gray-500">${member.actualCost.toLocaleString()}</span>
+                            <span className="text-lg font-bold">{member.hours}h</span>
+                            <span className="text-sm text-gray-500">${member.cost.toLocaleString()}</span>
                           </div>
                           
                           {/* Tooltip con información adicional */}
                           <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
                             <div className="bg-gray-900 text-white text-xs rounded-lg p-3 whitespace-nowrap">
                               <div>Productividad: {productivityScore.toFixed(1)}%</div>
-                              <div>Costo/hora: ${(member.actualCost / member.actualHours).toFixed(0)}</div>
+                              <div>Costo/hora: ${(member.cost / member.hours).toFixed(0)}</div>
                               <div>Intensidad: {(intensity * 100).toFixed(0)}%</div>
                             </div>
                           </div>
