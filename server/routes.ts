@@ -727,13 +727,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Helper function para obtener el rol real de una persona
       const getRoleForPerson = (personnelId: number | null, personName: string): string => {
         if (!personnelId) {
-          // Para personas del Excel MAESTRO sin personnelId, buscar por nombre exacto
-          const matchedPersonnel = allPersonnel.find(p => p.name === personName);
+          // Para personas del Excel MAESTRO sin personnelId, buscar por nombre exacto o similar
+          const matchedPersonnel = allPersonnel.find(p => 
+            p.name === personName || 
+            p.name.toLowerCase().includes(personName.toLowerCase()) ||
+            personName.toLowerCase().includes(p.name.toLowerCase())
+          );
           if (matchedPersonnel) {
             const role = allRoles.find(r => r.id === matchedPersonnel.roleId);
             return role?.name || 'Sin Rol';
           }
-          return 'Freelancer Excel'; // Para external del Excel MAESTRO
+          // Si no se encuentra en la configuración, usar rol por defecto según el contexto
+          return 'Freelancer Excel'; // Para external del Excel MAESTRO sin configuración
         } else {
           // Para personnel con ID, buscar directamente
           const personnel = allPersonnel.find(p => p.id === personnelId);

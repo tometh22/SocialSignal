@@ -3573,12 +3573,12 @@ const ProjectDetailsPage = () => {
                     teamBreakdown.forEach((member: any) => {
                       const roleName = member.role || member.roleName || 'Sin Rol Asignado';
                       if (!roleGroups[roleName]) {
-                        // Mapeo de colores para los roles configurados en la app
+                        // Mapeo de colores para los roles configurados en la app (español)
                         const colorMap: { [key: string]: string } = {
-                          'Senior Analyst': 'bg-blue-500',
-                          'Data Scientist': 'bg-green-500', 
-                          'Content Specialist': 'bg-purple-500',
-                          'Project Manager': 'bg-orange-500',
+                          'Analista Senior': 'bg-blue-500',
+                          'Científico de Datos': 'bg-green-500', 
+                          'Especialista en Contenido': 'bg-purple-500',
+                          'Gerente de Proyecto': 'bg-orange-500',
                           'Freelancer Excel': 'bg-yellow-500',
                           'Sin Rol Asignado': 'bg-gray-500'
                         };
