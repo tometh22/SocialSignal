@@ -3331,68 +3331,102 @@ const ProjectDetailsPage = () => {
               </div>
             </div>
 
-            {/* PREDICTIVE ANALYTICS - MOVED UP */}
+            {/* FINANCIAL PROJECTIONS & ANALYSIS */}
             <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-cyan-100 rounded-lg">
-                  <Brain className="h-5 w-5 text-cyan-600" />
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <BarChart3 className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Predictive Analytics & Insights</h3>
-                  <p className="text-sm text-gray-500">Proyecciones e inteligencia de negocio</p>
+                  <h3 className="font-semibold text-gray-900">Proyecciones Financieras y Análisis</h3>
+                  <p className="text-sm text-gray-500">Métricas clave de rentabilidad y cash flow</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Projected Revenue */}
+                {/* Ingresos Proyectados vs Reales */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
                     <span className="text-sm font-medium text-green-700">Ingresos Proyectados</span>
                   </div>
                   <div className="text-2xl font-bold text-green-800">
-                    ${Math.round((unifiedData?.quotation?.totalAmount || 0) * 1.15).toLocaleString()}
+                    ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
                   </div>
-                  <div className="text-xs text-green-600">+15% estimado</div>
-                </div>
-
-                {/* Risk Score */}
-                <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 border border-orange-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-medium text-orange-700">Risk Score</span>
-                  </div>
-                  <div className="text-2xl font-bold text-orange-800">
-                    {Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0)))}
-                  </div>
-                  <div className="text-xs text-orange-600">
-                    {Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0))) < 30 ? 'Bajo' : 
-                     Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0))) < 60 ? 'Medio' : 'Alto'}
+                  <div className="text-xs text-green-600">
+                    vs ${(() => {
+                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
+                      const realizedRevenue = (unifiedData?.quotation?.totalAmount || 0) * progress;
+                      return Math.round(realizedRevenue).toLocaleString();
+                    })()} realizado ({((unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1) * 100).toFixed(0)}%)
                   </div>
                 </div>
 
-                {/* Client Lifetime Value */}
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
+                {/* Break-even Point */}
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
                   <div className="flex items-center gap-2 mb-2">
-                    <Heart className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-purple-700">Client LTV</span>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-800">
-                    ${Math.round((unifiedData?.quotation?.totalAmount || 0) * 2.3).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-purple-600">Valor estimado</div>
-                </div>
-
-                {/* Time to Market */}
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">Tiempo Restante</span>
+                    <Target className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-700">Punto de Equilibrio</span>
                   </div>
                   <div className="text-2xl font-bold text-blue-800">
-                    {Math.max(0, Math.round((unifiedData?.estimatedHours || 0) - (unifiedData?.workedHours || 0)))}h
+                    {(() => {
+                      const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const currentRevenue = unifiedData?.quotation?.totalAmount || 0;
+                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
+                      const realizedRevenue = currentRevenue * progress;
+                      return realizedRevenue >= totalCost ? 'Alcanzado' : Math.round(((totalCost / currentRevenue) * 100)).toString() + '%';
+                    })()} 
                   </div>
-                  <div className="text-xs text-blue-600">Para completar</div>
+                  <div className="text-xs text-blue-600">
+                    {(() => {
+                      const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const currentRevenue = unifiedData?.quotation?.totalAmount || 0;
+                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
+                      const realizedRevenue = currentRevenue * progress;
+                      return realizedRevenue >= totalCost ? 'Proyecto rentable' : 'Progreso requerido';
+                    })()} 
+                  </div>
+                </div>
+
+                {/* Cash Flow Actual */}
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DollarSign className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-700">Cash Flow Neto</span>
+                  </div>
+                  <div className="text-2xl font-bold text-purple-800">
+                    ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-purple-600">
+                    {(() => {
+                      const cashFlow = (unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0);
+                      return cashFlow > 0 ? 'Flujo positivo' : cashFlow < 0 ? 'Flujo negativo' : 'Equilibrado';
+                    })()} 
+                  </div>
+                </div>
+
+                {/* Rentabilidad del Proyecto */}
+                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg p-4 border border-yellow-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-yellow-600" />
+                    <span className="text-sm font-medium text-yellow-700">Rentabilidad</span>
+                  </div>
+                  <div className="text-2xl font-bold text-yellow-800">
+                    {(() => {
+                      const revenue = unifiedData?.quotation?.totalAmount || 0;
+                      const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const profitability = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
+                      return profitability > 0 ? '+' + profitability.toFixed(1) + '%' : profitability.toFixed(1) + '%';
+                    })()} 
+                  </div>
+                  <div className="text-xs text-yellow-600">
+                    {(() => {
+                      const revenue = unifiedData?.quotation?.totalAmount || 0;
+                      const cost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const profitability = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
+                      return profitability > 30 ? 'Muy rentable' : profitability > 15 ? 'Rentable' : profitability > 0 ? 'Mínimo' : 'Pérdida';
+                    })()} 
+                  </div>
                 </div>
               </div>
             </div>
@@ -3458,50 +3492,91 @@ const ProjectDetailsPage = () => {
                 })()}
               </div>
 
-              {/* Team Performance Heatmap */}
+              {/* Cost Breakdown Analysis */}
               <div className="bg-white rounded-xl border shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <Activity className="h-5 w-5 text-orange-600" />
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <BarChart3 className="h-5 w-5 text-indigo-600" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Mapa de Rendimiento</h3>
+                      <h3 className="font-semibold text-gray-900">Análisis de Costos por Categoría</h3>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="max-w-xs">Muestra la eficiencia de cada miembro del equipo comparando las horas trabajadas contra las horas objetivo. Verde = &gt;80%, Amarillo = 60-80%, Rojo = &lt;60%</p>
+                            <p className="max-w-xs">Desglose detallado de los costos del proyecto por tipo de recurso y su impacto en la rentabilidad total</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </div>
-                    <p className="text-sm text-gray-500">Eficiencia por miembro del equipo</p>
+                    <p className="text-sm text-gray-500">Distribución de costos y rentabilidad</p>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {(Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {})).slice(0, 6).map((member: any, index: number) => {
-                    const actualHours = member.actualHours || member.hours || 0;
-                    const targetHours = member.targetHours || member.estimatedHours || 1;
-                    const efficiency = actualHours > 0 ? Math.min((actualHours / targetHours) * 100, 100) : 0;
-                    const performanceColor = efficiency > 80 ? 'bg-green-500' : efficiency > 60 ? 'bg-yellow-500' : 'bg-red-500';
+                <div className="space-y-4">
+                  {(() => {
+                    const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
+                    const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
                     
-                    return (
-                      <div key={index} className="flex items-center gap-3">
-                        <div className="w-24 text-sm text-gray-600 truncate">{member.name}</div>
-                        <div className="flex-1 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${performanceColor}`} 
-                            style={{ width: `${Math.min(efficiency, 100)}%` }}
-                          ></div>
+                    // Agrupar por tipo de contrato
+                    const fullTimeTeam = teamBreakdown.filter((member: any) => member.contractType === 'full-time');
+                    const externalTeam = teamBreakdown.filter((member: any) => member.contractType === 'external' || member.isFromExcel);
+                    
+                    const fullTimeCost = fullTimeTeam.reduce((sum: number, member: any) => sum + (member.actualCost || member.cost || 0), 0);
+                    const externalCost = externalTeam.reduce((sum: number, member: any) => sum + (member.actualCost || member.cost || 0), 0);
+                    
+                    const categories = [
+                      { name: 'Equipo Interno', cost: fullTimeCost, color: 'bg-blue-500', count: fullTimeTeam.length },
+                      { name: 'Colaboradores Externos', cost: externalCost, color: 'bg-green-500', count: externalTeam.length },
+                      { name: 'Margen de Beneficio', cost: Math.max(0, totalRevenue - totalCost), color: 'bg-purple-500', count: 1 }
+                    ];
+                    
+                    return categories.map((category, index) => {
+                      const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
+                      
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded ${category.color}`}></div>
+                              <span className="text-sm font-medium text-gray-900">{category.name}</span>
+                              {category.name !== 'Margen de Beneficio' && (
+                                <span className="text-xs text-gray-500">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-gray-900">${category.cost.toLocaleString()}</div>
+                              <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
+                            </div>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${category.color}`} 
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            ></div>
+                          </div>
                         </div>
-                        <div className="w-12 text-sm text-gray-500">{efficiency.toFixed(0)}%</div>
+                      );
+                    });
+                  })()}
+                  
+                  {/* Summary */}
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-900">Total del Proyecto</span>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">
+                          Costo: ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()} | 
+                          Beneficio: ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()}
+                        </div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
