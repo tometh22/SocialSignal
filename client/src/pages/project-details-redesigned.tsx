@@ -3494,35 +3494,80 @@ const ProjectDetailsPage = () => {
 
               {/* Cost Breakdown Analysis */}
               <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-indigo-100 rounded-lg">
-                    <BarChart3 className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Análisis de Costos por Categoría</h3>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Desglose detallado de los costos del proyecto por tipo de recurso y su impacto en la rentabilidad total</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-indigo-600" />
                     </div>
-                    <p className="text-sm text-gray-500">Distribución de costos y rentabilidad</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">Análisis de Costos por Categoría</h3>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">Desglose detallado de los costos del proyecto por tipo de recurso y su impacto en la rentabilidad total</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <p className="text-sm text-gray-500">Distribución de costos y rentabilidad</p>
+                    </div>
+                  </div>
+                  
+                  {/* Toggle View Button */}
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={(e) => {
+                        // Mostrar vista por rol
+                        document.querySelectorAll('.breakdown-person-view').forEach(el => el.classList.add('hidden'));
+                        document.querySelector('.breakdown-role-view')?.classList.remove('hidden');
+                        
+                        // Actualizar botones
+                        document.querySelectorAll('.breakdown-toggle-btn').forEach(btn => {
+                          btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                          btn.classList.add('text-gray-500');
+                        });
+                        
+                        e.currentTarget.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                        e.currentTarget.classList.remove('text-gray-500');
+                      }}
+                      className="breakdown-toggle-btn px-3 py-1 text-xs font-medium rounded-md transition-colors bg-white text-gray-900 shadow-sm"
+                    >
+                      Por Rol
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        // Mostrar vista por persona
+                        document.querySelectorAll('.breakdown-role-view').forEach(el => el.classList.add('hidden'));
+                        document.querySelector('.breakdown-person-view')?.classList.remove('hidden');
+                        
+                        // Actualizar botones
+                        document.querySelectorAll('.breakdown-toggle-btn').forEach(btn => {
+                          btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
+                          btn.classList.add('text-gray-500');
+                        });
+                        
+                        e.currentTarget.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
+                        e.currentTarget.classList.remove('text-gray-500');
+                      }}
+                      className="breakdown-toggle-btn px-3 py-1 text-xs font-medium rounded-md transition-colors text-gray-500 hover:text-gray-700"
+                    >
+                      Por Persona
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                {/* Vista por Rol */}
+                <div className="space-y-4 breakdown-role-view">
                   {(() => {
                     const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
                     const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
                     const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
                     
-                    // Agrupar por roles configurados en la app
+                    // Vista por roles configurados en la app
                     const roleGroups: { [key: string]: { cost: number, count: number, color: string } } = {};
                     
                     teamBreakdown.forEach((member: any) => {
@@ -3557,7 +3602,6 @@ const ProjectDetailsPage = () => {
                       count: data.count
                     }));
                     
-                    // Agregar margen de beneficio al final
                     categories.push({
                       name: 'Margen de Beneficio',
                       cost: Math.max(0, totalRevenue - totalCost),
@@ -3573,10 +3617,71 @@ const ProjectDetailsPage = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div className={`w-4 h-4 rounded ${category.color}`}></div>
-                              <span className="text-sm font-medium text-gray-900">{category.name}</span>
-                              {category.name !== 'Margen de Beneficio' && (
-                                <span className="text-xs text-gray-500">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
-                              )}
+                              <div>
+                                <span className="text-sm font-medium text-gray-900">{category.name}</span>
+                                {category.name !== 'Margen de Beneficio' && (
+                                  <span className="text-xs text-gray-500 ml-2">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold text-gray-900">${category.cost.toLocaleString()}</div>
+                              <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
+                            </div>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${category.color}`} 
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                
+                {/* Vista por Persona */}
+                <div className="space-y-4 breakdown-person-view hidden">
+                  {(() => {
+                    const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
+                    const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                    
+                    // Vista por persona individual
+                    const personColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-cyan-500', 'bg-pink-500', 'bg-yellow-500', 'bg-indigo-500', 'bg-red-500', 'bg-gray-500'];
+                    
+                    const categories = teamBreakdown.map((member: any, index: number) => ({
+                      name: member.name,
+                      cost: member.actualCost || member.cost || 0,
+                      color: personColors[index % personColors.length],
+                      count: 1,
+                      subtitle: member.role || member.roleName || 'Sin rol asignado'
+                    }));
+                    
+                    // Agregar margen de beneficio
+                    categories.push({
+                      name: 'Margen de Beneficio',
+                      cost: Math.max(0, totalRevenue - totalCost),
+                      color: 'bg-emerald-500',
+                      count: 1,
+                      subtitle: 'Beneficio total del proyecto'
+                    });
+                    
+                    return categories.map((category, index) => {
+                      const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
+                      
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-4 h-4 rounded ${category.color}`}></div>
+                              <div>
+                                <span className="text-sm font-medium text-gray-900">{category.name}</span>
+                                {category.subtitle && (
+                                  <div className="text-xs text-gray-500">{category.subtitle}</div>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-sm font-semibold text-gray-900">${category.cost.toLocaleString()}</div>
@@ -3816,6 +3921,3 @@ const ProjectDetailsPage = () => {
 };
 
 export default ProjectDetailsPage;
-                      <div className="p-2 bg-emerald-100 rounded-lg">
-                        <History className="h-4 w-4 text-emerald-600" />
-                      </div>
