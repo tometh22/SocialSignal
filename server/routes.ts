@@ -11641,11 +11641,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredData = filteredData.filter(record => record.status === status);
       }
 
-      // Eliminar duplicados basados en nombre del miembro y mes
+      // Eliminar duplicados basados en nombre del miembro, mes Y tipo de costo
       const uniqueData = filteredData.reduce((acc: any[], current: any) => {
         const existing = acc.find(item => 
           item.member_name === current.member_name && 
-          item.month_key === current.month_key
+          item.month_key === current.month_key &&
+          item.cost_type === current.cost_type
         );
         
         if (!existing) {
