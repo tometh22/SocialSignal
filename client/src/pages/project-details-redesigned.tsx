@@ -3258,9 +3258,9 @@ const ProjectDetailsPage = () => {
                         {(() => {
                           const revenue = unifiedData?.quotation?.totalAmount || 0;
                           const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const markup = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
-                          return markup.toFixed(1);
-                        })()}%
+                          const markup = cost > 0 ? (revenue / cost) : 0;
+                          return markup.toFixed(2);
+                        })()}X
                       </p>
                       <p className="text-xs text-violet-200">
                         ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()} sobre costo
