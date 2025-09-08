@@ -11405,22 +11405,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (costSummary && costSummary.costByPerson) {
           // Transformar los datos al formato esperado por el frontend
-          costRecords = costSummary.costByPerson.map((person: any, index: number) => {
+          // Crear registros separados para costos reales y operacionales
+          costRecords = [];
+          
+          costSummary.costByPerson.forEach((person: any, index: number) => {
             const monthKey = dateRange ? 
               `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
               new Date().toISOString().slice(0, 7);
             
-            return {
-              id: index + 1,
-              member_name: person.name,
-              hours_worked: person.hours || 0,
-              hourly_rate: person.hourlyRate || person.realCost / (person.hours || 1),
-              total_cost: person.realCost || 0,
-              month_key: monthKey,
-              cost_type: person.realCost > 0 ? "real" : "operational",
-              status: "confirmed",
-              confirmed: "SI"
-            };
+            // Registro de costo real
+            if (person.realCost > 0) {
+              costRecords.push({
+                id: index * 2 + 1,
+                member_name: person.name,
+                hours_worked: person.hours || 0,
+                hourly_rate: person.realCost / (person.hours || 1),
+                total_cost: person.realCost || 0,
+                month_key: monthKey,
+                cost_type: "real",
+                status: "confirmed",
+                confirmed: "SI"
+              });
+            }
+            
+            // Registro de costo operacional (si es diferente del real)
+            if (person.operationalCost > 0) {
+              costRecords.push({
+                id: index * 2 + 2,
+                member_name: person.name,
+                hours_worked: person.hours || 0,
+                hourly_rate: person.operationalCost / (person.hours || 1),
+                total_cost: person.operationalCost || 0,
+                month_key: monthKey,
+                cost_type: "operational",
+                status: "confirmed",
+                confirmed: "SI"
+              });
+            }
           });
         }
 
@@ -11451,25 +11472,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const costSummary = await storage.getProjectCostSummary(project.id, dateRange);
             
             if (costSummary && costSummary.costByPerson) {
-              const projectRecords = costSummary.costByPerson.map((person: any, index: number) => {
+              costSummary.costByPerson.forEach((person: any, index: number) => {
                 const monthKey = dateRange ? 
                   `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
                   new Date().toISOString().slice(0, 7);
                 
-                return {
-                  id: project.id * 1000 + index,
-                  member_name: person.name,
-                  hours_worked: person.hours || 0,
-                  hourly_rate: person.hourlyRate || person.realCost / (person.hours || 1),
-                  total_cost: person.realCost || 0,
-                  month_key: monthKey,
-                  cost_type: person.realCost > 0 ? "real" : "operational",
-                  status: "confirmed",
-                  confirmed: "SI",
-                  project_name: project.name
-                };
+                // Registro de costo real
+                if (person.realCost > 0) {
+                  costRecords.push({
+                    id: project.id * 1000 + index * 2 + 1,
+                    member_name: person.name,
+                    hours_worked: person.hours || 0,
+                    hourly_rate: person.realCost / (person.hours || 1),
+                    total_cost: person.realCost || 0,
+                    month_key: monthKey,
+                    cost_type: "real",
+                    status: "confirmed",
+                    confirmed: "SI",
+                    project_name: project.name
+                  });
+                }
+                
+                // Registro de costo operacional
+                if (person.operationalCost > 0) {
+                  costRecords.push({
+                    id: project.id * 1000 + index * 2 + 2,
+                    member_name: person.name,
+                    hours_worked: person.hours || 0,
+                    hourly_rate: person.operationalCost / (person.hours || 1),
+                    total_cost: person.operationalCost || 0,
+                    month_key: monthKey,
+                    cost_type: "operational",
+                    status: "confirmed",
+                    confirmed: "SI",
+                    project_name: project.name
+                  });
+                }
               });
-              costRecords = [...costRecords, ...projectRecords];
             }
           } catch (error) {
             console.warn(`💰 Error getting costs for project ${project.id}:`, error.message);
