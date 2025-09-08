@@ -3621,7 +3621,7 @@ const ProjectDetailsPage = () => {
                   </div>
                   <div className="border-t pt-2">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Break-even Status</span>
+                      <span className="text-sm text-gray-600">Estado de Punto de Equilibrio</span>
                       <span className={`font-semibold ${(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'text-green-600' : 'text-red-600'}`}>
                         {(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'Alcanzado' : 'Pendiente'}
                       </span>
