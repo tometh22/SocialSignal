@@ -11367,95 +11367,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Cost Dashboard API - Análisis de costos por proyecto
+  // Cost Dashboard API - Análisis de costos por proyecto con datos reales
   app.get('/api/cost-dashboard', async (req, res) => {
     try {
       const { projectId, timeFilter, memberName, costType, status } = req.query;
       
       console.log(`💰 COST DASHBOARD API called with params:`, { projectId, timeFilter, memberName, costType, status });
 
-      // Por ahora, crear datos de ejemplo para la demostración
-      // TODO: Implementar lógica real basada en time entries y personnel rates
+      // Función auxiliar para convertir nombres de mes a números
+      const getMonthNumber = (monthName: string): string => {
+        const monthMap: { [key: string]: string } = {
+          'enero': '01', 'ene': '01', '01 ene': '01',
+          'febrero': '02', 'feb': '02', '02 feb': '02', 
+          'marzo': '03', 'mar': '03', '03 mar': '03',
+          'abril': '04', 'abr': '04', '04 abr': '04',
+          'mayo': '05', 'may': '05', '05 may': '05',
+          'junio': '06', 'jun': '06', '06 jun': '06',
+          'julio': '07', 'jul': '07', '07 jul': '07',
+          'agosto': '08', 'ago': '08', '08 ago': '08',
+          'septiembre': '09', 'sep': '09', '09 sep': '09',
+          'octubre': '10', 'oct': '10', '10 oct': '10',
+          'noviembre': '11', 'nov': '11', '11 nov': '11',
+          'diciembre': '12', 'dic': '12', '12 dic': '12'
+        };
+        return monthMap[monthName.toLowerCase()] || '01';
+      };
+
+      // Obtener rango de fechas para el filtro temporal
+      const dateRange = timeFilter ? getDateRangeForFilter(timeFilter as string) : null;
       
-      const mockCostData = [
-        {
-          id: 1,
-          member_name: "Tomas Criado",
-          hours_worked: 45.5,
-          hourly_rate: 35,
-          total_cost: 1592.5,
-          month_key: "2025-08",
-          cost_type: "operational",
-          status: "confirmed",
-          confirmed: "SI"
-        },
-        {
-          id: 2,
-          member_name: "Sol Ayala",
-          hours_worked: 32.0,
-          hourly_rate: 28,
-          total_cost: 896.0,
-          month_key: "2025-08",
-          cost_type: "operational",
-          status: "confirmed",
-          confirmed: "SI"
-        },
-        {
-          id: 3,
-          member_name: "Freelancer Ext",
-          hours_worked: 15.0,
-          hourly_rate: 45,
-          total_cost: 675.0,
-          month_key: "2025-08",
-          cost_type: "real",
-          status: "confirmed",
-          confirmed: "SI"
-        },
-        {
-          id: 4,
-          member_name: "Tomas Criado",
-          hours_worked: 50.0,
-          hourly_rate: 35,
-          total_cost: 1750.0,
-          month_key: "2025-07",
-          cost_type: "operational",
-          status: "confirmed",
-          confirmed: "SI"
-        },
-        {
-          id: 5,
-          member_name: "Sol Ayala",
-          hours_worked: 28.5,
-          hourly_rate: 28,
-          total_cost: 798.0,
-          month_key: "2025-07",
-          cost_type: "operational",
-          status: "confirmed",
-          confirmed: "SI"
+      let costRecords = [];
+
+      if (projectId) {
+        // Si se especifica un proyecto, obtener costos de ese proyecto específico
+        console.log(`💰 Getting cost data for project ${projectId}`);
+        const costSummary = await storage.getProjectCostSummary(parseInt(projectId as string), dateRange);
+        
+        if (costSummary && costSummary.costByPerson) {
+          // Transformar los datos al formato esperado por el frontend
+          costRecords = costSummary.costByPerson.map((person: any, index: number) => {
+            const monthKey = dateRange ? 
+              `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
+              new Date().toISOString().slice(0, 7);
+            
+            return {
+              id: index + 1,
+              member_name: person.name,
+              hours_worked: person.hours || 0,
+              hourly_rate: person.hourlyRate || person.realCost / (person.hours || 1),
+              total_cost: person.realCost || 0,
+              month_key: monthKey,
+              cost_type: person.realCost > 0 ? "real" : "operational",
+              status: "confirmed",
+              confirmed: "SI"
+            };
+          });
         }
-      ];
 
-      // Aplicar filtros básicos
-      let filteredData = mockCostData;
-
-      // Filtro temporal básico
-      if (timeFilter && timeFilter !== 'all_time') {
-        try {
-          if (timeFilter === 'august_2025') {
-            filteredData = filteredData.filter(record => record.month_key === '2025-08');
-          } else if (timeFilter === 'july_2025') {
-            filteredData = filteredData.filter(record => record.month_key === '2025-07');
+        // También incluir datos del Excel MAESTRO si están disponibles
+        if (costSummary && costSummary.excelDirectCosts) {
+          const excelRecords = costSummary.excelDirectCosts.map((record: any, index: number) => {
+            return {
+              id: 1000 + index, // IDs altos para evitar conflictos
+              member_name: record.persona,
+              hours_worked: record.horasRealesAsana || 0,
+              hourly_rate: record.valorHoraPersona || 0,
+              total_cost: record.montoTotalUSD || 0,
+              month_key: `${record.año}-${String(getMonthNumber(record.mes)).padStart(2, '0')}`,
+              cost_type: "real",
+              status: "confirmed",
+              confirmed: "SI"
+            };
+          });
+          costRecords = [...costRecords, ...excelRecords];
+        }
+      } else {
+        // Vista global - obtener datos de todos los proyectos activos
+        console.log(`💰 Getting cost data for all active projects`);
+        const projects = await storage.getActiveProjects();
+        
+        for (const project of projects) {
+          try {
+            const costSummary = await storage.getProjectCostSummary(project.id, dateRange);
+            
+            if (costSummary && costSummary.costByPerson) {
+              const projectRecords = costSummary.costByPerson.map((person: any, index: number) => {
+                const monthKey = dateRange ? 
+                  `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}` :
+                  new Date().toISOString().slice(0, 7);
+                
+                return {
+                  id: project.id * 1000 + index,
+                  member_name: person.name,
+                  hours_worked: person.hours || 0,
+                  hourly_rate: person.hourlyRate || person.realCost / (person.hours || 1),
+                  total_cost: person.realCost || 0,
+                  month_key: monthKey,
+                  cost_type: person.realCost > 0 ? "real" : "operational",
+                  status: "confirmed",
+                  confirmed: "SI",
+                  project_name: project.name
+                };
+              });
+              costRecords = [...costRecords, ...projectRecords];
+            }
+          } catch (error) {
+            console.warn(`💰 Error getting costs for project ${project.id}:`, error.message);
           }
-          // Agregar más filtros temporales según sea necesario
-        } catch (error) {
-          console.warn(`💰 Error applying timeFilter '${timeFilter}':`, error.message);
         }
       }
+
+      // Aplicar filtros adicionales
+      let filteredData = costRecords;
 
       // Filtro por miembro
       if (memberName) {
         filteredData = filteredData.filter(record => 
-          record.member_name.toLowerCase().includes(memberName.toLowerCase())
+          record.member_name.toLowerCase().includes((memberName as string).toLowerCase())
         );
       }
 
@@ -11469,10 +11497,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filteredData = filteredData.filter(record => record.status === status);
       }
 
-      console.log(`💰 Returning ${filteredData.length} cost records`);
-      console.log(`💰 Sample data:`, filteredData.slice(0, 2));
+      // Eliminar duplicados basados en nombre del miembro y mes
+      const uniqueData = filteredData.reduce((acc: any[], current: any) => {
+        const existing = acc.find(item => 
+          item.member_name === current.member_name && 
+          item.month_key === current.month_key
+        );
+        
+        if (!existing) {
+          acc.push(current);
+        } else {
+          // Si existe, sumar los costos
+          existing.hours_worked += current.hours_worked;
+          existing.total_cost += current.total_cost;
+          existing.hourly_rate = existing.total_cost / (existing.hours_worked || 1);
+        }
+        
+        return acc;
+      }, []);
 
-      res.json(filteredData);
+      console.log(`💰 Returning ${uniqueData.length} real cost records`);
+      console.log(`💰 Sample data:`, uniqueData.slice(0, 2));
+
+      res.json(uniqueData);
     } catch (error) {
       console.error('Error fetching cost dashboard data:', error);
       res.status(500).json({ error: 'Error fetching cost dashboard data' });
