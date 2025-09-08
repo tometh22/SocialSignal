@@ -3882,81 +3882,96 @@ const ProjectDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="operational-analysis" className="space-y-6">
-            {/* ANÁLISIS OPERACIONAL PROFUNDO */}
-            <div className="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-xl p-8 text-white">
+            {/* ANÁLISIS OPERACIONAL COMPLEMENTARIO */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional Profundo</h2>
-                  <p className="text-cyan-100">Métricas avanzadas de eficiencia, productividad y optimización operativa</p>
+                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional Complementario</h2>
+                  <p className="text-purple-100">Flujos de trabajo, cuellos de botella y optimización de procesos</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
                   <Cog className="h-8 w-8" />
                 </div>
               </div>
               
-              {/* MÉTRICAS OPERACIONALES CLAVE */}
+              {/* MÉTRICAS OPERACIONALES ÚNICAS */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Eficiencia del Equipo */}
+                {/* Flujo de Trabajo */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-cyan-100 text-sm">Eficiencia del Equipo</p>
+                      <p className="text-purple-100 text-sm">Flujo de Trabajo</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.efficiency ? `${unifiedData.efficiency.toFixed(1)}%` : unifiedData?.actuals && unifiedData?.quotation ? `${((unifiedData.actuals.totalWorkedHours / unifiedData.quotation.estimatedHours) * 100).toFixed(1)}%` : '0%'}
+                        {unifiedData?.actuals?.teamBreakdown ? 
+                          `${unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).length}→${unifiedData.actuals.teamBreakdown.length}` : 
+                          '0→0'
+                        }
                       </p>
                     </div>
-                    <Activity className="h-6 w-6 text-cyan-200" />
+                    <Zap className="h-6 w-6 text-purple-200" />
                   </div>
-                  <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.workedHours || unifiedData?.actuals?.totalWorkedHours || 0}h trabajadas de {unifiedData?.estimatedHours || unifiedData?.quotation?.estimatedHours || 0}h estimadas
+                  <p className="text-xs text-purple-200 mt-2">
+                    Personas activas → Total del equipo
                   </p>
                 </div>
 
-                {/* Velocidad de Entrega */}
+                {/* Cuellos de Botella */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-cyan-100 text-sm">Velocidad de Entrega</p>
+                      <p className="text-purple-100 text-sm">Cuellos de Botella</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.actuals ? `${Math.round((unifiedData.actuals.totalEntries / Math.max(1, unifiedData.actuals.totalEntries + 5)) * 100)}%` : '0%'}
+                        {unifiedData?.actuals?.teamBreakdown ? (() => {
+                          const overloaded = unifiedData.actuals.teamBreakdown.filter(m => 
+                            m.hours > 0 && (m.hours / Math.max(1, m.estimatedHours || m.hours)) > 1.2
+                          ).length;
+                          return overloaded;
+                        })() : 0}
                       </p>
                     </div>
-                    <Rocket className="h-6 w-6 text-cyan-200" />
+                    <XCircle className="h-6 w-6 text-purple-200" />
                   </div>
-                  <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.actuals?.totalEntries || 0} entradas de tiempo registradas
+                  <p className="text-xs text-purple-200 mt-2">
+                    Recursos sobrecargados detectados
                   </p>
                 </div>
 
-                {/* Capacidad Utilizada */}
+                {/* Dependencias Críticas */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-cyan-100 text-sm">Capacidad Utilizada</p>
+                      <p className="text-purple-100 text-sm">Dependencias</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.actuals?.teamBreakdown ? `${Math.round((unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).length / unifiedData.actuals.teamBreakdown.length) * 100)}%` : '0%'}
+                        {unifiedData?.actuals?.teamBreakdown ? (() => {
+                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.role || 'Sin Rol'));
+                          return uniqueRoles.size;
+                        })() : 0}
                       </p>
                     </div>
-                    <Database className="h-6 w-6 text-cyan-200" />
+                    <Brain className="h-6 w-6 text-purple-200" />
                   </div>
-                  <p className="text-xs text-cyan-200 mt-2">
-                    {unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0).length || 0} miembros activos
+                  <p className="text-xs text-purple-200 mt-2">
+                    Roles críticos interdependientes
                   </p>
                 </div>
 
-                {/* Índice de Calidad */}
+                {/* Riesgo Operacional */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-cyan-100 text-sm">Índice de Calidad</p>
+                      <p className="text-purple-100 text-sm">Riesgo Operacional</p>
                       <p className="text-2xl font-bold">
-                        {unifiedData?.metrics?.efficiency ? `${unifiedData.metrics.efficiency.toFixed(1)}%` : 'N/A'}
+                        {unifiedData?.metrics?.efficiency ? (() => {
+                          const risk = unifiedData.metrics.efficiency < 50 ? 'Alto' : 
+                                     unifiedData.metrics.efficiency < 80 ? 'Medio' : 'Bajo';
+                          return risk;
+                        })() : 'N/A'}
                       </p>
                     </div>
-                    <Star className="h-6 w-6 text-cyan-200" />
+                    <Heart className="h-6 w-6 text-purple-200" />
                   </div>
-                  <p className="text-xs text-cyan-200 mt-2">
-                    Basado en eficiencia del proyecto
+                  <p className="text-xs text-purple-200 mt-2">
+                    Evaluación de riesgo del proceso
                   </p>
                 </div>
               </div>
@@ -4037,19 +4052,19 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Análisis de Capacidad y Carga de Trabajo */}
+              {/* Identificación de Dependencias Críticas */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <Zap className="h-5 w-5 text-yellow-600" />
-                    Capacidad y Carga de Trabajo
+                    <Brain className="h-5 w-5 text-indigo-600" />
+                    Dependencias Críticas
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
                           <Info className="h-4 w-4 text-gray-400" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="max-w-xs">Análisis de distribución de carga y identificación de recursos subutilizados o sobrecargados</p>
+                          <p className="max-w-xs">Identificación de dependencias operacionales y riesgos de continuidad</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -4057,56 +4072,53 @@ const ProjectDetailsPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {unifiedData?.actuals?.teamBreakdown?.slice(0, 6).map((member, index) => {
-                      const utilizationRate = member.hours > 0 ? 
-                        (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100 : 0;
+                    {unifiedData?.actuals?.teamBreakdown && (() => {
+                      // Análisis de dependencias
+                      const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                      const roleGroups = {};
                       
-                      let statusColor = 'bg-gray-200';
-                      let statusText = 'Sin actividad';
-                      
-                      if (utilizationRate > 0) {
-                        if (utilizationRate >= 120) {
-                          statusColor = 'bg-red-500';
-                          statusText = 'Sobrecargado';
-                        } else if (utilizationRate >= 100) {
-                          statusColor = 'bg-orange-500';
-                          statusText = 'Capacidad máxima';
-                        } else if (utilizationRate >= 80) {
-                          statusColor = 'bg-green-500';
-                          statusText = 'Óptimo';
-                        } else if (utilizationRate >= 50) {
-                          statusColor = 'bg-yellow-500';
-                          statusText = 'Subutilizado';
-                        } else {
-                          statusColor = 'bg-blue-500';
-                          statusText = 'Baja utilización';
+                      activeMembers.forEach(member => {
+                        const role = member.role || 'Sin Rol';
+                        if (!roleGroups[role]) {
+                          roleGroups[role] = { members: [], totalHours: 0, isCritical: false };
                         }
-                      }
+                        roleGroups[role].members.push(member.name);
+                        roleGroups[role].totalHours += member.hours;
+                        // Un rol es crítico si tiene muchas horas o pocos miembros
+                        roleGroups[role].isCritical = roleGroups[role].members.length === 1 && roleGroups[role].totalHours > 50;
+                      });
 
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${statusColor}`}></div>
-                              <span className="font-medium text-gray-900">{member.name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {member.role || 'Sin rol'}
+                      return Object.entries(roleGroups).map(([role, data]) => {
+                        const dependencyLevel = data.isCritical ? 'Crítica' : 
+                                               data.members.length === 1 ? 'Alta' : 
+                                               data.members.length === 2 ? 'Media' : 'Baja';
+                        const riskColor = data.isCritical ? 'border-red-300 bg-red-50' : 
+                                         data.members.length === 1 ? 'border-orange-300 bg-orange-50' : 
+                                         'border-green-300 bg-green-50';
+                        
+                        return (
+                          <div key={role} className={`p-4 rounded-lg border-2 ${riskColor}`}>
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-gray-900">{role}</h4>
+                              <Badge variant={data.isCritical ? 'destructive' : data.members.length === 1 ? 'secondary' : 'default'}>
+                                {dependencyLevel}
                               </Badge>
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm font-medium">{member.hours}h</div>
-                              <div className="text-xs text-gray-500">{statusText}</div>
+                            <div className="text-sm text-gray-600 mb-2">
+                              {data.members.length} {data.members.length === 1 ? 'persona' : 'personas'} • {data.totalHours}h trabajadas
                             </div>
+                            <div className="text-xs text-gray-500">
+                              <strong>Miembros:</strong> {data.members.join(', ')}
+                            </div>
+                            {data.isCritical && (
+                              <div className="mt-2 text-xs text-red-700 bg-red-100 p-2 rounded">
+                                ⚠️ Rol de alta dependencia: considerar redundancia
+                              </div>
+                            )}
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${statusColor}`}
-                              style={{ width: `${Math.min(100, utilizationRate)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    }) || <p className="text-gray-500">No hay datos del equipo disponibles</p>}
+                        );
+                      });
+                    })() || <p className="text-gray-500">No hay datos de dependencias disponibles</p>}
                   </div>
                 </CardContent>
               </Card>
