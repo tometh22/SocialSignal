@@ -3977,22 +3977,22 @@ const ProjectDetailsPage = () => {
               </div>
             </div>
 
-            {/* ANÁLISIS DE PRODUCTIVIDAD Y PROCESOS */}
+            {/* ANÁLISIS OPERACIONAL AVANZADO */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Análisis de Productividad por Rol */}
+              {/* Análisis de Patrones de Colaboración */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                    Productividad por Rol
+                    <Heart className="h-5 w-5 text-pink-600" />
+                    Patrones de Colaboración
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger>
                           <Info className="h-4 w-4 text-gray-400" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="max-w-xs">Análisis de eficiencia y costo por hora trabajada según el rol del equipo</p>
+                          <p className="max-w-xs">Análisis de cómo interactúan los roles y qué patrones de trabajo emergen</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -4001,53 +4001,35 @@ const ProjectDetailsPage = () => {
                 <CardContent>
                   <div className="space-y-4">
                     {unifiedData?.actuals?.teamBreakdown && (() => {
-                      // Agrupar por rol y calcular métricas
-                      const roleGroups = {};
-                      unifiedData.actuals.teamBreakdown.forEach(member => {
-                        if (member.hours > 0) {
-                          const role = member.role || 'Sin Rol';
-                          if (!roleGroups[role]) {
-                            roleGroups[role] = {
-                              totalHours: 0,
-                              totalCost: 0,
-                              members: 0,
-                              avgEfficiency: 0
-                            };
-                          }
-                          roleGroups[role].totalHours += member.hours;
-                          roleGroups[role].totalCost += member.cost;
-                          roleGroups[role].members += 1;
-                          roleGroups[role].avgEfficiency += (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100;
-                        }
+                      const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                      const collaborationPatterns = activeMembers.map(member => {
+                        const workIntensity = member.hours / Math.max(...activeMembers.map(m => m.hours));
+                        const collaborationType = member.role === 'Analista Senior' ? 'Ejecutor Principal' :
+                                                 member.role === 'Operations Lead' ? 'Coordinador' :
+                                                 member.role === 'Project Manager' ? 'Supervisor' : 'Especialista';
+                        return { ...member, workIntensity, collaborationType };
                       });
 
-                      return Object.entries(roleGroups).map(([role, data]) => {
-                        const avgCostPerHour = data.totalCost / data.totalHours;
-                        const efficiency = data.avgEfficiency / data.members;
-                        
-                        return (
-                          <div key={role} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium text-gray-900">{role}</h4>
-                                <Badge variant="secondary" className="text-xs">
-                                  {data.members} {data.members === 1 ? 'persona' : 'personas'}
-                                </Badge>
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                {data.totalHours.toFixed(1)}h trabajadas • ${avgCostPerHour.toFixed(0)}/hora
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-lg font-semibold">${data.totalCost.toLocaleString()}</div>
-                              <div className={`text-sm ${efficiency >= 100 ? 'text-green-600' : efficiency >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                {efficiency.toFixed(1)}% eficiencia
-                              </div>
+                      return collaborationPatterns.map((member, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-4 h-4 rounded-full ${
+                              member.collaborationType === 'Ejecutor Principal' ? 'bg-green-500' :
+                              member.collaborationType === 'Coordinador' ? 'bg-blue-500' :
+                              member.collaborationType === 'Supervisor' ? 'bg-purple-500' : 'bg-orange-500'
+                            }`}></div>
+                            <div>
+                              <h4 className="font-medium text-gray-900">{member.name}</h4>
+                              <div className="text-sm text-gray-600">{member.collaborationType}</div>
                             </div>
                           </div>
-                        );
-                      });
-                    })() || <p className="text-gray-500">No hay datos de equipo disponibles</p>}
+                          <div className="text-right">
+                            <div className="text-sm font-semibold">{(member.workIntensity * 100).toFixed(0)}%</div>
+                            <div className="text-xs text-gray-500">Intensidad</div>
+                          </div>
+                        </div>
+                      ));
+                    })() || <p className="text-gray-500">No hay datos de colaboración disponibles</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -4122,215 +4104,102 @@ const ProjectDetailsPage = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
 
-            {/* MÉTRICAS AVANZADAS DE PROCESOS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Análisis de Eficiencia Temporal */}
+              {/* Recomendaciones de Optimización */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <Timer className="h-5 w-5 text-purple-600" />
-                    Eficiencia Temporal
+                    <Lightbulb className="h-5 w-5 text-yellow-600" />
+                    Optimización Operacional
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Recomendaciones inteligentes para mejorar los procesos operacionales</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Tiempo Planificado</span>
-                      <span className="font-semibold">{unifiedData?.quotation?.estimatedHours || 0}h</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Tiempo Trabajado</span>
-                      <span className="font-semibold">{unifiedData?.actuals?.totalWorkedHours || 0}h</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Tiempo Restante</span>
-                      <span className="font-semibold">
-                        {Math.max(0, (unifiedData?.quotation?.estimatedHours || 0) - (unifiedData?.actuals?.totalWorkedHours || 0))}h
-                      </span>
-                    </div>
-                    <div className="border-t pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Velocidad Promedio</span>
-                        <span className="font-semibold">
-                          {unifiedData?.actuals?.totalWorkedHours ? 
-                            `${((unifiedData.actuals.totalWorkedHours / 30) * 7).toFixed(1)}h/semana` : 
-                            '0h/semana'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Análisis de Costos Operacionales */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                    Costos Operacionales
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Costo por Hora</span>
-                      <span className="font-semibold">
-                        ${unifiedData?.actuals?.totalWorkedHours ? 
-                          ((unifiedData.actuals.totalWorkedCost) / unifiedData.actuals.totalWorkedHours).toFixed(0) : 
-                          '0'
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Costo por Deliverable</span>
-                      <span className="font-semibold">
-                        ${unifiedData?.actuals?.totalEntries ? 
-                          ((unifiedData.actuals?.totalWorkedCost || 0) / unifiedData.actuals.totalEntries).toFixed(0) : 
-                          '0'
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Eficiencia de Costo</span>
-                      <span className={`font-semibold ${
-                        (unifiedData?.actuals?.totalWorkedCost || 0) <= (unifiedData?.quotation?.totalCost || 0) ? 
-                        'text-green-600' : 'text-red-600'
-                      }`}>
-                        {unifiedData?.quotation?.totalAmount ? 
-                          `${(((unifiedData.quotation.totalAmount) / (unifiedData.actuals?.totalWorkedCost || 1)) * 100).toFixed(1)}%` : 
-                          '0%'
-                        }
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Predicciones y Recomendaciones */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Brain className="h-5 w-5 text-pink-600" />
-                    Predicciones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {(() => {
-                      const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                      const totalHours = unifiedData?.quotation?.estimatedHours || 0;
-                      const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const quotedCost = unifiedData?.quotation?.totalAmount || 0;
+                    {unifiedData?.actuals?.teamBreakdown && (() => {
+                      const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                      const efficiency = unifiedData?.efficiency || 0;
                       
-                      const timeCompletion = totalHours > 0 ? (workedHours / totalHours) * 100 : 0;
-                      const projectedFinalCost = workedHours > 0 ? (workedCost / workedHours) * totalHours : workedCost;
-                      const projectedOverrun = Math.max(0, projectedFinalCost - quotedCost);
+                      const recommendations = [];
                       
-                      return (
-                        <>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Progreso Estimado</span>
-                            <span className="font-semibold">{timeCompletion.toFixed(1)}%</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Costo Final Proyectado</span>
-                            <span className="font-semibold">${projectedFinalCost.toLocaleString()}</span>
-                          </div>
-                          {projectedOverrun > 0 && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-red-600">Exceso Proyectado</span>
-                              <span className="font-semibold text-red-600">+${projectedOverrun.toLocaleString()}</span>
-                            </div>
-                          )}
-                          <div className="border-t pt-3">
-                            <div className="bg-blue-50 p-3 rounded-lg">
-                              <h4 className="text-sm font-medium text-blue-900 mb-2">Recomendación</h4>
-                              <p className="text-xs text-blue-700">
-                                {timeCompletion > 100 ? 
-                                  'Proyecto excedido en tiempo. Revisar scope y optimizar procesos.' :
-                                  timeCompletion > 80 ?
-                                  'Proyecto en fase final. Mantener calidad y controlar costos.' :
-                                  'Proyecto en desarrollo normal. Continuar monitoreando métricas.'
-                                }
-                              </p>
-                            </div>
-                          </div>
-                        </>
+                      // Recomendación basada en eficiencia
+                      if (efficiency < 50) {
+                        recommendations.push({
+                          type: 'Crítico',
+                          title: 'Revisar Procesos',
+                          description: 'Eficiencia baja detectada. Considerar redistribución de tareas.',
+                          icon: '🚨',
+                          color: 'bg-red-50 border-red-200'
+                        });
+                      }
+                      
+                      // Recomendación basada en distribución del equipo
+                      const roles = new Set(activeMembers.map(m => m.role));
+                      if (roles.size < 3) {
+                        recommendations.push({
+                          type: 'Mejora',
+                          title: 'Diversificar Roles',
+                          description: 'Pocas especialidades en el equipo. Considerar agregar más roles.',
+                          icon: '👥',
+                          color: 'bg-yellow-50 border-yellow-200'
+                        });
+                      }
+                      
+                      // Recomendación basada en carga de trabajo
+                      const overloadedMembers = activeMembers.filter(m => 
+                        m.hours > 80
                       );
-                    })()}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      if (overloadedMembers.length > 0) {
+                        recommendations.push({
+                          type: 'Balanceo',
+                          title: 'Redistribuir Carga',
+                          description: `${overloadedMembers.length} miembro(s) con alta carga de trabajo.`,
+                          icon: '⚖️',
+                          color: 'bg-orange-50 border-orange-200'
+                        });
+                      }
+                      
+                      // Recomendación positiva si todo va bien
+                      if (efficiency >= 50 && roles.size >= 3 && overloadedMembers.length === 0) {
+                        recommendations.push({
+                          type: 'Éxito',
+                          title: 'Procesos Óptimos',
+                          description: 'El equipo muestra patrones de trabajo saludables.',
+                          icon: '✅',
+                          color: 'bg-green-50 border-green-200'
+                        });
+                      }
 
-            {/* MAPA DE CALOR DE ACTIVIDAD */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Activity className="h-5 w-5 text-orange-600" />
-                  Mapa de Calor de Actividad del Equipo
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4 text-gray-400" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">Visualización de la actividad y productividad del equipo en tiempo real</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {unifiedData?.actuals?.teamBreakdown?.filter(member => member.hours > 0).map((member, index) => {
-                    const intensity = member.hours / Math.max(...(unifiedData.actuals.teamBreakdown.map(m => m.hours)));
-                    const productivityScore = (member.hours / Math.max(1, member.estimatedHours || member.hours)) * 100;
-                    
-                    return (
-                      <div key={index} className="relative group">
-                        <div 
-                          className={`p-4 rounded-lg border-2 transition-all duration-300 hover:scale-105 ${
-                            intensity >= 0.8 ? 'bg-red-100 border-red-300' :
-                            intensity >= 0.6 ? 'bg-orange-100 border-orange-300' :
-                            intensity >= 0.4 ? 'bg-yellow-100 border-yellow-300' :
-                            intensity >= 0.2 ? 'bg-green-100 border-green-300' :
-                            'bg-blue-100 border-blue-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-medium text-gray-900 truncate">{member.name}</h4>
-                            <div className={`w-3 h-3 rounded-full ${
-                              productivityScore >= 100 ? 'bg-green-500' :
-                              productivityScore >= 80 ? 'bg-yellow-500' :
-                              'bg-red-500'
-                            }`}></div>
-                          </div>
-                          <div className="text-sm text-gray-600 mb-1">{member.role || 'Sin rol'}</div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold">{member.hours}h</span>
-                            <span className="text-sm text-gray-500">${member.cost.toLocaleString()}</span>
-                          </div>
-                          
-                          {/* Tooltip con información adicional */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                            <div className="bg-gray-900 text-white text-xs rounded-lg p-3 whitespace-nowrap">
-                              <div>Productividad: {productivityScore.toFixed(1)}%</div>
-                              <div>Costo/hora: ${(member.cost / member.hours).toFixed(0)}</div>
-                              <div>Intensidad: {(intensity * 100).toFixed(0)}%</div>
+                      return recommendations.map((rec, index) => (
+                        <div key={index} className={`p-4 rounded-lg border-2 ${rec.color}`}>
+                          <div className="flex items-start gap-3">
+                            <div className="text-lg">{rec.icon}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-gray-900">{rec.title}</h4>
+                                <Badge variant="secondary" className="text-xs">
+                                  {rec.type}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">{rec.description}</p>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  }) || <p className="text-gray-500 col-span-full text-center py-8">No hay datos de actividad disponibles</p>}
-                </div>
-              </CardContent>
-            </Card>
+                      ));
+                    })() || <p className="text-gray-500">No hay recomendaciones disponibles</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
           </TabsContent>
 
