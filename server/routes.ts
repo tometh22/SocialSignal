@@ -11211,74 +11211,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { projectId, clientName, projectName, monthKey, timeFilter } = req.query;
       
-      // Build dynamic query based on filters
-      let conditions = ['confirmed = $1'];
-      let params = ['SI']; // Always filter for confirmed records
-      let paramCount = 2;
-      
-      // Add timeFilter logic if provided
+      // Use Drizzle query builder instead of raw SQL to properly handle parameters
+      let query = db
+        .select({
+          id: googleSheetsSales.id,
+          client_name: googleSheetsSales.clientName,
+          project_name: googleSheetsSales.projectName,
+          month_key: googleSheetsSales.monthKey,
+          sales_type: googleSheetsSales.salesType,
+          amount_usd: googleSheetsSales.amountUsd,
+          status: googleSheetsSales.status,
+          confirmed: googleSheetsSales.confirmed
+        })
+        .from(googleSheetsSales)
+        .where(eq(googleSheetsSales.confirmed, 'SI'));
+
+      // Apply additional filters if provided
       if (timeFilter && timeFilter !== 'all_time') {
         console.log(`📊 Applying timeFilter: ${timeFilter}`);
         try {
           const { startDate, endDate } = getDateRangeForFilter(timeFilter);
           if (startDate && endDate) {
-            // Convert dates to YYYY-MM format for month_key comparison
-            const startMonth = startDate.toISOString().slice(0, 7); // YYYY-MM
-            const endMonth = endDate.toISOString().slice(0, 7); // YYYY-MM
-            conditions.push(`month_key >= $${paramCount++}`);
-            conditions.push(`month_key <= $${paramCount++}`);
-            params.push(startMonth, endMonth);
+            const startMonth = startDate.toISOString().slice(0, 7);
+            const endMonth = endDate.toISOString().slice(0, 7);
+            query = query.where(and(
+              eq(googleSheetsSales.confirmed, 'SI'),
+              gte(googleSheetsSales.monthKey, startMonth),
+              lte(googleSheetsSales.monthKey, endMonth)
+            ));
             console.log(`📊 Applied time filter: ${startMonth} to ${endMonth}`);
           }
         } catch (error) {
           console.warn(`📊 Error applying timeFilter '${timeFilter}':`, error.message);
         }
       }
-      
-      // Add other filters
+
       if (clientName) {
-        conditions.push(`client_name = $${paramCount++}`);
-        params.push(clientName);
+        query = query.where(and(
+          eq(googleSheetsSales.confirmed, 'SI'),
+          eq(googleSheetsSales.clientName, clientName as string)
+        ));
       }
-      
+
       if (projectName) {
-        conditions.push(`project_name = $${paramCount++}`);
-        params.push(projectName);
+        query = query.where(and(
+          eq(googleSheetsSales.confirmed, 'SI'),
+          eq(googleSheetsSales.projectName, projectName as string)
+        ));
       }
-      
+
       if (monthKey) {
-        conditions.push(`month_key = $${paramCount++}`);
-        params.push(monthKey);
+        query = query.where(and(
+          eq(googleSheetsSales.confirmed, 'SI'),
+          eq(googleSheetsSales.monthKey, monthKey as string)
+        ));
       }
+
+      query = query.orderBy(desc(googleSheetsSales.monthKey), googleSheetsSales.clientName, googleSheetsSales.projectName);
       
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      console.log(`📊 Executing Drizzle query for income dashboard`);
       
-      const sqlQuery = `
-        SELECT 
-          id, 
-          client_name, 
-          project_name, 
-          month_key, 
-          sales_type, 
-          amount_usd, 
-          status, 
-          confirmed
-        FROM google_sheets_sales
-        ${whereClause}
-        ORDER BY month_key DESC, client_name, project_name
-      `;
+      const result = await query;
       
-      console.log(`📊 Executing SQL query:`, sqlQuery);
-      console.log(`📊 Params:`, params);
+      console.log(`📊 Found ${result.length} income records`);
+      console.log(`📊 Sample data:`, result.slice(0, 3));
       
-      const result = await db.execute(sql.raw(sqlQuery, ...params));
-      
-      // Extract rows from result object
-      const rows = result.rows || result || [];
-      console.log(`📊 Found ${rows.length} income records`);
-      console.log(`📊 Sample data:`, rows.slice(0, 3));
-      
-      res.json(rows);
+      res.json(result);
     } catch (error) {
       console.error("❌ Error in income dashboard:", error);
       res.status(500).json({ error: "Failed to fetch income data" });
