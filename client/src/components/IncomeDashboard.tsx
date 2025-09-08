@@ -21,23 +21,24 @@ interface IncomeRecord {
 interface IncomeFilters {
   clientName?: string;
   projectName?: string;
-  monthKey?: string;
 }
 
 export default function IncomeDashboard({ projectId, timeFilter }: { projectId?: number; timeFilter?: string }) {
   const [filters, setFilters] = useState<IncomeFilters>({});
 
-  // Fetch income data
+  // Fetch income data with global time filter
   const { data: incomeData = [], isLoading } = useQuery({
-    queryKey: ['/api/income-dashboard', filters, projectId],
+    queryKey: ['/api/income-dashboard', filters, projectId, timeFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (projectId) params.append('projectId', projectId.toString());
       if (filters.clientName) params.append('clientName', filters.clientName);
       if (filters.projectName) params.append('projectName', filters.projectName);
-      if (filters.monthKey) params.append('monthKey', filters.monthKey);
+      // Use global time filter instead of local month filter
+      if (timeFilter && timeFilter !== 'all_time') params.append('timeFilter', timeFilter);
       
       console.log('🔍 IncomeDashboard - Fetching with params:', params.toString());
+      console.log('🔍 IncomeDashboard - Global timeFilter:', timeFilter);
       const response = await fetch(`/api/income-dashboard?${params}`);
       if (!response.ok) {
         console.error('❌ IncomeDashboard - API error:', response.status, response.statusText);
@@ -78,19 +79,7 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
     return Array.from(projectSet).sort();
   }, [incomeData]);
 
-  const uniqueMonths = useMemo(() => {
-    const monthSet = new Set();
-    // Ensure incomeData is an array before using forEach
-    if (Array.isArray(incomeData)) {
-      incomeData.forEach((record: any) => {
-        const month = record.monthKey || record.month_key;
-        if (month && month !== "N/A" && typeof month === 'string' && month.trim()) {
-          monthSet.add(month.trim());
-        }
-      });
-    }
-    return Array.from(monthSet).sort().reverse();
-  }, [incomeData]);
+  // Removed uniqueMonths since we're using global time filter
 
   // Calculate total income with fallbacks for different column names
   const totalIncome = useMemo(() => {
@@ -113,7 +102,6 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
       
       if (filters.clientName && clientName !== filters.clientName) return false;
       if (filters.projectName && projectName !== filters.projectName) return false;
-      if (filters.monthKey && monthKey !== filters.monthKey) return false;
       return true;
     });
   }, [incomeData, filters]);
@@ -150,8 +138,8 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
           </Badge>
         </div>
 
-        {/* Filtros Alineados */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        {/* Filtros Alineados - Removido filtro de fecha ya que se usa el global */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-700">Cliente</label>
             <select 
@@ -176,20 +164,6 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
               <option value="">Todos los proyectos</option>
               {uniqueProjects.map((project) => (
                 <option key={project as string} value={project as string}>{project as string}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-700">Mes</label>
-            <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={filters.monthKey || ""}
-              onChange={(e) => setFilters(prev => ({ ...prev, monthKey: e.target.value || undefined }))}
-            >
-              <option value="">Todos los meses</option>
-              {uniqueMonths.map((month) => (
-                <option key={month as string} value={month as string}>{month as string}</option>
               ))}
             </select>
           </div>
