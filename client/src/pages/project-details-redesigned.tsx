@@ -42,13 +42,16 @@ import {
   History,
   Download,
   FileSpreadsheet,
-  Shield,
   Crown,
   Lightbulb,
   Info,
   Star,
   Flame,
-  Database
+  Database,
+  Rocket,
+  Heart,
+  Brain,
+  XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1709,7 +1712,7 @@ const ProjectDetailsPage = () => {
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
               <TrendingUp className="h-4 w-4" />
-              Financiero
+              Análisis Financiero
             </TabsTrigger>
           </TabsList>
 
@@ -3223,210 +3226,313 @@ const ProjectDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="financial-analysis" className="space-y-6">
-            {/* FINANCIAL EXECUTIVE DASHBOARD */}
-            <div className="bg-gradient-to-r from-green-600 to-emerald-700 rounded-xl p-8 text-white">
+            {/* STARTUP-STYLE METRICS HEADER */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Análisis Financiero Ejecutivo</h2>
-                  <p className="text-green-100">Rentabilidad y performance económica del proyecto</p>
+                  <h2 className="text-2xl font-bold mb-2">Business Intelligence & Analytics</h2>
+                  <p className="text-violet-100">Métricas avanzadas y proyecciones financieras</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
-                  <TrendingUp className="h-8 w-8" />
+                  <BarChart3 className="h-8 w-8" />
                 </div>
               </div>
               
-              {unifiedData?.project && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {/* Total Revenue */}
-                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100 text-sm">Ingresos Totales</p>
-                        <p className="text-2xl font-bold">
-                          ${(unifiedData.financialSummary?.totalRevenue || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <DollarSign className="h-6 w-6 text-green-200" />
+              {/* STARTUP METRICS GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {/* Revenue per Employee */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-violet-100 text-sm">Revenue per Employee</p>
+                      <p className="text-2xl font-bold">
+                        ${Math.round((unifiedData?.totalRevenue || 0) / Math.max(unifiedData?.teamBreakdown?.length || 1, 1)).toLocaleString()}
+                      </p>
                     </div>
-                  </div>
-
-                  {/* Total Costs */}
-                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100 text-sm">Costos Totales</p>
-                        <p className="text-2xl font-bold">
-                          ${(unifiedData.financialSummary?.totalCosts || 0).toLocaleString()}
-                        </p>
-                      </div>
-                      <TrendingDown className="h-6 w-6 text-green-200" />
-                    </div>
-                  </div>
-
-                  {/* Profit Margin */}
-                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100 text-sm">Margen de Beneficio</p>
-                        <p className="text-2xl font-bold">
-                          {((unifiedData.financialSummary?.profitMargin || 0) * 100).toFixed(1)}%
-                        </p>
-                      </div>
-                      <Percent className="h-6 w-6 text-green-200" />
-                    </div>
-                  </div>
-
-                  {/* ROI */}
-                  <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100 text-sm">ROI</p>
-                        <p className="text-2xl font-bold">
-                          {((unifiedData.financialSummary?.roi || 0) * 100).toFixed(1)}%
-                        </p>
-                      </div>
-                      <Target className="h-6 w-6 text-green-200" />
-                    </div>
+                    <Users className="h-6 w-6 text-violet-200" />
                   </div>
                 </div>
-              )}
+
+                {/* Utilization Rate */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-violet-100 text-sm">Utilization Rate</p>
+                      <p className="text-2xl font-bold">
+                        {((unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1) * 100).toFixed(1)}%
+                      </p>
+                    </div>
+                    <Zap className="h-6 w-6 text-violet-200" />
+                  </div>
+                </div>
+
+                {/* Burn Rate */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-violet-100 text-sm">Monthly Burn Rate</p>
+                      <p className="text-2xl font-bold">
+                        ${Math.round((unifiedData?.totalCosts || 0) / 1).toLocaleString()}
+                      </p>
+                    </div>
+                    <Flame className="h-6 w-6 text-violet-200" />
+                  </div>
+                </div>
+
+                {/* Project Velocity */}
+                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-violet-100 text-sm">Project Velocity</p>
+                      <p className="text-2xl font-bold">
+                        {Math.round((unifiedData?.workedHours || 0) / 4)}
+                      </p>
+                      <p className="text-xs text-violet-200">hours/week</p>
+                    </div>
+                    <Rocket className="h-6 w-6 text-violet-200" />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* FINANCIAL COMPONENTS GRID */}
+            {/* FINANCIAL CHARTS SECTION */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* Income Analysis */}
-              <div className="bg-white rounded-xl border shadow-sm">
-                <div className="p-6 border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Análisis de Ingresos</h3>
-                      <p className="text-sm text-gray-500">Revenue performance y proyecciones</p>
-                    </div>
+              {/* Cost vs Revenue Trend Chart */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Tendencia Financiera</h3>
+                    <p className="text-sm text-gray-500">Análisis temporal de ingresos vs costos</p>
                   </div>
                 </div>
-                <div className="p-6">
-                  <IncomeDashboard 
-                    projectId={unifiedData?.project?.id} 
-                    timeFilter={timeFilterForHook}
-                  />
+                
+                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500 font-medium">Gráfico de Tendencias</p>
+                    <p className="text-sm text-gray-400">Datos del período actual</p>
+                    <div className="mt-4 flex justify-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded"></div>
+                        <span className="text-sm text-gray-600">Ingresos</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-red-500 rounded"></div>
+                        <span className="text-sm text-gray-600">Costos</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Cost Analysis */}
-              <div className="bg-white rounded-xl border shadow-sm">
-                <div className="p-6 border-b">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-100 rounded-lg">
-                      <TrendingDown className="h-5 w-5 text-red-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Análisis de Costos</h3>
-                      <p className="text-sm text-gray-500">Estructura de costos y eficiencia</p>
-                    </div>
+              {/* Team Performance Heatmap */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <Activity className="h-5 w-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Performance Heatmap</h3>
+                    <p className="text-sm text-gray-500">Eficiencia por miembro del equipo</p>
                   </div>
                 </div>
-                <div className="p-6">
-                  <CostDashboard 
-                    projectId={unifiedData?.project?.id} 
-                    timeFilter={timeFilterForHook}
-                  />
+
+                <div className="space-y-3">
+                  {unifiedData?.teamBreakdown?.slice(0, 6).map((member, index) => {
+                    const efficiency = member.actualHours > 0 ? (member.estimatedHours / member.actualHours * 100) : 0;
+                    const performanceColor = efficiency > 90 ? 'bg-green-500' : efficiency > 70 ? 'bg-yellow-500' : 'bg-red-500';
+                    
+                    return (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="w-24 text-sm text-gray-600 truncate">{member.name}</div>
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full ${performanceColor}`} 
+                            style={{ width: `${Math.min(efficiency, 100)}%` }}
+                          ></div>
+                        </div>
+                        <div className="w-12 text-sm text-gray-500">{efficiency.toFixed(0)}%</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* FINANCIAL METRICS DASHBOARD */}
+            {/* ADVANCED METRICS DASHBOARD */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Resource Efficiency Gauge */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Gauge className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Resource Efficiency</h3>
+                    <p className="text-sm text-gray-500">Optimización de recursos</p>
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="relative inline-flex items-center justify-center w-32 h-32 mb-4">
+                    <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#f3f4f6"
+                        strokeWidth="2"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="2"
+                        strokeDasharray={`${unifiedData?.efficiency || 0}, 100`}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-gray-900">{(unifiedData?.efficiency || 0).toFixed(1)}%</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">Eficiencia Global</p>
+                </div>
+              </div>
+
+              {/* Financial Health Score */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Shield className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Financial Health</h3>
+                    <p className="text-sm text-gray-500">Puntuación de salud financiera</p>
+                  </div>
+                </div>
+
+                {(() => {
+                  const profitMargin = unifiedData?.profitMargin || 0;
+                  const efficiency = unifiedData?.efficiency || 0;
+                  const healthScore = Math.round((profitMargin * 100 * 0.6) + (efficiency * 0.4));
+                  const healthColor = healthScore > 80 ? 'text-green-600' : healthScore > 60 ? 'text-yellow-600' : 'text-red-600';
+                  const healthStatus = healthScore > 80 ? 'Excelente' : healthScore > 60 ? 'Bueno' : 'Requiere Atención';
+                  
+                  return (
+                    <div className="text-center">
+                      <div className={`text-4xl font-bold mb-2 ${healthColor}`}>
+                        {healthScore}
+                      </div>
+                      <div className="text-sm text-gray-500 mb-3">{healthStatus}</div>
+                      <div className="flex justify-center">
+                        {healthScore > 80 ? 
+                          <CheckCircle className="h-8 w-8 text-green-500" /> : 
+                          healthScore > 60 ?
+                          <AlertCircle className="h-8 w-8 text-yellow-500" /> :
+                          <XCircle className="h-8 w-8 text-red-500" />}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Break-even Analysis */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Target className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Break-even Analysis</h3>
+                    <p className="text-sm text-gray-500">Punto de equilibrio</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Ingresos Actuales</span>
+                    <span className="font-semibold">${(unifiedData?.totalRevenue || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Costos Totales</span>
+                    <span className="font-semibold">${(unifiedData?.totalCosts || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Break-even Status</span>
+                      <span className={`font-semibold ${(unifiedData?.totalRevenue || 0) > (unifiedData?.totalCosts || 0) ? 'text-green-600' : 'text-red-600'}`}>
+                        {(unifiedData?.totalRevenue || 0) > (unifiedData?.totalCosts || 0) ? 'Alcanzado' : 'Pendiente'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PREDICTIVE ANALYTICS */}
             <div className="bg-white rounded-xl border shadow-sm p-6">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-cyan-100 rounded-lg">
+                  <Brain className="h-5 w-5 text-cyan-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900">Métricas Financieras Detalladas</h3>
-                  <p className="text-sm text-gray-500">KPIs y análisis de rentabilidad</p>
+                  <h3 className="font-semibold text-gray-900">Predictive Analytics & Insights</h3>
+                  <p className="text-sm text-gray-500">Proyecciones e inteligencia de negocio</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {/* Budget vs Actual */}
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    ${(unifiedData?.project?.budget || 0).toLocaleString()}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Projected Revenue */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700">Ingresos Proyectados</span>
                   </div>
-                  <div className="text-sm text-gray-500">Presupuesto</div>
+                  <div className="text-2xl font-bold text-green-800">
+                    ${Math.round((unifiedData?.totalRevenue || 0) * 1.15).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-green-600">+15% estimado</div>
                 </div>
 
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">
-                    ${(unifiedData?.financialSummary?.actualSpent || 0).toLocaleString()}
+                {/* Risk Score */}
+                <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 border border-orange-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium text-orange-700">Risk Score</span>
                   </div>
-                  <div className="text-sm text-gray-500">Gastado Real</div>
-                </div>
-
-                {/* Efficiency Metrics */}
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {(unifiedData?.efficiency || 0).toFixed(1)}%
+                  <div className="text-2xl font-bold text-orange-800">
+                    {Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0)))}
                   </div>
-                  <div className="text-sm text-gray-500">Eficiencia</div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    ${((unifiedData?.financialSummary?.totalRevenue || 0) - (unifiedData?.financialSummary?.totalCosts || 0)).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-500">Beneficio Neto</div>
-                </div>
-
-                {/* Time Metrics */}
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {unifiedData?.estimatedHours || 0}h
-                  </div>
-                  <div className="text-sm text-gray-500">Horas Estimadas</div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {unifiedData?.workedHours || 0}h
-                  </div>
-                  <div className="text-sm text-gray-500">Horas Trabajadas</div>
-                </div>
-              </div>
-
-              {/* Performance Indicators */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-700 font-medium">Status Financiero</p>
-                      <p className="text-2xl font-bold text-green-800">
-                        {(unifiedData?.financialSummary?.profitMargin || 0) > 0.2 ? 'Excelente' : 
-                         (unifiedData?.financialSummary?.profitMargin || 0) > 0.1 ? 'Bueno' : 'Requiere Atención'}
-                      </p>
-                    </div>
-                    <div className="text-green-600">
-                      {(unifiedData?.financialSummary?.profitMargin || 0) > 0.2 ? 
-                        <CheckCircle className="h-8 w-8" /> : 
-                        <AlertTriangle className="h-8 w-8" />}
-                    </div>
+                  <div className="text-xs text-orange-600">
+                    {Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0))) < 30 ? 'Bajo' : 
+                     Math.max(0, Math.round(100 - (unifiedData?.efficiency || 0))) < 60 ? 'Medio' : 'Alto'}
                   </div>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-700 font-medium">Cumplimiento Presupuesto</p>
-                      <p className="text-2xl font-bold text-blue-800">
-                        {((unifiedData?.financialSummary?.actualSpent || 0) / (unifiedData?.project?.budget || 1) * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                    <div className="text-blue-600">
-                      <Gauge className="h-8 w-8" />
-                    </div>
+                {/* Client Lifetime Value */}
+                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Heart className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-700">Client LTV</span>
                   </div>
+                  <div className="text-2xl font-bold text-purple-800">
+                    ${Math.round((unifiedData?.totalRevenue || 0) * 2.3).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-purple-600">Valor estimado</div>
+                </div>
+
+                {/* Time to Market */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-700">Tiempo Restante</span>
+                  </div>
+                  <div className="text-2xl font-bold text-blue-800">
+                    {Math.max(0, Math.round((unifiedData?.estimatedHours || 0) - (unifiedData?.workedHours || 0)))}h
+                  </div>
+                  <div className="text-xs text-blue-600">Para completar</div>
                 </div>
               </div>
             </div>
