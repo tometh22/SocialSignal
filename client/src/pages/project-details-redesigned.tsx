@@ -1705,13 +1705,6 @@ const ProjectDetailsPage = () => {
               Costos
             </TabsTrigger>
             <TabsTrigger 
-              value="operational-analysis" 
-              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
-            >
-              <Target className="h-4 w-4" />
-              Operacional
-            </TabsTrigger>
-            <TabsTrigger 
               value="financial-analysis" 
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
@@ -3229,13 +3222,6 @@ const ProjectDetailsPage = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="operational-analysis" className="space-y-6">
-            <CostDashboard 
-              projectId={unifiedData?.project?.id} 
-              timeFilter={timeFilterForHook}
-              defaultCostType="operational"
-            />
-          </TabsContent>
 
         </Tabs>
       </div>

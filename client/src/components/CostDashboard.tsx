@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 interface CostDashboardProps {
   projectId?: number;
   timeFilter?: string;
-  defaultCostType?: 'operational' | 'real';
 }
 
 interface CostRecord {
@@ -29,10 +28,8 @@ interface CostFilters {
   status?: string;
 }
 
-export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFilter, defaultCostType }) => {
-  const [filters, setFilters] = useState<CostFilters>({
-    costType: defaultCostType
-  });
+export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFilter }) => {
+  const [filters, setFilters] = useState<CostFilters>({});
 
   const { data: costData = [], isLoading } = useQuery({
     queryKey: ['/api/cost-dashboard', { projectId, timeFilter, ...filters }],
