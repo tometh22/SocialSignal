@@ -3971,13 +3971,71 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
             </div>
-              </div>
-            </div>
 
-            {/* ANÁLISIS OPERACIONAL AVANZADO */}
+            {/* ANÁLISIS DETALLADO - PRIMERA FILA */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Análisis de Patrones de Colaboración */}
+              {/* Velocidad de Proceso */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Clock className="h-5 w-5 text-blue-600" />
+                    Velocidad de Proceso
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Análisis de velocidad y ritmo de trabajo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {(() => {
+                      const totalHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                      const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                      const weeksElapsed = 4; // Simplificado para el ejemplo
+                      const weeklyVelocity = totalHours / weeksElapsed;
+                      const remainingHours = Math.max(0, estimatedHours - totalHours);
+                      
+                      return (
+                        <>
+                          <div className="text-center p-3 bg-blue-50 rounded-lg border">
+                            <div className="text-xl font-bold text-blue-700">{weeklyVelocity.toFixed(1)}h</div>
+                            <div className="text-xs text-blue-600">Velocidad Semanal</div>
+                          </div>
+                          <div className="text-center p-3 bg-green-50 rounded-lg border">
+                            <div className="text-xl font-bold text-green-700">{Math.ceil(remainingHours / weeklyVelocity)}</div>
+                            <div className="text-xs text-green-600">Semanas Restantes</div>
+                          </div>
+                          <div className="text-center p-3 bg-purple-50 rounded-lg border">
+                            <div className="text-xl font-bold text-purple-700">{((totalHours / estimatedHours) * 100).toFixed(0)}%</div>
+                            <div className="text-xs text-purple-600">Progreso</div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  
+                  <div className="border-t pt-3">
+                    <h5 className="text-sm font-medium text-gray-700 mb-2">Equipo Activo</h5>
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                      {unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0).slice(0, 3).map((member, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm">
+                          <span className="text-gray-700">{member.name}</span>
+                          <span className="text-blue-600">{member.hours}h</span>
+                        </div>
+                      )) || <p className="text-gray-500 text-sm">No hay datos</p>}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Patrones de Colaboración */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -3989,57 +4047,182 @@ const ProjectDetailsPage = () => {
                           <Info className="h-4 w-4 text-gray-400" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="max-w-xs">Análisis de cómo interactúan los roles y qué patrones de trabajo emergen</p>
+                          <p className="max-w-xs">Análisis de roles y trabajo en equipo</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
                     {unifiedData?.actuals?.teamBreakdown && (() => {
                       const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                      const collaborationPatterns = activeMembers.map(member => {
+                      
+                      return activeMembers.map((member, index) => {
                         const workIntensity = member.hours / Math.max(...activeMembers.map(m => m.hours));
                         const collaborationType = member.role === 'Analista Senior' ? 'Ejecutor Principal' :
                                                  member.role === 'Operations Lead' ? 'Coordinador' :
                                                  member.role === 'Project Manager' ? 'Supervisor' : 'Especialista';
-                        return { ...member, workIntensity, collaborationType };
-                      });
-
-                      return collaborationPatterns.map((member, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-4 h-4 rounded-full ${
-                              member.collaborationType === 'Ejecutor Principal' ? 'bg-green-500' :
-                              member.collaborationType === 'Coordinador' ? 'bg-blue-500' :
-                              member.collaborationType === 'Supervisor' ? 'bg-purple-500' : 'bg-orange-500'
-                            }`}></div>
-                            <div>
-                              <h4 className="font-medium text-gray-900">{member.name}</h4>
-                              <div className="text-sm text-gray-600">{member.collaborationType}</div>
+                        
+                        return (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-3 h-3 rounded-full ${
+                                collaborationType === 'Ejecutor Principal' ? 'bg-green-500' :
+                                collaborationType === 'Coordinador' ? 'bg-blue-500' :
+                                collaborationType === 'Supervisor' ? 'bg-purple-500' : 'bg-orange-500'
+                              }`}></div>
+                              <div>
+                                <h4 className="font-medium text-gray-900 text-sm">{member.name}</h4>
+                                <div className="text-xs text-gray-600">{collaborationType}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold">{(workIntensity * 100).toFixed(0)}%</div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-semibold">{(member.workIntensity * 100).toFixed(0)}%</div>
-                            <div className="text-xs text-gray-500">Intensidad</div>
-                          </div>
-                        </div>
-                      ));
-                    })() || <p className="text-gray-500">No hay datos de colaboración disponibles</p>}
+                        );
+                      });
+                    })() || <p className="text-gray-500">No hay datos</p>}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Identificación de Dependencias Críticas */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Brain className="h-5 w-5 text-indigo-600" />
-                    Dependencias Críticas
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
+            </div>
+
+            {/* PREDICCIÓN Y RECOMENDACIONES */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  Predicción y Recomendaciones
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Proyecciones inteligentes y recomendaciones de optimización</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {(() => {
+                    const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                    const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                    const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const budgetCost = unifiedData?.quotation?.totalAmount || 0;
+                    
+                    const progressPercent = estimatedHours > 0 ? (workedHours / estimatedHours) * 100 : 0;
+                    const currentBurnRate = workedHours > 0 ? workedCost / workedHours : 0;
+                    const projectedTotalCost = currentBurnRate * estimatedHours;
+                    const budgetOverrun = Math.max(0, projectedTotalCost - budgetCost);
+                    const overrunProbability = budgetOverrun > 0 ? Math.min(90, (budgetOverrun / budgetCost) * 100) : 10;
+                    const riskLevel = overrunProbability < 25 ? 'Bajo' : overrunProbability < 60 ? 'Medio' : 'Alto';
+                    const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
+
+                    // Recomendación inteligente
+                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                    const overloadedMembers = activeMembers.filter(m => m.hours > 80);
+                    
+                    let recommendation = '';
+                    let recommendationIcon = '';
+                    let recommendationColor = 'bg-blue-50 border-blue-200';
+
+                    if (progressPercent > 80) {
+                      recommendation = 'Proyecto en fase final. Mantener calidad y controlar costos.';
+                      recommendationIcon = '✓';
+                      recommendationColor = 'bg-green-50 border-green-200';
+                    } else if (budgetOverrun > budgetCost * 0.1) {
+                      recommendation = 'Riesgo alto de exceso. Revisar scope inmediatamente.';
+                      recommendationIcon = '⚠';
+                      recommendationColor = 'bg-red-50 border-red-200';
+                    } else if (overloadedMembers.length > 0) {
+                      recommendation = `${overloadedMembers.length} miembro(s) sobrecargado(s). Balancear carga de trabajo.`;
+                      recommendationIcon = '⚖️';
+                      recommendationColor = 'bg-orange-50 border-orange-200';
+                    } else {
+                      recommendation = 'Proyecto en desarrollo normal. Continuar monitoreando.';
+                      recommendationIcon = '→';
+                      recommendationColor = 'bg-blue-50 border-blue-200';
+                    }
+
+                    return (
+                      <>
+                        {/* Proyección de Costos */}
+                        <div className="p-4 bg-emerald-50 rounded-lg border">
+                          <h4 className="font-medium text-emerald-700 mb-3">Proyección de Costos</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Actual</span>
+                              <span className="font-semibold">${workedCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Proyectado</span>
+                              <span className="font-semibold">${projectedTotalCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-t pt-2">
+                              <span className="text-gray-600">Presupuesto</span>
+                              <span className="font-semibold">${budgetCost.toLocaleString()}</span>
+                            </div>
+                            {budgetOverrun > 0 && (
+                              <div className="flex justify-between text-red-600">
+                                <span>Exceso</span>
+                                <span className="font-semibold">+${budgetOverrun.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Análisis de Riesgo */}
+                        <div className="p-4 bg-orange-50 rounded-lg border">
+                          <h4 className="font-medium text-orange-700 mb-3">Análisis de Riesgo</h4>
+                          <div className="text-center mb-3">
+                            <div className={`text-2xl font-bold ${riskColor}`}>{riskLevel}</div>
+                            <div className="text-sm text-gray-600">Riesgo de Exceso</div>
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>• Burn rate: ${currentBurnRate.toFixed(0)}/h</div>
+                            <div>• Progreso: {progressPercent.toFixed(1)}%</div>
+                            <div>• Probabilidad: {overrunProbability.toFixed(0)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Recomendación Principal */}
+                        <div className={`p-4 rounded-lg border-2 ${recommendationColor}`}>
+                          <h4 className="font-medium text-gray-700 mb-3">Recomendación</h4>
+                          <div className="flex items-start gap-3">
+                            <div className="text-lg">{recommendationIcon}</div>
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-700">{recommendation}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+
+          </TabsContent>
+
+        </Tabs>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteEntryId} onOpenChange={() => setDeleteEntryId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar esta entrada de tiempo? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
                           <Info className="h-4 w-4 text-gray-400" />
                         </TooltipTrigger>
                         <TooltipContent>
