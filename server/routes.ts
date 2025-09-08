@@ -746,6 +746,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'malena quiroga': 'malena quiroga'
       };
 
+      // DEBUGGING: Log completo de mapeo de nombres
+      console.log(`📋 === MAPEO COMPLETO DE NOMBRES ===`);
+      console.log(`📋 Mapeo configurado:`, nameMapping);
+      console.log(`📋 Personnel en BD (${allPersonnel.length} personas):`);
+      allPersonnel.forEach(p => {
+        const role = allRoles.find(r => r.id === p.roleId);
+        console.log(`   • "${p.name}" (ID: ${p.id}) → ${role?.name || 'Sin Rol'}`);
+      });
+      console.log(`📋 Roles disponibles (${allRoles.length} roles):`);
+      allRoles.forEach(r => console.log(`   • "${r.name}" (ID: ${r.id})`));
+      console.log(`📋 =====================================`);
+
       // Helper function para obtener el rol real de una persona
       const getRoleForPerson = (personnelId: number | null, personName: string): string => {
         console.log(`🔍 Mapeando rol para: personnelId=${personnelId}, personName="${personName}"`);
@@ -775,7 +787,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           console.log(`❌ No encontrado: "${personName}"`);
-          console.log(`📋 Personnel disponible: ${allPersonnel.map(p => p.name).slice(0, 10).join(', ')}...`);
           return 'Freelancer Excel';
         } else {
           // Para personnel con ID, buscar directamente
