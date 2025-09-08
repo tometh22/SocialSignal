@@ -3883,98 +3883,94 @@ const ProjectDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="operational-analysis" className="space-y-6">
-            {/* ANÁLISIS OPERACIONAL COMPLEMENTARIO */}
+            {/* HEADER PRINCIPAL */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-8 text-white">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional Complementario</h2>
-                  <p className="text-purple-100">Flujos de trabajo, cuellos de botella y optimización de procesos</p>
+                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional</h2>
+                  <p className="text-purple-100">Flujos de trabajo, procesos y optimización del rendimiento operativo</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
                   <Cog className="h-8 w-8" />
                 </div>
               </div>
-              
-              {/* MÉTRICAS OPERACIONALES ÚNICAS */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Flujo de Trabajo */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+            </div>
+
+            {/* MÉTRICAS OPERACIONALES PRINCIPALES */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-100 text-sm">Flujo de Trabajo</p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-blue-600 text-sm font-medium">Flujo de Trabajo</p>
+                      <p className="text-2xl font-bold text-blue-900">
                         {unifiedData?.actuals?.teamBreakdown ? 
                           `${unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).length}→${unifiedData.actuals.teamBreakdown.length}` : 
                           '0→0'
                         }
                       </p>
+                      <p className="text-xs text-blue-600 mt-1">Activos → Total equipo</p>
                     </div>
-                    <Zap className="h-6 w-6 text-purple-200" />
+                    <Zap className="h-8 w-8 text-blue-500" />
                   </div>
-                  <p className="text-xs text-purple-200 mt-2">
-                    Personas activas → Total del equipo
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Cuellos de Botella */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-100 text-sm">Cuellos de Botella</p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-orange-600 text-sm font-medium">Cuellos de Botella</p>
+                      <p className="text-2xl font-bold text-orange-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const overloaded = unifiedData.actuals.teamBreakdown.filter(m => 
-                            m.hours > 0 && (m.hours / Math.max(1, m.estimatedHours || m.hours)) > 1.2
-                          ).length;
-                          return overloaded;
+                          const bottlenecks = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 80).length;
+                          return bottlenecks;
                         })() : 0}
                       </p>
+                      <p className="text-xs text-orange-600 mt-1">Recursos sobrecargados</p>
                     </div>
-                    <XCircle className="h-6 w-6 text-purple-200" />
+                    <Activity className="h-8 w-8 text-orange-500" />
                   </div>
-                  <p className="text-xs text-purple-200 mt-2">
-                    Recursos sobrecargados detectados
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Dependencias Críticas */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-100 text-sm">Dependencias</p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-purple-600 text-sm font-medium">Dependencias</p>
+                      <p className="text-2xl font-bold text-purple-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
                           const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.role || 'Sin Rol'));
                           return uniqueRoles.size;
                         })() : 0}
                       </p>
+                      <p className="text-xs text-purple-600 mt-1">Roles interdependientes</p>
                     </div>
-                    <Brain className="h-6 w-6 text-purple-200" />
+                    <Brain className="h-8 w-8 text-purple-500" />
                   </div>
-                  <p className="text-xs text-purple-200 mt-2">
-                    Roles críticos interdependientes
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
 
-                {/* Riesgo Operacional */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
+                <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-100 text-sm">Riesgo Operacional</p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-green-600 text-sm font-medium">Riesgo Operacional</p>
+                      <p className="text-2xl font-bold text-green-900">
                         {unifiedData?.metrics?.efficiency ? (() => {
                           const risk = unifiedData.metrics.efficiency < 50 ? 'Alto' : 
                                      unifiedData.metrics.efficiency < 80 ? 'Medio' : 'Bajo';
                           return risk;
                         })() : 'N/A'}
                       </p>
+                      <p className="text-xs text-green-600 mt-1">Evaluación del proceso</p>
                     </div>
-                    <Heart className="h-6 w-6 text-purple-200" />
+                    <Heart className="h-8 w-8 text-green-500" />
                   </div>
-                  <p className="text-xs text-purple-200 mt-2">
-                    Evaluación de riesgo del proceso
-                  </p>
-                </div>
+                </CardContent>
+              </Card>
+            </div>
               </div>
             </div>
 
