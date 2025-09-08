@@ -52,50 +52,60 @@ export default function IncomeDashboard({ projectId }: { projectId?: number }) {
   // Get unique values for filters with robust handling
   const uniqueClients = useMemo(() => {
     const clientSet = new Set();
-    incomeData.forEach((record: any) => {
-      const client = record.clientName || record.client_name;
-      if (client && client !== "N/A" && typeof client === 'string' && client.trim()) {
-        clientSet.add(client.trim());
-      }
-    });
+    // Ensure incomeData is an array before using forEach
+    if (Array.isArray(incomeData)) {
+      incomeData.forEach((record: any) => {
+        const client = record.clientName || record.client_name;
+        if (client && client !== "N/A" && typeof client === 'string' && client.trim()) {
+          clientSet.add(client.trim());
+        }
+      });
+    }
     return Array.from(clientSet).sort();
   }, [incomeData]);
 
   const uniqueProjects = useMemo(() => {
     const projectSet = new Set();
-    incomeData.forEach((record: any) => {
-      const project = record.projectName || record.project_name;
-      if (project && project !== "N/A" && typeof project === 'string' && project.trim()) {
-        projectSet.add(project.trim());
-      }
-    });
+    // Ensure incomeData is an array before using forEach
+    if (Array.isArray(incomeData)) {
+      incomeData.forEach((record: any) => {
+        const project = record.projectName || record.project_name;
+        if (project && project !== "N/A" && typeof project === 'string' && project.trim()) {
+          projectSet.add(project.trim());
+        }
+      });
+    }
     return Array.from(projectSet).sort();
   }, [incomeData]);
 
   const uniqueMonths = useMemo(() => {
     const monthSet = new Set();
-    incomeData.forEach((record: any) => {
-      const month = record.monthKey || record.month_key;
-      if (month && month !== "N/A" && typeof month === 'string' && month.trim()) {
-        monthSet.add(month.trim());
-      }
-    });
+    // Ensure incomeData is an array before using forEach
+    if (Array.isArray(incomeData)) {
+      incomeData.forEach((record: any) => {
+        const month = record.monthKey || record.month_key;
+        if (month && month !== "N/A" && typeof month === 'string' && month.trim()) {
+          monthSet.add(month.trim());
+        }
+      });
+    }
     return Array.from(monthSet).sort().reverse();
   }, [incomeData]);
 
   // Calculate total income with fallbacks for different column names
-  const totalIncome = useMemo(() => 
-    incomeData
+  const totalIncome = useMemo(() => {
+    if (!Array.isArray(incomeData)) return 0;
+    return incomeData
       .filter((record: any) => record.confirmed === 'SI' || record.confirmed === 'Si')
       .reduce((sum: number, record: any) => {
         const amount = parseFloat(record.amountUsd || record.amount_usd || "0");
         return sum + amount;
-      }, 0),
-    [incomeData]
-  );
+      }, 0);
+  }, [incomeData]);
 
   // Filter data based on current filters with fallbacks
   const filteredData = useMemo(() => {
+    if (!Array.isArray(incomeData)) return [];
     return incomeData.filter((record: any) => {
       const clientName = record.clientName || record.client_name;
       const projectName = record.projectName || record.project_name;

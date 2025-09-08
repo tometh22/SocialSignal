@@ -11245,9 +11245,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(fullQuery);
       
-      console.log(`📊 Found ${result.length} income records`);
+      // Extract rows from result object
+      const rows = result.rows || result || [];
+      console.log(`📊 Found ${rows.length} income records`);
+      console.log(`📊 Sample data:`, rows.slice(0, 3));
       
-      res.json(result);
+      res.json(rows);
     } catch (error) {
       console.error("❌ Error in income dashboard:", error);
       res.status(500).json({ error: "Failed to fetch income data" });
