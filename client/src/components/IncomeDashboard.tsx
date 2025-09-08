@@ -241,7 +241,7 @@ const IncomeDashboard: React.FC<IncomeDashboardProps> = ({
               </SelectContent>
             </Select>
             
-            <Select value={selectedViewMode} onValueChange={setSelectedViewMode}>
+            <Select value={selectedViewMode} onValueChange={(value) => setSelectedViewMode(value as 'executive' | 'detailed')}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
@@ -291,7 +291,7 @@ const IncomeDashboard: React.FC<IncomeDashboardProps> = ({
         </div>
 
         {/* Contenido Principal */}
-        <Tabs value={selectedViewMode} onValueChange={setSelectedViewMode} className="space-y-6">
+        <Tabs value={selectedViewMode} onValueChange={(value) => setSelectedViewMode(value as 'executive' | 'detailed')} className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="executive" className="flex items-center gap-2">
               <PieChart className="h-4 w-4" />
