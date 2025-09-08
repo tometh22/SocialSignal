@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,6 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, FileSpreadsheet, Filter, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 
 interface IncomeRecord {
   id: number;
@@ -25,7 +33,17 @@ interface IncomeFilters {
   status?: string;
 }
 
-export default function IncomeDashboard({ projectId, timeFilter }: { projectId?: number; timeFilter?: string }) {
+interface IncomeDashboardProps {
+  projectId?: number;
+  timeFilter?: string;
+  viewMode?: 'executive' | 'detailed' | 'compact';
+}
+
+export default function IncomeDashboard({ 
+  projectId, 
+  timeFilter, 
+  viewMode = 'executive' 
+}: IncomeDashboardProps) {
   const [filters, setFilters] = useState<IncomeFilters>({});
 
   // Fetch income data with global time filter
@@ -86,8 +104,6 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
     return Array.from(projectSet).sort();
   }, [incomeData, projectId]);
 
-  // Removed uniqueMonths since we're using global time filter
-
   // Calculate total income with fallbacks for different column names
   const totalIncome = useMemo(() => {
     if (!Array.isArray(incomeData)) return 0;
@@ -141,173 +157,320 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header con filtros */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <DollarSign className="w-5 h-5 text-green-600" />
-          <h2 className="text-lg font-bold text-gray-900">
-            {projectId ? 'Ingresos del Proyecto' : 'Ingresos - Numerador Limpio'}
-          </h2>
-        </div>
-
-        {/* Filtros contextuales compactos */}
-        {!projectId ? (
-          // Vista global - filtros horizontales compactos
-          <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border">
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Cliente:</label>
-              <select 
-                className="border border-gray-300 rounded px-2 py-1 text-sm min-w-32 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filters.clientName || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                {uniqueClients.map((client) => (
-                  <option key={client as string} value={client as string}>{client as string}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Proyecto:</label>
-              <select 
-                className="border border-gray-300 rounded px-2 py-1 text-sm min-w-32 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filters.projectName || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                {uniqueProjects.map((project) => (
-                  <option key={project as string} value={project as string}>{project as string}</option>
-                ))}
-              </select>
-            </div>
-
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearFilters}
-              className="ml-auto flex items-center gap-1 h-7 px-2 text-xs"
-            >
-              <Filter className="w-3 h-3" />
-              Limpiar
-            </Button>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Header con filtros */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-green-600" />
+            <h2 className="text-lg font-bold text-gray-900">
+              {projectId ? 'Ingresos del Proyecto' : 'Análisis Financiero - Ingresos'}
+            </h2>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-4 w-4 text-blue-600 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md">
+                <p className="font-semibold mb-1">Numerador Limpio de Ingresos</p>
+                <p className="text-sm mb-2">Este dashboard muestra los ingresos confirmados que forman el numerador para el cálculo de márgenes.</p>
+                <ul className="text-sm space-y-1">
+                  <li>• <strong>Confirmados:</strong> Solo ingresos marcados como "Si" en el Excel</li>
+                  <li>• <strong>Por proyecto:</strong> Filtrable por cliente y proyecto específico</li>
+                  <li>• <strong>Tipos:</strong> Fee, One Shot, Bonus según el Excel MAESTRO</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
           </div>
-        ) : (
-          // Vista de proyecto específico - filtros compactos horizontales
-          <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-blue-700 whitespace-nowrap">Tipo:</label>
-              <select 
-                className="border border-blue-300 rounded px-2 py-1 text-sm min-w-24 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filters.salesType || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, salesType: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                <option value="Fee">Fee</option>
-                <option value="One Shot">One Shot</option>
-                <option value="Bonus">Bonus</option>
-              </select>
-            </div>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-blue-700 whitespace-nowrap">Estado:</label>
-              <select 
-                className="border border-blue-300 rounded px-2 py-1 text-sm min-w-24 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                value={filters.status || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                <option value="completada">Completada</option>
-                <option value="activa">Activa</option>
-                <option value="proyectada">Proyectada</option>
-              </select>
-            </div>
-
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearFilters}
-              className="ml-auto flex items-center gap-1 h-7 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              <Filter className="w-3 h-3" />
-              Limpiar
-            </Button>
-          </div>
-        )}
-
-        {/* Total Income Card - Compacto */}
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-sm font-medium">Ingresos Confirmados</span>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-bold">
-                ${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          {/* Filtros contextuales compactos */}
+          {!projectId ? (
+            // Vista global - filtros horizontales compactos
+            <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border">
+              <div className="flex items-center gap-2 min-w-0">
+                <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Cliente:</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <select 
+                      className="border border-gray-300 rounded px-2 py-1 text-sm min-w-32 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={filters.clientName || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
+                    >
+                      <option value="">Todos</option>
+                      {uniqueClients.map((client) => (
+                        <option key={client as string} value={client as string}>{client as string}</option>
+                      ))}
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtra los ingresos por cliente específico</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <div className="text-xs opacity-90">USD</div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Tabla de Ingresos - Diseño Corporativo Compacto */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
-          <div className="flex items-center gap-2">
-            <FileSpreadsheet className="w-4 h-4 text-gray-600" />
-            <h3 className="font-medium text-gray-900">Detalle de Ingresos</h3>
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-              {filteredData.length} registros
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-gray-600">Completada</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Proyecto:</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <select 
+                      className="border border-gray-300 rounded px-2 py-1 text-sm min-w-32 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={filters.projectName || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
+                    >
+                      <option value="">Todos</option>
+                      {uniqueProjects.map((project) => (
+                        <option key={project as string} value={project as string}>{project as string}</option>
+                      ))}
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtra los ingresos por proyecto específico</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="ml-auto flex items-center gap-1 h-7 px-2 text-xs"
+                  >
+                    <Filter className="w-3 h-3" />
+                    Limpiar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Elimina todos los filtros aplicados</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-gray-600">Activa</span>
+          ) : (
+            // Vista de proyecto específico - filtros compactos horizontales
+            <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <label className="text-xs font-medium text-blue-700 whitespace-nowrap">Tipo:</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <select 
+                      className="border border-blue-300 rounded px-2 py-1 text-sm min-w-24 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={filters.salesType || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, salesType: e.target.value || undefined }))}
+                    >
+                      <option value="">Todos</option>
+                      <option value="Fee">Fee</option>
+                      <option value="One Shot">One Shot</option>
+                      <option value="Bonus">Bonus</option>
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtra por tipo de ingreso: Fee (recurrente), One Shot (único), Bonus (adicional)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className="flex items-center gap-2 min-w-0">
+                <label className="text-xs font-medium text-blue-700 whitespace-nowrap">Estado:</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <select 
+                      className="border border-blue-300 rounded px-2 py-1 text-sm min-w-24 bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={filters.status || ""}
+                      onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value || undefined }))}
+                    >
+                      <option value="">Todos</option>
+                      <option value="completada">Completada</option>
+                      <option value="activa">Activa</option>
+                      <option value="proyectada">Proyectada</option>
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Filtra por estado del proyecto: Completada (facturado), Activa (en curso), Proyectada (estimado)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={clearFilters}
+                    className="ml-auto flex items-center gap-1 h-7 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-100"
+                  >
+                    <Filter className="w-3 h-3" />
+                    Limpiar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Elimina todos los filtros aplicados</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-              <span className="text-gray-600">Proyectada</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-25">
-                <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Proyecto</th>
-                <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Cliente</th>
-                <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Mes</th>
-                <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Tipo</th>
-                <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Ingresos USD</th>
-                <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Estado</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredData.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
-                    <div className="flex flex-col items-center gap-2">
-                      <FileSpreadsheet className="w-6 h-6 text-gray-400" />
-                      <span className="text-sm">No se encontraron registros</span>
-                      <span className="text-xs">Verifica los filtros aplicados</span>
+          )}
+
+          {/* Total Income Card - Compacto */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white shadow-sm cursor-help">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4" />
+                    <span className="text-sm font-medium">Ingresos Confirmados</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold">
+                      ${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </div>
-                  </td>
+                    <div className="text-xs opacity-90">USD</div>
+                  </div>
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-semibold">Total de Ingresos Confirmados</p>
+              <p className="text-sm">Suma de todos los ingresos marcados como "Si" en la columna Confirmado del Excel MAESTRO</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        {/* Tabla de Ingresos - Diseño Corporativo Compacto */}
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-gray-600" />
+              <h3 className="font-medium text-gray-900">Detalle de Ingresos</h3>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded cursor-help">
+                    {filteredData.length} registros
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Número de registros de ingresos que coinciden con los filtros aplicados</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-gray-600">Completada</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Proyectos completados y facturados</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-gray-600">Activa</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Proyectos en desarrollo activo</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span className="text-gray-600">Proyectada</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Ingresos estimados o proyectados</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-25">
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Proyecto</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Nombre del proyecto según Excel MAESTRO</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Cliente</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Cliente asociado al proyecto</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Mes</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Mes en formato YYYY-MM del ingreso</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Tipo</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Tipo de venta: Fee (recurrente), One Shot (único), Bonus (adicional)</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Ingresos USD</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Monto en dólares estadounidenses del ingreso confirmado</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help">Estado</span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Estado del proyecto: Completada, Activa, o Proyectada</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
                 </tr>
-              ) : (
-                filteredData.map((record: any) => {
-                  const projectName = record.projectName || record.project_name || "N/A";
-                  const clientName = record.clientName || record.client_name || "N/A";
-                  const monthKey = record.monthKey || record.month_key || "N/A";
-                  const salesType = record.salesType || record.sales_type || record.revenueType || "N/A";
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredData.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-gray-500">
+                      <div className="flex flex-col items-center gap-2">
+                        <FileSpreadsheet className="w-6 h-6 text-gray-400" />
+                        <span className="text-sm">No se encontraron registros</span>
+                        <span className="text-xs">Verifica los filtros aplicados</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredData.map((record: any) => {
+                    const projectName = record.projectName || record.project_name || "N/A";
+                    const clientName = record.clientName || record.client_name || "N/A";
+                    const monthKey = record.monthKey || record.month_key || "N/A";
+                    const salesType = record.salesType || record.sales_type || record.revenueType || "N/A";
                     const amountUsd = parseFloat(record.amountUsd || record.amount_usd || "0");
                     const status = record.status || "N/A";
                     const confirmed = record.confirmed || "NO";
@@ -319,31 +482,55 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
                         <td className="px-4 py-2 text-sm text-gray-700">{clientName}</td>
                         <td className="px-4 py-2 text-sm text-gray-700 font-mono">{monthKey}</td>
                         <td className="px-4 py-2 text-center">
-                          <Badge variant={
-                            salesType.toLowerCase() === 'fee' ? 'default' : 
-                            salesType.toLowerCase() === 'tm' ? 'secondary' : 'outline'
-                          } className="text-xs">
-                            {salesType}
-                          </Badge>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant={
+                                salesType.toLowerCase() === 'fee' ? 'default' : 
+                                salesType.toLowerCase() === 'tm' ? 'secondary' : 'outline'
+                              } className="text-xs cursor-help">
+                                {salesType}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {salesType.toLowerCase() === 'fee' ? 'Ingreso recurrente mensual' :
+                                 salesType.toLowerCase() === 'one shot' ? 'Ingreso único por proyecto' :
+                                 salesType.toLowerCase() === 'bonus' ? 'Ingreso adicional o bonificación' :
+                                 'Tipo de ingreso'}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
                         <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
                           ${amountUsd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </td>
                         <td className="px-4 py-2 text-center">
-                          <Badge 
-                            variant="outline"
-                            className={`text-xs ${
-                              status === 'proyectada' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                              status === 'activa' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                              status === 'completada' ? 'bg-green-100 text-green-700 border-green-300' :
-                              'bg-gray-100 text-gray-700 border-gray-300'
-                            }`}
-                          >
-                            {status === 'proyectada' ? 'Proyectada' :
-                             status === 'activa' ? 'Activa' :
-                             status === 'completada' ? 'Completada' :
-                             status}
-                          </Badge>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge 
+                                variant="outline"
+                                className={`text-xs cursor-help ${
+                                  status === 'proyectada' ? 'bg-orange-100 text-orange-700 border-orange-300' :
+                                  status === 'activa' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                  status === 'completada' ? 'bg-green-100 text-green-700 border-green-300' :
+                                  'bg-gray-100 text-gray-700 border-gray-300'
+                                }`}
+                              >
+                                {status === 'proyectada' ? 'Proyectada' :
+                                 status === 'activa' ? 'Activa' :
+                                 status === 'completada' ? 'Completada' :
+                                 status}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>
+                                {status === 'proyectada' ? 'Ingreso estimado o planificado' :
+                                 status === 'activa' ? 'Proyecto en desarrollo, ingreso en proceso' :
+                                 status === 'completada' ? 'Proyecto finalizado, ingreso confirmado' :
+                                 'Estado del proyecto'}
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
                       </tr>
                     );
@@ -353,79 +540,7 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
             </table>
           </div>
         </div>
-    </div>
+      </div>
+    </TooltipProvider>
   );
-}
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  BarChart3,
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Users,
-  Clock,
-  Target,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-  PieChart,
-  LineChart,
-  Calendar,
-  Gauge,
-  Zap,
-  Shield,
-  Lightbulb,
-  Info
-} from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer,
-  LineChart as RechartsLineChart,
-  Line,
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area
-} from 'recharts';
-
-interface IncomeDashboardProps {
-  timeFilter?: string;
-  viewMode?: 'executive' | 'detailed' | 'compact';
 }
