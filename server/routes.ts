@@ -46,6 +46,7 @@ import {
   deliverables,
   clientModoComments,
   activeProjects,
+  clients,
   quotations,
   quotationVariants,
   timeEntries,
@@ -11211,6 +11212,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { projectId, clientName, projectName, monthKey, timeFilter } = req.query;
       
+      // If projectId is provided, get the client and project names to filter by
+      let projectClientName = clientName as string;
+      let projectProjectName = projectName as string;
+      
+      if (projectId) {
+        console.log(`📊 Looking up project details for projectId: ${projectId}`);
+        try {
+          const projectDetails = await db
+            .select({
+              clientName: clients.name,
+              projectName: activeProjects.name
+            })
+            .from(activeProjects)
+            .innerJoin(clients, eq(activeProjects.clientId, clients.id))
+            .where(eq(activeProjects.id, parseInt(projectId as string)))
+            .limit(1);
+            
+          if (projectDetails.length > 0) {
+            projectClientName = projectDetails[0].clientName;
+            projectProjectName = projectDetails[0].projectName;
+            console.log(`📊 Found project: ${projectClientName} - ${projectProjectName}`);
+          } else {
+            console.warn(`📊 Project ${projectId} not found`);
+          }
+        } catch (error) {
+          console.error(`📊 Error looking up project ${projectId}:`, error);
+        }
+      }
+      
       // Use Drizzle query builder instead of raw SQL to properly handle parameters
       let query = db
         .select({
@@ -11246,18 +11276,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      if (clientName) {
+      // Apply project-specific filters (either from projectId lookup or direct filters)
+      if (projectClientName) {
         query = query.where(and(
           eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.clientName, clientName as string)
+          eq(googleSheetsSales.clientName, projectClientName)
         ));
+        console.log(`📊 Applied client filter: ${projectClientName}`);
       }
 
-      if (projectName) {
+      if (projectProjectName) {
         query = query.where(and(
           eq(googleSheetsSales.confirmed, 'SI'),
-          eq(googleSheetsSales.projectName, projectName as string)
+          eq(googleSheetsSales.projectName, projectProjectName)
         ));
+        console.log(`📊 Applied project filter: ${projectProjectName}`);
       }
 
       if (monthKey) {

@@ -33,11 +33,13 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
       const params = new URLSearchParams();
       if (projectId) params.append('projectId', projectId.toString());
       if (filters.clientName) params.append('clientName', filters.clientName);
-      if (filters.projectName) params.append('projectName', filters.projectName);
+      // Only include project filter if we're NOT in a specific project context
+      if (!projectId && filters.projectName) params.append('projectName', filters.projectName);
       // Use global time filter instead of local month filter
       if (timeFilter && timeFilter !== 'all_time') params.append('timeFilter', timeFilter);
       
       console.log('🔍 IncomeDashboard - Fetching with params:', params.toString());
+      console.log('🔍 IncomeDashboard - Project context:', projectId ? `Project ${projectId}` : 'All projects');
       console.log('🔍 IncomeDashboard - Global timeFilter:', timeFilter);
       const response = await fetch(`/api/income-dashboard?${params}`);
       if (!response.ok) {
@@ -66,6 +68,9 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
   }, [incomeData]);
 
   const uniqueProjects = useMemo(() => {
+    // Only calculate unique projects if we're NOT in project context
+    if (projectId) return [];
+    
     const projectSet = new Set();
     // Ensure incomeData is an array before using forEach
     if (Array.isArray(incomeData)) {
@@ -77,7 +82,7 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
       });
     }
     return Array.from(projectSet).sort();
-  }, [incomeData]);
+  }, [incomeData, projectId]);
 
   // Removed uniqueMonths since we're using global time filter
 
@@ -101,7 +106,8 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
       const monthKey = record.monthKey || record.month_key;
       
       if (filters.clientName && clientName !== filters.clientName) return false;
-      if (filters.projectName && projectName !== filters.projectName) return false;
+      // Only apply project filter if we're NOT in project context
+      if (!projectId && filters.projectName && projectName !== filters.projectName) return false;
       return true;
     });
   }, [incomeData, filters]);
@@ -132,55 +138,90 @@ export default function IncomeDashboard({ projectId, timeFilter }: { projectId?:
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4">
         <div className="flex items-center gap-2 mb-4">
           <DollarSign className="w-5 h-5 text-green-600" />
-          <h2 className="text-lg font-bold text-gray-900">Ingresos - Numerador Limpio</h2>
+          <h2 className="text-lg font-bold text-gray-900">
+            {projectId ? 'Ingresos del Proyecto' : 'Ingresos - Numerador Limpio'}
+          </h2>
           <Badge variant="outline" className="text-xs">
-            Solo ingresos confirmados para cálculos financieros
+            {projectId ? 'Solo ingresos confirmados de este proyecto' : 'Solo ingresos confirmados para cálculos financieros'}
           </Badge>
         </div>
 
-        {/* Filtros Alineados - Removido filtro de fecha ya que se usa el global */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-700">Cliente</label>
-            <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={filters.clientName || ""}
-              onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
-            >
-              <option value="">Todos los clientes</option>
-              {uniqueClients.map((client) => (
-                <option key={client as string} value={client as string}>{client as string}</option>
-              ))}
-            </select>
-          </div>
+        {/* Filtros contextuales - adapta según si estamos en proyecto específico o vista global */}
+        {!projectId ? (
+          // Vista global - mostrar todos los filtros
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Cliente</label>
+              <select 
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.clientName || ""}
+                onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
+              >
+                <option value="">Todos los clientes</option>
+                {uniqueClients.map((client) => (
+                  <option key={client as string} value={client as string}>{client as string}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-700">Proyecto</label>
-            <select 
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              value={filters.projectName || ""}
-              onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
-            >
-              <option value="">Todos los proyectos</option>
-              {uniqueProjects.map((project) => (
-                <option key={project as string} value={project as string}>{project as string}</option>
-              ))}
-            </select>
-          </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Proyecto</label>
+              <select 
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.projectName || ""}
+                onChange={(e) => setFilters(prev => ({ ...prev, projectName: e.target.value || undefined }))}
+              >
+                <option value="">Todos los proyectos</option>
+                {uniqueProjects.map((project) => (
+                  <option key={project as string} value={project as string}>{project as string}</option>
+                ))}
+              </select>
+            </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-700">Acciones</label>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearFilters}
-              className="flex items-center gap-2 h-[38px]"
-            >
-              <Filter className="w-4 h-4" />
-              Limpiar
-            </Button>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Acciones</label>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                className="flex items-center gap-2 h-[38px]"
+              >
+                <Filter className="w-4 h-4" />
+                Limpiar
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          // Vista de proyecto específico - filtros simplificados
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Cliente</label>
+              <select 
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={filters.clientName || ""}
+                onChange={(e) => setFilters(prev => ({ ...prev, clientName: e.target.value || undefined }))}
+              >
+                <option value="">Todos los clientes</option>
+                {uniqueClients.map((client) => (
+                  <option key={client as string} value={client as string}>{client as string}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-700">Acciones</label>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearFilters}
+                className="flex items-center gap-2 h-[38px]"
+              >
+                <Filter className="w-4 h-4" />
+                Limpiar
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Total Income Card */}
         <Card className="border-l-4 border-l-green-600 bg-gradient-to-br from-green-50 to-white">
