@@ -17,6 +17,7 @@ interface DeviationAnalysisProps {
 
 interface Deviation {
   personnelId: number;
+  personnelName?: string;
   budgetedHours: number;
   actualHours: number;
   budgetedCost: number;
@@ -31,6 +32,7 @@ interface DeviationAnalysisData {
   deviationByRole: Deviation[];
   totalVariance: {
     variance: number;
+    adjustedBudget?: number;
   };
   summary: {
     membersOverBudget: number;
@@ -235,8 +237,8 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
           {/* Sobrecosto Total */}
           {(() => {
             // Calcular el porcentaje de desviación para determinar severidad
-            const variancePercentage = deviationData.totalVariance.adjustedBudget > 0 
-              ? (deviationData.totalVariance.variance / deviationData.totalVariance.adjustedBudget) * 100
+            const variancePercentage = (deviationData.totalVariance.adjustedBudget ?? 0) > 0 
+              ? (deviationData.totalVariance.variance / (deviationData.totalVariance.adjustedBudget ?? 1)) * 100
               : 0;
             
             // Usar los mismos umbrales que el dashboard principal
@@ -543,7 +545,7 @@ export function DeviationAnalysis({ projectId, dateFilter, timeFilter, onNavigat
                     
                     if (criticalPeople.length > 0) {
                       const mostCritical = criticalPeople[0];
-                      return mostCritical.personnelName;
+                      return mostCritical.personnelName || 'Personal sin nombre';
                     }
                     return 'Sin casos críticos';
                   })()}
