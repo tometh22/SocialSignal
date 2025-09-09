@@ -328,18 +328,50 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Parsear valores monetarios que vienen con formato $X.XXX,XX
+   * Parsear valores monetarios que vienen con formato $X.XXX,XX (argentino) o $X,XXX.XX (americano)
    */
   private parseMoneyValue(value: string): number {
     if (!value) return 0;
     
-    // Remover símbolo de peso, puntos de miles, y convertir coma decimal a punto
-    const cleaned = value
-      .replace(/[$\s]/g, '') // Remover $ y espacios
-      .replace(/\./g, '') // Remover puntos de miles
-      .replace(',', '.'); // Convertir coma decimal a punto
+    // Remover símbolo de peso y espacios
+    let cleaned = value.replace(/[$\s]/g, '');
+    
+    // 🚨 DETECCIÓN AUTOMÁTICA DE FORMATO:
+    // Si tiene punto al final (ej: "267.02") → formato americano (punto = decimal)
+    // Si tiene coma al final (ej: "267,02") → formato argentino (coma = decimal)
+    const hasDecimalPoint = /\.\d{1,2}$/.test(cleaned); // Punto seguido de 1-2 dígitos al final
+    const hasDecimalComma = /,\d{1,2}$/.test(cleaned);  // Coma seguida de 1-2 dígitos al final
+    const hasThreeDigitsAfterPoint = /\.\d{3}$/.test(cleaned); // Punto seguido de exactamente 3 dígitos (ej: .000)
+    
+    if (hasDecimalPoint && !hasDecimalComma && !hasThreeDigitsAfterPoint) {
+      // Formato americano claro: $267.02 → 267.02
+      cleaned = cleaned.replace(/,/g, ''); // Solo remover comas (miles)
+      // El punto ya es decimal, no tocar
+    } else if (hasDecimalComma && !hasDecimalPoint) {
+      // Formato argentino claro: $1.234,56 → 1234.56  
+      cleaned = cleaned.replace(/\./g, ''); // Remover puntos (miles)
+      cleaned = cleaned.replace(',', '.'); // Convertir coma decimal a punto
+    } else if (hasThreeDigitsAfterPoint) {
+      // Caso ambiguo como $420.000 - probablemente formato argentino con .000 como miles
+      // HEURÍSTICA: Si termina en .000, probablemente sean miles, no decimales
+      cleaned = cleaned.replace(/\.000$/, ''); // Remover .000 final
+      cleaned = cleaned.replace(/\./g, ''); // Remover otros puntos de miles
+    } else {
+      // Sin decimales claros, asumir entero y remover separadores
+      cleaned = cleaned.replace(/[,\.]/g, ''); // Remover separadores
+    }
     
     const parsed = parseFloat(cleaned);
+    
+    // 🚨 VALIDACIÓN ANTI-ERRORES MEJORADA
+    const originalValue = value.replace(/[$\s]/g, '');
+    if (originalValue && parsed > 10000 && originalValue.length <= 8) {
+      console.log(`⚠️ PARSING SOSPECHOSO: "${value}" → ${parsed} (posible error x100)`);
+      console.log(`   - Original: "${originalValue}"`);
+      console.log(`   - Cleaned: "${cleaned}"`);
+      console.log(`   - hasDecimalPoint: ${hasDecimalPoint}, hasDecimalComma: ${hasDecimalComma}`);
+    }
+    
     return isNaN(parsed) ? 0 : parsed;
   }
 
