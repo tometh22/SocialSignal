@@ -189,10 +189,10 @@ export class AutoSyncService {
             if (!client) return false;
 
             // Normalizar nombres para comparación
-            const saleClientName = this.normalizeName(sale.client_name || '');
-            const saleProjectName = this.normalizeName(sale.project_name || '');
+            const saleClientName = this.normalizeName(sale.clientName || '');
+            const saleProjectName = this.normalizeName(sale.projectName || '');
             const projectClientName = this.normalizeName(client.name || '');
-            const projectName = this.normalizeName(quotation.project_name || '');
+            const projectName = this.normalizeName(quotation.projectName || '');
 
             // Verificar coincidencias
             const clientMatch = saleClientName === projectClientName || 
@@ -209,8 +209,8 @@ export class AutoSyncService {
           if (matchingProject) {
             // Actualizar la venta con el ID del proyecto
             await storage.updateGoogleSheetsSales(sale.id, {
-              project_id: matchingProject.id,
-              last_updated: new Date()
+              projectId: matchingProject.id,
+              lastUpdated: new Date()
             });
 
             // Crear o actualizar ingreso mensual del proyecto (simplificado)
@@ -219,7 +219,7 @@ export class AutoSyncService {
             linked++;
             
             if (linked <= 5) { // Log primeros 5 para debug
-              console.log(`🔗 Vinculado: ${sale.client_name} - ${sale.project_name} → Proyecto ${matchingProject.id}`);
+              console.log(`🔗 Vinculado: ${sale.clientName} - ${sale.projectName} → Proyecto ${matchingProject.id}`);
             }
           }
 
@@ -262,7 +262,7 @@ export class AutoSyncService {
     try {
       // Por ahora, solo registrar la vinculación sin crear ingresos mensuales
       // para evitar errores de funciones faltantes
-      console.log(`💰 Venta vinculada: ${sale.client_name} - ${sale.project_name} ($${sale.amount_usd || sale.amount_ars})`);
+      console.log(`💰 Venta vinculada: ${sale.clientName} - ${sale.projectName} ($${sale.amountUsd || sale.amountLocal})`);
       return 0; // No crear ingresos por ahora
 
     } catch (error: any) {
