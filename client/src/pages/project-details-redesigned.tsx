@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import {
   ArrowLeft,
+  ArrowRight,
   Calendar,
   Clock,
   DollarSign,
@@ -4769,46 +4770,6 @@ const ProjectDetailsPage = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Link
-                to="/"
-                className="text-gray-500 hover:text-gray-700 flex items-center"
-              >
-                <ArrowRight className="h-4 w-4 rotate-180 mr-1" />
-                Proyectos
-              </Link>
-              <div className="text-gray-300">/</div>
-              <h1 className="text-xl font-semibold text-gray-900">
-                {projectData.projectName || `Proyecto ${projectId}`}
-              </h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                ID: {projectId}
-              </Badge>
-              {projectData.clientName && (
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  {projectData.clientName}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {renderContent()}
       </div>
     </div>
   );
