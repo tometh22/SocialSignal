@@ -4569,6 +4569,373 @@ const ProjectDetailsPage = () => {
 
             </div>
 
+            {/* EFICIENCIA POR FASES DEL PROYECTO */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Layers className="h-5 w-5 text-emerald-600" />
+                  Eficiencia por Fases del Proyecto
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Análisis comparativo de eficiencia entre diferentes fases del proyecto: Estrategia, Ejecución y Revisión</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                  const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                  const totalEstimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                  
+                  // Simulación inteligente de fases basada en roles y distribución de horas
+                  const phaseAnalysis = (() => {
+                    const phases = {
+                      estrategia: {
+                        name: 'Estrategia & Planeación',
+                        estimatedHours: Math.round(totalEstimatedHours * 0.25), // 25% estrategia
+                        actualHours: 0,
+                        cost: 0,
+                        members: [],
+                        efficiency: 0,
+                        status: 'pending',
+                        icon: '📊',
+                        color: 'blue'
+                      },
+                      ejecucion: {
+                        name: 'Ejecución & Desarrollo', 
+                        estimatedHours: Math.round(totalEstimatedHours * 0.55), // 55% ejecución
+                        actualHours: 0,
+                        cost: 0,
+                        members: [],
+                        efficiency: 0,
+                        status: 'pending',
+                        icon: '⚙️',
+                        color: 'green'
+                      },
+                      revision: {
+                        name: 'Revisión & Optimización',
+                        estimatedHours: Math.round(totalEstimatedHours * 0.20), // 20% revisión
+                        actualHours: 0,
+                        cost: 0,
+                        members: [],
+                        efficiency: 0,
+                        status: 'pending',
+                        icon: '✅',
+                        color: 'purple'
+                      }
+                    };
+                    
+                    // Distribuir miembros por fase según su rol y porcentaje de trabajo
+                    activeMembers.forEach(member => {
+                      const workPercentage = totalProjectHours > 0 ? (member.hours / totalProjectHours) * 100 : 0;
+                      const roleName = member.roleName || 'Sin Rol';
+                      
+                      // Lógica inteligente de asignación por rol
+                      if (roleName.includes('Manager') || roleName.includes('Lead') || roleName.includes('Director')) {
+                        // Managers/Leads: más en estrategia y revisión
+                        const estrategiaHours = Math.round(member.hours * 0.4);
+                        const ejecucionHours = Math.round(member.hours * 0.35);
+                        const revisionHours = member.hours - estrategiaHours - ejecucionHours;
+                        
+                        phases.estrategia.actualHours += estrategiaHours;
+                        phases.estrategia.cost += (estrategiaHours * member.rate) / 100;
+                        phases.estrategia.members.push({...member, phaseHours: estrategiaHours});
+                        
+                        phases.ejecucion.actualHours += ejecucionHours;
+                        phases.ejecucion.cost += (ejecucionHours * member.rate) / 100;
+                        phases.ejecucion.members.push({...member, phaseHours: ejecucionHours});
+                        
+                        phases.revision.actualHours += revisionHours;
+                        phases.revision.cost += (revisionHours * member.rate) / 100;
+                        phases.revision.members.push({...member, phaseHours: revisionHours});
+                      } else if (roleName.includes('Senior') || roleName.includes('Especialista')) {
+                        // Seniors: más en ejecución y revisión
+                        const estrategiaHours = Math.round(member.hours * 0.15);
+                        const ejecucionHours = Math.round(member.hours * 0.65);
+                        const revisionHours = member.hours - estrategiaHours - ejecucionHours;
+                        
+                        phases.estrategia.actualHours += estrategiaHours;
+                        phases.estrategia.cost += (estrategiaHours * member.rate) / 100;
+                        phases.estrategia.members.push({...member, phaseHours: estrategiaHours});
+                        
+                        phases.ejecucion.actualHours += ejecucionHours;
+                        phases.ejecucion.cost += (ejecucionHours * member.rate) / 100;
+                        phases.ejecucion.members.push({...member, phaseHours: ejecucionHours});
+                        
+                        phases.revision.actualHours += revisionHours;
+                        phases.revision.cost += (revisionHours * member.rate) / 100;
+                        phases.revision.members.push({...member, phaseHours: revisionHours});
+                      } else {
+                        // Otros roles: más concentrados en ejecución
+                        const estrategiaHours = Math.round(member.hours * 0.10);
+                        const ejecucionHours = Math.round(member.hours * 0.80);
+                        const revisionHours = member.hours - estrategiaHours - ejecucionHours;
+                        
+                        phases.estrategia.actualHours += estrategiaHours;
+                        phases.estrategia.cost += (estrategiaHours * member.rate) / 100;
+                        phases.estrategia.members.push({...member, phaseHours: estrategiaHours});
+                        
+                        phases.ejecucion.actualHours += ejecucionHours;
+                        phases.ejecucion.cost += (ejecucionHours * member.rate) / 100;
+                        phases.ejecucion.members.push({...member, phaseHours: ejecucionHours});
+                        
+                        phases.revision.actualHours += revisionHours;
+                        phases.revision.cost += (revisionHours * member.rate) / 100;
+                        phases.revision.members.push({...member, phaseHours: revisionHours});
+                      }
+                    });
+                    
+                    // Calcular eficiencia y estado de cada fase
+                    Object.keys(phases).forEach(phaseKey => {
+                      const phase = phases[phaseKey];
+                      phase.efficiency = phase.estimatedHours > 0 ? 
+                        Math.round((phase.actualHours / phase.estimatedHours) * 100) : 0;
+                      
+                      // Determinar estado de la fase
+                      if (phase.efficiency >= 95) {
+                        phase.status = 'completed';
+                      } else if (phase.efficiency >= 60) {
+                        phase.status = 'active';
+                      } else if (phase.efficiency >= 30) {
+                        phase.status = 'starting';
+                      } else {
+                        phase.status = 'pending';
+                      }
+                    });
+                    
+                    return phases;
+                  })();
+                  
+                  const phaseKeys = Object.keys(phaseAnalysis);
+                  const bestPhase = phaseKeys.reduce((best, current) => 
+                    phaseAnalysis[current].efficiency > phaseAnalysis[best].efficiency ? current : best
+                  );
+                  const worstPhase = phaseKeys.reduce((worst, current) => 
+                    phaseAnalysis[current].efficiency < phaseAnalysis[worst].efficiency && phaseAnalysis[current].actualHours > 0 ? current : worst
+                  );
+                  
+                  return (
+                    <div className="space-y-6">
+                      {/* KPIs de Fases */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {phaseKeys.map(phaseKey => {
+                          const phase = phaseAnalysis[phaseKey];
+                          const isActive = phase.status === 'active' || phase.status === 'completed';
+                          const progressWidth = Math.min(100, Math.max(5, phase.efficiency));
+                          
+                          return (
+                            <div key={phaseKey} className={`p-4 rounded-lg border-2 transition-all ${
+                              phase.status === 'completed' ? 'bg-green-50 border-green-200' :
+                              phase.status === 'active' ? `bg-${phase.color}-50 border-${phase.color}-200` :
+                              phase.status === 'starting' ? 'bg-yellow-50 border-yellow-200' :
+                              'bg-gray-50 border-gray-200'
+                            }`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{phase.icon}</span>
+                                  <h4 className="font-medium text-sm text-gray-800">{phase.name}</h4>
+                                </div>
+                                <Badge variant={phase.status === 'completed' ? 'default' : 'outline'} className="text-xs">
+                                  {phase.status === 'completed' ? 'Completa' :
+                                   phase.status === 'active' ? 'Activa' :
+                                   phase.status === 'starting' ? 'Iniciando' : 'Pendiente'}
+                                </Badge>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Progreso</span>
+                                  <span className="font-semibold">{phase.efficiency}%</span>
+                                </div>
+                                
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full transition-all duration-500 ${
+                                      phase.status === 'completed' ? 'bg-green-500' :
+                                      phase.status === 'active' ? `bg-${phase.color}-500` :
+                                      'bg-gray-400'
+                                    }`}
+                                    style={{ width: `${progressWidth}%` }}
+                                  ></div>
+                                </div>
+                                
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>{phase.actualHours}h trabajadas</span>
+                                  <span>{phase.estimatedHours}h estimadas</span>
+                                </div>
+                                
+                                <div className="text-xs text-gray-600">
+                                  {phase.members.filter((m, i, arr) => 
+                                    arr.findIndex(member => member.name === m.name) === i
+                                  ).length} miembro(s) activo(s)
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Análisis Comparativo */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        
+                        {/* Rendimiento por Fase */}
+                        <div className="p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg border">
+                          <h4 className="font-medium text-emerald-800 mb-3">🏆 Rendimiento por Fase</h4>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-2 bg-green-100 rounded border">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span className="text-sm font-medium">Más eficiente</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-semibold">{phaseAnalysis[bestPhase].name}</div>
+                                <div className="text-xs text-gray-600">{phaseAnalysis[bestPhase].efficiency}% eficiencia</div>
+                              </div>
+                            </div>
+                            
+                            {worstPhase !== bestPhase && phaseAnalysis[worstPhase].actualHours > 0 && (
+                              <div className="flex items-center justify-between p-2 bg-red-100 rounded border">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                                  <span className="text-sm font-medium">Necesita atención</span>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-semibold">{phaseAnalysis[worstPhase].name}</div>
+                                  <div className="text-xs text-gray-600">{phaseAnalysis[worstPhase].efficiency}% eficiencia</div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="pt-2 border-t">
+                              <div className="text-xs text-gray-600">
+                                ℹ️ La distribución de fases está basada en roles y patrones de trabajo del equipo
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Insights y Recomendaciones */}
+                        <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border">
+                          <h4 className="font-medium text-blue-800 mb-3">💡 Insights de Fases</h4>
+                          <div className="space-y-2 text-sm text-blue-700">
+                            {(() => {
+                              const insights = [];
+                              
+                              // Insight sobre eficiencia general
+                              const avgEfficiency = phaseKeys.reduce((sum, key) => 
+                                sum + phaseAnalysis[key].efficiency, 0
+                              ) / phaseKeys.length;
+                              
+                              if (avgEfficiency > 80) {
+                                insights.push('• Excelente eficiencia general en todas las fases');
+                              } else if (avgEfficiency < 50) {
+                                insights.push('• Eficiencia general baja - revisar asignación de recursos');
+                              } else {
+                                insights.push('• Eficiencia moderada - oportunidades de optimización');
+                              }
+                              
+                              // Insight sobre balance de fases
+                              const completedPhases = phaseKeys.filter(key => 
+                                phaseAnalysis[key].status === 'completed'
+                              ).length;
+                              
+                              if (completedPhases === 0) {
+                                insights.push('• Proyecto en etapas iniciales - enfocar en estrategia');
+                              } else if (completedPhases === phaseKeys.length) {
+                                insights.push('• Todas las fases completadas - proyecto listo para entrega');
+                              } else {
+                                insights.push(`• ${completedPhases} de ${phaseKeys.length} fases completadas`);
+                              }
+                              
+                              // Insight sobre distribución de carga
+                              const ejecucionPhase = phaseAnalysis.ejecucion;
+                              if (ejecucionPhase.efficiency > 120) {
+                                insights.push('• Fase de ejecución excede estimaciones - controlar scope');
+                              } else if (ejecucionPhase.efficiency < 30) {
+                                insights.push('• Fase de ejecución lenta - asignar más recursos');
+                              }
+                              
+                              return insights.slice(0, 4).map((insight, i) => (
+                                <div key={i}>{insight}</div>
+                              ));
+                            })()}
+                          </div>
+                          
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <div className="text-xs text-blue-600">
+                              🔄 La asignación por fases se actualiza automáticamente según el progreso del equipo
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Desglose Detallado por Fase */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-medium text-gray-800 mb-4">📈 Desglose Detallado por Fase</h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 font-medium text-gray-700">Fase</th>
+                                <th className="text-right py-2 px-3 font-medium text-gray-700">Horas</th>
+                                <th className="text-right py-2 px-3 font-medium text-gray-700">Costo</th>
+                                <th className="text-right py-2 px-3 font-medium text-gray-700">Eficiencia</th>
+                                <th className="text-center py-2 px-3 font-medium text-gray-700">Estado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {phaseKeys.map(phaseKey => {
+                                const phase = phaseAnalysis[phaseKey];
+                                return (
+                                  <tr key={phaseKey} className="border-b border-gray-100">
+                                    <td className="py-2 px-3">
+                                      <div className="flex items-center gap-2">
+                                        <span>{phase.icon}</span>
+                                        <span>{phase.name}</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3 text-right">
+                                      {phase.actualHours}h / {phase.estimatedHours}h
+                                    </td>
+                                    <td className="py-2 px-3 text-right">
+                                      ${Math.round(phase.cost).toLocaleString()}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-medium">
+                                      <span className={`${
+                                        phase.efficiency > 100 ? 'text-orange-600' :
+                                        phase.efficiency > 80 ? 'text-green-600' :
+                                        phase.efficiency > 50 ? 'text-blue-600' :
+                                        'text-gray-600'
+                                      }`}>
+                                        {phase.efficiency}%
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <Badge variant={phase.status === 'completed' ? 'default' : 'outline'} className="text-xs">
+                                        {phase.status === 'completed' ? 'Completa' :
+                                         phase.status === 'active' ? 'Activa' :
+                                         phase.status === 'starting' ? 'Iniciando' : 'Pendiente'}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
             {/* PREDICCIÓN Y RECOMENDACIONES */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
