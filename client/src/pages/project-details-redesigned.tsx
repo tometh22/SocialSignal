@@ -1663,6 +1663,95 @@ const ProjectDetailsPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Indicador del Período del Proyecto */}
+      {unifiedData?.actuals?.projectPeriod && (
+        <div className="px-6 pt-4">
+          <Card className={`border-l-4 ${
+            unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
+              ? 'border-l-amber-500 bg-amber-50' 
+              : 'border-l-blue-500 bg-blue-50'
+          } shadow-sm`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
+                      ? 'bg-amber-100' 
+                      : 'bg-blue-100'
+                  }`}>
+                    <Calendar className={`h-5 w-5 ${
+                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
+                        ? 'text-amber-600' 
+                        : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${
+                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
+                        ? 'text-amber-800' 
+                        : 'text-blue-800'
+                    }`}>
+                      Período del Proyecto
+                    </h3>
+                    <p className={`text-sm ${
+                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
+                        ? 'text-amber-700' 
+                        : 'text-blue-700'
+                    }`}>
+                      {new Date(unifiedData.actuals.projectPeriod.startDate).toLocaleDateString('es-ES', { 
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric' 
+                      })} - {
+                        unifiedData.actuals.projectPeriod.actualEndDate 
+                          ? new Date(unifiedData.actuals.projectPeriod.actualEndDate).toLocaleDateString('es-ES', { 
+                              day: '2-digit', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })
+                          : (unifiedData.actuals.projectPeriod.expectedEndDate 
+                            ? `${new Date(unifiedData.actuals.projectPeriod.expectedEndDate).toLocaleDateString('es-ES', { 
+                                day: '2-digit', 
+                                month: 'short', 
+                                year: 'numeric' 
+                              })} (estimado)`
+                            : 'En curso')
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  {unifiedData.actuals.projectPeriod.isFilterOutOfPeriod ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
+                        <Info className="h-3 w-3 mr-1" />
+                        Datos Totales
+                      </Badge>
+                      <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
+                        Filtro fuera del período
+                      </Badge>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Filtro en período activo
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {unifiedData.actuals.projectPeriod.isFilterOutOfPeriod && (
+                <div className={`mt-3 p-3 rounded-lg bg-amber-100 border border-amber-200`}>
+                  <p className="text-sm text-amber-800">
+                    <strong>Información:</strong> El filtro temporal seleccionado está fuera del período de vida del proyecto. 
+                    Se muestran los datos totales del proyecto para referencia.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
