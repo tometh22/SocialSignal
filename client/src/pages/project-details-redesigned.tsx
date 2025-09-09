@@ -1663,95 +1663,6 @@ const ProjectDetailsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Indicador del Período del Proyecto */}
-      {unifiedData?.actuals?.projectPeriod && (
-        <div className="px-6 pt-4">
-          <Card className={`border-l-4 ${
-            unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
-              ? 'border-l-amber-500 bg-amber-50' 
-              : 'border-l-blue-500 bg-blue-50'
-          } shadow-sm`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${
-                    unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
-                      ? 'bg-amber-100' 
-                      : 'bg-blue-100'
-                  }`}>
-                    <Calendar className={`h-5 w-5 ${
-                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
-                        ? 'text-amber-600' 
-                        : 'text-blue-600'
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className={`font-semibold ${
-                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
-                        ? 'text-amber-800' 
-                        : 'text-blue-800'
-                    }`}>
-                      Período del Proyecto
-                    </h3>
-                    <p className={`text-sm ${
-                      unifiedData.actuals.projectPeriod.isFilterOutOfPeriod 
-                        ? 'text-amber-700' 
-                        : 'text-blue-700'
-                    }`}>
-                      {new Date(unifiedData.actuals.projectPeriod.startDate).toLocaleDateString('es-ES', { 
-                        day: '2-digit', 
-                        month: 'short', 
-                        year: 'numeric' 
-                      })} - {
-                        unifiedData.actuals.projectPeriod.actualEndDate 
-                          ? new Date(unifiedData.actuals.projectPeriod.actualEndDate).toLocaleDateString('es-ES', { 
-                              day: '2-digit', 
-                              month: 'short', 
-                              year: 'numeric' 
-                            })
-                          : (unifiedData.actuals.projectPeriod.expectedEndDate 
-                            ? `${new Date(unifiedData.actuals.projectPeriod.expectedEndDate).toLocaleDateString('es-ES', { 
-                                day: '2-digit', 
-                                month: 'short', 
-                                year: 'numeric' 
-                              })} (estimado)`
-                            : 'En curso')
-                      }
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  {unifiedData.actuals.projectPeriod.isFilterOutOfPeriod ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">
-                        <Info className="h-3 w-3 mr-1" />
-                        Datos Totales
-                      </Badge>
-                      <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-                        Filtro fuera del período
-                      </Badge>
-                    </div>
-                  ) : (
-                    <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Filtro en período activo
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              {unifiedData.actuals.projectPeriod.isFilterOutOfPeriod && (
-                <div className={`mt-3 p-3 rounded-lg bg-amber-100 border border-amber-200`}>
-                  <p className="text-sm text-amber-800">
-                    <strong>Información:</strong> El filtro temporal seleccionado está fuera del período de vida del proyecto. 
-                    Se muestran los datos totales del proyecto para referencia.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -4059,6 +3970,197 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* TIMELINE DE PRODUCTIVIDAD - NUEVA FUNCIONALIDAD */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                  Timeline de Productividad
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Análisis temporal de productividad del equipo con tendencias semanales</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  // Obtener time entries del proyecto para crear timeline
+                  const { data: projectTimeEntries = [], isLoading: timeEntriesLoading } = useQuery({
+                    queryKey: [`/api/time-entries/project/${projectId}`, projectId, unifiedData?.timeFilter],
+                    enabled: !!projectId
+                  });
+
+                  if (timeEntriesLoading) {
+                    return (
+                      <div className="flex items-center justify-center h-64">
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                          Cargando timeline...
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Procesar datos para crear timeline semanal
+                  const weeklyData = (() => {
+                    const weekMap = new Map();
+                    const currentDate = new Date();
+                    
+                    // Crear 8 semanas (2 meses) de datos
+                    for (let i = 7; i >= 0; i--) {
+                      const weekStart = new Date(currentDate);
+                      weekStart.setDate(currentDate.getDate() - (i * 7));
+                      // Ajustar al lunes de la semana
+                      const dayOfWeek = weekStart.getDay();
+                      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                      weekStart.setDate(weekStart.getDate() + mondayOffset);
+                      
+                      const weekEnd = new Date(weekStart);
+                      weekEnd.setDate(weekStart.getDate() + 6); // Domingo
+                      
+                      const weekKey = `${weekStart.getFullYear()}-W${Math.ceil(weekStart.getDate() / 7)}`;
+                      const weekLabel = `${weekStart.getDate()}/${weekStart.getMonth() + 1} - ${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+                      
+                      weekMap.set(weekKey, {
+                        week: weekLabel,
+                        hours: 0,
+                        entries: 0,
+                        members: new Set(),
+                        weekStart: weekStart.toISOString().split('T')[0],
+                        weekEnd: weekEnd.toISOString().split('T')[0]
+                      });
+                    }
+
+                    // Procesar time entries reales
+                    (projectTimeEntries as any[]).forEach((entry: any) => {
+                      const entryDate = new Date(entry.date);
+                      const entryWeekStart = new Date(entryDate);
+                      entryWeekStart.setDate(entryDate.getDate() - entryDate.getDay() + 1);
+                      
+                      const weekKey = `${entryWeekStart.getFullYear()}-W${Math.ceil(entryWeekStart.getDate() / 7)}`;
+                      
+                      if (weekMap.has(weekKey)) {
+                        const weekData = weekMap.get(weekKey);
+                        weekData.hours += entry.hours || 0;
+                        weekData.entries += 1;
+                        weekData.members.add(entry.personnelId);
+                      }
+                    });
+
+                    return Array.from(weekMap.values()).map(week => ({
+                      ...week,
+                      members: week.members.size
+                    }));
+                  })();
+
+                  const maxHours = Math.max(...weeklyData.map(w => w.hours), 1);
+                  const avgHours = weeklyData.reduce((sum, w) => sum + w.hours, 0) / weeklyData.length;
+                  const trend = weeklyData.length > 1 ? 
+                    (weeklyData[weeklyData.length - 1].hours - weeklyData[0].hours) / weeklyData.length : 0;
+
+                  return (
+                    <div className="space-y-6">
+                      {/* KPIs del Timeline */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-indigo-50 rounded-lg border">
+                          <h4 className="font-medium text-indigo-700 mb-2">Promedio Semanal</h4>
+                          <div className="text-2xl font-bold text-indigo-900">{avgHours.toFixed(1)}h</div>
+                          <div className="text-xs text-indigo-600">Últimas 8 semanas</div>
+                        </div>
+                        <div className="p-4 bg-emerald-50 rounded-lg border">
+                          <h4 className="font-medium text-emerald-700 mb-2">Semana Pico</h4>
+                          <div className="text-2xl font-bold text-emerald-900">{maxHours.toFixed(1)}h</div>
+                          <div className="text-xs text-emerald-600">Máximo registrado</div>
+                        </div>
+                        <div className={`p-4 rounded-lg border ${
+                          trend > 0 ? 'bg-green-50' : trend < 0 ? 'bg-red-50' : 'bg-gray-50'
+                        }`}>
+                          <h4 className={`font-medium mb-2 ${
+                            trend > 0 ? 'text-green-700' : trend < 0 ? 'text-red-700' : 'text-gray-700'
+                          }`}>Tendencia</h4>
+                          <div className={`text-2xl font-bold ${
+                            trend > 0 ? 'text-green-900' : trend < 0 ? 'text-red-900' : 'text-gray-900'
+                          }`}>
+                            {trend > 0 ? '↗' : trend < 0 ? '↘' : '→'} {Math.abs(trend).toFixed(1)}h
+                          </div>
+                          <div className={`text-xs ${
+                            trend > 0 ? 'text-green-600' : trend < 0 ? 'text-red-600' : 'text-gray-600'
+                          }`}>
+                            {trend > 0 ? 'Incrementando' : trend < 0 ? 'Disminuyendo' : 'Estable'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Gráfico de barras simplificado */}
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-700">Actividad Semanal</h4>
+                        <div className="space-y-2">
+                          {weeklyData.map((week, index) => (
+                            <div key={index} className="flex items-center gap-3">
+                              <div className="w-20 text-xs text-gray-600 font-mono">{week.week}</div>
+                              <div className="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
+                                <div 
+                                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 transition-all duration-500 flex items-center justify-end px-2"
+                                  style={{ width: `${Math.max(5, (week.hours / maxHours) * 100)}%` }}
+                                >
+                                  {week.hours > 0 && (
+                                    <span className="text-white text-xs font-medium">{week.hours.toFixed(1)}h</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="w-16 text-right">
+                                <div className="text-xs text-gray-500">{week.members} 👥</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Insights automáticos */}
+                      <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                        <h5 className="font-medium text-blue-800 mb-2">📊 Insights Automáticos</h5>
+                        <div className="space-y-1 text-sm text-blue-700">
+                          {(() => {
+                            const insights = [];
+                            const recentHours = weeklyData.slice(-2).reduce((sum, w) => sum + w.hours, 0) / 2;
+                            const previousHours = weeklyData.slice(-4, -2).reduce((sum, w) => sum + w.hours, 0) / 2;
+                            
+                            if (recentHours > previousHours * 1.2) {
+                              insights.push('• Incremento significativo en las últimas 2 semanas (+20%)');
+                            } else if (recentHours < previousHours * 0.8) {
+                              insights.push('• Disminución notable en las últimas 2 semanas (-20%)');
+                            }
+                            
+                            const activeWeeks = weeklyData.filter(w => w.hours > 0).length;
+                            if (activeWeeks === weeklyData.length) {
+                              insights.push('• Actividad constante en todas las semanas analizadas');
+                            }
+                            
+                            const peakWeek = weeklyData.find(w => w.hours === maxHours);
+                            if (peakWeek && maxHours > avgHours * 1.5) {
+                              insights.push(`• Semana pico detectada: ${peakWeek.week} con ${maxHours.toFixed(1)}h`);
+                            }
+                            
+                            if (insights.length === 0) {
+                              insights.push('• Patrón de trabajo estable y consistente');
+                            }
+                            
+                            return insights.map((insight, i) => <div key={i}>{insight}</div>);
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
 
             {/* ANÁLISIS DETALLADO - PRIMERA FILA */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

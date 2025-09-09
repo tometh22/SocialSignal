@@ -2073,53 +2073,6 @@ export class DatabaseStorage implements IStorage {
       const project = await this.getActiveProject(projectId);
       if (!project) return null;
 
-      // ✅ VALIDAR ESTADO Y FECHAS DE FINALIZACIÓN DEL PROYECTO
-      let isFilterOutOfProjectPeriod = false;
-      let shouldShowTotals = false;
-      
-      if (dateRange && project.actualEndDate) {
-        const projectEndDate = new Date(project.actualEndDate);
-        const projectStartDate = new Date(project.startDate);
-        
-        // Si el proyecto terminó antes del rango de fechas solicitado, mostrar datos totales
-        if (projectEndDate < dateRange.startDate) {
-          console.log(`📊 Project ${projectId} ended ${projectEndDate.toISOString()} before filter range starts ${dateRange.startDate.toISOString()} - showing total project data`);
-          isFilterOutOfProjectPeriod = true;
-          shouldShowTotals = true;
-          // No aplicar filtro temporal, obtener todos los datos del proyecto
-          dateRange = null;
-        }
-        // Si el rango filtrado empieza antes que el proyecto, mostrar datos totales
-        else if (dateRange.endDate < projectStartDate) {
-          console.log(`📊 Filter range ends ${dateRange.endDate.toISOString()} before project started ${projectStartDate.toISOString()} - showing total project data`);
-          isFilterOutOfProjectPeriod = true;
-          shouldShowTotals = true;
-          // No aplicar filtro temporal, obtener todos los datos del proyecto
-          dateRange = null;
-        }
-        // Si el proyecto terminó durante el rango filtrado, ajustar el rango final
-        else if (projectEndDate < dateRange.endDate) {
-          console.log(`⚠️ Project ${projectId} ended ${projectEndDate.toISOString()} during filter range, adjusting end date`);
-          dateRange = {
-            startDate: dateRange.startDate,
-            endDate: projectEndDate
-          };
-        }
-      }
-
-      // Si el proyecto está marcado como completado/cancelado y no hay fecha específica de fin,
-      // considerar la fecha actual como límite para evitar datos futuros
-      if (dateRange && ['completed', 'cancelled'].includes(project.status) && !project.actualEndDate) {
-        const today = new Date();
-        if (dateRange.startDate > today) {
-          console.log(`📊 Project ${projectId} is ${project.status} and filter starts after today - showing total project data`);
-          isFilterOutOfProjectPeriod = true;
-          shouldShowTotals = true;
-          // No aplicar filtro temporal, obtener todos los datos del proyecto
-          dateRange = null;
-        }
-      }
-
       // Obtener ALL time entries para el proyecto
       let entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
       
@@ -2415,16 +2368,7 @@ export class DatabaseStorage implements IStorage {
           montoTotalUSD: dc.montoTotalUSD,
           costoTotal: dc.costoTotal,
           valorHoraPersona: dc.valorHoraPersona
-        })),
-        // NUEVO: Información del período del proyecto y filtros
-        projectPeriod: {
-          startDate: project.startDate,
-          expectedEndDate: project.expectedEndDate,
-          actualEndDate: project.actualEndDate,
-          status: project.status,
-          isFilterOutOfPeriod: isFilterOutOfProjectPeriod,
-          showingTotalData: shouldShowTotals
-        }
+        }))
       };
     } catch (error) {
       console.error("Error al obtener resumen de costos del proyecto:", error);
