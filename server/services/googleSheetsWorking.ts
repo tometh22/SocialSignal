@@ -361,7 +361,17 @@ class GoogleSheetsWorkingService {
       cleaned = cleaned.replace(/[,\.]/g, ''); // Remover separadores
     }
     
-    const parsed = parseFloat(cleaned);
+    let parsed = parseFloat(cleaned);
+    
+    // 🚨 VALIDACIÓN HEURÍSTICA PARA COSTOS ANORMALMENTE ALTOS
+    // Si el valor es > $10,000 USD para un costo individual, probablemente está mal parseado x100
+    // Típicamente los costos mensuales por persona están entre $10-$5,000 USD máximo
+    if (parsed > 10000) {
+      const dividedBy100 = parsed / 100;
+      console.log(`🔧 AUTO-CORRECCIÓN: "${value}" → $${parsed.toLocaleString()} parece demasiado alto.`);
+      console.log(`    Aplicando corrección ÷100: $${parsed.toLocaleString()} → $${dividedBy100.toLocaleString()}`);
+      parsed = dividedBy100;
+    }
     
     // 🚨 VALIDACIÓN ANTI-ERRORES MEJORADA
     const originalValue = value.replace(/[$\s]/g, '');
@@ -370,6 +380,7 @@ class GoogleSheetsWorkingService {
       console.log(`   - Original: "${originalValue}"`);
       console.log(`   - Cleaned: "${cleaned}"`);
       console.log(`   - hasDecimalPoint: ${hasDecimalPoint}, hasDecimalComma: ${hasDecimalComma}`);
+      console.log(`   - hasThreeDigitsAfterPoint: ${hasThreeDigitsAfterPoint}`);
     }
     
     return isNaN(parsed) ? 0 : parsed;
