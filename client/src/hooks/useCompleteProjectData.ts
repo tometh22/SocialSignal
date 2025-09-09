@@ -12,6 +12,14 @@ interface CompleteProjectData {
   workedCost: number;
   workedHours: number;
   
+  // Project type validation (new for one-shot projects)
+  isOutOfRange?: boolean;
+  activityRange?: {
+    startPeriod: string;
+    endPeriod: string;
+    isActive: boolean;
+  };
+  
   // Nested objects (full structure from backend)
   project: {
     id: number;

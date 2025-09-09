@@ -683,6 +683,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return monthMap[monthName.toLowerCase()] || 1;
   };
 
+  // Helper function to convert time filter to period format for comparison
+  const parseTimeFilterToPeriod = (timeFilter: string): string | null => {
+    if (!timeFilter || timeFilter === 'all') return null;
+    
+    // Manejo de filtros de mes específico como "mayo_2025", "08_ago_2025", etc.
+    const monthYearMatch = timeFilter.match(/^(\d+_)?([a-z]+)_(\d{4})$/i);
+    if (monthYearMatch) {
+      const monthName = monthYearMatch[2];
+      const year = monthYearMatch[3];
+      const monthNum = getMonthNumber(monthName);
+      return `${year}-${monthNum.toString().padStart(2, '0')}`;
+    }
+    
+    // Manejo de filtros Q1, Q2, Q3, Q4 (usar primer mes del trimestre)
+    const quarterMatch = timeFilter.match(/^Q(\d)_(\d{4})$/i);
+    if (quarterMatch) {
+      const quarter = parseInt(quarterMatch[1]);
+      const year = quarterMatch[2];
+      const quarterStartMonths = { 1: '01', 2: '04', 3: '07', 4: '10' };
+      return `${year}-${quarterStartMonths[quarter as keyof typeof quarterStartMonths] || '01'}`;
+    }
+    
+    // Manejo de filtros de año como "año_2025"
+    if (timeFilter.match(/^a[ñn]o_(\d{4})$/i)) {
+      const year = timeFilter.match(/^a[ñn]o_(\d{4})$/i)?.[1];
+      return year ? `${year}-01` : null;
+    }
+    
+    // Manejo de rangos específicos como "mayo_jul_2025"
+    const rangeMatch = timeFilter.match(/^([a-z]+)_([a-z]+)_(\d{4})$/i);
+    if (rangeMatch) {
+      const startMonth = rangeMatch[1];
+      const year = rangeMatch[3];
+      const monthNum = getMonthNumber(startMonth);
+      return `${year}-${monthNum.toString().padStart(2, '0')}`;
+    }
+    
+    console.log(`⚠️ No se pudo parsear filtro temporal: ${timeFilter}`);
+    return null;
+  };
+
 
   // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
@@ -694,6 +735,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       console.log(`📊 Getting complete data for project ${id} with filter: ${timeFilter}`);
+      
+      // NUEVA VALIDACIÓN: Verificar rango de actividad para proyectos one-shot
+      const activityRange = await storage.getProjectActivityRange(id);
+      console.log(`🔍 Rango de actividad para proyecto ${id}:`, activityRange);
+      
+      // Si el proyecto es one-shot terminado y el filtro está fuera del rango, retornar datos vacíos
+      if (activityRange && !activityRange.isActive && timeFilter !== 'all') {
+        // Convertir el timeFilter a formato comparable
+        const filterPeriod = parseTimeFilterToPeriod(timeFilter);
+        if (filterPeriod && (filterPeriod < activityRange.startPeriod || filterPeriod > activityRange.endPeriod)) {
+          console.log(`⚠️ Proyecto ${id} terminado - filtro ${timeFilter} (${filterPeriod}) fuera del rango activo ${activityRange.startPeriod}-${activityRange.endPeriod}`);
+          return res.json({
+            project: await storage.getActiveProject(id),
+            quotation: { team: [], estimatedHours: 0 },
+            actuals: { totalWorkedHours: 0, totalWorkedCost: 0, totalEntries: 0, teamBreakdown: [] },
+            metrics: { efficiency: 0, markup: 0, budgetUtilization: 0, hoursDeviation: 0, costDeviation: 0 },
+            rankings: { economicMetrics: [], summary: { totalMembers: 0, excellentPerformers: 0, goodPerformers: 0, criticalPerformers: 0 } },
+            directCosts: [],
+            isOutOfRange: true,
+            activityRange,
+            timeFilter,
+            estimatedCost: 0,
+            estimatedHours: 0,
+            isAlwaysOn: false,
+            markup: 0,
+            workedCost: 0,
+            workedHours: 0,
+            efficiency: 0
+          });
+        }
+      }
       
       // 1. Obtener datos base del proyecto
       const project = await storage.getActiveProject(id);

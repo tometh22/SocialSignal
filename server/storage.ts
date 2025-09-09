@@ -435,6 +435,9 @@ export interface IStorage {
 
   // Personnel lookup
   getPersonnelByName(name: string): Promise<Personnel | undefined>;
+  
+  // Project activity range for one-shot projects
+  getProjectActivityRange(projectId: number): Promise<{ startPeriod: string; endPeriod: string; isActive: boolean } | null>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -2066,6 +2069,77 @@ export class DatabaseStorage implements IStorage {
     };
     
     return monthMap[monthName.toLowerCase()] || '01';
+  }
+
+  // ==================== NUEVA FUNCIÓN: OBTENER RANGO DE ACTIVIDAD REAL DE PROYECTOS ONE-SHOT ====================
+  async getProjectActivityRange(projectId: number): Promise<{ startPeriod: string; endPeriod: string; isActive: boolean } | null> {
+    try {
+      console.log(`🔍 Calculando rango de actividad para proyecto ${projectId}`);
+      
+      // Obtener el proyecto y su tipo desde la cotización
+      const project = await this.getActiveProject(projectId);
+      if (!project?.quotation) {
+        console.log(`❌ No se encontró proyecto o cotización para ID ${projectId}`);
+        return null;
+      }
+
+      const projectType = project.quotation.projectType;
+      console.log(`📊 Tipo de proyecto ${projectId}: ${projectType}`);
+
+      // Solo aplicar lógica de rango para proyectos one-time
+      if (projectType !== 'one-time') {
+        console.log(`✅ Proyecto ${projectId} es ${projectType}, permitir todos los períodos`);
+        return { startPeriod: '2025-01', endPeriod: '2025-12', isActive: true };
+      }
+
+      // Para proyectos one-time, obtener costos directos del Excel MAESTRO
+      const directCosts = await this.getDirectCostsByProject(projectId);
+      console.log(`💰 Costos directos encontrados para proyecto ${projectId}: ${directCosts.length} registros`);
+
+      if (directCosts.length === 0) {
+        console.log(`⚠️ Proyecto one-time ${projectId} sin costos directos - considerado inactivo`);
+        return { startPeriod: '2025-01', endPeriod: '2025-01', isActive: false };
+      }
+
+      // Convertir fechas a formato comparable (YYYY-MM)
+      const periods = directCosts.map(cost => {
+        let monthNumber;
+        if (cost.mes.includes(' ')) {
+          // Formato "08 ago", "05 may", etc.
+          monthNumber = cost.mes.substring(0, 2);
+        } else {
+          // Formato "Agosto", "Mayo", etc.
+          const monthMap: { [key: string]: string } = {
+            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+          };
+          monthNumber = monthMap[cost.mes.toLowerCase()] || '01';
+        }
+        return `${cost.año}-${monthNumber}`;
+      }).filter(period => period); // Filtrar valores inválidos
+
+      if (periods.length === 0) {
+        console.log(`⚠️ No se pudieron extraer períodos válidos para proyecto ${projectId}`);
+        return { startPeriod: '2025-01', endPeriod: '2025-01', isActive: false };
+      }
+
+      // Ordenar y obtener primer y último período
+      periods.sort();
+      const startPeriod = periods[0];
+      const endPeriod = periods[periods.length - 1];
+
+      // Verificar si el proyecto está activo (último período en el mes actual o futuro)
+      const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
+      const isActive = endPeriod >= currentPeriod;
+
+      console.log(`📅 Proyecto ${projectId} - Rango: ${startPeriod} a ${endPeriod}, Activo: ${isActive}`);
+      
+      return { startPeriod, endPeriod, isActive };
+    } catch (error) {
+      console.error(`❌ Error calculando rango de actividad para proyecto ${projectId}:`, error);
+      return null;
+    }
   }
 
   async getProjectCostSummary(projectId: number, dateRange?: { startDate: Date; endDate: Date }): Promise<any> {
