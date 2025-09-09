@@ -1514,6 +1514,68 @@ const ProjectDetailsPage = () => {
     );
   }
 
+  // Verificar si el proyecto está fuera del rango para proyectos one-shot
+  if ((unifiedData as any)?.isOutOfRange) {
+    const activityRange = (unifiedData as any)?.activityRange;
+    const timeFilter = (unifiedData as any)?.timeFilter;
+    
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center bg-white rounded-lg shadow-md p-8">
+          <div className="mb-6">
+            <CalendarDays className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sin Datos en este Período</h2>
+          </div>
+          
+          <div className="space-y-4 text-gray-600">
+            <p className="leading-relaxed">
+              Este proyecto <strong>one-shot</strong> solo tiene actividad registrada entre <br />
+              <span className="font-semibold text-blue-600">{activityRange?.startPeriod}</span> y{' '}
+              <span className="font-semibold text-blue-600">{activityRange?.endPeriod}</span>
+            </p>
+            
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-sm text-amber-700">
+                <strong>Filtro actual:</strong> {timeFilter} <br />
+                No hay datos registrados para este período.
+              </p>
+            </div>
+            
+            <div className="space-y-2 pt-2">
+              <p className="text-sm font-medium text-gray-700">Opciones:</p>
+              <div className="flex flex-col gap-2">
+                <Button 
+                  variant="default" 
+                  onClick={() => {
+                    // Cambiar filtro a "Todos los períodos"
+                    setDateFilter({
+                      type: 'custom',
+                      startDate: new Date(2020, 0, 1),
+                      endDate: new Date(2030, 11, 31),
+                      label: 'Todos los períodos'
+                    });
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <CalendarDays className="h-4 w-4 mr-2" />
+                  Ver Todos los Períodos
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setLocation("/active-projects")}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Volver a Proyectos
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const projectData = project as any;
   const clientData = client as any;
   const projectName = projectData?.quotation?.projectName || projectData?.name || "Proyecto sin nombre";
