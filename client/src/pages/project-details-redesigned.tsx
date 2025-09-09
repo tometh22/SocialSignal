@@ -4254,7 +4254,267 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Patrones de Colaboración */}
+              {/* Análisis de Bloqueos y Dependencias Críticas */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    Bloqueos y Dependencias Críticas
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Identificación de cuellos de botella y dependencias que pueden afectar el flujo de trabajo</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                    const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                    const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                    const progressPercent = estimatedHours > 0 ? (totalProjectHours / estimatedHours) * 100 : 0;
+
+                    // Análisis de cuellos de botella por carga de trabajo
+                    const bottleneckAnalysis = activeMembers.map(member => {
+                      const workloadPercentage = totalProjectHours > 0 ? (member.hours / totalProjectHours) * 100 : 0;
+                      const efficiencyRatio = member.estimatedHours > 0 ? member.hours / member.estimatedHours : 0;
+                      
+                      let bottleneckType = 'normal';
+                      let bottleneckReason = '';
+                      let criticality = 'low';
+                      
+                      // Detectar diferentes tipos de cuellos de botella
+                      if (workloadPercentage > 40) {
+                        bottleneckType = 'overload';
+                        bottleneckReason = `Concentra el ${workloadPercentage.toFixed(0)}% del trabajo total`;
+                        criticality = 'high';
+                      } else if (efficiencyRatio > 1.5) {
+                        bottleneckType = 'exceeded';
+                        bottleneckReason = `Superó estimación en ${((efficiencyRatio - 1) * 100).toFixed(0)}%`;
+                        criticality = 'medium';
+                      } else if (member.hours > 80) {
+                        bottleneckType = 'high_hours';
+                        bottleneckReason = `Total de ${member.hours}h puede causar burnout`;
+                        criticality = 'medium';
+                      } else if (member.lastActivity && new Date(member.lastActivity) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
+                        bottleneckType = 'inactive';
+                        bottleneckReason = 'Sin actividad en los últimos 7 días';
+                        criticality = 'high';
+                      }
+                      
+                      return {
+                        ...member,
+                        workloadPercentage,
+                        efficiencyRatio,
+                        bottleneckType,
+                        bottleneckReason,
+                        criticality
+                      };
+                    }).sort((a, b) => {
+                      const criticalityOrder: Record<string, number> = { 'high': 3, 'medium': 2, 'low': 1 };
+                      return (criticalityOrder[b.criticality] || 1) - (criticalityOrder[a.criticality] || 1);
+                    });
+
+                    // Análisis de dependencias críticas por roles
+                    const dependencyAnalysis = (() => {
+                      const roleGroups = activeMembers.reduce((acc, member) => {
+                        const role = member.roleName || 'Sin Rol';
+                        if (!acc[role]) acc[role] = [];
+                        acc[role].push(member);
+                        return acc;
+                      }, {} as Record<string, any[]>);
+
+                      return Object.entries(roleGroups).map(([role, members]) => {
+                        const totalRoleHours = members.reduce((sum, m) => sum + m.hours, 0);
+                        const roleWorkload = totalProjectHours > 0 ? (totalRoleHours / totalProjectHours) * 100 : 0;
+                        const isCritical = members.length === 1 && roleWorkload > 15; // Un solo miembro con >15% del trabajo
+                        const hasInactivity = members.some(m => 
+                          m.lastActivity && new Date(m.lastActivity) < new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+                        );
+
+                        let dependencyRisk = 'low';
+                        let riskReason = '';
+
+                        if (isCritical && hasInactivity) {
+                          dependencyRisk = 'critical';
+                          riskReason = 'Rol crítico con un solo responsable inactivo';
+                        } else if (isCritical) {
+                          dependencyRisk = 'high';
+                          riskReason = 'Dependencia crítica: solo un responsable';
+                        } else if (hasInactivity) {
+                          dependencyRisk = 'medium';
+                          riskReason = 'Algunos miembros del rol están inactivos';
+                        }
+
+                        return {
+                          role,
+                          members: members.length,
+                          hours: totalRoleHours,
+                          workloadPercentage: roleWorkload,
+                          dependencyRisk,
+                          riskReason,
+                          memberNames: members.map(m => m.name).join(', ')
+                        };
+                      }).filter(dep => dep.dependencyRisk !== 'low');
+                    })();
+
+                    // Alertas críticas
+                    const criticalAlerts = (() => {
+                      const alerts = [];
+                      
+                      // Alertas por cuellos de botella
+                      const criticalBottlenecks = bottleneckAnalysis.filter(b => b.criticality === 'high');
+                      criticalBottlenecks.forEach(bottleneck => {
+                        alerts.push({
+                          type: 'bottleneck',
+                          priority: 'high',
+                          title: `Cuello de botella: ${bottleneck.name}`,
+                          message: bottleneck.bottleneckReason,
+                          action: bottleneck.bottleneckType === 'overload' ? 'Redistribuir carga' : 'Verificar estado',
+                          color: 'bg-red-50 border-red-200 text-red-800'
+                        });
+                      });
+
+                      // Alertas por dependencias críticas
+                      const criticalDependencies = dependencyAnalysis.filter(d => d.dependencyRisk === 'critical');
+                      criticalDependencies.forEach(dep => {
+                        alerts.push({
+                          type: 'dependency',
+                          priority: 'critical',
+                          title: `Dependencia crítica: ${dep.role}`,
+                          message: dep.riskReason,
+                          action: 'Asignar backup inmediatamente',
+                          color: 'bg-red-100 border-red-300 text-red-900'
+                        });
+                      });
+
+                      // Alerta de progreso general
+                      if (progressPercent > 80 && bottleneckAnalysis.some(b => b.criticality === 'high')) {
+                        alerts.push({
+                          type: 'progress',
+                          priority: 'medium',
+                          title: 'Proyecto en fase final con bloqueos',
+                          message: 'Resolver cuellos de botella para evitar retrasos en entrega',
+                          action: 'Revisar asignaciones',
+                          color: 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                        });
+                      }
+
+                      return alerts.slice(0, 3); // Máximo 3 alertas más críticas
+                    })();
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Alertas Críticas */}
+                        {criticalAlerts.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="font-medium text-gray-800 text-sm">🚨 Alertas Críticas</h4>
+                            {criticalAlerts.map((alert, index) => (
+                              <div key={index} className={`p-3 rounded-lg border ${alert.color}`}>
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <h5 className="font-medium text-sm">{alert.title}</h5>
+                                    <p className="text-xs mt-1">{alert.message}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">{alert.action}</Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Análisis de Cuellos de Botella */}
+                        <div>
+                          <h4 className="font-medium text-gray-800 text-sm mb-3">⚡ Análisis de Carga de Trabajo</h4>
+                          <div className="space-y-2 max-h-32 overflow-y-auto">
+                            {bottleneckAnalysis.slice(0, 5).map((member, index) => (
+                              <div key={index} className={`p-2 rounded border text-sm ${
+                                member.criticality === 'high' ? 'bg-red-50 border-red-200' :
+                                member.criticality === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                                'bg-green-50 border-green-200'
+                              }`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${
+                                      member.criticality === 'high' ? 'bg-red-500' :
+                                      member.criticality === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                                    }`}></div>
+                                    <span className="font-medium">{member.name}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-medium">{member.hours}h</div>
+                                    <div className="text-xs text-gray-600">{member.workloadPercentage.toFixed(0)}% del total</div>
+                                  </div>
+                                </div>
+                                {member.bottleneckReason && (
+                                  <div className="mt-1 text-xs text-gray-600">{member.bottleneckReason}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Análisis de Dependencias */}
+                        {dependencyAnalysis.length > 0 && (
+                          <div>
+                            <h4 className="font-medium text-gray-800 text-sm mb-3">🔗 Dependencias Críticas</h4>
+                            <div className="space-y-2">
+                              {dependencyAnalysis.map((dep, index) => (
+                                <div key={index} className={`p-2 rounded border text-sm ${
+                                  dep.dependencyRisk === 'critical' ? 'bg-red-50 border-red-200' :
+                                  dep.dependencyRisk === 'high' ? 'bg-orange-50 border-orange-200' :
+                                  'bg-yellow-50 border-yellow-200'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-2 h-2 rounded-full ${
+                                        dep.dependencyRisk === 'critical' ? 'bg-red-500' :
+                                        dep.dependencyRisk === 'high' ? 'bg-orange-500' : 'bg-yellow-500'
+                                      }`}></div>
+                                      <span className="font-medium">{dep.role}</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-xs text-gray-600">{dep.members} miembro(s)</div>
+                                      <div className="text-xs text-gray-600">{dep.workloadPercentage.toFixed(0)}% carga</div>
+                                    </div>
+                                  </div>
+                                  <div className="mt-1 text-xs text-gray-600">{dep.riskReason}</div>
+                                  <div className="mt-1 text-xs text-gray-500">Responsables: {dep.memberNames}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Estado General */}
+                        <div className={`p-3 rounded-lg border-2 ${
+                          criticalAlerts.length > 0 ? 'bg-red-50 border-red-200' :
+                          dependencyAnalysis.length > 0 ? 'bg-yellow-50 border-yellow-200' :
+                          'bg-green-50 border-green-200'
+                        }`}>
+                          <h4 className="font-medium text-sm mb-2">📋 Resumen Operacional</h4>
+                          <div className="text-sm text-gray-700">
+                            {criticalAlerts.length > 0 ? (
+                              <span>⚠️ Se detectaron {criticalAlerts.length} problema(s) crítico(s) que requieren atención inmediata</span>
+                            ) : dependencyAnalysis.length > 0 ? (
+                              <span>⚡ Hay {dependencyAnalysis.length} dependencia(s) que necesita(n) seguimiento</span>
+                            ) : (
+                              <span>✅ Flujo operacional saludable sin bloqueos críticos detectados</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              {/* Patrones de Colaboración - ACTUALIZADO */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
