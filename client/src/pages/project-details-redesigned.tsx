@@ -4936,12 +4936,257 @@ const ProjectDetailsPage = () => {
               </CardContent>
             </Card>
 
-            {/* PREDICCIÓN Y RECOMENDACIONES */}
+            {/* CENTRO DE ALERTAS ACCIONABLES INTELIGENTES */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Bell className="h-5 w-5 text-red-600" />
+                  Centro de Alertas Operacionales
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Alertas inteligentes con acciones específicas para optimizar la gestión del proyecto</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                  const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                  const totalEstimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                  const totalWorkedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                  const totalBudget = unifiedData?.quotation?.totalAmount || 0;
+                  const progressPercent = totalEstimatedHours > 0 ? (totalProjectHours / totalEstimatedHours) * 100 : 0;
+                  const budgetUsedPercent = totalBudget > 0 ? (totalWorkedCost / totalBudget) * 100 : 0;
+
+                  // Sistema de alertas inteligentes avanzado
+                  const intelligentAlerts = (() => {
+                    const alerts = [];
+
+                    // ALERTA 1: Riesgo de exceso presupuestario crítico
+                    if (budgetUsedPercent > 85) {
+                      const remainingBudget = totalBudget - totalWorkedCost;
+                      const dailyBurnRate = totalWorkedCost / Math.max(1, totalProjectHours / 8); // asumiendo 8h por día
+                      const daysRemaining = remainingBudget > 0 ? Math.floor(remainingBudget / dailyBurnRate) : 0;
+                      
+                      alerts.push({
+                        id: 'budget_critical',
+                        type: 'critical',
+                        icon: '🚨',
+                        title: 'Riesgo Crítico de Exceso Presupuestario',
+                        message: `Se ha usado el ${budgetUsedPercent.toFixed(1)}% del presupuesto. Quedan aproximadamente ${daysRemaining} días hábiles al ritmo actual.`,
+                        actions: [
+                          { label: 'Revisar scope inmediatamente', priority: 'high', type: 'scope' },
+                          { label: 'Reunir al equipo líder', priority: 'high', type: 'meeting' },
+                          { label: 'Evaluar renegociación con cliente', priority: 'medium', type: 'negotiation' }
+                        ],
+                        priority: 5,
+                        color: 'bg-red-100 border-red-300 text-red-900'
+                      });
+                    }
+
+                    // ALERTA 2: Miembro del equipo con sobrecarga crítica
+                    const overloadedMembers = activeMembers.filter(m => {
+                      const weeklyHours = m.hours / 4; // asumiendo 4 semanas de trabajo
+                      return weeklyHours > 45; // más de 45h semanales
+                    });
+                    
+                    if (overloadedMembers.length > 0) {
+                      const memberNames = overloadedMembers.map(m => m.name).join(', ');
+                      alerts.push({
+                        id: 'team_overload',
+                        type: 'warning',
+                        icon: '⚠️',
+                        title: 'Riesgo de Burnout en el Equipo',
+                        message: `${overloadedMembers.length} miembro(s) superan las 45h semanales: ${memberNames}`,
+                        actions: [
+                          { label: 'Redistribuir carga de trabajo', priority: 'high', type: 'redistribution' },
+                          { label: 'Evaluar contratación temporal', priority: 'medium', type: 'hiring' },
+                          { label: 'Revisar prioridades de tareas', priority: 'medium', type: 'prioritization' }
+                        ],
+                        priority: 4,
+                        color: 'bg-orange-100 border-orange-300 text-orange-900'
+                      });
+                    }
+
+                    // ALERTA 3: Inactividad prolongada
+                    const inactiveMembers = activeMembers.filter(m => 
+                      m.lastActivity && new Date(m.lastActivity) < new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+                    );
+                    
+                    if (inactiveMembers.length > 0) {
+                      alerts.push({
+                        id: 'team_inactive',
+                        type: 'warning',
+                        icon: '🔄',
+                        title: 'Miembros con Inactividad Prolongada',
+                        message: `${inactiveMembers.length} miembro(s) sin actividad en los últimos 5 días`,
+                        actions: [
+                          { label: 'Contactar miembros inactivos', priority: 'high', type: 'communication' },
+                          { label: 'Verificar bloqueos o impedimentos', priority: 'high', type: 'blockers' },
+                          { label: 'Actualizar asignaciones', priority: 'medium', type: 'reassignment' }
+                        ],
+                        priority: 3,
+                        color: 'bg-yellow-100 border-yellow-300 text-yellow-800'
+                      });
+                    }
+
+                    // ALERTA 4: Progreso lento vs cronograma
+                    if (progressPercent < 60 && budgetUsedPercent > 70) {
+                      alerts.push({
+                        id: 'progress_slow',
+                        type: 'info',
+                        icon: '🐌',
+                        title: 'Velocidad de Progreso Insuficiente',
+                        message: `Solo ${progressPercent.toFixed(1)}% completado pero ${budgetUsedPercent.toFixed(1)}% del presupuesto usado`,
+                        actions: [
+                          { label: 'Acelerar entregas clave', priority: 'high', type: 'acceleration' },
+                          { label: 'Priorizar tasks críticos', priority: 'high', type: 'prioritization' },
+                          { label: 'Implementar daily standups', priority: 'medium', type: 'process' }
+                        ],
+                        priority: 3,
+                        color: 'bg-blue-100 border-blue-300 text-blue-800'
+                      });
+                    }
+
+                    // ALERTA 5: Oportunidad de optimización
+                    const highPerformers = activeMembers.filter(m => {
+                      const efficiency = m.estimatedHours > 0 ? (m.hours / m.estimatedHours) * 100 : 100;
+                      return efficiency < 80 && m.hours > 20; // Bajo uso de horas estimadas
+                    });
+                    
+                    if (highPerformers.length > 0) {
+                      alerts.push({
+                        id: 'optimization_opportunity',
+                        type: 'success',
+                        icon: '💡',
+                        title: 'Oportunidad de Optimización',
+                        message: `${highPerformers.length} miembro(s) con eficiencia superior al promedio pueden liderar mejoras`,
+                        actions: [
+                          { label: 'Documentar mejores prácticas', priority: 'medium', type: 'documentation' },
+                          { label: 'Implementar mentoring', priority: 'medium', type: 'mentoring' },
+                          { label: 'Replicar procesos exitosos', priority: 'low', type: 'replication' }
+                        ],
+                        priority: 1,
+                        color: 'bg-green-100 border-green-300 text-green-800'
+                      });
+                    }
+
+                    return alerts.sort((a, b) => b.priority - a.priority).slice(0, 4); // Top 4 alertas más importantes
+                  })();
+
+                  return (
+                    <div className="space-y-4">
+                      {intelligentAlerts.length > 0 ? (
+                        <div className="space-y-3">
+                          {intelligentAlerts.map((alert, index) => (
+                            <div key={alert.id} className={`p-4 rounded-lg border-2 ${alert.color}`}>
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="text-xl">{alert.icon}</div>
+                                  <div>
+                                    <h4 className="font-semibold text-sm">{alert.title}</h4>
+                                    <p className="text-sm mt-1 opacity-90">{alert.message}</p>
+                                  </div>
+                                </div>
+                                <Badge variant="outline" className={`text-xs ${
+                                  alert.type === 'critical' ? 'border-red-400 text-red-600' :
+                                  alert.type === 'warning' ? 'border-orange-400 text-orange-600' :
+                                  alert.type === 'info' ? 'border-blue-400 text-blue-600' :
+                                  'border-green-400 text-green-600'
+                                }`}>
+                                  {alert.type === 'critical' ? 'CRÍTICO' :
+                                   alert.type === 'warning' ? 'ATENCIÓN' :
+                                   alert.type === 'info' ? 'INFO' : 'OPORTUNIDAD'}
+                                </Badge>
+                              </div>
+                              
+                              {alert.actions && alert.actions.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-current border-opacity-20">
+                                  <h5 className="text-xs font-medium mb-2 opacity-75">ACCIONES RECOMENDADAS:</h5>
+                                  <div className="flex flex-wrap gap-2">
+                                    {alert.actions.map((action, actionIndex) => (
+                                      <Button
+                                        key={actionIndex}
+                                        variant="outline"
+                                        size="sm"
+                                        className={`text-xs h-6 ${
+                                          action.priority === 'high' ? 'border-current font-medium' :
+                                          action.priority === 'medium' ? 'border-current opacity-80' :
+                                          'border-current opacity-60'
+                                        }`}
+                                      >
+                                        {action.priority === 'high' && '🔥 '}
+                                        {action.label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-4xl mb-2">✅</div>
+                          <h4 className="font-medium text-green-800 mb-1">Operación Saludable</h4>
+                          <p className="text-sm text-green-700">No se detectaron alertas críticas. El proyecto funciona dentro de los parámetros normales.</p>
+                        </div>
+                      )}
+                      
+                      {/* Panel de Insights Rápidos */}
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <h4 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                          Resumen de Estado Operacional
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                          <div className="text-center">
+                            <div className={`text-lg font-bold ${
+                              budgetUsedPercent > 85 ? 'text-red-600' :
+                              budgetUsedPercent > 70 ? 'text-orange-600' : 'text-green-600'
+                            }`}>
+                              {budgetUsedPercent.toFixed(1)}%
+                            </div>
+                            <div className="text-xs text-gray-600">Presupuesto Usado</div>
+                          </div>
+                          <div className="text-center">
+                            <div className={`text-lg font-bold ${
+                              activeMembers.filter(m => m.hours > 160).length > 0 ? 'text-red-600' :
+                              activeMembers.filter(m => m.hours > 120).length > 0 ? 'text-orange-600' : 'text-green-600'
+                            }`}>
+                              {activeMembers.length}
+                            </div>
+                            <div className="text-xs text-gray-600">Miembros Activos</div>
+                          </div>
+                          <div className="text-center">
+                            <div className={`text-lg font-bold ${
+                              intelligentAlerts.filter(a => a.type === 'critical').length > 0 ? 'text-red-600' :
+                              intelligentAlerts.filter(a => a.type === 'warning').length > 0 ? 'text-orange-600' : 'text-green-600'
+                            }`}>
+                              {intelligentAlerts.length}
+                            </div>
+                            <div className="text-xs text-gray-600">Alertas Activas</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* PREDICCIÓN Y RECOMENDACIONES - MEJORADO */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  Predicción y Recomendaciones
+                  Análisis Predictivo Avanzado
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
