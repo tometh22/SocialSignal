@@ -53,7 +53,8 @@ import {
   Brain,
   XCircle,
   Cog,
-  Award
+  Award,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -4595,13 +4596,13 @@ const ProjectDetailsPage = () => {
                   
                   // Simulación inteligente de fases basada en roles y distribución de horas
                   const phaseAnalysis = (() => {
-                    const phases = {
+                    const phases: Record<string, any> = {
                       estrategia: {
                         name: 'Estrategia & Planeación',
                         estimatedHours: Math.round(totalEstimatedHours * 0.25), // 25% estrategia
                         actualHours: 0,
                         cost: 0,
-                        members: [],
+                        members: [] as any[],
                         efficiency: 0,
                         status: 'pending',
                         icon: '📊',
@@ -4612,7 +4613,7 @@ const ProjectDetailsPage = () => {
                         estimatedHours: Math.round(totalEstimatedHours * 0.55), // 55% ejecución
                         actualHours: 0,
                         cost: 0,
-                        members: [],
+                        members: [] as any[],
                         efficiency: 0,
                         status: 'pending',
                         icon: '⚙️',
@@ -4623,7 +4624,7 @@ const ProjectDetailsPage = () => {
                         estimatedHours: Math.round(totalEstimatedHours * 0.20), // 20% revisión
                         actualHours: 0,
                         cost: 0,
-                        members: [],
+                        members: [] as any[],
                         efficiency: 0,
                         status: 'pending',
                         icon: '✅',
@@ -4771,8 +4772,8 @@ const ProjectDetailsPage = () => {
                                 </div>
                                 
                                 <div className="text-xs text-gray-600">
-                                  {phase.members.filter((m, i, arr) => 
-                                    arr.findIndex(member => member.name === m.name) === i
+                                  {phase.members.filter((m: any, i: number, arr: any[]) => 
+                                    arr.findIndex((member: any) => member.name === m.name) === i
                                   ).length} miembro(s) activo(s)
                                 </div>
                               </div>
