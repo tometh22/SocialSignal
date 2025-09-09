@@ -2074,26 +2074,31 @@ export class DatabaseStorage implements IStorage {
       if (!project) return null;
 
       // ✅ VALIDAR ESTADO Y FECHAS DE FINALIZACIÓN DEL PROYECTO
+      let isFilterOutOfProjectPeriod = false;
+      let shouldShowTotals = false;
+      
       if (dateRange && project.actualEndDate) {
         const projectEndDate = new Date(project.actualEndDate);
+        const projectStartDate = new Date(project.startDate);
         
-        // Si el proyecto terminó antes del rango de fechas solicitado, retornar datos vacíos
+        // Si el proyecto terminó antes del rango de fechas solicitado, mostrar datos totales
         if (projectEndDate < dateRange.startDate) {
-          console.log(`🚫 Project ${projectId} ended ${projectEndDate.toISOString()} before filter range starts ${dateRange.startDate.toISOString()}`);
-          return {
-            totalRealCost: 0,
-            operationalCost: 0,
-            directCostsFromExcel: 0,
-            timeEntriesCost: 0,
-            totalCombinedCost: 0,
-            teamBreakdown: [],
-            teamSummary: { totalMembers: 0, totalHours: 0, averageRate: 0 },
-            projectInfo: project
-          };
+          console.log(`📊 Project ${projectId} ended ${projectEndDate.toISOString()} before filter range starts ${dateRange.startDate.toISOString()} - showing total project data`);
+          isFilterOutOfProjectPeriod = true;
+          shouldShowTotals = true;
+          // No aplicar filtro temporal, obtener todos los datos del proyecto
+          dateRange = null;
         }
-        
+        // Si el rango filtrado empieza antes que el proyecto, mostrar datos totales
+        else if (dateRange.endDate < projectStartDate) {
+          console.log(`📊 Filter range ends ${dateRange.endDate.toISOString()} before project started ${projectStartDate.toISOString()} - showing total project data`);
+          isFilterOutOfProjectPeriod = true;
+          shouldShowTotals = true;
+          // No aplicar filtro temporal, obtener todos los datos del proyecto
+          dateRange = null;
+        }
         // Si el proyecto terminó durante el rango filtrado, ajustar el rango final
-        if (projectEndDate < dateRange.endDate) {
+        else if (projectEndDate < dateRange.endDate) {
           console.log(`⚠️ Project ${projectId} ended ${projectEndDate.toISOString()} during filter range, adjusting end date`);
           dateRange = {
             startDate: dateRange.startDate,
@@ -2107,17 +2112,11 @@ export class DatabaseStorage implements IStorage {
       if (dateRange && ['completed', 'cancelled'].includes(project.status) && !project.actualEndDate) {
         const today = new Date();
         if (dateRange.startDate > today) {
-          console.log(`🚫 Project ${projectId} is ${project.status} and filter starts after today`);
-          return {
-            totalRealCost: 0,
-            operationalCost: 0,
-            directCostsFromExcel: 0,
-            timeEntriesCost: 0,
-            totalCombinedCost: 0,
-            teamBreakdown: [],
-            teamSummary: { totalMembers: 0, totalHours: 0, averageRate: 0 },
-            projectInfo: project
-          };
+          console.log(`📊 Project ${projectId} is ${project.status} and filter starts after today - showing total project data`);
+          isFilterOutOfProjectPeriod = true;
+          shouldShowTotals = true;
+          // No aplicar filtro temporal, obtener todos los datos del proyecto
+          dateRange = null;
         }
       }
 
@@ -2416,7 +2415,16 @@ export class DatabaseStorage implements IStorage {
           montoTotalUSD: dc.montoTotalUSD,
           costoTotal: dc.costoTotal,
           valorHoraPersona: dc.valorHoraPersona
-        }))
+        })),
+        // NUEVO: Información del período del proyecto y filtros
+        projectPeriod: {
+          startDate: project.startDate,
+          expectedEndDate: project.expectedEndDate,
+          actualEndDate: project.actualEndDate,
+          status: project.status,
+          isFilterOutOfPeriod: isFilterOutOfProjectPeriod,
+          showingTotalData: shouldShowTotals
+        }
       };
     } catch (error) {
       console.error("Error al obtener resumen de costos del proyecto:", error);
