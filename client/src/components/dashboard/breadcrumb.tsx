@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useLocation } from 'wouter';
 import { ChevronRight, Home } from 'lucide-react';
 

@@ -209,8 +209,7 @@ export class AutoSyncService {
           if (matchingProject) {
             // Actualizar la venta con el ID del proyecto
             await storage.updateGoogleSheetsSales(sale.id, {
-              projectId: matchingProject.id,
-              lastUpdated: new Date()
+              projectId: matchingProject.id
             });
 
             // Crear o actualizar ingreso mensual del proyecto (simplificado)
