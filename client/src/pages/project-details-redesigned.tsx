@@ -4774,3 +4774,4 @@ const ProjectDetailsPage = () => {
     </div>
   );
 }
+export default ProjectDetailsRedesigned;
