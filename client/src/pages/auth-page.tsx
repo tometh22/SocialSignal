@@ -46,13 +46,6 @@ export default function AuthPage() {
 
   // Validación en tiempo real
   useEffect(() => {
-    validateForm();
-    if (!isLogin) {
-      calculatePasswordStrength();
-    }
-  }, [formData, isLogin]);
-
-  const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
     // Validación de email
@@ -78,23 +71,22 @@ export default function AuthPage() {
       if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Las contraseñas no coinciden';
       }
+
+      // Calcular fortaleza de contraseña
+      const password = formData.password;
+      let strength = 0;
+
+      if (password.length >= 6) strength += 20;
+      if (password.length >= 10) strength += 20;
+      if (/[A-Z]/.test(password)) strength += 20;
+      if (/[0-9]/.test(password)) strength += 20;
+      if (/[^A-Za-z0-9]/.test(password)) strength += 20;
+
+      setPasswordStrength(strength);
     }
 
     setErrors(newErrors);
-  };
-
-  const calculatePasswordStrength = () => {
-    const password = formData.password;
-    let strength = 0;
-
-    if (password.length >= 6) strength += 20;
-    if (password.length >= 10) strength += 20;
-    if (/[A-Z]/.test(password)) strength += 20;
-    if (/[0-9]/.test(password)) strength += 20;
-    if (/[^A-Za-z0-9]/.test(password)) strength += 20;
-
-    setPasswordStrength(strength);
-  };
+  }, [formData, isLogin]);
 
   const getPasswordStrengthColor = () => {
     if (passwordStrength <= 40) return 'bg-red-500';
@@ -120,8 +112,7 @@ export default function AuthPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Validación final
-    validateForm();
+    // Validación final - verificar si hay errores actuales
     if (Object.keys(errors).length > 0) return;
 
     setIsSubmitting(true);
