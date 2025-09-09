@@ -24,6 +24,7 @@ interface ProjectData {
   budget?: number;
   startDate?: string;
   expectedEndDate?: string;
+  actualEndDate?: string;
   clientId?: number;
   client?: {
     name: string;
@@ -54,6 +55,7 @@ export default function EditProject() {
   const [status, setStatus] = useState("active");
   const [startDate, setStartDate] = useState("");
   const [expectedEndDate, setExpectedEndDate] = useState("");
+  const [actualEndDate, setActualEndDate] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
 
   // Cargar datos del proyecto
@@ -78,6 +80,7 @@ export default function EditProject() {
 
       setStartDate(project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : "");
       setExpectedEndDate(project.expectedEndDate ? new Date(project.expectedEndDate).toISOString().split('T')[0] : "");
+      setActualEndDate(project.actualEndDate ? new Date(project.actualEndDate).toISOString().split('T')[0] : "");
     }
   }, [project]);
 
@@ -130,6 +133,7 @@ export default function EditProject() {
       notes: notes || null,
       startDate: startDate || null,
       expectedEndDate: expectedEndDate || null,
+      actualEndDate: actualEndDate || null,
       subprojectName: subprojectName || null
     };
 
@@ -428,6 +432,27 @@ export default function EditProject() {
                       className="pl-10"
                     />
                   </div>
+                </div>
+
+                {/* Fecha real de finalización */}
+                <div className="space-y-2">
+                  <Label htmlFor="actualEndDate" className="text-sm font-medium">
+                    Fecha real de finalización
+                  </Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                    <Input
+                      id="actualEndDate"
+                      type="date"
+                      value={actualEndDate}
+                      onChange={(e) => setActualEndDate(e.target.value)}
+                      className="pl-10"
+                      placeholder="Solo para proyectos terminados"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Establece esta fecha cuando el proyecto haya terminado realmente. Los filtros temporales respetarán esta fecha.
+                  </p>
                 </div>
               </div>
             </CardContent>
