@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +9,13 @@ import { Loader } from '@/components/ui/loader';
 import { useLocation } from 'wouter';
 import { Eye, EyeOff, AlertCircle, CheckCircle2, Mail, Lock, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { queryClient } from '@/lib/queryClient';
 
 export default function AuthPage() {
-  // Todos los hooks al principio sin condiciones
   const [, setLocation] = useLocation();
   const { user, loginMutation, registerMutation, loading } = useAuth();
-  
+
+  // Estados del formulario
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,31 +25,19 @@ export default function AuthPage() {
     lastName: '',
     confirmPassword: ''
   });
+
+  // Estados de validación y UX
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
 
-  // Funciones auxiliares usando useCallback para estabilidad
-  const getPasswordStrengthColor = useCallback(() => {
-    if (passwordStrength <= 40) return 'bg-red-500';
-    if (passwordStrength <= 60) return 'bg-yellow-500';
-    if (passwordStrength <= 80) return 'bg-blue-500';
-    return 'bg-green-500';
-  }, [passwordStrength]);
-
-  const getPasswordStrengthText = useCallback(() => {
-    if (passwordStrength <= 40) return 'Débil';
-    if (passwordStrength <= 60) return 'Regular';
-    if (passwordStrength <= 80) return 'Buena';
-    return 'Excelente';
-  }, [passwordStrength]);
-
-  // Redirección cuando el usuario está autenticado
+  // Redirection si ya está autenticado
   useEffect(() => {
     console.log('🔍 AuthPage useEffect:', { user: !!user, loading });
     if (user && !loading) {
       console.log('✅ User authenticated, redirecting to dashboard');
+      // Añadir un pequeño delay para evitar bucles
       setTimeout(() => {
         setLocation('/');
       }, 100);
@@ -57,16 +46,26 @@ export default function AuthPage() {
 
   // Validación en tiempo real
   useEffect(() => {
+    validateForm();
+    if (!isLogin) {
+      calculatePasswordStrength();
+    }
+  }, [formData, isLogin]);
+
+  const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
+    // Validación de email
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Formato de email inválido';
     }
 
+    // Validación de contraseña
     if (formData.password && formData.password.length < 6) {
       newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
     }
 
+    // Validaciones para registro
     if (!isLogin) {
       if (formData.firstName && formData.firstName.length < 2) {
         newErrors.firstName = 'El nombre debe tener al menos 2 caracteres';
@@ -79,33 +78,50 @@ export default function AuthPage() {
       if (formData.confirmPassword && formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Las contraseñas no coinciden';
       }
-
-      // Calcular fortaleza de contraseña para registro
-      const password = formData.password;
-      let strength = 0;
-      if (password.length >= 6) strength += 20;
-      if (password.length >= 10) strength += 20;
-      if (/[A-Z]/.test(password)) strength += 20;
-      if (/[0-9]/.test(password)) strength += 20;
-      if (/[^A-Za-z0-9]/.test(password)) strength += 20;
-      setPasswordStrength(strength);
-    } else {
-      setPasswordStrength(0);
     }
 
     setErrors(newErrors);
-  }, [formData, isLogin]);
+  };
 
-  const handleInputChange = useCallback((field: string, value: string) => {
+  const calculatePasswordStrength = () => {
+    const password = formData.password;
+    let strength = 0;
+
+    if (password.length >= 6) strength += 20;
+    if (password.length >= 10) strength += 20;
+    if (/[A-Z]/.test(password)) strength += 20;
+    if (/[0-9]/.test(password)) strength += 20;
+    if (/[^A-Za-z0-9]/.test(password)) strength += 20;
+
+    setPasswordStrength(strength);
+  };
+
+  const getPasswordStrengthColor = () => {
+    if (passwordStrength <= 40) return 'bg-red-500';
+    if (passwordStrength <= 60) return 'bg-yellow-500';
+    if (passwordStrength <= 80) return 'bg-blue-500';
+    return 'bg-green-500';
+  };
+
+  const getPasswordStrengthText = () => {
+    if (passwordStrength <= 40) return 'Débil';
+    if (passwordStrength <= 60) return 'Regular';
+    if (passwordStrength <= 80) return 'Buena';
+    return 'Excelente';
+  };
+
+  const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  }, []);
+  };
 
-  const handleSubmit = useCallback(async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validación final
+    validateForm();
     if (Object.keys(errors).length > 0) return;
 
     setIsSubmitting(true);
@@ -137,9 +153,9 @@ export default function AuthPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [errors, isLogin, formData, loginMutation, registerMutation]);
+  };
 
-  const resetForm = useCallback(() => {
+  const resetForm = () => {
     setFormData({
       email: '',
       password: '',
@@ -149,14 +165,13 @@ export default function AuthPage() {
     });
     setErrors({});
     setPasswordStrength(0);
-  }, []);
+  };
 
-  const toggleMode = useCallback(() => {
+  const toggleMode = () => {
     setIsLogin(!isLogin);
     resetForm();
-  }, [isLogin, resetForm]);
+  };
 
-  // Renderizado condicional al final, después de todos los hooks
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -409,11 +424,11 @@ export default function AuthPage() {
                 }
               </button>
               
+              {/* Acceso rápido para testing */}
               <div className="text-xs text-gray-500 border-t pt-3">
                 <p className="mb-2">Credenciales de prueba:</p>
                 <div className="space-y-1">
                   <button
-                    type="button"
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,
@@ -427,7 +442,6 @@ export default function AuthPage() {
                   </button>
                   <br />
                   <button
-                    type="button"
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,

@@ -36,7 +36,7 @@ import ExcelMaestroPage from "@/pages/excel-maestro";
 
 
 // Authentication & Utilities
-import AuthPageSimple from "@/pages/auth-page-simple";
+import AuthPage from "@/pages/auth-page";
 import EditDeliverable from "@/pages/edit-deliverable";
 import EditRobustnessPage from "@/pages/edit-robustness";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
@@ -102,7 +102,7 @@ function AppRoutes() {
 
   return (
     <Switch>
-      <Route path="/auth" component={AuthPageSimple} />
+      <Route path="/auth" component={AuthPage} />
 
       <Route path="*">
         <div className="flex h-screen overflow-hidden bg-background">

@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useParams, Link } from "wouter";
+import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft,
-  ArrowRight,
   Calendar,
   Clock,
   DollarSign,
@@ -54,9 +53,7 @@ import {
   Brain,
   XCircle,
   Cog,
-  Award,
-  Layers,
-  Bell
+  Award
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -4257,267 +4254,7 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Análisis de Bloqueos y Dependencias Críticas */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    Bloqueos y Dependencias Críticas
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">Identificación de cuellos de botella y dependencias que pueden afectar el flujo de trabajo</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {(() => {
-                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
-                    const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                    const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
-                    const progressPercent = estimatedHours > 0 ? (totalProjectHours / estimatedHours) * 100 : 0;
-
-                    // Análisis de cuellos de botella por carga de trabajo
-                    const bottleneckAnalysis = activeMembers.map(member => {
-                      const workloadPercentage = totalProjectHours > 0 ? (member.hours / totalProjectHours) * 100 : 0;
-                      const efficiencyRatio = member.estimatedHours > 0 ? member.hours / member.estimatedHours : 0;
-                      
-                      let bottleneckType = 'normal';
-                      let bottleneckReason = '';
-                      let criticality = 'low';
-                      
-                      // Detectar diferentes tipos de cuellos de botella
-                      if (workloadPercentage > 40) {
-                        bottleneckType = 'overload';
-                        bottleneckReason = `Concentra el ${workloadPercentage.toFixed(0)}% del trabajo total`;
-                        criticality = 'high';
-                      } else if (efficiencyRatio > 1.5) {
-                        bottleneckType = 'exceeded';
-                        bottleneckReason = `Superó estimación en ${((efficiencyRatio - 1) * 100).toFixed(0)}%`;
-                        criticality = 'medium';
-                      } else if (member.hours > 80) {
-                        bottleneckType = 'high_hours';
-                        bottleneckReason = `Total de ${member.hours}h puede causar burnout`;
-                        criticality = 'medium';
-                      } else if (member.lastActivity && new Date(member.lastActivity) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
-                        bottleneckType = 'inactive';
-                        bottleneckReason = 'Sin actividad en los últimos 7 días';
-                        criticality = 'high';
-                      }
-                      
-                      return {
-                        ...member,
-                        workloadPercentage,
-                        efficiencyRatio,
-                        bottleneckType,
-                        bottleneckReason,
-                        criticality
-                      };
-                    }).sort((a, b) => {
-                      const criticalityOrder: Record<string, number> = { 'high': 3, 'medium': 2, 'low': 1 };
-                      return (criticalityOrder[b.criticality] || 1) - (criticalityOrder[a.criticality] || 1);
-                    });
-
-                    // Análisis de dependencias críticas por roles
-                    const dependencyAnalysis = (() => {
-                      const roleGroups = activeMembers.reduce((acc, member) => {
-                        const role = member.roleName || 'Sin Rol';
-                        if (!acc[role]) acc[role] = [];
-                        acc[role].push(member);
-                        return acc;
-                      }, {} as Record<string, any[]>);
-
-                      return Object.entries(roleGroups).map(([role, members]) => {
-                        const totalRoleHours = members.reduce((sum, m) => sum + m.hours, 0);
-                        const roleWorkload = totalProjectHours > 0 ? (totalRoleHours / totalProjectHours) * 100 : 0;
-                        const isCritical = members.length === 1 && roleWorkload > 15; // Un solo miembro con >15% del trabajo
-                        const hasInactivity = members.some(m => 
-                          m.lastActivity && new Date(m.lastActivity) < new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-                        );
-
-                        let dependencyRisk = 'low';
-                        let riskReason = '';
-
-                        if (isCritical && hasInactivity) {
-                          dependencyRisk = 'critical';
-                          riskReason = 'Rol crítico con un solo responsable inactivo';
-                        } else if (isCritical) {
-                          dependencyRisk = 'high';
-                          riskReason = 'Dependencia crítica: solo un responsable';
-                        } else if (hasInactivity) {
-                          dependencyRisk = 'medium';
-                          riskReason = 'Algunos miembros del rol están inactivos';
-                        }
-
-                        return {
-                          role,
-                          members: members.length,
-                          hours: totalRoleHours,
-                          workloadPercentage: roleWorkload,
-                          dependencyRisk,
-                          riskReason,
-                          memberNames: members.map(m => m.name).join(', ')
-                        };
-                      }).filter(dep => dep.dependencyRisk !== 'low');
-                    })();
-
-                    // Alertas críticas
-                    const criticalAlerts = (() => {
-                      const alerts = [];
-                      
-                      // Alertas por cuellos de botella
-                      const criticalBottlenecks = bottleneckAnalysis.filter(b => b.criticality === 'high');
-                      criticalBottlenecks.forEach(bottleneck => {
-                        alerts.push({
-                          type: 'bottleneck',
-                          priority: 'high',
-                          title: `Cuello de botella: ${bottleneck.name}`,
-                          message: bottleneck.bottleneckReason,
-                          action: bottleneck.bottleneckType === 'overload' ? 'Redistribuir carga' : 'Verificar estado',
-                          color: 'bg-red-50 border-red-200 text-red-800'
-                        });
-                      });
-
-                      // Alertas por dependencias críticas
-                      const criticalDependencies = dependencyAnalysis.filter(d => d.dependencyRisk === 'critical');
-                      criticalDependencies.forEach(dep => {
-                        alerts.push({
-                          type: 'dependency',
-                          priority: 'critical',
-                          title: `Dependencia crítica: ${dep.role}`,
-                          message: dep.riskReason,
-                          action: 'Asignar backup inmediatamente',
-                          color: 'bg-red-100 border-red-300 text-red-900'
-                        });
-                      });
-
-                      // Alerta de progreso general
-                      if (progressPercent > 80 && bottleneckAnalysis.some(b => b.criticality === 'high')) {
-                        alerts.push({
-                          type: 'progress',
-                          priority: 'medium',
-                          title: 'Proyecto en fase final con bloqueos',
-                          message: 'Resolver cuellos de botella para evitar retrasos en entrega',
-                          action: 'Revisar asignaciones',
-                          color: 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                        });
-                      }
-
-                      return alerts.slice(0, 3); // Máximo 3 alertas más críticas
-                    })();
-
-                    return (
-                      <div className="space-y-4">
-                        {/* Alertas Críticas */}
-                        {criticalAlerts.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="font-medium text-gray-800 text-sm">🚨 Alertas Críticas</h4>
-                            {criticalAlerts.map((alert, index) => (
-                              <div key={index} className={`p-3 rounded-lg border ${alert.color}`}>
-                                <div className="flex items-start justify-between">
-                                  <div className="flex-1">
-                                    <h5 className="font-medium text-sm">{alert.title}</h5>
-                                    <p className="text-xs mt-1">{alert.message}</p>
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">{alert.action}</Badge>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Análisis de Cuellos de Botella */}
-                        <div>
-                          <h4 className="font-medium text-gray-800 text-sm mb-3">⚡ Análisis de Carga de Trabajo</h4>
-                          <div className="space-y-2 max-h-32 overflow-y-auto">
-                            {bottleneckAnalysis.slice(0, 5).map((member, index) => (
-                              <div key={index} className={`p-2 rounded border text-sm ${
-                                member.criticality === 'high' ? 'bg-red-50 border-red-200' :
-                                member.criticality === 'medium' ? 'bg-yellow-50 border-yellow-200' :
-                                'bg-green-50 border-green-200'
-                              }`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`w-2 h-2 rounded-full ${
-                                      member.criticality === 'high' ? 'bg-red-500' :
-                                      member.criticality === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                                    }`}></div>
-                                    <span className="font-medium">{member.name}</span>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="font-medium">{member.hours}h</div>
-                                    <div className="text-xs text-gray-600">{member.workloadPercentage.toFixed(0)}% del total</div>
-                                  </div>
-                                </div>
-                                {member.bottleneckReason && (
-                                  <div className="mt-1 text-xs text-gray-600">{member.bottleneckReason}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Análisis de Dependencias */}
-                        {dependencyAnalysis.length > 0 && (
-                          <div>
-                            <h4 className="font-medium text-gray-800 text-sm mb-3">🔗 Dependencias Críticas</h4>
-                            <div className="space-y-2">
-                              {dependencyAnalysis.map((dep, index) => (
-                                <div key={index} className={`p-2 rounded border text-sm ${
-                                  dep.dependencyRisk === 'critical' ? 'bg-red-50 border-red-200' :
-                                  dep.dependencyRisk === 'high' ? 'bg-orange-50 border-orange-200' :
-                                  'bg-yellow-50 border-yellow-200'
-                                }`}>
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-2 h-2 rounded-full ${
-                                        dep.dependencyRisk === 'critical' ? 'bg-red-500' :
-                                        dep.dependencyRisk === 'high' ? 'bg-orange-500' : 'bg-yellow-500'
-                                      }`}></div>
-                                      <span className="font-medium">{dep.role}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-xs text-gray-600">{dep.members} miembro(s)</div>
-                                      <div className="text-xs text-gray-600">{dep.workloadPercentage.toFixed(0)}% carga</div>
-                                    </div>
-                                  </div>
-                                  <div className="mt-1 text-xs text-gray-600">{dep.riskReason}</div>
-                                  <div className="mt-1 text-xs text-gray-500">Responsables: {dep.memberNames}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Estado General */}
-                        <div className={`p-3 rounded-lg border-2 ${
-                          criticalAlerts.length > 0 ? 'bg-red-50 border-red-200' :
-                          dependencyAnalysis.length > 0 ? 'bg-yellow-50 border-yellow-200' :
-                          'bg-green-50 border-green-200'
-                        }`}>
-                          <h4 className="font-medium text-sm mb-2">📋 Resumen Operacional</h4>
-                          <div className="text-sm text-gray-700">
-                            {criticalAlerts.length > 0 ? (
-                              <span>⚠️ Se detectaron {criticalAlerts.length} problema(s) crítico(s) que requieren atención inmediata</span>
-                            ) : dependencyAnalysis.length > 0 ? (
-                              <span>⚡ Hay {dependencyAnalysis.length} dependencia(s) que necesita(n) seguimiento</span>
-                            ) : (
-                              <span>✅ Flujo operacional saludable sin bloqueos críticos detectados</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-
-              {/* Patrones de Colaboración - ACTUALIZADO */}
+              {/* Patrones de Colaboración */}
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-2 text-lg">
@@ -4572,206 +4309,165 @@ const ProjectDetailsPage = () => {
 
             </div>
 
-            {/* EFICIENCIA POR FASES DEL PROYECTO */}
-            <Card className="border-0 shadow-lg mb-6">
+            {/* PREDICCIÓN Y RECOMENDACIONES */}
+            <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Layers className="h-5 w-5 text-emerald-600" />
-                  Eficiencia por Fases del Proyecto
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  Predicción y Recomendaciones
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <Info className="h-4 w-4 text-gray-400" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p className="max-w-xs">Análisis comparativo de eficiencia entre diferentes fases del proyecto: Estrategia, Ejecución y Revisión</p>
+                        <p className="max-w-xs">Proyecciones inteligentes y recomendaciones de optimización</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
-                    <h3 className="font-semibold text-blue-800 mb-2">🚀 Análisis por Fases Simplificado</h3>
-                    <p className="text-sm text-blue-700 mb-4">
-                      Distribución inteligente del trabajo del proyecto en tres fases principales.
-                    </p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {(() => {
+                    const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                    const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
+                    const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                    const budgetCost = unifiedData?.quotation?.totalAmount || 0;
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-blue-100">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">📊</span>
-                          <span className="font-medium text-sm">Estrategia</span>
-                        </div>
-                        <div className="text-lg font-bold text-blue-600">25%</div>
-                        <div className="text-xs text-gray-600">Planeación inicial</div>
-                      </div>
-                      
-                      <div className="bg-white p-4 rounded-lg border border-blue-100">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">⚙️</span>
-                          <span className="font-medium text-sm">Ejecución</span>
-                        </div>
-                        <div className="text-lg font-bold text-green-600">55%</div>
-                        <div className="text-xs text-gray-600">Desarrollo activo</div>
-                      </div>
-                      
-                      <div className="bg-white p-4 rounded-lg border border-blue-100">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">✅</span>
-                          <span className="font-medium text-sm">Revisión</span>
-                        </div>
-                        <div className="text-lg font-bold text-purple-600">20%</div>
-                        <div className="text-xs text-gray-600">Optimización final</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                    const progressPercent = estimatedHours > 0 ? (workedHours / estimatedHours) * 100 : 0;
+                    const currentBurnRate = workedHours > 0 ? workedCost / workedHours : 0;
+                    const projectedTotalCost = currentBurnRate * estimatedHours;
+                    const budgetOverrun = Math.max(0, projectedTotalCost - budgetCost);
+                    const overrunProbability = budgetOverrun > 0 ? Math.min(90, (budgetOverrun / budgetCost) * 100) : 10;
+                    const riskLevel = overrunProbability < 25 ? 'Bajo' : overrunProbability < 60 ? 'Medio' : 'Alto';
+                    const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
 
-            {/* CENTRO DE ALERTAS ACCIONABLES INTELIGENTES - SIMPLIFICADO */}
-            <Card className="border-0 shadow-lg mb-6">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Bell className="h-5 w-5 text-red-600" />
-                  Centro de Alertas Operacionales
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                  const totalWorkedCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                  const totalBudget = unifiedData?.quotation?.totalAmount || 0;
-                  const budgetUsedPercent = totalBudget > 0 ? (totalWorkedCost / totalBudget) * 100 : 0;
-                  
-                  const hasAlerts = budgetUsedPercent > 80 || totalProjectHours > 200;
+                    // Recomendación inteligente
+                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                    const overloadedMembers = activeMembers.filter(m => m.hours > 80);
+                    
+                    let recommendation = '';
+                    let recommendationIcon = '';
+                    let recommendationColor = 'bg-blue-50 border-blue-200';
 
-                  if (!hasAlerts) {
+                    if (progressPercent > 80) {
+                      recommendation = 'Proyecto en fase final. Mantener calidad y controlar costos.';
+                      recommendationIcon = '✓';
+                      recommendationColor = 'bg-green-50 border-green-200';
+                    } else if (budgetOverrun > budgetCost * 0.1) {
+                      recommendation = 'Riesgo alto de exceso. Revisar scope inmediatamente.';
+                      recommendationIcon = '⚠';
+                      recommendationColor = 'bg-red-50 border-red-200';
+                    } else if (overloadedMembers.length > 0) {
+                      recommendation = `${overloadedMembers.length} miembro(s) sobrecargado(s). Balancear carga de trabajo.`;
+                      recommendationIcon = '⚖️';
+                      recommendationColor = 'bg-orange-50 border-orange-200';
+                    } else {
+                      recommendation = 'Proyecto en desarrollo normal. Continuar monitoreando.';
+                      recommendationIcon = '→';
+                      recommendationColor = 'bg-blue-50 border-blue-200';
+                    }
+
                     return (
-                      <div className="text-center py-8 bg-green-50 rounded-lg border border-green-200">
-                        <div className="text-4xl mb-2">✅</div>
-                        <h4 className="font-medium text-green-800 mb-1">Operación Saludable</h4>
-                        <p className="text-sm text-green-700">No se detectaron alertas críticas. El proyecto funciona dentro de los parámetros normales.</p>
-                      </div>
+                      <>
+                        {/* Proyección de Costos */}
+                        <div className="p-4 bg-emerald-50 rounded-lg border">
+                          <h4 className="font-medium text-emerald-700 mb-3">Proyección de Costos</h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Actual</span>
+                              <span className="font-semibold">${workedCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Proyectado</span>
+                              <span className="font-semibold">${projectedTotalCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between border-t pt-2">
+                              <span className="text-gray-600">Presupuesto</span>
+                              <span className="font-semibold">${budgetCost.toLocaleString()}</span>
+                            </div>
+                            {budgetOverrun > 0 && (
+                              <div className="flex justify-between text-red-600">
+                                <span>Exceso</span>
+                                <span className="font-semibold">+${budgetOverrun.toLocaleString()}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Análisis de Riesgo */}
+                        <div className="p-4 bg-orange-50 rounded-lg border">
+                          <h4 className="font-medium text-orange-700 mb-3">Análisis de Riesgo</h4>
+                          <div className="text-center mb-3">
+                            <div className={`text-2xl font-bold ${riskColor}`}>{riskLevel}</div>
+                            <div className="text-sm text-gray-600">Riesgo de Exceso</div>
+                          </div>
+                          <div className="text-xs text-gray-600 space-y-1">
+                            <div>• Burn rate: ${currentBurnRate.toFixed(0)}/h</div>
+                            <div>• Progreso: {progressPercent.toFixed(1)}%</div>
+                            <div>• Probabilidad: {overrunProbability.toFixed(0)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Recomendación Principal */}
+                        <div className={`p-4 rounded-lg border-2 ${recommendationColor}`}>
+                          <h4 className="font-medium text-gray-700 mb-3">Recomendación</h4>
+                          <div className="flex items-start gap-3">
+                            <div className="text-lg">{recommendationIcon}</div>
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-700">{recommendation}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     );
-                  }
-
-                  return (
-                    <div className="space-y-3">
-                      {budgetUsedPercent > 80 && (
-                        <div className="p-4 rounded-lg border-2 bg-orange-100 border-orange-300 text-orange-900">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="text-xl">⚠️</div>
-                              <div>
-                                <h4 className="font-semibold text-sm">Uso Alto del Presupuesto</h4>
-                                <p className="text-sm mt-1 opacity-90">Se ha usado el {budgetUsedPercent.toFixed(1)}% del presupuesto</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="mt-3 pt-3 border-t border-current border-opacity-20">
-                            <h5 className="text-xs font-medium mb-2 opacity-75">ACCIONES RECOMENDADAS:</h5>
-                            <div className="text-xs">
-                              • Revisar alcance del proyecto<br/>
-                              • Evaluar optimización de recursos<br/>
-                              • Considerar renegociación con cliente
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {totalProjectHours > 200 && (
-                        <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-300 text-blue-800">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="text-xl">📈</div>
-                              <div>
-                                <h4 className="font-semibold text-sm">Proyecto de Alto Volumen</h4>
-                                <p className="text-sm mt-1 opacity-90">{totalProjectHours} horas trabajadas registradas</p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* PREDICCIÓN Y RECOMENDACIONES - SIMPLIFICADO */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  Análisis Predictivo Simplificado
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg border">
-                    <h3 className="font-semibold text-emerald-800 mb-3">📊 Resumen Operacional</h3>
-                    <div className="space-y-2 text-sm text-emerald-700">
-                      <p>• Timeline de productividad con tendencias semanales</p>
-                      <p>• Análisis de bloqueos y dependencias críticas</p>
-                      <p>• Eficiencia por fases del proyecto</p>
-                      <p>• Alertas operacionales inteligentes</p>
-                    </div>
-                  </div>
-                  
-                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border">
-                    <h3 className="font-semibold text-blue-800 mb-3">🎯 Próximas Mejoras</h3>
-                    <div className="space-y-2 text-sm text-blue-700">
-                      <p>• Predicciones de tiempo y presupuesto</p>
-                      <p>• Recomendaciones automáticas</p>
-                      <p>• Análisis predictivo avanzado</p>
-                      <p>• Integración con herramientas externas</p>
-                    </div>
-                  </div>
+                  })()}
                 </div>
               </CardContent>
             </Card>
-            
+
           </TabsContent>
 
-          {/* PESTAÑA TEAM TRACKER */}
-          <TabsContent value="team" className="space-y-6 mt-6">
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Team Tracker
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-600">Funcionalidad de seguimiento del equipo disponible próximamente.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* PESTAÑA ENTREGAS */} 
-          <TabsContent value="deliverables" className="space-y-6 mt-6">
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Entregas y Calidad
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-600">Sistema de entregas disponible próximamente.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteEntryId} onOpenChange={() => setDeleteEntryId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Eliminación</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar esta entrada de tiempo? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteEntryId(null)}>
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteEntry}
+              disabled={deleteTimeEntryMutation.isPending}
+            >
+              {deleteTimeEntryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Time Registration Dialog */}
+      <Dialog open={showQuickRegister} onOpenChange={setShowQuickRegister}>
+        <DialogContent className="sm:max-w-md">
+          <div className="p-4">
+            <p>Registro rápido de tiempo</p>
+            <Button onClick={() => setShowQuickRegister(false)}>Cerrar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};
+
 export default ProjectDetailsPage;

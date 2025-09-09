@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Card,
   CardContent,
@@ -49,28 +50,6 @@ import { es } from "date-fns/locale";
  * Componente principal de resumen de proyecto, versión final optimizada
  * Soluciona todos los problemas de espaciado y superposición
  */
-interface ProjectSummaryFixedProps {
-  project: any;
-  costSummary: any;
-  timeEntries: any[];
-  personnel: any[];
-  roles: any[];
-  deliverableData: any;
-  dashboardState: any;
-  setDashboardState: (state: any) => void;
-  timeByPersonnelData: any[];
-  billableDistributionData: any[];
-  projectMetrics: any;
-  riskIndicators: any;
-  handleTimeFilterChange: (filter: any) => void;
-  handleViewModeChange: (mode: any) => void;
-  handleSectionToggle: (section: any) => void;
-  handleExpandChart: (chart: any) => void;
-  handleHelpDialog: (dialog: any) => void;
-  handleGoBack: () => void;
-  isLoading: boolean;
-}
-
 const ProjectSummaryFixed = ({
   project,
   costSummary,
@@ -91,22 +70,22 @@ const ProjectSummaryFixed = ({
   handleHelpDialog,
   handleGoBack,
   isLoading,
-}: ProjectSummaryFixedProps) => {
+}) => {
   
   // Cálculos de estadísticas clave
-  const totalHours = timeEntries?.reduce((sum: number, entry: any) => sum + entry.hours, 0) || 0;
-  const billableHours = timeEntries?.filter((entry: any) => entry.billable).reduce((sum: number, entry: any) => sum + entry.hours, 0) || 0;
+  const totalHours = timeEntries?.reduce((sum, entry) => sum + entry.hours, 0) || 0;
+  const billableHours = timeEntries?.filter(entry => entry.billable).reduce((sum, entry) => sum + entry.hours, 0) || 0;
   const nonBillableHours = totalHours - billableHours;
   const billablePercentage = totalHours > 0 ? (billableHours / totalHours) * 100 : 0;
 
   // Formatear fechas
-  const formatDate = (dateString: string | null | undefined) => {
+  const formatDate = (dateString) => {
     if (!dateString) return "No definida";
     return format(new Date(dateString), "dd MMM yyyy", { locale: es });
   };
 
   // Formatear números con separador de miles
-  const formatNumber = (num: number) => {
+  const formatNumber = (num) => {
     return new Intl.NumberFormat('es-AR', { 
       maximumFractionDigits: 1 
     }).format(num);
@@ -831,7 +810,7 @@ const ProjectSummaryFixed = ({
                   <CardContent className="p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {timeByPersonnelData && timeByPersonnelData.length > 0 ? (
-                        timeByPersonnelData.slice(0, 6).map((person: any, index: number) => (
+                        timeByPersonnelData.slice(0, 6).map((person, index) => (
                           <div key={index} className="bg-white rounded-lg border p-4 flex items-start space-x-4">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-lg flex-shrink-0">
                               {person.name?.charAt(0) || '?'}

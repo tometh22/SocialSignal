@@ -1,4 +1,4 @@
-
+import React from 'react';
 import { ExternalLink, Clock, DollarSign, Timer, Activity } from 'lucide-react';
 import {
   Card,
