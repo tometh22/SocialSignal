@@ -107,7 +107,7 @@ export class AutoSyncService {
 
       // 1. Obtener datos de ventas desde Excel MAESTRO "Ventas Tomi"
       const salesData = await googleSheetsWorkingService.getVentasTomi();
-      let salesResult = { imported: 0, updated: 0, errors: [] };
+      let salesResult = { imported: 0, updated: 0, errors: [] as string[] };
       
       if (salesData.length > 0) {
         console.log(`📈 Procesando ${salesData.length} registros de ventas...`);
