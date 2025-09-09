@@ -4590,58 +4590,229 @@ const ProjectDetailsPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {(() => {
-                  const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
-                  const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                  const totalEstimatedHours = unifiedData?.quotation?.estimatedHours || 0;
-                  
-                  // Simulación inteligente de fases basada en roles y distribución de horas
-                  const phaseAnalysis = (() => {
-                    const phases: Record<string, any> = {
-                      estrategia: {
-                        name: 'Estrategia & Planeación',
-                        estimatedHours: Math.round(totalEstimatedHours * 0.25), // 25% estrategia
-                        actualHours: 0,
-                        cost: 0,
-                        members: [] as any[],
-                        efficiency: 0,
-                        status: 'pending',
-                        icon: '📊',
-                        color: 'blue'
-                      },
-                      ejecucion: {
-                        name: 'Ejecución & Desarrollo', 
-                        estimatedHours: Math.round(totalEstimatedHours * 0.55), // 55% ejecución
-                        actualHours: 0,
-                        cost: 0,
-                        members: [] as any[],
-                        efficiency: 0,
-                        status: 'pending',
-                        icon: '⚙️',
-                        color: 'green'
-                      },
-                      revision: {
-                        name: 'Revisión & Optimización',
-                        estimatedHours: Math.round(totalEstimatedHours * 0.20), // 20% revisión
-                        actualHours: 0,
-                        cost: 0,
-                        members: [] as any[],
-                        efficiency: 0,
-                        status: 'pending',
-                        icon: '✅',
-                        color: 'purple'
-                      }
-                    };
+                <div className="space-y-4">
+                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg">
+                    <h3 className="font-semibold text-blue-800 mb-2">🚀 Análisis por Fases Simplificado</h3>
+                    <p className="text-sm text-blue-700 mb-4">
+                      Distribución inteligente del trabajo del proyecto en tres fases principales.
+                    </p>
                     
-                    // Distribuir miembros por fase según su rol y porcentaje de trabajo
-                    activeMembers.forEach(member => {
-                      const workPercentage = totalProjectHours > 0 ? (member.hours / totalProjectHours) * 100 : 0;
-                      const roleName = member.roleName || 'Sin Rol';
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">📊</span>
+                          <span className="font-medium text-sm">Estrategia</span>
+                        </div>
+                        <div className="text-lg font-bold text-blue-600">25%</div>
+                        <div className="text-xs text-gray-600">Planeación inicial</div>
+                      </div>
                       
-                      // Lógica inteligente de asignación por rol
-                      if (roleName.includes('Manager') || roleName.includes('Lead') || roleName.includes('Director')) {
-                        // Managers/Leads: más en estrategia y revisión
-                        const estrategiaHours = Math.round(member.hours * 0.4);
+                      <div className="bg-white p-4 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">⚙️</span>
+                          <span className="font-medium text-sm">Ejecución</span>
+                        </div>
+                        <div className="text-lg font-bold text-green-600">55%</div>
+                        <div className="text-xs text-gray-600">Desarrollo activo</div>
+                      </div>
+                      
+                      <div className="bg-white p-4 rounded-lg border border-blue-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">✅</span>
+                          <span className="font-medium text-sm">Revisión</span>
+                        </div>
+                        <div className="text-lg font-bold text-purple-600">20%</div>
+                        <div className="text-xs text-gray-600">Optimización final</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CENTRO DE ALERTAS ACCIONABLES INTELIGENTES - SIMPLIFICADO */}
+            <Card className="border-0 shadow-lg mb-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Bell className="h-5 w-5 text-red-600" />
+                  Centro de Alertas Operacionales
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const totalProjectHours = unifiedData?.actuals?.totalWorkedHours || 0;
+                  const totalWorkedCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                  const totalBudget = unifiedData?.quotation?.totalAmount || 0;
+                  const budgetUsedPercent = totalBudget > 0 ? (totalWorkedCost / totalBudget) * 100 : 0;
+                  
+                  const hasAlerts = budgetUsedPercent > 80 || totalProjectHours > 200;
+
+                  if (!hasAlerts) {
+                    return (
+                      <div className="text-center py-8 bg-green-50 rounded-lg border border-green-200">
+                        <div className="text-4xl mb-2">✅</div>
+                        <h4 className="font-medium text-green-800 mb-1">Operación Saludable</h4>
+                        <p className="text-sm text-green-700">No se detectaron alertas críticas. El proyecto funciona dentro de los parámetros normales.</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {budgetUsedPercent > 80 && (
+                        <div className="p-4 rounded-lg border-2 bg-orange-100 border-orange-300 text-orange-900">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="text-xl">⚠️</div>
+                              <div>
+                                <h4 className="font-semibold text-sm">Uso Alto del Presupuesto</h4>
+                                <p className="text-sm mt-1 opacity-90">Se ha usado el {budgetUsedPercent.toFixed(1)}% del presupuesto</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-current border-opacity-20">
+                            <h5 className="text-xs font-medium mb-2 opacity-75">ACCIONES RECOMENDADAS:</h5>
+                            <div className="text-xs">
+                              • Revisar alcance del proyecto<br/>
+                              • Evaluar optimización de recursos<br/>
+                              • Considerar renegociación con cliente
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {totalProjectHours > 200 && (
+                        <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-300 text-blue-800">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="text-xl">📈</div>
+                              <div>
+                                <h4 className="font-semibold text-sm">Proyecto de Alto Volumen</h4>
+                                <p className="text-sm mt-1 opacity-90">{totalProjectHours} horas trabajadas registradas</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* PREDICCIÓN Y RECOMENDACIONES - SIMPLIFICADO */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  Análisis Predictivo Simplificado
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-lg border">
+                    <h3 className="font-semibold text-emerald-800 mb-3">📊 Resumen Operacional</h3>
+                    <div className="space-y-2 text-sm text-emerald-700">
+                      <p>• Timeline de productividad con tendencias semanales</p>
+                      <p>• Análisis de bloqueos y dependencias críticas</p>
+                      <p>• Eficiencia por fases del proyecto</p>
+                      <p>• Alertas operacionales inteligentes</p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border">
+                    <h3 className="font-semibold text-blue-800 mb-3">🎯 Próximas Mejoras</h3>
+                    <div className="space-y-2 text-sm text-blue-700">
+                      <p>• Predicciones de tiempo y presupuesto</p>
+                      <p>• Recomendaciones automáticas</p>
+                      <p>• Análisis predictivo avanzado</p>
+                      <p>• Integración con herramientas externas</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+          </TabsContent>
+
+          {/* PESTAÑA TEAM TRACKER */}
+          <TabsContent value="team" className="space-y-6 mt-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  Team Tracker
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Funcionalidad de seguimiento del equipo disponible próximamente.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* PESTAÑA ENTREGAS */} 
+          <TabsContent value="deliverables" className="space-y-6 mt-6">
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Entregas y Calidad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Sistema de entregas disponible próximamente.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* HEADER */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/"
+                className="text-gray-500 hover:text-gray-700 flex items-center"
+              >
+                <ArrowRight className="h-4 w-4 rotate-180 mr-1" />
+                Proyectos
+              </Link>
+              <div className="text-gray-300">/</div>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {projectData.projectName || `Proyecto ${projectId}`}
+              </h1>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                ID: {projectId}
+              </Badge>
+              {projectData.clientName && (
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  {projectData.clientName}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {renderContent()}
+      </div>
+    </div>
+  );
+}
                         const ejecucionHours = Math.round(member.hours * 0.35);
                         const revisionHours = member.hours - estrategiaHours - ejecucionHours;
                         
