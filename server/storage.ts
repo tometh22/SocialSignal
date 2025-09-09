@@ -2073,6 +2073,54 @@ export class DatabaseStorage implements IStorage {
       const project = await this.getActiveProject(projectId);
       if (!project) return null;
 
+      // ✅ VALIDAR ESTADO Y FECHAS DE FINALIZACIÓN DEL PROYECTO
+      if (dateRange && project.actualEndDate) {
+        const projectEndDate = new Date(project.actualEndDate);
+        
+        // Si el proyecto terminó antes del rango de fechas solicitado, retornar datos vacíos
+        if (projectEndDate < dateRange.startDate) {
+          console.log(`🚫 Project ${projectId} ended ${projectEndDate.toISOString()} before filter range starts ${dateRange.startDate.toISOString()}`);
+          return {
+            totalRealCost: 0,
+            operationalCost: 0,
+            directCostsFromExcel: 0,
+            timeEntriesCost: 0,
+            totalCombinedCost: 0,
+            teamBreakdown: [],
+            teamSummary: { totalMembers: 0, totalHours: 0, averageRate: 0 },
+            projectInfo: project
+          };
+        }
+        
+        // Si el proyecto terminó durante el rango filtrado, ajustar el rango final
+        if (projectEndDate < dateRange.endDate) {
+          console.log(`⚠️ Project ${projectId} ended ${projectEndDate.toISOString()} during filter range, adjusting end date`);
+          dateRange = {
+            startDate: dateRange.startDate,
+            endDate: projectEndDate
+          };
+        }
+      }
+
+      // Si el proyecto está marcado como completado/cancelado y no hay fecha específica de fin,
+      // considerar la fecha actual como límite para evitar datos futuros
+      if (dateRange && ['completed', 'cancelled'].includes(project.status) && !project.actualEndDate) {
+        const today = new Date();
+        if (dateRange.startDate > today) {
+          console.log(`🚫 Project ${projectId} is ${project.status} and filter starts after today`);
+          return {
+            totalRealCost: 0,
+            operationalCost: 0,
+            directCostsFromExcel: 0,
+            timeEntriesCost: 0,
+            totalCombinedCost: 0,
+            teamBreakdown: [],
+            teamSummary: { totalMembers: 0, totalHours: 0, averageRate: 0 },
+            projectInfo: project
+          };
+        }
+      }
+
       // Obtener ALL time entries para el proyecto
       let entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
       
