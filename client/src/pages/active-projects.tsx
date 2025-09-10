@@ -184,10 +184,11 @@ function ProjectCard({
               
               {/* Información del proyecto */}
               <div className="flex-1 min-w-0">
+                {/* 🎯 CLIENTE MÁS VISIBLE */}
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-semibold text-gray-900 truncate text-lg">
-                    {projectName}
-                  </h3>
+                  <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md border">
+                    {clientName}
+                  </span>
                   {project.quotation?.projectType && (
                     <Badge 
                       variant="outline" 
@@ -201,9 +202,9 @@ function ProjectCard({
                     </Badge>
                   )}
                 </div>
-                <div className="text-sm font-medium text-blue-700">
-                  {clientName}
-                </div>
+                <h3 className="font-semibold text-gray-900 truncate text-lg">
+                  {projectName}
+                </h3>
               </div>
             </div>
             
