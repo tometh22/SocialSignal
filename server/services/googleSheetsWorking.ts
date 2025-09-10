@@ -364,14 +364,19 @@ class GoogleSheetsWorkingService {
     let parsed = parseFloat(cleaned);
     
     // 🚨 VALIDACIÓN HEURÍSTICA PARA COSTOS ANORMALMENTE ALTOS
-    // Si el valor es > $10,000 USD para un costo individual, probablemente está mal parseado x100
-    // Típicamente los costos mensuales por persona están entre $10-$5,000 USD máximo
+    // DESHABILITADA: Esta lógica estaba causando problemas con ventas en pesos argentinos
+    // Los valores altos ($20,000+ ARS) son normales para ventas, no deben dividirse por 100
+    // TODO: Implementar validación específica por contexto (ventas vs costos) si es necesario
+    
+    /*
+    // Lógica original deshabilitada - causaba conversión incorrecta de pesos argentinos
     if (parsed > 10000) {
       const dividedBy100 = parsed / 100;
       console.log(`🔧 AUTO-CORRECCIÓN: "${value}" → $${parsed.toLocaleString()} parece demasiado alto.`);
       console.log(`    Aplicando corrección ÷100: $${parsed.toLocaleString()} → $${dividedBy100.toLocaleString()}`);
       parsed = dividedBy100;
     }
+    */
     
     // 🚨 VALIDACIÓN ANTI-ERRORES MEJORADA
     const originalValue = value.replace(/[$\s]/g, '');
