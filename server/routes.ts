@@ -1642,21 +1642,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // 6. Calcular métricas consolidadas (ÚNICA FUENTE)
-      const efficiency = adjustedEstimatedHours > 0 ? (totalWorkedHours / adjustedEstimatedHours) * 100 : 0;
+      // 6. 🎯 CORRECCIÓN: Calcular métricas EXCLUSIVAMENTE desde Excel MAESTRO filtrado temporalmente
+      const filteredDirectCosts = await getFilteredDirectCosts(id, timeFilter, dateRange);
+      console.log(`🎯 METRICS CALCULATION: Using ${filteredDirectCosts.length} filtered directCosts for period metrics`);
       
-      // SIEMPRE usar ingresos reales del Excel MAESTRO para cálculos de markup (excepto cuando no hay datos)
+      // Calcular desde Excel MAESTRO: horas objetivo vs horas reales
+      const excelTargetHours = filteredDirectCosts.reduce((sum, dc) => sum + (dc.horasObjetivo || 0), 0);
+      const excelActualHours = filteredDirectCosts.reduce((sum, dc) => sum + (dc.horasRealesAsana || 0), 0);
+      const excelTotalCost = filteredDirectCosts.reduce((sum, dc) => sum + (dc.montoTotalUSD || dc.costoTotal || 0), 0);
+      
+      // Eficiencia basada en Excel MAESTRO: horasObjetivo vs horasRealesAsana  
+      const efficiency = excelTargetHours > 0 ? (excelActualHours / excelTargetHours) * 100 : 0;
+      
+      // Revenue desde Google Sheets filtrado temporalmente
       const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
       const totalRealRevenue = salesData.length > 0 
-        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd || sale.montoUSD || '0') || 0), 0)
-        : adjustedTotalAmount; // Fallback a cotización solo si no hay datos reales
+        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd || '0') || 0), 0)
+        : 0; // NO usar fallback de cotización para métricas de período
       
-      console.log(`💰 Using real revenue for filter "${timeFilter}": $${totalRealRevenue} from ${salesData.length} sales records (fallback to quotation: ${salesData.length === 0})`);
-      if (salesData.length > 0) {
-        console.log(`📊 Sales breakdown:`, salesData.map(s => ({ month: s.month, year: s.year, amount: s.amountUsd })));
-      }
+      console.log(`🎯 CORRECTED METRICS CALCULATION for project ${id} (${timeFilter}):`);
+      console.log(`   Excel Target Hours: ${excelTargetHours}`);
+      console.log(`   Excel Actual Hours: ${excelActualHours}`);
+      console.log(`   Excel Total Cost: $${excelTotalCost}`);
+      console.log(`   Real Revenue: $${totalRealRevenue} from ${salesData.length} sales`);
+      console.log(`   Efficiency: ${efficiency.toFixed(1)}% (${excelActualHours}h/${excelTargetHours}h)`);
       
-      const markup = totalWorkedCost > 0 ? totalRealRevenue / totalWorkedCost : 0;
+      // Markup desde datos filtrados temporalmente
+      const markup = excelTotalCost > 0 ? totalRealRevenue / excelTotalCost : 0;
       const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
       
       console.log(`🔢 MARKUP CALCULATION DEBUG for project ${id} (${timeFilter}):`);
@@ -1819,16 +1831,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         directCosts: await getFilteredDirectCosts(id, timeFilter, dateRange)
       };
 
-      // Agregar campos principales en el nivel superior para compatibilidad con frontend
+      // 🎯 CORRECCIÓN: Usar métricas corregidas desde Excel MAESTRO
       const responseData = {
         ...completeData,
-        // Campos principales para acceso directo desde frontend
-        estimatedHours: adjustedEstimatedHours,
-        estimatedCost: adjustedBaseCost,
-        workedHours: totalWorkedHours,
-        workedCost: totalWorkedCost,
-        efficiency: completeData.metrics.efficiency,
-        markup: completeData.metrics.markup,
+        // Campos principales para acceso directo desde frontend - DATOS CORREGIDOS
+        estimatedHours: excelTargetHours, // Usar horas objetivo del Excel MAESTRO
+        estimatedCost: excelTotalCost,    // Usar costo real del Excel MAESTRO  
+        workedHours: excelActualHours,    // Usar horas reales del Excel MAESTRO
+        workedCost: excelTotalCost,       // Usar costo real del Excel MAESTRO
+        efficiency: efficiency,            // Eficiencia corregida (Excel target vs actual)
+        markup: markup,                   // Markup corregido (revenue real vs costo real)
         timeFilter: timeFilter,
         isAlwaysOn: project.quotation?.projectType === 'always-on',
         // Agregar salesData para compatibilidad con frontend
