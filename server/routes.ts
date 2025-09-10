@@ -11916,5 +11916,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== DASHBOARD UNIFICADO ====================
+  // Nuevo endpoint consolidado para el dashboard de proyectos activos
+  app.get("/api/dashboard/projects", requireAuth, async (req, res) => {
+    try {
+      const timeFilter = req.query.timeFilter as string || 'all';
+      console.log(`🎯 Dashboard API called with timeFilter: ${timeFilter}`);
+      
+      // 1. Obtener el rango de fechas para el filtro
+      const getDateRangeForFilter = (filter: string) => {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-based
+        
+        switch (filter) {
+          case 'current_month':
+          case 'este_mes':
+            return {
+              startDate: new Date(currentYear, currentMonth, 1),
+              endDate: new Date(currentYear, currentMonth + 1, 0)
+            };
+          case 'last_month':
+          case 'mes_pasado':
+            return {
+              startDate: new Date(currentYear, currentMonth - 1, 1),
+              endDate: new Date(currentYear, currentMonth, 0)
+            };
+          case 'current_quarter':
+          case 'este_trimestre':
+            const quarterStart = Math.floor(currentMonth / 3) * 3;
+            return {
+              startDate: new Date(currentYear, quarterStart, 1),
+              endDate: new Date(currentYear, quarterStart + 3, 0)
+            };
+          case 'last_quarter':
+          case 'trimestre_pasado':
+            const lastQuarterStart = Math.floor((currentMonth - 3) / 3) * 3;
+            const quarterYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+            return {
+              startDate: new Date(quarterYear, lastQuarterStart, 1),
+              endDate: new Date(quarterYear, lastQuarterStart + 3, 0)
+            };
+          case 'june_2025':
+          case 'junio_2025':
+            return {
+              startDate: new Date(2025, 5, 1),
+              endDate: new Date(2025, 5, 30)
+            };
+          case 'may_2025':
+          case 'mayo_2025':
+            return {
+              startDate: new Date(2025, 4, 1),
+              endDate: new Date(2025, 4, 31)
+            };
+          case 'q1_2025':
+            return {
+              startDate: new Date(2025, 0, 1),
+              endDate: new Date(2025, 2, 31)
+            };
+          case 'q2_2025':
+            return {
+              startDate: new Date(2025, 3, 1),
+              endDate: new Date(2025, 5, 30)
+            };
+          default:
+            return null; // No filter
+        }
+      };
+      
+      const dateRange = getDateRangeForFilter(timeFilter);
+      console.log(`📅 Date range for filter ${timeFilter}:`, dateRange);
+      
+      // 2. Obtener todos los proyectos activos principales
+      const allProjects = await storage.getActiveProjects();
+      const mainProjects = allProjects.filter(project => project.parentProjectId === null);
+      console.log(`📊 Retrieved ${mainProjects.length} main projects`);
+      
+      // 3. Obtener datos consolidados para cada proyecto
+      const consolidatedProjects = await Promise.all(
+        mainProjects.map(async (project) => {
+          try {
+            // Obtener datos completos del proyecto con filtro temporal
+            const completeData = await storage.getCompleteProjectData(project.id, timeFilter);
+            
+            // Obtener datos de ventas filtradas
+            const salesQuery = `
+              SELECT * FROM google_sheets_sales 
+              WHERE project_id = $1 
+              ${dateRange ? 'AND make_date(year, month_number, 1) >= $2 AND make_date(year, month_number, 1) <= $3' : ''}
+              ORDER BY year DESC, month_number DESC
+            `;
+            const salesParams = dateRange ? 
+              [project.id, dateRange.startDate, dateRange.endDate] :
+              [project.id];
+            
+            const { rows: salesData } = await pool.query(salesQuery, salesParams);
+            
+            // Calcular ingresos totales del período
+            const totalRevenue = salesData.reduce((sum, sale) => {
+              const amount = parseFloat(sale.amount_usd || '0');
+              return sum + (isNaN(amount) ? 0 : amount);
+            }, 0);
+            
+            // Obtener costos del período
+            const costSummary = await storage.getProjectCostSummary(project.id, dateRange);
+            const totalCost = costSummary?.totalWorkedCost || 0;
+            const totalHours = costSummary?.totalWorkedHours || 0;
+            
+            // Calcular métricas
+            const markup = totalCost > 0 ? (totalRevenue / totalCost) : 0;
+            const efficiency = project.estimatedHours > 0 ? 
+              (totalHours / project.estimatedHours * 100) : 0;
+            
+            return {
+              id: project.id,
+              name: project.quotation?.projectName || "Proyecto sin nombre",
+              clientId: project.clientId,
+              status: project.status,
+              isAlwaysOn: project.isAlwaysOnMacro,
+              estimatedHours: project.estimatedHours || 0,
+              workedHours: totalHours,
+              totalRevenue,
+              totalCost,
+              markup: markup.toFixed(2),
+              efficiency: efficiency.toFixed(1),
+              salesCount: salesData.length,
+              hasActivity: totalHours > 0 || totalRevenue > 0,
+              lastActivity: completeData?.lastActivity || null,
+              teamSize: completeData?.teamBreakdownLength || 0,
+              progress: efficiency > 100 ? 100 : efficiency
+            };
+          } catch (error) {
+            console.error(`❌ Error processing project ${project.id}:`, error);
+            return {
+              id: project.id,
+              name: project.quotation?.projectName || "Proyecto sin nombre",
+              clientId: project.clientId,
+              status: project.status,
+              isAlwaysOn: project.isAlwaysOnMacro,
+              estimatedHours: 0,
+              workedHours: 0,
+              totalRevenue: 0,
+              totalCost: 0,
+              markup: "0.00",
+              efficiency: "0.0",
+              salesCount: 0,
+              hasActivity: false,
+              lastActivity: null,
+              teamSize: 0,
+              progress: 0,
+              error: error.message
+            };
+          }
+        })
+      );
+      
+      // 4. Obtener clientes
+      const clients = await storage.getClients();
+      const clientsMap = new Map(clients.map(client => [client.id, client]));
+      
+      // 5. Calcular estadísticas generales
+      const stats = {
+        total: consolidatedProjects.length,
+        active: consolidatedProjects.filter(p => p.hasActivity).length,
+        totalRevenue: consolidatedProjects.reduce((sum, p) => sum + p.totalRevenue, 0),
+        totalCost: consolidatedProjects.reduce((sum, p) => sum + p.totalCost, 0),
+        totalHours: consolidatedProjects.reduce((sum, p) => sum + p.workedHours, 0),
+        averageMarkup: consolidatedProjects.length > 0 ? 
+          (consolidatedProjects.reduce((sum, p) => sum + parseFloat(p.markup), 0) / consolidatedProjects.length).toFixed(2) : "0.00",
+        averageEfficiency: consolidatedProjects.length > 0 ?
+          (consolidatedProjects.reduce((sum, p) => sum + parseFloat(p.efficiency), 0) / consolidatedProjects.length).toFixed(1) : "0.0"
+      };
+      
+      // 6. Agregar información de clientes a los proyectos
+      const projectsWithClients = consolidatedProjects.map(project => ({
+        ...project,
+        client: clientsMap.get(project.clientId) || null
+      }));
+      
+      console.log(`✅ Dashboard data prepared: ${consolidatedProjects.length} projects, ${stats.active} active`);
+      
+      // 7. Respuesta consolidada
+      res.json({
+        timeFilter,
+        dateRange: dateRange ? {
+          startDate: dateRange.startDate.toISOString(),
+          endDate: dateRange.endDate.toISOString()
+        } : null,
+        stats,
+        projects: projectsWithClients,
+        clients: clients,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error("❌ Error in dashboard endpoint:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch dashboard data", 
+        error: error.message,
+        timeFilter: req.query.timeFilter 
+      });
+    }
+  });
+
   return httpServer;
 }
