@@ -479,6 +479,17 @@ export default function ActiveProjectsRedesigned() {
             return (b.quotation?.totalAmount || 0) - (a.quotation?.totalAmount || 0);
           case "hours":
             return getProjectHours(b.id) - getProjectHours(a.id);
+          case "activity":
+            // Ordenamiento inteligente por actividad en el período
+            const hasActivityA = timeFilter !== "all" && timeEntriesData && timeEntriesData[a.id] && getProjectHours(a.id) > 0;
+            const hasActivityB = timeFilter !== "all" && timeEntriesData && timeEntriesData[b.id] && getProjectHours(b.id) > 0;
+            
+            // Proyectos con actividad van primero
+            if (hasActivityA && !hasActivityB) return -1;
+            if (!hasActivityA && hasActivityB) return 1;
+            
+            // Dentro del mismo grupo, ordenar por horas descendente
+            return getProjectHours(b.id) - getProjectHours(a.id);
           case "recent":
           default:
             return new Date((b as any).createdAt || 0).getTime() - new Date((a as any).createdAt || 0).getTime();
@@ -729,6 +740,7 @@ export default function ActiveProjectsRedesigned() {
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="activity">🎯 Actividad período</SelectItem>
                 <SelectItem value="recent">Más recientes</SelectItem>
                 <SelectItem value="name">Nombre A-Z</SelectItem>
                 <SelectItem value="client">Cliente A-Z</SelectItem>
