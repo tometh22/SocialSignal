@@ -75,6 +75,8 @@ function ProjectCard({
   onDeleteProject,
   allClients
 }: ProjectCardProps) {
+  // 🎯 Acceder al timeFilter desde el contexto padre
+  const { timeFilter } = useActiveProjectsData();
   const { refreshTimestamp } = useImageRefresh();
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
   const clientName = client?.name || "Cliente desconocido";
@@ -110,30 +112,47 @@ function ProjectCard({
     });
   }
   
+  // 🎯 NUEVO: Obtener horas objetivo del Excel MAESTRO usando useCompleteProjectData
+  const { data: completeData } = useCompleteProjectData(project.id, timeFilter);
+  
+  // Calcular horas objetivo totales del Excel MAESTRO
+  const excelTargetHours = completeData?.directCosts?.reduce((sum: number, cost: any) => {
+    return sum + (cost.horasObjetivo || 0);
+  }, 0) || 0;
+  
+  // Calcular horas objetivo del período actual (para fee mensual)
+  const periodTargetHours = completeData?.actuals?.teamBreakdown?.reduce((sum: number, member: any) => {
+    return sum + (member.targetHours || 0);
+  }, 0) || 0;
+
   let progressPercentage = 0;
   let progressLabel = "";
   let progressSubtitle = "";
   
   if (isFeeMensual) {
-    // Para proyectos fee mensual: progreso basado en tiempo calendario del mes actual
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const currentDay = now.getDate();
-    
-    progressPercentage = (currentDay / daysInMonth) * 100;
-    progressLabel = "Progreso mensual";
-    progressSubtitle = `Día ${currentDay} de ${daysInMonth}`;
-  } else {
-    // 🎯 CORREGIDO: Para proyectos one-shot, progreso basado en horas
-    if (estimatedHours > 0) {
-      progressPercentage = (totalHours / estimatedHours) * 100;
-      progressSubtitle = `${totalHours.toFixed(1)}h de ${estimatedHours.toFixed(0)}h`;
+    // 🎯 CORREGIDO: Para proyectos fee mensual, usar horas reales vs objetivo del período
+    if (periodTargetHours > 0) {
+      progressPercentage = (totalHours / periodTargetHours) * 100;
+      progressSubtitle = `${totalHours.toFixed(1)}h de ${periodTargetHours.toFixed(0)}h del período`;
     } else if (totalHours > 0) {
-      // Si no hay horas estimadas pero sí hay horas reales, mostrar que hay progreso
-      progressPercentage = 50; // Valor intermedio para indicar que hay actividad
-      progressSubtitle = `${totalHours.toFixed(1)}h registradas (sin estimación)`;
+      progressPercentage = 50; // Hay actividad pero sin objetivo definido
+      progressSubtitle = `${totalHours.toFixed(1)}h del período (sin objetivo)`;
+    } else {
+      progressPercentage = 0;
+      progressSubtitle = "Sin actividad en el período";
+    }
+    progressLabel = "Progreso del período";
+  } else {
+    // 🎯 CORREGIDO: Para proyectos one-shot, usar horas reales vs objetivo total del Excel MAESTRO
+    const targetHours = excelTargetHours > 0 ? excelTargetHours : estimatedHours;
+    
+    if (targetHours > 0) {
+      progressPercentage = (totalHours / targetHours) * 100;
+      const sourceLabel = excelTargetHours > 0 ? "(Excel MAESTRO)" : "(cotización)";
+      progressSubtitle = `${totalHours.toFixed(1)}h de ${targetHours.toFixed(0)}h ${sourceLabel}`;
+    } else if (totalHours > 0) {
+      progressPercentage = 50; // Hay actividad pero sin objetivo definido
+      progressSubtitle = `${totalHours.toFixed(1)}h registradas (sin objetivo)`;
     } else {
       progressPercentage = 0;
       progressSubtitle = "Sin actividad registrada";
