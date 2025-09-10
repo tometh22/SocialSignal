@@ -91,10 +91,22 @@ function ProjectCard({
   const projectType = project.quotation?.projectType || 'one-shot';
   const isFeeMensual = projectType === 'always-on';
   
-  // Calcular progreso según tipo de proyecto
+  // 🎯 CORREGIDO: Calcular progreso según tipo de proyecto
   const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
     return total + (member.estimatedHours || 0);
   }, 0) || 0;
+  
+  // 🔍 DEBUG: Verificar por qué el progreso es 0%
+  if (totalHours > 0 && estimatedHours === 0) {
+    console.log(`🚿 Project ${project.id} progress debug:`, {
+      projectName,
+      totalHours,
+      estimatedHours,
+      quotation: project.quotation,
+      teamMembers: project.quotation?.teamMembers,
+      excelData: project.excelMAESTROData
+    });
+  }
   
   let progressPercentage = 0;
   let progressLabel = "";
@@ -112,10 +124,19 @@ function ProjectCard({
     progressLabel = "Progreso mensual";
     progressSubtitle = `Día ${currentDay} de ${daysInMonth}`;
   } else {
-    // Para proyectos one-shot: progreso basado en horas
-    progressPercentage = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
+    // 🎯 CORREGIDO: Para proyectos one-shot, progreso basado en horas
+    if (estimatedHours > 0) {
+      progressPercentage = (totalHours / estimatedHours) * 100;
+      progressSubtitle = `${totalHours.toFixed(1)}h de ${estimatedHours.toFixed(0)}h`;
+    } else if (totalHours > 0) {
+      // Si no hay horas estimadas pero sí hay horas reales, mostrar que hay progreso
+      progressPercentage = 50; // Valor intermedio para indicar que hay actividad
+      progressSubtitle = `${totalHours.toFixed(1)}h registradas (sin estimación)`;
+    } else {
+      progressPercentage = 0;
+      progressSubtitle = "Sin actividad registrada";
+    }
     progressLabel = "Progreso del proyecto";
-    progressSubtitle = `${totalHours.toFixed(1)}h de ${estimatedHours.toFixed(0)}h`;
   }
 
   const getStatusConfig = (status: string) => {
