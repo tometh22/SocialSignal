@@ -2204,8 +2204,14 @@ export class DatabaseStorage implements IStorage {
       // PASO 1: Procesar costos directos del Excel MAESTRO como time entries sintéticos
       const syntheticTimeEntries = [];
       for (const directCost of excelDirectCosts) {
-        if (directCost.montoTotalUSD && directCost.montoTotalUSD > 0 && directCost.horasRealesAsana > 0) {
-          directCostsFromExcel += directCost.montoTotalUSD;
+        // 🎯 CORRECIÓN CRÍTICA: Usar SIEMPRE montoTotalUSD del Excel MAESTRO
+        // No usar valorHoraPersona × horas que puede estar corrupto
+        const montoUSD = Number(directCost.montoTotalUSD) || 0; // Convertir a número
+        
+        if (montoUSD > 0) {
+          directCostsFromExcel += montoUSD;
+          
+          console.log(`💰 Excel MAESTRO cost: ${directCost.persona} - ${directCost.mes} ${directCost.año} = $${montoUSD} USD`);
           
           // Crear time entry sintético para integrar con el sistema existente
           let monthNumber;
@@ -2217,16 +2223,19 @@ export class DatabaseStorage implements IStorage {
             monthNumber = this.getMonthNumber(directCost.mes);
           }
           
+          const horasReales = Number(directCost.horasRealesAsana) || 1; // Convertir a número
+          
           const syntheticEntry = {
             id: `excel-${directCost.id}`,
             projectId: projectId,
             personnelId: directCost.personnelId || null,
-            hours: directCost.horasRealesAsana,
+            hours: horasReales, // Fallback para división
             date: new Date(`${directCost.año}-${monthNumber}-15`), // Día 15 del mes
             billable: true,
             description: `Excel MAESTRO: ${directCost.persona} - ${directCost.mes} ${directCost.año}`,
-            hourlyRateAtTime: directCost.valorHoraPersona || 0,
-            costInUSD: directCost.montoTotalUSD,
+            // 🎯 NO usar valorHoraPersona corrupto, calcular tasa real basada en montoTotalUSD
+            hourlyRateAtTime: montoUSD / horasReales,
+            costInUSD: montoUSD, // FUENTE ÚNICA DE VERDAD
             isFromExcel: true // Marcador para distinguir
           };
           
@@ -2237,8 +2246,9 @@ export class DatabaseStorage implements IStorage {
           const monthName = directCost.mes;
           const personKey = `excel-${directCost.persona}-${year}-${monthName}`;
           
-          costByPersonMonth.set(personKey, (costByPersonMonth.get(personKey) || 0) + directCost.montoTotalUSD);
-          operationalByPersonMonth.set(personKey, (operationalByPersonMonth.get(personKey) || 0) + directCost.montoTotalUSD);
+          // 🎯 USAR SIEMPRE montoTotalUSD
+          costByPersonMonth.set(personKey, (costByPersonMonth.get(personKey) || 0) + montoUSD);
+          operationalByPersonMonth.set(personKey, (operationalByPersonMonth.get(personKey) || 0) + montoUSD);
         }
       }
 
