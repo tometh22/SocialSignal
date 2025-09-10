@@ -1315,23 +1315,58 @@ class GoogleSheetsWorkingService {
     try {
       console.log(`🔍 Buscando proyecto para cliente: "${clientName}", proyecto: "${projectName}"`);
       
-      // Mapeo directo de clientes a project IDs basado en los datos conocidos
-      const clientProjectMapping: Record<string, number> = {
+      // 🎯 CORRECIÓN: Mapeo específico por CLIENTE + PROYECTO
+      const clientProjectKey = `${clientName.toLowerCase().trim()}_${projectName.toLowerCase().trim()}`;
+      
+      const specificProjectMapping: Record<string, number> = {
+        // Warner
+        'warner_fee marketing': 34,
+        
+        // Kimberly Clark
+        'kimberly clark_fee huggies': 39,
+        
+        // Uber - SEPARADOS por proyecto específico
+        'uber_uber taxis': 40,    // ✅ Solo "Uber Taxis" → ID 40
+        'uber_quilmes rock': 41,  // 🆕 "Quilmes Rock" → Nuevo ID (a verificar)
+        'uber_colapinto': 44,     // 🆕 "Colapinto" → Nuevo ID (a verificar)
+        
+        // Coelsa
+        'coelsa_fee mensual': 43,
+        
+        // Play Digital S.A (Modo)
+        'play digital s.a (modo)_fee mensual': 42,
+        'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
+        
+        // Coca-Cola
+        'coca-cola_hecho en mexico': 36,
+        
+        // Arcos Dorados
+        'arcos dorados_estudio atributos': 37,
+      };
+      
+      const projectId = specificProjectMapping[clientProjectKey];
+      
+      if (projectId) {
+        console.log(`🔗 Proyecto encontrado vía mapeo específico: ${clientName} + ${projectName} → Proyecto ${projectId}`);
+        return projectId;
+      }
+      
+      // Fallback al mapeo por cliente solo (para compatibilidad)
+      const clientOnlyMapping: Record<string, number> = {
         'warner': 34,
         'kimberly clark': 39,
-        'uber': 40,
         'coelsa': 43,
         'play digital s.a (modo)': 42,
         'coca-cola': 36,
-        'arcos dorados': 37, // o 38 dependiendo del proyecto específico
+        'arcos dorados': 37,
       };
       
       const normalizedClientName = clientName.toLowerCase().trim();
-      const projectId = clientProjectMapping[normalizedClientName];
+      const fallbackProjectId = clientOnlyMapping[normalizedClientName];
       
-      if (projectId) {
-        console.log(`🔗 Proyecto encontrado vía mapeo: ${clientName} → Proyecto ${projectId}`);
-        return projectId;
+      if (fallbackProjectId) {
+        console.log(`🔗 Proyecto encontrado vía mapeo de cliente (fallback): ${clientName} → Proyecto ${fallbackProjectId}`);
+        return fallbackProjectId;
       }
       
       // Fallback: buscar usando getActiveProjects
