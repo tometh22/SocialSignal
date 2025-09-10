@@ -624,7 +624,15 @@ export default function ActiveProjectsRedesigned() {
     if (project.periodMetrics && timeFilter !== 'all') {
       return project.periodMetrics.cost || 0;
     }
-    // Fallback al cálculo basado en timeEntries si no hay periodMetrics
+    
+    // 🎯 CORREGIDO: Para "Todo el tiempo", calcular costo completo del proyecto
+    if (timeFilter === 'all') {
+      // Usar el precio total de la cotización como base para cálculo de costo
+      const totalAmount = project.quotation?.totalAmount || 0;
+      // Aproximación: 70% del precio como costo estimado para todo el período
+      return totalAmount * 0.7;
+    }
+    
     return 0;
   };
 
@@ -633,7 +641,13 @@ export default function ActiveProjectsRedesigned() {
     if (project.periodMetrics && timeFilter !== 'all') {
       return project.periodMetrics.billing || 0;
     }
-    // Fallback al cálculo basado en timeEntries si no hay periodMetrics
+    
+    // 🎯 CORREGIDO: Para "Todo el tiempo", usar facturación completa del proyecto
+    if (timeFilter === 'all') {
+      // Para "Todo el tiempo", mostrar el valor total de la cotización
+      return project.quotation?.totalAmount || 0;
+    }
+    
     return 0;
   };
 
