@@ -87,14 +87,16 @@ function ProjectCard({
   const periodCost = hasPeriodMetrics ? project.periodMetrics.cost : 0;
   const periodBilling = hasPeriodMetrics ? project.periodMetrics.billing : 0;
   
-  // Detectar tipo de proyecto para calcular progreso apropiado
+  // 🎯 Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';
-  const isFeeMensual = projectType === 'always-on';
+  const isFeeMensual = projectType === 'recurring' || projectType === 'fee-mensual';
   
-  // 🎯 CORREGIDO: Calcular progreso según tipo de proyecto
-  const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
-    return total + (member.estimatedHours || 0);
-  }, 0) || 0;
+  // 🎯 CORREGIDO: Usar horas estimadas del backend (API response)
+  const estimatedHours = project.quotation?.estimatedHours ?? (
+    project.quotation?.teamMembers?.reduce((total: number, member: any) => {
+      return total + (member.estimatedHours || member.hours || 0);
+    }, 0) || 0
+  );
   
   // 🔍 DEBUG: Verificar por qué el progreso es 0%
   if (totalHours > 0 && estimatedHours === 0) {

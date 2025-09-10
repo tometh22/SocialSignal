@@ -481,8 +481,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log('🚀 Force sync triggered via debug endpoint');
       
-      const { GoogleSheetsWorkingService } = await import('./services/googleSheetsWorking');
-      const googleSheetsService = new GoogleSheetsWorkingService();
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      const googleSheetsService = googleSheetsWorkingService;
       
       const result = await googleSheetsService.importDirectCosts(storage);
       
@@ -520,14 +520,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allCosts: directCosts || [],
         sampleData: sample,
         summary: {
-          hasUSDAmounts: directCosts?.filter(c => c.montoTotalUSD && c.montoTotalUSD > 0).length || 0,
+          hasUSDAmounts: directCosts?.filter(c => c.montoTotalUSD && parseFloat(c.montoTotalUSD) > 0).length || 0,
           hasARSAmounts: directCosts?.filter(c => c.costoTotal && c.costoTotal > 0).length || 0,
           hasHours: directCosts?.filter(c => c.horasRealesAsana && c.horasRealesAsana > 0).length || 0
         }
       });
     } catch (error) {
       console.error('❌ Error en debug de costos:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -549,12 +549,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
         const inRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
         
-        console.log(`💰 Costo: ${cost.projectName} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
+        console.log(`💰 Costo: ${cost.clientName || 'Unknown'} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
         return inRange;
       }) || [];
       
       // Calcular totales
-      const totalUSD = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.montoTotalUsd as string) || 0), 0);
+      const totalUSD = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.montoTotalUSD as string) || 0), 0);
       const totalARS = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.costoTotal as string) || 0), 0);
       
       console.log(`💰 RESULTADO: ${filteredCosts.length} costos filtrados = $${totalUSD} USD`);
@@ -573,17 +573,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ars: totalARS
         },
         detailedCosts: filteredCosts.map(cost => ({
-          nombre: cost.nombre,
+          nombre: cost.clientName || 'Unknown',
           mes: cost.mes,
           año: cost.año,
-          montoUSD: cost.montoTotalUsd,
+          montoUSD: cost.montoTotalUSD,
           montoARS: cost.costoTotal,
           tipo: cost.tipoGasto
         }))
       });
     } catch (error) {
       console.error('❌ Error en debug de costos filtrados:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
@@ -1632,7 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // SIEMPRE usar ingresos reales del Excel MAESTRO para cálculos de markup (excepto cuando no hay datos)
       const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
       const totalRealRevenue = salesData.length > 0 
-        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd) || 0), 0)
+        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd || sale.montoUSD || '0') || 0), 0)
         : adjustedTotalAmount; // Fallback a cotización solo si no hay datos reales
       
       console.log(`💰 Using real revenue for filter "${timeFilter}": $${totalRealRevenue} from ${salesData.length} sales records (fallback to quotation: ${salesData.length === 0})`);
@@ -1823,11 +1823,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? timeEntries.map(entry => ({
               id: entry.id,
               personnelId: entry.personnelId,
-              personnelName: entry.personnelName || 'Sin nombre',
+              personnelName: 'Sin nombre',
               date: entry.date,
               hours: entry.hours,
               description: entry.description,
-              roleName: entry.roleName || 'Sin rol'
+              roleName: 'Sin rol'
             })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           : Object.values(teamBreakdown).map((member: any, index) => ({
               id: `excel-${index}`,
@@ -2123,7 +2123,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes,
           createdBy: req.user?.id || 1
         })
-        .onDuplicateKeyUpdate({
+        .onConflictDoUpdate({
+          target: [personnelHistoricalCosts.personnelId, personnelHistoricalCosts.year, personnelHistoricalCosts.month],
           set: {
             hourlyRateARS: hourlyRateARS?.toString(),
             monthlySalaryARS: monthlySalaryARS?.toString(),
@@ -3583,7 +3584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           // Si no hay registros de billing o falló, usar el precio original
-          const originalPrice = googleProject[0].originalAmountUsd || null;
+          const originalPrice = googleProject[0].originalAmountUSD || null;
           console.log(`💰 Using original price: $${originalPrice}`);
           return originalPrice;
         } catch (error) {
@@ -3743,17 +3744,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
             
             // Añadir datos del período al proyecto
-            projects[i] = {
-              ...project,
-              periodMetrics: {
-                hours: periodHours,
-                cost: periodCost,
-                billing: periodBilling,
-                entries: periodTimeEntries.length,
-                dateRange: {
-                  start: dateRange.startDate,
-                  end: dateRange.endDate
-                }
+            (projects[i] as any).periodMetrics = {
+              hours: periodHours,
+              cost: periodCost,
+              billing: periodBilling,
+              entries: periodTimeEntries.length,
+              dateRange: {
+                start: dateRange.startDate,
+                end: dateRange.endDate
               }
             };
           }
@@ -3799,18 +3797,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           // 🎯 CORREGIDO: Agregar datos del Excel MAESTRO Y horas estimadas al proyecto
-          projects[i] = {
-            ...project,
-            quotation: project.quotation ? {
-              ...project.quotation,
-              estimatedHours: estimatedHours // 🔢 NUEVO: Horas objetivo de la cotización
-            } : null,
-            excelMAESTROData: {
-              totalCost: excelTotalCost,
-              totalHours: excelTotalHours,
-              entries: allDirectCosts.length
-            }
+          (projects[i] as any).excelMAESTROData = {
+            totalCost: excelTotalCost,
+            totalHours: excelTotalHours,
+            entries: allDirectCosts.length
           };
+          
+          if (project.quotation) {
+            (projects[i] as any).quotation = {
+              ...project.quotation,
+              estimatedHours: estimatedHours
+            };
+          }
+        } else {
+          // 🎯 Para proyectos sin Excel MAESTRO, agregar solo las horas estimadas
+          if (project.quotation && estimatedHours > 0) {
+            (projects[i] as any).quotation = {
+              ...project.quotation,
+              estimatedHours: estimatedHours
+            };
+          }
         }
       }
 
@@ -3820,13 +3826,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const project = projects[i];
         if (project.quotation) {
           // Marcar todos los proyectos como usando precios originales
-          projects[i] = {
-            ...project,
-            quotation: {
+          if (project.quotation) {
+            (projects[i] as any).quotation = {
               ...project.quotation,
               priceSource: 'original_quotation'
-            }
-          };
+            };
+          }
         }
       }
 
