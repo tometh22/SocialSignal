@@ -103,20 +103,20 @@ function useDashboardData(timeFilter: string) {
       enabled: !!project.id && !!projects,
       staleTime: 5 * 60 * 1000,
     }))
-  });
+  }) as any[];
 
   console.log(`🔍 Dashboard Debug:`, {
     projectsCount: projects?.length || 0,
     projectsLoading,
-    queriesCount: projectsQueries.length,
-    queriesLoading: projectsQueries.filter(q => q.isLoading).length,
-    queriesWithData: projectsQueries.filter(q => q.data).length,
-    queriesWithError: projectsQueries.filter(q => q.error).length
+    queriesCount: projectsQueries?.length || 0,
+    queriesLoading: projectsQueries?.filter((q: any) => q.isLoading)?.length || 0,
+    queriesWithData: projectsQueries?.filter((q: any) => q.data)?.length || 0,
+    queriesWithError: projectsQueries?.filter((q: any) => q.error)?.length || 0
   });
 
   // Combinar resultados
-  const isLoading = projectsLoading || projectsQueries.some(q => q.isLoading);
-  const error = projectsQueries.find(q => q.error)?.error;
+  const isLoading = projectsLoading || projectsQueries?.some((q: any) => q.isLoading);
+  const error = projectsQueries?.find((q: any) => q.error)?.error;
 
   if (isLoading) {
     console.log(`⏳ Dashboard still loading...`);
@@ -129,10 +129,10 @@ function useDashboardData(timeFilter: string) {
   }
 
   // Procesar datos y crear estructura del dashboard
-  const projectsData = projectsQueries
-    .filter(q => q.data)
-    .map(q => q.data)
-    .filter(data => data && !data.error);
+  const projectsData = (projectsQueries || [])
+    .filter((q: any) => q.data)
+    .map((q: any) => q.data)
+    .filter((data: any) => data && !data.error);
 
   console.log(`📊 Processing ${projectsData.length} projects for dashboard`);
   
@@ -203,7 +203,7 @@ function useDashboardData(timeFilter: string) {
   console.log(`✅ Dashboard stats calculated:`, dashboardData.stats);
 
   const refetch = () => {
-    projectsQueries.forEach(q => q.refetch?.());
+    projectsQueries?.forEach((q: any) => q.refetch?.());
   };
 
   return { data: dashboardData, isLoading: false, error: null, refetch };
