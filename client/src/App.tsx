@@ -15,7 +15,7 @@ import Admin from "@/pages/admin-fixed";
 import AdminInflation from "@/pages/admin-inflation";
 
 // Project Management Pages
-import ActiveProjectsV2 from "@/pages/active-projects-v2";
+import ActiveProjects from "@/pages/active-projects";
 import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
@@ -129,7 +129,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/quotation/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/quotations/${params.id}`} />} />
                   
                   {/* Project Management */}
-                  <ProtectedRoute path="/active-projects" component={ActiveProjectsV2} />
+                  <ProtectedRoute path="/active-projects" component={ActiveProjects} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
