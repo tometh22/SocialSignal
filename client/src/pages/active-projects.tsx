@@ -543,7 +543,8 @@ export default function ActiveProjectsRedesigned() {
   const [filterClient, setFilterClient] = useState("all");
   const [sortBy, setSortBy] = useState("recent");
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
-  const [timeFilter, setTimeFilter] = useState("all");
+  const [timeFilter, setTimeFilter] = useState("este_mes");
+  const [showOnlyPeriodActivity, setShowOnlyPeriodActivity] = useState(false);
   
   // Estados para eliminación de proyectos
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
@@ -762,7 +763,17 @@ export default function ActiveProjectsRedesigned() {
         const matchesStatus = filterStatus === "all" || project.status === filterStatus;
         const matchesClient = filterClient === "all" || project.clientId.toString() === filterClient;
 
-        return matchesSearch && matchesStatus && matchesClient;
+        // 🎯 NUEVO: Filtro de actividad en el período
+        const matchesPeriodActivity = !showOnlyPeriodActivity || timeFilter === 'all' || (() => {
+          // Solo verificar time entries (ya filtrados por período) para garantizar correctitud
+          // periodMetrics contiene datos de todo el tiempo, no del período específico
+          const timeEntry = timeEntriesData[project.id];
+          const hasTimeActivity = timeEntry && timeEntry.hours > 0;
+          
+          return hasTimeActivity;
+        })();
+
+        return matchesSearch && matchesStatus && matchesClient && matchesPeriodActivity;
       })
       .sort((a: any, b: any) => {
         switch (sortBy) {
@@ -781,7 +792,7 @@ export default function ActiveProjectsRedesigned() {
             return new Date((b as any).createdAt || 0).getTime() - new Date((a as any).createdAt || 0).getTime();
         }
       });
-  }, [projects, clients, searchTerm, filterStatus, filterClient, sortBy, timeEntriesData]);
+  }, [projects, clients, searchTerm, filterStatus, filterClient, sortBy, timeEntriesData, showOnlyPeriodActivity, timeFilter]);
 
   // Estadísticas generales
   const stats = useMemo(() => {
@@ -891,70 +902,104 @@ export default function ActiveProjectsRedesigned() {
             </div>
           </div>
 
-          {/* Estadísticas mejoradas */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
-                  <div className="text-sm text-blue-700 font-medium">
-                    {timeFilter === "all" ? "Total Proyectos" : "Proyectos (período)"}
+          {/* 🎯 DUAL-LAYER: Métricas de Portfolio + Período */}
+          <div className="space-y-4 mb-6">
+            {/* Métricas de Portfolio (Sin Filtro) */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 mb-2">Estado Actual del Portfolio</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-bold text-blue-900">{stats.total}</div>
+                      <div className="text-sm text-blue-700 font-medium">Total Proyectos</div>
+                      <div className="text-xs text-blue-600 opacity-75">Estado actual (sin filtro)</div>
+                    </div>
+                    <div className="p-3 bg-blue-500 rounded-full shadow-lg">
+                      <Building2 className="h-6 w-6 text-white" />
+                    </div>
                   </div>
                 </div>
-                <div className="p-3 bg-blue-500 rounded-full shadow-lg">
-                  <Building2 className="h-6 w-6 text-white" />
+                
+                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-bold text-green-900">{stats.active}</div>
+                      <div className="text-sm text-green-700 font-medium">Activos</div>
+                      <div className="text-xs text-green-600 opacity-75">Estado actual (sin filtro)</div>
+                    </div>
+                    <div className="p-3 bg-green-500 rounded-full shadow-lg">
+                      <Play className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-green-900">{stats.active}</div>
-                  <div className="text-sm text-green-700 font-medium">
-                    {timeFilter === "all" ? "Activos" : "Activos (período)"}
+
+            {/* Métricas de Período (Con Filtro) */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                Período: {timeFilter === "all" ? "Todo el tiempo" : 
+                  timeFilter === "este_mes" ? "Septiembre 2025" :
+                  timeFilter === "mes_pasado" ? "Agosto 2025" :
+                  timeFilter.replace("_", " ")}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-bold text-purple-900">
+                        ${(stats.hasPeriodData && timeFilter !== "all" ? stats.periodBilling : stats.totalBudget).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-purple-700 font-medium">Facturación</div>
+                      <div className="text-xs text-purple-600 opacity-75">
+                        {timeFilter === "all" ? "Datos totales" : "Del período seleccionado"}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-purple-500 rounded-full shadow-lg">
+                      <DollarSign className="h-6 w-6 text-white" />
+                    </div>
                   </div>
                 </div>
-                <div className="p-3 bg-green-500 rounded-full shadow-lg">
-                  <Play className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-purple-900">
-                    ${(stats.hasPeriodData && timeFilter !== "all" ? stats.periodBilling : stats.totalBudget).toLocaleString()}
+                
+                <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 hover:shadow-md transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-bold text-orange-900">{stats.totalHours.toFixed(0)}h</div>
+                      <div className="text-sm text-orange-700 font-medium">Horas Registradas</div>
+                      <div className="text-xs text-orange-600 opacity-75">
+                        {timeFilter === "all" ? "Datos totales" : "Del período seleccionado"}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-orange-500 rounded-full shadow-lg">
+                      <Clock className="h-6 w-6 text-white" />
+                    </div>
                   </div>
-                  <div className="text-sm text-purple-700 font-medium">
-                    {stats.hasPeriodData && timeFilter !== "all" ? "Facturación (período)" : 
-                     timeFilter === "all" ? "Facturación Total" : "Facturación (período)"}
-                  </div>
-                </div>
-                <div className="p-3 bg-purple-500 rounded-full shadow-lg">
-                  <DollarSign className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-orange-900">{stats.totalHours.toFixed(0)}h</div>
-                  <div className="text-sm text-orange-700 font-medium">
-                    {timeFilter === "all" ? "Horas Registradas" : "Horas (período)"}
-                  </div>
-                </div>
-                <div className="p-3 bg-orange-500 rounded-full shadow-lg">
-                  <Clock className="h-6 w-6 text-white" />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Filtros rápidos */}
-          <div className="flex items-center gap-2 mb-4">
+          {/* Filtros rápidos y toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showOnlyPeriodActivity ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowOnlyPeriodActivity(!showOnlyPeriodActivity)}
+                className="h-8"
+                disabled={timeFilter === "all"}
+              >
+                <Filter className="h-3 w-3 mr-1" />
+                Solo con actividad en el período
+              </Button>
+              {showOnlyPeriodActivity && timeFilter !== "all" && (
+                <span className="text-xs text-gray-500">
+                  Mostrando solo proyectos con actividad en {timeFilter.replace("_", " ")}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
             <Button
               variant={filterStatus === "active" ? "default" : "outline"}
               size="sm"
@@ -982,6 +1027,7 @@ export default function ActiveProjectsRedesigned() {
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Completados
             </Button>
+            </div>
           </div>
 
           {/* Filtros y búsqueda */}

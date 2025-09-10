@@ -608,6 +608,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return allSales;
       }
       
+      // Verificar que dateRange no sea null
+      if (!dateRange || !dateRange.startDate || !dateRange.endDate) {
+        console.log(`⚠️ Invalid dateRange for filter ${timeFilter}, returning all sales`);
+        return allSales;
+      }
+      
       // Filtrar por fechas según el período temporal
       const filteredSales = allSales.filter(sale => {
         // Crear fecha del primer día del mes de la venta usando getMonthNumber
@@ -648,6 +654,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Si es 'all', retornar todos los costos directos
       if (timeFilter === 'all') {
         console.log(`💰 Returning all ${allDirectCosts.length} direct costs (filter: all)`);
+        return allDirectCosts;
+      }
+      
+      // Verificar que dateRange no sea null
+      if (!dateRange || !dateRange.startDate || !dateRange.endDate) {
+        console.log(`⚠️ Invalid dateRange for filter ${timeFilter}, returning all direct costs`);
         return allDirectCosts;
       }
       
