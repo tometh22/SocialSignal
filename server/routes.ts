@@ -3769,6 +3769,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 0; i < projects.length; i++) {
         const project = projects[i];
         
+        // 🎯 NUEVO: Calcular horas estimadas de la cotización
+        let estimatedHours = 0;
+        if (project.quotation) {
+          try {
+            const quotationTeam = await storage.getQuotationTeamMembers(project.quotation.id);
+            estimatedHours = quotationTeam.reduce((total, member) => total + (member.hours || 0), 0);
+            console.log(`🔢 Project ${project.id} estimated hours from quotation:`, estimatedHours);
+          } catch (error) {
+            console.error(`⚠️ Error calculating estimated hours for project ${project.id}:`, error);
+          }
+        }
+        
         // Obtener datos del Excel MAESTRO para este proyecto (sin filtro)
         const allDirectCosts = await storage.getDirectCostsByProject(project.id);
         
@@ -3786,9 +3798,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalHours: excelTotalHours
           });
           
-          // Agregar datos del Excel MAESTRO al proyecto
+          // 🎯 CORREGIDO: Agregar datos del Excel MAESTRO Y horas estimadas al proyecto
           projects[i] = {
             ...project,
+            quotation: project.quotation ? {
+              ...project.quotation,
+              estimatedHours: estimatedHours // 🔢 NUEVO: Horas objetivo de la cotización
+            } : null,
             excelMAESTROData: {
               totalCost: excelTotalCost,
               totalHours: excelTotalHours,
