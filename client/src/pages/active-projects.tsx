@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useImageRefresh } from "@/contexts/ImageRefreshContext";
+import { useCompleteProjectData } from "@/hooks/useCompleteProjectData";
 import {
   Select,
   SelectContent,
@@ -614,52 +615,65 @@ export default function ActiveProjectsRedesigned() {
     enabled: timeFilter === 'all' // Solo cargar cuando se necesite
   });
 
-  // 🎯 CORREGIDO: Función para obtener horas de un proyecto según el filtro temporal
-  const getProjectHours = (projectId: number): number => {
-    if (timeFilter === 'all') {
-      // Para "Todo el tiempo", usar allTimeEntriesData (todos los datos históricos)
-      if (!allTimeEntriesData || typeof allTimeEntriesData !== 'object') return 0;
-      const entries = (allTimeEntriesData as any)[projectId] || [];
-      return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
-    } else {
-      // Para períodos específicos, usar periodMetrics si está disponible
-      const project = projects.find((p: any) => p.id === projectId);
-      if (project?.periodMetrics) {
-        return project.periodMetrics.hours || 0;
-      }
-      // Si no hay periodMetrics, usar timeEntriesData filtrado
-      if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
-      const entries = (timeEntriesData as any)[projectId] || [];
-      return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
-    }
+  // Hook para obtener datos reales del Excel MAESTRO para cada proyecto
+  const useProjectRealData = (projectId: number) => {
+    return useCompleteProjectData(projectId, timeFilter);
   };
 
-  // Función para obtener costos del período
+  // 🎯 NUEVO: Función para obtener horas REALES de un proyecto desde Excel MAESTRO
+  const getProjectHours = (projectId: number): number => {
+    // Buscar el proyecto en la lista para obtener sus datos reales
+    const project = projects.find((p: any) => p.id === projectId);
+    if (!project) return 0;
+    
+    // Si el proyecto tiene periodMetrics calculados desde Excel MAESTRO, usarlos
+    if (project.periodMetrics) {
+      return project.periodMetrics.hours || 0;
+    }
+    
+    // Fallback: usar datos estimados si no hay datos reales disponibles
+    const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
+      return total + (member.estimatedHours || 0);
+    }, 0) || 0;
+    
+    return estimatedHours;
+  };
+
+  // 🎯 NUEVO: Función para obtener costos REALES de un proyecto desde Excel MAESTRO
   const getProjectCost = (project: any): number => {
+    // Si hay datos del período desde Excel MAESTRO, usarlos
     if (project.periodMetrics && timeFilter !== 'all') {
       return project.periodMetrics.cost || 0;
     }
     
-    // 🎯 CORREGIDO: Para "Todo el tiempo", calcular costo completo del proyecto
+    // Para "Todo el tiempo", necesitamos obtener datos consolidados del Excel MAESTRO
     if (timeFilter === 'all') {
-      // Usar el precio total de la cotización como base para cálculo de costo
+      // Usar periodMetrics.totalCost si está disponible (datos desde Excel MAESTRO)
+      if (project.periodMetrics?.totalCost) {
+        return project.periodMetrics.totalCost;
+      }
+      // Fallback: estimación basada en cotización
       const totalAmount = project.quotation?.totalAmount || 0;
-      // Aproximación: 70% del precio como costo estimado para todo el período
       return totalAmount * 0.7;
     }
     
     return 0;
   };
 
-  // Función para obtener facturación del período
+  // 🎯 NUEVO: Función para obtener facturación REAL del período desde Excel MAESTRO
   const getProjectBilling = (project: any): number => {
+    // Si hay datos del período desde Excel MAESTRO, usarlos
     if (project.periodMetrics && timeFilter !== 'all') {
       return project.periodMetrics.billing || 0;
     }
     
-    // 🎯 CORREGIDO: Para "Todo el tiempo", usar facturación completa del proyecto
+    // Para "Todo el tiempo", usar datos consolidados del Excel MAESTRO
     if (timeFilter === 'all') {
-      // Para "Todo el tiempo", mostrar el valor total de la cotización
+      // Usar periodMetrics.totalBilling si está disponible (datos desde Excel MAESTRO)
+      if (project.periodMetrics?.totalBilling) {
+        return project.periodMetrics.totalBilling;
+      }
+      // Fallback: valor total de la cotización
       return project.quotation?.totalAmount || 0;
     }
     
