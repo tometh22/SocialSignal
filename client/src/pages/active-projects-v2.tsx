@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -84,17 +84,87 @@ interface DashboardData {
   timestamp: string;
 }
 
-// Custom hook para el dashboard
+// Custom hook para el dashboard usando el endpoint que SÍ funciona
 function useDashboardData(timeFilter: string) {
-  return useQuery<DashboardData>({
-    queryKey: ["/api/dashboard/projects", timeFilter],
-    queryFn: ({ queryKey }) => {
-      const currentTimeFilter = queryKey[1] as string;
-      return apiRequest(`/api/dashboard/projects?timeFilter=${currentTimeFilter}`, 'GET');
-    },
-    staleTime: 30000, // Cache por 30 segundos
-    refetchOnWindowFocus: false,
+  // Primero obtener la lista de proyectos activos
+  const { data: projects } = useQuery({
+    queryKey: ["/api/active-projects"],
+    staleTime: 5 * 60 * 1000,
   });
+
+  // Luego obtener datos completos para cada proyecto usando el endpoint que funciona
+  const projectsQueries = useQueries({
+    queries: (projects || []).map((project: any) => ({
+      queryKey: ["/api/projects", project.id, "complete-data", timeFilter],
+      queryFn: () => apiRequest(`/api/projects/${project.id}/complete-data?timeFilter=${timeFilter}`, 'GET'),
+      enabled: !!project.id,
+      staleTime: 5 * 60 * 1000,
+    }))
+  });
+
+  // Combinar resultados
+  const isLoading = !projects || projectsQueries.some(q => q.isLoading);
+  const error = projectsQueries.find(q => q.error)?.error;
+
+  if (isLoading || error) {
+    return { data: null, isLoading, error, refetch: () => {} };
+  }
+
+  // Procesar datos y crear estructura del dashboard
+  const projectsData = projectsQueries
+    .filter(q => q.data)
+    .map(q => q.data)
+    .filter(data => data && !data.error);
+
+  const dashboardData: DashboardData = {
+    timeFilter,
+    dateRange: null,
+    projects: projectsData.map((data: any) => ({
+      id: data.project?.id || 0,
+      name: data.project?.quotation?.projectName || data.project?.name || "Proyecto sin nombre",
+      client: data.project?.client || null,
+      clientId: data.project?.clientId || 0,
+      status: data.project?.status || "active",
+      isAlwaysOn: data.project?.isAlwaysOnMacro || false,
+      estimatedHours: data.estimatedHours || 0,
+      workedHours: data.totalHours || 0,
+      totalRevenue: data.totalRevenue || 0,
+      totalCost: data.totalCost || 0,
+      markup: data.totalRevenue && data.totalCost > 0 ? (data.totalRevenue / data.totalCost).toFixed(2) : "0.00",
+      efficiency: data.estimatedHours > 0 ? ((data.totalHours / data.estimatedHours) * 100).toFixed(1) : "0.0",
+      hasActivity: (data.totalHours || 0) > 0 || (data.totalRevenue || 0) > 0,
+      teamSize: data.teamMembers?.length || 0,
+      progress: data.estimatedHours > 0 ? Math.min((data.totalHours / data.estimatedHours) * 100, 100) : 0,
+      lastActivity: data.lastActivity,
+      error: data.error,
+      salesCount: data.salesData?.length || 0
+    })),
+    stats: {
+      total: projectsData.length,
+      active: projectsData.filter((data: any) => (data.totalHours || 0) > 0 || (data.totalRevenue || 0) > 0).length,
+      totalRevenue: projectsData.reduce((sum: number, data: any) => sum + (data.totalRevenue || 0), 0),
+      totalCost: projectsData.reduce((sum: number, data: any) => sum + (data.totalCost || 0), 0),
+      totalHours: projectsData.reduce((sum: number, data: any) => sum + (data.totalHours || 0), 0),
+      averageMarkup: projectsData.length > 0 ? 
+        (projectsData.reduce((sum: number, data: any) => {
+          const markup = data.totalRevenue && data.totalCost > 0 ? data.totalRevenue / data.totalCost : 0;
+          return sum + markup;
+        }, 0) / projectsData.length).toFixed(2) : "0.00",
+      averageEfficiency: projectsData.length > 0 ?
+        (projectsData.reduce((sum: number, data: any) => {
+          const eff = data.estimatedHours > 0 ? (data.totalHours / data.estimatedHours) * 100 : 0;
+          return sum + eff;
+        }, 0) / projectsData.length).toFixed(1) : "0.0"
+    },
+    clients: [],
+    timestamp: new Date().toISOString()
+  };
+
+  const refetch = () => {
+    projectsQueries.forEach(q => q.refetch?.());
+  };
+
+  return { data: dashboardData, isLoading: false, error: null, refetch };
 }
 
 // Componente para las estadísticas
