@@ -620,18 +620,23 @@ export default function ActiveProjectsRedesigned() {
     return useCompleteProjectData(projectId, timeFilter);
   };
 
-  // 🎯 NUEVO: Función para obtener horas REALES de un proyecto desde Excel MAESTRO
+  // 🎯 CORREGIDO: Función para obtener horas REALES de un proyecto desde Excel MAESTRO
   const getProjectHours = (projectId: number): number => {
     // Buscar el proyecto en la lista para obtener sus datos reales
     const project = projects.find((p: any) => p.id === projectId);
     if (!project) return 0;
     
-    // Si el proyecto tiene periodMetrics calculados desde Excel MAESTRO, usarlos
+    // PRIORIDAD 1: Si el proyecto tiene periodMetrics calculados (filtro temporal), usarlos
     if (project.periodMetrics) {
       return project.periodMetrics.hours || 0;
     }
     
-    // Fallback: usar datos estimados si no hay datos reales disponibles
+    // PRIORIDAD 2: Si el proyecto tiene datos del Excel MAESTRO, usarlos
+    if (project.excelMAESTROData && project.excelMAESTROData.totalHours > 0) {
+      return project.excelMAESTROData.totalHours;
+    }
+    
+    // PRIORIDAD 3: Fallback a datos estimados si no hay datos reales disponibles
     const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
       return total + (member.estimatedHours || 0);
     }, 0) || 0;

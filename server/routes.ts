@@ -3594,6 +3594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Obtener todos los proyectos
       const allProjects = await storage.getActiveProjects();
+      console.log(`🔍 Retrieved ${allProjects.length} projects from storage`);
 
       // Filtrar los proyectos según el parámetro
       let projects;
@@ -3680,7 +3681,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             if (projectDirectCosts && projectDirectCosts.length > 0) {
               // Sumar costos reales del Excel MAESTRO
-              const excelCost = projectDirectCosts.reduce((sum, cost) => sum + (cost.montoTotalUSD || cost.costoTotal || 0), 0);
+              const excelCost = projectDirectCosts.reduce((sum, cost) => {
+                const amount = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : (cost.costoTotal || 0);
+                return sum + (isNaN(amount) ? 0 : amount);
+              }, 0);
               const excelHours = projectDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
               
               periodCost += excelCost;
@@ -3755,6 +3759,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           console.log(`📊 Enriched ${projects.length} projects with period metrics`);
+        }
+      }
+
+      // 🎯 NUEVO: Enriquecer TODOS los proyectos con datos del Excel MAESTRO
+      // (No solo cuando hay filtro temporal)
+      console.log(`📊 Enriching all ${projects.length} projects with Excel MAESTRO data...`);
+      
+      for (let i = 0; i < projects.length; i++) {
+        const project = projects[i];
+        
+        // Obtener datos del Excel MAESTRO para este proyecto (sin filtro)
+        const allDirectCosts = await storage.getDirectCostsByProject(project.id);
+        
+        if (allDirectCosts && allDirectCosts.length > 0) {
+          // Calcular totales del Excel MAESTRO
+          const excelTotalCost = allDirectCosts.reduce((sum, cost) => {
+            const amount = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : (cost.costoTotal || 0);
+            return sum + (isNaN(amount) ? 0 : amount);
+          }, 0);
+          const excelTotalHours = allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
+          
+          console.log(`📊 Project ${project.id} Excel MAESTRO data:`, {
+            costEntries: allDirectCosts.length,
+            totalCost: excelTotalCost,
+            totalHours: excelTotalHours
+          });
+          
+          // Agregar datos del Excel MAESTRO al proyecto
+          projects[i] = {
+            ...project,
+            excelMAESTROData: {
+              totalCost: excelTotalCost,
+              totalHours: excelTotalHours,
+              entries: allDirectCosts.length
+            }
+          };
         }
       }
 
