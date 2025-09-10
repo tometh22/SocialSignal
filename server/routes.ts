@@ -104,11 +104,13 @@ export function getDateRangeForFilter(filter: string) {
   switch (filter) {
     case 'current_month':
     case 'this-month':
+    case 'este_mes':
       startDate = new Date(now.getFullYear(), now.getMonth(), 1);
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       break;
     case 'last_month':
     case 'last-month':
+    case 'mes_pasado':
       startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       endDate = new Date(now.getFullYear(), now.getMonth(), 0);
       break;
@@ -135,12 +137,14 @@ export function getDateRangeForFilter(filter: string) {
       break;
     case 'current_quarter':
     case 'this-quarter':
+    case 'este_trimestre':
       const currentQuarter = Math.floor(now.getMonth() / 3);
       startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
       endDate = new Date(now.getFullYear(), (currentQuarter + 1) * 3, 0);
       break;
     case 'last_quarter':
     case 'last-quarter':
+    case 'trimestre_pasado':
       const lastQuarter = Math.floor(now.getMonth() / 3) - 1;
       const quarterYear = lastQuarter < 0 ? now.getFullYear() - 1 : now.getFullYear();
       const adjustedQuarter = lastQuarter < 0 ? 3 : lastQuarter;
