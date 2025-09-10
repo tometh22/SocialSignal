@@ -84,10 +84,15 @@ function ProjectCard({
   const totalHours = getProjectHours(project.id);
   const isAlwaysOnProject = project.isAlwaysOnMacro || subprojects.length > 0;
   
-  // Verificar si tenemos datos del período específico
-  const hasPeriodMetrics = project.periodMetrics;
-  const periodCost = hasPeriodMetrics ? project.periodMetrics.cost : 0;
-  const periodBilling = hasPeriodMetrics ? project.periodMetrics.billing : 0;
+  // 🎯 CORREGIDO: Usar hook completeData en lugar de project.periodMetrics
+  const { data: completeData } = useCompleteProjectData(project.id, timeFilter);
+  
+  // Define hasPeriodMetrics based on timeFilter
+  const hasPeriodMetrics = timeFilter !== 'all';
+  
+  // Obtener métricas REALES del hook corregido (como en vista individual)
+  const periodCost = completeData?.actuals?.totalWorkedCost || 0;
+  const periodBilling = completeData?.quotation?.totalAmount || 0;
   
   // 🎯 Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';
@@ -111,9 +116,6 @@ function ProjectCard({
       excelData: project.excelMAESTROData
     });
   }
-  
-  // 🎯 NUEVO: Obtener horas objetivo del Excel MAESTRO usando useCompleteProjectData
-  const { data: completeData } = useCompleteProjectData(project.id, timeFilter);
   
   // Calcular horas objetivo totales del Excel MAESTRO
   const excelTargetHours = completeData?.directCosts?.reduce((sum: number, cost: any) => {
@@ -749,9 +751,9 @@ export default function ActiveProjectsRedesigned() {
     if (isFeeMensual) {
       // FEE MENSUAL: Usar filtros temporales cuando corresponda
       if (timeFilter !== 'all') {
-        // Para período específico: PRIORIZAR datos del Excel MAESTRO filtrados por período
-        if (project.periodMetrics && project.periodMetrics.hours > 0) {
-          return project.periodMetrics.hours;
+        // Para período específico: usar datos filtrados del completeData
+        if (project.excelMAESTROData && project.excelMAESTROData.totalHours > 0) {
+          return project.excelMAESTROData.totalHours;
         }
         // Fallback: datos de time entries del período
         return timeEntriesData[projectId]?.hours || 0;
@@ -776,46 +778,6 @@ export default function ActiveProjectsRedesigned() {
     return estimatedHours;
   };
 
-  // 🎯 NUEVO: Función para obtener costos REALES de un proyecto desde Excel MAESTRO
-  const getProjectCost = (project: any): number => {
-    // Si hay datos del período desde Excel MAESTRO, usarlos
-    if (project.periodMetrics && timeFilter !== 'all') {
-      return project.periodMetrics.cost || 0;
-    }
-    
-    // Para "Todo el tiempo", necesitamos obtener datos consolidados del Excel MAESTRO
-    if (timeFilter === 'all') {
-      // Usar periodMetrics.totalCost si está disponible (datos desde Excel MAESTRO)
-      if (project.periodMetrics?.totalCost) {
-        return project.periodMetrics.totalCost;
-      }
-      // Fallback: estimación basada en cotización
-      const totalAmount = project.quotation?.totalAmount || 0;
-      return totalAmount * 0.7;
-    }
-    
-    return 0;
-  };
-
-  // 🎯 NUEVO: Función para obtener facturación REAL del período desde Excel MAESTRO
-  const getProjectBilling = (project: any): number => {
-    // Si hay datos del período desde Excel MAESTRO, usarlos
-    if (project.periodMetrics && timeFilter !== 'all') {
-      return project.periodMetrics.billing || 0;
-    }
-    
-    // Para "Todo el tiempo", usar datos consolidados del Excel MAESTRO
-    if (timeFilter === 'all') {
-      // Usar periodMetrics.totalBilling si está disponible (datos desde Excel MAESTRO)
-      if (project.periodMetrics?.totalBilling) {
-        return project.periodMetrics.totalBilling;
-      }
-      // Fallback: valor total de la cotización
-      return project.quotation?.totalAmount || 0;
-    }
-    
-    return 0;
-  };
 
   // Proyectos filtrados y ordenados
   const filteredProjects = useMemo(() => {
@@ -874,11 +836,9 @@ export default function ActiveProjectsRedesigned() {
     const totalBudget = filteredProjects.reduce((sum: number, p: any) => sum + (p.quotation?.totalAmount || 0), 0);
     const totalHours = filteredProjects.reduce((sum: number, p: any) => sum + getProjectHours(p.id), 0);
     
-    // Calcular métricas específicas del período si hay datos disponibles
-    const periodBilling = filteredProjects.reduce((sum: number, p: any) => 
-      sum + (p.periodMetrics?.billing || 0), 0);
-    const periodCost = filteredProjects.reduce((sum: number, p: any) => 
-      sum + (p.periodMetrics?.cost || 0), 0);
+    // Calcular métricas específicas del período usando datos reales
+    const periodBilling = 0; // Will be calculated from completeData in each ProjectCard
+    const periodCost = 0; // Will be calculated from completeData in each ProjectCard
     
     return {
       total: filteredProjects.length,
@@ -887,7 +847,7 @@ export default function ActiveProjectsRedesigned() {
       totalHours,
       periodBilling,
       periodCost,
-      hasPeriodData: filteredProjects.some((p: any) => p.periodMetrics)
+      hasPeriodData: timeFilter !== 'all'
     };
   }, [filteredProjects, timeEntriesData]);
 
