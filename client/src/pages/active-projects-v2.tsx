@@ -87,7 +87,7 @@ interface DashboardData {
 // Custom hook para el dashboard usando el endpoint que SÍ funciona
 function useDashboardData(timeFilter: string) {
   // Primero obtener la lista de proyectos activos
-  const { data: projects } = useQuery({
+  const { data: projects, isLoading: projectsLoading } = useQuery({
     queryKey: ["/api/active-projects"],
     staleTime: 5 * 60 * 1000,
   });
@@ -96,18 +96,36 @@ function useDashboardData(timeFilter: string) {
   const projectsQueries = useQueries({
     queries: (projects || []).map((project: any) => ({
       queryKey: ["/api/projects", project.id, "complete-data", timeFilter],
-      queryFn: () => apiRequest(`/api/projects/${project.id}/complete-data?timeFilter=${timeFilter}`, 'GET'),
-      enabled: !!project.id,
+      queryFn: () => {
+        console.log(`🔥 Fetching complete data for project ${project.id} with filter ${timeFilter}`);
+        return apiRequest(`/api/projects/${project.id}/complete-data?timeFilter=${timeFilter}`, 'GET');
+      },
+      enabled: !!project.id && !!projects,
       staleTime: 5 * 60 * 1000,
     }))
   });
 
+  console.log(`🔍 Dashboard Debug:`, {
+    projectsCount: projects?.length || 0,
+    projectsLoading,
+    queriesCount: projectsQueries.length,
+    queriesLoading: projectsQueries.filter(q => q.isLoading).length,
+    queriesWithData: projectsQueries.filter(q => q.data).length,
+    queriesWithError: projectsQueries.filter(q => q.error).length
+  });
+
   // Combinar resultados
-  const isLoading = !projects || projectsQueries.some(q => q.isLoading);
+  const isLoading = projectsLoading || projectsQueries.some(q => q.isLoading);
   const error = projectsQueries.find(q => q.error)?.error;
 
-  if (isLoading || error) {
-    return { data: null, isLoading, error, refetch: () => {} };
+  if (isLoading) {
+    console.log(`⏳ Dashboard still loading...`);
+    return { data: null, isLoading: true, error: null, refetch: () => {} };
+  }
+
+  if (error) {
+    console.error(`❌ Dashboard error:`, error);
+    return { data: null, isLoading: false, error, refetch: () => {} };
   }
 
   // Procesar datos y crear estructura del dashboard
@@ -116,10 +134,22 @@ function useDashboardData(timeFilter: string) {
     .map(q => q.data)
     .filter(data => data && !data.error);
 
-  const dashboardData: DashboardData = {
-    timeFilter,
-    dateRange: null,
-    projects: projectsData.map((data: any) => ({
+  console.log(`📊 Processing ${projectsData.length} projects for dashboard`);
+  
+  // Log sample data
+  if (projectsData.length > 0) {
+    console.log(`📋 Sample project data:`, {
+      projectId: projectsData[0].project?.id,
+      projectName: projectsData[0].project?.quotation?.projectName,
+      totalRevenue: projectsData[0].totalRevenue,
+      totalCost: projectsData[0].totalCost,
+      totalHours: projectsData[0].totalHours,
+      teamMembersCount: projectsData[0].teamMembers?.length
+    });
+  }
+
+  const dashboardProjects = projectsData.map((data: any) => {
+    const project = {
       id: data.project?.id || 0,
       name: data.project?.quotation?.projectName || data.project?.name || "Proyecto sin nombre",
       client: data.project?.client || null,
@@ -138,27 +168,39 @@ function useDashboardData(timeFilter: string) {
       lastActivity: data.lastActivity,
       error: data.error,
       salesCount: data.salesData?.length || 0
-    })),
+    };
+    
+    console.log(`📊 Project ${project.id} (${project.name}):`, {
+      revenue: project.totalRevenue,
+      cost: project.totalCost,
+      hours: project.workedHours,
+      markup: project.markup,
+      hasActivity: project.hasActivity
+    });
+    
+    return project;
+  });
+
+  const dashboardData: DashboardData = {
+    timeFilter,
+    dateRange: null,
+    projects: dashboardProjects,
     stats: {
       total: projectsData.length,
-      active: projectsData.filter((data: any) => (data.totalHours || 0) > 0 || (data.totalRevenue || 0) > 0).length,
-      totalRevenue: projectsData.reduce((sum: number, data: any) => sum + (data.totalRevenue || 0), 0),
-      totalCost: projectsData.reduce((sum: number, data: any) => sum + (data.totalCost || 0), 0),
-      totalHours: projectsData.reduce((sum: number, data: any) => sum + (data.totalHours || 0), 0),
-      averageMarkup: projectsData.length > 0 ? 
-        (projectsData.reduce((sum: number, data: any) => {
-          const markup = data.totalRevenue && data.totalCost > 0 ? data.totalRevenue / data.totalCost : 0;
-          return sum + markup;
-        }, 0) / projectsData.length).toFixed(2) : "0.00",
-      averageEfficiency: projectsData.length > 0 ?
-        (projectsData.reduce((sum: number, data: any) => {
-          const eff = data.estimatedHours > 0 ? (data.totalHours / data.estimatedHours) * 100 : 0;
-          return sum + eff;
-        }, 0) / projectsData.length).toFixed(1) : "0.0"
+      active: dashboardProjects.filter(p => p.hasActivity).length,
+      totalRevenue: dashboardProjects.reduce((sum, p) => sum + p.totalRevenue, 0),
+      totalCost: dashboardProjects.reduce((sum, p) => sum + p.totalCost, 0),
+      totalHours: dashboardProjects.reduce((sum, p) => sum + p.workedHours, 0),
+      averageMarkup: dashboardProjects.length > 0 ? 
+        (dashboardProjects.reduce((sum, p) => sum + parseFloat(p.markup), 0) / dashboardProjects.length).toFixed(2) : "0.00",
+      averageEfficiency: dashboardProjects.length > 0 ?
+        (dashboardProjects.reduce((sum, p) => sum + parseFloat(p.efficiency), 0) / dashboardProjects.length).toFixed(1) : "0.0"
     },
     clients: [],
     timestamp: new Date().toISOString()
   };
+
+  console.log(`✅ Dashboard stats calculated:`, dashboardData.stats);
 
   const refetch = () => {
     projectsQueries.forEach(q => q.refetch?.());
