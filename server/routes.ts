@@ -11996,9 +11996,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const consolidatedProjects = await Promise.all(
         mainProjects.map(async (project) => {
           try {
-            // Obtener datos completos del proyecto con filtro temporal
-            const completeData = await storage.getCompleteProjectData(project.id, timeFilter);
-            
             // Obtener datos de ventas filtradas
             const salesQuery = `
               SELECT * FROM google_sheets_sales 
@@ -12023,10 +12020,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const totalCost = costSummary?.totalWorkedCost || 0;
             const totalHours = costSummary?.totalWorkedHours || 0;
             
+            // Obtener el tamaño del equipo desde las time entries
+            const timeEntriesQuery = `
+              SELECT DISTINCT personnel_id FROM time_entries 
+              WHERE project_id = $1 
+              ${dateRange ? 'AND date >= $2 AND date <= $3' : ''}
+            `;
+            const { rows: teamMembers } = await pool.query(timeEntriesQuery, salesParams);
+            const teamSize = teamMembers.length;
+            
             // Calcular métricas
             const markup = totalCost > 0 ? (totalRevenue / totalCost) : 0;
-            const efficiency = project.estimatedHours > 0 ? 
-              (totalHours / project.estimatedHours * 100) : 0;
+            const estimatedHours = project.quotation?.estimatedHours || project.estimatedHours || 0;
+            const efficiency = estimatedHours > 0 ? 
+              (totalHours / estimatedHours * 100) : 0;
+            
+            // Obtener la última actividad
+            const lastActivityQuery = `
+              SELECT MAX(date) as last_activity FROM time_entries 
+              WHERE project_id = $1
+            `;
+            const { rows: activityRows } = await pool.query(lastActivityQuery, [project.id]);
+            const lastActivity = activityRows[0]?.last_activity || null;
             
             return {
               id: project.id,
@@ -12034,7 +12049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               clientId: project.clientId,
               status: project.status,
               isAlwaysOn: project.isAlwaysOnMacro,
-              estimatedHours: project.estimatedHours || 0,
+              estimatedHours: estimatedHours,
               workedHours: totalHours,
               totalRevenue,
               totalCost,
@@ -12042,9 +12057,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               efficiency: efficiency.toFixed(1),
               salesCount: salesData.length,
               hasActivity: totalHours > 0 || totalRevenue > 0,
-              lastActivity: completeData?.lastActivity || null,
-              teamSize: completeData?.teamBreakdownLength || 0,
-              progress: efficiency > 100 ? 100 : efficiency
+              lastActivity,
+              teamSize,
+              progress: Math.min(efficiency, 100)
             };
           } catch (error) {
             console.error(`❌ Error processing project ${project.id}:`, error);
