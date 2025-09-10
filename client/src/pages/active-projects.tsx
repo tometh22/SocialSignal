@@ -120,47 +120,54 @@ function ProjectCard({
     return sum + (cost.horasObjetivo || 0);
   }, 0) || 0;
   
-  // Calcular horas objetivo del período actual (para fee mensual)
-  const periodTargetHours = completeData?.actuals?.teamBreakdown?.reduce((sum: number, member: any) => {
-    return sum + (member.targetHours || 0);
-  }, 0) || 0;
-
-  let progressPercentage = 0;
-  let progressLabel = "";
-  let progressSubtitle = "";
+  // 🎯 NUEVA MÉTRICA: Calcular eficiencia usando Excel MAESTRO
+  // Calcular horas objetivo y reales del Excel MAESTRO según el filtro temporal
+  let targetHours = 0;
+  let actualHours = 0;
   
-  if (isFeeMensual) {
-    // 🎯 CORREGIDO: Para proyectos fee mensual, elegir target según timeFilter
-    const target = timeFilter === 'all' ? excelTargetHours : periodTargetHours;
-    const periodLabel = timeFilter === 'all' ? 'totales' : 'del período';
+  if (completeData?.directCosts) {
+    const costs = Array.isArray(completeData.directCosts) ? completeData.directCosts : [];
+    targetHours = costs.reduce((sum: number, cost: any) => sum + (cost.horasObjetivo || 0), 0);
+    actualHours = costs.reduce((sum: number, cost: any) => sum + (cost.horasRealesAsana || 0), 0);
+  }
+  
+  // Calcular eficiencia: horas objetivo / horas reales * 100
+  let efficiencyPercentage = 0;
+  let efficiencyLabel = "";
+  let efficiencySubtitle = "";
+  let efficiencyStatus = "neutral"; // "good", "warning", "danger", "neutral"
+  
+  if (targetHours > 0 && actualHours > 0) {
+    efficiencyPercentage = (targetHours / actualHours) * 100;
     
-    if (target > 0) {
-      progressPercentage = (totalHours / target) * 100;
-      progressSubtitle = `${totalHours.toFixed(1)}h de ${target.toFixed(0)}h ${periodLabel}`;
-    } else if (totalHours > 0) {
-      progressPercentage = 50; // Hay actividad pero sin objetivo definido
-      progressSubtitle = `${totalHours.toFixed(1)}h ${periodLabel} (sin objetivo)`;
+    if (efficiencyPercentage >= 100) {
+      efficiencyStatus = "good";
+      efficiencyLabel = "Eficiencia excelente";
+      efficiencySubtitle = `${targetHours.toFixed(0)}h objetivo vs ${actualHours.toFixed(0)}h real`;
+    } else if (efficiencyPercentage >= 80) {
+      efficiencyStatus = "warning"; 
+      efficiencyLabel = "Eficiencia aceptable";
+      efficiencySubtitle = `${targetHours.toFixed(0)}h objetivo vs ${actualHours.toFixed(0)}h real`;
     } else {
-      progressPercentage = 0;
-      progressSubtitle = "Sin actividad en el período";
+      efficiencyStatus = "danger";
+      efficiencyLabel = "Eficiencia baja";
+      efficiencySubtitle = `${targetHours.toFixed(0)}h objetivo vs ${actualHours.toFixed(0)}h real`;
     }
-    progressLabel = "Progreso del período";
+  } else if (targetHours > 0) {
+    efficiencyPercentage = 0;
+    efficiencyStatus = "neutral";
+    efficiencyLabel = "Sin horas registradas";
+    efficiencySubtitle = `${targetHours.toFixed(0)}h objetivo planeadas`;
+  } else if (actualHours > 0) {
+    efficiencyPercentage = 0;
+    efficiencyStatus = "neutral";  
+    efficiencyLabel = "Sin objetivo definido";
+    efficiencySubtitle = `${actualHours.toFixed(0)}h trabajadas sin objetivo`;
   } else {
-    // 🎯 CORREGIDO: Para proyectos one-shot, usar horas reales vs objetivo total del Excel MAESTRO
-    const targetHours = excelTargetHours > 0 ? excelTargetHours : estimatedHours;
-    
-    if (targetHours > 0) {
-      progressPercentage = (totalHours / targetHours) * 100;
-      const sourceLabel = excelTargetHours > 0 ? "(Excel MAESTRO)" : "(cotización)";
-      progressSubtitle = `${totalHours.toFixed(1)}h de ${targetHours.toFixed(0)}h ${sourceLabel}`;
-    } else if (totalHours > 0) {
-      progressPercentage = 50; // Hay actividad pero sin objetivo definido
-      progressSubtitle = `${totalHours.toFixed(1)}h registradas (sin objetivo)`;
-    } else {
-      progressPercentage = 0;
-      progressSubtitle = "Sin actividad registrada";
-    }
-    progressLabel = "Progreso del proyecto";
+    efficiencyPercentage = 0;
+    efficiencyStatus = "neutral";
+    efficiencyLabel = "Sin datos de eficiencia";
+    efficiencySubtitle = "No hay datos de Excel MAESTRO";
   }
 
   const getStatusConfig = (status: string) => {
@@ -276,40 +283,53 @@ function ProjectCard({
               </div>
               
               <div className="text-center">
-                <div className="text-lg font-bold text-blue-700">{totalHours.toFixed(1)}h</div>
+                <div className="text-lg font-bold text-blue-700">{actualHours.toFixed(1)}h</div>
                 <div className="text-xs text-gray-600">
-                  {hasPeriodMetrics ? 'Del período' : 'Registradas'}
+                  {timeFilter !== 'all' ? 'Reales del período' : 'Reales registradas'}
                 </div>
               </div>
               
               <div className="text-center">
                 <div className={`text-lg font-bold ${
-                  isFeeMensual ? 'text-blue-700' : 'text-purple-700'
+                  efficiencyStatus === 'good' ? 'text-green-700' : 
+                  efficiencyStatus === 'warning' ? 'text-orange-700' : 
+                  efficiencyStatus === 'danger' ? 'text-red-700' : 
+                  'text-gray-700'
                 }`}>
-                  {progressPercentage.toFixed(0)}%
+                  {efficiencyPercentage > 0 ? `${efficiencyPercentage.toFixed(0)}%` : 'N/A'}
                 </div>
-                <div className="text-xs text-gray-600">
-                  {isFeeMensual ? 'Progreso mensual' : 'Progreso'}
-                </div>
+                <div className="text-xs text-gray-600">Eficiencia</div>
               </div>
             </div>
 
-            {/* Barra de progreso más simple */}
+            {/* Barra de eficiencia */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">{progressLabel}</span>
-                <span className="text-sm font-bold text-gray-900">{progressPercentage.toFixed(0)}%</span>
-              </div>
-              <Progress 
-                value={Math.min(progressPercentage, 100)} 
-                className="h-2" 
-              />
-              <div className="flex justify-between text-xs mt-1 text-gray-500">
-                <span>
-                  {isFeeMensual ? `${totalHours.toFixed(1)}h registradas` : progressSubtitle}
+                <span className="text-sm font-medium text-gray-700">{efficiencyLabel}</span>
+                <span className={`text-sm font-bold ${
+                  efficiencyStatus === 'good' ? 'text-green-900' : 
+                  efficiencyStatus === 'warning' ? 'text-orange-900' : 
+                  efficiencyStatus === 'danger' ? 'text-red-900' : 
+                  'text-gray-900'
+                }`}>
+                  {efficiencyPercentage > 0 ? `${efficiencyPercentage.toFixed(0)}%` : 'N/A'}
                 </span>
-                <span className={!isFeeMensual && progressPercentage > 100 ? 'text-red-600' : ''}>
-                  {isFeeMensual ? progressSubtitle : `${estimatedHours.toFixed(0)}h estimadas`}
+              </div>
+              {efficiencyPercentage > 0 && (
+                <Progress 
+                  value={Math.min(efficiencyPercentage, 100)} 
+                  className={`h-2 ${
+                    efficiencyStatus === 'good' ? '[&>div]:bg-green-500' : 
+                    efficiencyStatus === 'warning' ? '[&>div]:bg-orange-500' : 
+                    efficiencyStatus === 'danger' ? '[&>div]:bg-red-500' : 
+                    '[&>div]:bg-gray-500'
+                  }`}
+                />
+              )}
+              <div className="flex justify-between text-xs mt-1 text-gray-500">
+                <span>{efficiencySubtitle}</span>
+                <span className={efficiencyStatus === 'danger' ? 'text-red-600' : ''}>
+                  {targetHours > 0 ? `Objetivo: ${targetHours.toFixed(0)}h` : 'Sin objetivo'}
                 </span>
               </div>
             </div>
@@ -418,42 +438,88 @@ function ProjectCard({
         </div>
       </CardHeader>
 
-      {/* Métricas del período específico */}
-      {hasPeriodMetrics && (
-        <CardContent className="pt-0">
-          <div className="border-t pt-3 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <CalendarDays className="h-4 w-4 text-orange-500" />
-              <span className="text-sm font-medium text-gray-700">
-                Métricas del período filtrado
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                <div className="text-sm font-bold text-orange-800">
-                  ${periodBilling.toLocaleString()}
-                </div>
-                <div className="text-xs text-orange-600">Facturación del período</div>
-              </div>
-              
-              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                <div className="text-sm font-bold text-red-800">
-                  ${periodCost.toLocaleString()}
-                </div>
-                <div className="text-xs text-red-600">Costos del período</div>
-              </div>
-              
-              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                <div className="text-sm font-bold text-green-800">
-                  ${(periodBilling - periodCost).toLocaleString()}
-                </div>
-                <div className="text-xs text-green-600">Beneficio del período</div>
-              </div>
-            </div>
+      {/* Métricas financieras siempre visibles */}
+      <CardContent className="pt-0">
+        <div className="border-t pt-3 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <DollarSign className="h-4 w-4 text-green-500" />
+            <span className="text-sm font-medium text-gray-700">
+              {timeFilter !== 'all' ? 'Métricas del período filtrado' : 'Métricas financieras totales'}
+            </span>
           </div>
-        </CardContent>
-      )}
+          
+          {/* Calcular métricas financieras usando Excel MAESTRO */}
+          {(() => {
+            const costs = Array.isArray(completeData?.directCosts) ? completeData.directCosts : [];
+            const totalCost = costs.reduce((sum: number, cost: any) => sum + (cost.costoTotal || 0), 0);
+            
+            // 🎯 CORRECCIÓN: Usar tarifas reales del Excel MAESTRO o implícitas
+            const totalBilling = costs.reduce((sum: number, cost: any) => {
+              const horasFacturacion = cost.horasParaFacturacion || 0;
+              let valorHora = cost.valorHoraPersona || 0;
+              const tipoCambio = cost.tipoCambio || 1;
+              
+              // Si no hay tarifa explícita, calcular tarifa implícita ya en USD
+              if (valorHora === 0 && cost.horasRealesAsana > 0 && cost.costoTotal > 0) {
+                // costoTotal ya está en USD, así que la tarifa implícita también es en USD
+                valorHora = cost.costoTotal / cost.horasRealesAsana;
+              } else if (valorHora > 0) {
+                // Si hay tarifa explícita, convertir a USD
+                valorHora = valorHora / tipoCambio;
+              }
+              
+              // Calcular facturación: horas * tarifa (ya en USD)
+              const facturaciónEntry = horasFacturacion * valorHora;
+              return sum + facturaciónEntry;
+            }, 0);
+            
+            const billingHours = costs.reduce((sum: number, cost: any) => sum + (cost.horasParaFacturacion || 0), 0);
+            const markup = totalBilling > 0 && totalCost > 0 ? ((totalBilling - totalCost) / totalCost * 100) : 0;
+            
+            return (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <div className="text-sm font-bold text-blue-800">
+                    ${totalBilling.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    {timeFilter !== 'all' ? 'Facturación del período' : 'Facturación total'}
+                  </div>
+                  <div className="text-xs text-blue-500 mt-1">
+                    {billingHours.toFixed(1)}h facturables
+                  </div>
+                </div>
+                
+                <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                  <div className="text-sm font-bold text-red-800">
+                    ${totalCost.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-red-600">
+                    {timeFilter !== 'all' ? 'Costos del período' : 'Costos totales'}
+                  </div>
+                  <div className="text-xs text-red-500 mt-1">
+                    {costs.length} entradas de costo
+                  </div>
+                </div>
+                
+                <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                  <div className="text-sm font-bold text-green-800">
+                    {markup > 0 ? `${markup.toFixed(1)}%` : 'N/A'}
+                  </div>
+                  <div className="text-xs text-green-600">Markup</div>
+                  <div className={`text-xs mt-1 ${
+                    markup >= 30 ? 'text-green-500' : 
+                    markup >= 15 ? 'text-orange-500' : 
+                    'text-red-500'
+                  }`}>
+                    ${(totalBilling - totalCost).toLocaleString()} beneficio
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      </CardContent>
 
       {/* Subproyectos expandibles */}
       {isAlwaysOnProject && isExpanded && subprojects.length > 0 && (
