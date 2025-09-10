@@ -564,17 +564,13 @@ export default function ActiveProjectsRedesigned() {
     return filterMap[filter] || 'all';
   };
 
-  // Datos
+  // 🎯 CORREGIDO: Datos de proyectos SIN filtros temporales (siempre mostrar todos)
   const { data: projects = [], isLoading: loadingProjects } = useQuery({
-    queryKey: ["/api/active-projects", timeFilter],
+    queryKey: ["/api/active-projects"],
     queryFn: () => {
-      const apiFilter = getTimeFilterForAPI(timeFilter);
-      const url = `/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`;
-      console.log(`🔍 Active Projects API call:`, { 
-        timeFilter, 
-        apiFilter, 
-        url 
-      });
+      // Siempre traer TODOS los proyectos, sin filtros temporales
+      const url = `/api/active-projects`;
+      console.log(`🔍 Active Projects API call (always all):`, { url });
       return apiRequest(url, 'GET');
     }
   });
@@ -583,11 +579,12 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/clients"],
   });
 
+  // 🎯 CORREGIDO: Proyectos con subproyectos SIN filtros temporales
   const { data: allProjects = [] } = useQuery({
-    queryKey: ["/api/active-projects?showSubprojects=true", timeFilter],
+    queryKey: ["/api/active-projects?showSubprojects=true"],
     queryFn: () => {
-      const apiFilter = getTimeFilterForAPI(timeFilter);
-      return apiRequest(`/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`, 'GET');
+      // Siempre traer TODOS los proyectos con subproyectos
+      return apiRequest(`/api/active-projects?showSubprojects=true`, 'GET');
     }
   });
 
@@ -605,18 +602,24 @@ export default function ActiveProjectsRedesigned() {
     }
   });
 
-  // Función para obtener horas de un proyecto - usa periodMetrics si está disponible
+  // 🎯 CORREGIDO: Función para obtener horas de un proyecto según el filtro temporal
   const getProjectHours = (projectId: number): number => {
-    // Buscar el proyecto en los datos principales para ver si tiene periodMetrics
-    const project = projects.find((p: any) => p.id === projectId);
-    if (project?.periodMetrics && timeFilter !== 'all') {
-      return project.periodMetrics.hours || 0;
+    if (timeFilter === 'all') {
+      // Para "Todo el tiempo", usar timeEntriesData (que ahora SÍ debe tener todos los datos)
+      if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
+      const entries = (timeEntriesData as any)[projectId] || [];
+      return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
+    } else {
+      // Para períodos específicos, usar periodMetrics si está disponible
+      const project = projects.find((p: any) => p.id === projectId);
+      if (project?.periodMetrics) {
+        return project.periodMetrics.hours || 0;
+      }
+      // Si no hay periodMetrics, usar timeEntriesData filtrado
+      if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
+      const entries = (timeEntriesData as any)[projectId] || [];
+      return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
     }
-    
-    // Fallback a timeEntriesData para cálculo completo
-    if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
-    const entries = (timeEntriesData as any)[projectId] || [];
-    return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
   };
 
   // Función para obtener costos del período
