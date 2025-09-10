@@ -588,6 +588,7 @@ export default function ActiveProjectsRedesigned() {
     }
   });
 
+  // 🎯 CORREGIDO: Time entries filtrados por período actual
   const { data: timeEntriesData = {} } = useQuery({
     queryKey: ["/api/time-entries/all-projects", timeFilter],
     queryFn: () => {
@@ -602,12 +603,23 @@ export default function ActiveProjectsRedesigned() {
     }
   });
 
+  // 🎯 NUEVO: Time entries completos para "Todo el tiempo"
+  const { data: allTimeEntriesData = {} } = useQuery({
+    queryKey: ["/api/time-entries/all-projects-complete"],
+    queryFn: () => {
+      const url = `/api/time-entries/all-projects`;
+      console.log(`🔍 All Time Entries API call:`, { url });
+      return apiRequest(url, 'GET');
+    },
+    enabled: timeFilter === 'all' // Solo cargar cuando se necesite
+  });
+
   // 🎯 CORREGIDO: Función para obtener horas de un proyecto según el filtro temporal
   const getProjectHours = (projectId: number): number => {
     if (timeFilter === 'all') {
-      // Para "Todo el tiempo", usar timeEntriesData (que ahora SÍ debe tener todos los datos)
-      if (!timeEntriesData || typeof timeEntriesData !== 'object') return 0;
-      const entries = (timeEntriesData as any)[projectId] || [];
+      // Para "Todo el tiempo", usar allTimeEntriesData (todos los datos históricos)
+      if (!allTimeEntriesData || typeof allTimeEntriesData !== 'object') return 0;
+      const entries = (allTimeEntriesData as any)[projectId] || [];
       return Array.isArray(entries) ? entries.reduce((sum: number, entry: any) => sum + (entry.hours || 0), 0) : 0;
     } else {
       // Para períodos específicos, usar periodMetrics si está disponible
