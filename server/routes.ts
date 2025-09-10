@@ -11996,29 +11996,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const consolidatedProjects = await Promise.all(
         mainProjects.map(async (project) => {
           try {
-            // Obtener datos de ventas filtradas
+            // Obtener datos consolidados de costos Y ventas del Excel MAESTRO
+            const costSummary = await storage.getProjectCostSummary(project.id, dateRange);
+            const totalCost = costSummary?.totalWorkedCost || 0;
+            const totalHours = costSummary?.totalWorkedHours || 0;
+            
+            // Obtener ventas del Excel MAESTRO unificado desde la misma fuente
             const salesQuery = `
-              SELECT * FROM google_sheets_sales 
-              WHERE project_id = $1 
-              ${dateRange ? 'AND make_date(year, month_number, 1) >= $2 AND make_date(year, month_number, 1) <= $3' : ''}
-              ORDER BY year DESC, month_number DESC
+              SELECT 
+                dc.cliente as client_name,
+                dc.proyecto as project_name,
+                dc.mes as month,
+                dc."año" as year,
+                SUM(CASE 
+                  WHEN dc.monto_total_usd IS NOT NULL 
+                  THEN dc.monto_total_usd::numeric 
+                  ELSE 0 
+                END) as total_revenue_usd
+              FROM direct_costs dc
+              WHERE dc.project_id = $1 
+                AND dc.tipo_gasto = 'Directo'
+                ${dateRange ? `AND make_date(dc."año", 
+                  CASE dc.mes
+                    WHEN 'enero' THEN 1 WHEN 'febrero' THEN 2 WHEN 'marzo' THEN 3
+                    WHEN 'abril' THEN 4 WHEN 'mayo' THEN 5 WHEN 'junio' THEN 6
+                    WHEN 'julio' THEN 7 WHEN 'agosto' THEN 8 WHEN 'septiembre' THEN 9
+                    WHEN 'octubre' THEN 10 WHEN 'noviembre' THEN 11 WHEN 'diciembre' THEN 12
+                    ELSE 1
+                  END, 1) >= $2 
+                  AND make_date(dc."año", 
+                    CASE dc.mes
+                      WHEN 'enero' THEN 1 WHEN 'febrero' THEN 2 WHEN 'marzo' THEN 3
+                      WHEN 'abril' THEN 4 WHEN 'mayo' THEN 5 WHEN 'junio' THEN 6
+                      WHEN 'julio' THEN 7 WHEN 'agosto' THEN 8 WHEN 'septiembre' THEN 9
+                      WHEN 'octubre' THEN 10 WHEN 'noviembre' THEN 11 WHEN 'diciembre' THEN 12
+                      ELSE 1
+                    END, 1) <= $3` : ''}
+              GROUP BY dc.cliente, dc.proyecto, dc.mes, dc."año"
+              ORDER BY dc."año" DESC, dc.mes DESC
             `;
+            
             const salesParams = dateRange ? 
               [project.id, dateRange.startDate, dateRange.endDate] :
               [project.id];
             
             const { rows: salesData } = await pool.query(salesQuery, salesParams);
             
-            // Calcular ingresos totales del período
+            // Calcular ingresos totales del período desde Excel MAESTRO
             const totalRevenue = salesData.reduce((sum, sale) => {
-              const amount = parseFloat(sale.amount_usd || '0');
+              const amount = parseFloat(sale.total_revenue_usd || '0');
               return sum + (isNaN(amount) ? 0 : amount);
             }, 0);
-            
-            // Obtener costos del período
-            const costSummary = await storage.getProjectCostSummary(project.id, dateRange);
-            const totalCost = costSummary?.totalWorkedCost || 0;
-            const totalHours = costSummary?.totalWorkedHours || 0;
             
             // Obtener el tamaño del equipo desde las time entries
             const timeEntriesQuery = `
