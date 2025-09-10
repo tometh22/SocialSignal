@@ -70,7 +70,7 @@ import {
   googleSheetsSales,
   directCosts
 } from "@shared/schema";
-import { eq, and, isNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { setupAuth } from "./auth";
 // Temporalmente deshabilitado: import { setupChat } from "./chat";
@@ -3651,14 +3651,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const projectsWithExcelActivity = await db
             .select({ projectId: directCosts.projectId })
             .from(directCosts)
-            .where(sql`
-              directCosts.project_id IS NOT NULL AND
-              directCosts.año = ${dateRange.startDate.getFullYear()} AND
-              directCosts.mes IN (
-                'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-              )
-            `)
+            .where(
+              dateRange 
+                ? and(
+                    isNotNull(directCosts.projectId),
+                    eq(directCosts.año, dateRange.startDate.getFullYear())
+                  )
+                : isNotNull(directCosts.projectId)
+            )
             .groupBy(directCosts.projectId);
           
           const timeActivityIds = new Set(projectsWithTimeActivity.map(p => p.projectId));

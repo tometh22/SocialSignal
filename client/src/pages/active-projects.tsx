@@ -611,13 +611,14 @@ export default function ActiveProjectsRedesigned() {
     return filterMap[filter] || 'all';
   };
 
-  // 🎯 CORREGIDO: Datos de proyectos SIN filtros temporales (siempre mostrar todos)
+  // 🎯 CORREGIDO: Datos de proyectos CON filtros temporales para periodMetrics
   const { data: projects = [], isLoading: loadingProjects } = useQuery({
-    queryKey: ["/api/active-projects"],
+    queryKey: ["/api/active-projects", timeFilter],
     queryFn: () => {
-      // Siempre traer TODOS los proyectos, sin filtros temporales
-      const url = `/api/active-projects`;
-      console.log(`🔍 Active Projects API call (always all):`, { url });
+      // Traer proyectos incluyendo filtro temporal para periodMetrics
+      const apiFilter = getTimeFilterForAPI(timeFilter);
+      const url = `/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`;
+      console.log(`🔍 Active Projects API call with timeFilter:`, { timeFilter, apiFilter, url });
       return apiRequest(url, 'GET');
     }
   });
@@ -626,12 +627,15 @@ export default function ActiveProjectsRedesigned() {
     queryKey: ["/api/clients"],
   });
 
-  // 🎯 CORREGIDO: Proyectos con subproyectos SIN filtros temporales
+  // 🎯 CORREGIDO: Proyectos con subproyectos CON filtros temporales para periodMetrics
   const { data: allProjects = [] } = useQuery({
-    queryKey: ["/api/active-projects?showSubprojects=true"],
+    queryKey: ["/api/active-projects?showSubprojects=true", timeFilter],
     queryFn: () => {
-      // Siempre traer TODOS los proyectos con subproyectos
-      return apiRequest(`/api/active-projects?showSubprojects=true`, 'GET');
+      // Traer proyectos con subproyectos incluyendo filtro temporal para periodMetrics
+      const apiFilter = getTimeFilterForAPI(timeFilter);
+      const url = `/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`;
+      console.log(`🔍 All Projects API call with timeFilter:`, { timeFilter, apiFilter, url });
+      return apiRequest(url, 'GET');
     }
   });
 
@@ -679,7 +683,11 @@ export default function ActiveProjectsRedesigned() {
     if (isFeeMensual) {
       // FEE MENSUAL: Usar filtros temporales cuando corresponda
       if (timeFilter !== 'all') {
-        // Para período específico: solo datos del período, NO fallback a todo el tiempo
+        // Para período específico: PRIORIZAR datos del Excel MAESTRO filtrados por período
+        if (project.periodMetrics && project.periodMetrics.hours > 0) {
+          return project.periodMetrics.hours;
+        }
+        // Fallback: datos de time entries del período
         return timeEntriesData[projectId]?.hours || 0;
       } else {
         // Para "todo el tiempo": usar datos totales del Excel MAESTRO
