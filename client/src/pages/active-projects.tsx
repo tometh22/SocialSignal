@@ -62,6 +62,7 @@ interface ProjectCardProps {
   getProjectHours: (id: number) => number;
   onDeleteProject: (id: number) => void;
   allClients: any[];
+  timeFilter: string;
 }
 
 function ProjectCard({ 
@@ -73,10 +74,9 @@ function ProjectCard({
   onNavigate,
   getProjectHours,
   onDeleteProject,
-  allClients
+  allClients,
+  timeFilter
 }: ProjectCardProps) {
-  // 🎯 Acceder al timeFilter desde el contexto padre
-  const { timeFilter } = useActiveProjectsData();
   const { refreshTimestamp } = useImageRefresh();
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
   const clientName = client?.name || "Cliente desconocido";
@@ -130,13 +130,16 @@ function ProjectCard({
   let progressSubtitle = "";
   
   if (isFeeMensual) {
-    // 🎯 CORREGIDO: Para proyectos fee mensual, usar horas reales vs objetivo del período
-    if (periodTargetHours > 0) {
-      progressPercentage = (totalHours / periodTargetHours) * 100;
-      progressSubtitle = `${totalHours.toFixed(1)}h de ${periodTargetHours.toFixed(0)}h del período`;
+    // 🎯 CORREGIDO: Para proyectos fee mensual, elegir target según timeFilter
+    const target = timeFilter === 'all' ? excelTargetHours : periodTargetHours;
+    const periodLabel = timeFilter === 'all' ? 'totales' : 'del período';
+    
+    if (target > 0) {
+      progressPercentage = (totalHours / target) * 100;
+      progressSubtitle = `${totalHours.toFixed(1)}h de ${target.toFixed(0)}h ${periodLabel}`;
     } else if (totalHours > 0) {
       progressPercentage = 50; // Hay actividad pero sin objetivo definido
-      progressSubtitle = `${totalHours.toFixed(1)}h del período (sin objetivo)`;
+      progressSubtitle = `${totalHours.toFixed(1)}h ${periodLabel} (sin objetivo)`;
     } else {
       progressPercentage = 0;
       progressSubtitle = "Sin actividad en el período";
@@ -668,17 +671,29 @@ export default function ActiveProjectsRedesigned() {
     const project = projects.find((p: any) => p.id === projectId);
     if (!project) return 0;
     
-    // PRIORIDAD 1: Si el proyecto tiene periodMetrics calculados (filtro temporal), usarlos
-    if (project.periodMetrics) {
-      return project.periodMetrics.hours || 0;
+    // Detectar tipo de proyecto
+    const projectType = project.quotation?.projectType || 'one-shot';
+    const isFeeMensual = projectType === 'recurring' || projectType === 'fee-mensual';
+    
+    if (isFeeMensual) {
+      // FEE MENSUAL: Usar filtros temporales cuando corresponda
+      if (timeFilter !== 'all') {
+        // Para período específico: solo datos del período, NO fallback a todo el tiempo
+        return timeEntriesData[projectId]?.hours || 0;
+      } else {
+        // Para "todo el tiempo": usar datos totales del Excel MAESTRO
+        if (project.excelMAESTROData && project.excelMAESTROData.totalHours > 0) {
+          return project.excelMAESTROData.totalHours;
+        }
+      }
+    } else {
+      // ONE-SHOT: SIEMPRE usar datos de todo el tiempo (ignorar filtros)
+      if (project.excelMAESTROData && project.excelMAESTROData.totalHours > 0) {
+        return project.excelMAESTROData.totalHours;
+      }
     }
     
-    // PRIORIDAD 2: Si el proyecto tiene datos del Excel MAESTRO, usarlos
-    if (project.excelMAESTROData && project.excelMAESTROData.totalHours > 0) {
-      return project.excelMAESTROData.totalHours;
-    }
-    
-    // PRIORIDAD 3: Fallback a datos estimados si no hay datos reales disponibles
+    // Fallback para ambos tipos: datos estimados si no hay datos reales disponibles
     const estimatedHours = project.quotation?.teamMembers?.reduce((total: number, member: any) => {
       return total + (member.estimatedHours || 0);
     }, 0) || 0;
@@ -1056,6 +1071,7 @@ export default function ActiveProjectsRedesigned() {
                   getProjectHours={getProjectHours}
                   onDeleteProject={handleDeleteProject}
                   allClients={clients as any[]}
+                  timeFilter={timeFilter}
                 />
               );
             })}
