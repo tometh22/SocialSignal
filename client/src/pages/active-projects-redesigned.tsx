@@ -412,8 +412,9 @@ export default function ActiveProjectsRedesigned() {
   // Datos
   const { data: projects = [], isLoading: loadingProjects } = useQuery({
     queryKey: ["/api/active-projects", timeFilter],
-    queryFn: () => {
-      const apiFilter = getTimeFilterForAPI(timeFilter);
+    queryFn: ({ queryKey }) => {
+      const currentTimeFilter = queryKey[1] as string;
+      const apiFilter = getTimeFilterForAPI(currentTimeFilter);
       return apiRequest(`/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
@@ -424,16 +425,18 @@ export default function ActiveProjectsRedesigned() {
 
   const { data: allProjects = [] } = useQuery({
     queryKey: ["/api/active-projects?showSubprojects=true", timeFilter],
-    queryFn: () => {
-      const apiFilter = getTimeFilterForAPI(timeFilter);
+    queryFn: ({ queryKey }) => {
+      const currentTimeFilter = queryKey[1] as string;
+      const apiFilter = getTimeFilterForAPI(currentTimeFilter);
       return apiRequest(`/api/active-projects?showSubprojects=true${apiFilter !== 'all' ? `&timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
 
   const { data: timeEntriesData = {} } = useQuery({
     queryKey: ["/api/time-entries/all-projects", timeFilter],
-    queryFn: () => {
-      const apiFilter = getTimeFilterForAPI(timeFilter);
+    queryFn: ({ queryKey }) => {
+      const currentTimeFilter = queryKey[1] as string;
+      const apiFilter = getTimeFilterForAPI(currentTimeFilter);
       return apiRequest(`/api/time-entries/all-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`, 'GET');
     }
   });
