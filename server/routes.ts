@@ -1654,10 +1654,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Eficiencia basada en Excel MAESTRO: horasObjetivo vs horasRealesAsana  
       const efficiency = excelTargetHours > 0 ? (excelActualHours / excelTargetHours) * 100 : 0;
       
-      // Revenue desde Google Sheets filtrado temporalmente
+      // Revenue desde Google Sheets filtrado temporalmente - CORRECCIÓN: usar ambos campos
       const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
       const totalRealRevenue = salesData.length > 0 
-        ? salesData.reduce((sum, sale) => sum + (parseFloat(sale.amountUsd || '0') || 0), 0)
+        ? salesData.reduce((sum, sale) => {
+            // Priorizar amountUsd, si no existe convertir amountArs usando tipo de cambio típico
+            const usdAmount = parseFloat(sale.amountUsd || '0') || 0;
+            const arsAmount = parseFloat(sale.amountArs || '0') || 0;
+            
+            if (usdAmount > 0) {
+              return sum + usdAmount;
+            } else if (arsAmount > 0) {
+              // Usar tipo de cambio aproximado (debería obtener el real desde Excel)
+              const estimatedUsd = arsAmount / 1300; // Aproximación, mejorará después
+              console.log(`💱 Converting ARS $${arsAmount} to USD $${estimatedUsd.toFixed(2)} for sale ${sale.id}`);
+              return sum + estimatedUsd;
+            }
+            return sum;
+          }, 0)
         : 0; // NO usar fallback de cotización para métricas de período
       
       console.log(`🎯 CORRECTED METRICS CALCULATION for project ${id} (${timeFilter}):`);

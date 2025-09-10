@@ -4532,8 +4532,26 @@ export class DatabaseStorage implements IStorage {
         const monthName = String(row.mes).toLowerCase().trim();
         const year = parseInt(row.año);
         const salesType = String(row.tipo_venta || row.tipoVenta || 'fee').trim();
-        const amountArs = row.monto_ars || row.montoArs || null;
-        const amountUsd = row.monto_usd || row.montoUsd || null;
+        
+        // 🎯 CORRECCIÓN CRÍTICA: Mapeo correcto de campos de moneda
+        const rawAmountArs = row.monto_ars || row.montoArs || null;
+        const rawAmountUsd = row.monto_usd || row.montoUsd || null;
+        
+        // Determinar moneda principal basada en qué campo tiene datos
+        let currency = 'ARS'; // Default a ARS para Argentina
+        let amountArs = null;
+        let amountUsd = null;
+        
+        if (rawAmountUsd && rawAmountUsd > 0) {
+          currency = 'USD';
+          amountUsd = rawAmountUsd;
+        } else if (rawAmountArs && rawAmountArs > 0) {
+          currency = 'ARS';
+          amountArs = rawAmountArs;
+        }
+        
+        console.log(`💱 Sale mapping for ${clientName}-${projectName}: rawARS=${rawAmountArs}, rawUSD=${rawAmountUsd} → currency=${currency}, finalARS=${amountArs}, finalUSD=${amountUsd}`);
+        
         const confirmed = String(row.confirmado || 'SI').toUpperCase();
         
         // Convertir mes a número
@@ -4569,7 +4587,7 @@ export class DatabaseStorage implements IStorage {
           year,
           salesType,
           amountArs: amountArs ? String(amountArs) : null,
-          // currency: 'ARS', // NUEVO: Moneda por defecto (comentado hasta migración)
+          currency: currency, // 🎯 USAR MONEDA DETERMINADA CORRECTAMENTE
           amountUsd: amountUsd ? String(amountUsd) : null,
           confirmed,
           monthNumber,
