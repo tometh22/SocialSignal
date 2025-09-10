@@ -3621,16 +3621,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           });
           
-          // Obtener IDs de proyectos que tuvieron actividad en el período
-          const projectsWithActivity = await db
+          // 🎯 CORREGIDO: Obtener IDs de proyectos que tuvieron actividad en el período
+          // Incluir tanto time_entries como direct_costs del Excel MAESTRO
+          const projectsWithTimeActivity = await db
             .select({ projectId: timeEntries.projectId })
             .from(timeEntries)
             .where(sql`time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`)
             .groupBy(timeEntries.projectId);
           
-          const activeProjectIds = new Set(projectsWithActivity.map(p => p.projectId));
+          // 🎯 NUEVO: También incluir proyectos con datos del Excel MAESTRO
+          const projectsWithExcelActivity = await db
+            .select({ projectId: directCosts.projectId })
+            .from(directCosts)
+            .where(sql`
+              directCosts.project_id IS NOT NULL AND
+              directCosts.año = ${dateRange.startDate.getFullYear()} AND
+              directCosts.mes IN (
+                'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+              )
+            `)
+            .groupBy(directCosts.projectId);
           
-          console.log(`🔍 Found ${activeProjectIds.size} projects with activity in period`);
+          const timeActivityIds = new Set(projectsWithTimeActivity.map(p => p.projectId));
+          const excelActivityIds = new Set(projectsWithExcelActivity.map(p => p.projectId));
+          
+          // Combinar ambos conjuntos de IDs de proyectos
+          const activeProjectIds = new Set([...timeActivityIds, ...excelActivityIds]);
+          
+          console.log(`🔍 Found projects with activity in period:`, {
+            timeEntries: timeActivityIds.size,
+            excelMAESTRO: excelActivityIds.size,
+            combined: activeProjectIds.size
+          });
           
           // Filtrar proyectos para mostrar solo los que tuvieron actividad
           projects = projects.filter(project => activeProjectIds.has(project.id));
@@ -3647,10 +3670,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .from(timeEntries)
               .where(sql`time_entries.project_id = ${project.id} AND time_entries.date >= ${dateRange.startDate} AND time_entries.date <= ${dateRange.endDate}`);
             
-            // Calcular métricas del período según el tipo de proyecto
+            // 🎯 CORREGIDO: Calcular métricas del período incluyendo Excel MAESTRO
             let periodHours = periodTimeEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
             let periodCost = periodTimeEntries.reduce((sum, entry) => sum + (entry.totalCost || 0), 0);
             let periodBilling = 0;
+            
+            // 🎯 NUEVO: Agregar datos del Excel MAESTRO al cálculo
+            const projectDirectCosts = await getFilteredDirectCosts(project.id, timeFilter, dateRange);
+            
+            if (projectDirectCosts && projectDirectCosts.length > 0) {
+              // Sumar costos reales del Excel MAESTRO
+              const excelCost = projectDirectCosts.reduce((sum, cost) => sum + (cost.montoTotalUSD || cost.costoTotal || 0), 0);
+              const excelHours = projectDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
+              
+              periodCost += excelCost;
+              periodHours += excelHours;
+              
+              console.log(`📊 Excel MAESTRO data added to project ${project.id}:`, {
+                excelCost,
+                excelHours,
+                totalPeriodCost: periodCost,
+                totalPeriodHours: periodHours
+              });
+            }
             
             // Determinar tipo de proyecto
             const isAlwaysOn = project.quotation?.projectType === 'always-on' || 
