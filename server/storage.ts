@@ -4475,33 +4475,85 @@ export class DatabaseStorage implements IStorage {
         const year = parseInt(row.año);
         const salesType = String(row.tipo_venta || row.tipoVenta || 'fee').trim();
         
-        // 🎯 CORRECCIÓN CRÍTICA: Mapeo correcto de campos de moneda
-        const rawAmountArs = row.monto_ars || row.montoArs || null;
-        const rawAmountUsd = row.monto_usd || row.montoUsd || null;
-        
-        // Determinar moneda principal basada en qué campo tiene datos
-        let currency = 'ARS'; // Default a ARS para Argentina
-        let amountArs = null;
-        let amountUsd = null;
-        
-        if (rawAmountUsd && rawAmountUsd > 0) {
-          currency = 'USD';
-          amountUsd = rawAmountUsd;
-        } else if (rawAmountArs && rawAmountArs > 0) {
-          currency = 'ARS';
-          amountArs = rawAmountArs;
-        }
-        
-        console.log(`💱 Sale mapping for ${clientName}-${projectName}: rawARS=${rawAmountArs}, rawUSD=${rawAmountUsd} → currency=${currency}, finalARS=${amountArs}, finalUSD=${amountUsd}`);
-        
-        const confirmed = String(row.confirmado || 'SI').toUpperCase();
-        
-        // Convertir mes a número
+        // Convertir mes a número ANTES de usar en exchange rate lookup
         const monthNumber = monthMap[monthName];
         if (!monthNumber) {
           result.errors.push(`Fila ${i + 1}: Mes '${monthName}' no reconocido`);
           continue;
         }
+        
+        // 🎯 CORRECCIÓN CRÍTICA: Mapeo correcto de campos de moneda con parsing mejorado
+        const rawAmountArs = row.monto_ars || row.montoArs || null;
+        const rawAmountUsd = row.monto_usd || row.montoUsd || null;
+        
+        // Helper function to parse Spanish locale numbers (e.g., "4.210.975,00")
+        const parseSpanishNumber = (value: any): number | null => {
+          if (value === null || value === undefined || value === '') return null;
+          const stringValue = String(value).trim();
+          if (stringValue === '' || stringValue === '0' || stringValue === '-') return null;
+          
+          try {
+            // Handle Spanish format: "4.210.975,00" → 4210975.00
+            const normalizedValue = stringValue
+              .replace(/\./g, '') // Remove thousands separators
+              .replace(/,/g, '.'); // Replace decimal comma with decimal point
+            
+            const parsed = parseFloat(normalizedValue);
+            return isNaN(parsed) || parsed <= 0 ? null : parsed;
+          } catch (error) {
+            console.warn(`⚠️ Failed to parse number: ${value}`);
+            return null;
+          }
+        };
+        
+        // Parse amounts with Spanish locale support
+        const parsedAmountArs = parseSpanishNumber(rawAmountArs);
+        const parsedAmountUsd = parseSpanishNumber(rawAmountUsd);
+        
+        // Determinar moneda principal basada en qué campo tiene datos
+        let currency = 'ARS'; // Default a ARS para Argentina
+        let amountArs: number | null = null;
+        let amountUsd: number | null = null;
+        let fxApplied: number | null = null;
+        let fxSource = 'Manual';
+        
+        if (parsedAmountUsd && parsedAmountUsd > 0) {
+          // Prefer USD when available
+          currency = 'USD';
+          amountUsd = parsedAmountUsd;
+          console.log(`💰 Using USD amount directly for ${clientName}-${projectName}: $${amountUsd}`);
+        } else if (parsedAmountArs && parsedAmountArs > 0) {
+          // Convert ARS to USD using dynamic exchange rate
+          currency = 'ARS';
+          amountArs = parsedAmountArs;
+          
+          // 🚨 CORRECCIÓN CRÍTICA: Usar tasa de cambio dinámica
+          try {
+            const exchangeRate = await this.getExchangeRateByMonth(year, monthNumber || 1);
+            
+            if (exchangeRate && exchangeRate.rate) {
+              const rate = parseFloat(String(exchangeRate.rate));
+              amountUsd = amountArs / rate;
+              fxApplied = rate;
+              fxSource = exchangeRate.source || 'Database';
+              console.log(`💱 ARS Sale: ARS $${amountArs.toLocaleString('es-AR', {minimumFractionDigits: 2})} → USD $${amountUsd.toFixed(2)} (rate: ${rate}) for ${clientName}-${projectName}`);
+            } else {
+              // Fallback to a warning and manual rate requirement
+              result.errors.push(`Fila ${i + 1}: No se encontró tasa de cambio para ${monthName} ${year}. Configure la tasa en el sistema.`);
+              continue; // Skip this row
+            }
+          } catch (error: any) {
+            result.errors.push(`Fila ${i + 1}: Error al obtener tasa de cambio: ${error.message}`);
+            continue; // Skip this row
+          }
+        } else {
+          result.errors.push(`Fila ${i + 1}: No se encontró monto válido en ARS o USD`);
+          continue;
+        }
+        
+        console.log(`💱 Sale mapping for ${clientName}-${projectName}: rawARS=${rawAmountArs}, rawUSD=${rawAmountUsd} → currency=${currency}, finalARS=${amountArs}, finalUSD=${amountUsd}, fxApplied=${fxApplied}`);
+        
+        const confirmed = String(row.confirmado || 'SI').toUpperCase();
 
         // Calcular estado automáticamente
         const status = calculateStatus(monthNumber, year, salesType);
@@ -4520,7 +4572,7 @@ export class DatabaseStorage implements IStorage {
         // Generar month_key (YYYY-MM)
         const monthKey = `${year}-${String(monthNumber).padStart(2, '0')}`;
         
-        // Preparar datos para inserción
+        // Preparar datos para inserción con FX data completa
         const salesRecord: InsertGoogleSheetsSales = {
           monthKey: monthKey, // NUEVO: Clave temporal única
           clientName,
@@ -4530,7 +4582,10 @@ export class DatabaseStorage implements IStorage {
           salesType,
           amountLocal: amountArs ? String(amountArs) : null, // 🎯 CAMPO CORRECTO PARA ARS
           currency: currency, // 🎯 USAR MONEDA DETERMINADA CORRECTAMENTE
+          fxApplied: fxApplied ? String(fxApplied) : null, // 🎯 PERSISTIR TASA DE CAMBIO APLICADA
           amountUsd: amountUsd ? String(amountUsd) : null,
+          fxSource: fxSource, // 🎯 PERSISTIR FUENTE DE LA TASA
+          fxAt: new Date(), // 🎯 TIMESTAMP DE CONVERSIÓN
           confirmed,
           monthNumber,
           status,
