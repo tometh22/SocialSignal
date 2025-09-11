@@ -11687,8 +11687,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📊 Found ${result.length} income records`);
       console.log(`📊 Sample data:`, result.slice(0, 3));
+
+      // Convert ARS to USD and calculate summary data
+      let totalIncome = 0;
+      let activeProjects = new Set();
+      let clientIncomes: { [key: string]: number } = {};
+
+      for (const sale of result) {
+        let amountUsd = 0;
+        
+        if (sale.amount_usd && parseFloat(sale.amount_usd) > 0) {
+          // Already has USD value
+          amountUsd = parseFloat(sale.amount_usd);
+        } else {
+          // Need to convert ARS to USD
+          try {
+            // Get the ARS amount from amountLocal in the database
+            const fullSale = await db
+              .select()
+              .from(googleSheetsSales)
+              .where(eq(googleSheetsSales.id, sale.id))
+              .limit(1);
+
+            if (fullSale.length > 0 && fullSale[0].amountLocal) {
+              const arsAmount = parseFloat(fullSale[0].amountLocal);
+              
+              // Get exchange rate from Excel MAESTRO or use fallback
+              const exchangeRate = await storage.getExchangeRateFromExcel(sale.month_key) || 1300;
+              amountUsd = arsAmount / exchangeRate;
+              
+              console.log(`💱 Converted ${sale.client_name}-${sale.project_name}: ARS $${arsAmount} → USD $${amountUsd.toFixed(2)} (rate: ${exchangeRate})`);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Error converting ARS to USD for sale ${sale.id}:`, error);
+            amountUsd = 0;
+          }
+        }
+
+        totalIncome += amountUsd;
+        activeProjects.add(`${sale.client_name}-${sale.project_name}`);
+        
+        if (!clientIncomes[sale.client_name]) {
+          clientIncomes[sale.client_name] = 0;
+        }
+        clientIncomes[sale.client_name] += amountUsd;
+      }
+
+      // Calculate summary metrics
+      const topPerformingClient = Object.entries(clientIncomes)
+        .sort(([,a], [,b]) => b - a)[0]?.[0] || 'N/A';
       
-      res.json(result);
+      const averageProjectValue = activeProjects.size > 0 ? totalIncome / activeProjects.size : 0;
+
+      // Build response structure expected by frontend
+      const response = {
+        totalIncome,
+        targetIncome: totalIncome * 1.1, // Placeholder target (10% above current)
+        variance: 0, // Calculate based on targets if available
+        summary: {
+          activeProjects: activeProjects.size,
+          totalProjects: activeProjects.size, // Same as active for now
+          averageProjectValue,
+          topPerformingClient,
+          deliverableProjects: activeProjects.size // Required by frontend
+        },
+        details: result.map(sale => ({
+          ...sale,
+          converted_usd: sale.amount_usd ? parseFloat(sale.amount_usd) : null
+        }))
+      };
+
+      console.log(`📊 Income Dashboard Response:`, {
+        totalIncome,
+        activeProjects: activeProjects.size,
+        topClient: topPerformingClient
+      });
+      
+      res.json(response);
     } catch (error) {
       console.error("❌ Error in income dashboard:", error);
       res.status(500).json({ error: "Failed to fetch income data" });
