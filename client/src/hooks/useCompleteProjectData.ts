@@ -125,6 +125,17 @@ interface CompleteProjectData {
     projectId?: number;
     personnelId?: number;
   }>;
+  // 🎯 NUEVO: Ventas filtradas de Google Sheets para cálculo de revenue del período
+  googleSheetsSales?: Array<{
+    id: number;
+    clientName: string;
+    projectName: string;
+    month: string;
+    year: number;
+    amountUsd: string;
+    currency: string;
+    status: string;
+  }>;
 }
 
 export const useCompleteProjectData = (projectId: number, timeFilter: string = 'all') => {
