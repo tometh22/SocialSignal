@@ -261,7 +261,7 @@ function ProjectCard({
                 <StatusIcon className="h-3 w-3" />
                 {statusConfig.label}
               </div>
-              {hasPeriodMetrics && (
+              {timeFilter !== 'all' && (
                 <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700 border border-orange-200">
                   <CalendarDays className="h-3 w-3" />
                   Período específico
@@ -272,7 +272,7 @@ function ProjectCard({
             {/* Métricas principales organizadas */}
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-lg font-bold text-green-700">${totalAmount.toLocaleString()}</div>
+                <div className="text-lg font-bold text-green-700">${(completeData?.totalRealRevenue ?? 0).toLocaleString()}</div>
                 <div className="text-xs text-gray-600">Precio al cliente</div>
               </div>
               
