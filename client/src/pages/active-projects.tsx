@@ -80,24 +80,11 @@ function ProjectCard({
   const { refreshTimestamp } = useImageRefresh();
   const projectName = project.quotation?.projectName || "Proyecto sin nombre";
   const clientName = client?.name || "Cliente desconocido";
-  const totalAmount = project.quotation?.totalAmount || 0;
   const totalHours = getProjectHours(project.id);
   const isAlwaysOnProject = project.isAlwaysOnMacro || subprojects.length > 0;
   
-  // 🎯 CORREGIDO: Usar hook completeData en lugar de project.periodMetrics
+  // 🎯 FUENTE UNIFICADA: Usar hook completeData para todos los proyectos
   const { data: completeData } = useCompleteProjectData(project.id, timeFilter);
-  
-  // Define hasPeriodMetrics based on timeFilter
-  const hasPeriodMetrics = timeFilter !== 'all';
-  
-  // 🎯 SOLUCIÓN DIRECTA: Usar los mismos valores que la vista individual
-  // Por ahora usar 0 para período hasta corregir la autenticación de la API
-  const periodCost = 0;
-  const periodBilling = 0;
-  
-  // 🎯 FALLBACK: Usar valores de quotation como la vista individual funcional
-  const displayBilling = hasPeriodMetrics ? periodBilling : totalAmount;
-  const displayCost = hasPeriodMetrics ? periodCost : 0;
   
   // 🎯 Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';
