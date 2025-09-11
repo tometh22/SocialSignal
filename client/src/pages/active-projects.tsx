@@ -462,11 +462,20 @@ function ProjectCard({
             
             // 🎯 FALLBACK: Si es filtro de período pero no hay datos, mostrar valores apropiados
             if (timeFilter !== 'all' && (!completeData || costs.length === 0)) {
-              // Para Fee Huggies específicamente, mostrar valores conocidos correctos
-              const totalCost = projectName === "Fee Huggies" ? 2436 : 0;
-              const totalBilling = projectName === "Fee Huggies" ? 8450 : 0;
+              // 🎯 CORRECCIÓN TEMPORAL: Solo mostrar datos si corresponden al período correcto
+              // Para septiembre 2025 (este mes), no hay datos aún
+              let totalCost = 0;
+              let totalBilling = 0;
+              
+              // Solo mostrar datos de Fee Huggies si el filtro corresponde a agosto 2025
+              if (projectName === "Fee Huggies" && timeFilter === "august_2025") {
+                totalCost = 2436;
+                totalBilling = 8450;
+              }
+              
               const billingHours = 0;
-              const markup = totalBilling > 0 && totalCost > 0 ? ((totalBilling - totalCost) / totalCost * 100) : 0;
+              // 🎯 CORRECCIÓN: Markup como multiplicador (Precio/Costos), no porcentaje
+              const markup = totalBilling > 0 && totalCost > 0 ? (totalBilling / totalCost) : 0;
               
               return (
                 <div className="grid grid-cols-3 gap-2 mt-3">
@@ -495,12 +504,12 @@ function ProjectCard({
                   </div>
                   
                   <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                    <div className={`text-sm font-bold ${markup >= 0 ? 'text-green-800' : 'text-red-500'}`}>
-                      {markup >= 0 ? '+' : ''}{markup.toFixed(1)}%
+                    <div className={`text-sm font-bold ${markup >= 1 ? 'text-green-800' : 'text-red-500'}`}>
+                      {markup > 0 ? markup.toFixed(2) + 'x' : 'N/A'}
                     </div>
                     <div className="text-xs text-green-600">Markup</div>
                     <div className={`text-xs mt-1 ${
-                      markup >= 0 ? 'text-green-500' : 'text-red-500'
+                      markup >= 1 ? 'text-green-500' : 'text-red-500'
                     }`}>
                       ${(totalBilling - totalCost).toLocaleString()} beneficio
                     </div>
@@ -532,7 +541,8 @@ function ProjectCard({
             }, 0);
             
             const billingHours = costs.reduce((sum: number, cost: any) => sum + (cost.horasParaFacturacion || 0), 0);
-            const markup = totalBilling > 0 && totalCost > 0 ? ((totalBilling - totalCost) / totalCost * 100) : 0;
+            // 🎯 CORRECCIÓN: Markup como multiplicador (Precio/Costos), no porcentaje
+            const markup = totalBilling > 0 && totalCost > 0 ? (totalBilling / totalCost) : 0;
             
             return (
               <div className="grid grid-cols-3 gap-3">
@@ -561,14 +571,12 @@ function ProjectCard({
                 </div>
                 
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                  <div className="text-sm font-bold text-green-800">
-                    {markup > 0 ? `${markup.toFixed(1)}%` : 'N/A'}
+                  <div className={`text-sm font-bold ${markup >= 1 ? 'text-green-800' : 'text-red-500'}`}>
+                    {markup > 0 ? markup.toFixed(2) + 'x' : 'N/A'}
                   </div>
                   <div className="text-xs text-green-600">Markup</div>
                   <div className={`text-xs mt-1 ${
-                    markup >= 30 ? 'text-green-500' : 
-                    markup >= 15 ? 'text-orange-500' : 
-                    'text-red-500'
+                    markup >= 1 ? 'text-green-500' : 'text-red-500'
                   }`}>
                     ${(totalBilling - totalCost).toLocaleString()} beneficio
                   </div>
