@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
 
 interface CompleteProjectData {
   // Root level properties (for direct access)
@@ -145,35 +144,67 @@ export const useCompleteProjectData = (projectId: number, timeFilter: string = '
       const url = `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
       console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, url });
       
-      const response = await fetch(url, {
-        credentials: "include",
-        headers: {
-          'Content-Type': 'application/json'
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('🔍 HOOK: Request timeout after 20 seconds');
+        controller.abort();
+      }, 20000); // 20 second timeout for complex project data
+      
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          credentials: "include",
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        clearTimeout(timeoutId);
+        console.log('🔍 HOOK: Response status:', response.status);
+        console.log('🔍 HOOK: Response ok:', response.ok);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('🔍 HOOK: Error response:', errorText);
+          
+          if (response.status === 408 || response.status >= 500) {
+            throw new Error('El servidor está experimentando problemas. Por favor, recarga la página.');
+          }
+          if (response.status === 404) {
+            throw new Error('Proyecto no encontrado.');
+          }
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
-      });
-      
-      console.log('🔍 HOOK: Response status:', response.status);
-      console.log('🔍 HOOK: Response ok:', response.ok);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('🔍 HOOK: Error response:', errorText);
-        throw new Error(`Failed to fetch complete project data: ${response.status} - ${errorText}`);
+        
+        const data = await response.json();
+        console.log('🔍 HOOK: Success data received:', {
+          projectId,
+          timeFilter,
+          estimatedHours: data.quotation?.estimatedHours,
+          workedHours: data.actuals?.totalWorkedHours,
+          totalCost: data.actuals?.totalWorkedCost,
+          markup: data.metrics?.markup
+        });
+        return data;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error('La carga de datos tardó demasiado tiempo. Verifica tu conexión e inténtalo de nuevo.');
+        }
+        console.error('🔍 HOOK: Fetch error:', error);
+        throw error;
       }
-      
-      const data = await response.json();
-      console.log('🔍 HOOK: Success data received:', {
-        projectId,
-        timeFilter,
-        estimatedHours: data.quotation?.estimatedHours,
-        workedHours: data.actuals?.totalWorkedHours,
-        totalCost: data.actuals?.totalWorkedCost,
-        markup: data.metrics?.markup
-      });
-      return data;
     },
     enabled: !!projectId,
-    staleTime: 30 * 1000, // 30 seconds - reasonable freshness for project data
+    retry: (failureCount, error: any) => {
+      // No retry for client errors (4xx) or if already tried 2 times
+      if (failureCount >= 2) return false;
+      if (error?.message?.includes('no encontrado')) return false;
+      if (error?.message?.includes('404')) return false;
+      return true;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 60 * 1000, // 60 seconds - reasonable freshness for project data
     gcTime: 5 * 60 * 1000, // 5 minute cache - better performance
     refetchOnWindowFocus: false, // Disable refetch on window focus
     refetchInterval: false, // Disable automatic polling

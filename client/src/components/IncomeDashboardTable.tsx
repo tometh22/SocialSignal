@@ -30,9 +30,9 @@ interface IncomeFilters {
 export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ projectId, timeFilter }) => {
   const [filters, setFilters] = useState<IncomeFilters>({});
 
-  const { data: incomeData = [], isLoading } = useQuery({
+  const { data: incomeData = [], isLoading, error, refetch } = useQuery({
     queryKey: ['/api/income-dashboard-rows', { projectId, timeFilter, ...filters }],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const params = new URLSearchParams();
       if (projectId) params.append('projectId', projectId.toString());
       if (timeFilter) params.append('timeFilter', timeFilter);
@@ -40,10 +40,62 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
       if (filters.revenueType) params.append('revenueType', filters.revenueType);
       if (filters.status) params.append('status', filters.status);
 
-      const response = await fetch(`/api/income-dashboard-rows?${params}`);
-      if (!response.ok) throw new Error('Error fetching income data');
-      return response.json();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      // Forward React Query's signal to our controller
+      let abortListener: (() => void) | null = null;
+      if (signal) {
+        abortListener = () => controller.abort();
+        signal.addEventListener('abort', abortListener);
+      }
+      
+      try {
+        const response = await fetch(`/api/income-dashboard-rows?${params}`, {
+          signal: controller.signal,
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        clearTimeout(timeoutId);
+        if (signal && abortListener) {
+          signal.removeEventListener('abort', abortListener);
+        }
+        
+        if (!response.ok) {
+          const error = new Error(`Error ${response.status}: ${response.statusText}`) as any;
+          error.status = response.status;
+          
+          if (response.status === 408 || response.status >= 500) {
+            error.message = 'El servidor está experimentando problemas. Inténtalo de nuevo.';
+          }
+          throw error;
+        }
+        return response.json();
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          const abortError = new Error('La consulta tardó demasiado tiempo. Verifica tu conexión.') as any;
+          abortError.status = 408;
+          throw abortError;
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+        if (signal && abortListener) {
+          signal.removeEventListener('abort', abortListener);
+        }
+      }
     },
+    retry: (failureCount, error: any) => {
+      // No retry for client errors (4xx) or if already tried 2 times
+      if (failureCount >= 2) return false;
+      if (error?.status >= 400 && error?.status < 500 && error?.status !== 429) return false;
+      return true;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 60000, // 1 minute cache
+    gcTime: 300000, // 5 minutes in cache
   });
 
   // Calcular métricas principales
@@ -89,7 +141,35 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
             <h2 className="text-lg font-bold text-gray-900">Ingresos del Proyecto</h2>
           </div>
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-32"></div>
+            <div className="h-8 bg-gray-200 rounded w-32 mb-2"></div>
+            <div className="text-sm text-gray-500">
+              Cargando datos de ingresos...
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-red-600" />
+            <h2 className="text-lg font-bold text-red-900">Error al Cargar Ingresos</h2>
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm text-red-700">
+              {error.message || 'Ocurrió un problema al obtener los datos de ingresos.'}
+            </p>
+            <Button 
+              onClick={() => refetch()} 
+              variant="outline" 
+              className="text-red-600 border-red-300 hover:bg-red-50"
+            >
+              Intentar de Nuevo
+            </Button>
           </div>
         </div>
       </div>
