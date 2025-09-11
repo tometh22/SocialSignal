@@ -928,9 +928,17 @@ class GoogleSheetsWorkingService {
       
       if (!mes || !tipoCambioStr) continue;
       
-      // Parar si encontramos filas de proyección o año
-      if (mes.includes('próx') || mes.includes('2025') || mes.includes('2026')) {
+      // Parar si encontramos filas de proyección - CORRECCIÓN: permitir 2025
+      if (mes.includes('próx') || mes.includes('2026') || mes.includes('proyecc')) {
         break;
+      }
+      
+      // Determinar año actual desde el mes si contiene año
+      let currentYear = 2024; // Default
+      if (mes.includes('2025')) {
+        currentYear = 2025;
+      } else if (mes.includes('2024')) {
+        currentYear = 2024;
       }
       
       // Convertir el tipo de cambio a número
@@ -946,7 +954,7 @@ class GoogleSheetsWorkingService {
       
       tiposCambio.push({
         mes: mes,
-        año: 2024, // Asumir 2024 por defecto
+        año: currentYear, // Usar año detectado dinámicamente
         tipoCambio: tipoCambio,
         fuente: 'BCRA'
       });

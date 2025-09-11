@@ -1667,14 +1667,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`💰 USD Sale: $${usdAmount} for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
               return sum + usdAmount;
             } else if (arsAmount > 0) {
-              // Obtener tipo de cambio real del Excel MAESTRO
+              // Obtener tipo de cambio real del Excel MAESTRO con normalización robusta
               try {
                 const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
-                const monthExchangeRate = tiposCambio.find(tc => 
-                  tc.mes.toLowerCase().includes(sale.month.toLowerCase().slice(0, 3)) && 
-                  tc.año === sale.year
-                );
-                const realExchangeRate = monthExchangeRate?.tipoCambio || 1300; // fallback seguro
+                
+                // Función para normalizar nombres de meses (español/inglés/abreviado)
+                const normalizeMonth = (month: string): string => {
+                  const monthLower = month.toLowerCase().trim();
+                  const monthMap: Record<string, string> = {
+                    // Español completo
+                    'enero': 'ene', 'febrero': 'feb', 'marzo': 'mar', 'abril': 'abr', 
+                    'mayo': 'may', 'junio': 'jun', 'julio': 'jul', 'agosto': 'ago',
+                    'septiembre': 'sep', 'octubre': 'oct', 'noviembre': 'nov', 'diciembre': 'dic',
+                    // Inglés completo  
+                    'january': 'ene', 'february': 'feb', 'march': 'mar', 'april': 'abr',
+                    'may': 'may', 'june': 'jun', 'july': 'jul', 'august': 'ago',
+                    'september': 'sep', 'october': 'oct', 'november': 'nov', 'december': 'dic',
+                    // Abreviaciones inglesas
+                    'jan': 'ene', 'feb': 'feb', 'mar': 'mar', 'apr': 'abr', 'jul': 'jul', 
+                    'aug': 'ago', 'sep': 'sep', 'oct': 'oct', 'nov': 'nov', 'dec': 'dic'
+                  };
+                  return monthMap[monthLower] || monthLower.slice(0, 3);
+                };
+                
+                const normalizedSaleMonth = normalizeMonth(sale.month);
+                const monthExchangeRate = tiposCambio.find(tc => {
+                  const normalizedTcMonth = normalizeMonth(tc.mes);
+                  return normalizedTcMonth === normalizedSaleMonth && tc.año === sale.year;
+                });
+                
+                let realExchangeRate = monthExchangeRate?.tipoCambio;
+                
+                // Si no se encuentra para el año exacto, buscar el más reciente
+                if (!realExchangeRate) {
+                  const fallbackRate = tiposCambio
+                    .filter(tc => normalizeMonth(tc.mes) === normalizedSaleMonth)
+                    .sort((a, b) => b.año - a.año)[0];
+                  realExchangeRate = fallbackRate?.tipoCambio || 1300;
+                  console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
+                }
+                
                 const convertedUsd = arsAmount / realExchangeRate;
                 console.log(`💱 ARS Sale: ARS $${arsAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
                 return sum + convertedUsd;
