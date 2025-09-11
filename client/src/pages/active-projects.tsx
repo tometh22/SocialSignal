@@ -505,7 +505,7 @@ function ProjectCard({
                 
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                   <div className={`text-sm font-bold ${markup >= 1 ? 'text-green-800' : 'text-red-500'}`}>
-                    {markup > 0 ? markup.toFixed(2) + 'x' : 'N/A'}
+                    {markup > 0 ? markup + 'x' : 'N/A'}
                   </div>
                   <div className="text-xs text-green-600">Markup</div>
                   <div className={`text-xs mt-1 ${
