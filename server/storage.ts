@@ -4802,13 +4802,24 @@ export class DatabaseStorage implements IStorage {
 
       // Mapear datos al formato IncomeRecord
       const incomeRecords: IncomeRecord[] = salesData.map((sale, index) => {
-        // Conversión de moneda: si está en ARS, convertir a USD
+        // Determinar si mostrar original ARS o USD
         let amountUsd = 0;
-        if (sale.amountUsd && parseFloat(sale.amountUsd) > 0) {
+        let originalAmount = 0;
+        let currency: 'USD' | 'ARS' = 'USD';
+        
+        const hasOriginalUsd = sale.amountUsd && parseFloat(sale.amountUsd) > 0;
+        const hasOriginalArs = sale.amountLocal && parseFloat(sale.amountLocal) > 0 && sale.currency === 'ARS';
+        
+        if (hasOriginalUsd) {
+          // Excel tenía valores USD originales - mostrar USD
           amountUsd = parseFloat(sale.amountUsd);
-        } else if (sale.amountLocal && parseFloat(sale.amountLocal) > 0 && sale.currency === 'ARS') {
-          // Conversión ARS → USD con tasa fija 1300 (consistente con cost-dashboard)
-          amountUsd = parseFloat(sale.amountLocal) / 1300;
+          originalAmount = parseFloat(sale.amountUsd);
+          currency = 'USD';
+        } else if (hasOriginalArs) {
+          // Excel solo tenía valores ARS - mostrar ARS originales
+          amountUsd = parseFloat(sale.amountLocal) / 1300; // Para cálculos internos
+          originalAmount = parseFloat(sale.amountLocal);
+          currency = 'ARS';
         }
 
         // Mapear revenue_type de salesType
@@ -4836,6 +4847,8 @@ export class DatabaseStorage implements IStorage {
           client_name: sale.clientName || '',
           project_name: sale.projectName || '',
           amount_usd: amountUsd,
+          original_amount: originalAmount,
+          currency: currency,
           month_key: sale.monthKey || '',
           revenue_type: revenueType,
           status: status,

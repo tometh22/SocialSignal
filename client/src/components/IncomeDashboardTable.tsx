@@ -15,6 +15,8 @@ interface IncomeRecord {
   client_name: string;
   project_name: string;
   amount_usd: number;
+  original_amount: number;
+  currency: 'USD' | 'ARS';
   month_key: string;
   revenue_type: 'fee' | 'project' | 'bonus';
   status: 'completada' | 'pendiente' | 'proyectada';
@@ -26,6 +28,23 @@ interface IncomeFilters {
   revenueType?: string;
   status?: string;
 }
+
+// Helper function to format currency amounts
+const formatCurrency = (amount: number, currency: 'USD' | 'ARS') => {
+  if (currency === 'ARS') {
+    return `ARS $${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  } else {
+    return `USD $${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+};
+
+// Helper function to get display amount and currency
+const getDisplayAmount = (record: IncomeRecord) => {
+  return {
+    amount: record.original_amount,
+    currency: record.currency
+  };
+};
 
 export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ projectId, timeFilter }) => {
   const [filters, setFilters] = useState<IncomeFilters>({});
@@ -98,9 +117,14 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
     gcTime: 300000, // 5 minutes in cache
   });
 
-  // Calcular métricas principales
-  const totalIncome = useMemo(() => {
-    return incomeData.reduce((sum: number, record: IncomeRecord) => sum + record.amount_usd, 0);
+  // Calcular métricas principales por moneda
+  const currencyTotals = useMemo(() => {
+    const totals = { USD: 0, ARS: 0 };
+    incomeData.forEach((record: IncomeRecord) => {
+      const { amount, currency } = getDisplayAmount(record);
+      totals[currency] += amount;
+    });
+    return totals;
   }, [incomeData]);
 
   const totalProjects = useMemo(() => {
@@ -108,10 +132,12 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
     return uniqueProjects.size;
   }, [incomeData]);
 
-  const avgProjectValue = useMemo(() => {
+  // Calcular valor promedio en USD usando amount_usd para comparación
+  const avgProjectValueUsd = useMemo(() => {
     if (totalProjects === 0) return 0;
-    return totalIncome / totalProjects;
-  }, [totalIncome, totalProjects]);
+    const totalUsd = incomeData.reduce((sum: number, record: IncomeRecord) => sum + record.amount_usd, 0);
+    return totalUsd / totalProjects;
+  }, [incomeData, totalProjects]);
 
   // Obtener valores únicos para filtros
   const uniqueClients = useMemo(() => {
@@ -310,10 +336,19 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
                 <span className="text-sm font-medium">Ingresos Totales</span>
               </div>
               <div className="text-right">
-                <div className="text-lg font-bold">
-                  ${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </div>
-                <div className="text-xs opacity-90">USD</div>
+                {currencyTotals.USD > 0 && (
+                  <div className="text-sm font-bold">
+                    {formatCurrency(currencyTotals.USD, 'USD')}
+                  </div>
+                )}
+                {currencyTotals.ARS > 0 && (
+                  <div className={`text-sm font-bold ${currencyTotals.USD > 0 ? 'text-xs' : ''}`}>
+                    {formatCurrency(currencyTotals.ARS, 'ARS')}
+                  </div>
+                )}
+                {currencyTotals.USD === 0 && currencyTotals.ARS === 0 && (
+                  <div className="text-lg font-bold">$0</div>
+                )}
               </div>
             </div>
           </div>
@@ -343,9 +378,9 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold">
-                  ${avgProjectValue.toFixed(0)}
+                  ${avgProjectValueUsd.toFixed(0)}
                 </div>
-                <div className="text-xs opacity-90">/proyecto</div>
+                <div className="text-xs opacity-90">USD promedio</div>
               </div>
             </div>
           </div>
@@ -385,7 +420,7 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Cliente</th>
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Proyecto</th>
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Mes</th>
-                <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Monto USD</th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Monto</th>
                 <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Tipo</th>
                 <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Estado</th>
               </tr>
@@ -408,7 +443,7 @@ export const IncomeDashboardTable: React.FC<IncomeDashboardTableProps> = ({ proj
                     <td className="px-4 py-2 text-sm text-gray-700">{record.project_name}</td>
                     <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.month_key}</td>
                     <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
-                      ${record.amount_usd.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      {formatCurrency(getDisplayAmount(record).amount, getDisplayAmount(record).currency)}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <Badge 
