@@ -455,118 +455,51 @@ function ProjectCard({
             </span>
           </div>
           
-          {/* Calcular métricas financieras usando Excel MAESTRO */}
+          {/* 🎯 MÉTRICAS UNIFICADAS: Usar exclusivamente datos de useCompleteProjectData */}
           {(() => {
-            // 🎯 CORRECCIÓN TEMPORAL: Si no hay datos por API error, usar valores seguros
-            const costs = Array.isArray(completeData?.directCosts) ? completeData.directCosts : [];
+            // 🎯 FUENTE ÚNICA DE VERDAD: Mismos datos que la vista individual
+            const displayBilling = completeData?.totalRealRevenue ?? 0;
+            const displayCost = completeData?.workedCost ?? 0;
+            const workedHours = completeData?.workedHours ?? completeData?.actuals?.totalWorkedHours ?? 0;
+            const markup = completeData?.metrics?.markup ?? 0;
             
-            // 🎯 FALLBACK: Si es filtro de período pero no hay datos, mostrar valores apropiados
-            if (timeFilter !== 'all' && (!completeData || costs.length === 0)) {
-              // 🎯 CORRECCIÓN TEMPORAL: Solo mostrar datos si corresponden al período correcto
-              // Para septiembre 2025 (este mes), no hay datos aún
-              let totalCost = 0;
-              let totalBilling = 0;
-              
-              // Solo mostrar datos de Fee Huggies si el filtro corresponde a agosto 2025
-              if (projectName === "Fee Huggies" && timeFilter === "august_2025") {
-                totalCost = 2436;
-                totalBilling = 8450;
-              }
-              
-              const billingHours = 0;
-              // 🎯 CORRECCIÓN: Markup como multiplicador (Precio/Costos), no porcentaje
-              const markup = totalBilling > 0 && totalCost > 0 ? (totalBilling / totalCost) : 0;
-              
+            // Si no hay datos completos, mostrar estado de carga/error en lugar de fallbacks
+            if (!completeData) {
               return (
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <div className="text-sm font-bold text-blue-800">
-                      ${totalBilling.toLocaleString()}
+                <div className="grid grid-cols-3 gap-3">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-gray-50 p-3 rounded-lg border border-gray-200 animate-pulse">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
                     </div>
-                    <div className="text-xs text-blue-600">
-                      Facturación del período
-                    </div>
-                    <div className="text-xs text-blue-500 mt-1">
-                      {billingHours.toFixed(1)}h facturables
-                    </div>
-                  </div>
-                  
-                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                    <div className="text-sm font-bold text-red-800">
-                      ${totalCost.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-red-600">
-                      Costos del período
-                    </div>
-                    <div className="text-xs text-red-500 mt-1">
-                      USD correctos
-                    </div>
-                  </div>
-                  
-                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                    <div className={`text-sm font-bold ${markup >= 1 ? 'text-green-800' : 'text-red-500'}`}>
-                      {markup > 0 ? markup.toFixed(2) + 'x' : 'N/A'}
-                    </div>
-                    <div className="text-xs text-green-600">Markup</div>
-                    <div className={`text-xs mt-1 ${
-                      markup >= 1 ? 'text-green-500' : 'text-red-500'
-                    }`}>
-                      ${(totalBilling - totalCost).toLocaleString()} beneficio
-                    </div>
-                  </div>
+                  ))}
                 </div>
               );
             }
-            
-            const totalCost = costs.reduce((sum: number, cost: any) => sum + (cost.costoTotal || 0), 0);
-            
-            // 🎯 CORRECCIÓN: Usar tarifas reales del Excel MAESTRO o implícitas
-            const totalBilling = costs.reduce((sum: number, cost: any) => {
-              const horasFacturacion = cost.horasParaFacturacion || 0;
-              let valorHora = cost.valorHoraPersona || 0;
-              const tipoCambio = cost.tipoCambio || 1;
-              
-              // Si no hay tarifa explícita, calcular tarifa implícita ya en USD
-              if (valorHora === 0 && cost.horasRealesAsana > 0 && cost.costoTotal > 0) {
-                // costoTotal ya está en USD, así que la tarifa implícita también es en USD
-                valorHora = cost.costoTotal / cost.horasRealesAsana;
-              } else if (valorHora > 0) {
-                // Si hay tarifa explícita, convertir a USD
-                valorHora = valorHora / tipoCambio;
-              }
-              
-              // Calcular facturación: horas * tarifa (ya en USD)
-              const facturaciónEntry = horasFacturacion * valorHora;
-              return sum + facturaciónEntry;
-            }, 0);
-            
-            const billingHours = costs.reduce((sum: number, cost: any) => sum + (cost.horasParaFacturacion || 0), 0);
-            // 🎯 CORRECCIÓN: Markup como multiplicador (Precio/Costos), no porcentaje
-            const markup = totalBilling > 0 && totalCost > 0 ? (totalBilling / totalCost) : 0;
             
             return (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <div className="text-sm font-bold text-blue-800">
-                    ${totalBilling.toLocaleString()}
+                    ${displayBilling.toLocaleString()}
                   </div>
                   <div className="text-xs text-blue-600">
                     {timeFilter !== 'all' ? 'Facturación del período' : 'Facturación total'}
                   </div>
                   <div className="text-xs text-blue-500 mt-1">
-                    {billingHours.toFixed(1)}h facturables
+                    {workedHours.toFixed(1)}h trabajadas
                   </div>
                 </div>
                 
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                   <div className="text-sm font-bold text-red-800">
-                    ${totalCost.toLocaleString()}
+                    ${displayCost.toLocaleString()}
                   </div>
                   <div className="text-xs text-red-600">
                     {timeFilter !== 'all' ? 'Costos del período' : 'Costos totales'}
                   </div>
                   <div className="text-xs text-red-500 mt-1">
-                    {costs.length} entradas de costo
+                    {completeData?.directCosts?.length || 0} entradas
                   </div>
                 </div>
                 
@@ -578,7 +511,7 @@ function ProjectCard({
                   <div className={`text-xs mt-1 ${
                     markup >= 1 ? 'text-green-500' : 'text-red-500'
                   }`}>
-                    ${(totalBilling - totalCost).toLocaleString()} beneficio
+                    ${(displayBilling - displayCost).toLocaleString()} beneficio
                   </div>
                 </div>
               </div>
