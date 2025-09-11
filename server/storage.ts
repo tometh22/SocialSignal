@@ -1053,7 +1053,7 @@ export class DatabaseStorage implements IStorage {
             personnelData = personnelResult[0];
           }
           
-          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId));
+          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId!));
           
           return {
             ...member,
@@ -1089,7 +1089,7 @@ export class DatabaseStorage implements IStorage {
             personnelData = personnelResult[0];
           }
           
-          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId));
+          const roleData = await db.select().from(roles).where(eq(roles.id, member.roleId!));
           
           return {
             ...member,
@@ -2082,75 +2082,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== NUEVA FUNCIÓN: OBTENER RANGO DE ACTIVIDAD REAL DE PROYECTOS ONE-SHOT ====================
-  async getProjectActivityRange(projectId: number): Promise<{ startPeriod: string; endPeriod: string; isActive: boolean } | null> {
-    try {
-      console.log(`🔍 Calculando rango de actividad para proyecto ${projectId}`);
-      
-      // Obtener el proyecto y su tipo desde la cotización
-      const project = await this.getActiveProject(projectId);
-      if (!project?.quotation) {
-        console.log(`❌ No se encontró proyecto o cotización para ID ${projectId}`);
-        return null;
-      }
-
-      const projectType = project.quotation.projectType;
-      console.log(`📊 Tipo de proyecto ${projectId}: ${projectType}`);
-
-      // Solo aplicar lógica de rango para proyectos one-time
-      if (projectType !== 'one-time') {
-        console.log(`✅ Proyecto ${projectId} es ${projectType}, permitir todos los períodos`);
-        return { startPeriod: '2025-01', endPeriod: '2025-12', isActive: true };
-      }
-
-      // Para proyectos one-time, obtener costos directos del Excel MAESTRO
-      const directCosts = await this.getDirectCostsByProject(projectId);
-      console.log(`💰 Costos directos encontrados para proyecto ${projectId}: ${directCosts.length} registros`);
-
-      if (directCosts.length === 0) {
-        console.log(`⚠️ Proyecto one-time ${projectId} sin costos directos - considerado inactivo`);
-        return { startPeriod: '2025-01', endPeriod: '2025-01', isActive: false };
-      }
-
-      // Convertir fechas a formato comparable (YYYY-MM)
-      const periods = directCosts.map(cost => {
-        let monthNumber;
-        if (cost.mes.includes(' ')) {
-          // Formato "08 ago", "05 may", etc.
-          monthNumber = cost.mes.substring(0, 2);
-        } else {
-          // Formato "Agosto", "Mayo", etc.
-          const monthMap: { [key: string]: string } = {
-            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
-          };
-          monthNumber = monthMap[cost.mes.toLowerCase()] || '01';
-        }
-        return `${cost.año}-${monthNumber}`;
-      }).filter(period => period); // Filtrar valores inválidos
-
-      if (periods.length === 0) {
-        console.log(`⚠️ No se pudieron extraer períodos válidos para proyecto ${projectId}`);
-        return { startPeriod: '2025-01', endPeriod: '2025-01', isActive: false };
-      }
-
-      // Ordenar y obtener primer y último período
-      periods.sort();
-      const startPeriod = periods[0];
-      const endPeriod = periods[periods.length - 1];
-
-      // Verificar si el proyecto está activo (último período en el mes actual o futuro)
-      const currentPeriod = new Date().toISOString().substring(0, 7); // YYYY-MM
-      const isActive = endPeriod >= currentPeriod;
-
-      console.log(`📅 Proyecto ${projectId} - Rango: ${startPeriod} a ${endPeriod}, Activo: ${isActive}`);
-      
-      return { startPeriod, endPeriod, isActive };
-    } catch (error) {
-      console.error(`❌ Error calculando rango de actividad para proyecto ${projectId}:`, error);
-      return null;
-    }
-  }
+  // (Removed duplicate function - using implementation at line 4712)
 
   async getProjectCostSummary(projectId: number, dateRange?: { startDate: Date; endDate: Date }): Promise<any> {
     try {
@@ -3545,8 +3477,8 @@ export class DatabaseStorage implements IStorage {
 
       // Si no hay ajustes, devolver el precio original del proyecto
       const project = await this.getActiveProject(projectId);
-      if (project) {
-        return Number(project.totalCost || 0);
+      if (project && project.quotation) {
+        return Number(project.quotation.totalCost || 0);
       }
 
       return 0;
@@ -4000,13 +3932,13 @@ export class DatabaseStorage implements IStorage {
           }
 
         } catch (error: any) {
-          results.errors.push(`Error processing project ${key}: ${error?.message || error}`);
+          results.errors.push(`Error processing project ${key}: ${(error as any)?.message || String(error)}`);
           console.error(`Error processing project ${key}:`, error);
         }
       }
 
     } catch (error: any) {
-      results.errors.push(`General import error: ${error?.message || error}`);
+      results.errors.push(`General import error: ${(error as any)?.message || String(error)}`);
       console.error("Error in importGoogleSheetsProjects:", error);
     }
 
@@ -4579,7 +4511,7 @@ export class DatabaseStorage implements IStorage {
         const projects = await this.getActiveProjects();
         const project = projects.find(p => 
           p.quotation?.projectName?.toLowerCase().includes(projectName.toLowerCase()) ||
-          p.name?.toLowerCase().includes(projectName.toLowerCase())
+          p.quotation?.clientProjectName?.toLowerCase().includes(projectName.toLowerCase())
         );
 
         // Crear clave única para evitar duplicados
@@ -4683,7 +4615,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateDirectCost(id: number, cost: Partial<InsertDirectCost>): Promise<DirectCost | undefined> {
     const result = await db.update(directCosts)
-      .set({ ...cost, updatedAt: new Date() })
+      .set({ ...cost, lastUpdated: new Date() })
       .where(eq(directCosts.id, id))
       .returning();
     return result[0];
@@ -4691,7 +4623,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDirectCost(id: number): Promise<boolean> {
     const result = await db.delete(directCosts).where(eq(directCosts.id, id));
-    return result.rowCount > 0;
+    return (result as any).rowCount > 0;
   }
 
   async clearDirectCosts(): Promise<boolean> {
@@ -4787,7 +4719,7 @@ export class DatabaseStorage implements IStorage {
         })
         .from(activeProjects)
         .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-        .leftJoin(clients, eq(quotations.clientId, clients.id))
+        .leftJoin(clients, eq(quotations.clientId, clients.id!))
         .where(eq(activeProjects.id, filters.projectId))
         .limit(1);
         
@@ -4796,7 +4728,7 @@ export class DatabaseStorage implements IStorage {
           console.log(`💰 Found client mapping: Project ${filters.projectId} -> Client "${clientName}"`);
           
           // Buscar registros de ventas que coincidan con este cliente (más inclusivo)
-          conditions.push(eq(googleSheetsSales.clientName, clientName));
+          conditions.push(eq(googleSheetsSales.clientName, clientName!));
           console.log(`💰 Applied client filter: ${clientName}`);
           
           // DEBUGGING: Log what we're looking for
