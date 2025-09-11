@@ -1630,6 +1630,18 @@ export type InsertProjectFinancialTransaction = z.infer<typeof insertProjectFina
 export type GoogleSheetsSales = typeof googleSheetsSales.$inferSelect;
 export type InsertGoogleSheetsSales = z.infer<typeof insertGoogleSheetsSalesSchema>;
 
+// Interface para endpoint de income dashboard (replicando patrón de cost dashboard)
+export interface IncomeRecord {
+  id: number;
+  client_name: string;
+  project_name: string;
+  amount_usd: number;
+  month_key: string;
+  revenue_type: 'fee' | 'project' | 'bonus';
+  status: 'completada' | 'pendiente' | 'proyectada';
+  confirmed: string;
+}
+
 // Relaciones de ingresos mensuales de proyectos
 export const projectMonthlyRevenueRelations = relations(projectMonthlyRevenue, ({ one }) => ({
   project: one(activeProjects, { fields: [projectMonthlyRevenue.projectId], references: [activeProjects.id] }),

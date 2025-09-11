@@ -78,7 +78,7 @@ import { TeamDeviationAnalysis } from "@/components/advanced-analytics/team-devi
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { EconomicRankings } from "@/components/EconomicRankings";
 import TimeTracking from "@/components/TimeTracking";
-import IncomeDashboard from "@/components/IncomeDashboard";
+import IncomeDashboardTable from "@/components/IncomeDashboardTable";
 import { CostDashboard } from "@/components/CostDashboard";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
@@ -3274,7 +3274,7 @@ const ProjectDetailsPage = () => {
 
 
           <TabsContent value="income-details" className="space-y-6">
-            <IncomeDashboard 
+            <IncomeDashboardTable 
               projectId={unifiedData?.project?.id} 
               timeFilter={timeFilterForHook}
             />

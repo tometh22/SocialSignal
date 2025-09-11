@@ -12145,5 +12145,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Income Dashboard API - Análisis de ingresos por proyecto con datos reales
+  app.get('/api/income-dashboard-rows', async (req, res) => {
+    try {
+      const { projectId, timeFilter, clientName, revenueType, status } = req.query;
+      
+      console.log(`💰 INCOME DASHBOARD ROWS API called with params:`, { projectId, timeFilter, clientName, revenueType, status });
+
+      // Crear filtros object para la función storage
+      const filters: {
+        projectId?: number;
+        timeFilter?: string;
+        clientName?: string;
+        revenueType?: string;
+        status?: string;
+      } = {};
+
+      // Convertir projectId a número si está presente
+      if (projectId) {
+        filters.projectId = parseInt(projectId as string);
+      }
+
+      // Agregar filtros opcionales
+      if (timeFilter) filters.timeFilter = timeFilter as string;
+      if (clientName) filters.clientName = clientName as string;
+      if (revenueType) filters.revenueType = revenueType as string;
+      if (status) filters.status = status as string;
+
+      // Llamar a la función storage implementada
+      const incomeRecords = await storage.listIncomeRows(filters);
+
+      console.log(`💰 Income Dashboard Rows Response: ${incomeRecords.length} records found`);
+      if (incomeRecords.length > 0) {
+        console.log(`💰 Sample records:`, incomeRecords.slice(0, 3));
+      }
+
+      res.json(incomeRecords);
+    } catch (error) {
+      console.error('❌ Error fetching income dashboard rows:', error);
+      res.status(500).json({ error: 'Error fetching income dashboard rows' });
+    }
+  });
+
   return httpServer;
 }

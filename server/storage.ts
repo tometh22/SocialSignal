@@ -34,6 +34,7 @@ import {
   type ProjectFinancialTransaction, type InsertProjectFinancialTransaction,
   type GoogleSheetsSales, type InsertGoogleSheetsSales,
   type DirectCost, type InsertDirectCost,
+  type IncomeRecord,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -438,6 +439,15 @@ export interface IStorage {
   
   // Project activity range for one-shot projects
   getProjectActivityRange(projectId: number): Promise<{ startPeriod: string; endPeriod: string; isActive: boolean } | null>;
+  
+  // Income Dashboard operations
+  listIncomeRows(filters?: {
+    projectId?: number;
+    timeFilter?: string;
+    clientName?: string;
+    revenueType?: string;
+    status?: string;
+  }): Promise<IncomeRecord[]>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
@@ -4696,6 +4706,181 @@ export class DatabaseStorage implements IStorage {
       .where(eq(personnel.name, name))
       .limit(1);
     return result[0];
+  }
+
+  // Project activity range for one-shot projects
+  async getProjectActivityRange(projectId: number): Promise<{ startPeriod: string; endPeriod: string; isActive: boolean } | null> {
+    const costEntries = await db.select()
+      .from(directCosts)
+      .where(eq(directCosts.projectId, projectId))
+      .orderBy(asc(directCosts.año), asc(directCosts.monthKey));
+      
+    if (costEntries.length === 0) return null;
+    
+    const firstEntry = costEntries[0];
+    const lastEntry = costEntries[costEntries.length - 1];
+    
+    return {
+      startPeriod: `${firstEntry.año}-${firstEntry.monthKey?.split('-')[1] || '01'}`,
+      endPeriod: `${lastEntry.año}-${lastEntry.monthKey?.split('-')[1] || '12'}`,
+      isActive: new Date() <= new Date(`${lastEntry.año}-${lastEntry.monthKey?.split('-')[1] || '12'}-31`)
+    };
+  }
+
+  // Income Dashboard operations - Lista registros de ingresos para el dashboard
+  async listIncomeRows(filters?: {
+    projectId?: number;
+    timeFilter?: string;
+    clientName?: string;
+    revenueType?: string;
+    status?: string;
+  }): Promise<IncomeRecord[]> {
+    try {
+      console.log(`💰 INCOME ROWS API called with filters:`, filters);
+
+      // Función auxiliar para obtener rango de fechas del filtro temporal
+      const getDateRangeForFilter = (filter: string) => {
+        const now = new Date();
+        let startDate: Date;
+        let endDate: Date = now;
+
+        switch (filter) {
+          case 'august_2025':
+          case 'agosto_2025':
+            startDate = new Date(2025, 7, 1); // Agosto 2025
+            endDate = new Date(2025, 7, 31);
+            break;
+          case 'current_month':
+          case 'this-month':
+          case 'este_mes':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            break;
+          case 'last_month':
+          case 'last-month':
+          case 'mes_pasado':
+            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+            break;
+          case 'all':
+            return null; // Sin filtro temporal - mostrar todo
+          default:
+            // Soporte para rangos personalizados
+            return null;
+        }
+
+        return { startDate, endDate };
+      };
+
+      // Construir query base
+      let query = db.select().from(googleSheetsSales);
+      const conditions = [];
+
+      // Filtro por proyecto específico
+      if (filters?.projectId) {
+        // Buscar el nombre del proyecto para comparar
+        const projectQuery = await db.select()
+          .from(activeProjects)
+          .where(eq(activeProjects.id, filters.projectId))
+          .limit(1);
+        
+        if (projectQuery.length > 0) {
+          const projectName = projectQuery[0].name;
+          conditions.push(eq(googleSheetsSales.projectName, projectName));
+          console.log(`💰 Applied project filter: ${projectName}`);
+        }
+      }
+
+      // Filtro temporal
+      if (filters?.timeFilter) {
+        const dateRange = getDateRangeForFilter(filters.timeFilter);
+        if (dateRange) {
+          const startMonthKey = `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}`;
+          const endMonthKey = `${dateRange.endDate.getFullYear()}-${String(dateRange.endDate.getMonth() + 1).padStart(2, '0')}`;
+          
+          // Aplicar filtro de rango de meses
+          conditions.push(
+            sql`${googleSheetsSales.monthKey} >= ${startMonthKey} AND ${googleSheetsSales.monthKey} <= ${endMonthKey}`
+          );
+          console.log(`💰 Applied time filter: ${startMonthKey} to ${endMonthKey}`);
+        }
+      }
+
+      // Filtros adicionales opcionales
+      if (filters?.clientName) {
+        conditions.push(eq(googleSheetsSales.clientName, filters.clientName));
+      }
+
+      if (filters?.revenueType) {
+        conditions.push(eq(googleSheetsSales.revenueType, filters.revenueType));
+      }
+
+      if (filters?.status) {
+        conditions.push(eq(googleSheetsSales.status, filters.status));
+      }
+
+      // Aplicar condiciones si existen
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+
+      // Ejecutar consulta ordenada
+      const salesData = await query.orderBy(desc(googleSheetsSales.year), desc(googleSheetsSales.monthNumber));
+
+      console.log(`💰 Found ${salesData.length} sales records`);
+
+      // Mapear datos al formato IncomeRecord
+      const incomeRecords: IncomeRecord[] = salesData.map((sale, index) => {
+        // Conversión de moneda: si está en ARS, convertir a USD
+        let amountUsd = 0;
+        if (sale.amountUsd && parseFloat(sale.amountUsd) > 0) {
+          amountUsd = parseFloat(sale.amountUsd);
+        } else if (sale.amountLocal && parseFloat(sale.amountLocal) > 0 && sale.currency === 'ARS') {
+          // Conversión ARS → USD con tasa fija 1300 (consistente con cost-dashboard)
+          amountUsd = parseFloat(sale.amountLocal) / 1300;
+        }
+
+        // Mapear revenue_type de salesType
+        let revenueType: 'fee' | 'project' | 'bonus' = 'fee';
+        if (sale.salesType?.toLowerCase().includes('fee')) {
+          revenueType = 'fee';
+        } else if (sale.salesType?.toLowerCase().includes('one shot') || sale.salesType?.toLowerCase().includes('project')) {
+          revenueType = 'project';
+        } else if (sale.salesType?.toLowerCase().includes('bonus')) {
+          revenueType = 'bonus';
+        }
+
+        // Mapear status de los datos del Excel
+        let status: 'completada' | 'pendiente' | 'proyectada' = 'completada';
+        if (sale.status?.toLowerCase().includes('proyectado') || sale.status?.toLowerCase().includes('projected')) {
+          status = 'proyectada';
+        } else if (sale.status?.toLowerCase().includes('pendiente') || sale.status?.toLowerCase().includes('pending')) {
+          status = 'pendiente';
+        } else if (sale.status?.toLowerCase().includes('emitido') || sale.status?.toLowerCase().includes('completada') || sale.status?.toLowerCase().includes('completed')) {
+          status = 'completada';
+        }
+
+        return {
+          id: sale.id,
+          client_name: sale.clientName || '',
+          project_name: sale.projectName || '',
+          amount_usd: amountUsd,
+          month_key: sale.monthKey || '',
+          revenue_type: revenueType,
+          status: status,
+          confirmed: sale.confirmed || 'SI'
+        };
+      });
+
+      console.log(`💰 Mapped ${incomeRecords.length} income records`);
+      console.log(`💰 Sample records:`, incomeRecords.slice(0, 3));
+
+      return incomeRecords;
+
+    } catch (error) {
+      console.error("❌ Error in listIncomeRows:", error);
+      return [];
+    }
   }
 
 }
