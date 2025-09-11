@@ -1659,14 +1659,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRealRevenue = salesData.length > 0 
         ? await salesData.reduce(async (sumPromise, sale) => {
             const sum = await sumPromise;
-            // Priorizar amountUsd, si no existe convertir amountArs usando tipo de cambio REAL
+            // Priorizar amountUsd, si no existe usar amountLocal con conversión según currency
             const usdAmount = Number(sale.amountUsd ?? 0) || 0;
-            const arsAmount = Number(sale.amountArs ?? 0) || 0;
+            const localAmount = Number(sale.amountLocal ?? 0) || 0;
+            const isARS = sale.currency === 'ARS';
             
             if (usdAmount > 0) {
               console.log(`💰 USD Sale: $${usdAmount} for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
               return sum + usdAmount;
-            } else if (arsAmount > 0) {
+            } else if (isARS && localAmount > 0) {
               // Obtener tipo de cambio real del Excel MAESTRO con normalización robusta
               try {
                 const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
@@ -1707,15 +1708,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.log(`⚠️ Using fallback exchange rate for ${sale.month}/${sale.year}: ${realExchangeRate} (from ${fallbackRate?.año || 'default'})`);
                 }
                 
-                const convertedUsd = arsAmount / realExchangeRate;
-                console.log(`💱 ARS Sale: ARS $${arsAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
+                const convertedUsd = localAmount / realExchangeRate;
+                console.log(`💱 ARS Sale: ARS $${localAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
                 return sum + convertedUsd;
               } catch (error) {
                 console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using fallback 1300:`, error);
-                const fallbackUsd = arsAmount / 1300;
-                console.log(`💱 ARS Sale (fallback): ARS $${arsAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
+                const fallbackUsd = localAmount / 1300;
+                console.log(`💱 ARS Sale (fallback): ARS $${localAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
                 return sum + fallbackUsd;
               }
+            } else {
+              console.log(`⚠️ Sale has no valid amount: ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year}) - USD: ${usdAmount}, Local: ${localAmount}, Currency: ${sale.currency}`);
             }
             return sum;
           }, Promise.resolve(0))
