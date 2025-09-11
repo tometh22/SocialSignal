@@ -262,7 +262,8 @@ export class AutoSyncService {
     try {
       // Por ahora, solo registrar la vinculación sin crear ingresos mensuales
       // para evitar errores de funciones faltantes
-      console.log(`💰 Venta vinculada: ${sale.client_name} - ${sale.project_name} ($${sale.amount_usd || sale.amount_ars})`);
+      console.log(`💰 Venta vinculada: ${sale.clientName} - ${sale.projectName} ($${sale.amountUsd || sale.amountArs})`);
+      console.log(`🔗 Vinculado: ${sale.clientName} - ${sale.projectName} → Proyecto ${project.id}`);
       return 0; // No crear ingresos por ahora
 
     } catch (error: any) {
