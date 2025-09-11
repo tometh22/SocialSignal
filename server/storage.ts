@@ -56,6 +56,7 @@ import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import { getDateRangeForFilter } from "./routes";
 
 // Función auxiliar para obtener el campo correcto de costo histórico
 function getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
@@ -4725,39 +4726,7 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`💰 INCOME ROWS API called with filters:`, filters);
 
-      // Función auxiliar para obtener rango de fechas del filtro temporal
-      const getDateRangeForFilter = (filter: string) => {
-        const now = new Date();
-        let startDate: Date;
-        let endDate: Date = now;
-
-        switch (filter) {
-          case 'august_2025':
-          case 'agosto_2025':
-            startDate = new Date(2025, 7, 1); // Agosto 2025
-            endDate = new Date(2025, 7, 31);
-            break;
-          case 'current_month':
-          case 'this-month':
-          case 'este_mes':
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-            break;
-          case 'last_month':
-          case 'last-month':
-          case 'mes_pasado':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            endDate = new Date(now.getFullYear(), now.getMonth(), 0);
-            break;
-          case 'all':
-            return null; // Sin filtro temporal - mostrar todo
-          default:
-            // Soporte para rangos personalizados
-            return null;
-        }
-
-        return { startDate, endDate };
-      };
+      // Usar la función auxiliar importada para obtener rango de fechas del filtro temporal
 
       // Construir query base
       let query = db.select().from(googleSheetsSales);
