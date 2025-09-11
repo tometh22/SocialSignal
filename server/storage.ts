@@ -4586,7 +4586,7 @@ export class DatabaseStorage implements IStorage {
           month: monthName,
           year,
           salesType,
-          amountArs: amountArs ? String(amountArs) : null,
+          amountLocal: amountArs ? String(amountArs) : null, // 🎯 CAMPO CORRECTO PARA ARS
           currency: currency, // 🎯 USAR MONEDA DETERMINADA CORRECTAMENTE
           amountUsd: amountUsd ? String(amountUsd) : null,
           confirmed,
