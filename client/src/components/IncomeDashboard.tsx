@@ -137,7 +137,7 @@ const IncomeDashboard: React.FC<IncomeDashboardProps> = ({
   const { data: incomeData, isLoading, error } = useQuery({
     queryKey: ['income-analysis', selectedTimeFilter],
     queryFn: async (): Promise<IncomeData> => {
-      const response = await fetch(`/api/income-analysis?timeFilter=${selectedTimeFilter}`);
+      const response = await fetch(`/api/income-dashboard?timeFilter=${selectedTimeFilter}`);
       if (!response.ok) {
         throw new Error('Error al cargar datos de ingresos');
       }
