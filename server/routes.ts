@@ -1654,24 +1654,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Eficiencia basada en Excel MAESTRO: horasObjetivo vs horasRealesAsana  
       const efficiency = excelTargetHours > 0 ? (excelActualHours / excelTargetHours) * 100 : 0;
       
-      // Revenue desde Google Sheets filtrado temporalmente - CORRECCIÓN: usar ambos campos
+      // Revenue desde Google Sheets filtrado temporalmente - CORRECCIÓN: usar ambos campos CON TIPO DE CAMBIO REAL
       const salesData = await getFilteredGoogleSheetsSales(id, timeFilter, dateRange);
       const totalRealRevenue = salesData.length > 0 
-        ? salesData.reduce((sum, sale) => {
-            // Priorizar amountUsd, si no existe convertir amountArs usando tipo de cambio típico
+        ? await salesData.reduce(async (sumPromise, sale) => {
+            const sum = await sumPromise;
+            // Priorizar amountUsd, si no existe convertir amountArs usando tipo de cambio REAL
             const usdAmount = Number(sale.amountUsd ?? 0) || 0;
             const arsAmount = Number(sale.amountArs ?? 0) || 0;
             
             if (usdAmount > 0) {
+              console.log(`💰 USD Sale: $${usdAmount} for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
               return sum + usdAmount;
             } else if (arsAmount > 0) {
-              // Usar tipo de cambio aproximado (debería obtener el real desde Excel)
-              const estimatedUsd = arsAmount / 1300; // Aproximación, mejorará después
-              console.log(`💱 Converting ARS $${arsAmount} to USD $${estimatedUsd.toFixed(2)} for sale ${sale.id}`);
-              return sum + estimatedUsd;
+              // Obtener tipo de cambio real del Excel MAESTRO
+              try {
+                const tiposCambio = await googleSheetsWorkingService.getTiposCambio();
+                const monthExchangeRate = tiposCambio.find(tc => 
+                  tc.mes.toLowerCase().includes(sale.month.toLowerCase().slice(0, 3)) && 
+                  tc.año === sale.year
+                );
+                const realExchangeRate = monthExchangeRate?.tipoCambio || 1300; // fallback seguro
+                const convertedUsd = arsAmount / realExchangeRate;
+                console.log(`💱 ARS Sale: ARS $${arsAmount} → USD $${convertedUsd.toFixed(2)} (rate: ${realExchangeRate}) for ${sale.clientName}-${sale.projectName} (${sale.month}/${sale.year})`);
+                return sum + convertedUsd;
+              } catch (error) {
+                console.warn(`⚠️ Error getting exchange rate for ${sale.month}/${sale.year}, using fallback 1300:`, error);
+                const fallbackUsd = arsAmount / 1300;
+                console.log(`💱 ARS Sale (fallback): ARS $${arsAmount} → USD $${fallbackUsd.toFixed(2)} for ${sale.clientName}-${sale.projectName}`);
+                return sum + fallbackUsd;
+              }
             }
             return sum;
-          }, 0)
+          }, Promise.resolve(0))
         : 0; // NO usar fallback de cotización para métricas de período
       
       console.log(`🎯 CORRECTED METRICS CALCULATION for project ${id} (${timeFilter}):`);
