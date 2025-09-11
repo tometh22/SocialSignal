@@ -11739,6 +11739,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const averageProjectValue = activeProjects.size > 0 ? totalIncome / activeProjects.size : 0;
 
+      // Build client breakdown for frontend
+      const clientBreakdown = Object.entries(clientIncomes).map(([clientName, income]) => ({
+        clientName,
+        income,
+        percentage: totalIncome > 0 ? (income / totalIncome) * 100 : 0
+      }));
+
       // Build response structure expected by frontend
       const response = {
         totalIncome,
@@ -11751,6 +11758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           topPerformingClient,
           deliverableProjects: activeProjects.size // Required by frontend
         },
+        clientBreakdown, // Required by frontend
         details: result.map(sale => ({
           ...sale,
           converted_usd: sale.amount_usd ? parseFloat(sale.amount_usd) : null
