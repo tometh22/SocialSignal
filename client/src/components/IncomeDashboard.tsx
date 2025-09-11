@@ -84,6 +84,7 @@ interface IncomeSummary {
 interface IncomeDashboardProps {
   timeFilter?: string;
   viewMode?: 'executive' | 'detailed';
+  projectId?: number;
 }
 
 const timeFilterOptions = [
@@ -129,15 +130,20 @@ const getStatusBadge = (status: string) => {
 
 const IncomeDashboard: React.FC<IncomeDashboardProps> = ({ 
   timeFilter = 'current_month',
-  viewMode = 'executive'
+  viewMode = 'executive',
+  projectId
 }) => {
   const [selectedTimeFilter, setSelectedTimeFilter] = useState(timeFilter);
   const [selectedViewMode, setSelectedViewMode] = useState(viewMode);
 
   const { data: incomeData, isLoading, error } = useQuery({
-    queryKey: ['income-analysis', selectedTimeFilter],
+    queryKey: ['income-analysis', selectedTimeFilter, projectId],
     queryFn: async (): Promise<IncomeData> => {
-      const response = await fetch(`/api/income-dashboard?timeFilter=${selectedTimeFilter}`);
+      const urlParams = new URLSearchParams({ timeFilter: selectedTimeFilter });
+      if (projectId) {
+        urlParams.append('projectId', projectId.toString());
+      }
+      const response = await fetch(`/api/income-dashboard?${urlParams.toString()}`);
       if (!response.ok) {
         throw new Error('Error al cargar datos de ingresos');
       }
