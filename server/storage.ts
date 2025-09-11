@@ -4776,18 +4776,33 @@ export class DatabaseStorage implements IStorage {
       let query = db.select().from(googleSheetsSales);
       const conditions = [];
 
-      // Filtro por proyecto específico
+      // Filtro por proyecto específico - CORRECTED: usar quotation_id -> client mapping
       if (filters?.projectId) {
-        // Buscar el nombre del proyecto para comparar
-        const projectQuery = await db.select()
-          .from(activeProjects)
-          .where(eq(activeProjects.id, filters.projectId))
-          .limit(1);
+        console.log(`💰 Looking for project ${filters.projectId} client mapping...`);
         
-        if (projectQuery.length > 0) {
-          const projectName = projectQuery[0].name;
-          conditions.push(eq(googleSheetsSales.projectName, projectName));
-          console.log(`💰 Applied project filter: ${projectName}`);
+        // Mapear projectId -> quotation -> client para obtener cliente correcto
+        const projectMapping = await db.select({
+          clientName: clients.name,
+          quotationId: quotations.id
+        })
+        .from(activeProjects)
+        .leftJoin(quotations, eq(activeProjects.quotationId, quotations.id))
+        .leftJoin(clients, eq(quotations.clientId, clients.id))
+        .where(eq(activeProjects.id, filters.projectId))
+        .limit(1);
+        
+        if (projectMapping.length > 0) {
+          const clientName = projectMapping[0].clientName;
+          console.log(`💰 Found client mapping: Project ${filters.projectId} -> Client "${clientName}"`);
+          
+          // Buscar registros de ventas que coincidan con este cliente (más inclusivo)
+          conditions.push(eq(googleSheetsSales.clientName, clientName));
+          console.log(`💰 Applied client filter: ${clientName}`);
+          
+          // DEBUGGING: Log what we're looking for
+          console.log(`💰 DEBUGGING: Looking for sales with client_name='${clientName}' in timeFilter range`);
+        } else {
+          console.log(`💰 No client mapping found for project ${filters.projectId}`);
         }
       }
 
