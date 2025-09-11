@@ -90,9 +90,9 @@ function ProjectCard({
   // Define hasPeriodMetrics based on timeFilter
   const hasPeriodMetrics = timeFilter !== 'all';
   
-  // Obtener métricas REALES del hook corregido (como en vista individual)
+  // 🎯 CORREGIDO: Usar revenue REAL del período filtrado en lugar de quotation.totalAmount
   const periodCost = completeData?.actuals?.totalWorkedCost || 0;
-  const periodBilling = completeData?.quotation?.totalAmount || 0;
+  const periodBilling = completeData?.totalRealRevenue || 0; // ✅ Revenue correcto del período
   
   // 🎯 Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';

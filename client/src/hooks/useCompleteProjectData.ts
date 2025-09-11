@@ -11,6 +11,7 @@ interface CompleteProjectData {
   timeFilter: string;
   workedCost: number;
   workedHours: number;
+  totalRealRevenue: number; // 🎯 NUEVO: Revenue real del período filtrado
   
   // Project type validation (new for one-shot projects)
   isOutOfRange?: boolean;

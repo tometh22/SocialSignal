@@ -1855,6 +1855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workedCost: excelTotalCost,       // Usar costo real del Excel MAESTRO
         efficiency: efficiency,            // Eficiencia corregida (Excel target vs actual)
         markup: markup,                   // Markup corregido (revenue real vs costo real)
+        totalRealRevenue: totalRealRevenue, // 🎯 NUEVO: Revenue real del período filtrado
         timeFilter: timeFilter,
         isAlwaysOn: project.quotation?.projectType === 'always-on',
         // Agregar salesData para compatibilidad con frontend
