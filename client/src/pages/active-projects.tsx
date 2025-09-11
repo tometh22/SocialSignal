@@ -90,9 +90,14 @@ function ProjectCard({
   // Define hasPeriodMetrics based on timeFilter
   const hasPeriodMetrics = timeFilter !== 'all';
   
-  // 🎯 CORREGIDO: Usar revenue REAL del período filtrado en lugar de quotation.totalAmount
+  // 🎯 CORREGIDO: Usar valores del período desde googleSheetsSales filtradas
   const periodCost = completeData?.actuals?.totalWorkedCost || 0;
-  const periodBilling = completeData?.totalRealRevenue || 0; // ✅ Revenue correcto del período
+  
+  // Calcular revenue del período desde googleSheetsSales filtradas (solución temporal hasta arreglar totalRealRevenue)
+  const periodBilling = completeData?.googleSheetsSales?.reduce((sum: number, sale: any) => {
+    const usdAmount = parseFloat(sale.amountUsd || '0') || 0;
+    return sum + usdAmount;
+  }, 0) || 0;
   
   // 🎯 Detectar tipo de proyecto para calcular progreso apropiado
   const projectType = project.quotation?.projectType || 'one-shot';

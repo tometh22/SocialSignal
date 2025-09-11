@@ -553,13 +553,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const costDate = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
         const inRange = costDate >= dateRange.startDate && costDate <= dateRange.endDate;
         
-        console.log(`💰 Costo: ${cost.clientName || 'Unknown'} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
+        console.log(`💰 Costo: ${cost.cliente || 'Unknown'} - ${cost.mes} ${cost.año} = $${cost.montoTotalUSD} USD, En rango: ${inRange}`);
         return inRange;
       }) || [];
       
       // Calcular totales
-      const totalUSD = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.montoTotalUSD as string) || 0), 0);
-      const totalARS = filteredCosts.reduce((sum, cost) => sum + (parseFloat(cost.costoTotal as string) || 0), 0);
+      const totalUSD = filteredCosts.reduce((sum, cost) => sum + (Number(cost.montoTotalUSD ?? 0) || 0), 0);
+      const totalARS = filteredCosts.reduce((sum, cost) => sum + (Number(cost.costoTotal ?? 0) || 0), 0);
       
       console.log(`💰 RESULTADO: ${filteredCosts.length} costos filtrados = $${totalUSD} USD`);
       
@@ -567,8 +567,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         timeFilter,
         dateRange: {
-          start: dateRange.startDate.toISOString(),
-          end: dateRange.endDate.toISOString()
+          start: dateRange?.startDate?.toISOString() || 'N/A',
+          end: dateRange?.endDate?.toISOString() || 'N/A'
         },
         allCosts: allCosts?.length || 0,
         filteredCosts: filteredCosts.length,
@@ -577,7 +577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ars: totalARS
         },
         detailedCosts: filteredCosts.map(cost => ({
-          nombre: cost.clientName || 'Unknown',
+          nombre: cost.cliente || 'Unknown',
           mes: cost.mes,
           año: cost.año,
           montoUSD: cost.montoTotalUSD,
@@ -1649,7 +1649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calcular desde Excel MAESTRO: horas objetivo vs horas reales
       const excelTargetHours = filteredDirectCosts.reduce((sum, dc) => sum + (dc.horasObjetivo || 0), 0);
       const excelActualHours = filteredDirectCosts.reduce((sum, dc) => sum + (dc.horasRealesAsana || 0), 0);
-      const excelTotalCost = filteredDirectCosts.reduce((sum, dc) => sum + (dc.montoTotalUSD || dc.costoTotal || 0), 0);
+      const excelTotalCost = filteredDirectCosts.reduce((sum, dc) => sum + (Number(dc.montoTotalUSD ?? 0) || Number(dc.costoTotal ?? 0) || 0), 0);
       
       // Eficiencia basada en Excel MAESTRO: horasObjetivo vs horasRealesAsana  
       const efficiency = excelTargetHours > 0 ? (excelActualHours / excelTargetHours) * 100 : 0;
@@ -1659,8 +1659,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRealRevenue = salesData.length > 0 
         ? salesData.reduce((sum, sale) => {
             // Priorizar amountUsd, si no existe convertir amountArs usando tipo de cambio típico
-            const usdAmount = parseFloat(sale.amountUsd || '0') || 0;
-            const arsAmount = parseFloat(sale.amountArs || '0') || 0;
+            const usdAmount = Number(sale.amountUsd ?? 0) || 0;
+            const arsAmount = Number(sale.amountArs ?? 0) || 0;
             
             if (usdAmount > 0) {
               return sum + usdAmount;
@@ -1896,7 +1896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timeEntriesCount: timeEntries.length > 0 ? timeEntries.length : Object.values(teamBreakdown).filter((m: any) => m.hours > 0).length,
         recentTimeEntriesSample: timeEntries.length > 0 
           ? timeEntries.slice(0, 3).map(e => ({
-              personnelName: e.personnelName,
+              personnelName: 'N/A',
               date: e.date,
               hours: e.hours
             }))
@@ -3754,7 +3754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (monthsInPeriod > 0) {
                 // Valores mensuales base del proyecto
                 const monthlyAmount = project.quotation?.totalAmount || 0;
-                const monthlyHours = project.quotation?.totalHours || 0;
+                const monthlyHours = 0; // Default value since totalHours doesn't exist
                 const monthlyCost = project.quotation?.baseCost || monthlyAmount * 0.7; // Estimación si no hay baseCost
                 
                 // Multiplicar por el número de meses del período
@@ -7916,8 +7916,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (timeFilter) {
         const filterDates = getDateRangeForFilter(timeFilter as string);
-        filterStartDate = filterDates.startDate.toISOString().split('T')[0];
-        filterEndDate = filterDates.endDate.toISOString().split('T')[0];
+        if (filterDates) {
+          filterStartDate = filterDates.startDate.toISOString().split('T')[0];
+          filterEndDate = filterDates.endDate.toISOString().split('T')[0];
+        }
       } else if (startDate && endDate) {
         filterStartDate = startDate as string;
         filterEndDate = endDate as string;
@@ -8018,9 +8020,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // INTELIGENCIA DE NEGOCIO: Análisis predictivo de riesgos
       if (costDeviation > 10) {
-        const monthlyBurn = totalActualCost / (filterEndDate ? 
-          (new Date(filterEndDate).getMonth() - new Date(filterStartDate).getMonth() + 1) : 1);
-        const projectedOverrun = monthlyBurn * 12 - quotation?.baseCost;
+        const monthlyBurn = totalActualCost / (filterEndDate && filterStartDate ? 
+          (new Date(filterEndDate).getMonth() - new Date(filterStartDate as string).getMonth() + 1) : 1);
+        const projectedOverrun = monthlyBurn * 12 - (quotation?.baseCost ?? 0);
         
         recommendations.push({
           type: 'financial_risk',
@@ -8044,7 +8046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const person = teamMembers.find(m => m.personnelId === entry.personnelId);
           if (!acc[entry.personnelId]) {
             acc[entry.personnelId] = { 
-              name: person?.personnelName || 'Unknown',
+              name: 'N/A',
               actual: 0, 
               estimated: person?.hours || 0,
               cost: 0
