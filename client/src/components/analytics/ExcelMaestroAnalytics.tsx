@@ -19,29 +19,25 @@ import {
   Line
 } from "recharts";
 
-interface CostoDirectoIndirecto {
+interface DirectCostFromDB {
+  id: number;
+  monthKey: string;
+  clientName: string;
+  projectName: string;
+  month: string;
+  year: number;
   persona: string;
-  mes: string;
-  año: number;
-  costoDirecto: number;
-  costoIndirecto: number;
+  horasRealesAsana: number;
   costoTotal: number;
-  valorHora: number;
-  categoria: string;
-  proyecto?: string;
-}
-
-interface ExcelMaestroResponse {
-  success: boolean;
-  message: string;
-  data: CostoDirectoIndirecto[];
-  count: number;
-  source: string;
+  montoTotalUSD?: number;
+  valorHoraPersona: number;
+  projectId?: number;
+  personnelId?: number;
 }
 
 export function ExcelMaestroAnalytics() {
-  const { data: maestroData, isLoading, error } = useQuery<ExcelMaestroResponse>({
-    queryKey: ["/api/google-sheets/costos-maestro"],
+  const { data: directCostsData, isLoading, error } = useQuery<DirectCostFromDB[]>({
+    queryKey: ["/api/direct-costs"],
     refetchInterval: false, // ✅ Usar invalidación manual en lugar de polling
     staleTime: 2 * 60 * 1000, // 2 minutos - analytics no necesitan ser tan frecuentes
   });
@@ -67,13 +63,13 @@ export function ExcelMaestroAnalytics() {
     );
   }
 
-  if (error || !maestroData?.success) {
+  if (error || !directCostsData) {
     return (
       <Card className="border-red-200">
         <CardHeader>
           <CardTitle className="text-red-600">Error de Conexión</CardTitle>
           <CardDescription>
-            No se pudo conectar con el Excel MAESTRO de Epical
+            No se pudo conectar con la base de datos de costos directos
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -85,23 +81,25 @@ export function ExcelMaestroAnalytics() {
     );
   }
 
-  const { data: costosData, count, source } = maestroData;
+  const costosData = directCostsData;
+  const count = directCostsData.length;
+  const source = "Base de Datos";
 
   // Análisis de datos
   const personalUnico = Array.from(new Set(costosData.map(c => c.persona)));
   const costoTotalGeneral = costosData.reduce((sum, c) => sum + c.costoTotal, 0);
-  const costoDirectoTotal = costosData.reduce((sum, c) => sum + c.costoDirecto, 0);
-  const costoIndirectoTotal = costosData.reduce((sum, c) => sum + c.costoIndirecto, 0);
+  const costoDirectoTotal = costosData.reduce((sum, c) => sum + c.costoTotal, 0); // Todo es costo directo en la DB
+  const costoIndirectoTotal = 0; // No hay costos indirectos separados en la nueva estructura
 
   // Datos por persona
   const datosPorPersona = personalUnico.map(persona => {
     const registros = costosData.filter(c => c.persona === persona);
     const costoTotal = registros.reduce((sum, c) => sum + c.costoTotal, 0);
-    const costoDirecto = registros.reduce((sum, c) => sum + c.costoDirecto, 0);
-    const costoIndirecto = registros.reduce((sum, c) => sum + c.costoIndirecto, 0);
+    const costoDirecto = costoTotal; // Todo es costo directo
+    const costoIndirecto = 0; // No hay costos indirectos separados
     const valorHoraPromedio = registros
-      .filter(r => r.valorHora > 0)
-      .reduce((sum, r, _, arr) => sum + r.valorHora / arr.length, 0);
+      .filter(r => r.valorHoraPersona > 0)
+      .reduce((sum, r, _, arr) => sum + r.valorHoraPersona / arr.length, 0);
     
     return {
       persona,
@@ -113,9 +111,9 @@ export function ExcelMaestroAnalytics() {
     };
   }).sort((a, b) => b.costoTotal - a.costoTotal);
 
-  // Datos por categoría
+  // Datos por categoría (usando projectName como categoría)
   const datosPorCategoria = costosData.reduce((acc, c) => {
-    const categoria = c.categoria || 'Sin categoría';
+    const categoria = c.projectName || 'Sin categoría';
     if (!acc[categoria]) {
       acc[categoria] = { 
         categoria, 
@@ -126,8 +124,8 @@ export function ExcelMaestroAnalytics() {
       };
     }
     acc[categoria].costoTotal += c.costoTotal;
-    acc[categoria].costoDirecto += c.costoDirecto;
-    acc[categoria].costoIndirecto += c.costoIndirecto;
+    acc[categoria].costoDirecto += c.costoTotal; // Todo es costo directo
+    acc[categoria].costoIndirecto += 0; // No hay costos indirectos
     acc[categoria].registros += 1;
     return acc;
   }, {} as Record<string, any>);
