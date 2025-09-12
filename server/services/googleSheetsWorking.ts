@@ -1350,12 +1350,12 @@ class GoogleSheetsWorkingService {
         // Uber
         'uber_uber taxis': 40,
         
-        // Proyectos que van al ID 42 (múltiples clientes/Fee mensual)
+        // Proyectos Fee mensual específicos por cliente
         'play digital s.a (modo)_fee mensual': 42,
         'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
-        'coelsa_fee mensual': 42,
-        'detroit_fee mensual': 42,
-        'vertical media_fee mensual': 42,
+        'coelsa_fee mensual': 43,  // ✅ COELSA va al proyecto 43
+        'detroit_fee mensual': 44, // Detroit tiene su propio proyecto
+        'vertical media_fee mensual': 41, // Vertical Media tiene su propio proyecto
         
         // Proyectos adicionales sin ID asignado (por ahora van sin mapeo específico)
         // 'bid_exploratorio nicaragua': 45, // necesita ID
@@ -1383,9 +1383,9 @@ class GoogleSheetsWorkingService {
         'arcos dorados': 37, // Para Dashboard (default)
         'uber': 40,
         'play digital s.a (modo)': 42,
-        'coelsa': 42,
-        'detroit': 42,
-        'vertical media': 42,
+        'coelsa': 43,  // ✅ COELSA va al proyecto 43
+        'detroit': 44, // Detroit tiene su propio proyecto
+        'vertical media': 41, // Vertical Media tiene su propio proyecto
       };
       
       const normalizedClientName = clientName.toLowerCase().trim();

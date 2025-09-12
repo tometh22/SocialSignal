@@ -181,13 +181,13 @@ export class AutoSyncService {
       for (const sale of salesData) {
         try {
           // 🎯 USAR EL MAPEO ESPECÍFICO que funciona para costos
-          const projectId = await this.findProjectBySpecificMapping(sale.client_name || '', sale.project_name || '');
+          const projectId = await this.findProjectBySpecificMapping(sale.clientName || '', sale.projectName || '');
           
           if (projectId) {
             // Actualizar la venta con el ID del proyecto correcto
             await storage.updateGoogleSheetsSales(sale.id, {
-              project_id: projectId,
-              last_updated: new Date()
+              projectId: projectId,
+              lastUpdated: new Date()
             });
 
             // Crear o actualizar ingreso mensual del proyecto (simplificado)
@@ -199,10 +199,10 @@ export class AutoSyncService {
             linked++;
             
             if (linked <= 10) { // Log primeros 10 para debug
-              console.log(`🔗 Vinculado: ${sale.client_name} - ${sale.project_name} → Proyecto ${projectId}`);
+              console.log(`🔗 Vinculado: ${sale.clientName} - ${sale.projectName} → Proyecto ${projectId}`);
             }
           } else {
-            console.log(`⚠️ Sin mapeo para: ${sale.client_name} - ${sale.project_name}`);
+            console.log(`⚠️ Sin mapeo para: ${sale.clientName} - ${sale.projectName}`);
           }
 
         } catch (error: any) {
@@ -255,12 +255,12 @@ export class AutoSyncService {
         // Uber
         'uber_uber taxis': 40,
         
-        // Proyectos que van al ID 42 (múltiples clientes/Fee mensual)
+        // Proyectos Fee mensual específicos por cliente
         'play digital s.a (modo)_fee mensual': 42,
         'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
-        'coelsa_fee mensual': 42,
-        'detroit_fee mensual': 42,
-        'vertical media_fee mensual': 42,
+        'coelsa_fee mensual': 43,  // ✅ COELSA va al proyecto 43
+        'detroit_fee mensual': 44, // Detroit tiene su propio proyecto
+        'vertical media_fee mensual': 41, // Vertical Media tiene su propio proyecto
       };
       
       const projectId = specificProjectMapping[clientProjectKey];
@@ -278,9 +278,9 @@ export class AutoSyncService {
         'arcos dorados': 37, // Para Dashboard (default)
         'uber': 40,
         'play digital s.a (modo)': 42,
-        'coelsa': 42,
-        'detroit': 42,
-        'vertical media': 42,
+        'coelsa': 43,  // ✅ COELSA va al proyecto 43
+        'detroit': 44, // Detroit tiene su propio proyecto
+        'vertical media': 41, // Vertical Media tiene su propio proyecto
       };
       
       const normalizedClientName = clientName.toLowerCase().trim();

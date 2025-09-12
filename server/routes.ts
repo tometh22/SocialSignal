@@ -11718,7 +11718,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const exchangeRate = 1300;
               amountUsd = arsAmount / exchangeRate;
               
-              console.log(`💱 Converted ${sale.client_name}-${sale.project_name}: ARS $${arsAmount} → USD $${amountUsd.toFixed(2)} (rate: ${exchangeRate})`);
+              console.log(`💱 Converted ${sale.clientName}-${sale.projectName}: ARS $${arsAmount} → USD $${amountUsd.toFixed(2)} (rate: ${exchangeRate})`);
             }
           } catch (error) {
             console.warn(`⚠️ Error converting ARS to USD for sale ${sale.id}:`, error);
@@ -11727,12 +11727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         totalIncome += amountUsd;
-        activeProjects.add(`${sale.client_name}-${sale.project_name}`);
+        activeProjects.add(`${sale.clientName}-${sale.projectName}`);
         
-        if (!clientIncomes[sale.client_name]) {
-          clientIncomes[sale.client_name] = 0;
+        if (!clientIncomes[sale.clientName]) {
+          clientIncomes[sale.clientName] = 0;
         }
-        clientIncomes[sale.client_name] += amountUsd;
+        clientIncomes[sale.clientName] += amountUsd;
       }
 
       // Calculate summary metrics
@@ -11758,7 +11758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build project-specific income mapping
       const projectIncomes: Record<string, number> = {};
       result.forEach(sale => {
-        const projectKey = `${sale.client_name}-${sale.project_name}`;
+        const projectKey = `${sale.clientName}-${sale.projectName}`;
         if (!projectIncomes[projectKey]) {
           projectIncomes[projectKey] = 0;
         }
