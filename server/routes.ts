@@ -8769,7 +8769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           client_name: sale.clientName || 'N/A',
           project_name: sale.projectName || 'N/A', 
           amount_usd: Number(sale.amountUsd || 0),
-          original_amount: Number(sale.amount || 0),
+          original_amount: Number(sale.amountLocal || sale.amountUsd || 0),
           currency: sale.currency || 'USD',
           month_key: sale.monthKey || '',
           revenue_type: sale.revenueType || 'fee',
