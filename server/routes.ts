@@ -8739,38 +8739,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('🔍 Income Dashboard Rows - Request params:', { projectId, timeFilter, clientName, revenueType, status });
       
-      // Obtener costos directos (fuente única: Excel MAESTRO sincronizado)
-      let directCostsData;
+      // Obtener datos de ventas/ingresos (fuente: pestaña "Ventas Tomi" del Excel MAESTRO)
+      let salesData;
       if (projectId) {
-        directCostsData = await storage.getDirectCostsByProject(parseInt(projectId as string));
+        salesData = await storage.getGoogleSheetsSalesByProject(parseInt(projectId as string));
       } else {
-        directCostsData = await storage.getAllDirectCosts();
+        salesData = await storage.getGoogleSheetsSales();
       }
 
-      console.log(`💰 Found ${directCostsData.length} direct cost records`);
+      console.log(`💰 Found ${salesData.length} sales records`);
 
       // Filtro temporal
       const filterStr = (timeFilter as string) || 'all';
       const dateRange = filterStr === 'all' ? null : getDateRangeForFilter(filterStr);
 
       // Transformar a la estructura esperada por el frontend
-      const incomeRecords = (directCostsData || [])
-        .filter(cost => {
+      const incomeRecords = (salesData || [])
+        .filter(sale => {
           if (!dateRange) return true;
-          const d = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
-          return d >= dateRange.startDate && d <= dateRange.endDate;
+          // Filtrar por month_key (formato YYYY-MM como "2025-08")
+          if (sale.monthKey) {
+            const saleDate = new Date(sale.monthKey + '-01');
+            return saleDate >= dateRange.startDate && saleDate <= dateRange.endDate;
+          }
+          return false;
         })
-        .map(cost => ({
-          id: cost.id,
-          client_name: cost.cliente || cost.clientName || 'N/A',
-          project_name: cost.proyecto || cost.projectName || 'N/A',
-          amount_usd: Number(cost.montoTotalUSD ?? 0),
-          original_amount: Number(cost.costoTotal ?? 0),
-          currency: Number(cost.montoTotalUSD ?? 0) > 0 ? 'USD' : 'ARS',
-          month_key: `${cost.año}-${String(getMonthNumber(cost.mes)).padStart(2, '0')}`,
-          revenue_type: cost.tipoGasto || 'fee',
-          status: 'completada',
-          confirmed: 'SI'
+        .map(sale => ({
+          id: sale.id,
+          client_name: sale.clientName || 'N/A',
+          project_name: sale.projectName || 'N/A', 
+          amount_usd: Number(sale.amountUsd || 0),
+          original_amount: Number(sale.amount || 0),
+          currency: sale.currency || 'USD',
+          month_key: sale.monthKey || '',
+          revenue_type: sale.revenueType || 'fee',
+          status: sale.status || 'completada',
+          confirmed: sale.confirmed || 'SI'
         }));
       
       // Aplicar filtros si están presentes
