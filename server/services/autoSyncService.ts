@@ -184,10 +184,17 @@ export class AutoSyncService {
           const projectId = await this.findProjectBySpecificMapping(sale.clientName || '', sale.projectName || '');
           
           if (projectId) {
-            // Actualizar la venta con el ID del proyecto correcto
+            // Actualizar la venta con el ID del proyecto correcto, preservando montos ya calculados
             await storage.updateGoogleSheetsSales(sale.id, {
               projectId: projectId,
-              lastUpdated: new Date()
+              lastUpdated: new Date(),
+              // Preservar campos de montos que ya fueron calculados durante importSalesFromGoogleSheets
+              amountLocal: sale.amountLocal,
+              amountUsd: sale.amountUsd,
+              currency: sale.currency,
+              fxApplied: sale.fxApplied,
+              fxSource: sale.fxSource,
+              fxAt: sale.fxAt
             });
 
             // Crear o actualizar ingreso mensual del proyecto (simplificado)
