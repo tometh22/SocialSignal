@@ -8732,6 +8732,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Income Dashboard Rows endpoint - Obtener datos de ingresos para la tabla del dashboard
+  app.get('/api/income-dashboard-rows', requireAuth, async (req, res) => {
+    try {
+      const { projectId, timeFilter, clientName, revenueType, status } = req.query;
+      
+      console.log('🔍 Income Dashboard Rows - Request params:', { projectId, timeFilter, clientName, revenueType, status });
+      
+      // Obtener costos directos (fuente única: Excel MAESTRO sincronizado)
+      let directCostsData;
+      if (projectId) {
+        directCostsData = await storage.getDirectCostsByProject(parseInt(projectId as string));
+      } else {
+        directCostsData = await storage.getAllDirectCosts();
+      }
+
+      console.log(`💰 Found ${directCostsData.length} direct cost records`);
+
+      // Filtro temporal
+      const filterStr = (timeFilter as string) || 'all';
+      const dateRange = filterStr === 'all' ? null : getDateRangeForFilter(filterStr);
+
+      // Transformar a la estructura esperada por el frontend
+      const incomeRecords = (directCostsData || [])
+        .filter(cost => {
+          if (!dateRange) return true;
+          const d = new Date(cost.año, getMonthNumber(cost.mes) - 1, 1);
+          return d >= dateRange.startDate && d <= dateRange.endDate;
+        })
+        .map(cost => ({
+          id: cost.id,
+          client_name: cost.cliente || cost.clientName || 'N/A',
+          project_name: cost.proyecto || cost.projectName || 'N/A',
+          amount_usd: Number(cost.montoTotalUSD ?? 0),
+          original_amount: Number(cost.costoTotal ?? 0),
+          currency: Number(cost.montoTotalUSD ?? 0) > 0 ? 'USD' : 'ARS',
+          month_key: `${cost.año}-${String(getMonthNumber(cost.mes)).padStart(2, '0')}`,
+          revenue_type: cost.tipoGasto || 'fee',
+          status: 'completada',
+          confirmed: 'SI'
+        }));
+      
+      // Aplicar filtros si están presentes
+      let filteredRecords = incomeRecords;
+      
+      if (clientName) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.client_name.toLowerCase().includes((clientName as string).toLowerCase())
+        );
+      }
+      
+      if (revenueType) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.revenue_type === revenueType
+        );
+      }
+      
+      if (status) {
+        filteredRecords = filteredRecords.filter(record => 
+          record.status === status
+        );
+      }
+      
+      console.log(`📊 Returning ${filteredRecords.length} filtered income records`);
+      
+      res.json(filteredRecords);
+    } catch (error: any) {
+      console.error('❌ Error in income-dashboard-rows:', error);
+      res.status(500).json({ 
+        error: 'Error fetching income data',
+        message: error.message 
+      });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }
