@@ -38,6 +38,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
   const currencyAnalysis = projectData?.analysis;        // Análisis de moneda automático
   
   
+  
 
   // 💰 UTILITY: Función para formatear monedas con símbolos claros
   const formatCurrency = (amount: number, currency: 'USD' | 'ARS' = 'USD'): string => {
@@ -330,19 +331,13 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                       <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
                       <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
                       
-                      {/* COSTO ARS: Monto total en pesos argentinos */}
+                      {/* COSTO ARS: USD convertido a pesos argentinos */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
-                        {record.montoTotalUSD && record.tipoCambio ? 
-                          formatCurrency(record.montoTotalUSD * record.tipoCambio, 'ARS') : 
-                          formatCurrency(record.costoTotal || 0, 'ARS')
-                        }
+                        {formatCurrency((record.montoTotalUSD || 0) * (record.tipoCambio || 1345), 'ARS')}
                       </td>
-                      {/* COSTO USD: Monto total convertido a dólares */}
+                      {/* COSTO USD: Valor original en dólares */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
-                        {record.montoTotalUSD ? 
-                          formatCurrency(record.montoTotalUSD, 'USD') : 
-                          formatCurrency((record.costoTotal || 0) / (record.tipoCambio || 1300), 'USD')
-                        }
+                        {formatCurrency(record.montoTotalUSD || 0, 'USD')}
                       </td>
                       <td className="px-4 py-2 text-center">
                         <Badge 
