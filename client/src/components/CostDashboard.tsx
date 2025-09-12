@@ -36,6 +36,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
   const costData: CostRecord[] = projectData?.directCosts || [];
   const costsDisplay = projectData?.costsDisplay || [];  // Costos con ambas monedas
   const currencyAnalysis = projectData?.analysis;        // Análisis de moneda automático
+  
 
   // 💰 UTILITY: Función para formatear monedas con símbolos claros
   const formatCurrency = (amount: number, currency: 'USD' | 'ARS' = 'USD'): string => {
@@ -274,29 +275,18 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
           </div>
           {/* 💰 MULTI-CURRENCY: Indicadores de moneda */}
           <div className="flex items-center gap-3 text-xs">
-            {costsDisplay.length > 0 ? (
-              // Si tenemos costsDisplay, mostrar ambas monedas
-              <>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-gray-600">ARS Original</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-600">USD Converted</span>
-                </div>
-                {currencyAnalysis && (
-                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
-                    Analysis: {currencyAnalysis.currency}
-                  </Badge>
-                )}
-              </>
-            ) : (
-              // Fallback a mostrar solo ARS
-              <div className="flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-gray-600">Moneda Original (ARS)</span>
-              </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-gray-600">ARS Convertido</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-gray-600">USD Original</span>
+            </div>
+            {currencyAnalysis && (
+              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+                Analysis: {currencyAnalysis.currency}
+              </Badge>
             )}
           </div>
         </div>
@@ -308,27 +298,16 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Miembro</th>
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Mes</th>
                 <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Horas</th>
-                {costsDisplay.length > 0 ? (
-                  // 💰 MULTI-CURRENCY: Mostrar ambas monedas cuando costsDisplay está disponible
-                  <>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-blue-600 uppercase tracking-wider">
-                      Costo ARS
-                      <div className="w-2 h-2 bg-blue-500 rounded-full inline-block ml-1"></div>
-                    </th>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-green-600 uppercase tracking-wider">
-                      Costo USD
-                      <div className="w-2 h-2 bg-green-500 rounded-full inline-block ml-1"></div>
-                    </th>
-                    <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Origen</th>
-                  </>
-                ) : (
-                  // Fallback a columnas tradicionales
-                  <>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Tarifa/h</th>
-                    <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Costo Total</th>
-                    <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Moneda</th>
-                  </>
-                )}
+                {/* SIEMPRE mostrar ambas columnas de costos */}
+                <th className="text-right px-4 py-2 text-xs font-medium text-blue-600 uppercase tracking-wider">
+                  Costo ARS
+                  <div className="w-2 h-2 bg-blue-500 rounded-full inline-block ml-1"></div>
+                </th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-green-600 uppercase tracking-wider">
+                  Costo USD
+                  <div className="w-2 h-2 bg-green-500 rounded-full inline-block ml-1"></div>
+                </th>
+                <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Origen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -343,51 +322,32 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                   </td>
                 </tr>
               ) : (
-                filteredData.map((record: any) => (
-                  <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona}</td>
+                filteredData.map((record: any, index: number) => (
+                  <tr key={`cost-${record.id || index}`} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona || record.name || 'Sin nombre'}</td>
                     <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
-                    <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || 0).toFixed(1)}h</td>
+                    <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
                     
-                    {costsDisplay.length > 0 && record.costoTotalARS ? (
-                      // 💰 MULTI-CURRENCY: Mostrar ambas monedas
-                      <>
-                        <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
-                          {formatCurrency(record.costoTotalARS, 'ARS')}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
-                          {formatCurrency(record.costoTotalUSD, 'USD')}
-                        </td>
-                        <td className="px-4 py-2 text-center">
-                          <Badge 
-                            variant="outline"
-                            className={`text-xs ${record.hasUsdValue 
-                              ? 'bg-green-100 text-green-700 border-green-300' 
-                              : 'bg-orange-100 text-orange-700 border-orange-300'}`}
-                          >
-                            {record.hasUsdValue ? 'Original' : 'Converted'}
-                          </Badge>
-                        </td>
-                      </>
-                    ) : (
-                      // Fallback a mostrar datos tradicionales
-                      <>
-                        <td className="px-4 py-2 text-sm text-right font-mono text-blue-600">
-                          {formatCurrency(record.valorHoraPersona || 0, 'ARS')}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-right font-mono font-medium text-red-600">
-                          {formatCurrency(record.costoTotal || 0, 'ARS')}
-                        </td>
-                        <td className="px-4 py-2 text-center">
-                          <Badge 
-                            variant="outline"
-                            className="text-xs bg-green-100 text-green-700 border-green-300"
-                          >
-                            ARS
-                          </Badge>
-                        </td>
-                      </>
-                    )}
+                    {/* SIEMPRE mostrar ambas columnas de costos */}
+                    <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
+                      {record.tipoCambio && record.montoTotalUSD ? 
+                        formatCurrency(record.montoTotalUSD * record.tipoCambio, 'ARS') : 
+                        formatCurrency(record.costoTotal || 0, 'ARS')
+                      }
+                    </td>
+                    <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
+                      {formatCurrency(record.montoTotalUSD || record.costoTotal || 0, 'USD')}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <Badge 
+                        variant="outline"
+                        className={`text-xs ${record.montoTotalUSD 
+                          ? 'bg-green-100 text-green-700 border-green-300' 
+                          : 'bg-orange-100 text-orange-700 border-orange-300'}`}
+                      >
+                        {record.montoTotalUSD ? 'Original' : 'Estimado'}
+                      </Badge>
+                    </td>
                   </tr>
                 ))
               )}
