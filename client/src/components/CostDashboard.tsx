@@ -301,6 +301,12 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Miembro</th>
                 <th className="text-left px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Mes</th>
                 <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Horas</th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-purple-600 uppercase tracking-wider">
+                  Valor Hora
+                </th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-orange-600 uppercase tracking-wider">
+                  Cotización USD
+                </th>
                 {/* SIEMPRE mostrar ambas columnas de costos */}
                 <th className="text-right px-4 py-2 text-xs font-medium text-blue-600 uppercase tracking-wider">
                   Costo ARS
@@ -316,7 +322,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
             <tbody className="divide-y divide-gray-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     <div className="flex flex-col items-center gap-2">
                       <FileSpreadsheet className="w-6 h-6 text-gray-400" />
                       <span className="text-sm">No se encontraron registros</span>
@@ -330,6 +336,16 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                       <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona || 'Sin nombre'}</td>
                       <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
                       <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
+                      
+                      {/* VALOR HORA: Del Excel MAESTRO */}
+                      <td className="px-4 py-2 text-sm text-right font-mono font-medium text-purple-600">
+                        {record.valorHoraPersona ? formatCurrency(record.valorHoraPersona, 'ARS') : '-'}
+                      </td>
+                      
+                      {/* COTIZACIÓN USD: Tipo de cambio */}
+                      <td className="px-4 py-2 text-sm text-right font-mono font-medium text-orange-600">
+                        ${(record.tipoCambio || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      </td>
                       
                       {/* COSTO ARS: USD convertido a pesos argentinos */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
