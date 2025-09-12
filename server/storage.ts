@@ -449,13 +449,19 @@ export interface IStorage {
     revenueType?: string;
     status?: string;
   }): Promise<IncomeRecord[]>;
+
+  // Direct Costs operations
+  getAllDirectCosts(): Promise<DirectCost[]>;
+  upsertDirectCost(costData: InsertDirectCost): Promise<{ isNew: boolean; record: DirectCost }>;
 }
 
 // IMPLEMENTACIÓN UNIFICADA DE BASE DE DATOS
 export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
+  db: typeof db;
 
   constructor() {
+    this.db = db;
     const PgStore = connectPgSimple(session);
     this.sessionStore = new PgStore({
       pool,
@@ -4890,6 +4896,61 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("❌ Error in listIncomeRows:", error);
       return [];
+    }
+  }
+
+  // ==================== DIRECT COSTS METHODS ====================
+  
+  async getAllDirectCosts(): Promise<any[]> {
+    try {
+      // Obtener todos los costos directos desde la tabla direct_costs
+      const costs = await this.db.select().from(directCosts);
+      console.log(`📊 Obtenidos ${costs.length} costos directos desde base de datos`);
+      return costs;
+    } catch (error) {
+      console.error("❌ Error getting all direct costs:", error);
+      return [];
+    }
+  }
+
+  async upsertDirectCost(costData: InsertDirectCost): Promise<{ isNew: boolean; record: DirectCost }> {
+    try {
+      // Validar datos usando el schema
+      const validatedData = insertDirectCostSchema.parse(costData);
+      
+      // Intentar buscar registro existente por unique_key
+      const existing = await this.db
+        .select()
+        .from(directCosts)
+        .where(eq(directCosts.uniqueKey, validatedData.uniqueKey))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Actualizar registro existente
+        const [updated] = await this.db
+          .update(directCosts)
+          .set({
+            ...validatedData,
+            lastUpdated: new Date(),
+          })
+          .where(eq(directCosts.id, existing[0].id))
+          .returning();
+        
+        console.log(`🔄 Actualizado costo directo: ${validatedData.persona} - ${validatedData.proyecto}`);
+        return { isNew: false, record: updated };
+      } else {
+        // Insertar nuevo registro
+        const [inserted] = await this.db
+          .insert(directCosts)
+          .values(validatedData)
+          .returning();
+        
+        console.log(`✅ Insertado nuevo costo directo: ${validatedData.persona} - ${validatedData.proyecto}`);
+        return { isNew: true, record: inserted };
+      }
+    } catch (error) {
+      console.error(`❌ Error en upsert direct cost:`, error);
+      throw error;
     }
   }
 
