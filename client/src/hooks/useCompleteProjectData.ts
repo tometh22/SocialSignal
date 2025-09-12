@@ -135,6 +135,43 @@ interface CompleteProjectData {
     currency: string;
     status: string;
   }>;
+  
+  // 💰 NUEVO: Multi-Currency Analysis
+  analysis?: {
+    currency: 'ARS' | 'USD'; // Detected analysis currency
+    totals: {
+      revenue: number;       // Normalized revenue
+      costs: number;         // Normalized costs  
+      margin: number;        // Revenue - costs
+      markup: number;        // Revenue / costs ratio
+      roi: number;           // ROI percentage
+    };
+    metadata: {
+      incomeRecords: number;
+      costRecords: number;
+      hasUsdIncomes: boolean;
+      hasArsIncomes: boolean;
+      hasMixedCurrencies: boolean;
+    };
+  };
+  
+  // 💰 NUEVO: Costs formatted for dual-currency display
+  costsDisplay?: Array<{
+    id: number;
+    persona: string;
+    mes: string;
+    año: number;
+    horasRealesAsana: number;
+    costoTotal: number;
+    montoTotalUSD?: number;
+    costoTotalARS: number;     // ARS version (always available)
+    costoTotalUSD: number;     // USD version (converted if needed)
+    hasUsdValue: boolean;      // Whether montoTotalUSD is original or converted
+    isConverted: boolean;      // Whether USD value is converted from ARS
+    valorHoraPersona: number;
+    projectId?: number;
+    personnelId?: number;
+  }>;
 }
 
 export const useCompleteProjectData = (projectId: number, timeFilter: string = 'all') => {

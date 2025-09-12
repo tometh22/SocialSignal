@@ -80,6 +80,14 @@ import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
 import { googleSheetsFixedService } from "./services/googleSheetsFixed";
 import { googleSheetsWorkingService } from "./services/googleSheetsWorking";
 import { autoSyncService } from "./services/autoSyncService";
+import { 
+  pickAnalysisCurrency, 
+  createAnalysisStructure, 
+  formatCostsForDisplay, 
+  convertGoogleSheetsToIncome, 
+  convertDirectCostsToCostRecord,
+  type CurrencyCode 
+} from "./services/currency";
 
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
@@ -1957,7 +1965,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }))
       });
 
-      res.json(responseData);
+      // 💰 MULTI-CURRENCY ANALYSIS - Universal currency system implementation
+      console.log(`🪙 Implementing multi-currency analysis for project ${id}`);
+      
+      // Convert data to standard format for currency analysis
+      const incomes = convertGoogleSheetsToIncome(completeData.googleSheetsSales || []);
+      const costs = convertDirectCostsToCostRecord(completeData.directCosts || []);
+      
+      console.log(`🪙 Currency analysis data:`, {
+        incomesCount: incomes.length,
+        costsCount: costs.length,
+        incomeCurrencies: [...new Set(incomes.map(i => i.currency))],
+        hasUsdIncomes: incomes.some(i => i.currency?.toUpperCase() === 'USD'),
+        hasArsIncomes: incomes.some(i => i.currency?.toUpperCase() === 'ARS')
+      });
+      
+      // Create comprehensive currency analysis (ASYNC)
+      const currencyAnalysis = await createAnalysisStructure(incomes, costs);
+      
+      // Format costs for dual-currency display (ARS + USD) (ASYNC)
+      const costsDisplay = await formatCostsForDisplay(costs);
+      
+      console.log(`🪙 Currency analysis completed:`, {
+        analysisCurrency: currencyAnalysis.currency,
+        normalizedRevenue: currencyAnalysis.totals.revenue,
+        normalizedCosts: currencyAnalysis.totals.costs,
+        margin: currencyAnalysis.totals.margin,
+        markup: currencyAnalysis.totals.markup,
+        roi: currencyAnalysis.totals.roi
+      });
+      
+      // Add multi-currency analysis to response
+      const enhancedResponseData = {
+        ...responseData,
+        // Multi-currency analysis
+        analysis: {
+          currency: currencyAnalysis.currency,
+          totals: currencyAnalysis.totals,
+          metadata: currencyAnalysis.metadata
+        },
+        // Costs formatted for dual-currency display  
+        costsDisplay: costsDisplay
+      };
+
+      res.json(enhancedResponseData);
     } catch (error) {
       console.error("Error getting complete project data:", error);
       res.status(500).json({ message: "Failed to get complete project data" });
