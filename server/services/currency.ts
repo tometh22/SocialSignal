@@ -166,26 +166,37 @@ export async function normalizeIncomeTo(targetCurrency: CurrencyCode, income: In
 
 /**
  * Normaliza un costo a la moneda objetivo
+ * CORREGIDO: Los costos del Excel MAESTRO vienen en USD, necesitan conversión a ARS
  */
 export async function normalizeCostTo(targetCurrency: CurrencyCode, cost: CostRecord, rate?: ExchangeRate): Promise<number> {
-  // Si queremos ARS, usar costoTotal
+  // LÓGICA CORREGIDA: Detectar la moneda original del costo
+  const hasUSDValue = cost.montoTotalUSD && cost.montoTotalUSD > 0;
+  const isOriginallyUSD = hasUSDValue; // Los datos del Excel MAESTRO vienen en USD
+  
   if (targetCurrency === 'ARS') {
-    return cost.costoTotal;
+    if (isOriginallyUSD) {
+      // 🔧 CORRECCIÓN: Convertir USD a ARS
+      const exchangeRate = rate || await getPeriodRate(`${cost.mes}_${cost.año}`);
+      return cost.montoTotalUSD * exchangeRate.rate;
+    } else {
+      // Si está en ARS originalmente, usar costoTotal
+      return cost.costoTotal;
+    }
   }
   
-  // Si queremos USD y tenemos el valor convertido
-  if (targetCurrency === 'USD' && cost.montoTotalUSD) {
-    return cost.montoTotalUSD;
-  }
-  
-  // Si no tenemos USD, convertir desde ARS
   if (targetCurrency === 'USD') {
-    const exchangeRate = rate || await getPeriodRate(`${cost.mes}_${cost.año}`);
-    return cost.costoTotal / exchangeRate.rate;
+    if (hasUSDValue) {
+      // Si tenemos valor USD, usarlo directamente
+      return cost.montoTotalUSD;
+    } else {
+      // Convertir desde ARS a USD
+      const exchangeRate = rate || await getPeriodRate(`${cost.mes}_${cost.año}`);
+      return cost.costoTotal / exchangeRate.rate;
+    }
   }
   
-  // Por defecto, devolver costo en ARS
-  return cost.costoTotal;
+  // Por defecto, devolver el valor que tengamos
+  return cost.montoTotalUSD || cost.costoTotal;
 }
 
 /**
