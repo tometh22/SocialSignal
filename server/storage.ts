@@ -4762,19 +4762,26 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Filtro temporal
-      if (filters?.timeFilter) {
+      // Filtro temporal - FIXED: Use proper Drizzle ORM filters
+      if (filters?.timeFilter && filters.timeFilter !== 'all') {
         const dateRange = getDateRangeForFilter(filters.timeFilter);
         if (dateRange) {
           const startMonthKey = `${dateRange.startDate.getFullYear()}-${String(dateRange.startDate.getMonth() + 1).padStart(2, '0')}`;
           const endMonthKey = `${dateRange.endDate.getFullYear()}-${String(dateRange.endDate.getMonth() + 1).padStart(2, '0')}`;
           
-          // Aplicar filtro de rango de meses
+          // Aplicar filtro de rango de meses usando operadores de Drizzle
           conditions.push(
-            sql`${googleSheetsSales.monthKey} >= ${startMonthKey} AND ${googleSheetsSales.monthKey} <= ${endMonthKey}`
+            and(
+              sql`${googleSheetsSales.monthKey} >= ${startMonthKey}`,
+              sql`${googleSheetsSales.monthKey} <= ${endMonthKey}`
+            )
           );
-          console.log(`💰 Applied time filter: ${startMonthKey} to ${endMonthKey}`);
+          console.log(`💰 Applied time filter: ${startMonthKey} to ${endMonthKey} (range: ${filters.timeFilter})`);
+        } else {
+          console.log(`💰 No date range found for timeFilter: ${filters.timeFilter}`);
         }
+      } else {
+        console.log(`💰 No temporal filter applied (filter: ${filters?.timeFilter})`);
       }
 
       // Filtros adicionales opcionales
@@ -4800,8 +4807,10 @@ export class DatabaseStorage implements IStorage {
 
       console.log(`💰 Found ${salesData.length} sales records`);
 
-      // Mapear datos al formato IncomeRecord
-      const incomeRecords: IncomeRecord[] = salesData.map((sale, index) => {
+      // Mapear datos al formato IncomeRecord con conversión de moneda dinámica
+      const incomeRecords: IncomeRecord[] = [];
+      
+      for (const sale of salesData) {
         // Determinar si mostrar original ARS o USD
         let amountUsd = 0;
         let originalAmount = 0;
@@ -4816,10 +4825,25 @@ export class DatabaseStorage implements IStorage {
           originalAmount = parseFloat(sale.amountUsd);
           currency = 'USD';
         } else if (hasOriginalArs) {
-          // Excel solo tenía valores ARS - mostrar ARS originales
-          amountUsd = parseFloat(sale.amountLocal) / 1300; // Para cálculos internos
-          originalAmount = parseFloat(sale.amountLocal);
-          currency = 'ARS';
+          // Excel solo tenía valores ARS - FIXED: usar tipo de cambio real mensual
+          const year = sale.year || 2025;
+          const month = sale.monthNumber || 1;
+          
+          try {
+            const exchangeRate = await this.getExchangeRateByMonth(year, month);
+            const rate = exchangeRate ? parseFloat(exchangeRate.rate as any) : 1300; // fallback to 1300 if no rate found
+            
+            amountUsd = parseFloat(sale.amountLocal) / rate;
+            originalAmount = parseFloat(sale.amountLocal);
+            currency = 'ARS';
+            
+            console.log(`💱 Currency conversion for ${sale.clientName} ${year}-${String(month).padStart(2, '0')}: ARS ${parseFloat(sale.amountLocal)} ÷ ${rate} = USD ${amountUsd.toFixed(2)}`);
+          } catch (error) {
+            console.warn(`⚠️ Could not get exchange rate for ${year}-${month}, using fallback rate 1300`);
+            amountUsd = parseFloat(sale.amountLocal) / 1300;
+            originalAmount = parseFloat(sale.amountLocal);
+            currency = 'ARS';
+          }
         }
 
         // Mapear revenue_type de salesType
@@ -4842,7 +4866,7 @@ export class DatabaseStorage implements IStorage {
           status = 'completada';
         }
 
-        return {
+        incomeRecords.push({
           id: sale.id,
           client_name: sale.clientName || '',
           project_name: sale.projectName || '',
@@ -4853,8 +4877,8 @@ export class DatabaseStorage implements IStorage {
           revenue_type: revenueType,
           status: status,
           confirmed: sale.confirmed || 'SI'
-        };
-      });
+        });
+      }
 
       console.log(`💰 Mapped ${incomeRecords.length} income records`);
       console.log(`💰 Sample records:`, incomeRecords.slice(0, 3));
