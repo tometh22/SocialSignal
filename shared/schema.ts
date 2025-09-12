@@ -1631,11 +1631,14 @@ export type GoogleSheetsSales = typeof googleSheetsSales.$inferSelect;
 export type InsertGoogleSheetsSales = z.infer<typeof insertGoogleSheetsSalesSchema>;
 
 // Interface para endpoint de income dashboard (replicando patrón de cost dashboard)
+// 💰 EXTENDED for multi-currency system
 export interface IncomeRecord {
   id: number;
   client_name: string;
   project_name: string;
   amount_usd: number;
+  original_amount: number; // 💰 NEW: Original amount in source currency
+  currency: 'USD' | 'ARS';  // 💰 NEW: Source currency for display
   month_key: string;
   revenue_type: 'fee' | 'project' | 'bonus';
   status: 'completada' | 'pendiente' | 'proyectada';

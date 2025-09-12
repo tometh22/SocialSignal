@@ -35,6 +35,7 @@ import {
   type GoogleSheetsSales, type InsertGoogleSheetsSales,
   type DirectCost, type InsertDirectCost,
   type IncomeRecord,
+  insertDirectCostSchema,
 
   type IndirectCostCategory, type InsertIndirectCostCategory,
   type IndirectCost, type InsertIndirectCost,
@@ -3485,7 +3486,7 @@ export class DatabaseStorage implements IStorage {
       // Si no hay ajustes, devolver el precio original del proyecto
       const project = await this.getActiveProject(projectId);
       if (project && project.quotation) {
-        return Number(project.quotation.totalCost || 0);
+        return Number(project.quotation.totalAmount || 0);
       }
 
       return 0;
@@ -4836,21 +4837,21 @@ export class DatabaseStorage implements IStorage {
             const rate = exchangeRate ? parseFloat(exchangeRate.rate as any) : 1300; // fallback to 1300 if no rate found
             
             // CALCULAR USD para cálculos internos pero MOSTRAR ARS original
-            amountUsd = parseFloat(sale.amountLocal) / rate;
-            originalAmount = parseFloat(sale.amountLocal);  // ✅ MOSTRAR MILLONES ARS
+            amountUsd = parseFloat(sale.amountLocal || '0') / rate;
+            originalAmount = parseFloat(sale.amountLocal || '0');  // ✅ MOSTRAR MILLONES ARS
             currency = 'ARS';  // ✅ MOSTRAR COMO ARS ORIGINAL
             
             console.log(`💱 Original ARS shown: ${originalAmount.toLocaleString()} ARS (USD equivalent: ${amountUsd.toFixed(2)} for calculations)`);
           } catch (error) {
             console.warn(`⚠️ Could not get exchange rate for ${year}-${month}, using fallback rate 1300`);
-            amountUsd = parseFloat(sale.amountLocal) / 1300;
-            originalAmount = parseFloat(sale.amountLocal);  // ✅ MOSTRAR MILLONES ARS
+            amountUsd = parseFloat(sale.amountLocal || '0') / 1300;
+            originalAmount = parseFloat(sale.amountLocal || '0');  // ✅ MOSTRAR MILLONES ARS
             currency = 'ARS';  // ✅ MOSTRAR COMO ARS ORIGINAL
           }
         } else if (hasOriginalUsd) {
           // Datos que originalmente estaban en USD - mantener USD
-          amountUsd = parseFloat(sale.amountUsd);
-          originalAmount = parseFloat(sale.amountUsd);
+          amountUsd = parseFloat(sale.amountUsd || '0');
+          originalAmount = parseFloat(sale.amountUsd || '0');
           currency = 'USD';
         }
 
