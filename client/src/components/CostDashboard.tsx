@@ -39,16 +39,17 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
   
   
   
+  
 
-  // 💰 UTILITY: Función para formatear monedas con símbolos claros
+  // 💰 UTILITY: Función para formatear monedas con símbolos claros y números grandes legibles
   const formatCurrency = (amount: number, currency: 'USD' | 'ARS' = 'USD'): string => {
-    const formattedAmount = new Intl.NumberFormat('en-US', { 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: 0 
-    }).format(amount);
-    
-    const symbol = currency === 'USD' ? 'US$' : 'AR$';
-    return `${symbol}${formattedAmount}`;
+    if (currency === 'ARS') {
+      // Formato ARS con separadores de miles y símbolo AR$
+      return `AR$ ${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    } else {
+      // Formato USD con decimales
+      return `USD ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
   };
 
   // 💰 MULTI-CURRENCY: Calcular métricas principales usando análisis de moneda
@@ -337,9 +338,11 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                       <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
                       <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
                       
-                      {/* VALOR HORA: Del Excel MAESTRO */}
+                      {/* VALOR HORA: Calculado como montoTotalUSD ÷ horas */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-purple-600">
-                        {record.valorHoraPersona ? formatCurrency(record.valorHoraPersona, 'ARS') : '-'}
+                        {record.montoTotalUSD && record.horasRealesAsana ? 
+                          formatCurrency(record.montoTotalUSD / record.horasRealesAsana, 'USD') : 
+                          '-'}
                       </td>
                       
                       {/* COTIZACIÓN USD: Tipo de cambio */}
