@@ -4819,13 +4819,9 @@ export class DatabaseStorage implements IStorage {
         const hasOriginalUsd = sale.amountUsd && parseFloat(sale.amountUsd) > 0;
         const hasOriginalArs = sale.amountLocal && parseFloat(sale.amountLocal) > 0 && sale.currency === 'ARS';
         
-        if (hasOriginalUsd) {
-          // Excel tenía valores USD originales - mostrar USD
-          amountUsd = parseFloat(sale.amountUsd);
-          originalAmount = parseFloat(sale.amountUsd);
-          currency = 'USD';
-        } else if (hasOriginalArs) {
-          // Excel solo tenía valores ARS - FIXED: usar tipo de cambio real mensual
+        // ✅ CORRECCIÓN: SIEMPRE MOSTRAR VALORES ORIGINALES ARS
+        if (hasOriginalArs) {
+          // Datos originalmente en ARS - MOSTRAR ARS con conversión USD para cálculos
           const year = sale.year || 2025;
           const month = sale.monthNumber || 1;
           
@@ -4833,17 +4829,23 @@ export class DatabaseStorage implements IStorage {
             const exchangeRate = await this.getExchangeRateByMonth(year, month);
             const rate = exchangeRate ? parseFloat(exchangeRate.rate as any) : 1300; // fallback to 1300 if no rate found
             
+            // CALCULAR USD para cálculos internos pero MOSTRAR ARS original
             amountUsd = parseFloat(sale.amountLocal) / rate;
-            originalAmount = parseFloat(sale.amountLocal);
-            currency = 'ARS';
+            originalAmount = parseFloat(sale.amountLocal);  // ✅ MOSTRAR MILLONES ARS
+            currency = 'ARS';  // ✅ MOSTRAR COMO ARS ORIGINAL
             
-            console.log(`💱 Currency conversion for ${sale.clientName} ${year}-${String(month).padStart(2, '0')}: ARS ${parseFloat(sale.amountLocal)} ÷ ${rate} = USD ${amountUsd.toFixed(2)}`);
+            console.log(`💱 Original ARS shown: ${originalAmount.toLocaleString()} ARS (USD equivalent: ${amountUsd.toFixed(2)} for calculations)`);
           } catch (error) {
             console.warn(`⚠️ Could not get exchange rate for ${year}-${month}, using fallback rate 1300`);
             amountUsd = parseFloat(sale.amountLocal) / 1300;
-            originalAmount = parseFloat(sale.amountLocal);
-            currency = 'ARS';
+            originalAmount = parseFloat(sale.amountLocal);  // ✅ MOSTRAR MILLONES ARS
+            currency = 'ARS';  // ✅ MOSTRAR COMO ARS ORIGINAL
           }
+        } else if (hasOriginalUsd) {
+          // Datos que originalmente estaban en USD - mantener USD
+          amountUsd = parseFloat(sale.amountUsd);
+          originalAmount = parseFloat(sale.amountUsd);
+          currency = 'USD';
         }
 
         // Mapear revenue_type de salesType
