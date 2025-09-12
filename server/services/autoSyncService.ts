@@ -117,7 +117,7 @@ export class AutoSyncService {
         console.log('⚠️ No se encontraron datos de ventas en Excel MAESTRO');
       }
 
-      // 2. Obtener costos directos desde Excel MAESTRO "Ventas Tomi" (misma fuente)
+      // 2. Obtener costos directos desde Excel MAESTRO "Costos directos e indirectos"
       const costsResult = await googleSheetsWorkingService.importDirectCosts(storage);
       
       if (costsResult.success) {

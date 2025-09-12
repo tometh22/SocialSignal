@@ -1257,14 +1257,39 @@ class GoogleSheetsWorkingService {
           console.log(`⚠️ ALERTA PARSING: ${montoTotalUSDRaw} parseado como ${montoUSDValue} - posible error de locale`);
         }
 
-        // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS
-        if (tipoGasto !== 'Directo') continue;
+        // 🔍 LOGGING DETALLADO: Verificar por qué se filtran registros
+        const debugInfo = {
+          fila: i,
+          persona: persona || 'VACÍO',
+          tipoGasto: tipoGasto || 'VACÍO', 
+          cliente: cliente || 'VACÍO',
+          proyecto: proyecto || 'VACÍO',
+          horasReales: horasRealesAsana,
+          montoUSD: montoUSDValue
+        };
         
-        // Solo procesar filas válidas con datos esenciales
-        if (!persona || !cliente || !proyecto) continue;
+        // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS (más tolerante)
+        if (!tipoGasto || tipoGasto.toLowerCase().trim() !== 'directo') {
+          if (tipoGasto) console.log(`⏭️ Fila ${i}: Filtrado por tipo '${tipoGasto}' != 'directo'`);
+          continue;
+        }
         
-        // Verificar que tenga al menos horas O monto USD válido
-        if (horasRealesAsana <= 0 && montoUSDValue <= 0) continue;
+        // Solo procesar filas válidas con datos esenciales (más flexible)
+        if (!persona && !cliente && !proyecto) {
+          console.log(`⏭️ Fila ${i}: Filtrado por datos vacíos:`, debugInfo);
+          continue;
+        }
+        
+        // Verificar que tenga al menos horas O monto USD válido (más flexible)  
+        if (horasRealesAsana <= 0 && horasParaFacturacion <= 0 && montoUSDValue <= 0) {
+          console.log(`⏭️ Fila ${i}: Filtrado por sin horas ni monto:`, debugInfo);
+          continue;
+        }
+        
+        // Log filas que SÍ pasan los filtros
+        if (cliente?.includes('Play Digital')) {
+          console.log(`✅ Fila ${i}: Play Digital procesada:`, debugInfo);
+        }
 
         const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
         const montoOriginalARSRaw = this.getCellValue(row, columnMap.montoOriginalARS) || '';
