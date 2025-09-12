@@ -56,9 +56,9 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
       const symbol = currency === 'USD' ? 'US$' : 'AR$';
       return {
         totalCosts: currencyAnalysis.totals.costs,
-        totalHours: costData.reduce((sum: number, record: CostRecord) => sum + record.horasRealesAsana, 0),
-        avgHourlyRate: costData.reduce((sum: number, record: CostRecord) => sum + record.horasRealesAsana, 0) > 0 
-          ? currencyAnalysis.totals.costs / costData.reduce((sum: number, record: CostRecord) => sum + record.horasRealesAsana, 0) 
+        totalHours: costData.reduce((sum: number, record: CostRecord) => sum + (record.horasRealesAsana || 0), 0),
+        avgHourlyRate: costData.reduce((sum: number, record: CostRecord) => sum + (record.horasRealesAsana || 0), 0) > 0 
+          ? currencyAnalysis.totals.costs / costData.reduce((sum: number, record: CostRecord) => sum + (record.horasRealesAsana || 0), 0) 
           : 0,
         currencySymbol: symbol,
         analysisMetrics: currencyAnalysis.totals,
@@ -67,7 +67,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
     } else {
       // Fallback a cálculo tradicional en ARS
       const totalCosts = costData.reduce((sum: number, record: CostRecord) => sum + record.costoTotal, 0);
-      const totalHours = costData.reduce((sum: number, record: CostRecord) => sum + record.horasRealesAsana, 0);
+      const totalHours = costData.reduce((sum: number, record: CostRecord) => sum + (record.horasRealesAsana || 0), 0);
       return {
         totalCosts,
         totalHours,
@@ -347,7 +347,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                   <tr key={record.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona}</td>
                     <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
-                    <td className="px-4 py-2 text-sm text-right font-mono">{record.horasRealesAsana.toFixed(1)}h</td>
+                    <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || 0).toFixed(1)}h</td>
                     
                     {costsDisplay.length > 0 && record.costoTotalARS ? (
                       // 💰 MULTI-CURRENCY: Mostrar ambas monedas
