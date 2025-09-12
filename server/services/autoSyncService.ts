@@ -180,47 +180,29 @@ export class AutoSyncService {
       // Procesar cada venta
       for (const sale of salesData) {
         try {
-          // Buscar proyecto que coincida con cliente y nombre del proyecto
-          const matchingProject = activeProjects.find(project => {
-            const quotation = quotationMap.get(project.quotationId);
-            if (!quotation) return false;
-            
-            const client = clientMap.get(quotation.clientId);
-            if (!client) return false;
-
-            // Normalizar nombres para comparación
-            const saleClientName = this.normalizeName(sale.client_name || '');
-            const saleProjectName = this.normalizeName(sale.project_name || '');
-            const projectClientName = this.normalizeName(client.name || '');
-            const projectName = this.normalizeName(quotation.project_name || '');
-
-            // Verificar coincidencias
-            const clientMatch = saleClientName === projectClientName || 
-                               saleClientName.includes(projectClientName) ||
-                               projectClientName.includes(saleClientName);
-            
-            const projectMatch = saleProjectName === projectName ||
-                                saleProjectName.includes(projectName) ||
-                                projectName.includes(saleProjectName);
-
-            return clientMatch && projectMatch;
-          });
-
-          if (matchingProject) {
-            // Actualizar la venta con el ID del proyecto
+          // 🎯 USAR EL MAPEO ESPECÍFICO que funciona para costos
+          const projectId = await this.findProjectBySpecificMapping(sale.client_name || '', sale.project_name || '');
+          
+          if (projectId) {
+            // Actualizar la venta con el ID del proyecto correcto
             await storage.updateGoogleSheetsSales(sale.id, {
-              project_id: matchingProject.id,
+              project_id: projectId,
               last_updated: new Date()
             });
 
             // Crear o actualizar ingreso mensual del proyecto (simplificado)
-            created += await this.createOrUpdateProjectRevenue(sale, matchingProject);
+            const matchingProject = activeProjects.find(p => p.id === projectId);
+            if (matchingProject) {
+              created += await this.createOrUpdateProjectRevenue(sale, matchingProject);
+            }
             
             linked++;
             
-            if (linked <= 5) { // Log primeros 5 para debug
-              console.log(`🔗 Vinculado: ${sale.client_name} - ${sale.project_name} → Proyecto ${matchingProject.id}`);
+            if (linked <= 10) { // Log primeros 10 para debug
+              console.log(`🔗 Vinculado: ${sale.client_name} - ${sale.project_name} → Proyecto ${projectId}`);
             }
+          } else {
+            console.log(`⚠️ Sin mapeo para: ${sale.client_name} - ${sale.project_name}`);
           }
 
         } catch (error: any) {
@@ -241,6 +223,80 @@ export class AutoSyncService {
         created: 0, 
         errors: [`Error sincronizando con proyectos: ${error.message}`] 
       };
+    }
+  }
+
+  /**
+   * 🎯 MAPEO ESPECÍFICO para ventas (misma lógica que funciona para costos)
+   */
+  private async findProjectBySpecificMapping(clientName: string, projectName: string): Promise<number | null> {
+    try {
+      console.log(`🔍 Buscando mapeo para venta: "${clientName}", proyecto: "${projectName}"`);
+      
+      // 🎯 MISMO MAPEO que funciona para costos
+      const clientProjectKey = `${clientName.toLowerCase().trim()}_${projectName.toLowerCase().trim()}`;
+      
+      const specificProjectMapping: Record<string, number> = {
+        // Warner
+        'warner_fee marketing': 34,
+        'warner_fee insights': 34, // Fee Insights también va a Warner
+        
+        // Kimberly Clark
+        'kimberly clark_fee huggies': 39,
+        
+        // Coca-Cola
+        'coca-cola_hecho en mexico': 36,
+        
+        // Arcos Dorados
+        'arcos dorados_dashboard': 37,
+        'arcos dorados_dashboard pbi': 37, // variante
+        'arcos dorados_estudio atributos': 38,
+        
+        // Uber
+        'uber_uber taxis': 40,
+        
+        // Proyectos que van al ID 42 (múltiples clientes/Fee mensual)
+        'play digital s.a (modo)_fee mensual': 42,
+        'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
+        'coelsa_fee mensual': 42,
+        'detroit_fee mensual': 42,
+        'vertical media_fee mensual': 42,
+      };
+      
+      const projectId = specificProjectMapping[clientProjectKey];
+      
+      if (projectId) {
+        console.log(`🔗 Mapeo encontrado para venta: ${clientName} + ${projectName} → Proyecto ${projectId}`);
+        return projectId;
+      }
+      
+      // Fallback al mapeo por cliente solo (para compatibilidad)
+      const clientOnlyMapping: Record<string, number> = {
+        'warner': 34,
+        'kimberly clark': 39,
+        'coca-cola': 36,
+        'arcos dorados': 37, // Para Dashboard (default)
+        'uber': 40,
+        'play digital s.a (modo)': 42,
+        'coelsa': 42,
+        'detroit': 42,
+        'vertical media': 42,
+      };
+      
+      const normalizedClientName = clientName.toLowerCase().trim();
+      const fallbackProjectId = clientOnlyMapping[normalizedClientName];
+      
+      if (fallbackProjectId) {
+        console.log(`🔗 Mapeo fallback para venta: ${clientName} → Proyecto ${fallbackProjectId}`);
+        return fallbackProjectId;
+      }
+      
+      console.log(`⚠️ Sin mapeo para venta: ${clientName} - ${projectName}`);
+      return null;
+      
+    } catch (error) {
+      console.error(`❌ Error buscando mapeo para venta ${clientName}:`, error);
+      return null;
     }
   }
 

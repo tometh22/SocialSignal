@@ -1334,27 +1334,38 @@ class GoogleSheetsWorkingService {
       const specificProjectMapping: Record<string, number> = {
         // Warner
         'warner_fee marketing': 34,
+        'warner_fee insights': 34, // Fee Insights también va a Warner
         
         // Kimberly Clark
         'kimberly clark_fee huggies': 39,
-        
-        // Uber - SEPARADOS por proyecto específico
-        'uber_uber taxis': 40,    // ✅ Solo "Uber Taxis" → ID 40
-        'uber_quilmes rock': 41,  // 🆕 "Quilmes Rock" → Nuevo ID (a verificar)
-        'uber_colapinto': 44,     // 🆕 "Colapinto" → Nuevo ID (a verificar)
-        
-        // Coelsa
-        'coelsa_fee mensual': 43,
-        
-        // Play Digital S.A (Modo)
-        'play digital s.a (modo)_fee mensual': 42,
-        'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
         
         // Coca-Cola
         'coca-cola_hecho en mexico': 36,
         
         // Arcos Dorados
-        'arcos dorados_estudio atributos': 37,
+        'arcos dorados_dashboard': 37,
+        'arcos dorados_dashboard pbi': 37, // variante
+        'arcos dorados_estudio atributos': 38,
+        
+        // Uber
+        'uber_uber taxis': 40,
+        
+        // Proyectos que van al ID 42 (múltiples clientes/Fee mensual)
+        'play digital s.a (modo)_fee mensual': 42,
+        'play digital s.a (modo)_fee_mensual': 42, // variante con guion bajo
+        'coelsa_fee mensual': 42,
+        'detroit_fee mensual': 42,
+        'vertical media_fee mensual': 42,
+        
+        // Proyectos adicionales sin ID asignado (por ahora van sin mapeo específico)
+        // 'bid_exploratorio nicaragua': 45, // necesita ID
+        // 'cami criado_olas': 46, // necesita ID
+        // 'detroit_cambios web': 42, // va con Detroit
+        // 'detroit_modificaciones pagina web': 45, // según BD actual
+        // 'peya_categoria': 47, // necesita ID
+        // 'tortugas open mall_vacaciones invierno': 46, // según BD actual 
+        // 'animal studio_diego perez': 47, // según BD actual
+        // 'animal studio_referentes obesidad': 48, // según BD actual
       };
       
       const projectId = specificProjectMapping[clientProjectKey];
@@ -1368,10 +1379,13 @@ class GoogleSheetsWorkingService {
       const clientOnlyMapping: Record<string, number> = {
         'warner': 34,
         'kimberly clark': 39,
-        'coelsa': 43,
-        'play digital s.a (modo)': 42,
         'coca-cola': 36,
-        'arcos dorados': 37,
+        'arcos dorados': 37, // Para Dashboard (default)
+        'uber': 40,
+        'play digital s.a (modo)': 42,
+        'coelsa': 42,
+        'detroit': 42,
+        'vertical media': 42,
       };
       
       const normalizedClientName = clientName.toLowerCase().trim();

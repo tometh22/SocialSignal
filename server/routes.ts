@@ -11594,9 +11594,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Use direct mapping for known projects to avoid Drizzle issues
         const projectMappings: Record<string, { clientName: string; projectName: string }> = {
           '34': { clientName: 'Warner', projectName: 'Fee Marketing' },
-          '36': { clientName: 'Kimberly Clark', projectName: 'Fee Huggies' },
-          '37': { clientName: 'Arcos Dorados', projectName: 'Dashboard PBI' },
-          '40': { clientName: 'Uber', projectName: 'Colapinto' },
+          '36': { clientName: 'Coca-Cola', projectName: 'Hecho en Mexico' },
+          '37': { clientName: 'Arcos Dorados', projectName: 'Dashboard' },
+          '38': { clientName: 'Arcos Dorados', projectName: 'Estudio Atributos' },
+          '39': { clientName: 'Kimberly Clark', projectName: 'Fee Huggies' },
+          '40': { clientName: 'Uber', projectName: 'Uber Taxis' },
           '42': { clientName: 'Play Digital S.A (Modo)', projectName: 'Fee mensual' }
         };
         
