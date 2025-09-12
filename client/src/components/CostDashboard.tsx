@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { DollarSign, TrendingDown, FileSpreadsheet, Filter, Clock, Calculator } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 
 interface CostDashboardProps {
   projectId?: number;
@@ -12,48 +12,36 @@ interface CostDashboardProps {
 
 interface CostRecord {
   id: number;
-  member_name: string;
-  hours_worked: number;
-  hourly_rate: number;
-  total_cost: number;
-  month_key: string;
-  cost_type: 'operational' | 'real';
-  status: string;
-  confirmed: string;
+  persona: string;
+  mes: string;
+  año: number;
+  horasRealesAsana: number;
+  costoTotal: number;
+  valorHoraPersona: number;
+  proyecto: string;
+  cliente: string;
 }
 
 interface CostFilters {
   memberName?: string;
-  costType?: string;
-  status?: string;
 }
 
-export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFilter }) => {
+export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFilter = 'all' }) => {
   const [filters, setFilters] = useState<CostFilters>({});
 
-  const { data: costData = [], isLoading } = useQuery({
-    queryKey: ['/api/cost-dashboard', { projectId, timeFilter, ...filters }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (projectId) params.append('projectId', projectId.toString());
-      if (timeFilter) params.append('timeFilter', timeFilter);
-      if (filters.memberName) params.append('memberName', filters.memberName);
-      if (filters.costType) params.append('costType', filters.costType);
-      if (filters.status) params.append('status', filters.status);
+  // Usar el hook correcto que ya existe
+  const { data: projectData, isLoading } = useCompleteProjectData(projectId!, timeFilter);
+  
+  // Extraer costos directos del Excel MAESTRO
+  const costData: CostRecord[] = projectData?.directCosts || [];
 
-      const response = await fetch(`/api/cost-dashboard?${params}`);
-      if (!response.ok) throw new Error('Error fetching cost data');
-      return response.json();
-    },
-  });
-
-  // Calcular métricas principales
+  // Calcular métricas principales en ARS (moneda original)
   const totalCosts = useMemo(() => {
-    return costData.reduce((sum: number, record: CostRecord) => sum + record.total_cost, 0);
+    return costData.reduce((sum: number, record: CostRecord) => sum + record.costoTotal, 0);
   }, [costData]);
 
   const totalHours = useMemo(() => {
-    return costData.reduce((sum: number, record: CostRecord) => sum + record.hours_worked, 0);
+    return costData.reduce((sum: number, record: CostRecord) => sum + record.horasRealesAsana, 0);
   }, [costData]);
 
   const avgHourlyRate = useMemo(() => {
@@ -63,7 +51,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
 
   // Obtener valores únicos para filtros
   const uniqueMembers = useMemo(() => {
-    return Array.from(new Set(costData.map((record: CostRecord) => record.member_name)));
+    return Array.from(new Set(costData.map((record: CostRecord) => record.persona)));
   }, [costData]);
 
   const clearFilters = () => {
@@ -73,9 +61,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
   // Filtrar datos del frontend
   const filteredData = useMemo(() => {
     return costData.filter((record: CostRecord) => {
-      if (filters.memberName && record.member_name !== filters.memberName) return false;
-      if (filters.costType && record.cost_type !== filters.costType) return false;
-      if (filters.status && record.status !== filters.status) return false;
+      if (filters.memberName && record.persona !== filters.memberName) return false;
       return true;
     });
   }, [costData, filters]);
@@ -125,18 +111,6 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
               </select>
             </div>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Tipo:</label>
-              <select 
-                className="border border-gray-300 rounded px-2 py-1 text-sm min-w-24 focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={filters.costType || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, costType: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                <option value="operational">Operacional</option>
-                <option value="real">Real</option>
-              </select>
-            </div>
 
             <Button 
               variant="outline" 
@@ -165,18 +139,6 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
               </select>
             </div>
 
-            <div className="flex items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-red-700 whitespace-nowrap">Tipo:</label>
-              <select 
-                className="border border-red-300 rounded px-2 py-1 text-sm min-w-24 bg-white focus:ring-1 focus:ring-red-500 focus:border-red-500"
-                value={filters.costType || ""}
-                onChange={(e) => setFilters(prev => ({ ...prev, costType: e.target.value || undefined }))}
-              >
-                <option value="">Todos</option>
-                <option value="operational">Operacional</option>
-                <option value="real">Real</option>
-              </select>
-            </div>
 
             <Button 
               variant="outline" 
@@ -201,9 +163,9 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold">
-                  ${totalCosts.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  ${totalCosts.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </div>
-                <div className="text-xs opacity-90">USD</div>
+                <div className="text-xs opacity-90">ARS</div>
               </div>
             </div>
           </div>
@@ -233,9 +195,9 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
               </div>
               <div className="text-right">
                 <div className="text-lg font-bold">
-                  ${avgHourlyRate.toFixed(0)}
+                  ${avgHourlyRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </div>
-                <div className="text-xs opacity-90">/hora</div>
+                <div className="text-xs opacity-90">ARS/hora</div>
               </div>
             </div>
           </div>
@@ -254,12 +216,8 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
           </div>
           <div className="flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-gray-600">Operacional</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              <span className="text-gray-600">Real</span>
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-gray-600">Moneda Original (ARS)</span>
             </div>
           </div>
         </div>
@@ -273,7 +231,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                 <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Horas</th>
                 <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Tarifa/h</th>
                 <th className="text-right px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Costo Total</th>
-                <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Tipo</th>
+                <th className="text-center px-4 py-2 text-xs font-medium text-gray-600 uppercase tracking-wider">Moneda</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -290,24 +248,21 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
               ) : (
                 filteredData.map((record: CostRecord) => (
                   <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.member_name}</td>
-                    <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.month_key}</td>
-                    <td className="px-4 py-2 text-sm text-right font-mono">{record.hours_worked.toFixed(1)}h</td>
+                    <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona}</td>
+                    <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
+                    <td className="px-4 py-2 text-sm text-right font-mono">{record.horasRealesAsana.toFixed(1)}h</td>
                     <td className="px-4 py-2 text-sm text-right font-mono text-blue-600">
-                      ${record.hourly_rate.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${record.valorHoraPersona.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </td>
                     <td className="px-4 py-2 text-sm text-right font-mono font-medium text-red-600">
-                      ${record.total_cost.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                      ${record.costoTotal.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <Badge 
                         variant="outline"
-                        className={`text-xs ${
-                          record.cost_type === 'real' ? 'bg-red-100 text-red-700 border-red-300' :
-                          'bg-blue-100 text-blue-700 border-blue-300'
-                        }`}
+                        className="text-xs bg-green-100 text-green-700 border-green-300"
                       >
-                        {record.cost_type === 'real' ? 'Real' : 'Operacional'}
+                        ARS
                       </Badge>
                     </td>
                   </tr>
