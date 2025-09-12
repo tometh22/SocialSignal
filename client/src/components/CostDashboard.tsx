@@ -330,15 +330,19 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                       <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
                       <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
                       
-                      {/* SIEMPRE mostrar ambas columnas de costos */}
+                      {/* COSTO ARS: Monto total en pesos argentinos */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-blue-600">
-                        {record.tipoCambio && record.montoTotalUSD ? 
+                        {record.montoTotalUSD && record.tipoCambio ? 
                           formatCurrency(record.montoTotalUSD * record.tipoCambio, 'ARS') : 
                           formatCurrency(record.costoTotal || 0, 'ARS')
                         }
                       </td>
+                      {/* COSTO USD: Monto total convertido a dólares */}
                       <td className="px-4 py-2 text-sm text-right font-mono font-medium text-green-600">
-                        {formatCurrency(record.montoTotalUSD || record.costoTotal || 0, 'USD')}
+                        {record.montoTotalUSD ? 
+                          formatCurrency(record.montoTotalUSD, 'USD') : 
+                          formatCurrency((record.costoTotal || 0) / (record.tipoCambio || 1300), 'USD')
+                        }
                       </td>
                       <td className="px-4 py-2 text-center">
                         <Badge 
