@@ -1739,15 +1739,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`   Real Revenue: $${totalRealRevenue} from ${salesData.length} sales`);
       console.log(`   Efficiency: ${efficiency.toFixed(1)}% (${excelActualHours}h/${excelTargetHours}h)`);
       
-      // Markup desde datos filtrados temporalmente
-      const markup = excelTotalCost > 0 ? totalRealRevenue / excelTotalCost : 0;
+      // NOTA: Markup temporal - se actualizará con el análisis multi-moneda unificado más adelante
+      const markup = excelTotalCost > 0 ? totalRealRevenue / excelTotalCost : 0; // Temporal
       const budgetUtilization = adjustedBaseCost > 0 ? (totalWorkedCost / adjustedBaseCost) * 100 : 0;
-      
-      console.log(`🔢 MARKUP CALCULATION DEBUG for project ${id} (${timeFilter}):`);
-      console.log(`   Total Real Revenue: $${totalRealRevenue}`);
-      console.log(`   Total Worked Cost: $${totalWorkedCost}`);
-      console.log(`   Calculated Markup: ${markup.toFixed(3)}x`);
-      console.log(`   Expected 5.5x? ${markup > 5.0 ? 'YES' : 'NO - Issue detected'}`);
 
       // 7. CALCULAR RANKINGS ECONÓMICOS USANDO LOS DATOS REALES
       const { calculateTeamRankings } = await import('../shared/ranking-utils');
@@ -1998,6 +1992,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add multi-currency analysis to response
       const enhancedResponseData = {
         ...responseData,
+        // 🪙 CORRECCIÓN: Usar markup del análisis unificado de currency
+        markup: currencyAnalysis.totals.markup,
+        metrics: {
+          ...responseData.metrics,
+          markup: Math.round(currencyAnalysis.totals.markup * 100) / 100
+        },
         // Multi-currency analysis
         analysis: {
           currency: currencyAnalysis.currency,

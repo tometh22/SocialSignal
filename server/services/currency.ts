@@ -274,8 +274,8 @@ export function convertGoogleSheetsToIncome(sheets: any[]): IncomeRecord[] {
     let amountUsd: number | undefined;
     
     if (currency === 'ARS') {
-      // Para ARS: usar sheet.amount como monto local
-      amountLocal = parseFloat(sheet.amount || 0);
+      // Para ARS: usar sheet.amountLocal como monto local (CORREGIDO)
+      amountLocal = parseFloat(sheet.amountLocal || sheet.amount || 0);
       // Si hay amountUsd, usarlo como valor convertido
       amountUsd = sheet.amountUsd ? parseFloat(sheet.amountUsd) : undefined;
     } else {
