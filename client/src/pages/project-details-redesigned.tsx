@@ -1872,15 +1872,22 @@ const ProjectDetailsPage = () => {
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-slate-300">Ingresos Generados</span>
                         <span className="text-2xl font-bold text-green-400">
-                          ${(() => {
-                            // SIEMPRE usar datos reales del Excel MAESTRO si están disponibles
+                          {(() => {
+                            // 🪙 ANÁLISIS MULTI-MONEDA: Usar análisis unificado si está disponible
+                            const analysis = (unifiedData as any)?.analysis;
+                            if (analysis && analysis.totals) {
+                              const currency = analysis.currency === 'ARS' ? 'AR$' : '$';
+                              return `${currency} ${analysis.totals.revenue.toLocaleString()}`;
+                            }
+                            
+                            // Fallback: usar datos reales del Excel MAESTRO
                             const realSales = (unifiedData as any)?.googleSheetsSales || [];
                             if (realSales.length > 0) {
-                              return (realSales
-                                .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0) || 0).toLocaleString();
+                              return `$${(realSales
+                                .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0) || 0).toLocaleString()}`;
                             } else {
-                              // Fallback a cotización solo si no hay datos reales
-                              return (unifiedData?.quotation?.totalAmount || 0).toLocaleString();
+                              // Último fallback: cotización
+                              return `$${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}`;
                             }
                           })()}
                         </span>
@@ -1892,8 +1899,16 @@ const ProjectDetailsPage = () => {
                         ></div>
                       </div>
                       <div className="text-xs text-slate-400">
-                        Cost: ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()} • 
-                        Margin: {((1 - 1/(unifiedData?.metrics?.markup || 1)) * 100).toFixed(1)}%
+                        {(() => {
+                          // 🪙 ANÁLISIS MULTI-MONEDA: Usar costos del análisis unificado
+                          const analysis = (unifiedData as any)?.analysis;
+                          if (analysis && analysis.totals) {
+                            const currency = analysis.currency === 'ARS' ? 'AR$' : '$';
+                            return `Costo: ${currency} ${analysis.totals.costs.toLocaleString()} • Margen: ${((analysis.totals.margin / analysis.totals.revenue) * 100).toFixed(1)}%`;
+                          }
+                          // Fallback: valores originales
+                          return `Costo: $${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()} • Margen: ${((1 - 1/(unifiedData?.metrics?.markup || 1)) * 100).toFixed(1)}%`;
+                        })()}
                       </div>
                     </div>
 
