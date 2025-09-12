@@ -37,6 +37,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
   const costsDisplay = projectData?.costsDisplay || [];  // Costos con ambas monedas
   const currencyAnalysis = projectData?.analysis;        // Análisis de moneda automático
   
+  
 
   // 💰 UTILITY: Función para formatear monedas con símbolos claros
   const formatCurrency = (amount: number, currency: 'USD' | 'ARS' = 'USD'): string => {
@@ -89,14 +90,15 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
     setFilters({});
   };
 
-  // 💰 MULTI-CURRENCY: Filtrar datos usando costsDisplay cuando esté disponible
+  // 💰 MULTI-CURRENCY: Filtrar datos usando siempre directCosts que tiene los nombres
   const filteredData = useMemo(() => {
-    const dataToFilter = costsDisplay.length > 0 ? costsDisplay : costData;
+    // SIEMPRE usar directCosts porque tiene el campo persona
+    const dataToFilter = costData;
     return dataToFilter.filter((record: any) => {
       if (filters.memberName && record.persona !== filters.memberName) return false;
       return true;
     });
-  }, [costData, costsDisplay, filters]);
+  }, [costData, filters]);
 
   if (isLoading) {
     return (
@@ -322,18 +324,9 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                   </td>
                 </tr>
               ) : (
-                filteredData.map((record: any, index: number) => {
-                  // 🔍 DEBUG: Log the exact structure of each record
-                  console.log('🔍 CostDashboard record structure:', {
-                    id: record.id,
-                    persona: record.persona,
-                    name: record.name,
-                    allFields: Object.keys(record)
-                  });
-                  
-                  return (
+                filteredData.map((record: any, index: number) => (
                     <tr key={`cost-${record.id || index}`} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona || record.name || 'Sin nombre'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-900 font-medium">{record.persona || 'Sin nombre'}</td>
                       <td className="px-4 py-2 text-sm text-gray-700 font-mono">{record.mes}</td>
                       <td className="px-4 py-2 text-sm text-right font-mono">{(record.horasRealesAsana || record.hours || 0).toFixed(1)}h</td>
                       
@@ -358,8 +351,7 @@ export const CostDashboard: React.FC<CostDashboardProps> = ({ projectId, timeFil
                         </Badge>
                       </td>
                     </tr>
-                  );
-                })
+                ))
               )}
             </tbody>
           </table>
