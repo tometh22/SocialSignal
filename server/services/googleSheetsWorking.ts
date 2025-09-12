@@ -1274,15 +1274,21 @@ class GoogleSheetsWorkingService {
           continue;
         }
         
-        // Solo procesar filas válidas con datos esenciales (más flexible)
-        if (!persona && !cliente && !proyecto) {
-          console.log(`⏭️ Fila ${i}: Filtrado por datos vacíos:`, debugInfo);
+        // Solo procesar filas válidas con datos esenciales (MUY flexible)
+        if (!persona || persona.trim() === '') {
+          console.log(`⏭️ Fila ${i}: Filtrado por persona vacía:`, debugInfo);
           continue;
         }
         
-        // Verificar que tenga al menos horas O monto USD válido (más flexible)  
-        if (horasRealesAsana <= 0 && horasParaFacturacion <= 0 && montoUSDValue <= 0) {
-          console.log(`⏭️ Fila ${i}: Filtrado por sin horas ni monto:`, debugInfo);
+        // Solo requerir cliente O proyecto (no ambos)
+        if ((!cliente || cliente.trim() === '') && (!proyecto || proyecto.trim() === '')) {
+          console.log(`⏭️ Fila ${i}: Filtrado por cliente Y proyecto vacíos:`, debugInfo);
+          continue;
+        }
+        
+        // Aceptar cualquier fila que tenga al menos UN valor numérico válido
+        if (horasRealesAsana <= 0 && horasParaFacturacion <= 0 && horasObjetivo <= 0 && montoUSDValue <= 0) {
+          console.log(`⏭️ Fila ${i}: Filtrado por sin datos numéricos:`, debugInfo);
           continue;
         }
         
