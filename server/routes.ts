@@ -2015,6 +2015,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // NUEVO ENDPOINT: Performance Rankings - Vista completa para la pestaña Performance
+  app.get('/api/projects/:id/performance-rankings', requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    const timeFilter = req.query.timeFilter as string || 'all';
+    console.log(`🌟 PROJECT API CALL: GET /${id}/performance-rankings?timeFilter=${timeFilter}`);
+    
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+
+    try {
+      // Importar función necesaria
+      const { calculateTeamRankings } = await import('../shared/ranking-utils');
+      
+      // Reutilizar la misma lógica de complete-data pero solo para rankings
+      const project = await storage.getActiveProject(id);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+
+      // Obtener datos de costos integrados con filtro temporal
+      const costSummary = await storage.getProjectCostSummary(id, timeFilter);
+      const teamBreakdown = costSummary.teamBreakdown || {};
+      
+      // Obtener ventas y calcular ingresos ajustados (COPIAR LÓGICA DE COMPLETE-DATA)
+      const allSales = await storage.getGoogleSheetsSalesByProject(id);
+      
+      // Función helper para obtener número de mes
+      const getMonthNumber = (monthName: string): number => {
+        const months: { [key: string]: number } = {
+          enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+          julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+        };
+        return months[monthName.toLowerCase()] || 1;
+      };
+      
+      // Filtrar ventas por período temporal (COPIAR LÓGICA EXISTENTE)
+      const filteredSales = timeFilter === 'all' ? allSales : allSales.filter((sale: any) => {
+        const monthNum = getMonthNumber(sale.month);
+        const saleDate = new Date(sale.year, monthNum - 1, 1);
+        
+        // Lógica de filtrado temporal simplificada para agosto 2025
+        if (timeFilter === 'august_2025') {
+          return sale.year === 2025 && monthNum === 8;
+        }
+        return true;
+      });
+      
+      const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.amountUsd || 0), 0);
+      const adjustedTotalAmount = Math.max(totalRevenue, project.quotation?.totalAmount || 0);
+
+      // Preparar datos para rankings si hay miembros con horas
+      const teamRankingData = Object.entries(teamBreakdown)
+        .filter(([_, member]: [string, any]) => member.hours > 0)
+        .map(([key, member]: [string, any]) => ({
+          key,
+          personnelId: member.personnelId,
+          personnelName: member.name,
+          estimatedHours: member.estimatedHours || member.targetHours || 0,
+          actualHours: member.hours || member.actualHours || 0,
+          estimatedCost: (member.estimatedHours || member.targetHours || 0) * (member.rate || 0),
+          actualCost: member.cost || member.actualCost || 0
+        }));
+
+      // Calcular rankings económicos
+      const economicRankings = teamRankingData.length > 0 ? 
+        calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
+
+      // TRANSFORMAR DATOS: De estructura backend a estructura frontend
+      const transformedRankings = economicRankings.map((ranking: any, index: number) => {
+        const teamMember = teamBreakdown[ranking.key] || {};
+        const actualHours = teamMember.hours || teamMember.actualHours || 0;
+        const targetHours = teamMember.targetHours || teamMember.estimatedHours || 0;
+        const participacion = ranking.pricePercentage * 100;
+
+        // Calcular scores normalizados
+        const efficiencyScore = targetHours > 0 ? Math.min(100, Math.max(0, (actualHours / targetHours) * 100)) : 70;
+        const impactScore = Math.min(100, Math.max(0, ranking.impactScore));
+        const unifiedScore = Math.min(100, Math.max(0, (efficiencyScore * 0.5) + (impactScore * 0.5)));
+
+        // Función helper para clasificación
+        const getClassification = (score: number, type: 'efficiency' | 'impact' | 'unified') => {
+          const thresholds = {
+            efficiency: { excellent: 70, good: 50 },
+            impact: { excellent: 15, good: 8 },
+            unified: { excellent: 20, good: 12 }
+          };
+          
+          const threshold = thresholds[type];
+          if (score >= threshold.excellent) return { label: 'Excelente', color: 'green' };
+          if (score >= threshold.good) return { label: 'Bueno', color: 'yellow' };
+          return { label: 'Crítico', color: 'red' };
+        };
+
+        return {
+          persona: ranking.personnelName || teamMember.name,
+          eficiencia: {
+            score: Math.round(efficiencyScore),
+            display: `${Math.round(efficiencyScore)}% eficiencia`,
+            clasificacion: getClassification(efficiencyScore, 'efficiency')
+          },
+          impacto: {
+            score: Math.round(impactScore),
+            display: `${Math.round(impactScore)} pts impacto`,
+            clasificacion: getClassification(impactScore, 'impact')
+          },
+          unificado: {
+            score: Math.round(unifiedScore),
+            display: `${Math.round(unifiedScore)} pts total`,
+            clasificacion: getClassification(unifiedScore, 'unified')
+          },
+          horas: {
+            real: actualHours,
+            objetivo: targetHours
+          },
+          economia: {
+            participacion_pct: Math.round(participacion * 100) / 100
+          }
+        };
+      });
+
+      // Datos de validación
+      const validaciones = {
+        datosCompletos: transformedRankings.length,
+        sinObjetivo: transformedRankings.filter((r: any) => r.horas.objetivo === 0).length,
+        participacionTotal: Math.round(transformedRankings.reduce((sum: number, r: any) => sum + r.economia.participacion_pct, 0) * 100) / 100,
+        noDataForPeriod: transformedRankings.length === 0,
+        sinIngresos: totalRevenue === 0
+      };
+
+      const configuracion = {
+        balanceEficienciaImpacto: "50-50",
+        periodoAnalisis: timeFilter
+      };
+
+      console.log(`📊 Performance rankings generated for ${transformedRankings.length} team members`);
+      
+      res.json({
+        rankings: transformedRankings,
+        validaciones,
+        configuracion,
+        timeFilter,
+        projectId: id
+      });
+
+    } catch (error) {
+      console.error("Error getting performance rankings:", error);
+      res.status(500).json({ message: "Failed to get performance rankings" });
+    }
+  });
+
   // Endpoint para asignar horas a personal no cotizado
   app.post("/api/projects/assign-unquoted-personnel", requireAuth, async (req, res) => {
     try {
