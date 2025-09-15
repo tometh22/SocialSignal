@@ -2373,13 +2373,13 @@ export class DatabaseStorage implements IStorage {
       for (const excelPerson of excelOnlyPersonnel) {
         const existingTraditional = costByPerson.find(p => p.name === excelPerson.name);
         if (existingTraditional) {
-          // FUSIONAR datos: sumar horas y costos del Excel MAESTRO al tradicional
-          console.log(`🔗 Fusionando datos duplicados: ${excelPerson.name} (tradicional + Excel MAESTRO)`);
-          existingTraditional.realCost += excelPerson.realCost;
-          existingTraditional.operationalCost += excelPerson.operationalCost;
-          existingTraditional.hours += excelPerson.hours;
+          // CORRECCIÓN CRÍTICA: Para rankings, usar SOLO datos del Excel MAESTRO (más exactos)
+          console.log(`🔗 Reemplazando datos tradicionales con Excel MAESTRO: ${excelPerson.name}`);
+          existingTraditional.realCost = excelPerson.realCost; // USAR SOLO Excel MAESTRO
+          existingTraditional.operationalCost = excelPerson.operationalCost; // USAR SOLO Excel MAESTRO
+          existingTraditional.hours = excelPerson.hours; // USAR SOLO Excel MAESTRO
           if (excelPerson.targetHours > 0) {
-            existingTraditional.targetHours = Math.max(existingTraditional.targetHours || 0, excelPerson.targetHours);
+            existingTraditional.targetHours = excelPerson.targetHours; // USAR SOLO Excel MAESTRO
           }
           // Marcar que tiene datos de Excel
           existingTraditional.hasExcelData = true;
