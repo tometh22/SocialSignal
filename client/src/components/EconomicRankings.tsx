@@ -25,11 +25,18 @@ export function EconomicRankings({
   const { data: performanceData, isLoading, error } = useQuery({
     queryKey: ['/api/projects', projectId, 'performance-rankings', timeFilter],
     queryFn: async () => {
+      console.log(`🔍 RANKINGS: Fetching data for project ${projectId} with filter ${timeFilter}`);
       const response = await fetch(`/api/projects/${projectId}/performance-rankings?timeFilter=${timeFilter}`);
       if (!response.ok) throw new Error('Failed to fetch performance rankings');
-      return response.json();
+      const data = await response.json();
+      console.log(`📊 RANKINGS: Received ${data.rankings?.length || 0} rankings for ${timeFilter}`);
+      return data;
     },
-    enabled: !!projectId
+    enabled: !!projectId,
+    staleTime: 0, // Always refetch when timeFilter changes
+    gcTime: 1000 * 60 * 2, // Keep in cache for 2 minutes only (renamed from cacheTime in v5)
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: false // Don't refetch on window focus
   });
   
   // Consolidate loading state
