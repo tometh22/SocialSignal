@@ -1,7 +1,7 @@
 {
   "kimberly_huggies": {
-    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
-    "sheetName": "Costos directos e indirectos",
+    "spreadsheetId": "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc",
+    "sheetName": "Ventas Tomi",
     "columnMap": {
       "horasReal": 11,
       "horasObjetivo": 10, 
@@ -17,8 +17,8 @@
     }
   },
   "uber_taxis": {
-    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
-    "sheetName": "Costos directos e indirectos",
+    "spreadsheetId": "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc",
+    "sheetName": "Ventas Tomi",
     "columnMap": {
       "horasReal": 11,
       "horasObjetivo": 10, 
@@ -31,8 +31,8 @@
     }
   },
   "warner_marketing": {
-    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
-    "sheetName": "Costos directos e indirectos",
+    "spreadsheetId": "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc",
+    "sheetName": "Ventas Tomi",
     "columnMap": {
       "horasReal": 11,
       "horasObjetivo": 10, 
@@ -45,8 +45,8 @@
     }
   },
   "modo_monthly": {
-    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
-    "sheetName": "Costos directos e indirectos",
+    "spreadsheetId": "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc",
+    "sheetName": "Ventas Tomi",
     "columnMap": {
       "horasReal": 11,
       "horasObjetivo": 10, 
@@ -59,8 +59,8 @@
     }
   },
   "coelsa_monthly": {
-    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
-    "sheetName": "Costos directos e indirectos",
+    "spreadsheetId": "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc",
+    "sheetName": "Ventas Tomi",
     "columnMap": {
       "horasReal": 11,
       "horasObjetivo": 10, 

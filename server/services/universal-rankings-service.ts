@@ -83,7 +83,7 @@ export async function getUniversalRankings(request: UniversalRankingsRequest): P
   if (rawData && rawData.length > 0) {
     const firstRow = rawData[0];
     console.log(`📋 First row type: ${typeof firstRow}, isArray: ${Array.isArray(firstRow)}, length: ${firstRow?.length || 'N/A'}`);
-    console.log(`🔍 Sample data: persona[${columnMap.persona}]="${firstRow?.[columnMap.persona]}", month[${columnMap.month}]="${firstRow?.[columnMap.month]}", year[${columnMap.year}]="${firstRow?.[columnMap.year]}"`);
+    console.log(`🔍 Sample data: persona[${cfg.columnMap.persona}]="${firstRow?.[cfg.columnMap.persona]}", month[${cfg.columnMap.month}]="${firstRow?.[cfg.columnMap.month]}", year[${cfg.columnMap.year}]="${firstRow?.[cfg.columnMap.year]}"`);
   }
   
   if (!rawData || rawData.length === 0) {
@@ -105,7 +105,7 @@ export async function getUniversalRankings(request: UniversalRankingsRequest): P
 
   // 4. Convertir datos al formato universal
   const universalRows = adaptExcelToUniversal(rawData, projectKey, projectId.toString());
-  console.log(`🔄 Converted ${rawData.length} Excel rows to ${universalRows.length} universal rows`);
+  console.log(`🔄 Converted ${rawData.length} Excel rows to ${universalRows.length} universal rows using config:`, cfg.columnMap);
 
   // 5. Filtrar por período temporal
   const filteredRows = filterByPeriod(universalRows, period);
