@@ -130,6 +130,14 @@ export function calculateImpactScores(
 ): number[] {
   if (efficiencyScores.length !== pricePercentages.length) return [];
   
+  // CORRECCIÓN: Si no hay datos de ingresos (todos los porcentajes son 0), usar solo eficiencia
+  const hasIncomeData = pricePercentages.some(percentage => percentage > 0);
+  
+  if (!hasIncomeData) {
+    console.log(`⚠️ No hay datos de ingresos, usando solo eficiencia para Impacto`);
+    return efficiencyScores.map(efficiency => efficiency * 0.5); // Penalizar pero no eliminar
+  }
+  
   return efficiencyScores.map((efficiency, index) => 
     efficiency * pricePercentages[index]
   );
@@ -146,6 +154,14 @@ export function calculateUnifiedScores(
   if (efficiencyScores.length !== pricePercentages.length) return [];
   
   const weights = customWeights || RANKING_CONFIG.unifiedWeights;
+  
+  // CORRECCIÓN: Si no hay datos de ingresos, usar solo eficiencia
+  const hasIncomeData = pricePercentages.some(percentage => percentage > 0);
+  
+  if (!hasIncomeData) {
+    console.log(`⚠️ No hay datos de ingresos, usando solo eficiencia para Unificado`);
+    return efficiencyScores; // Usar eficiencia completa cuando no hay datos de ingresos
+  }
   
   // Normalizar porcentajes de precio a escala 0-100
   const normalizedPrices = normalizeToScale(pricePercentages);
