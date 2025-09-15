@@ -57,7 +57,7 @@ import { db, pool } from "./db";
 import { eq, ne, and, sql, inArray, desc, asc } from "drizzle-orm";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { getDateRangeForFilter } from "./routes";
+import { getDateRangeForFilter } from "./utils/dateRange";
 
 // Función auxiliar para obtener el campo correcto de costo histórico
 function getHistoricalMonthField(year: number, month: number, type: 'hourly' | 'salary'): string {
@@ -2092,10 +2092,20 @@ export class DatabaseStorage implements IStorage {
   // ==================== NUEVA FUNCIÓN: OBTENER RANGO DE ACTIVIDAD REAL DE PROYECTOS ONE-SHOT ====================
   // (Removed duplicate function - using implementation at line 4712)
 
-  async getProjectCostSummary(projectId: number, dateRange?: { startDate: Date; endDate: Date }): Promise<any> {
+  async getProjectCostSummary(projectId: number, dateRangeOrFilter?: { startDate: Date; endDate: Date } | string): Promise<any> {
     try {
+      console.log(`🔍 getProjectCostSummary called with projectId: ${projectId}, filter:`, dateRangeOrFilter);
       const project = await this.getActiveProject(projectId);
       if (!project) return null;
+
+      // NORMALIZE INPUT: Aceptar tanto string como objeto
+      const input = dateRangeOrFilter;
+      let dateRange: { startDate: Date; endDate: Date } | undefined;
+      if (typeof input === 'string') {
+        dateRange = getDateRangeForFilter(input) || undefined;
+      } else {
+        dateRange = input;
+      }
 
       // Obtener ALL time entries para el proyecto
       let entries = await db.select().from(timeEntries).where(eq(timeEntries.projectId, projectId));
@@ -2106,7 +2116,10 @@ export class DatabaseStorage implements IStorage {
           const entryDate = new Date(entry.date);
           return entryDate >= dateRange.startDate && entryDate <= dateRange.endDate;
         });
-        console.log(`📊 Filtered time entries for cost summary: ${entries.length} entries in range ${dateRange.startDate.toISOString()} to ${dateRange.endDate.toISOString()}`);
+        // DEFENSIVE LOGGING: Guard para evitar errores
+        const startIso = dateRange.startDate?.toISOString?.() ?? 'unknown';
+        const endIso = dateRange.endDate?.toISOString?.() ?? 'unknown';
+        console.log(`📊 Filtered time entries for cost summary: ${entries.length} entries in range ${startIso} to ${endIso}`);
       }
       
       // NUEVA INTEGRACIÓN: Obtener costos directos del Excel MAESTRO con filtros temporales

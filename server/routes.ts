@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db, pool } from "./db";
 import { z } from "zod";
+import { getDateRangeForFilter } from "./utils/dateRange";
 import { 
   insertClientSchema, 
   insertRoleSchema, 
@@ -2031,7 +2032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const project = await storage.getActiveProject(id);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
-      // Obtener datos de costos integrados con filtro temporal
+      // Obtener datos de costos integrados con filtro temporal normalizado
       const costSummary = await storage.getProjectCostSummary(id, timeFilter);
       const teamBreakdown = costSummary.teamBreakdown || {};
       
@@ -2157,7 +2158,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error) {
-      console.error("Error getting performance rankings:", error);
+      console.error("❌ Error getting performance rankings for project", id, "with filter", timeFilter, ":", error);
+      console.error("❌ Error stack:", error.stack);
       res.status(500).json({ message: "Failed to get performance rankings" });
     }
   });
