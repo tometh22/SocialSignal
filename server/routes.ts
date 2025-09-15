@@ -2026,20 +2026,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
-      // Importar función necesaria
-      const { calculateTeamRankings } = await import('../shared/ranking-utils');
+      // ✅ NUEVA IMPLEMENTACIÓN: Usar funciones según especificación del documento
+      const { processDocumentRankings } = await import('../shared/document-ranking-utils');
       
-      // Reutilizar la misma lógica de complete-data pero solo para rankings
+      // Obtener datos básicos del proyecto
       const project = await storage.getActiveProject(id);
       if (!project) return res.status(404).json({ message: "Project not found" });
 
       // Obtener datos de costos integrados con filtro temporal normalizado
       const costSummary = await storage.getProjectCostSummary(id, timeFilter);
-      // ✅ CORRECCIÓN CRÍTICA: Usar costByPerson en vez de teamBreakdown (que no existe)
       const costByPerson = costSummary.costByPerson || [];
       
-      
-      // Obtener ventas y calcular ingresos ajustados (COPIAR LÓGICA DE COMPLETE-DATA)
+      // Obtener ventas del Excel MAESTRO filtradas por período
       const allSales = await storage.getGoogleSheetsSalesByProject(id);
       
       // Función helper para obtener número de mes
@@ -2051,124 +2049,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return months[monthName.toLowerCase()] || 1;
       };
       
-      // Filtrar ventas por período temporal (COPIAR LÓGICA EXISTENTE)
-      const filteredSales = timeFilter === 'all' ? allSales : allSales.filter((sale: any) => {
-        const monthNum = getMonthNumber(sale.month);
-        const saleDate = new Date(sale.year, monthNum - 1, 1);
-        
-        // Lógica de filtrado temporal simplificada para agosto 2025
-        if (timeFilter === 'august_2025') {
-          return sale.year === 2025 && monthNum === 8;
+      // Filtrar ventas por período temporal usando getDateRangeForFilter
+      let filteredSales = allSales;
+      let dateRangeApplied = null;
+      
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(timeFilter);
+        if (dateRange) {
+          dateRangeApplied = dateRange;
+          filteredSales = allSales.filter((sale: any) => {
+            const monthNum = getMonthNumber(sale.month);
+            const saleDate = new Date(sale.year, monthNum - 1, 1);
+            return saleDate >= dateRange.start && saleDate <= dateRange.end;
+          });
         }
-        return true;
-      });
+      }
+      
+      console.log(`📊 Filtro temporal aplicado: ${timeFilter}, Ventas: ${allSales.length} → ${filteredSales.length}`);
       
       const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.amountUsd || 0), 0);
-      const adjustedTotalAmount = Math.max(totalRevenue, project.quotation?.totalAmount || 0);
 
-      // Preparar datos para rankings si hay miembros con horas O costos
-      
-      // ✅ CORRECCIÓN: Trabajar con array costByPerson en vez de objeto teamBreakdown
-      const teamRankingData = costByPerson
+      // ✅ NUEVA LÓGICA: Preparar datos según especificación del documento
+      // Estructura: { persona, horasReales, horasObjetivo, montoUSD }
+      const teamData = costByPerson
         .filter((member: any) => {
           const hasHours = (member.hours || member.actualHours || 0) > 0;
           const hasCost = (member.cost || member.actualCost || member.realCost || 0) > 0;
           return hasHours || hasCost;
         })
-        .map((member: any, index: number) => ({
-          key: member.name || `member_${index}`,
-          personnelId: member.personnelId,
-          personnelName: member.name,
-          estimatedHours: member.estimatedHours || member.targetHours || 0,
-          actualHours: member.hours || member.actualHours || 0,
-          estimatedCost: (member.estimatedHours || member.targetHours || 0) * (member.rate || 0),
-          // ✅ CORRECCIÓN: Usar realCost como fallback para personal del Excel MAESTRO
-          actualCost: member.cost || member.actualCost || member.realCost || 0,
-          // ✅ NUEVO: Agregar revenue real del Excel MAESTRO para cálculo de impacto
-          actualRevenue: member.realCost || member.cost || 0
-        }));
-      
-
-      // Calcular rankings económicos
-      const economicRankings = teamRankingData.length > 0 ? 
-        calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
-      
-
-      // TRANSFORMAR DATOS: De estructura backend a estructura frontend
-      const transformedRankings = economicRankings.map((ranking: any) => {
-        
-        // ✅ CORRECCIÓN CRÍTICA: Usar datos directos del ranking que son correctos
-        const actualHours = ranking.actualHours || 0;
-        const targetHours = ranking.estimatedHours || 0;
-        const participacion = (ranking.pricePercentage || 0) * 100;
-
-        // Calcular scores normalizados
-        const efficiencyScore = targetHours > 0 ? Math.min(100, Math.max(0, (actualHours / targetHours) * 100)) : 70;
-        const impactScore = Math.min(100, Math.max(0, ranking.impactScore));
-        const unifiedScore = Math.min(100, Math.max(0, (efficiencyScore * 0.5) + (impactScore * 0.5)));
-
-        // Función helper para clasificación
-        const getClassification = (score: number, type: 'efficiency' | 'impact' | 'unified') => {
-          const thresholds = {
-            efficiency: { excellent: 70, good: 50 },
-            impact: { excellent: 15, good: 8 },
-            unified: { excellent: 20, good: 12 }
-          };
+        .map((member: any) => {
+          console.log(`📊 Processing team member: ${member.name}`, {
+            hours: member.hours || member.actualHours || 0,
+            targetHours: member.targetHours || member.estimatedHours || 0,
+            cost: member.cost || member.actualCost || member.realCost || 0
+          });
           
-          const threshold = thresholds[type];
-          if (score >= threshold.excellent) return { label: 'Excelente', color: 'green' };
-          if (score >= threshold.good) return { label: 'Bueno', color: 'yellow' };
-          return { label: 'Crítico', color: 'red' };
-        };
+          return {
+            persona: member.name,
+            horasReales: member.hours || member.actualHours || 0,
+            horasObjetivo: member.targetHours || member.estimatedHours || 0,
+            montoUSD: member.cost || member.actualCost || member.realCost || 0
+          };
+        });
 
-        return {
-          persona: ranking.personnelName,
-          eficiencia: {
-            score: Math.round(efficiencyScore),
-            display: `${Math.round(efficiencyScore)}% eficiencia`,
-            clasificacion: getClassification(efficiencyScore, 'efficiency')
-          },
-          impacto: {
-            score: Math.round(impactScore),
-            display: `${Math.round(impactScore)} pts impacto`,
-            clasificacion: getClassification(impactScore, 'impact')
-          },
-          unificado: {
-            score: Math.round(unifiedScore),
-            display: `${Math.round(unifiedScore)} pts total`,
-            clasificacion: getClassification(unifiedScore, 'unified')
-          },
-          horas: {
-            real: actualHours,
-            objetivo: targetHours
-          },
-          economia: {
-            participacion_pct: Math.round(participacion * 100) / 100
-          }
-        };
-      });
+      console.log(`📊 Team data prepared: ${teamData.length} members`);
+      console.log('📊 First member sample:', teamData[0]);
+
+      // ✅ USAR NUEVA IMPLEMENTACIÓN según especificación del documento
+      const documentRankings = processDocumentRankings(teamData);
+      
+      console.log(`📊 Document rankings generated: ${documentRankings.length} results`);
 
       // Datos de validación
       const validaciones = {
-        datosCompletos: transformedRankings.length,
-        sinObjetivo: transformedRankings.filter((r: any) => r.horas.objetivo === 0).length,
-        participacionTotal: Math.round(transformedRankings.reduce((sum: number, r: any) => sum + r.economia.participacion_pct, 0) * 100) / 100,
-        noDataForPeriod: transformedRankings.length === 0,
-        sinIngresos: totalRevenue === 0
+        datosCompletos: documentRankings.length,
+        sinObjetivo: documentRankings.filter(r => r.horas.objetivo === 0).length,
+        participacionTotal: Math.round(documentRankings.reduce((sum, r) => sum + r.economia.participacion_pct, 0) * 100) / 100,
+        noDataForPeriod: documentRankings.length === 0,
+        sinIngresos: totalRevenue === 0,
+        totalRevenue: totalRevenue,
+        totalMembers: teamData.length
       };
 
       const configuracion = {
         balanceEficienciaImpacto: "50-50",
-        periodoAnalisis: timeFilter
+        periodoAnalisis: timeFilter,
+        algoritmo: "especificacion_documento",
+        version: "2025.09.15"
       };
 
-      console.log(`📊 Performance rankings generated for ${transformedRankings.length} team members`);
+      console.log(`✅ Rankings según especificación generados: ${documentRankings.length} miembros`);
       
       res.json({
-        rankings: transformedRankings,
+        rankings: documentRankings,
         validaciones,
         configuracion,
         timeFilter,
+        dateRangeApplied,
         projectId: id
       });
 
