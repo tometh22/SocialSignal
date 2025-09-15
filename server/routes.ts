@@ -1215,7 +1215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             hours: personCost.hours || 0, // CORRECCIÓN: Usar también 'hours' para compatibilidad con filtros
             cost: personCost.realCost || personCost.operationalCost || 0, // CORRECCIÓN: Usar también 'cost'
             rate: actualRate,
-            efficiency: estimatedHours > 0 ? Math.round(((personCost.hours || 0) / estimatedHours) * 100) : 0,
+            efficiency: estimatedHours > 0 ? ((personCost.hours || 0) / estimatedHours) * 100 : 70, // K=0 → 70 pts (sin redondeo)
             isQuoted: isQuoted,
             contractType: personCost.contractType || 'external',
             isFromExcel: !personCost.personnelId, // Marcador para entries del Excel
@@ -1883,13 +1883,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         },
         
-        // Métricas calculadas (ÚNICA FUENTE)
+        // Métricas calculadas (ÚNICA FUENTE) - sin redondeos prematuros
         metrics: {
-          efficiency: Math.round(efficiency * 100) / 100,
-          markup: Math.round(markup * 100) / 100,
-          budgetUtilization: Math.round(budgetUtilization * 100) / 100,
-          hoursDeviation: Math.round((totalWorkedHours - adjustedEstimatedHours) * 100) / 100,
-          costDeviation: Math.round((totalWorkedCost - adjustedBaseCost) * 100) / 100
+          efficiency: efficiency,
+          markup: markup,
+          budgetUtilization: budgetUtilization,
+          hoursDeviation: totalWorkedHours - adjustedEstimatedHours,
+          costDeviation: totalWorkedCost - adjustedBaseCost
         },
 
         // Datos de ventas desde Excel MAESTRO (filtradas por período temporal)
@@ -1998,7 +1998,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         markup: currencyAnalysis.totals.markup,
         metrics: {
           ...responseData.metrics,
-          markup: Math.round(currencyAnalysis.totals.markup * 100) / 100
+          markup: currencyAnalysis.totals.markup
         },
         // Multi-currency analysis
         analysis: {
@@ -2100,14 +2100,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📊 Document rankings generated: ${documentRankings.length} results`);
 
+      // ✅ CORRECCIÓN: Banner ingresos usando mismo criterio económico que cálculos
+      const totalEconomicoPeriodo = teamData
+        .map((r: any) => Math.max(0, r.montoUSD || 0))
+        .reduce((a: number, b: number) => a + b, 0);
+
       // Datos de validación
       const validaciones = {
         datosCompletos: documentRankings.length,
         sinObjetivo: documentRankings.filter(r => r.horas.objetivo === 0).length,
-        participacionTotal: Math.round(documentRankings.reduce((sum, r) => sum + r.economia.participacion_pct, 0) * 100) / 100,
+        participacionTotal: documentRankings.reduce((sum, r) => sum + r.economia.participacion_pct, 0), // Sin redondeo prematuro
         noDataForPeriod: documentRankings.length === 0,
-        sinIngresos: totalRevenue === 0,
-        totalRevenue: totalRevenue,
+        sinIngresos: totalEconomicoPeriodo <= 1e-6, // ✅ CORRECCIÓN: Usar mismo criterio económico
+        totalEconomicoPeriodo: totalEconomicoPeriodo, // Reemplazar totalRevenue
         totalMembers: teamData.length
       };
 

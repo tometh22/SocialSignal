@@ -1,0 +1,93 @@
+¡Está perfecto el diagnóstico del agent! 💯
+Te propongo hacerlo 1:1 con los números que validamos y cierro algunos detalles para que no vuelva a desviarse.
+Cambios clave (con código)
+1) No redondear antes de calcular (y “70 pts” si K=0)
+Tu agent puso : 0 cuando K=0. Según tu regla, debe ser 70 (neutro).
+// util: parsear decimales con coma o puntos
+const parseDec = (v: unknown) =>
+  typeof v === "number" ? v :
+  Number(String(v).replace(/\./g, "").replace(",", ".")) || 0;
+
+// --- Eficiencia
+const L = parseDec(row[columnMap.horasRealesAsana]);   // reales
+const K = parseDec(row[columnMap.horasObjetivo]);      // objetivo
+
+const effRatio = K === 0 ? null : Math.min(1, L / K);
+const effScore = K === 0 ? 70 : (effRatio! * 100);     // << 70 pts neutro
+
+// redondeo SOLO para mostrar
+const effScoreUi = Math.round(effScore * 100) / 100;
+2) Impacto: participación * eficiencia_normalizada * 30
+Participación del período/proyecto-mes = peso de cada fila / suma del grupo.
+Peso = M (horas facturadas) × ValorHora. (Si tenés montoUSD, podés usarlo; para participación da igual la moneda porque se cancela).
+// Clave de agrupación recomendada (proyecto + YYYY-MM)
+const periodo = `${row.year}-${String(row.month).padStart(2,"0")}-01`;
+const groupKey = `${row.proyectoId}|${periodo}`;
+
+// Peso por fila (fallback si no hay USD)
+const M  = parseDec(row[columnMap.horasFacturacion]);
+const VH = parseDec(row[columnMap.valorHoraARS]);
+const montoUSD = parseDec(row[columnMap.montoUSD]); // si existe
+const pesoFila = Number.isFinite(montoUSD) && montoUSD > 0 ? montoUSD : (M * VH);
+
+// Suma por grupo (hecha con reduce por groupKey)
+const totalGrupo = sumBy(grupos[groupKey], "pesoFila");
+const share = totalGrupo > 0 ? (pesoFila / totalGrupo) : 0;
+
+// eficiencia normalizada para impacto (K=0 ⇒ 1 para no penalizar)
+const effNorm = K === 0 ? 1 : Math.min(1, L / K);
+
+// Impacto 0–30 (sin redondear)
+const impacto = effNorm * share * 30;
+const impactoUi = Math.round(impacto * 100) / 100;
+3) Unificado: 50% eficiencia + 50% impacto (escalado)
+const impactoEsc = (impacto / 30) * 100; // 0–100
+const unificado = 0.5 * effScore + 0.5 * impactoEsc;
+const unificadoUi = Math.round(unificado * 100) / 100;
+4) Banner “Sin ingresos”
+Mostralo solo si el total económico del período es cero con el mismo criterio que usás para el cálculo:
+// suma del período filtrado
+const totalEconomicoPeriodo = teamData
+  .map(r => {
+    const M = parseDec(r[columnMap.horasFacturacion]);
+    const VH = parseDec(r[columnMap.valorHoraARS]);
+    const usd = parseDec(r[columnMap.montoUSD]);
+    return Number.isFinite(usd) && usd > 0 ? usd : (M * VH);
+  })
+  .reduce((a,b)=>a+b,0);
+
+const EPS = 1e-6;
+const sinIngresos = totalEconomicoPeriodo <= EPS;
+5) UI / presentación
+No redondear en estado interno.
+Mostrar enteros en tarjetas si querés, pero con tooltip:
+"Impacto: 0.29 pts" / "Eficiencia: 83.80%".
+Asegurá que la suma de shares por grupo sea ≈ 1 (tolerancia 1e-6).
+Validaciones (deben quedar así)
+Junio (casos sensibles):
+To Merello: L=3.5, K=4 → Efic 87.5; Unificado 45.8 ✅
+Micro-impactos (0.12–0.29) NO deben mostrarse como 0 interno (ok redondeo visual).
+Julio:
+Sol 100 / 10.28 / 67.13; Vanu 100 / 7.17 / 61.95; Vicky 100 / 2.92 / 54.87; Aylu 90.74 / 4.15 / 52.29 (±0.3 por redondeo UI) ✅
+Agosto:
+Trini 100 / 10.68 / 67.80; Sol 100 / 9.53 / 65.88; Vanu 100 / 4.90 / 58.17; Vicky 83.80 / 1.71 / 44.75; Aylu 44.39 / 1.26 / 24.30 ✅
+Vicky debe quedar 83.8% (no 80%). ✅
+Tests unitarios mínimos
+// Eficiencia neutro
+expect(effScore({K:0,L:0})).toBe(70);
+
+// To Merello (junio)
+expect(calc({K:4,L:3.5,M:3.5,VH:16760}).eff).toBeCloseTo(87.5, 2);
+expect(calc(...).unificado).toBeCloseTo(45.8, 1);
+
+// Vicky (ago)
+expect(calc({K:10,L:8.38,M:8.38,VH:26583.3}).eff).toBeCloseTo(83.8, 1);
+
+// Suma shares por groupKey
+expect(sum(shares(groupKey))).toBeCloseTo(1, 6);
+Orden sugerido (rápido)
+Parsing con parseDec en todas las columnas numéricas.
+Eliminar Math.round en server y hooks; redondear solo al render.
+Impacto con share = (M*VH)/Σ(M*VH) (o montoUSD si viene).
+Banner leyendo el mismo agregado.
+Tests con los casos To Merello / Vicky / tablas de julio-agosto.

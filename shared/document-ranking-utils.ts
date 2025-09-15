@@ -58,10 +58,16 @@ export interface DocumentRankingResult {
  * Si no hay objetivo (K_total=0), usar 70 pts como especifica el documento
  */
 export function calculateDocumentEfficiency(horasReales: number, horasObjetivo: number): number {
-  if (horasObjetivo === 0) {
+  const L = Math.max(0, horasReales);
+  const K = Math.max(0, horasObjetivo);
+  
+  if (K === 0) {
     return 70; // Sin objetivo = 70 pts según especificación
   }
-  return Math.min(100, (horasReales / horasObjetivo) * 100);
+  
+  // Ratio para cálculos internos (sin redondeos)
+  const effRatio = Math.min(1, Math.max(0, L / K));
+  return effRatio * 100;
 }
 
 /**
@@ -69,13 +75,12 @@ export function calculateDocumentEfficiency(horasReales: number, horasObjetivo: 
  * Para efic_norm: si K_fila=0, usar 1; si no, MIN(1; L_fila/K_fila)
  */
 export function calculateDocumentImpact(participacionPct: number, horasReales: number, horasObjetivo: number): number {
-  let eficNorm: number;
+  const L = Math.max(0, horasReales);
+  const K = Math.max(0, horasObjetivo);
   
-  if (horasObjetivo === 0) {
-    eficNorm = 1; // Sin objetivo no penalizar el reparto
-  } else {
-    eficNorm = Math.min(1, horasReales / horasObjetivo);
-  }
+  // Eficiencia normalizada para impacto (K=0 ⇒ 1 para no penalizar)
+  const effRatio = K === 0 ? null : Math.min(1, Math.max(0, L / K));
+  const eficNorm = K === 0 ? 1 : (effRatio ?? 0);
   
   // Escala 0-30: participación × efic_norm × 30
   return (participacionPct / 100) * eficNorm * 30;

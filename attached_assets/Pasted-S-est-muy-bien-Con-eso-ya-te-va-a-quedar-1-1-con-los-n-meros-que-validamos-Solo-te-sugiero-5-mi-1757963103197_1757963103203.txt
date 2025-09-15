@@ -1,0 +1,72 @@
+Sí, está muy bien. Con eso ya te va a quedar 1:1 con los números que validamos.
+Solo te sugiero 5 micro-ajustes para blindarlo y evitar desvíos futuros:
+parseDec más robusto (monedas, espacios, paréntesis negativos)
+const parseDec = (v: unknown): number => {
+  if (v == null) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const s = String(v)
+    .replace(/\s+/g, "")        // espacios
+    .replace(/\$/g, "")         // símbolos
+    .replace(/\./g, "")         // miles
+    .replace(/,/g, ".");        // decimales
+  // (1.234,56) ó (1234,56) como negativo
+  const neg = /^\(.*\)$/.test(s);
+  const n = Number(s.replace(/[()]/g, "")) || 0;
+  return neg ? -n : n;
+};
+Eficiencia: límites y caso K=0 coherente
+const L = parseDec(member.hours);
+const K = parseDec(member.targetHours);
+
+// ratio para cálculos internos (sin redondeos)
+const effRatio = K === 0 ? null : Math.min(1, Math.max(0, L / K));
+
+// Score mostrado (regla de negocio: 70 si K=0)
+const effScore = K === 0 ? 70 : (effRatio! * 100);
+Si K=0 y L>0, mantené 70 (neutro) como definiste; para impacto usamos effNorm=1 (ver punto 4).
+Clave de agrupación “proyecto-mes” normalizada
+Evita strings tipo “07 jul”. Centralizá el período:
+const toMonth = (m: string|number) => {
+  const map: Record<string, number> = { ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12 };
+  if (typeof m === "number") return m;
+  const key = m.toString().slice(0,3).toLowerCase();
+  return map[key] ?? Number(m) ?? 0;
+};
+const monthNum = toMonth(row[columnMap.mes]);
+const yearNum  = parseDec(row[columnMap.anio]);
+const period   = `${yearNum}-${String(monthNum).padStart(2,"0")}`; // yyyy-mm
+const groupKey = `${projectId}|${period}`;
+Impacto: pesos no negativos + norma cuando K=0
+const M  = Math.max(0, parseDec(row[columnMap.horasFacturacion]));
+const VH = Math.max(0, parseDec(row[columnMap.valorHoraARS]));
+const usd= Math.max(0, parseDec(row[columnMap.montoUSD]));
+
+const pesoFila = usd > 0 ? usd : (M * VH);
+
+// suma por groupKey del período filtrado
+const totalGrupo = Math.max(0, groups[groupKey]?.totalPeso ?? 0);
+const share = totalGrupo > 0 ? (pesoFila / totalGrupo) : 0;
+
+const effNorm = K === 0 ? 1 : (effRatio ?? 0); // K=0 ⇒ 1 (no penalizar)
+const impacto = effNorm * share * 30; // 0–30
+Banner de ingresos y presentación
+const totalEconomicoPeriodo = teamData
+  .map(r => {
+    const m = Math.max(0, parseDec(r[columnMap.montoUSD]));
+    if (m > 0) return m;
+    return Math.max(0, parseDec(r[columnMap.horasFacturacion])) *
+           Math.max(0, parseDec(r[columnMap.valorHoraARS]));
+  })
+  .reduce((a,b)=>a+b,0);
+
+const sinIngresos = totalEconomicoPeriodo <= 1e-6;
+Mantener internamente decimales; redondear solo al render (Math.round(x*100)/100).
+Para tarjetas, si mostras “0 pts”, agregá tooltip con el valor real (ej. 0.29 pts).
+Empates en “Unificado”: rompe por Impacto y luego por Eficiencia para estabilidad.
+Checks que deberían pasar tras el cambio
+To Merello (junio): Efic 87.5; Unificado 45.8.
+Vicky (agosto): Efic 83.8 (no 80); Unificado ~44.8.
+Julio/Agosto: tablas coinciden con:
+Julio → Sol 67.13, Vanu 61.95, Vicky 54.87, Aylu 52.29.
+Agosto → Trini 67.80, Sol 65.88, Vanu 58.17, Vicky 44.75, Aylu 24.30.
+Suma de shares por proyecto-mes ≈ 1.000000 (tolerancia 1e-6).

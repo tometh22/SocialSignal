@@ -1,0 +1,23 @@
+Qué tan alineado está
+Julio: coincide casi perfecto (todas las diferencias ≤ 0.3 pts). ✔️
+Agosto: también muy alineado. La única diferencia visible es Vicky Achabal: tu app usa 80 de eficiencia (toma “8 h / 10 h”), mientras mi cálculo usa 8.38/10 = 83.8 → eso baja tu Unificado de ~44.8 a 43. Es por redondeo previo de horas.
+Junio: coincide en general, salvo To Merello.
+Mi cálculo: Eficiencia 87.5% (3.5/4) → Unificado 45.8.
+Tu app: Eficiencia 75% (3/4) → Unificado 39.
+Causa: tu app parece redondear horas antes de calcular (3h en lugar de 3.5h). En el resto (impactos chicos) se ve el mismo efecto: 0.21 → 0 al redondear a entero.
+Por qué aparecen esas diferencias
+Redondeo previo de horas (L y/o M).
+Si truncás a enteros antes del cociente L/K, medís 75% en vez de 87.5% (caso To Merello) y 80% en vez de 83.8% (Vicky en agosto).
+Recomendación: no redondees antes del cálculo. Redondeá solo al mostrar (dos decimales).
+Impacto mostrado como entero.
+Tus “0 pts impacto” en junio son valores pequeños (0.12–0.29) que mi cálculo muestra con decimales. Si los mostrás como entero, quedan en 0 (lo cual está ok visualmente, pero aclará en tooltip el valor real).
+Banner amar amarillo en agosto (“sin ingresos detectados…”).
+Aunque el banner dice cero ingresos, sí se están calculando Impactos (11, 10, 5…). Probable chequeo del banner mirando otra columna de ingresos. Ajustá la verificación para que use el mismo agregado que usa el cálculo (p. ej., SUM(M * ValorHora) cuando no hay Monto USD directo).
+Ajustes concretos para que te coincida 1:1
+Eficiencia: eff = IF(K=0, 70, MIN(1, L/K)*100) usando L con decimales (no redondear antes).
+Participación de ingresos (por mes o por proyecto-mes):
+share = (M * ValorHora) / Σ(M * ValorHora) con decimales.
+Impacto (0–30): impact = MIN(1, L/K) * share * 30 (si K=0, usa 1 para no penalizar).
+Unificado (0–100): 0.5 * eff + 0.5 * (impact/30*100); redondeá al final.
+UI: mostrar enteros, pero conservar decimales en tooltip / card secundaria.
+¿Querés que te deje las fórmulas listas para Google Sheets (con helpers Periodo, clave proyecto-mes, participación, etc.) y así todo esto se recalcula solo con el filtro temporal?

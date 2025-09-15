@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
+import { parseDec } from '../../shared/parse-utils';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -1244,9 +1245,9 @@ class GoogleSheetsWorkingService {
       try {
         const persona = this.getCellValue(row, columnMap.persona);
         const tipoGasto = this.getCellValue(row, columnMap.tipoGasto);
-        const horasObjetivo = parseFloat(this.getCellValue(row, columnMap.horasObjetivo)) || 0;
-        const horasRealesAsana = parseFloat(this.getCellValue(row, columnMap.horasRealesAsana)) || 0;
-        const horasParaFacturacion = parseFloat(this.getCellValue(row, columnMap.horasParaFacturacion)) || 0; // NUEVO: Columna M
+        const horasObjetivo = parseDec(this.getCellValue(row, columnMap.horasObjetivo));
+        const horasRealesAsana = parseDec(this.getCellValue(row, columnMap.horasRealesAsana));
+        const horasParaFacturacion = parseDec(this.getCellValue(row, columnMap.horasParaFacturacion));
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
