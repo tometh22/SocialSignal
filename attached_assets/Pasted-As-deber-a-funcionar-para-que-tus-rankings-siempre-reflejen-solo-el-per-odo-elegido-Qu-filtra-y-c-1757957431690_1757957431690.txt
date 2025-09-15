@@ -1,0 +1,36 @@
+Así debería funcionar para que tus rankings siempre reflejen solo el período elegido.
+Qué filtra y con qué granularidad
+Granularidad base: mensual (tu data está por Mes (C) y Año (D)).
+Presets: Mes actual / Mes anterior / Últimos 3–6–12 meses / Año actual / Rango de meses.
+Opcional “avanzado”: día a día solo si tenés horas/ingresos diarios; si no, mantené meses completos.
+Columna helper (1 sola) para filtrar
+Agregá Periodo con la fecha del primer día del mes:
+Periodo := DATE(D2; C2; 1)
+Con eso podés aplicar cualquier rango: >= fecha_inicio y <= fecha_fin.
+Efecto del filtro en cada ranking
+El filtro SIEMPRE debe:
+Incluir solo filas cuyo Periodo esté dentro del rango.
+Recalcular totales y proporciones con ese subconjunto.
+1) Eficiencia (cumplimiento del plan)
+Usa K = horas objetivo y L = horas reales dentro del rango.
+Por persona:
+K_total = SUMIFS(K:K; A:A; persona; Periodo; ">="&ini; Periodo; "<="&fin)
+L_total = SUMIFS(L:..., mismas condiciones)
+Eficiencia = IF(K_total=0; 70; MIN(1; L_total/K_total)*100)
+2) Impacto (eficiencia ponderada por ingresos)
+Usa R = Monto Total USD + K/L dentro del rango.
+Agrupación para repartir ingresos: proyecto–mes (ej.: clave = G|"|"&TEXT(Periodo,"yyyy-mm")).
+Para cada fila del rango:
+participación = R_fila / SUMA(R) del mismo proyecto–mes (en el rango)
+efic_norm = IF(K_fila=0; 1; MIN(1; L_fila/K_fila))
+impacto_fila = participación * efic_norm * 30
+Impacto persona = SUMA(impacto_fila) del rango.
+(Mantiene escala 0–30: ≥15 Excelente; 8–14 Bueno; <8 Crítico)
+3) Unificado
+Impacto escalado a 0–100: Impacto_esc = Impacto/30*100
+Score = wEEficiencia + wIImpacto_esc (default wE=0.5, wI=0.5; ambos suman 1)
+Decisiones de borde (recomendadas)
+Meses parciales: si elegís un rango que corta un mes, mostrale un aviso y considerá el mes completo (evitás prorrateos arbitrarios).
+(Solo prorratear si tenés horas/ingresos diarios).
+Sin objetivo en el período (K_total=0): persona = 70 pts en Eficiencia; en Impacto su efic_norm=1 para no penalizar el reparto.
+Moneda: usá R (USD) ya convertido; no recalcules con Q si R ya es final.
