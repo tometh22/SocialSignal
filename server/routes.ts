@@ -2017,6 +2017,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // FEATURE FLAG: Sistema universal de rankings
+  const USE_UNIVERSAL_RANKINGS = process.env.UNIVERSAL_RANKINGS === 'true';
+  
+  if (USE_UNIVERSAL_RANKINGS) {
+    // Importar y registrar endpoint universal
+    const { addUniversalRankingsEndpoint } = await import('./routes-universal.js');
+    addUniversalRankingsEndpoint(app, storage, requireAuth);
+  }
+
   // NUEVO ENDPOINT: Performance Rankings - Vista completa para la pestaña Performance
   app.get('/api/projects/:id/performance-rankings', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);

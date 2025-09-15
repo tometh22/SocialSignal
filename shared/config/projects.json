@@ -1,0 +1,19 @@
+{
+  "kimberly_huggies": {
+    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
+    "sheetName": "Ventas Tomi",
+    "columnMap": {
+      "horasReal": "L",
+      "horasObjetivo": "K", 
+      "horasFacturacion": "M",
+      "valorHoraARS": "N",
+      "montoUSD": "R",
+      "persona": "E",
+      "year": "A",
+      "month": "B"
+    },
+    "aliases": {
+      "huggies_period": { "start": "2024-01", "end": "2025-12" }
+    }
+  }
+}

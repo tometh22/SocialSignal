@@ -1,0 +1,185 @@
+¡Vamos a universalizarla! Coincido con tu arquitecto: la matemática es universal, los cuellos están en parsing, agrupaciones y configuración. Abajo te dejo el plan cerrado + snippets listos.
+Qué cambio y cómo (resumen)
+parseDec robusto (ES/US, miles, moneda, paréntesis negativos).
+Participación: sumar todas las filas por persona dentro de cada proyecto-mes (no la última).
+Config fuera del código: spreadsheetId, rangos, y mapping por proyecto.
+Filtro temporal único: una sola función para normalizar mes/año y filtrar.
+Tests para no romper nada cuando escale a otros proyectos.
+1) parseDec universal (ES/US)
+// utils/num.ts
+export const parseDec = (v: unknown): number => {
+  if (v == null) return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+
+  // Limpio símbolos y espacios, dejo dígitos, coma, punto, paréntesis y signo
+  let s = String(v).trim()
+    .replace(/\s+/g, "")
+    .replace(/[$€£%]/g, "");
+
+  // Paréntesis = negativo
+  const neg = /^\(.*\)$/.test(s);
+  s = s.replace(/[()]/g, "");
+
+  // Detecto separador decimal por el ÚLTIMO (.,) del string
+  const lastDot   = s.lastIndexOf(".");
+  const lastComma = s.lastIndexOf(",");
+  const hasDot    = lastDot   !== -1;
+  const hasComma  = lastComma !== -1;
+
+  if (hasDot && hasComma) {
+    // El que aparece más a la derecha es el decimal; el otro es miles
+    const decimalSep = lastDot > lastComma ? "." : ",";
+    const thousandSep = decimalSep === "." ? "," : ".";
+    s = s.split(thousandSep).join("");     // saco miles
+    if (decimalSep === ",") s = s.replace(",", "."); // normalizo decimal
+  } else if (hasComma || hasDot) {
+    const sep = hasComma ? "," : ".";
+    // Si el separador aparece más de una vez → casi seguro miles
+    const count = (s.match(new RegExp("\\"+sep, "g")) || []).length;
+    if (count > 1) {
+      s = s.split(sep).join("");
+    } else {
+      // única ocurrencia: si hay 1–2 dígitos detrás ⇒ decimal
+      const tail = s.split(sep)[1] ?? "";
+      if (tail.length <= 2) {
+        if (sep === ",") s = s.replace(",", ".");
+      } else {
+        s = s.split(sep).join("");
+      }
+    }
+  }
+  const n = Number(s);
+  return (neg ? -n : n) || 0;
+};
+2) Participación sin perder filas (agregación correcta)
+type Row = {
+  person: string;
+  projectId: string;
+  year: number | string;
+  month: number | string; // "jul" o 7
+  horasReal: unknown;         // L
+  horasObjetivo: unknown;     // K
+  horasFacturacion: unknown;  // M
+  valorHoraARS: unknown;      // N
+  montoUSD?: unknown;         // R (opcional)
+};
+
+// yyyy-mm
+const normMonth = (m: string|number) => {
+  const map: any = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
+  if (typeof m === "number") return m;
+  const k = m.toString().slice(0,3).toLowerCase();
+  return map[k] ?? Number(m) ?? 0;
+};
+
+export function computeParticipacion(rows: Row[]) {
+  // 1) agrego pesos por persona dentro de cada proyecto-mes
+  const group = new Map<string, Map<string, number>>(); // key -> person -> peso
+  const totals = new Map<string, number>();             // key -> total peso
+
+  for (const r of rows) {
+    const key = `${r.projectId}|${r.year}-${String(normMonth(r.month)).padStart(2,"0")}`;
+    const M  = Math.max(0, parseDec(r.horasFacturacion));
+    const VH = Math.max(0, parseDec(r.valorHoraARS));
+    const USD= Math.max(0, parseDec(r.montoUSD));
+    const peso = USD > 0 ? USD : (M * VH);
+
+    if (!group.has(key)) group.set(key, new Map());
+    const byPerson = group.get(key)!;
+    byPerson.set(r.person, (byPerson.get(r.person) ?? 0) + peso);
+
+    totals.set(key, (totals.get(key) ?? 0) + peso);
+  }
+
+  // 2) convierto a shares (0–1) por key/person
+  const share = new Map<string, number>(); // `${key}|${person}` -> share
+  for (const [key, byPerson] of group) {
+    const total = Math.max(0, totals.get(key) ?? 0);
+    for (const [person, pesoPers] of byPerson) {
+      const s = total > 0 ? (pesoPers / total) : 0;
+      share.set(`${key}|${person}`, s);
+    }
+  }
+  return { share, totals };
+}
+3) Cálculos universales de rankings
+export function computeRankings(rows: Row[]) {
+  // Filtrado temporal ya aplicado (ver punto 4)
+  const { share } = computeParticipacion(rows);
+
+  // Eficiencia, Impacto, Unificado por persona (suma de filas)
+  const agg = new Map<string, {K:number; L:number; M:number; pesoImpacto:number; impacto:number;}>();
+
+  for (const r of rows) {
+    const person = r.person;
+    const K = parseDec(r.horasObjetivo);
+    const L = parseDec(r.horasReal);
+    const key = `${r.projectId}|${r.year}-${String(normMonth(r.month)).padStart(2,"0")}|${person}`;
+
+    const effNorm = K === 0 ? 1 : Math.min(1, Math.max(0, L/K));
+    const s = share.get(key.replace(`|${person}`,"") + `|${person}`) ?? 0;
+    const impactoFila = effNorm * s * 30;
+
+    if (!agg.has(person)) agg.set(person, {K:0, L:0, M:0, pesoImpacto:0, impacto:0});
+    const a = agg.get(person)!;
+    a.K += K; a.L += L; a.impacto += impactoFila;
+  }
+
+  // Genero scores
+  return [...agg.entries()].map(([person, a]) => {
+    const effScore = a.K === 0 ? 70 : Math.min(1, a.L / a.K) * 100;
+    const impacto  = a.impacto;                     // 0–30 ya sumado
+    const unif     = 0.5 * effScore + 0.5 * (impacto/30*100);
+    return { person, eficiencia: effScore, impacto, unificado: unif };
+  }).sort((x,y) =>
+    y.unificado - x.unificado || y.impacto - x.impacto || y.eficiencia - x.eficiencia
+  );
+}
+4) Filtro temporal único
+type Period = { start: string; end: string }; // 'yyyy-mm' inclusive
+
+export function filterByPeriod(rows: Row[], p: Period) {
+  const toKey = (r: Row) => `${r.year}-${String(normMonth(r.month)).padStart(2,"0")}`;
+  return rows.filter(r => {
+    const k = toKey(r);
+    return k >= p.start && k <= p.end;
+  });
+}
+5) Config externa (multi-proyecto)
+.env:
+DEFAULT_SHEET_ID=...
+GOOGLE_CREDENTIALS_JSON=...
+config/projects.json:
+{
+  "kimberly_huggies": {
+    "spreadsheetId": "1AbC...",
+    "sheetName": "data",
+    "columnMap": { "horasReal": "L", "horasObjetivo": "K", ... }
+  },
+  "otro_cliente": {
+    "spreadsheetId": "9ZyX...",
+    "sheetName": "metrics",
+    "columnMap": { ... }
+  }
+}
+Cargar por projectKey en request; nada hardcodeado en routes.ts.
+Tests (mínimos)
+parseDec
+$1,234.56 → 1234.56
+1.234,56 → 1234.56
+1 234,56 → 1234.56
+(1.234,56) → -1234.56
+10,000 → 10000 y 10.000 → 10000
+Participación
+Dos filas misma persona mismo proyecto-mes se suman.
+Σ share por proyecto-mes ≈ 1 (tolerancia 1e-6).
+Rankings (fixtures)
+Junio/Julio/Agosto (los que validamos):
+Sol 67.13 / Vanu 61.95 / Vicky 54.87 / Aylu 52.29, etc.
+To Merello 45.8 unificado; Vicky agosto 83.8% eficiencia.
+Checklist de despliegue
+Feature flag UNIVERSAL_RANKINGS=true.
+Comparación 1:1 con tablas existentes (regresión cero).
+Logs: warn si Σ share se desvía > 1e-3.
+Tooltip con decimales en Impacto/Eficiencia; tarjetas redondeadas.
+Si te sirve, lo armamos así: yo te paso un PR con utils/num.ts, ranking.ts, period.ts, la carga de config/projects.json y los tests. Con eso queda plug-and-play para cualquier proyecto.
