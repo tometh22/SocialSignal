@@ -72,11 +72,19 @@ export async function getUniversalRankings(request: UniversalRankingsRequest): P
   
   console.log(`📅 Resolved period for ${timeFilter}:`, period);
 
-  // 3. Obtener datos del Excel MAESTRO
+  // 3. Obtener datos raw 2D del Excel MAESTRO (para usar con índices numéricos)
   const googleSheetsModule = await import('./googleSheetsWorking.js');
   
-  // Usar configuración dinámica del proyecto
-  const rawData = await googleSheetsModule.googleSheetsWorkingService.getAllData(cfg.spreadsheetId, cfg.sheetName);
+  // Usar función que devuelve raw 2D arrays compatible con columnMap numérico
+  const rawData = await googleSheetsModule.googleSheetsWorkingService.getSheetValues(cfg.spreadsheetId, cfg.sheetName);
+  
+  // 🔧 DIAGNOSTICOS TEMPORALES
+  console.log(`📊 Raw data type: ${typeof rawData}, length: ${rawData?.length || 0}`);
+  if (rawData && rawData.length > 0) {
+    const firstRow = rawData[0];
+    console.log(`📋 First row type: ${typeof firstRow}, isArray: ${Array.isArray(firstRow)}, length: ${firstRow?.length || 'N/A'}`);
+    console.log(`🔍 Sample data: persona[${columnMap.persona}]="${firstRow?.[columnMap.persona]}", month[${columnMap.month}]="${firstRow?.[columnMap.month]}", year[${columnMap.year}]="${firstRow?.[columnMap.year]}"`);
+  }
   
   if (!rawData || rawData.length === 0) {
     console.log('⚠️ No data found in Excel MAESTRO');

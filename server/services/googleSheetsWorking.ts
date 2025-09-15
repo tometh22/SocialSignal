@@ -165,6 +165,39 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Obtener datos raw 2D de cualquier hoja (para uso con índices numéricos)
+   */
+  async getSheetValues(spreadsheetId: string, sheetName: string): Promise<any[][]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = `'${sheetName}'!A:Z`;
+      
+      console.log(`🔄 Obteniendo datos raw 2D de ${sheetName}...`);
+      console.log(`📊 Spreadsheet ID: ${spreadsheetId}`);
+      console.log(`📋 Range: ${range}`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: spreadsheetId,
+        range: range,
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ No se encontraron datos raw en la hoja');
+        return [];
+      }
+
+      console.log(`📊 Procesados ${rows.length} filas raw 2D`);
+      return rows as any[][];
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo datos raw 2D:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Obtener datos de costos directos e indirectos del Excel MAESTRO
    */
   async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
