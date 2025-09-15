@@ -224,7 +224,7 @@ class GoogleSheetsWorkingService {
 
       try {
         const tipoCosto = this.getCellValue(row, columnMap.tipoCosto).toLowerCase();
-        const montoTotal = parseFloat(this.getCellValue(row, columnMap.costoTotal)) || 0;
+        const montoTotal = parseDec(this.getCellValue(row, columnMap.costoTotal)) || 0;
         const persona = this.getCellValue(row, columnMap.persona);
         
         // Debug primera fila para entender la estructura
@@ -256,7 +256,7 @@ class GoogleSheetsWorkingService {
         const costoData: CostoDirectoIndirecto = {
           persona: persona,
           mes: this.getCellValue(row, columnMap.mes) || '',
-          año: parseInt(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
+          año: parseDec(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
           costoDirecto: tipoCosto.includes('directo') && !tipoCosto.includes('indirecto') ? costoEfectivo : 0,
           costoIndirecto: tipoCosto.includes('indirecto') ? costoEfectivo : 0,
           costoTotal: costoEfectivo,
@@ -362,7 +362,7 @@ class GoogleSheetsWorkingService {
       cleaned = cleaned.replace(/[,\.]/g, ''); // Remover separadores
     }
     
-    let parsed = parseFloat(cleaned);
+    let parsed = parseDec(cleaned);
     
     // 🚨 VALIDACIÓN HEURÍSTICA PARA COSTOS ANORMALMENTE ALTOS
     // DESHABILITADA: Esta lógica estaba causando problemas con ventas en pesos argentinos
@@ -491,16 +491,16 @@ class GoogleSheetsWorkingService {
 
         const proyectoData: ProyectoConfirmado = {
           mesFacturacion: this.getCellValue(row, columnMap.mesFacturacion) || '',
-          añoFacturacion: parseInt(this.getCellValue(row, columnMap.añoFacturacion)) || new Date().getFullYear(),
+          añoFacturacion: parseDec(this.getCellValue(row, columnMap.añoFacturacion)) || new Date().getFullYear(),
           mesCobre: this.getCellValue(row, columnMap.mesCobre) || '',
-          añoCobre: parseInt(this.getCellValue(row, columnMap.añoCobre)) || new Date().getFullYear(),
+          añoCobre: parseDec(this.getCellValue(row, columnMap.añoCobre)) || new Date().getFullYear(),
           cliente: cliente,
           detalle: this.getCellValue(row, columnMap.detalle) || '',
           proyecto: proyecto,
           confirmado: esConfirmado,
-          propuestasEnviadas: parseInt(this.getCellValue(row, columnMap.propuestasEnviadas)) || 0,
+          propuestasEnviadas: parseDec(this.getCellValue(row, columnMap.propuestasEnviadas)) || 0,
           condicionPago: this.getCellValue(row, columnMap.condicionPago) || '',
-          ajuste: parseFloat(this.getCellValue(row, columnMap.ajuste)) || 0,
+          ajuste: parseDec(this.getCellValue(row, columnMap.ajuste)) || 0,
           valorBase: this.parseMoneyValue(this.getCellValue(row, columnMap.valorBase)),
           monedaARS: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaARS)),
           monedaUSD: this.parseMoneyValue(this.getCellValue(row, columnMap.monedaUSD)),
@@ -943,7 +943,7 @@ class GoogleSheetsWorkingService {
       }
       
       // Convertir el tipo de cambio a número
-      const tipoCambio = parseFloat(tipoCambioStr.replace(/[.,]/g, (match, offset, string) => {
+      const tipoCambio = parseDec(tipoCambioStr.replace(/[.,]/g, (match, offset, string) => {
         // Reemplazar la última coma/punto por punto decimal
         const lastDotIndex = string.lastIndexOf('.');
         const lastCommaIndex = string.lastIndexOf(',');
@@ -1047,7 +1047,7 @@ class GoogleSheetsWorkingService {
           cliente: cliente,
           proyecto: proyecto,
           mes: mes,
-          año: parseInt(año) || new Date().getFullYear(),
+          año: parseDec(año) || new Date().getFullYear(),
           monto_usd: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_usd)),
           monto_ars: this.parseMoneyValue(this.getCellValue(row, columnMap.monto_ars)),
           tipo_venta: this.getCellValue(row, columnMap.tipo_venta) || 'fee',
@@ -1306,7 +1306,7 @@ class GoogleSheetsWorkingService {
         const costoData: CostoDirectoExcel = {
           persona: persona,
           mes: this.getCellValue(row, columnMap.mes) || '',
-          año: parseInt(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
+          año: parseDec(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
           tipoGasto: tipoGasto,
           especificacion: this.getCellValue(row, columnMap.especificacion) || '',
           proyecto: proyecto,
