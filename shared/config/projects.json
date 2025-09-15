@@ -15,5 +15,61 @@
     "aliases": {
       "huggies_period": { "start": "2024-01", "end": "2025-12" }
     }
+  },
+  "uber_taxis": {
+    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
+    "sheetName": "Ventas Tomi",
+    "columnMap": {
+      "horasReal": "L",
+      "horasObjetivo": "K", 
+      "horasFacturacion": "M",
+      "valorHoraARS": "N",
+      "montoUSD": "R",
+      "persona": "E",
+      "year": "A",
+      "month": "B"
+    }
+  },
+  "warner_marketing": {
+    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
+    "sheetName": "Ventas Tomi",
+    "columnMap": {
+      "horasReal": "L",
+      "horasObjetivo": "K", 
+      "horasFacturacion": "M",
+      "valorHoraARS": "N",
+      "montoUSD": "R",
+      "persona": "E",
+      "year": "A",
+      "month": "B"
+    }
+  },
+  "modo_monthly": {
+    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
+    "sheetName": "Ventas Tomi",
+    "columnMap": {
+      "horasReal": "L",
+      "horasObjetivo": "K", 
+      "horasFacturacion": "M",
+      "valorHoraARS": "N",
+      "montoUSD": "R",
+      "persona": "E",
+      "year": "A",
+      "month": "B"
+    }
+  },
+  "coelsa_monthly": {
+    "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
+    "sheetName": "Ventas Tomi",
+    "columnMap": {
+      "horasReal": "L",
+      "horasObjetivo": "K", 
+      "horasFacturacion": "M",
+      "valorHoraARS": "N",
+      "montoUSD": "R",
+      "persona": "E",
+      "year": "A",
+      "month": "B"
+    }
   }
 }

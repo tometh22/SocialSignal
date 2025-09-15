@@ -1,0 +1,109 @@
+¡Avancemos y completemos la universalización! ✅
+La base ya está; faltan 3 ajustes finales. Te dejo cómo cerrarlos, con snippets y checklist de aceptación.
+1) Mapeo dinámico projectId → projectKey (sin hardcode)
+Crea dos configs y un resolutor único.
+config/projects.json (por key):
+{
+  "kimberly_huggies": {
+    "spreadsheetId": "1AbC...",
+    "sheetName": "data",
+    "columnMap": { "horasReal": "L", "horasObjetivo": "K", "horasFacturacion": "M", "valorHoraARS": "N", "montoUSD": "R", "mes": "C", "anio": "D", "proyectoId": "G", "persona": "A" }
+  }
+}
+config/project-id-map.json (por id numérico):
+{
+  "39": "kimberly_huggies",
+  "40": "otro_cliente"
+}
+Resolver universal:
+// services/project-resolver.ts
+import projectsByKey from "../config/projects.json";
+import idMap from "../config/project-id-map.json";
+
+export type ProjectConfig = typeof projectsByKey[keyof typeof projectsByKey];
+
+export function resolveProject(input: { projectId?: string|number; projectKey?: string }): ProjectConfig {
+  const key = input.projectKey ?? (input.projectId != null ? idMap[String(input.projectId)] : undefined);
+  if (!key) throw new Error(`Unknown project (id=${input.projectId}, key=${input.projectKey})`);
+  const cfg = (projectsByKey as any)[key];
+  if (!cfg) throw new Error(`Missing config for key=${key}`);
+  return cfg;
+}
+2) Delegar el endpoint “viejo” al motor universal (transparente)
+Deja compatibilidad total (mismo response), pero que el cálculo lo haga el nuevo servicio.
+// server/routes.ts
+import { resolveProject } from "../services/project-resolver";
+import { computeRankings } from "../services/universal-rankings";
+import { resolvePeriod } from "../services/period";
+
+app.get("/api/projects/:projectId/performance-rankings", async (req, res, next) => {
+  try {
+    const { projectId } = req.params;
+    const { timeFilter, start, end } = req.query as any;
+
+    const cfg = resolveProject({ projectId });  // ← sin hardcode
+    const period = resolvePeriod({ timeFilter, start, end }); // yyyy-mm ... yyyy-mm
+
+    const rows = await loadRowsFromSheet(cfg);  // usa cfg.spreadsheetId + sheetName
+    const filtered = filterByPeriod(rows, period);
+    const rankings = computeRankings(filtered, cfg.columnMap);
+
+    // compatibilidad: misma forma que el endpoint original
+    res.set("X-Rankings-Engine", "universal");
+    res.json({ rankings });
+  } catch (e) { next(e); }
+});
+Tip: deja un feature flag UNIVERSAL_RANKINGS=true y, si está en false, cae al motor previo.
+3) Validación de regresión exacta (golden tests)
+Un script que compare contra fixtures (los números que ya validamos).
+tests/fixtures/expected-july-2025.json
+{
+  "Sol Ayala":   { "unificado": 67.13, "eficiencia": 100.00, "impacto": 10.28 },
+  "Vanu Lanza":  { "unificado": 61.95, "eficiencia": 100.00, "impacto": 7.17 },
+  "Vicky Achabal": { "unificado": 54.87, "eficiencia": 100.00, "impacto": 2.92 },
+  "Aylu Tamer":  { "unificado": 52.29, "eficiencia": 90.74,  "impacto": 4.15 }
+}
+Runner (tolerancia 0.3 pts):
+// scripts/verify-rankings.ts
+import { resolveProject } from "../services/project-resolver";
+import { computeRankings } from "../services/universal-rankings";
+import { resolvePeriod, filterByPeriod } from "../services/period";
+import exp from "./fixtures/expected-july-2025.json";
+
+(async () => {
+  const cfg = resolveProject({ projectId: 39 });
+  const period = resolvePeriod({ timeFilter: "july_2025" });
+  const rows = await loadRowsFromSheet(cfg);
+  const results = computeRankings(filterByPeriod(rows, period), cfg.columnMap);
+
+  const tol = 0.3;
+  for (const [persona, expected] of Object.entries(exp as any)) {
+    const r = results.find(x => x.person === persona);
+    if (!r) throw new Error(`Missing ${persona}`);
+    for (const k of ["unificado","eficiencia","impacto"] as const) {
+      if (Math.abs((r as any)[k] - expected[k]) > tol) {
+        throw new Error(`Mismatch ${persona}.${k}: got ${(r as any)[k]} expected ${expected[k]}`);
+      }
+    }
+  }
+  console.log("✅ Regression OK");
+})();
+CLI de verificación:
+# julio validado
+node scripts/verify-rankings.js
+# agosto y junio (añade fixtures análogos)
+node scripts/verify-rankings.js --timeFilter=august_2025
+node scripts/verify-rankings.js --timeFilter=june_2025
+Checks adicionales (evitan sorpresas)
+Suma de shares por proyecto-mes ≈ 1.000000 (log warn si |1−Σ|>1e-3).
+parseDec probado con:
+$1,234.56 → 1234.56, 1.234,56 → 1234.56, 1 234,56 → 1234.56, (1.234,56) → -1234.56, 10,000 → 10000, 10.000 → 10000.
+Filtro temporal único: resolvePeriod acepta presets (july_2025, last_3_months) y rango (start=2025-06&end=2025-08).
+Orden estable en ranking: Unificado desc → Impacto desc → Eficiencia desc.
+Aceptación (debe cumplirse para “DONE”)
+ Endpoint viejo responde con X-Rankings-Engine: universal.
+ curl a junio/julio/agosto 2025 coincide con fixtures (±0.3).
+ No hay hardcodes de projectKey; todo sale de project-id-map.json.
+ Una sola implementación de filtro temporal y de participación.
+ Banner “sin ingresos” usa el mismo agregado económico que el cálculo.
+ Tests de parseDec, shares y regression pasan en CI.

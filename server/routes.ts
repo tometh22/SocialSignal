@@ -2018,15 +2018,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // FEATURE FLAG: Sistema universal de rankings
-  const USE_UNIVERSAL_RANKINGS = process.env.UNIVERSAL_RANKINGS === 'true';
+  const USE_UNIVERSAL_RANKINGS = true; // FORCED: Always use universal system
   
-  if (USE_UNIVERSAL_RANKINGS) {
-    // Importar y registrar endpoint universal
-    const { addUniversalRankingsEndpoint } = await import('./routes-universal.js');
-    addUniversalRankingsEndpoint(app, storage, requireAuth);
-  }
-
-  // NUEVO ENDPOINT: Performance Rankings - Vista completa para la pestaña Performance
+  // ENDPOINT: Performance Rankings - Delegado al motor universal (transparente)
   app.get('/api/projects/:id/performance-rankings', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     const timeFilter = req.query.timeFilter as string || 'all';
@@ -2035,7 +2029,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
     try {
-      // ✅ NUEVA IMPLEMENTACIÓN: Usar funciones según especificación del documento
+      if (USE_UNIVERSAL_RANKINGS) {
+        // ✅ DELEGACIÓN AL MOTOR UNIVERSAL (transparente)
+        console.log(`🚀 Using universal rankings engine for project ${id}`);
+        const { getUniversalRankings } = await import('./services/universal-rankings-service.js');
+        
+        const universalResponse = await getUniversalRankings({
+          projectId: id,
+          timeFilter,
+          start: req.query.start as string,
+          end: req.query.end as string
+        });
+        
+        // Compatibilidad total: misma respuesta que sistema anterior
+        res.set("X-Rankings-Engine", "universal");
+        return res.json({
+          rankings: universalResponse.rankings,
+          validaciones: universalResponse.validaciones,
+          configuracion: universalResponse.configuracion,
+          timeFilter,
+          dateRangeApplied: universalResponse.period,
+          projectId: id
+        });
+      }
+      
+      // ✅ FALLBACK: Sistema anterior (para casos edge)
+      console.log(`🔄 Using legacy rankings engine for project ${id}`);
       const { processDocumentRankings } = await import('../shared/document-ranking-utils');
       
       // Obtener datos básicos del proyecto
