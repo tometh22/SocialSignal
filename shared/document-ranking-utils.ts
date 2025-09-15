@@ -30,6 +30,7 @@ export interface DocumentRankingResult {
   };
   impacto: {
     score: number;
+    scoreDecimal?: number; // Para tooltips con 2 decimales
     display: string;
     clasificacion: {
       label: string;
@@ -189,12 +190,13 @@ export function processDocumentRankings(
       },
       impacto: {
         score: Math.round(impacto),
+        scoreDecimal: impacto, // Para tooltips con 2 decimales
         display: `${Math.round(impacto)} pts impacto`,
         clasificacion: getDocumentClassification(impacto, 'impacto')
       },
       unificado: {
-        score: Math.round(unificado),
-        display: `${Math.round(unificado)} pts total`,
+        score: Math.round(unificado * 10) / 10, // Con 1 decimal
+        display: `${(Math.round(unificado * 10) / 10).toFixed(1)} pts total`,
         clasificacion: getDocumentClassification(unificado, 'unificado')
       },
       horas: {
@@ -207,6 +209,19 @@ export function processDocumentRankings(
     };
   });
   
-  // Ordenar por unificado descendente
-  return results.sort((a, b) => b.unificado.score - a.unificado.score);
+  // Ordenar por Unificado → Impacto → Eficiencia (para resolver empates)
+  return results.sort((a, b) => {
+    // 1. Comparar por unificado
+    if (Math.abs(b.unificado.score - a.unificado.score) > 0.05) {
+      return b.unificado.score - a.unificado.score;
+    }
+    // 2. Si empate en unificado, comparar por impacto (usar decimal para más precisión)
+    const impactoA = a.impacto.scoreDecimal || a.impacto.score;
+    const impactoB = b.impacto.scoreDecimal || b.impacto.score;
+    if (Math.abs(impactoB - impactoA) > 0.01) {
+      return impactoB - impactoA;
+    }
+    // 3. Si empate en impacto, comparar por eficiencia
+    return b.eficiencia.score - a.eficiencia.score;
+  });
 }

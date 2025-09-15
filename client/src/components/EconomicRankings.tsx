@@ -118,7 +118,7 @@ export function EconomicRankings({
   // Preparar los tres rankings diferentes usando los datos del nuevo API
   const efficiencyRanking = [...teamMembers].sort((a, b) => b.eficiencia.score - a.eficiencia.score);
   const impactRanking = [...teamMembers].sort((a, b) => b.impacto.score - a.impacto.score);
-  const unifiedRanking = [...teamMembers].sort((a, b) => b.unificado.score - a.unificado.score);
+  const unifiedRanking = [...teamMembers]; // Backend ya maneja el ordenamiento correctamente
   
   // Función para obtener la configuración actual
   const getCurrentConfig = () => {
@@ -233,9 +233,22 @@ export function EconomicRankings({
               </div>
 
               <div className="text-right">
-                <div className="font-bold text-lg text-gray-900">
-                  {metric.score}
-                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="font-bold text-lg text-gray-900 cursor-help">
+                        {metricType === 'impacto' && metric.scoreDecimal ? 
+                          `${metric.score} pts` : 
+                          metric.score}
+                      </div>
+                    </TooltipTrigger>
+                    {metricType === 'impacto' && metric.scoreDecimal && (
+                      <TooltipContent>
+                        <p>{metric.scoreDecimal.toFixed(2)} pts de impacto económico</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
                 <Badge variant="outline" className={getPerformanceBadgeColor(metric.clasificacion)}>
                   {metric.clasificacion.label}
                 </Badge>
