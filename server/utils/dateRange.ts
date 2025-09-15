@@ -146,6 +146,14 @@ export function getDateRangeForFilter(timeFilter: string): { startDate: Date; en
     };
   }
   
+  // Este mes (mes actual)
+  if (timeFilter === 'este_mes' || timeFilter === 'this_month') {
+    return {
+      startDate: new Date(2025, 8, 1), // Septiembre 2025 (mes 8 en 0-based)
+      endDate: new Date(2025, 8, 30, 23, 59, 59) // 30 de septiembre
+    };
+  }
+  
   return null;
 }
 
