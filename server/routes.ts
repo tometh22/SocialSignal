@@ -2035,8 +2035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { getUniversalRankings } = await import('./services/universal-rankings-service.js');
         
         const universalResponse = await getUniversalRankings({
-          projectId: id,
-          timeFilter,
+          projectId: id.toString(),
+          timeFilter: timeFilter || 'all',
           start: req.query.start as string,
           end: req.query.end as string
         });

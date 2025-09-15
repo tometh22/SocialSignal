@@ -38,18 +38,22 @@ export interface UniversalRankingsResponse {
 }
 
 export async function getUniversalRankings(request: UniversalRankingsRequest): Promise<UniversalRankingsResponse> {
+  // Validación defensiva contra llamadas incorrectas
+  if (!request || typeof request !== 'object') {
+    throw new Error(`Invalid request for getUniversalRankings: received ${typeof request}`);
+  }
+  
   const { projectId, timeFilter = 'all', start, end } = request;
   
   console.log(`🌟 UNIVERSAL SERVICE: Computing rankings for project ${projectId}, filter ${timeFilter}`);
   
   // 1. Resolver configuración del proyecto (dinámico, sin hardcode)
   const cfg = resolveProject({ projectId });
-  const projectKey = Object.keys(require('../../shared/config/project-id-map.json')).find(
-    id => (require('../../shared/config/project-id-map.json') as any)[id] === 
-          Object.keys(require('../../shared/config/projects.json')).find(
-            key => require('../../shared/config/projects.json')[key as keyof typeof import('../../shared/config/projects.json')] === cfg
-          )
-  ) || 'unknown';
+  
+  // Obtener projectKey desde el resolvido de id
+  const idMapModule = await import('../../shared/config/project-id-map.json', { assert: { type: 'json' } });
+  const idMap = idMapModule.default;
+  const projectKey = (idMap as any)[String(projectId)] || 'kimberly_huggies';
   
   // 2. Resolver período temporal usando sistema universal
   let period: { start: string; end: string };
@@ -69,10 +73,10 @@ export async function getUniversalRankings(request: UniversalRankingsRequest): P
   console.log(`📅 Resolved period for ${timeFilter}:`, period);
 
   // 3. Obtener datos del Excel MAESTRO
-  const { googleSheetsWorkingService } = await import('./googleSheetsWorking.js');
+  const googleSheetsModule = await import('./googleSheetsWorking.js');
   
   // Usar configuración dinámica del proyecto
-  const rawData = await googleSheetsWorkingService.getAllData(cfg.spreadsheetId, cfg.sheetName);
+  const rawData = await googleSheetsModule.googleSheetsWorkingService.getAllData(cfg.spreadsheetId, cfg.sheetName);
   
   if (!rawData || rawData.length === 0) {
     console.log('⚠️ No data found in Excel MAESTRO');

@@ -7,6 +7,44 @@ import { getProjectConfig } from './project-config.js';
 import { normMonth } from './num.js';
 import type { UniversalRow } from './rankings-universal.js';
 
+/**
+ * Helper function to access cells robustly from different row formats
+ */
+function getCell(row: ExcelRow, key: string | number): unknown {
+  // Handle numeric index directly
+  if (typeof key === 'number') {
+    if (Array.isArray(row)) return row[key];
+    if (row.values && Array.isArray(row.values)) return row.values[key];
+    return undefined;
+  }
+  
+  // Handle string key (column letter or header name)
+  if (typeof key === 'string') {
+    // Try direct object property access first
+    if (row[key] !== undefined) return row[key];
+    
+    // Convert column letter to index (A=0, B=1, etc.)
+    if (key.length === 1 && key >= 'A' && key <= 'Z') {
+      const index = key.charCodeAt(0) - 65; // A=0
+      if (Array.isArray(row)) return row[index];
+      if (row.values && Array.isArray(row.values)) return row.values[index];
+    }
+  }
+  
+  return undefined;
+}
+
+/**
+ * Checks if a person value looks like a header row
+ */
+function isHeaderRow(person: unknown): boolean {
+  if (typeof person !== 'string') return false;
+  const normalized = person.toLowerCase().trim();
+  return normalized === 'cliente' || normalized === 'proyecto' || 
+         normalized === 'persona' || normalized === 'detalle' ||
+         normalized === '' || normalized === '#n/a';
+}
+
 export interface ExcelRow {
   [column: string]: unknown;
 }
@@ -22,20 +60,33 @@ export function adaptExcelToUniversal(
   const config = getProjectConfig(projectKey);
   const { columnMap } = config;
   
-  return excelRows.map(row => ({
-    person: String(row[columnMap.persona] || '').trim(),
-    projectId,
-    year: row[columnMap.year] || new Date().getFullYear(),
-    month: row[columnMap.month] || new Date().getMonth() + 1,
-    horasReal: row[columnMap.horasReal],
-    horasObjetivo: row[columnMap.horasObjetivo],
-    horasFacturacion: row[columnMap.horasFacturacion],
-    valorHoraARS: row[columnMap.valorHoraARS],
-    montoUSD: columnMap.montoUSD ? row[columnMap.montoUSD] : undefined
-  })).filter(row => 
-    // Filtrar filas válidas (persona no vacía)
-    row.person && row.person !== '' && row.person !== '#N/A'
-  );
+  return excelRows.map(row => {
+    const persona = getCell(row, columnMap.persona);
+    const personStr = String(persona || '').trim();
+    
+    // Skip header rows
+    if (isHeaderRow(persona)) {
+      return null;
+    }
+    
+    const yearRaw = getCell(row, columnMap.year);
+    const monthRaw = getCell(row, columnMap.month);
+    
+    return {
+      person: personStr,
+      projectId,
+      year: yearRaw ? parseInt(String(yearRaw)) || new Date().getFullYear() : new Date().getFullYear(),
+      month: monthRaw ? normMonth(monthRaw) : new Date().getMonth() + 1,
+      horasReal: getCell(row, columnMap.horasReal),
+      horasObjetivo: getCell(row, columnMap.horasObjetivo), 
+      horasFacturacion: getCell(row, columnMap.horasFacturacion),
+      valorHoraARS: getCell(row, columnMap.valorHoraARS),
+      montoUSD: columnMap.montoUSD ? getCell(row, columnMap.montoUSD) : undefined
+    };
+  }).filter(row => 
+    // Filtrar filas válidas (persona no vacía y no null)
+    row && row.person && row.person !== '' && row.person !== '#N/A'
+  ) as UniversalRow[];
 }
 
 /**

@@ -3,14 +3,14 @@
     "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
     "sheetName": "Ventas Tomi",
     "columnMap": {
-      "horasReal": "L",
-      "horasObjetivo": "K", 
-      "horasFacturacion": "M",
-      "valorHoraARS": "N",
-      "montoUSD": "R",
-      "persona": "E",
-      "year": "A",
-      "month": "B"
+      "horasReal": 11,
+      "horasObjetivo": 10, 
+      "horasFacturacion": 12,
+      "valorHoraARS": 13,
+      "montoUSD": 15,
+      "persona": 0,
+      "year": 3,
+      "month": 2
     },
     "aliases": {
       "huggies_period": { "start": "2024-01", "end": "2025-12" }
@@ -20,56 +20,56 @@
     "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
     "sheetName": "Ventas Tomi",
     "columnMap": {
-      "horasReal": "L",
-      "horasObjetivo": "K", 
-      "horasFacturacion": "M",
-      "valorHoraARS": "N",
-      "montoUSD": "R",
-      "persona": "E",
-      "year": "A",
-      "month": "B"
+      "horasReal": 11,
+      "horasObjetivo": 10, 
+      "horasFacturacion": 12,
+      "valorHoraARS": 13,
+      "montoUSD": 15,
+      "persona": 0,
+      "year": 3,
+      "month": 2
     }
   },
   "warner_marketing": {
     "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
     "sheetName": "Ventas Tomi",
     "columnMap": {
-      "horasReal": "L",
-      "horasObjetivo": "K", 
-      "horasFacturacion": "M",
-      "valorHoraARS": "N",
-      "montoUSD": "R",
-      "persona": "E",
-      "year": "A",
-      "month": "B"
+      "horasReal": 11,
+      "horasObjetivo": 10, 
+      "horasFacturacion": 12,
+      "valorHoraARS": 13,
+      "montoUSD": 15,
+      "persona": 0,
+      "year": 3,
+      "month": 2
     }
   },
   "modo_monthly": {
     "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
     "sheetName": "Ventas Tomi",
     "columnMap": {
-      "horasReal": "L",
-      "horasObjetivo": "K", 
-      "horasFacturacion": "M",
-      "valorHoraARS": "N",
-      "montoUSD": "R",
-      "persona": "E",
-      "year": "A",
-      "month": "B"
+      "horasReal": 11,
+      "horasObjetivo": 10, 
+      "horasFacturacion": 12,
+      "valorHoraARS": 13,
+      "montoUSD": 15,
+      "persona": 0,
+      "year": 3,
+      "month": 2
     }
   },
   "coelsa_monthly": {
     "spreadsheetId": "1HIhMQsRN9Yg3-VJw6fJxv5NULWO6nKRIJCcW2TwmbdU",
     "sheetName": "Ventas Tomi",
     "columnMap": {
-      "horasReal": "L",
-      "horasObjetivo": "K", 
-      "horasFacturacion": "M",
-      "valorHoraARS": "N",
-      "montoUSD": "R",
-      "persona": "E",
-      "year": "A",
-      "month": "B"
+      "horasReal": 11,
+      "horasObjetivo": 10, 
+      "horasFacturacion": 12,
+      "valorHoraARS": 13,
+      "montoUSD": 15,
+      "persona": 0,
+      "year": 3,
+      "month": 2
     }
   }
 }

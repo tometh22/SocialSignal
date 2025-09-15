@@ -10,14 +10,14 @@ export interface ProjectConfig {
   spreadsheetId: string;
   sheetName: string;
   columnMap: {
-    horasReal: string;
-    horasObjetivo: string;
-    horasFacturacion: string;
-    valorHoraARS: string;
-    montoUSD?: string;
-    persona: string;
-    year: string;
-    month: string;
+    horasReal: string | number;
+    horasObjetivo: string | number;
+    horasFacturacion: string | number;
+    valorHoraARS: string | number;
+    montoUSD?: string | number;
+    persona: string | number;
+    year: string | number;
+    month: string | number;
   };
   aliases?: Record<string, { start: string; end: string }>;
 }
@@ -32,7 +32,8 @@ let cachedConfigs: ProjectConfigs | null = null;
  * Carga configuración de proyectos desde JSON
  */
 export function loadProjectConfigs(): ProjectConfigs {
-  if (cachedConfigs) return cachedConfigs;
+  // Disable caching in development to pick up config changes
+  if (cachedConfigs && process.env.NODE_ENV !== 'development') return cachedConfigs;
   
   try {
     const configPath = path.join(process.cwd(), 'shared', 'config', 'projects.json');
