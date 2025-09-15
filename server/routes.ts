@@ -2037,9 +2037,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ✅ CORRECCIÓN CRÍTICA: Usar costByPerson en vez de teamBreakdown (que no existe)
       const costByPerson = costSummary.costByPerson || [];
       
-      console.log(`🔍 CRITICAL DEBUG: costSummary keys:`, Object.keys(costSummary || {}));
-      console.log(`🔍 CRITICAL DEBUG: costByPerson length:`, costByPerson.length);
-      console.log(`🔍 CRITICAL DEBUG: costByPerson sample:`, costByPerson.slice(0, 2));
       
       // Obtener ventas y calcular ingresos ajustados (COPIAR LÓGICA DE COMPLETE-DATA)
       const allSales = await storage.getGoogleSheetsSalesByProject(id);
@@ -2069,8 +2066,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adjustedTotalAmount = Math.max(totalRevenue, project.quotation?.totalAmount || 0);
 
       // Preparar datos para rankings si hay miembros con horas O costos
-      console.log(`🔍 DEBUG: costByPerson length:`, costByPerson.length);
-      console.log(`🔍 DEBUG: costByPerson sample:`, costByPerson.slice(0, 2));
       
       // ✅ CORRECCIÓN: Trabajar con array costByPerson en vez de objeto teamBreakdown
       const teamRankingData = costByPerson
@@ -2090,28 +2085,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           actualCost: member.cost || member.actualCost || member.realCost || 0
         }));
       
-      console.log(`🔍 DEBUG: teamRankingData length: ${teamRankingData.length}`);
-      console.log(`🔍 DEBUG: teamRankingData sample:`, teamRankingData.slice(0, 2));
-      console.log(`🔍 DEBUG: adjustedTotalAmount: $${adjustedTotalAmount}`);
 
       // Calcular rankings económicos
       const economicRankings = teamRankingData.length > 0 ? 
         calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
       
-      console.log(`🔍 DEBUG: economicRankings length: ${economicRankings.length}`);
-      console.log(`🔍 DEBUG: economicRankings sample:`, economicRankings.slice(0, 2));
 
       // TRANSFORMAR DATOS: De estructura backend a estructura frontend
-      console.log(`🔍 DEBUG: Starting transformation for ${economicRankings.length} rankings`);
-      const transformedRankings = economicRankings.map((ranking: any, index: number) => {
-        console.log(`🔍 DEBUG: Processing ranking ${index}:`, {name: ranking.name, impactScore: ranking.impactScore, pricePercentage: ranking.pricePercentage});
-        // ✅ CORRECCIÓN: Buscar team member por NOMBRE en array costByPerson
-        const teamMember = costByPerson.find((member: any) => 
-          member.name === ranking.name || member.personnelName === ranking.name
-        ) || {};
-        const actualHours = teamMember.hours || teamMember.actualHours || 0;
-        const targetHours = teamMember.targetHours || teamMember.estimatedHours || 0;
-        const participacion = ranking.pricePercentage * 100;
+      const transformedRankings = economicRankings.map((ranking: any) => {
+        
+        // ✅ CORRECCIÓN CRÍTICA: Usar datos directos del ranking que son correctos
+        const actualHours = ranking.actualHours || 0;
+        const targetHours = ranking.estimatedHours || 0;
+        const participacion = (ranking.pricePercentage || 0) * 100;
 
         // Calcular scores normalizados
         const efficiencyScore = targetHours > 0 ? Math.min(100, Math.max(0, (actualHours / targetHours) * 100)) : 70;
@@ -2133,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         return {
-          persona: ranking.personnelName || teamMember.name,
+          persona: ranking.personnelName,
           eficiencia: {
             score: Math.round(efficiencyScore),
             display: `${Math.round(efficiencyScore)}% eficiencia`,
