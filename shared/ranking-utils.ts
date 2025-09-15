@@ -10,13 +10,15 @@ export function calculatePersonnelMetrics(
   actualHours: number,
   estimatedCost: number,
   actualCost: number,
+  actualRevenue: number,
   totalProjectPrice: number,
-  totalEstimatedCost: number
+  totalEstimatedCost: number,
+  totalActualRevenue: number
 ): Omit<PersonnelMetrics, 'efficiencyScore' | 'impactScore' | 'unifiedScore' | 'efficiencyRank' | 'impactRank' | 'unifiedRank' | 'performanceColor'> {
   // FILTRO: Solo calcular métricas si hay datos mínimos significativos
   // Excluir casos con solo datos objetivo sin realización
   const hasMinimumData = (actualHours > 0 || actualCost > 0) && 
-                         (estimatedHours > 0 || estimatedCost > 0);
+                         (estimatedHours > 0 || estimatedCost > 0 || actualRevenue > 0);
   
   if (!hasMinimumData) {
     console.log(`⚠️ Skipping metrics for ${personnelName} - insufficient data:`, {
@@ -25,7 +27,14 @@ export function calculatePersonnelMetrics(
   }
   
   // Calcular porcentaje del precio del proyecto que gestiona
-  const pricePercentage = totalEstimatedCost > 0 ? (estimatedCost / totalEstimatedCost) : 0;
+  // Usar revenue real (montoTotalUSD) como fallback cuando no hay estimatedCost
+  let pricePercentage = 0;
+  if (totalEstimatedCost > 0) {
+    pricePercentage = estimatedCost / totalEstimatedCost;
+  } else if (totalActualRevenue > 0) {
+    pricePercentage = actualRevenue / totalActualRevenue;
+    console.log(`💰 Using actualRevenue for ${personnelName}: ${actualRevenue}/${totalActualRevenue} = ${pricePercentage.toFixed(3)}`);
+  }
   const assignedPrice = totalProjectPrice * pricePercentage;
   
   // Calcular métricas base (con validaciones mejoradas)
@@ -183,6 +192,7 @@ export function calculateTeamRankings(
     actualHours: number;
     estimatedCost: number;
     actualCost: number;
+    actualRevenue?: number;
   }>,
   totalProjectPrice: number,
   customUnifiedWeights?: { efficiency: number; impact: number }
@@ -190,10 +200,10 @@ export function calculateTeamRankings(
   if (teamData.length === 0) return [];
   
   // FILTRO CRÍTICO: Solo incluir miembros con datos significativos para rankings
-  // Requerir actividad real (horas trabajadas O costo incurrido) para ser incluido en rankings
+  // Requerir actividad real (horas trabajadas O costo incurrido O revenue) para ser incluido en rankings
   const filteredTeamData = teamData.filter(member => {
     const hasRealActivity = member.actualHours > 0 || member.actualCost > 0;
-    const hasEstimatedData = member.estimatedHours > 0 || member.estimatedCost > 0;
+    const hasEstimatedData = member.estimatedHours > 0 || member.estimatedCost > 0 || (member.actualRevenue && member.actualRevenue > 0);
     return hasRealActivity && hasEstimatedData;
   });
   
@@ -220,8 +230,11 @@ export function calculateTeamRankings(
   
   if (filteredTeamData.length === 0) return [];
   
-  // Calcular costo total estimado del equipo (solo miembros con datos)
+  // Calcular totales del equipo (solo miembros con datos)
   const totalEstimatedCost = filteredTeamData.reduce((sum, member) => sum + member.estimatedCost, 0);
+  const totalActualRevenue = filteredTeamData.reduce((sum, member) => sum + (member.actualRevenue || 0), 0);
+  
+  console.log(`💰 Team totals: estimatedCost=${totalEstimatedCost}, actualRevenue=${totalActualRevenue}`);
   
   // Calcular métricas base para cada persona (usando datos filtrados)
   const baseMetrics = filteredTeamData.map(member => 
@@ -232,8 +245,10 @@ export function calculateTeamRankings(
       member.actualHours,
       member.estimatedCost,
       member.actualCost,
+      member.actualRevenue || 0,
       totalProjectPrice,
-      totalEstimatedCost
+      totalEstimatedCost,
+      totalActualRevenue
     )
   );
   

@@ -1794,7 +1794,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             estimatedHours: baseEstimatedHours, // USAR HORAS OBJETIVO DEL EXCEL MAESTRO PRIMERO
             actualHours: member.hours || 0, // Los datos reales están en 'hours', no 'actualHours'
             estimatedCost: baseEstimatedCost, // COSTO BASADO EN HORAS OBJETIVO
-            actualCost: member.cost || 0 // Los datos reales están en 'cost', no 'actualCost'
+            actualCost: member.cost || 0, // Los datos reales están en 'cost', no 'actualCost'
+            actualRevenue: member.realCost || member.cost || 0 // USAR MONTO USD DEL EXCEL MAESTRO
           };
         });
 
@@ -2082,7 +2083,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           actualHours: member.hours || member.actualHours || 0,
           estimatedCost: (member.estimatedHours || member.targetHours || 0) * (member.rate || 0),
           // ✅ CORRECCIÓN: Usar realCost como fallback para personal del Excel MAESTRO
-          actualCost: member.cost || member.actualCost || member.realCost || 0
+          actualCost: member.cost || member.actualCost || member.realCost || 0,
+          // ✅ NUEVO: Agregar revenue real del Excel MAESTRO para cálculo de impacto
+          actualRevenue: member.realCost || member.cost || 0
         }));
       
 
