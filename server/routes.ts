@@ -2034,7 +2034,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Obtener datos de costos integrados con filtro temporal normalizado
       const costSummary = await storage.getProjectCostSummary(id, timeFilter);
-      const teamBreakdown = costSummary.teamBreakdown || {};
+      // ✅ CORRECCIÓN CRÍTICA: Usar costByPerson en vez de teamBreakdown (que no existe)
+      const costByPerson = costSummary.costByPerson || [];
+      
+      console.log(`🔍 CRITICAL DEBUG: costSummary keys:`, Object.keys(costSummary || {}));
+      console.log(`🔍 CRITICAL DEBUG: costByPerson length:`, costByPerson.length);
+      console.log(`🔍 CRITICAL DEBUG: costByPerson sample:`, costByPerson.slice(0, 2));
       
       // Obtener ventas y calcular ingresos ajustados (COPIAR LÓGICA DE COMPLETE-DATA)
       const allSales = await storage.getGoogleSheetsSalesByProject(id);
@@ -2063,26 +2068,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.amountUsd || 0), 0);
       const adjustedTotalAmount = Math.max(totalRevenue, project.quotation?.totalAmount || 0);
 
-      // Preparar datos para rankings si hay miembros con horas
-      const teamRankingData = Object.entries(teamBreakdown)
-        .filter(([_, member]: [string, any]) => member.hours > 0)
-        .map(([key, member]: [string, any]) => ({
-          key,
+      // Preparar datos para rankings si hay miembros con horas O costos
+      console.log(`🔍 DEBUG: costByPerson length:`, costByPerson.length);
+      console.log(`🔍 DEBUG: costByPerson sample:`, costByPerson.slice(0, 2));
+      
+      // ✅ CORRECCIÓN: Trabajar con array costByPerson en vez de objeto teamBreakdown
+      const teamRankingData = costByPerson
+        .filter((member: any) => {
+          const hasHours = (member.hours || member.actualHours || 0) > 0;
+          const hasCost = (member.cost || member.actualCost || member.realCost || 0) > 0;
+          return hasHours || hasCost;
+        })
+        .map((member: any, index: number) => ({
+          key: member.name || `member_${index}`,
           personnelId: member.personnelId,
           personnelName: member.name,
           estimatedHours: member.estimatedHours || member.targetHours || 0,
           actualHours: member.hours || member.actualHours || 0,
           estimatedCost: (member.estimatedHours || member.targetHours || 0) * (member.rate || 0),
-          actualCost: member.cost || member.actualCost || 0
+          // ✅ CORRECCIÓN: Usar realCost como fallback para personal del Excel MAESTRO
+          actualCost: member.cost || member.actualCost || member.realCost || 0
         }));
+      
+      console.log(`🔍 DEBUG: teamRankingData length: ${teamRankingData.length}`);
+      console.log(`🔍 DEBUG: teamRankingData sample:`, teamRankingData.slice(0, 2));
+      console.log(`🔍 DEBUG: adjustedTotalAmount: $${adjustedTotalAmount}`);
 
       // Calcular rankings económicos
       const economicRankings = teamRankingData.length > 0 ? 
         calculateTeamRankings(teamRankingData, adjustedTotalAmount) : [];
+      
+      console.log(`🔍 DEBUG: economicRankings length: ${economicRankings.length}`);
+      console.log(`🔍 DEBUG: economicRankings sample:`, economicRankings.slice(0, 2));
 
       // TRANSFORMAR DATOS: De estructura backend a estructura frontend
+      console.log(`🔍 DEBUG: Starting transformation for ${economicRankings.length} rankings`);
       const transformedRankings = economicRankings.map((ranking: any, index: number) => {
-        const teamMember = teamBreakdown[ranking.key] || {};
+        console.log(`🔍 DEBUG: Processing ranking ${index}:`, {name: ranking.name, impactScore: ranking.impactScore, pricePercentage: ranking.pricePercentage});
+        // ✅ CORRECCIÓN: Buscar team member por NOMBRE en array costByPerson
+        const teamMember = costByPerson.find((member: any) => 
+          member.name === ranking.name || member.personnelName === ranking.name
+        ) || {};
         const actualHours = teamMember.hours || teamMember.actualHours || 0;
         const targetHours = teamMember.targetHours || teamMember.estimatedHours || 0;
         const participacion = ranking.pricePercentage * 100;
