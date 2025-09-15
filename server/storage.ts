@@ -2369,8 +2369,25 @@ export class DatabaseStorage implements IStorage {
         console.log(`🔍 FORCED DEBUG - Excel personnel for project 39:`, excelOnlyPersonnel.map(p => ({ name: p.name, hours: p.hours, realCost: p.realCost })));
       }
 
-      // CORRECCIÓN CRÍTICA: Combinar costByPerson con excelOnlyPersonnel inmediatamente
-      costByPerson.push(...excelOnlyPersonnel);
+      // CORRECCIÓN CRÍTICA: Combinar costByPerson con excelOnlyPersonnel SIN DUPLICADOS
+      for (const excelPerson of excelOnlyPersonnel) {
+        const existingTraditional = costByPerson.find(p => p.name === excelPerson.name);
+        if (existingTraditional) {
+          // FUSIONAR datos: sumar horas y costos del Excel MAESTRO al tradicional
+          console.log(`🔗 Fusionando datos duplicados: ${excelPerson.name} (tradicional + Excel MAESTRO)`);
+          existingTraditional.realCost += excelPerson.realCost;
+          existingTraditional.operationalCost += excelPerson.operationalCost;
+          existingTraditional.hours += excelPerson.hours;
+          if (excelPerson.targetHours > 0) {
+            existingTraditional.targetHours = Math.max(existingTraditional.targetHours || 0, excelPerson.targetHours);
+          }
+          // Marcar que tiene datos de Excel
+          existingTraditional.hasExcelData = true;
+        } else {
+          // Solo agregar si NO existe en el array tradicional
+          costByPerson.push(excelPerson);
+        }
+      }
       
       console.log(`🔍 DEBUG costByPerson for project ${projectId}:`, {
         traditionalPersonnel: costByPerson.length - excelOnlyPersonnel.length,
