@@ -9015,6 +9015,332 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== NEW ENDPOINTS: Motor Universal para Pestañas ==========
+  
+  // ENDPOINT: Project Incomes - Tabla detalle Ventas Tomi
+  app.get('/api/projects/:id/incomes', requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const timeFilter = req.query.timeFilter as string || 'all';
+    
+    console.log(`📊 INCOMES API: GET /projects/${projectId}/incomes?timeFilter=${timeFilter}`);
+    
+    if (isNaN(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    try {
+      // 1. Obtener ventas del proyecto filtradas por período
+      const allSales = await storage.getGoogleSheetsSalesByProject(projectId);
+      
+      // 2. Aplicar filtro temporal usando la misma lógica que complete-data
+      let filteredSales = allSales;
+      let periodInfo = { applied: false, range: null };
+      
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(timeFilter);
+        if (dateRange) {
+          periodInfo = { applied: true, range: dateRange };
+          
+          // Helper para obtener número de mes
+          const getMonthNumber = (monthName: string): number => {
+            const months: { [key: string]: number } = {
+              enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+              julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+            };
+            return months[monthName.toLowerCase()] || 1;
+          };
+          
+          filteredSales = allSales.filter((sale: any) => {
+            const monthNum = getMonthNumber(sale.month);
+            const saleDate = new Date(sale.year, monthNum - 1, 1);
+            return saleDate >= dateRange.startDate && saleDate <= dateRange.endDate;
+          });
+        }
+      }
+
+      // 3. ✅ MOTOR ÚNICO: Usar módulos universales
+      const { resolveFX } = await import('../shared/services/fxResolver.js');
+      
+      // Helper para obtener número de mes (función unificada)
+      const getMonthNumber = (monthName: string): number => {
+        const months: { [key: string]: number } = {
+          enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+          julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+        };
+        return months[monthName.toLowerCase()] || 1;
+      };
+      
+      // Resolver período correcto basado en timeFilter (august_2025 → 2025-08)
+      let fxPeriod = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`; // Default
+      if (timeFilter.includes('august') || timeFilter.includes('agosto')) {
+        const year = timeFilter.includes('2025') ? '2025' : '2024';
+        fxPeriod = `${year}-08`;
+      }
+      
+      const fxRate = await resolveFX(fxPeriod, projectId.toString());
+
+      // 4. Formatear datos para tabla detalle Ventas Tomi normalizada
+      const incomesTableData = filteredSales.map((sale: any) => {
+        const monthNum = getMonthNumber(sale.month);
+        const saleDate = new Date(sale.year, monthNum - 1, 1);
+        
+        // ✅ MOTOR ÚNICO: Lógica de normalización USD/ARS usando FXResolver
+        let ingresoUSD = 0;
+        let ingresoARS = 0;
+        let moneda = 'USD';
+        
+        if (Number(sale.amountUsd) > 0) {
+          ingresoUSD = Number(sale.amountUsd);
+          ingresoARS = ingresoUSD * fxRate.usdToArs;
+          moneda = 'USD';
+        } else if (Number(sale.amountLocal) > 0) {
+          ingresoARS = Number(sale.amountLocal);
+          ingresoUSD = ingresoARS * fxRate.arsToUsd;
+          moneda = 'ARS';
+        }
+
+        return {
+          id: sale.id,
+          clientName: sale.clientName,
+          projectName: sale.projectName,
+          month: sale.month,
+          year: sale.year,
+          monthKey: sale.monthKey,
+          salesType: sale.salesType || sale.revenueType,
+          
+          // Campos normalizados según plan
+          moneda,
+          ingresoUSD,
+          ingresoARS,
+          montoOriginal: Number(sale.amountLocal || sale.amountUsd || 0),
+          
+          // Metadatos
+          status: sale.status,
+          confirmed: sale.confirmed,
+          recognizedMonth: sale.recognizedMonth,
+          currency: sale.currency,
+          fxApplied: sale.fxApplied,
+          
+          // Fechas
+          saleDate: saleDate.toISOString(),
+          importedAt: sale.importedAt,
+          lastUpdated: sale.lastUpdated
+        };
+      });
+
+      // 5. Calcular totales por tipo (Fee / One Shot) y por período
+      const totalsByType = incomesTableData.reduce((acc: any, income: any) => {
+        const type = income.salesType || 'Fee';
+        if (!acc[type]) {
+          acc[type] = { count: 0, totalUSD: 0, totalARS: 0 };
+        }
+        acc[type].count++;
+        acc[type].totalUSD += income.ingresoUSD;
+        acc[type].totalARS += income.ingresoARS;
+        return acc;
+      }, {});
+
+      const totalUSD = incomesTableData.reduce((sum: number, income: any) => sum + income.ingresoUSD, 0);
+      const totalARS = incomesTableData.reduce((sum: number, income: any) => sum + income.ingresoARS, 0);
+
+      console.log(`📊 INCOMES: Returning ${incomesTableData.length} incomes (${totalUSD} USD, ${totalARS} ARS)`);
+
+      res.json({
+        incomes: incomesTableData,
+        totals: {
+          count: incomesTableData.length,
+          totalUSD,
+          totalARS,
+          byType: totalsByType
+        },
+        period: {
+          timeFilter,
+          applied: periodInfo.applied,
+          range: periodInfo.range
+        },
+        metadata: {
+          projectId,
+          engine: "motor_unico",
+          fxSource: fxRate.source,
+          fxRate: fxRate.usdToArs
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error getting project incomes:", error);
+      res.status(500).json({ 
+        message: "Failed to get project incomes",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // ENDPOINT: Project Costs - Tabla detalle Costos directos e indirectos  
+  app.get('/api/projects/:id/costs', requireAuth, async (req, res) => {
+    const projectId = parseInt(req.params.id);
+    const timeFilter = req.query.timeFilter as string || 'all';
+    
+    console.log(`💰 COSTS API: GET /projects/${projectId}/costs?timeFilter=${timeFilter}`);
+    
+    if (isNaN(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    try {
+      // 1. Obtener costos del proyecto filtrados por período
+      const allCosts = await storage.getDirectCostsByProject(projectId);
+      
+      // 2. Aplicar filtro temporal usando la misma lógica que complete-data
+      let filteredCosts = allCosts;
+      let periodInfo = { applied: false, range: null };
+      
+      // Helper para obtener número de mes (función unificada para costs)
+      const getMonthNumberCosts = (monthName: string): number => {
+        const months: { [key: string]: number } = {
+          enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+          julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+        };
+        return months[monthName.toLowerCase()] || 1;
+      };
+      
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(timeFilter);
+        if (dateRange) {
+          periodInfo = { applied: true, range: dateRange };
+          
+          filteredCosts = allCosts.filter((cost: any) => {
+            const year = Number(cost.año);
+            const month = getMonthNumberCosts(cost.mes);
+            
+            if (isNaN(year) || isNaN(month)) return false;
+            
+            const costDate = new Date(year, month - 1, 1);
+            return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+          });
+        }
+      }
+
+      // 3. ✅ MOTOR ÚNICO: Usar módulos universales
+      const { resolveFX: resolveFXCosts } = await import('../shared/services/fxResolver.js');
+      
+      // Resolver período correcto basado en timeFilter (august_2025 → 2025-08)
+      let fxPeriodCosts = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`; // Default
+      if (timeFilter.includes('august') || timeFilter.includes('agosto')) {
+        const year = timeFilter.includes('2025') ? '2025' : '2024';
+        fxPeriodCosts = `${year}-08`;
+      }
+      
+      const fxRateCosts = await resolveFXCosts(fxPeriodCosts, projectId.toString());
+
+      // 4. Formatear datos para tabla detalle Costos directos e indirectos normalizada
+      const costsTableData = filteredCosts.map((cost: any) => {
+        const year = Number(cost.año);
+        const month = getMonthNumberCosts(cost.mes);
+        const costDate = new Date(year, month - 1, 1);
+        
+        // ✅ MOTOR ÚNICO: Lógica de cálculo según plan usando FXResolver
+        const horasReales = Number(cost.horasRealesAsana || cost.horasReal || 0); // L
+        const valorHoraARS = Number(cost.valorHoraPersona || 0); // Valor_Hora_ARS
+        const costoARS = horasReales * valorHoraARS;
+        const costoUSD = costoARS * fxRateCosts.arsToUsd; // ✅ FX unificado
+
+        return {
+          id: cost.id,
+          persona: cost.persona,
+          mes: cost.mes,
+          año: cost.año,
+          monthKey: cost.monthKey,
+          proyecto: cost.proyecto,
+          cliente: cost.cliente,
+          
+          // Horas y objetivos (K, L, M según plan)
+          horasObjetivo: Number(cost.horasObjetivo || 0), // K
+          horasReales: horasReales, // L  
+          horasFacturacion: Number(cost.horasParaFacturacion || horasReales), // M
+          
+          // Costos normalizados según plan
+          valorHoraARS,
+          costoARS, // L * Valor_Hora_ARS
+          costoUSD, // costoARS / FX(periodo)
+          costoOriginal: Number(cost.costoTotal || 0),
+          
+          // Metadatos de la fila
+          tipoGasto: cost.tipoGasto,
+          especificacion: cost.especificacion || '',
+          tipoCambio: Number(cost.tipoCambio || 0),
+          
+          // Fechas
+          costDate: costDate.toISOString(),
+          importedAt: cost.importedAt,
+          lastUpdated: cost.lastUpdated,
+          
+          // IDs de mapeo
+          projectId: cost.projectId,
+          personnelId: cost.personnelId
+        };
+      });
+
+      // 4. Calcular subtotales por persona y totales del período
+      const totalsByPerson = costsTableData.reduce((acc: any, cost: any) => {
+        const persona = cost.persona;
+        if (!acc[persona]) {
+          acc[persona] = {
+            horasObjetivo: 0,
+            horasReales: 0,
+            horasFacturacion: 0,
+            costoARS: 0,
+            costoUSD: 0,
+            entries: 0
+          };
+        }
+        
+        acc[persona].horasObjetivo += cost.horasObjetivo;
+        acc[persona].horasReales += cost.horasReales;
+        acc[persona].horasFacturacion += cost.horasFacturacion;
+        acc[persona].costoARS += cost.costoARS;
+        acc[persona].costoUSD += cost.costoUSD;
+        acc[persona].entries++;
+        
+        return acc;
+      }, {});
+
+      const totalCostoARS = costsTableData.reduce((sum: number, cost: any) => sum + cost.costoARS, 0);
+      const totalCostoUSD = costsTableData.reduce((sum: number, cost: any) => sum + cost.costoUSD, 0);
+      const totalHorasReales = costsTableData.reduce((sum: number, cost: any) => sum + cost.horasReales, 0);
+
+      console.log(`💰 COSTS: Returning ${costsTableData.length} costs (${totalCostoUSD} USD, ${totalCostoARS} ARS, ${totalHorasReales}h)`);
+
+      res.json({
+        costs: costsTableData,
+        totals: {
+          count: costsTableData.length,
+          totalCostoARS,
+          totalCostoUSD,
+          totalHorasReales,
+          byPerson: totalsByPerson
+        },
+        period: {
+          timeFilter,
+          applied: periodInfo.applied,
+          range: periodInfo.range
+        },
+        metadata: {
+          projectId,
+          engine: "motor_unico",
+          fxSource: fxRateCosts.source,
+          fxRate: fxRateCosts.usdToArs
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error getting project costs:", error);
+      res.status(500).json({ 
+        message: "Failed to get project costs",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }

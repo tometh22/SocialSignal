@@ -1,0 +1,79 @@
+Con filtro temporal global por proyecto y pestañas (Dashboard, Performance, Costos, Ingresos), lo que pasé sigue aplicando, pero conviene encapsularlo en un “motor único” y en un Project Data Context para que todas las pestañas y el Dashboard lean la misma realidad (ingresos, costos, FX, horas) sin duplicar cálculos.
+Te dejo el plan final, ajustado a tu UI:
+1) Estado global por proyecto (frontend)
+ProjectDataProvider (por projectId): guarda period global (ej. 2025-08) y expone:
+period + setters (cambia desde el dropdown superior)
+fxMap resuelto para el período (por yyyy-mm)
+economic (ingresos/costos/margen en USD y ARS)
+performance (ΣK, ΣL, eficiencia equipo, velocity)
+teamBreakdown (K/L/M por persona)
+rankings (si querés cachearlos acá)
+Todas las pestañas (Dashboard, Performance, Costos, Ingresos) consumen este contexto.
+Usa SWR/React Query con clave [projectId, period] para compartir cache entre pestañas.
+2) Endpoints (motor universal, mismos cálculos para todas las pestañas)
+Todos reciben ?period=yyyy-mm o ?timeFilter=july_2025 y llaman a las mismas utilidades:
+GET /api/projects/:id/complete-data?timeFilter=...
+→ payload para Dashboard (económico + performance + breakdown)
+GET /api/projects/:id/performance-rankings?timeFilter=...
+→ rankings (ya lo tenés)
+GET /api/projects/:id/incomes?timeFilter=...
+→ grilla “Ventas Tomi” normalizada (USD/ARS, Confirmado)
+GET /api/projects/:id/costs?timeFilter=...
+→ “Costos directos e indirectos” normalizados (K/L/M, costo ARS, costo USD)
+Internamente, todos estos endpoints usan los mismos módulos: resolveProject, resolvePeriod, parseDec, fxResolver, readVentasTomi, readCostos, economicAggregator, performanceCalculator.
+3) De dónde sale cada dato (por pestaña/sección)
+A) Dashboard
+Ingresos generados (USD/ARS): de Ventas Tomi (Confirmado=Sí)
+Si Monto_USD>0: ingreso_usd = Monto_USD; ingreso_ars = Monto_USD * FX(periodo)
+Si Monto_USD=0 y Monto_ARS>0: ingreso_ars = Monto_ARS; ingreso_usd = Monto_ARS / FX(periodo)
+Costos (USD/ARS): de Costos directos e indirectos
+costo_ars_fila = L * Valor_Hora_ARS (o tu columna oficial de costo ARS si ya existe)
+costo_usd_fila = costo_ars_fila / FX(periodo)
+Margen / ROI / Markup:
+margin_usd = Σingresos_usd − Σcostos_usd
+markup_x = Σingresos_usd / Σcostos_usd
+roi_pct = (margin_usd / Σcostos_usd) * 100
+Velocidad equipo (h/sem): ΣL / semanas_del_periodo
+Estado presupuesto (ARS): budget_utilization = Σcostos_ars / presupuesto_ars_periodo * 100
+Performance (%): ΣK=0 ? 70 : MIN(1, ΣL/ΣK)*100
+Team breakdown: por persona (ΣK, ΣL, ΣM, eficiencia persona)
+B) Performance (tu pestaña actual)
+Reutiliza ΣK, ΣL, ΣM y eficiencia por persona ya calculados arriba.
+Si mostrás impacto/ranking, consume /performance-rankings.
+C) Costos
+Tabla detalle: filas de Costos directos e indirectos del período + helpers:
+costo_ars_fila = L * Valor_Hora_ARS (o tu columna oficial)
+costo_usd_fila = costo_ars_fila / FX(periodo)
+subtotales por persona y totales del período.
+D) Ingresos
+Tabla detalle: filas de Ventas Tomi (Confirmado=Sí) normalizadas:
+Moneda = USD|ARS
+ingreso_usd_fila / ingreso_ars_fila (según regla de moneda)
+totales por tipo (Fee / One Shot) y por período.
+4) Filtro temporal global (una sola implementación)
+resolvePeriod normaliza a yyyy-mm (o rango yyyy-mm…yyyy-mm).
+Se aplica antes de agregar en todas las utilidades: Ventas, Costos, Rankings.
+FX(periodo): una sola resolución por período (Cotizaciones!yyyy-mm, si falta → mediana de Costos.Cotización por proyecto-mes → fallback config).
+La misma FX alimenta Dashboard, Costos, Ingresos y Rankings (consistencia).
+5) Arquitectura & rendimiento
+Backend:
+Módulos puros y compartidos:
+parseDec (ES/US), normMonth, resolvePeriod
+readVentasTomi(cfg), readCostos(cfg) (mapeo de columnas por proyecto)
+fxResolver(period) (cache por projectId+period, TTL 10 min)
+economicAggregator(ventas,costos,fxMap)
+performanceCalculator(costos) (ΣK/ΣL/ΣM, eficiencias)
+Cache por (projectId, period) (Redis/mem) para complete-data y rankings.
+Todos los endpoints devuelven X-Engine: universal y el fx usado.
+Frontend:
+ProjectDataProvider con SWR key [projectId, period] y prefetch al cambiar de pestaña.
+Redondeo solo de UI (2 decimales); nunca antes de calcular.
+Si Σ participaciones se muestra, clamp a 100% cuando |1 − Σ| < 1e−6.
+6) Validaciones (QA)
+Cambiás period en el selector superior → todas las pestañas se re-renderizan con los mismos totales (ingresos, costos, ROI, eficiencia).
+Agosto/Julio/Junio de Kimberly reproducen exactamente los valores que validamos.
+Banner “sin ingresos”: se muestra solo si Σingresos_usd === 0 con esa misma FX.
+Presupuesto: la tarjeta usa ARS; la económica (ingresos/costos/margen) usa USD (comparables).
+Los endpoints de Costos e Ingresos muestran los mismos subtotales que usa el Dashboard.
+TL;DR
+Lo anterior aplica tal cual a tu estructura de pestañas con filtro global, con este ajuste: centralizá el período, la FX y los agregados en un motor único y un ProjectDataProvider. Así todas las vistas leen la misma verdad y el sistema queda universal para cualquier proyecto.

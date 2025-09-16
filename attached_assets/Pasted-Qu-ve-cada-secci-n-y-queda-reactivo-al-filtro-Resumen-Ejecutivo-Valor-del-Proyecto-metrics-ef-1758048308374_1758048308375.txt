@@ -1,0 +1,44 @@
+Qué ve cada sección (y queda reactivo al filtro)
+Resumen Ejecutivo
+“Valor del Proyecto” → metrics.efficiency ✅
+“ROI Performance” → usa projectData.markup (margen USD) ✅
+“Estado Presupuesto” → metrics.budgetUtilization ✅
+Rendimiento Financiero
+Ingresos/Costos/Margen → totalAmount / totalCost / markup ✅
+Rendimiento del Equipo
+teamBreakdown[] (solo miembros con actualHours>0) + promedio semanal (ΣL / semanas) ✅
+Recomendaciones
+Usa budgetUtilization, markup y teamBreakdown del período ✅
+IA Analytics
+Rankings desde /performance-rankings?timeFilter={period} ✅
+Performance/Presupuesto/Timeline/Calidad
+Performance = metrics.efficiency; Presupuesto = costos ARS vs presupuesto ARS; etc. ✅
+Contrato del payload (tal cual lo espera el Dashboard)
+{
+  "projectData": {
+    "totalAmount": 8450.0,
+    "totalCost": 243609.0,
+    "markup": -235159.0,               // margen USD (ingresos - costos)
+    "metrics": {
+      "efficiency": 90.1,              // %
+      "budgetUtilization": 90.0        // %
+    },
+    "teamBreakdown": [
+      { "person":"Trini", "targetHours":100, "actualHours":107.5, "billableHours":107.5, "efficiency":100.0 },
+      { "person":"Sol",   "targetHours":100, "actualHours":101.33,"billableHours":101.33,"efficiency":100.0 }
+    ]
+  }
+}
+Arquitectura para cualquier proyecto
+Resolver proyecto (sin hardcode) y periodo (resolveProject, resolvePeriod).
+Lector Ventas Tomi y Costos directos e indirectos con mapping por proyecto.
+parseDec robusto (ES/US) y normalizador de mes (ene..dic→1..12).
+fxResolver único por yyyy-mm.
+economicAggregator (ingresos/costos/margen) y performanceCalculator (K/L/M, eficiencias).
+Cache por (projectId, period) para que Dashboard y pestañas compartan datos.
+Check final (lo importante)
+ Los nombres que la app consume (totalAmount, totalCost, markup, metrics.efficiency, metrics.budgetUtilization, teamBreakdown[]) están cubiertos.
+ Todo se recalcula con timeFilter.
+ Costos siempre base ARS, convertidos a USD con la misma FX que ingresos.
+ La vista de Rankings sigue por endpoint aparte y también es sensible al período.
+Con esto, quedás alineado 1:1 con lo que te devolvió Replit. Si querés, te paso un “adapter” que arma exactamente este JSON a partir de las funciones universales que ya definimos.
