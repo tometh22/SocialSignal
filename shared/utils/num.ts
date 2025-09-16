@@ -58,7 +58,7 @@ export const parseDec = (v: unknown): number => {
 
 /**
  * Normaliza mes desde string/número a número 1-12
- * Ejemplos: "jul" → 7, "ene" → 1, 7 → 7
+ * Ejemplos: "jul" → 7, "ene" → 1, "01 ene" → 1, "08 ago" → 8, 7 → 7
  */
 export const normMonth = (m: string | number): number => {
   const map: Record<string, number> = {
@@ -67,6 +67,16 @@ export const normMonth = (m: string | number): number => {
   };
   
   if (typeof m === "number") return m;
-  const k = m.toString().slice(0, 3).toLowerCase();
-  return map[k] ?? Number(m) ?? 0;
+  
+  const str = m.toString().toLowerCase().trim();
+  
+  // Manejar formato "DD mmm" (ej: "01 ene", "08 ago")
+  if (/^\d{1,2}\s+[a-z]{3}/.test(str)) {
+    const monthPart = str.split(/\s+/)[1];
+    return map[monthPart] ?? 0;
+  }
+  
+  // Formato tradicional "mmm" (ej: "ene", "ago")
+  const k = str.slice(0, 3);
+  return map[k] ?? Number(str) ?? 0;
 };

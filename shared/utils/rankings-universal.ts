@@ -128,8 +128,21 @@ export function computeRankings(rows: UniversalRow[]): UniversalRankingResult[] 
 export function filterByPeriod(rows: UniversalRow[], p: UniversalPeriod): UniversalRow[] {
   const toKey = (r: UniversalRow) => `${r.year}-${String(normMonth(r.month)).padStart(2, "0")}`;
   
-  return rows.filter(r => {
+  console.log(`🔍 FILTER DEBUG: Target period: ${p.start} to ${p.end}`);
+  console.log(`🔍 FILTER DEBUG: Total rows to filter: ${rows.length}`);
+  
+  // Mostrar primeras 3 filas
+  for (let i = 0; i < Math.min(3, rows.length); i++) {
+    const r = rows[i];
+    const key = toKey(r);
+    console.log(`🔍 FILTER ROW ${i}: person="${r.person}", year="${r.year}", month="${r.month}", normMonth=${normMonth(r.month)}, key="${key}", passes=${key >= p.start && key <= p.end}`);
+  }
+  
+  const filtered = rows.filter(r => {
     const k = toKey(r);
     return k >= p.start && k <= p.end;
   });
+  
+  console.log(`🔍 FILTER RESULT: ${filtered.length} rows passed filter`);
+  return filtered;
 }

@@ -78,30 +78,9 @@ export async function getUniversalRankings(request: UniversalRankingsRequest): P
   // Usar función que devuelve raw 2D arrays compatible con columnMap numérico
   const rawData = await googleSheetsModule.googleSheetsWorkingService.getSheetValues(cfg.spreadsheetId, cfg.sheetName);
   
-  // 🔧 DIAGNOSTICOS TEMPORALES
-  console.log(`📊 Raw data type: ${typeof rawData}, length: ${rawData?.length || 0}`);
-  if (rawData && rawData.length > 0) {
-    const firstRow = rawData[0];
-    console.log(`📋 First row type: ${typeof firstRow}, isArray: ${Array.isArray(firstRow)}, length: ${firstRow?.length || 'N/A'}`);
-    console.log(`🔍 Sample data: persona[${cfg.columnMap.persona}]="${firstRow?.[cfg.columnMap.persona]}", month[${cfg.columnMap.month}]="${firstRow?.[cfg.columnMap.month]}", year[${cfg.columnMap.year}]="${firstRow?.[cfg.columnMap.year]}"`);
-  }
+
   
-  if (!rawData || rawData.length === 0) {
-    console.log('⚠️ No data found in Excel MAESTRO');
-    return {
-      rankings: [],
-      totalEconomicoPeriodo: 0,
-      periodLabel: timeFilter,
-      period: period,
-      metadata: {
-        universalSystem: true,
-        projectKey,
-        spreadsheetId: cfg.spreadsheetId,
-        filteredRows: 0,
-        originalRows: 0
-      }
-    };
-  }
+
 
   // 4. Convertir datos al formato universal
   const universalRows = adaptExcelToUniversal(rawData, projectKey, projectId.toString());
