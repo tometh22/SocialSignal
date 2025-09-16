@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Trophy, Target, BarChart3, DollarSign, Clock, Info, Settings, AlertTriangle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatHours, formatParticipation, roundTo2Decimals } from "@/lib/formatters";
 
 interface EconomicRankingsProps {
   projectId: number;
@@ -219,11 +220,11 @@ export function EconomicRankings({
                   <div className="flex items-center gap-3 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {member.horas.real}h / {member.horas.objetivo}h
+                      {formatHours(member.horas.real)} / {formatHours(member.horas.objetivo)}
                     </span>
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
-                      {member.economia.participacion_pct.toFixed(1)}%
+                      {formatParticipation(member.economia.participacion_pct)}
                     </span>
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
@@ -238,8 +239,8 @@ export function EconomicRankings({
                     <TooltipTrigger asChild>
                       <div className="font-bold text-lg text-gray-900 cursor-help">
                         {metricType === 'impacto' && metric.scoreDecimal ? 
-                          `${metric.score} pts` : 
-                          metric.score}
+                          `${roundTo2Decimals(metric.score)} pts` : 
+                          roundTo2Decimals(metric.score)}
                       </div>
                     </TooltipTrigger>
                     {metricType === 'impacto' && metric.scoreDecimal && (
@@ -472,7 +473,7 @@ export function EconomicRankings({
             </div>
             <div>
               <span className="text-gray-600">Participación total:</span>
-              <div className="font-medium">{validaciones.participacionTotal}%</div>
+              <div className="font-medium">{formatParticipation(validaciones.participacionTotal || 0)}</div>
             </div>
             <div>
               <span className="text-gray-600">Período:</span>

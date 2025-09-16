@@ -74,3 +74,41 @@ export const formatNumber = (value: number, digits: number = 2): string => {
     maximumFractionDigits: digits
   }).format(value);
 };
+
+/**
+ * Redondea un número a 2 decimales usando Math.round para precisión
+ * @param value El valor a redondear
+ * @returns El número redondeado a 2 decimales
+ */
+export const roundTo2Decimals = (value: number): number => {
+  return Math.round(value * 100) / 100;
+};
+
+/**
+ * Formatea horas con redondeo a 2 decimales
+ * @param hours Las horas a formatear
+ * @returns String formateado como "160.16h" en lugar de "160.16000000000003h"
+ */
+export const formatHours = (hours: number): string => {
+  return `${roundTo2Decimals(hours)}h`;
+};
+
+/**
+ * Formatea porcentaje de participación, mostrando 100% cuando es ≈100%
+ * @param percentage Porcentaje como número (ej: 99.9999999999999)
+ * @returns String formateado como "100%" o "67.3%"
+ */
+export const formatParticipation = (percentage: number): string => {
+  // Si está muy cerca de 100%, mostrar exactamente 100%
+  if (Math.abs(100 - percentage) < 1e-6) {
+    return '100%';
+  }
+  
+  // Si está muy cerca de 0%, mostrar exactamente 0%
+  if (Math.abs(percentage) < 1e-6) {
+    return '0%';
+  }
+  
+  // Para otros casos, redondear a 1 decimal
+  return `${roundTo2Decimals(percentage)}%`;
+};
