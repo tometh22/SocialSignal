@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
+import { buildPeriod, normalizeMonth } from '../../shared/utils/dateNormalization';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -257,7 +258,7 @@ class GoogleSheetsWorkingService {
 
       try {
         const tipoCosto = this.getCellValue(row, columnMap.tipoCosto).toLowerCase();
-        const montoTotal = parseDec(this.getCellValue(row, columnMap.costoTotal)) || 0;
+        const montoTotal = this.parseMoneyValue(this.getCellValue(row, columnMap.costoTotal)) || 0;
         const persona = this.getCellValue(row, columnMap.persona);
         
         // Debug primera fila para entender la estructura
@@ -412,10 +413,22 @@ class GoogleSheetsWorkingService {
     }
     */
     
-    // 🚨 VALIDACIÓN ANTI-ERRORES MEJORADA
+    // 🚨 CORRECCIÓN INTELIGENTE PARA FORMATO ESPAÑOL
     const originalValue = value.replace(/[$\s]/g, '');
-    if (originalValue && parsed > 10000 && originalValue.length <= 8) {
-      console.log(`⚠️ PARSING SOSPECHOSO: "${value}" → ${parsed} (posible error x100)`);
+    
+    // Detectar formato español con comas decimales que se parseó incorrectamente
+    const isSpanishDecimalFormat = hasDecimalComma && !hasDecimalPoint && originalValue.length <= 8;
+    const isProbablyMultipliedBy100 = parsed > 10000 && isSpanishDecimalFormat;
+    
+    if (isProbablyMultipliedBy100) {
+      const correctedValue = parsed / 100;
+      console.log(`🔧 AUTO-CORRECCIÓN FORMATO ESPAÑOL: "${value}" → ${parsed} ÷ 100 = ${correctedValue}`);
+      console.log(`   - Original: "${originalValue}" (formato español detectado)`);
+      console.log(`   - Cleaned: "${cleaned}"`);
+      console.log(`   - hasDecimalComma: ${hasDecimalComma}, hasDecimalPoint: ${hasDecimalPoint}`);
+      parsed = correctedValue;
+    } else if (originalValue && parsed > 10000 && originalValue.length <= 8) {
+      console.log(`⚠️ PARSING SOSPECHOSO: "${value}" → ${parsed} (revisar si necesita corrección)`);
       console.log(`   - Original: "${originalValue}"`);
       console.log(`   - Cleaned: "${cleaned}"`);
       console.log(`   - hasDecimalPoint: ${hasDecimalPoint}, hasDecimalComma: ${hasDecimalComma}`);

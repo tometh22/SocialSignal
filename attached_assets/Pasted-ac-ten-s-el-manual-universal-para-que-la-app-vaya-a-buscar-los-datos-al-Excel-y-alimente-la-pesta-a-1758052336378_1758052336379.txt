@@ -1,0 +1,165 @@
+acá tenés el manual universal para que la app vaya a buscar los datos al Excel y alimente la pestaña Dashboard de cualquier proyecto (con filtro temporal global).
+1) Estructura mínima de tus hojas
+A) Hoja “Ventas Tomi” (ingresos)
+Campos necesarios (nombres libres; se mapean por config):
+Cliente, Proyecto, Nro_Proyecto (ID estable), Mes, Año, Tipo_Venta (Fee/One Shot)
+Monto_ARS, Monto_USD, Confirmado (Sí/No)
+B) Hoja “Costos directos e indirectos” (horas/costos)
+Detalle (persona), Nro_Proyecto, Mes, Año
+K (horas objetivo), L (horas reales), M (horas para facturar)
+Valor_Hora_ARS, Cotización (ARS por USD)
+(si existe) Monto Total USD (= M*Valor_Hora_ARS/Cotización)
+C) Hoja “Cotizaciones” (recomendado)
+Periodo (yyyy-mm), ARS_por_USD
+Clave de integración: Nro_Proyecto + Periodo (yyyy-mm) en todas las hojas.
+2) Filtro temporal global (una sola implementación)
+Normalizá Mes → 1..12 (acepta “ene…dic” o número).
+Construí Periodo = ${Año}-${MM}.
+Filtrá antes de calcular: Periodo ∈ [start, end].
+Presets compatibles: july_2025, august_2025, last_3_months, ytd o rango start=YYYY-MM&end=YYYY-MM.
+3) Reglas universales de conversión y moneda
+3.1 FX por período
+FX(periodo) (ARS/USD) se obtiene por esta precedencia:
+Cotizaciones!ARS_por_USD[periodo]
+Si falta: mediana de Costos.Cotización para ese Nro_Proyecto + periodo
+Si falta: fallback en configuración
+3.2 Ingresos (USD) por fila (Ventas Tomi)
+Si Monto_USD > 0 → ingreso_usd_fila = Monto_USD
+Si Monto_USD = 0 y Monto_ARS > 0 → ingreso_usd_fila = Monto_ARS / FX(periodo)
+Si ambos >0 → usa USD y logueá warning (evitar doble conteo)
+Incluí solo Confirmado = "Sí"
+3.3 Costos (USD) por fila (Costos directos e indirectos)
+Si tenés Monto Total USD en la hoja → sumalo (es M*Valor_Hora_ARS/FX)
+Si no, calculalo: costo_usd_fila = M * Valor_Hora_ARS / FX(periodo)
+Regla de oro: usá la misma FX(periodo) para convertir ingresos y costos de ese período → comparables.
+4) Qué espera el Dashboard y cómo lo calculás
+4.1 Campos económicos (por proyecto y período)
+projectData.totalAmount = Σ ingreso_usd_fila
+projectData.totalCost = Σ costo_usd_fila
+projectData.markup = totalAmount − totalCost (en la app “markup” = margen USD)
+Extras (si querés mostrarlos):
+markupX = totalAmount / totalCost (si totalCost>0)
+roiPct = (markup / totalCost) * 100 (si totalCost>0)
+4.2 Métricas de equipo
+Desde Costos directos e indirectos:
+ΣK = SUM(K), ΣL = SUM(L), ΣM = SUM(M)
+projectData.metrics.efficiency
+= (ΣK=0 ? 70 : MIN(1, ΣL/ΣK) * 100)
+Velocidad (h/sem) = ΣL / 4.348 (semanas promedio/mes)
+Team Breakdown (projectData.teamBreakdown[]) por persona:
+targetHours=ΣK, actualHours=ΣL, billableHours=ΣM
+efficiency = (K=0?70:MIN(1,L/K)*100)
+(filtrar actualHours>0)
+4.3 Estado de presupuesto (si lo usás)
+projectData.metrics.budgetUtilization (en ARS)
+costos_ars_total = Σ(M*Valor_Hora_ARS) (o columna oficial ARS si la hay)
+= costos_ars_total / presupuesto_ars_periodo * 100
+5) Fórmulas de Google Sheets (copiá/pegá)
+Helper Periodo (yyyy-mm)
+=TEXT(D2 & "-" & (MATCH(LEFT(C2,3), {"ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"},0)); "0000-00")
+Ingresos (USD) por período
+(si tenés helper Ingreso_USD_fila = IF(Monto_USD>0, Monto_USD, Monto_ARS/FX(periodo)))
+=SUMIFS(Ventas!Ingreso_USD_fila, Ventas!Nro_Proyecto, $ID, Ventas!Periodo, $PERIODO, Ventas!Confirmado, "Sí")
+Costos (USD) por período
+(con Monto Total USD ya calculado en la hoja)
+=SUMIFS(Costos!Monto_Total_USD, Costos!Nro_Proyecto, $ID, Costos!Periodo, $PERIODO)
+o calculado on-the-fly:
+=SUMPRODUCT(
+  FILTER(Costos!M:M * Costos!Valor_Hora_ARS / Costos!Cotización,
+    (Costos!Nro_Proyecto=$ID) * (Costos!Periodo=$PERIODO))
+)
+Eficiencia equipo
+K_total: =SUMIFS(Costos!K:K, Costos!Nro_Proyecto, $ID, Costos!Periodo, $PERIODO)
+L_total: =SUMIFS(Costos!L:L, Costos!Nro_Proyecto, $ID, Costos!Periodo, $PERIODO)
+Eff_%:   =IF(K_total=0, 70, MIN(1, L_total/K_total)*100)
+Velocidad
+= L_total / 4.348
+6) Contrato del endpoint (lo que consume la app)
+GET /api/projects/:id/complete-data?timeFilter=august_2025
+{
+  "projectData": {
+    "totalAmount": 8450.0,
+    "totalCost": 2436.09,
+    "markup": 6013.91,
+    "metrics": {
+      "efficiency": 90.1,
+      "budgetUtilization": 90.0
+    },
+    "teamBreakdown": [
+      { "person": "Trini", "targetHours": 100, "actualHours": 107.5, "billableHours": 107.5, "efficiency": 100.0 },
+      { "person": "Sol",   "targetHours": 100, "actualHours": 101.33, "billableHours": 101.33, "efficiency": 100.0 }
+    ]
+  },
+  "fx": { "2025-08": 1345 }
+}
+El filtro temporal global lo reaprovecha Performance, Costos, Ingresos y Rankings (cada pestaña consulta con el mismo timeFilter).
+7) Backend “universal” (pseudocódigo TS)
+// 1) resolver proyecto y periodo (sin hardcode)
+const cfg = resolveProject({ projectId });       // spreadsheetId + mapping columnas
+const period = resolvePeriod({ timeFilter });    // {start,end} 'YYYY-MM'
+
+// 2) leer filas y normalizar (parseo ES/US)
+const ventas = await readVentasTomi(cfg);        // mapea columnas
+const costos = await readCostos(cfg);
+
+const rowsV = ventas
+  .map(normalizeVenta) // agrega Periodo=YYYY-MM, Nro_Proyecto normalizado
+  .filter(v => v.confirmado && v.proyectoId===id && inPeriod(v.periodo, period));
+
+const rowsC = costos
+  .map(normalizeCosto)
+  .filter(c => c.proyectoId===id && inPeriod(c.periodo, period));
+
+// 3) resolver FX por periodo (cotizaciones → mediana costos → fallback)
+const fx = resolveFxMap({ rowsC, period });
+
+// 4) ingresos USD
+const totalAmount = rowsV.reduce((sum, v) => {
+  const rate = fx[v.periodo] ?? 0;
+  if (v.montoUSD > 0) return sum + v.montoUSD;
+  if (v.montoARS > 0 && rate > 0) return sum + v.montoARS / rate;
+  return sum;
+}, 0);
+
+// 5) costos USD
+const totalCost = rowsC.reduce((sum, c) => {
+  const rate = fx[c.periodo] ?? 0;
+  if (c.montoUsdFila != null) return sum + c.montoUsdFila; // si ya viene
+  return sum + (c.M * c.valorHoraARS) / rate;
+}, 0);
+
+// 6) métrica de performance
+const K = sum(rowsC.map(r => r.K));
+const L = sum(rowsC.map(r => r.L));
+const efficiency = K===0 ? 70 : Math.min(1, L/K) * 100;
+
+// 7) teamBreakdown
+const team = groupBy(rowsC, r => r.persona).map(([person, rr]) => {
+  const Kp = sum(rr.map(r => r.K));
+  const Lp = sum(rr.map(r => r.L));
+  const Mp = sum(rr.map(r => r.M));
+  return {
+    person, targetHours: Kp, actualHours: Lp, billableHours: Mp,
+    efficiency: Kp===0 ? 70 : Math.min(1, Lp/Kp) * 100
+  };
+}).filter(p => p.actualHours > 0);
+
+// 8) payload
+return {
+  projectData: {
+    totalAmount,
+    totalCost,
+    markup: totalAmount - totalCost,
+    metrics: { efficiency, budgetUtilization: /* si tenés presupuesto */ null },
+    teamBreakdown: team
+  },
+  fx
+};
+8) Validaciones y bordes (para cualquier proyecto)
+Misma FX para ingresos y costos del período.
+Si Monto_USD y Monto_ARS vienen ambos >0 en la misma fila → usa USD y logueá DUP_MON.
+Redondeo solo en UI (2 decimales).
+Σ shares (si mostrás impacto) ≈ 1.000000 (|1−Σ|<1e-6).
+Confirmado="Sí" obligatorio en Ventas.
+Si no hay ingresos en el período → banner “Sin ingresos detectados”.
+Con este flujo, la app siempre sabe cómo ir al Excel, qué columnas leer, có

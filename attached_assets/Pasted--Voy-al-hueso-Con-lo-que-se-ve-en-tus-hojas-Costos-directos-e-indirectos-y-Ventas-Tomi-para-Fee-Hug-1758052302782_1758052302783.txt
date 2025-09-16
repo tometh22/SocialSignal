@@ -1,0 +1,104 @@
+¡Voy al hueso! Con lo que se ve en tus hojas Costos directos e indirectos y Ventas Tomi para Fee Huggies, esto es lo que debe aparecer en la pestaña Dashboard por mes y cómo se calcula.
+Voy a darte:
+Los números para junio, julio y agosto 2025 (con precisión total para agosto y estimaciones muy cercanas para junio/julio a partir de lo que se ve en la captura).
+Las fórmulas exactas para que lo reproduzcas.
+Qué muestra el Dashboard (por mes)
+1) Ingresos generados (USD)
+Fuente: hoja Ventas Tomi (filas con Confirmado = "Sí"), proyecto Fee Huggies.
+Regla por fila:
+Si Monto_USD > 0 → ingreso_usd_fila = Monto_USD
+Si Monto_USD = 0 y Monto_ARS > 0 → ingreso_usd_fila = Monto_ARS / FX(periodo)
+Para Fee Huggies: en Junio/Julio/Agosto 2025 hay USD 8.450 por mes (las filas de tu captura).
+2) Costos (USD)
+Fuente: hoja Costos directos e indirectos.
+Por fila:
+costo_usd_fila = M (horas facturación) × Valor_Hora_ARS ÷ Cotización_FX
+(en tu hoja ya aparece como “Monto Total USD”; sumar esa columna por mes y proyecto te da el costo en USD directamente).
+3) Margen y multiplicador
+margen_usd = ingresos_usd_mes − costos_usd_mes
+markup_x = ingresos_usd_mes / costos_usd_mes
+ROI_% = margen_usd / costos_usd_mes × 100
+4) Performance del equipo (eficiencia)
+ΣK = suma de horas objetivo del mes, ΣL = suma de horas reales del mes (misma hoja de Costos).
+eficiencia_equipo_% = (ΣK=0 ? 70 : MIN(1, ΣL/ΣK) × 100)
+(cap a 100%)
+5) Total trabajado y velocidad
+total_trabajado_h = ΣL
+velocidad_h/sem = ΣL / 4.348 (aprox. semanas por mes)
+Resultados para Fee Huggies
+Nota: Agosto es exacto (suma de tu columna “Monto Total USD”).
+Julio y Junio los calculé con los valores que se leen en la captura (FX de julio ≈ 1.320 para todos y junio ≈ 1.18 promedio). Si la planilla tiene ligeras variaciones de FX por persona, te va a cambiar algunos dólares pero <±3–5%.
+Agosto 2025 (FX 1.345 exacto en hoja)
+Ingresos (USD): 8.450
+Costos (USD): 2.436,09
+(suma de Monto Total USD para: Sol 773,74 • Trini 867,49 • Vanu 398,23 • Aylu 231,00 • Vicky 165,63)
+Margen (USD): 6.013,91
+Markup (x): 3,47x
+ROI (%): 246,9%
+Total trabajado (h): 288,28 (ΣL)
+Eficiencia equipo (%): 90,09% (ΣK=320; ΣL=288,28)
+Velocidad (h/sem): ~66,3 (288,28 / 4,348)
+Julio 2025 (FX ~1.320 asumido en todas las filas)
+Ingresos (USD): 8.450
+Costos (USD): ≈ 2.760
+(calculado como Σ[M × VH_ARS / 1.320] con tus valores de la captura)
+Margen (USD): ≈ 5.690
+Markup (x): ≈ 3,06x
+ROI (%): ≈ 206%
+Total trabajado (h): 333,95
+Eficiencia equipo (%): 100% (cap: ΣL/ΣK ≈ 104,4%)
+Velocidad (h/sem): ~76,8
+Junio 2025 (FX ~1.18 promedio visible en hoja)
+Ingresos (USD): 8.450
+Costos (USD): ≈ 1.080
+(Σ[M × VH_ARS / 1.18] con los valores de tu captura)
+Margen (USD): ≈ 7.370
+Markup (x): ≈ 7,8x
+ROI (%): ≈ 684%
+Total trabajado (h): ≈ 81,2
+Eficiencia equipo (%): ≈ 25,4% (ΣK ≈ 320; ΣL ≈ 81,2)
+Velocidad (h/sem): ~18,7
+Si en tu “Ventas Tomi” Junio no estuviera confirmado, poné Ingresos=0 y el margen/ROI se recalculan automáticamente (te quedaría margen negativo si hay costos).
+Fórmulas (tal cual para Excel/Sheets)
+Supongamos:
+Costos: columnas M (Horas facturación), N (Valor_Hora_ARS), Q (Cotización), R (Monto Total USD)
+Ventas: columnas G (Monto_ARS), H (Monto_USD), I (Confirmado), y una helper Periodo con YYYY-MM
+Ingresos (USD) por mes
+=SUMAR.SI.CONJUNTO(
+  Ventas!H:H, Ventas!I:I, "Sí",
+  Ventas!B:B, "Fee Huggies",
+  Ventas!Periodo, "2025-08"
+)
++
+SUMAR.SI.CONJUNTO(
+  Ventas!G:G / FX!B:B, Ventas!I:I, "Sí",
+  Ventas!B:B, "Fee Huggies",
+  Ventas!Periodo, "2025-08",
+  Ventas!H:H, 0
+)
+(si ponés Ingreso_USD_fila como helper que convierte ARS→USD, con =SI(H>0;H;G/FX), entonces basta con un único SUMAR.SI.CONJUNTO sobre esa columna).
+Costos (USD) por mes
+Si ya tenés R = M*N/Q:
+=SUMAR.SI.CONJUNTO(
+  Costos!R:R,
+  Costos!I:I, "Fee Huggies",
+  Costos!Periodo, "2025-08"
+)
+Si no tenés R:
+=SUMAPRODUCTO(
+  FILTRO(Costos!M:M * Costos!N:N / Costos!Q:Q,
+         (Costos!I:I="Fee Huggies") * (Costos!Periodo="2025-08"))
+)
+Margen, Markup, ROI
+Margen_USD:   =Ingresos_USD - Costos_USD
+Markup_x:     =SI(Costos_USD>0; Ingresos_USD / Costos_USD; )
+ROI_%:        =SI(Costos_USD>0; (Margen_USD/Costos_USD)*100; )
+Eficiencia equipo
+K_total:   =SUMAR.SI.CONJUNTO(Costos!K:K, Costos!I:I, "Fee Huggies", Costos!Periodo, "2025-08")
+L_total:   =SUMAR.SI.CONJUNTO(Costos!L:L, Costos!I:I, "Fee Huggies", Costos!Periodo, "2025-08")
+Efic_%:    =SI(K_total=0; 70; MIN(1; L_total/K_total) * 100)
+Total trabajado y velocidad
+Total_h:    =L_total
+Vel_h_sem:  =L_total / 4,348
+Por qué en tu screenshot de agosto salía “Costo $243,609”
+Eso viene del parseo de decimales (estabas leyendo 2.436,09 como 243,609). Con los cambios que hicimos (parseo robusto ES/US y sumar Monto Total USD), el costo correcto de agosto es USD 2.436,09 y el margen sale positivo (USD 6.013,91) con markup 3,47x.
