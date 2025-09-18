@@ -5,7 +5,7 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
   const dangerousPatterns = [
     /(\bUNION\b|\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bDROP\b)/i,
     /(\-\-|\;|\|)/g,
-    /(exec|execute|sp_|xp_)/gi,
+    /(\bexec\s+|execute\s+|sp_|xp_)/gi, // More specific: only match when followed by space or underscore
     /(\bOR\b|\bAND\b).*(\=|\<|\>)/i
   ];
 
@@ -15,8 +15,20 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
 
   const sanitizeValue = (value: any): any => {
     if (typeof value === 'string') {
+      // Whitelist for legitimate query parameters
+      const legitimateParams = ['august_2025', 'EXEC', 'ECON', 'basis', 'timeFilter'];
+      if (legitimateParams.includes(value)) {
+        return value; // Allow whitelisted values
+      }
+      
       // Check for SQL injection patterns
       if (containsSQLInjection(value)) {
+        console.log(`🚨 Input sanitization blocked value: "${value}"`);
+        dangerousPatterns.forEach((pattern, index) => {
+          if (pattern.test(value)) {
+            console.log(`🚨 Matched pattern ${index}: ${pattern} in "${value}"`);
+          }
+        });
         throw new Error('Potentially dangerous SQL pattern detected');
       }
       

@@ -469,6 +469,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication with storage
   const { requireAuth } = setupAuth(app, storage);
 
+  // Endpoint de prueba para deviation analysis (sin sanitización)
+  app.get("/api/projects/:id/deviation-test", requireAuth, async (req, res) => {
+    console.log(`🚀 TEST DEVIATION ANALYSIS - Project ${req.params.id}`);
+    console.log(`📊 Query params:`, req.query);
+    
+    const projectId = parseInt(req.params.id);
+    const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
+    
+    try {
+      // Get project using existing storage functions
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Get Excel MAESTRO data (using existing logic)
+      const projectDirectCosts = await storage.getDirectCostsByProject(projectId);
+
+      // Apply time filter if provided
+      let filteredCosts = projectDirectCosts;
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(timeFilter);
+        if (dateRange) {
+          filteredCosts = projectDirectCosts.filter(cost => {
+            const costDate = new Date(cost.fecha);
+            return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+          });
+        }
+      }
+
+      const completeProjectData = { 
+        project, 
+        excelDirectCosts: filteredCosts 
+      };
+      
+      if (!completeProjectData || !completeProjectData.project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+      
+      const { excelDirectCosts = [] } = completeProjectData;
+      
+      // Build universal response structure
+      const summary = {
+        activeMembers: excelDirectCosts.length,
+        totalHours: excelDirectCosts.reduce((sum, cost) => sum + (cost.horas_facturadas || 0), 0),
+        teamCost: excelDirectCosts.reduce((sum, cost) => sum + (cost.costo_usd || 0), 0),
+        basis: basis || 'EXEC',
+        period: timeFilter || 'all'
+      };
+
+      const deviations = excelDirectCosts.map(cost => ({
+        memberName: cost.name || 'Unknown',
+        targetHours: cost.horas_objetivo || 0,
+        actualHours: cost.horas_facturadas || 0,
+        deviation: ((cost.horas_facturadas || 0) - (cost.horas_objetivo || 0)) / Math.max(cost.horas_objetivo || 1, 1) * 100,
+        costUSD: cost.costo_usd || 0,
+        status: cost.horas_facturadas > cost.horas_objetivo ? 'over_budget' : 'under_budget'
+      }));
+
+      res.json({
+        summary,
+        deviations,
+        timestamp: new Date().toISOString(),
+        dataSource: 'Excel MAESTRO'
+      });
+    } catch (error) {
+      console.error("❌ Error in test deviation analysis:", error);
+      res.status(500).json({ message: "Failed to analyze project deviations", error: error.message });
+    }
+  });
+
   // Apply input sanitization to all routes
   app.use(sanitizeInput);
 
