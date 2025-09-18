@@ -8242,21 +8242,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
-        // Calcular costos según basis - USAR COSTOTOTAL DE EXCEL MAESTRO Y CONVERTIR A USD
+        // Calcular costos según basis - ROBUST CURRENCY DETECTION
         let actualCost = 0;
         if (person.records.length > 0) {
-          // Convertir costoTotal de ARS a USD usando tipoCambio
           actualCost = person.records.reduce((sum, record) => {
-            const costARS = record.costoTotal || 0;
-            const fxRate = record.tipoCambio || defaultFxRate;
-            const costUSD = costARS / fxRate;
-            console.log(`💰 Cost conversion for ${personKey}: ${costARS} ARS / ${fxRate} FX = ${costUSD} USD`);
-            return sum + costUSD;
+            const costoTotal = record.costoTotal || 0;
+            const montoTotalUSD = record.montoTotalUSD || 0;
+            const valorHoraPersona = record.valorHoraPersona || 0;
+            
+            // 1st: Use montoTotalUSD if available
+            if (montoTotalUSD > 0) {
+              console.log(`💰 Using montoTotalUSD for ${personKey}: ${montoTotalUSD} USD`);
+              return sum + montoTotalUSD;
+            }
+            // 2nd: Convert ARS to USD if valorHoraPersona > 0 
+            else if (valorHoraPersona > 0) {
+              const fxRate = record.tipoCambio || defaultFxRate;
+              if (fxRate > 0) {
+                const costUSD = costoTotal / fxRate;
+                console.log(`💰 Converting ${personKey}: ${costoTotal} ARS / ${fxRate} FX = ${costUSD} USD`);
+                return sum + costUSD;
+              }
+            }
+            // 3rd: Use costoTotal as USD
+            console.log(`💰 Using direct USD for ${personKey}: ${costoTotal} USD`);
+            return sum + costoTotal;
           }, 0);
-          console.log(`💰 Total cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
+          console.log(`💰 Final cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
         }
         
+        // Calcular presupuesto usando tarifa estable USD por persona
         const budgetedCost = person.K * rateUSD;
+        console.log(`💰 Budget for ${personKey}: ${person.K} hours × $${rateUSD.toFixed(2)}/hr = $${budgetedCost.toFixed(2)}`);
 
         // Calcular desviaciones
         const hourDeviation = person.L - person.K;
@@ -8306,6 +8323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Acumular totales
         totalHours += person.L;
         totalTeamCost += actualCost;
+        // Acumular SOLO miembros con presupuesto (K>0) para eficiencia ΣL/ΣK
         if (person.K > 0) {
           totalEfficiencyNum += person.L;
           totalEfficiencyDen += person.K;
