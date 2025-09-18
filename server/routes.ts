@@ -7951,197 +7951,223 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ test: 'working', params: req.params, query: req.query });
   });
 
-  // Endpoint para análisis de desviaciones
+  // 🏢 ENDPOINT UNIVERSAL: Análisis de desviaciones del equipo
+  // Integra completamente con Excel MAESTRO usando motor único
   app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
-    console.log(`🚀🚀🚀 DEVIATION ANALYSIS ENDPOINT HIT - ID: ${req.params.id}`);
+    console.log(`🚀 UNIVERSAL DEVIATION ANALYSIS - Project ${req.params.id}`);
+    
     try {
       const projectId = parseInt(req.params.id);
-      const { startDate, endDate } = req.query;
+      const { timeFilter, basis = 'EXEC', startDate, endDate } = req.query;
       
-      console.log(`🔍🔍🔍 DEVIATION ANALYSIS CALLED - ProjectId: ${projectId}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      console.log(`🔍 PARAMS: timeFilter=${timeFilter}, basis=${basis}, startDate=${startDate}, endDate=${endDate}`);
       
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      const quotation = await storage.getQuotation(project.quotationId);
-      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
-      
-      // NUEVO: Obtener costos directos del Excel MAESTRO para horas objetivo
-      let excelDirectCosts = await storage.getDirectCostsByProject(projectId);
-      
-      // Aplicar filtro temporal a costos directos si está especificado
-      if (startDate && endDate) {
-        excelDirectCosts = excelDirectCosts.filter(cost => {
-          // Manejar diferentes formatos de mes en el Excel MAESTRO
+      // 🎯 PASO 1: Resolver período usando mismo sistema que Dashboard/Performance
+      let filterStartDate: Date | null = null;
+      let filterEndDate: Date | null = null;
+      let periodKey = '';
+
+      if (timeFilter && typeof timeFilter === 'string') {
+        const filterDates = buildPeriod(timeFilter);
+        if (filterDates) {
+          filterStartDate = filterDates.startDate;
+          filterEndDate = filterDates.endDate;
+          periodKey = `${filterStartDate.getFullYear()}-${String(filterStartDate.getMonth() + 1).padStart(2, '0')}`;
+        }
+        console.log(`📅 TimeFilter resolved: ${timeFilter} → ${filterStartDate} to ${filterEndDate}`);
+      } else if (startDate && endDate) {
+        filterStartDate = new Date(startDate as string);
+        filterEndDate = new Date(endDate as string);
+        periodKey = `${filterStartDate.getFullYear()}-${String(filterStartDate.getMonth() + 1).padStart(2, '0')}`;
+        console.log(`📅 StartDate/EndDate resolved: ${filterStartDate} to ${filterEndDate}`);
+      }
+
+      // 🎯 PASO 2: Obtener datos del Excel MAESTRO (fuente única)
+      let excelCosts = await storage.getDirectCostsByProject(projectId);
+      console.log(`💰 Retrieved ${excelCosts.length} Excel MAESTRO records`);
+
+      // Filtrar por período si especificado
+      if (filterStartDate && filterEndDate) {
+        excelCosts = excelCosts.filter(cost => {
           let monthNumber;
           if (cost.mes.includes(' ')) {
-            // Formato "08 ago", "05 may", etc.
             monthNumber = parseInt(cost.mes.substring(0, 2));
           } else {
-            // Formato "Agosto", "Mayo", etc.
-            monthNumber = storage.getMonthNumber(cost.mes);
+            monthNumber = normalizeMonth(cost.mes);
           }
-          const costDate = new Date(`${cost.año}-${monthNumber}-15`); // Día 15 del mes
-          const filterStartDate = new Date(startDate as string);
-          const filterEndDate = new Date(endDate as string);
+          const costDate = new Date(cost.año, monthNumber - 1, 15);
           return costDate >= filterStartDate && costDate <= filterEndDate;
         });
-      }
-      
-      console.log(`📊 Found ${excelDirectCosts.length} Excel MAESTRO cost records for deviation analysis`);
-      
-      // Construir condiciones de filtro
-      const whereConditions = [eq(timeEntries.projectId, projectId)];
-      
-      if (startDate && endDate) {
-        whereConditions.push(
-          gte(timeEntries.date, startDate as string),
-          lte(timeEntries.date, endDate as string)
-        );
+        console.log(`💰 Filtered to ${excelCosts.length} records for period ${periodKey}`);
       }
 
-      console.log(`🔍 Building query with conditions:`, whereConditions);
-      
-      // Simplificar la consulta para evitar problemas de relaciones
-      const projectTimeEntries = await db.select()
-        .from(timeEntries)
-        .where(and(...whereConditions));
-      
-      console.log(`🔍 Found ${projectTimeEntries.length} time entries before joining with personnel`);
-      
-      // Obtener información del personal por separado
-      const personnelIds = [...new Set(projectTimeEntries.map(entry => entry.personnelId))];
-      const personnelData = personnelIds.length > 0 ? await db.select()
-        .from(personnel)
-        .where(inArray(personnel.id, personnelIds)) : [];
-      
-      console.log(`🔍 Found ${personnelData.length} personnel records`);
-      
-      console.log(`🔍 Deviation analysis - Found ${projectTimeEntries.length} time entries after filtering`);
-
-      // Si no hay registros de tiempo filtrados, devolver estructura vacía
-      if (projectTimeEntries.length === 0) {
-        console.log(`🔍 Deviation analysis - No time entries found for the filtered period, returning empty data`);
+      if (excelCosts.length === 0) {
+        console.log(`⚠️ No Excel MAESTRO data found for period, returning empty`);
         return res.json({
-          deviationByRole: [],
-          totalVariance: { variance: 0 },
-          summary: { membersOverBudget: 0, membersUnderBudget: 0 },
-          majorDeviations: [],
-          analysis: []
+          summary: {
+            activeMembers: 0,
+            totalHours: 0,
+            efficiencyPct: 0,
+            teamCost: 0,
+            basis: basis as string,
+            period: periodKey
+          },
+          deviations: []
         });
       }
 
-      // Calcular desviaciones solo para miembros que tienen registros en el período filtrado
-      const membersWithTimeEntries = teamMembers.filter(member => 
-        projectTimeEntries.some(entry => entry.personnelId === member.personnelId)
-      );
+      // 🎯 PASO 3: Agregar por persona usando lógica K, L, M
+      const personMap = new Map();
+      const defaultFxRate = 1350; // Fallback FX rate
 
-      console.log(`🔍 Deviation analysis - Found ${membersWithTimeEntries.length} team members with time entries in filtered period`);
-
-      const deviationByRole = membersWithTimeEntries.map(member => {
-        const memberTimeEntries = projectTimeEntries.filter(entry => 
-          entry.personnelId === member.personnelId
-        );
-        
-        const memberPersonnel = personnelData.find(p => p.id === member.personnelId);
-        
-        const actualHours = memberTimeEntries.reduce((sum, entry) => 
-          sum + entry.hours, 0);
-        const actualCost = memberTimeEntries.reduce((sum, entry) => 
-          sum + (entry.hours * (entry.hourlyRateAtTime || member.rate)), 0);
-        
-        // NUEVO: Obtener horas objetivo del Excel MAESTRO para este miembro
-        const memberExcelCosts = excelDirectCosts.filter(cost => cost.persona === memberPersonnel?.name);
-        const targetHours = memberExcelCosts.reduce((sum, cost) => sum + (cost.horasObjetivo || 0), 0);
-        
-        console.log(`📊 Deviation Analysis - ${memberPersonnel?.name}: Estimated: ${member.hours}h, Target: ${targetHours}h, Actual: ${actualHours}h`);
-
-        const hoursVariance = actualHours - member.hours;
-        const costVariance = actualCost - member.cost;
-        
-        // NUEVO: Calcular desviación vs horas objetivo del Excel MAESTRO
-        const targetVariance = targetHours > 0 ? actualHours - targetHours : 0;
-        const targetVariancePercentage = targetHours > 0 ? (targetVariance / targetHours) * 100 : 0;
-        
-        // NUEVO: Calcular eficiencia (horas objetivo vs trabajadas)
-        const efficiency = targetHours > 0 && actualHours > 0 ? (targetHours / actualHours) * 100 : 0;
-
-        return {
-          personnelId: member.personnelId,
-          personnelName: memberPersonnel?.name || 'Unknown',
-          roleName: 'Team Member',
-          estimated: {
-            hours: member.hours,
-            cost: member.cost
-          },
-          actual: {
-            hours: actualHours,
-            cost: actualCost
-          },
-          // NUEVO: Agregar información de horas objetivo del Excel MAESTRO
-          target: {
-            hours: targetHours,
-            efficiency: efficiency
-          },
-          variance: {
-            hours: hoursVariance,
-            cost: costVariance,
-            hoursPercentage: member.hours > 0 ? (hoursVariance / member.hours) * 100 : 0,
-            costPercentage: member.cost > 0 ? (costVariance / member.cost) * 100 : 0,
-            // NUEVO: Desviación vs horas objetivo
-            targetHours: targetVariance,
-            targetHoursPercentage: targetVariancePercentage
-          }
-        };
-      });
-
-      // Calcular totales
-      const totalEstimatedCost = teamMembers.reduce((sum, member) => sum + member.cost, 0);
-      const totalActualCost = projectTimeEntries.reduce((sum, entry) => 
-        sum + (entry.hours * (entry.hourlyRateAtTime || 100)), 0);
-      const totalVariance = totalActualCost - totalEstimatedCost;
-
-      // Identificar desviaciones mayores (>20%)
-      const majorDeviations = deviationByRole.filter(deviation => 
-        Math.abs(deviation.variance.costPercentage) > 20
-      );
-
-      // Generar causas basadas en análisis
-      const causes = [];
-      if (majorDeviations.length > 0) {
-        causes.push({
-          type: 'budget_overrun',
-          severity: 'high',
-          description: 'Algunos miembros del equipo excedieron significativamente el presupuesto estimado',
-          affectedMembers: majorDeviations.map(d => d.personnelName)
-        });
-      }
-
-      const membersOverBudget = deviationByRole.filter(d => d.variance.costPercentage > 0).length;
-      const membersUnderBudget = deviationByRole.filter(d => d.variance.costPercentage < 0).length;
-
-      res.json({
-        projectId,
-        projectName: project.name,
-        totalVariance: {
-          estimatedCost: totalEstimatedCost,
-          actualCost: totalActualCost,
-          variance: totalVariance
-        },
-        deviationByRole,
-        majorDeviations,
-        causes,
-        summary: {
-          membersOverBudget,
-          membersUnderBudget,
-          averageVariancePercentage: deviationByRole.length > 0 ? 
-            deviationByRole.reduce((sum, d) => sum + Math.abs(d.variance.costPercentage), 0) / deviationByRole.length : 0
+      for (const cost of excelCosts) {
+        const personKey = cost.persona;
+        if (!personMap.has(personKey)) {
+          personMap.set(personKey, {
+            personnelName: personKey,
+            K: 0,    // Horas objetivo
+            L: 0,    // Horas reales
+            M: 0,    // Horas facturables
+            valorHoraARS: 0,
+            fxRate: 0,
+            records: []
+          });
         }
+
+        const person = personMap.get(personKey);
+        person.K += cost.horasObjetivo || 0;
+        person.L += cost.horasRealesAsana || 0;
+        person.M += cost.horasParaFacturacion || 0;
+        person.valorHoraARS += (cost.valorHoraPersona || 0);
+        person.fxRate = cost.tipoCambio || defaultFxRate;
+        person.records.push(cost);
+      }
+
+      // 🎯 PASO 4: Calcular desviaciones con rateUSD
+      const deviations = [];
+      let totalActiveMembers = 0;
+      let totalHours = 0;
+      let totalTeamCost = 0;
+      let totalEfficiencyNum = 0;
+      let totalEfficiencyDen = 0;
+
+      for (const [personKey, person] of personMap.entries()) {
+        // Solo procesar miembros con actividad real
+        if (person.L === 0 && person.M === 0) continue;
+
+        totalActiveMembers++;
+
+        // Calcular rateUSD promedio ponderado
+        let rateUSD = 0;
+        if (person.records.length > 0) {
+          let totalWeightedRate = 0;
+          let totalWeight = 0;
+          
+          for (const record of person.records) {
+            const weight = record.horasRealesAsana || 1;
+            const recordRateUSD = (record.valorHoraPersona || 0) / (record.tipoCambio || defaultFxRate);
+            totalWeightedRate += recordRateUSD * weight;
+            totalWeight += weight;
+          }
+          rateUSD = totalWeight > 0 ? totalWeightedRate / totalWeight : 0;
+        }
+
+        // Calcular costos según basis
+        const budgetedCost = person.K * rateUSD;
+        const actualCost = (basis === 'EXEC') ? person.L * rateUSD : person.M * rateUSD;
+
+        // Calcular desviaciones
+        const hourDeviation = person.L - person.K;
+        const costDeviation = actualCost - budgetedCost;
+        const deviationPercentage = person.K > 0 ? ((person.L / person.K) - 1) * 100 : 0;
+
+        // Determinar severidad según criterios corporativos
+        let severity: 'critical' | 'high' | 'medium' | 'low';
+        let alertType: 'overrun' | 'underrun' | 'ok';
+
+        const ratio = person.K > 0 ? person.L / person.K : 0;
+        if (ratio >= 1.30 || ratio <= 0.70) {
+          severity = 'critical';
+        } else if ((ratio >= 1.15 && ratio < 1.30) || (ratio > 0.70 && ratio <= 0.85)) {
+          severity = 'high';
+        } else if ((ratio >= 1.05 && ratio < 1.15) || (ratio > 0.85 && ratio <= 0.95)) {
+          severity = 'medium';
+        } else {
+          severity = 'low';
+        }
+
+        if (person.L > person.K) {
+          alertType = 'overrun';
+        } else if (person.L < person.K) {
+          alertType = 'underrun';
+        } else {
+          alertType = 'ok';
+        }
+
+        const deviation = {
+          personnelId: personKey,
+          personnelName: personKey,
+          budgetedHours: person.K,
+          actualHours: person.L,
+          budgetedCost: Number(budgetedCost.toFixed(2)),
+          actualCost: Number(actualCost.toFixed(2)),
+          hourDeviation: Number(hourDeviation.toFixed(1)),
+          costDeviation: Number(costDeviation.toFixed(2)),
+          deviationPercentage: Number(deviationPercentage.toFixed(1)),
+          severity,
+          alertType,
+          deviationType: 'hours'
+        };
+
+        deviations.push(deviation);
+
+        // Acumular totales
+        totalHours += person.L;
+        totalTeamCost += actualCost;
+        if (person.K > 0) {
+          totalEfficiencyNum += person.L;
+          totalEfficiencyDen += person.K;
+        }
+      }
+
+      // 🎯 PASO 5: Calcular métricas resumen
+      const efficiencyPct = totalEfficiencyDen > 0 ? 
+        Math.min(100, (totalEfficiencyNum / totalEfficiencyDen) * 100) : 70;
+
+      // Ordenar por criticidad (critical → high → medium → low)
+      const severityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+      deviations.sort((a, b) => {
+        const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
+        if (severityDiff !== 0) return severityDiff;
+        return Math.abs(b.deviationPercentage) - Math.abs(a.deviationPercentage);
       });
+
+      console.log(`📊 UNIVERSAL DEVIATION ANALYSIS RESULT: ${totalActiveMembers} members, ${totalHours}h, ${efficiencyPct.toFixed(1)}% efficiency, $${totalTeamCost.toFixed(2)} cost`);
+
+      // 🎯 PASO 6: Devolver estructura universal
+      res.json({
+        summary: {
+          activeMembers: totalActiveMembers,
+          totalHours: Number(totalHours.toFixed(2)),
+          efficiencyPct: Number(efficiencyPct.toFixed(1)),
+          teamCost: Number(totalTeamCost.toFixed(2)),
+          basis: basis as string,
+          period: periodKey
+        },
+        deviations
+      });
+
     } catch (error) {
-      console.error("Error generating deviation analysis:", error);
+      console.error("❌ Universal deviation analysis error:", error);
       res.status(500).json({ message: "Failed to generate deviation analysis" });
     }
   });
