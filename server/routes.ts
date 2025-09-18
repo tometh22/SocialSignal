@@ -615,9 +615,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // All duplicate endpoints consolidated - using universal deviation-analysis
-    
-    const projectId = parseInt(req.params.id);
+  // Duplicate endpoints cleaned up - universal deviation-analysis working correctly
+
     const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
     const selectedBasis = basis || 'EXEC'; // Default recomendado para Equipo
     

@@ -32,20 +32,15 @@ interface Deviation {
 }
 
 interface DeviationAnalysisData {
-  deviationByRole: Deviation[];
-  totalVariance: {
-    variance: number;
-  };
   summary: {
-    membersOverBudget: number;
-    membersUnderBudget: number;
+    activeMembers: number;
+    totalHours: number;
+    efficiencyPct: number;
+    teamCost: number;
+    basis: string;
+    period?: string;
   };
-  majorDeviations: Deviation[];
-  analysis: Array<{
-    type: string;
-    message: string;
-    severity: string;
-  }>;
+  deviations: Deviation[];
 }
 
 type SortField = 'deviation' | 'cost' | 'hours';
@@ -105,18 +100,18 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
   };
 
   const getSortedData = () => {
-    if (!deviationData?.deviationByRole) return [];
+    if (!deviationData?.deviations) return [];
     
     // 🔍 FILTRAR SOLO MIEMBROS CON ACTIVIDAD REAL
-    const filteredData = deviationData.deviationByRole.filter(member => {
+    const filteredData = deviationData.deviations.filter(member => {
       // Solo mostrar miembros que tengan horas trabajadas O costo real
       return member.actualHours > 0 || member.actualCost > 0;
     });
     
     console.log('🎯 FILTRO DEBUG:', {
-      totalMembers: deviationData.deviationByRole.length,
+      totalMembers: deviationData.deviations.length,
       membersWithActivity: filteredData.length,
-      filtered: deviationData.deviationByRole.filter(m => m.actualHours === 0 && m.actualCost === 0).map(m => m.personnelName)
+      filtered: deviationData.deviations.filter(m => m.actualHours === 0 && m.actualCost === 0).map(m => m.personnelName)
     });
     
     return filteredData.sort((a, b) => {
@@ -219,18 +214,18 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
 
   // Debug logs para verificar datos
   console.log('🔍 TeamDeviationAnalysis - Datos recibidos:', deviationData);
-  if (deviationData?.deviationByRole) {
+  if (deviationData?.deviations) {
     // Usar la misma lógica inteligente del backend: desviación >50% Y horas significativas trabajadas
-    const criticalCount = deviationData.deviationByRole.filter(d => {
+    const criticalCount = deviationData.deviations.filter(d => {
       const absDeviation = Math.abs(d.deviationPercentage);
       const minHoursThreshold = d.budgetedHours * 0.3;
       return absDeviation > 50 && d.actualHours > minHoursThreshold;
     }).length;
     console.log('🚨 TeamDeviationAnalysis - Críticas calculadas (lógica inteligente):', criticalCount);
-    console.log('🚨 TeamDeviationAnalysis - Miembros con horas:', deviationData.deviationByRole.filter(d => d.actualHours > 0));
+    console.log('🚨 TeamDeviationAnalysis - Miembros con horas:', deviationData.deviations.filter(d => d.actualHours > 0));
   }
 
-  if (!deviationData.deviationByRole || deviationData.deviationByRole.length === 0) {
+  if (!deviationData.deviations || deviationData.deviations.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         <p className="text-sm">No hay datos de desviación para el período seleccionado</p>
@@ -248,7 +243,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <span className="text-sm font-medium text-red-800">Requieren Atención</span>
           </div>
           <div className="text-2xl font-bold text-red-600">
-            {deviationData.deviationByRole.filter(d => 
+            {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
               (d.severity === 'critical' || d.alertType === 'budget_overrun' || d.alertType === 'estimation_issue')
             ).length}
@@ -262,7 +257,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <span className="text-sm font-medium text-blue-800">Para Revisión</span>
           </div>
           <div className="text-2xl font-bold text-blue-600">
-            {deviationData.deviationByRole.filter(d => 
+            {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
               (d.alertType === 'efficiency_review' || d.deviationType === 'eficiencia_alta')
             ).length}
@@ -276,7 +271,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <span className="text-sm font-medium text-green-800">Subcostos Saludables</span>
           </div>
           <div className="text-2xl font-bold text-green-600">
-            {deviationData.deviationByRole.filter(d => 
+            {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
               (d.deviationType === 'subcosto_saludable' || d.alertType === 'healthy_savings')
             ).length}
@@ -290,7 +285,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
             <span className="text-sm font-medium text-purple-800">Ejecución Óptima</span>
           </div>
           <div className="text-2xl font-bold text-purple-600">
-            {deviationData.deviationByRole.filter(d => 
+            {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
               (d.deviationType === 'ejecucion_optima' || d.alertType === 'on_target')
             ).length}
