@@ -8242,12 +8242,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
-        // Calcular costos según basis - USAR COSTOTOTAL DIRECTO DE EXCEL MAESTRO
+        // Calcular costos según basis - USAR COSTOTOTAL DE EXCEL MAESTRO Y CONVERTIR A USD
         let actualCost = 0;
         if (person.records.length > 0) {
-          // Usar costoTotal directamente de Excel MAESTRO
-          actualCost = person.records.reduce((sum, record) => sum + (record.costoTotal || 0), 0);
-          console.log(`💰 Direct cost total for ${personKey}: $${actualCost} from ${person.records.length} records`);
+          // Convertir costoTotal de ARS a USD usando tipoCambio
+          actualCost = person.records.reduce((sum, record) => {
+            const costARS = record.costoTotal || 0;
+            const fxRate = record.tipoCambio || defaultFxRate;
+            const costUSD = costARS / fxRate;
+            console.log(`💰 Cost conversion for ${personKey}: ${costARS} ARS / ${fxRate} FX = ${costUSD} USD`);
+            return sum + costUSD;
+          }, 0);
+          console.log(`💰 Total cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
         }
         
         const budgetedCost = person.K * rateUSD;
