@@ -8219,7 +8219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         totalActiveMembers++;
 
-        // Calcular rateUSD promedio ponderado
+        // Calcular rateUSD promedio ponderado - CORREGIDO
         let rateUSD = 0;
         if (person.records.length > 0) {
           let totalWeightedRate = 0;
@@ -8227,11 +8227,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           for (const record of person.records) {
             const weight = record.horasRealesAsana || 1;
-            const recordRateUSD = (record.valorHoraPersona || 0) / (record.tipoCambio || defaultFxRate);
+            const recordRateARS = record.valorHoraPersona || 0;
+            const fxRate = record.tipoCambio || defaultFxRate;
+            
+            // Debug para entender los valores
+            console.log(`💰 Rate calc for ${personKey}: ${recordRateARS} ARS / ${fxRate} FX = ${recordRateARS / fxRate} USD`);
+            
+            const recordRateUSD = recordRateARS / fxRate;
             totalWeightedRate += recordRateUSD * weight;
             totalWeight += weight;
           }
           rateUSD = totalWeight > 0 ? totalWeightedRate / totalWeight : 0;
+          
+          console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
         // Calcular costos según basis
