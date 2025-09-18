@@ -1,0 +1,64 @@
+¡vamos a dejar Equipo prolijo, consistente y universal! 👇
+Qué debe mostrar Equipo siempre
+Top KPIs (mes/rango seleccionado):
+Miembros activos: # personas con actualHours > 0.
+Horas trabajadas: ΣL (horas reales).
+Eficiencia vs objetivo: ΣK=0 ? 70 : min(1, ΣL/ΣK)*100.
+Costo del equipo: elegir una base y usarla siempre
+Ejecución (recomendado en Equipo): Σ (L * rateUSD) → mide contra el plan
+Económico (mismo que Dashboard): Σ (M * rateUSD) → usa horas facturables
+rateUSD = Valor_Hora_ARS / FX(periodo). No mezclar bases.
+Tabla por miembro (orden crítico → alto → medio → bajo):
+interface Deviation {
+  personnelId: string;
+  personnelName: string;
+  budgetedHours: number;      // K
+  actualHours: number;        // L
+  budgetedCost: number;       // K * rateUSD
+  actualCost: number;         // L * rateUSD  (o M*rateUSD si elegís base ECON)
+  hourDeviation: number;      // L - K
+  costDeviation: number;      // actualCost - budgetedCost
+  deviationPercentage: number;// K==0 ? 0 : (L/K - 1)*100
+  severity: 'critical'|'high'|'medium'|'low';
+  alertType: 'overrun'|'underrun'|'ok';
+  deviationType: 'hours'|'cost';
+}
+De dónde salen los datos (mismo motor que el resto)
+Única fuente: hoja Costos directos e indirectos (como Performance/Dashboard).
+Campos: Nro_Proyecto, Mes, Año, Detalle(persona), K, L, M, Valor_Hora_ARS, Cotización.
+Reglas universales
+Periodo: normalizar yyyy-mm, filtrar antes de calcular.
+FX(periodo): usar la Cotización de la fila; si faltara, fallback del período.
+rateUSD por fila: Valor_Hora_ARS / FX(periodo).
+Agregar por persona:
+Kp=ΣK, Lp=ΣL, Mp=ΣM, rateUSD_p = promedio ponderado por L
+rateUSD_p = Σ(L*rateUSD) / ΣL (o por M si usás base ECON).
+Costos:
+Ejecución: budgetedCost = Kp*rateUSD_p, actualCost = Lp*rateUSD_p
+Económico: budgetedCost = Kp*rateUSD_p, actualCost = Mp*rateUSD_p
+hourDeviation = Lp - Kp
+costDeviation = actualCost - budgetedCost
+deviationPercentage = Kp==0 ? 0 : (Lp/Kp - 1)*100
+Severidad (parametrizable; default):
+critical: Lp/Kp ≥ 1.30 o ≤ 0.70
+high: 1.15–1.30 o 0.70–0.85
+medium: 1.05–1.15 o 0.85–0.95
+low: 0.95–1.05
+alertType: overrun si Lp>Kp, underrun si Lp<Kp, ok si bajo.
+Importante: Esta pestaña ya no usa time entries crudos. Todo sale de la misma hoja que usa Dashboard/Performance → consistente 100%.
+Endpoint universal (reemplaza al viejo)
+GET /api/projects/:id/deviation-analysis?timeFilter=august_2025&basis=EXEC|ECON
+basis=EXEC → actualCost con L (ejecución, recomendado para Equipo).
+basis=ECON → actualCost con M (económico, igual al Dashboard).
+Response
+{
+  "summary": {
+    "activeMembers": 5,
+    "totalHours": 288.28,
+    "efficiencyPct": 90.09,
+    "teamCost": 2436.09,             // según basis
+    "basis": "EXEC",
+    "period": "2025-08"
+  },
+  "deviations": [ /* array de Deviation */ ]
+}

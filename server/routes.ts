@@ -615,6 +615,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // All duplicate endpoints consolidated - using universal deviation-analysis
+    
+    const projectId = parseInt(req.params.id);
+    const { timeFilter, basis } = req.query as { timeFilter?: string; basis?: 'EXEC' | 'ECON' };
+    const selectedBasis = basis || 'EXEC'; // Default recomendado para Equipo
+    
+    try {
+      // Get project using existing storage functions
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Get Excel MAESTRO data
+      let projectDirectCosts = [];
+      try {
+        projectDirectCosts = await storage.getDirectCostsByProject(projectId);
+        console.log(`📊 Retrieved ${projectDirectCosts.length} direct costs for project ${projectId}`);
+      } catch (error) {
+        console.error(`❌ Error getting direct costs for project ${projectId}:`, error);
+        projectDirectCosts = [];
+      }
+
+      // Apply time filter using Excel MAESTRO mes/año fields
+      let filteredCosts = projectDirectCosts;
+      if (timeFilter && timeFilter !== 'all') {
+        const dateRange = getDateRangeForFilter(timeFilter);
+        if (dateRange) {
+          filteredCosts = projectDirectCosts.filter(cost => {
+            const monthMap = {
+              'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'may': 4, 'jun': 5,
+              'jul': 6, 'ago': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11
+            };
+            
+            const mesStr = cost.mes?.split(' ')[1]?.toLowerCase();
+            const año = cost.año || cost['año'];
+            
+            if (!mesStr || !año || !(mesStr in monthMap)) {
+              console.log(`⚠️ Invalid date format in cost record: mes=${cost.mes}, año=${año}`);
+              return false;
+            }
+            
+            const costDate = new Date(año, monthMap[mesStr], 1);
+            return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
+          });
+        }
+      }
+
+      // Agregar por persona (según especificación)
+      const memberAggregated = {};
+      filteredCosts.forEach(cost => {
+        const memberName = cost.persona || 'Unknown';
+        if (!memberAggregated[memberName]) {
+          memberAggregated[memberName] = {
+            kTotal: 0,      // K = horasObjetivo
+            lTotal: 0,      // L = horasRealesAsana  
+            mTotal: 0,      // M = horasParaFacturacion
+            rateWeightedSum: 0,
+            rateWeightedDivisor: 0,
+            entries: 0
+          };
+        }
+        
+        const k = Number(cost.horasObjetivo) || 0;
+        const l = Number(cost.horasRealesAsana) || 0;
+        const m = Number(cost.horasParaFacturacion) || 0;
+        const valorHoraARS = Number(cost.valorHoraARS) || 0;
+        const fx = Number(cost.cotizacion) || 1;
+        const rateUSD = fx > 0 ? valorHoraARS / fx : 0;
+        
+        memberAggregated[memberName].kTotal += k;
+        memberAggregated[memberName].lTotal += l;
+        memberAggregated[memberName].mTotal += m;
+        
+        // Rate promedio ponderado según basis
+        const weightHours = selectedBasis === 'EXEC' ? m : l;
+        if (weightHours > 0 && rateUSD > 0) {
+          memberAggregated[memberName].rateWeightedSum += weightHours * rateUSD;
+          memberAggregated[memberName].rateWeightedDivisor += weightHours;
+        }
+        memberAggregated[memberName].entries += 1;
+      });
+
+      // Calcular KPIs Top según especificación
+      const allMembers = Object.keys(memberAggregated);
+      const activeMembers = allMembers.filter(member => 
+        memberAggregated[member].lTotal > 0 // Miembros activos: actualHours > 0
+      );
+      
+      const totalHorasReales = activeMembers.reduce((sum, member) => 
+        sum + memberAggregated[member].lTotal, 0); // ΣL (horas reales)
+        
+      const totalHorasObjetivo = activeMembers.reduce((sum, member) => 
+        sum + memberAggregated[member].kTotal, 0); // ΣK
+        
+      // Eficiencia vs objetivo: ΣK=0 ? 70 : min(1, ΣL/ΣK)*100
+      const efficiencyPct = totalHorasObjetivo === 0 ? 70 : 
+        Math.min(1, totalHorasReales / totalHorasObjetivo) * 100;
+      
+      // Costo del equipo según basis
+      const teamCost = activeMembers.reduce((sum, member) => {
+        const data = memberAggregated[member];
+        const rateUSD = data.rateWeightedDivisor > 0 ? 
+          data.rateWeightedSum / data.rateWeightedDivisor : 0;
+        const costHours = selectedBasis === 'EXEC' ? data.mTotal : data.lTotal;
+        return sum + (costHours * rateUSD);
+      }, 0);
+
+      // Build deviations array con interface Deviation completa
+      const deviations = activeMembers.map(memberName => {
+        const data = memberAggregated[memberName];
+        
+        // Datos base
+        const budgetedHours = data.kTotal; // K
+        const actualHours = data.lTotal;   // L
+        const rateUSD = data.rateWeightedDivisor > 0 ? 
+          data.rateWeightedSum / data.rateWeightedDivisor : 0;
+          
+        // Costos según basis
+        const budgetedCost = budgetedHours * rateUSD; // K * rateUSD
+        const actualCost = selectedBasis === 'EXEC' ? 
+          (data.mTotal * rateUSD) :  // M * rateUSD para ECON
+          (actualHours * rateUSD);   // L * rateUSD para EXEC
+          
+        // Desviaciones
+        const hourDeviation = actualHours - budgetedHours; // L - K
+        const costDeviation = actualCost - budgetedCost;
+        const deviationPercentage = budgetedHours === 0 ? 0 : 
+          ((actualHours / budgetedHours) - 1) * 100; // (L/K - 1)*100
+          
+        // Severidad según umbrales especificados
+        let severity = 'low';
+        const ratio = budgetedHours === 0 ? 1 : actualHours / budgetedHours;
+        if (ratio >= 1.30 || ratio <= 0.70) severity = 'critical';
+        else if ((ratio >= 1.15 && ratio < 1.30) || (ratio > 0.70 && ratio <= 0.85)) severity = 'high';
+        else if ((ratio >= 1.05 && ratio < 1.15) || (ratio > 0.85 && ratio < 0.95)) severity = 'medium';
+        
+        // Alert type y deviation type
+        const alertType = actualHours > budgetedHours ? 'overrun' : 
+                         actualHours < budgetedHours ? 'underrun' : 'ok';
+        const deviationType = Math.abs(hourDeviation) > Math.abs(costDeviation) ? 'hours' : 'cost';
+        
+        return {
+          personnelId: memberName, // Usando nombre como ID por ahora
+          personnelName: memberName,
+          budgetedHours: Math.round(budgetedHours * 100) / 100,
+          actualHours: Math.round(actualHours * 100) / 100,
+          budgetedCost: Math.round(budgetedCost * 100) / 100,
+          actualCost: Math.round(actualCost * 100) / 100,
+          hourDeviation: Math.round(hourDeviation * 100) / 100,
+          costDeviation: Math.round(costDeviation * 100) / 100,
+          deviationPercentage: Math.round(deviationPercentage * 100) / 100,
+          severity,
+          alertType,
+          deviationType
+        };
+      });
+      
+      // Sort by severity (critical → high → medium → low)
+      const severityOrder = { 'critical': 0, 'high': 1, 'medium': 2, 'low': 3 };
+      deviations.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+
+      // Response final según especificación
+      const response = {
+        summary: {
+          activeMembers: activeMembers.length,
+          totalHours: Math.round(totalHorasReales * 100) / 100,
+          efficiencyPct: Math.round(efficiencyPct * 100) / 100,
+          teamCost: Math.round(teamCost * 100) / 100,
+          basis: selectedBasis,
+          period: timeFilter || 'all'
+        },
+        deviations
+      };
+
+      console.log(`📊 EQUIPO SUMMARY: ${response.summary.activeMembers} miembros, ${response.summary.totalHours}h, ${response.summary.efficiencyPct}% eficiencia, $${response.summary.teamCost} USD (${selectedBasis})`);
+      console.log(`📊 EQUIPO DEVIATIONS: ${deviations.length} registros ordenados por severidad`);
+
+      res.json(response);
+      
+    } catch (error) {
+      console.error("❌ Error in Equipo deviation analysis:", error);
+      res.status(500).json({ 
+        message: "Failed to analyze team deviations", 
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Apply input sanitization to all routes
   app.use(sanitizeInput);
 
@@ -8123,7 +8312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let periodKey = '';
 
       if (timeFilter && typeof timeFilter === 'string') {
-        const filterDates = buildPeriod(timeFilter);
+        const filterDates = getDateRangeForFilter(timeFilter);
         if (filterDates) {
           filterStartDate = filterDates.startDate;
           filterEndDate = filterDates.endDate;
@@ -8148,7 +8337,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (cost.mes.includes(' ')) {
             monthNumber = parseInt(cost.mes.substring(0, 2));
           } else {
-            monthNumber = normalizeMonth(cost.mes);
+            // Simple month mapping for cost.mes
+            const monthMap = {
+              'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+              'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
+            };
+            monthNumber = monthMap[cost.mes.toLowerCase()] || 1;
           }
           const costDate = new Date(cost.año, monthNumber - 1, 15);
           return costDate >= filterStartDate && costDate <= filterEndDate;
