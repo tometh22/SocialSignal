@@ -8242,9 +8242,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
-        // Calcular costos según basis
+        // Calcular costos según basis - USAR COSTOTOTAL DIRECTO DE EXCEL MAESTRO
+        let actualCost = 0;
+        if (person.records.length > 0) {
+          // Usar costoTotal directamente de Excel MAESTRO
+          actualCost = person.records.reduce((sum, record) => sum + (record.costoTotal || 0), 0);
+          console.log(`💰 Direct cost total for ${personKey}: $${actualCost} from ${person.records.length} records`);
+        }
+        
         const budgetedCost = person.K * rateUSD;
-        const actualCost = (basis === 'EXEC') ? person.L * rateUSD : person.M * rateUSD;
 
         // Calcular desviaciones
         const hourDeviation = person.L - person.K;
