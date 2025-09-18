@@ -485,15 +485,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get Excel MAESTRO data (using existing logic)
-      const projectDirectCosts = await storage.getDirectCostsByProject(projectId);
+      let projectDirectCosts = [];
+      try {
+        projectDirectCosts = await storage.getDirectCostsByProject(projectId);
+        console.log(`📊 Retrieved ${projectDirectCosts.length} direct costs for project ${projectId}`);
+      } catch (error) {
+        console.error(`❌ Error getting direct costs for project ${projectId}:`, error);
+        projectDirectCosts = []; // Fallback to empty array
+      }
 
-      // Apply time filter if provided
+      // Apply time filter using Excel MAESTRO mes/año fields
       let filteredCosts = projectDirectCosts;
       if (timeFilter && timeFilter !== 'all') {
         const dateRange = getDateRangeForFilter(timeFilter);
         if (dateRange) {
           filteredCosts = projectDirectCosts.filter(cost => {
-            const costDate = new Date(cost.fecha);
+            // Convert Excel MAESTRO mes/año to comparable date
+            const monthMap = {
+              'ene': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'may': 4, 'jun': 5,
+              'jul': 6, 'ago': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11
+            };
+            
+            const mesStr = cost.mes?.split(' ')[1]?.toLowerCase(); // Extract 'ago' from '08 ago'
+            const año = cost.año || cost['año']; // Handle both field names
+            
+            if (!mesStr || !año || !(mesStr in monthMap)) {
+              console.log(`⚠️ Invalid date format in cost record: mes=${cost.mes}, año=${año}`);
+              return false;
+            }
+            
+            const costDate = new Date(año, monthMap[mesStr], 1);
             return costDate >= dateRange.startDate && costDate <= dateRange.endDate;
           });
         }
@@ -510,23 +531,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { excelDirectCosts = [] } = completeProjectData;
       
-      // Build universal response structure
+      // Get unique team members (avoid counting duplicate rows)
+      const uniqueMembers = [...new Set(filteredCosts.map(cost => cost.persona))].filter(Boolean);
+      
+      // Build universal response with basis-specific logic
+      const isBasisEXEC = (basis || 'EXEC') === 'EXEC';
+      
+      // Aggregate data by team member
+      const memberData = {};
+      filteredCosts.forEach(cost => {
+        const memberName = cost.persona || 'Unknown';
+        if (!memberData[memberName]) {
+          memberData[memberName] = {
+            targetHours: 0,
+            actualHours: 0,
+            billableHours: 0,
+            costUSD: 0,
+            entries: 0
+          };
+        }
+        
+        memberData[memberName].targetHours += Number(cost.horasObjetivo) || 0;
+        memberData[memberName].actualHours += Number(cost.horasRealesAsana) || 0;
+        memberData[memberName].billableHours += Number(cost.horasParaFacturacion) || 0;
+        memberData[memberName].costUSD += Number(cost.montoTotalUSD) || 0;
+        memberData[memberName].entries += 1;
+      });
+
+      // Calculate totals based on basis
+      const totalTargetHours = Object.values(memberData).reduce((sum, member: any) => sum + member.targetHours, 0);
+      const totalActualHours = Object.values(memberData).reduce((sum, member: any) => 
+        sum + (isBasisEXEC ? member.billableHours : member.actualHours), 0);
+      const totalCost = Object.values(memberData).reduce((sum, member: any) => sum + member.costUSD, 0);
+
       const summary = {
-        activeMembers: excelDirectCosts.length,
-        totalHours: excelDirectCosts.reduce((sum, cost) => sum + (cost.horas_facturadas || 0), 0),
-        teamCost: excelDirectCosts.reduce((sum, cost) => sum + (cost.costo_usd || 0), 0),
+        activeMembers: uniqueMembers.length,
+        totalHours: totalActualHours,
+        teamCost: totalCost,
         basis: basis || 'EXEC',
         period: timeFilter || 'all'
       };
 
-      const deviations = excelDirectCosts.map(cost => ({
-        memberName: cost.name || 'Unknown',
-        targetHours: cost.horas_objetivo || 0,
-        actualHours: cost.horas_facturadas || 0,
-        deviation: ((cost.horas_facturadas || 0) - (cost.horas_objetivo || 0)) / Math.max(cost.horas_objetivo || 1, 1) * 100,
-        costUSD: cost.costo_usd || 0,
-        status: cost.horas_facturadas > cost.horas_objetivo ? 'over_budget' : 'under_budget'
-      }));
+      // Build deviations with proper calculations and severity
+      const deviations = Object.entries(memberData).map(([memberName, data]: [string, any]) => {
+        const targetHours = Number(data.targetHours) || 0;
+        const actualHours = isBasisEXEC ? (Number(data.billableHours) || 0) : (Number(data.actualHours) || 0);
+        const budgetedCost = targetHours * (Number(data.costUSD) / Math.max(actualHours, 1)); // Estimate rate
+        const actualCost = Number(data.costUSD) || 0;
+        
+        const hourVariance = targetHours > 0 ? ((actualHours - targetHours) / targetHours) * 100 : 0;
+        const costVariance = budgetedCost > 0 ? ((actualCost - budgetedCost) / budgetedCost) * 100 : 0;
+        
+        // Determine severity based on variance
+        let severity = 'low';
+        const absVariance = Math.abs(hourVariance);
+        if (absVariance > 50) severity = 'critical';
+        else if (absVariance > 25) severity = 'high';
+        else if (absVariance > 15) severity = 'medium';
+        
+        return {
+          memberName,
+          targetHours,
+          actualHours,
+          budgetedCost: Math.round(budgetedCost * 100) / 100,
+          actualCost: Math.round(actualCost * 100) / 100,
+          hourVariance: Math.round(hourVariance * 100) / 100,
+          costVariance: Math.round(costVariance * 100) / 100,
+          severity,
+          status: hourVariance > 0 ? 'over_budget' : 'under_budget',
+          basis: isBasisEXEC ? 'EXEC (Billable)' : 'ECON (Actual)'
+        };
+      });
 
       res.json({
         summary,
