@@ -131,7 +131,7 @@ export async function computeProjectPeriodMetrics(
   // 4. ENHANCED FALLBACK: Only try Google Sheets if we have NO local data at all
   let hadLocalData = costRows.length > 0 || ingRows.length > 0;
   
-  if (costRows.length === 0 || ingRows.length === 0) {
+  if (costRows.length === 0 && ingRows.length === 0) {
     try {
       const allCostRows = await readRows(cfg.sheetId, cfg.tabs.costos);
       const allIngRows = await readRows(cfg.sheetId, cfg.tabs.ingresos);
@@ -158,17 +158,49 @@ export async function computeProjectPeriodMetrics(
   
   console.log(`💰 Motor único - Proyecto ${projectId}: ${costRows.length} costos, ${ingRows.length} ingresos`);
   
+  // 5. FIXED: Extract hours directly from costRows like the project list does
+  const totalActualHours = costRows.reduce((sum, cost) => {
+    const hours = Number(cost.horasRealesAsana ?? cost.L ?? cost.hrs_reales ?? cost.horasParaFacturacion) || 0;
+    return sum + hours;
+  }, 0);
+  
+  const totalTargetHours = costRows.reduce((sum, cost) => {
+    const hours = Number(cost.horasObjetivo ?? cost.K ?? cost.hrs_objetivo) || 0;
+    return sum + hours;
+  }, 0);
+  
   // 5. Para cada fila de costos: rateUSD, acumular por persona K, L, M, budgetUSD, actualUSD
   const personGroups = groupByPerson(costRows, rng, basis);
   
   // 6. Totales: sumK, sumL, efficiency = sumL? (sumL/sumK*100) : 70; teamCost = Σ actualUSD
-  const sumK = Object.values(personGroups).reduce((sum, p) => sum + p.targetHours, 0);
-  const sumL = Object.values(personGroups).reduce((sum, p) => sum + p.actualHours, 0);
+  const sumK = totalTargetHours > 0 ? totalTargetHours : Object.values(personGroups).reduce((sum, p) => sum + p.targetHours, 0);
+  const sumL = totalActualHours > 0 ? totalActualHours : Object.values(personGroups).reduce((sum, p) => sum + p.actualHours, 0);
   const efficiency = sumK > 0 ? (sumL / sumK * 100) : 70;
   const teamCost = Object.values(personGroups).reduce((sum, p) => sum + p.actualCost, 0);
   
-  // 7. Ingresos: revenueUSD = Σ (Monto_USD || Monto_ARS/FX)
-  const revenueUSD = calculateRevenue(ingRows, rng);
+  // 7. FIXED: Get revenue using same strategy as project list - search by project name
+  let revenueUSD = 0;
+  try {
+    // Get project name from costRows (same strategy as list)
+    const projectNameFromCosts = costRows.length > 0 ? costRows[0].proyecto : null;
+    
+    if (projectNameFromCosts) {
+      const { storage } = await import('../storage');
+      const allSales = await storage.getGoogleSheetsSales();
+      const projectSales = allSales.filter(sale => sale.projectName === projectNameFromCosts!);
+      
+      // Calculate revenue from matching sales (no temporal filter for now to match list behavior)
+      revenueUSD = projectSales.reduce((sum, sale) => {
+        const montoUSD = parseFloat(sale.amountUsd) || 0;
+        return sum + montoUSD;
+      }, 0);
+      
+      console.log(`💰 REVENUE FIX - Proyecto ${projectId}: Found ${projectSales.length} sales for "${projectNameFromCosts}", total: $${revenueUSD}`);
+    }
+  } catch (error) {
+    console.log(`⚠️ Revenue fallback failed, using original calculation`, error);
+    revenueUSD = calculateRevenue(ingRows, rng);
+  }
   
   // 8. markupUSD = revenueUSD - teamCost
   const markupUSD = revenueUSD - teamCost;

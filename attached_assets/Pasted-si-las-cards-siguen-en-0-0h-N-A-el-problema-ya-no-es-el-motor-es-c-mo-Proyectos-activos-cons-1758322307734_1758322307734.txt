@@ -1,0 +1,86 @@
+si las cards siguen en $0 / 0h / N/A el problema ya no es el motor: es cómo “Proyectos activos” consume / mapea la respuesta de /api/projects?timeFilter=…. Te dejo la ruta más corta para destrabarlo en minutos.
+1) Verificación express (3 comandos)
+Ejecutá esto y pegá lo que sale (pero si te da estos valores, ya sabemos qué falta):
+BASE="http://localhost:5000"
+TF="august_2025"
+PID=39   # Fee Huggies
+
+# A) ¿Qué trae la lista?
+curl -s "$BASE/api/projects?timeFilter=$TF" \
+| jq '.projects[] | select(.projectId==39)'
+
+# B) ¿Viene el bloque summary universal?
+curl -s "$BASE/api/projects?timeFilter=$TF" \
+| jq '.projects[] | select(.projectId==39) | .summary // "NO_SUMMARY"'
+
+# C) ¿Vienen los alias que la card espera?
+curl -s "$BASE/api/projects?timeFilter=$TF" \
+| jq '.projects[] | select(.projectId==39) 
+      | {totalRealRevenue, workedCost, markup, efficiency, actualHours, targetHours}'
+Interpretación:
+Si B trae números correctos (revenueUSD=8450, teamCostUSD=2436.09, etc.) pero C sale null, la UI está leyendo alias legacy que no estás publicando → ver #2.
+Si B ya es NO_SUMMARY, entonces esa ruta no está llamando al motor único (o hay otra ruta “vieja”) → unificá rutas.
+2) Adapter en /api/projects (garantiza compatibilidad)
+En la construcción de cada item de la lista, devolvé ambas formas: el bloque universal y los alias que la card lee hoy.
+// dentro de la route /api/projects
+const item = {
+  projectId: p.id,
+  clientName: p.client.name,
+  projectName: p.quotation?.projectName ?? p.name,
+  status: p.status,                     // "active" | "paused" | "completed"
+  projectType: p.quotation?.projectType, // "recurrente" | "one-time"
+
+  // Bloque universal del motor único
+  summary: {
+    period: range.key,          // "2025-08"
+    basis: "ECON",
+    revenueUSD: metrics.revenueUSD,       // 8450
+    teamCostUSD: metrics.teamCostUSD,     // 2436.09
+    markupUSD: metrics.markupUSD,         // 6013.91
+    efficiencyPct: metrics.efficiencyPct, // 90.1
+    totalHours: metrics.totalHours,       // 288.28
+    estimatedHours: metrics.estimatedHours, // 320
+    hasData: metrics.hasData
+  },
+
+  // Aliases que HOY leen las cards
+  totalRealRevenue: Number(metrics.revenueUSD),
+  workedCost:      Number(metrics.teamCostUSD),
+  markup:          Number(metrics.markupUSD),
+  efficiency:      Number(metrics.efficiencyPct),
+  actualHours:     Number(metrics.totalHours),
+  targetHours:     Number(metrics.estimatedHours)
+};
+Importante: enviá números, no strings con $ o comas.
+3) Normalizador defensivo en la vista (por si llega sólo la forma nueva)
+En active-projects.tsx (o donde pintás la card):
+const price   = p.totalRealRevenue ?? p.summary?.revenueUSD ?? 0;
+const cost    = p.workedCost      ?? p.summary?.teamCostUSD ?? 0;
+const markup$ = p.markup          ?? p.summary?.markupUSD   ?? 0;
+const hrs     = p.actualHours     ?? p.summary?.totalHours  ?? 0;
+const target  = p.targetHours     ?? p.summary?.estimatedHours ?? 0;
+const eff     = p.efficiency      ?? p.summary?.efficiencyPct ?? null;
+Con esto aunque el backend aún no traiga los alias, igual se llenan.
+4) “Solo con actividad” — criterio correcto
+Ese switch oculta proyectos si ve “sin actividad”. Usá:
+const hasActivity = (hrs > 0) || (price > 0) || (cost > 0);
+Si usás solo hrs > 0, te va a ocultar proyectos con facturación pero sin horas.
+5) Cache de datos (clave de query)
+Asegurate de que la queryKey incluya el filtro para que no te traiga una respuesta antigua:
+useQuery({
+  queryKey: ['projects', timeFilter, basis ?? 'ECON'],
+  queryFn: () => fetch(`/api/projects?timeFilter=${timeFilter}`).then(r => r.json())
+});
+6) Qué debería verse (Huggies · agosto 2025)
+Precio al cliente: $8,450
+Reales del período: 288.28h
+Eficiencia: ~90.1%
+Costos: $2,436.09
+Markup: $6,013.91
+Objetivo: 320h
+Si aplicás #2 + #3, esas cards aparecen aunque la UI siga usando los nombres legacy.
+Resumen “paso 1-2-3”
+Corre el cURL de verificación (#1).
+Si faltan alias → agrega el adapter del punto #2 en /api/projects.
+Añadí el normalizador del punto #3 en la vista y confirmá que la queryKey cachea por timeFilter (#5).
+Si querés, pasame el JSON de GET /api/projects?timeFilter=august_2025 para un par de proyectos (ej. 39 y otro) y te digo exactamente qué campo te falta en 1 línea.
