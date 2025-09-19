@@ -12,7 +12,8 @@ const router = Router();
  * Proyecto completo con métricas unificadas
  * Usa el motor único para consistencia total
  */
-router.get('/:id/complete-data', async (req, res) => {
+// RUTA DUPLICADA ELIMINADA - Ahora usa completeDataHandler en routes/index.ts
+// router.get('/:id/complete-data', async (req, res) => {
   console.log(`🚀 UNIFIED COMPLETE DATA - Project ${req.params.id}, TimeFilter: ${req.query.timeFilter}, Basis: ${req.query.basis}`);
   
   try {

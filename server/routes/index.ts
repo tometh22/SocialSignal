@@ -6,6 +6,7 @@ import { projectsRouter } from './projects';
 import { projectRouter } from './project';
 import { deviationRouter } from './deviation';
 import { rankingsRouter } from './rankings';
+import { completeDataHandler } from './complete-data';
 
 /**
  * Integra todas las rutas del sistema universal
@@ -17,7 +18,7 @@ export function setupUniversalRoutes(app: Express, requireAuth: any) {
   
   // Integrar todas las rutas universales
   app.use('/api/projects', projectsRouter);          // GET /api/projects
-  app.use('/api/projects', projectRouter);           // GET /api/projects/:id/complete-data
+  app.get('/api/projects/:id/complete-data', completeDataHandler);  // ÚNICA RUTA COMPLETE-DATA (fix quirúrgico)
   app.use('/api/projects', deviationRouter);         // GET /api/projects/:id/deviation-analysis  
   app.use('/api/projects', rankingsRouter);          // GET /api/projects/:id/performance-rankings
 
