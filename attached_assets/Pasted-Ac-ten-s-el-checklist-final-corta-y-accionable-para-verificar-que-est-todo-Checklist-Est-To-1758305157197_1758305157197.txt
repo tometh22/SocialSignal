@@ -1,0 +1,71 @@
+Acá tenés el checklist final (corta y accionable) para verificar que está todo.
+✅ Checklist “Está Todo”
+0) Server & módulos
+ ESM only en rutas (await import, sin require).
+ Motor único computeProjectPeriodMetrics(projectId, timeFilter, basis).
+ resolveProjectConfig(projectId) (sheetId, tabs, peopleMap) sin hardcodes.
+ Utilidades DRY: resolveTimeFilter, parseDec, fxForRow, rateUSD, groupByPerson.
+1) Fuentes & filtro temporal
+ Ingresos ← hoja “Ventas Tomi” (Confirmado=Sí).
+ Costos/Equipo/Performance ← “Costos directos e indirectos”.
+ Filtro único resolveTimeFilter (mes, Q, custom) usado en todas las rutas.
+2) Moneda & FX
+ Backend entrega USD ya convertidos (UI no divide por FX).
+ fxForRow: fila > período > fallback.
+ Sin dobles conversiones (nada de valores ~0.12/0.64 por dividir de más).
+3) Bases & fórmulas
+ Basis por defecto = ECON (Actual = Σ M·ValorHora_ARS/FX).
+ Budget = Σ K·ValorHora_ARS/FX (o tarifa histórica si falta).
+ Eficiencia header = (ΣL/ΣK)×100; si ΣK=0 → 70.
+ Desvío horas = (L/K − 1)×100 con signo; severidad por umbrales (5/15/30).
+4) Endpoints universales (contrato)
+ GET /api/projects?timeFilter=...
+ GET /api/projects/:id/complete-data?timeFilter=...&basis=ECON|EXEC
+ GET /api/projects/:id/deviation-analysis?timeFilter=...&basis=...
+ (opcional) GET /api/projects/:id/performance-rankings?timeFilter=...
+ Todos devuelven summary.period, summary.basis, summary.emptyStates, summary.hasData.
+Deviation row (mínimo)
+ personnelId, personnelName, budgetedHours, actualHours, budgetedCost, actualCost, hourDeviation, costDeviation, deviationPercentage, severity, alertType, deviationType
+5) Vista Proyectos (cards)
+ Usa /api/projects?timeFilter=....
+ Muestra revenueUSD, teamCostUSD, markupUSD, hours, efficiencyPct.
+ Banners por emptyStates.costos/ingresos.
+6) Proyecto único (todas las pestañas)
+ Prefetch paralelo de /complete-data y /deviation-analysis.
+ Cache keys incluyen {projectId, period, basis}.
+ Dashboard: Totales de summary (mismos que Equipo/Performance).
+ Equipo: tabla de desviaciones con USD, signos correctos, ordenamientos:
+Criticidad (|Δ%|), Costo total (o Tarifa $/h si lo definiste así), Productividad (L/K).
+ Performance: barras por persona con K/L/M del mismo payload.
+ Ingresos: filas de Ventas Tomi → USD.
+ Costos: totales/desglose desde deviation-analysis (basis ECON).
+7) Estados vacíos (no crashea)
+ summary.emptyStates.costos → “Sin datos de Excel MAESTRO en el período”.
+ summary.emptyStates.ingresos → “Sin ingresos detectados para el período”.
+ summary.emptyStates.objetivos → eficiencia = 70 + tooltip “sin K”.
+8) Golden test (Fee Huggies · august_2025 · basis=ECON)
+ efficiencyPct ≈ 90.09 (ΣL=288.28 / ΣK=320).
+ teamCostUSD = 2436.09.
+ revenueUSD = 8450.
+ markupUSD = 6013.91.
+ Por persona (Actual/Budget/Δ%):
+Trini 867.49 / 806.97 / +7.5%
+Sol 773.74 / 763.57 / +1.3%
+Vanu 398.23 / 398.23 / 0.0%
+Aylu 231.00 / 520.44 / −55.6%
+Vicky 165.63 / 197.65 / −16.2%
+9) Smoke cURL (copiar y pegar)
+curl -s "/api/projects/39/complete-data?timeFilter=august_2025&basis=ECON" | jq '.summary'
+curl -s "/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON" | jq '.summary, .deviations | length'
+curl -s "/api/projects?timeFilter=august_2025" | jq '.[0]'
+10) QA automatizado (mínimo)
+ Unit: parseDec (ES/US/moneda/paréntesis), fxForRow (prioridades), agregación multi-fila.
+ Contract: endpoints devuelven summary completo + schema de deviations.
+ Golden: asserts exactos de Huggies/aug_2025.
+ Coherencia: /projects, /complete-data, /deviation-analysis dan mismos totales para mismo período/basis.
+11) Performance & caché
+ Server: lecturas a Sheets cacheadas por (projectId, period) y (projectId, period, basis).
+ Front: invalidación correcta al cambiar período/basis.
+12) Observabilidad
+ Logs con projectId, period, basis, fxSource (row|period|fallback), conteo de filas (ingresos/costos).
+ Errores controlados: mensajes claros en UI ante timeouts o sheets vacíos.

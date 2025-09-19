@@ -5,6 +5,27 @@ import { resolveTimeFilter, isDateInRange, TimeFilter } from '../services/time';
 import { parseDec } from '../services/number';
 import { fxForRow, rateUSD } from '../services/fx';
 import { readRows } from '../services/sheets';
+import { storage } from '../storage';
+
+// Helper function for month name to number conversion
+function getMonthNumber(monthName: string): string {
+  const monthMap: { [key: string]: string } = {
+    'enero': '01', 'ene': '01', '01 ene': '01',
+    'febrero': '02', 'feb': '02', '02 feb': '02', 
+    'marzo': '03', 'mar': '03', '03 mar': '03',
+    'abril': '04', 'abr': '04', '04 abr': '04',
+    'mayo': '05', 'may': '05', '05 may': '05',
+    'junio': '06', 'jun': '06', '06 jun': '06',
+    'julio': '07', 'jul': '07', '07 jul': '07',
+    'agosto': '08', 'ago': '08', '08 ago': '08',
+    'septiembre': '09', 'sep': '09', '09 sep': '09',
+    'octubre': '10', 'oct': '10', '10 oct': '10',
+    'noviembre': '11', 'nov': '11', '11 nov': '11',
+    'diciembre': '12', 'dic': '12', '12 dic': '12'
+  };
+  
+  return monthMap[monthName.toLowerCase()] || '01';
+}
 
 export interface PeriodMetrics {
   summary: {
@@ -63,13 +84,67 @@ export async function computeProjectPeriodMetrics(
   // 2. rng = resolveTimeFilter(timeFilter)
   const rng = resolveTimeFilter(timeFilter);
   
-  // 3. costRows = readRows(cfg.sheetId, cfg.tabs.costos) filtradas por proyecto y período
-  const allCostRows = await readRows(cfg.sheetId, cfg.tabs.costos);
-  const costRows = filterRowsByProjectAndPeriod(allCostRows, projectId, rng);
+  // 3. DATOS LOCALES PRIMERO: costRows desde base de datos filtradas por proyecto y período
+  let costRows: any[] = [];
+  let ingRows: any[] = [];
   
-  // 4. ingRows = readRows(cfg.sheetId, cfg.tabs.ingresos) filtradas por proyecto y período
-  const allIngRows = await readRows(cfg.sheetId, cfg.tabs.ingresos);
-  const ingRows = filterRowsByProjectAndPeriod(allIngRows, projectId, rng);
+  try {
+    // Intentar usar datos locales primero (según checklist punto 1)
+    const directCosts = await storage.getDirectCosts(projectId);
+    const sales = await storage.getAllSales();
+    
+    if (directCosts && directCosts.length > 0) {
+      // Filtrar costos por período usando isDateInRange
+      costRows = directCosts.filter((cost: any) => {
+        if (!cost.mes || !cost.año) return false;
+        // Convertir "08 ago" + 2025 a fecha y verificar si está en rango
+        const monthMatch = cost.mes.match(/(\d{2})\s+(\w+)/);
+        if (!monthMatch) return false;
+        
+        const monthNum = getMonthNumber(monthMatch[2]);
+        const dateStr = `${cost.año}-${monthNum}-01`;
+        const costDate = new Date(dateStr);
+        
+        return isDateInRange(costDate, rng);
+      });
+      console.log(`💰 BD Local - Proyecto ${projectId}: ${costRows.length} costos filtrados de ${directCosts.length} totales`);
+    }
+    
+    if (sales && sales.length > 0) {
+      // Filtrar ingresos por proyecto y período
+      ingRows = sales.filter((sale: any) => {
+        if (sale.projectId !== projectId) return false;
+        if (!sale.year || !sale.month) return false;
+        
+        const monthNum = getMonthNumber(sale.month);
+        const dateStr = `${sale.year}-${monthNum}-01`;
+        const saleDate = new Date(dateStr);
+        
+        return isDateInRange(saleDate, rng);
+      });
+      console.log(`💰 BD Local - Proyecto ${projectId}: ${ingRows.length} ingresos filtrados de ${sales.filter((s: any) => s.projectId === projectId).length} del proyecto`);
+    }
+  } catch (localError) {
+    console.log(`⚠️ Error accessing local DB, falling back to Google Sheets:`, localError instanceof Error ? localError.message : String(localError));
+  }
+  
+  // 4. FALLBACK a Google Sheets solo si no hay datos locales
+  if (costRows.length === 0 || ingRows.length === 0) {
+    try {
+      const allCostRows = await readRows(cfg.sheetId, cfg.tabs.costos);
+      const allIngRows = await readRows(cfg.sheetId, cfg.tabs.ingresos);
+      
+      if (costRows.length === 0) {
+        costRows = filterRowsByProjectAndPeriod(allCostRows, projectId, rng);
+      }
+      if (ingRows.length === 0) {
+        ingRows = filterRowsByProjectAndPeriod(allIngRows, projectId, rng);
+      }
+      console.log(`📊 Google Sheets Fallback - Proyecto ${projectId}: ${costRows.length} costos, ${ingRows.length} ingresos`);
+    } catch (sheetsError) {
+      console.log(`❌ Google Sheets also failed:`, sheetsError instanceof Error ? sheetsError.message : String(sheetsError));
+    }
+  }
   
   console.log(`💰 Motor único - Proyecto ${projectId}: ${costRows.length} costos, ${ingRows.length} ingresos`);
   
