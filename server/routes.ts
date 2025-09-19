@@ -8106,7 +8106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const projectId = parseInt(req.params.id);
-      const { timeFilter, basis = 'EXEC', startDate, endDate } = req.query;
+      const { timeFilter, basis = 'ECON', startDate, endDate } = req.query;
       
       console.log(`🔍 PARAMS: timeFilter=${timeFilter}, basis=${basis}, startDate=${startDate}, endDate=${endDate}`);
       
@@ -8151,7 +8151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             monthNumber = parseInt(cost.mes.substring(0, 2));
           } else {
             // Simple month mapping for cost.mes
-            const monthMap = {
+            const monthMap: { [key: string]: number } = {
               'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
               'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
             };
@@ -8242,34 +8242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
-        // Calcular costos según basis - ROBUST CURRENCY DETECTION
-        let actualCost = 0;
-        if (person.records.length > 0) {
-          actualCost = person.records.reduce((sum, record) => {
-            const costoTotal = record.costoTotal || 0;
-            const montoTotalUSD = record.montoTotalUSD || 0;
-            const valorHoraPersona = record.valorHoraPersona || 0;
-            
-            // 1st: Use montoTotalUSD if available
-            if (montoTotalUSD > 0) {
-              console.log(`💰 Using montoTotalUSD for ${personKey}: ${montoTotalUSD} USD`);
-              return sum + montoTotalUSD;
-            }
-            // 2nd: Convert ARS to USD if valorHoraPersona > 0 
-            else if (valorHoraPersona > 0) {
-              const fxRate = record.tipoCambio || defaultFxRate;
-              if (fxRate > 0) {
-                const costUSD = costoTotal / fxRate;
-                console.log(`💰 Converting ${personKey}: ${costoTotal} ARS / ${fxRate} FX = ${costUSD} USD`);
-                return sum + costUSD;
-              }
-            }
-            // 3rd: Use costoTotal as USD
-            console.log(`💰 Using direct USD for ${personKey}: ${costoTotal} USD`);
-            return sum + costoTotal;
-          }, 0);
-          console.log(`💰 Final cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
-        }
+        // Calcular costos según basis ECON: M * rateUSD
+        const actualCost = person.M * rateUSD;
+        console.log(`💰 ECON calculation for ${personKey}: ${person.M} hours × $${rateUSD.toFixed(2)}/hr = $${actualCost.toFixed(2)} USD`);
         
         // Calcular presupuesto usando tarifa estable USD por persona
         const budgetedCost = person.K * rateUSD;
@@ -8351,7 +8326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalHours: Number(totalHours.toFixed(2)),
           efficiencyPct: Number(efficiencyPct.toFixed(1)),
           teamCost: Number(totalTeamCost.toFixed(2)),
-          basis: basis as string,
+          basis: "ECON",
           period: periodKey
         },
         deviations
