@@ -8154,18 +8154,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Universal deviation analysis error:", error);
       res.status(500).json({ message: "Failed to generate deviation analysis" });
     }
+  });
 
+  // Endpoint para recomendaciones
+  app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const { startDate, endDate, timeFilter } = req.query;
+      
+      console.log(`🔍🔍🔍 RECOMMENDATIONS CALLED - ProjectId: ${projectId}, TimeFilter: ${timeFilter}, StartDate: ${startDate}, EndDate: ${endDate}`);
+      
       const project = await storage.getActiveProject(projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // 🎯 PASO 1: Resolver período usando mismo sistema que Dashboard/Performance
-      let filterStartDate: Date | null = null;
-      let filterEndDate: Date | null = null;
-      let periodKey = '';
-
-      if (timeFilter && typeof timeFilter === 'string') {
+      const quotation = await storage.getQuotation(project.quotationId);
+      const teamMembers = await storage.getQuotationTeamMembers(project.quotationId);
+      
+      // Construir condiciones de filtro
+      const whereConditions = [eq(timeEntries.projectId, projectId)];
+      
+      // Procesar timeFilter o usar startDate/endDate
+      let filterStartDate: string | undefined;
+      let filterEndDate: string | undefined;
+      
+      if (timeFilter) {
         const filterDates = getDateRangeForFilter(timeFilter);
         if (filterDates) {
           filterStartDate = filterDates.startDate;
