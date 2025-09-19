@@ -1,0 +1,67 @@
+Qué está pasando realmente
+Esa pantalla (“Proyectos activos”) no llama /api/projects/:id/complete-data por tarjeta. Carga toda la grilla con /api/projects?timeFilter=… y la UI espera claves legacy (de la versión vieja).
+Tu backend nuevo devuelve summary.* (revenueUSD, teamCostUSD, …) y por eso la card cae a $0 / 0h / N/A.
+Cómo debe responder /api/projects
+Para cada proyecto, devolvé ambas cosas:
+El bloque nuevo summary (contrato universal)
+Alias legacy que la card usa hoy
+// respuesta por item en /api/projects
+{
+  projectId: 39,
+  clientName: "Kimberly Clark",
+  projectName: "Fee Huggies",
+  status: "active",
+  projectType: "recurrente",
+
+  // --- NUEVO contrato coherente con el motor ---
+  summary: {
+    period: "2025-08",
+    basis: "ECON",
+    revenueUSD: 8450,
+    teamCostUSD: 2436.09,
+    markupUSD: 6013.91,
+    efficiencyPct: 90.1,
+    totalHours: 288.28,   // ΣL
+    estimatedHours: 320,  // ΣK
+    emptyStates: { ingresos:false, costos:false },
+    hasData: { ingresos:true, costos:true }
+  },
+
+  // --- ALIAS LEGACY que la card actual lee ---
+  totalRealRevenue: 8450,        // Facturación (azul)
+  workedCost: 2436.09,           // Costos (rojo)
+  markup: 6013.91,               // Markup (verde, en $)
+  efficiency: 90.1,              // % eficiencia
+  actualHours: 288.28,           // horas reales
+  targetHours: 320               // horas objetivo
+}
+Con esto no tocás la UI y la página queda consistente con el motor único.
+Más adelante podés migrar la card a leer summary.* y quitar los alias.
+Checklist de verificación (2 minutos)
+Parámetro temporal
+Asegurate de pasar timeFilter al motor:
+computeProjectPeriodMetrics(projectId, timeFilter, basis='ECON')
+EndPoint correcto
+La ruta que atiende /api/projects debe usar ese motor (no Sheets).
+Evitá duplicados/antiguas; que haya una definición activa.
+Alias presentes
+En la respuesta, confirmá que existen:
+totalRealRevenue, workedCost, markup, efficiency, actualHours, targetHours.
+Filtro “Solo con actividad”
+La UI oculta cards si todos son 0/Null. El criterio debe ser:
+actualHours > 0 || totalRealRevenue > 0 || workedCost > 0.
+Caso de oro – Huggies / agosto_2025
+Lo esperado por tarjeta:
+Precio al cliente: $8,450
+Reales del período: 288.28 h
+Eficiencia: ~90.1%
+Facturación (azul): $8,450
+Costos (rojo): $2,436.09
+Markup (verde): $6,013.91
+Objetivo: 320 h (para la barra)
+Si seguís viendo $0/N/A, mira esto
+/api/projects devuelve sólo summary.* → faltan alias ➜ agrégalos.
+La ruta usa readRows() (Sheets) y falla → cambiar a BD local (tu motor ya lo hace).
+Hay rutas duplicadas y está respondiendo la vieja → deja una sola.
+basis distinto entre endpoints → usa ECON para todos en la grilla.
+Con ese adapter de salida en /api/projects la página de Proyectos activos se va a poblar al instante y quedará alineada con Dashboard, Equipo y Performance.
