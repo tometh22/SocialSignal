@@ -17,6 +17,7 @@ import AdminInflation from "@/pages/admin-inflation";
 // Project Management Pages
 import ActiveProjects from "@/pages/active-projects";
 import ProjectDetailsRedesigned from "@/pages/project-details-redesigned";
+import ProjectSingle from "@/pages/project-single";
 import ProjectSettings from "@/pages/project-settings";
 import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
@@ -135,7 +136,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} />
-                  <ProtectedRoute path="/projects/:id" component={ProjectDetailsRedesigned} />
+                  <ProtectedRoute path="/projects/:id" component={ProjectSingle} />
                   <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} />
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
                   

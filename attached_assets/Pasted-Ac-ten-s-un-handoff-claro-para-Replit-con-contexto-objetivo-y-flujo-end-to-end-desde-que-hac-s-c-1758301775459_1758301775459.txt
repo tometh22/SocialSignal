@@ -1,0 +1,124 @@
+Acá tenés un “handoff” claro para Replit con contexto, objetivo y flujo end-to-end desde que hacés clic en una card de proyecto hasta ver todas las pestañas del Proyecto único. Incluye variables universales y un ejemplo dorado (Huggies · aug_2025) para validar.
+Contexto
+Tenés dos vistas:
+Proyectos (grid de cards): lista de todos los proyectos con KPIs resumidos del período activo.
+Proyecto único (layout con pestañas): Dashboard, Equipo, Performance, Ingresos, Costos, etc., todas alimentadas por el mismo motor y el mismo filtro temporal global.
+Objetivo
+Universalizar: que cualquier proyecto/periodo use la misma fuente y motor.
+Consistencia total entre pestañas (mismos números, misma FX, misma base).
+Contrato de API estable para que el front no dependa de estructuras ad-hoc.
+DRY: un solo cálculo en backend, múltiples vistas en frontend.
+Estados vacíos y errores controlados (sin crashear).
+Principios (reglas de oro)
+Ingresos: siempre de hoja “Ventas Tomi”.
+Costos/Equipo/Performance: siempre de “Costos directos e indirectos”.
+FX por período (fila > período > fallback).
+Base por defecto: ECON (actual = Σ M × rateUSD).
+UI jamás reconvierte moneda (USD ya viene convertido del backend).
+Filtro temporal único (resolveTimeFilter) para todas las rutas.
+Flujo completo (desde que clickeás una card)
+0) En Proyectos (cards)
+Endpoint:
+GET /api/projects?timeFilter={timeFilter}
+Cada card muestra (resumen por proyecto):
+revenueUSD, teamCostUSD, markupUSD, hours (ΣL), efficiencyPct, hasData, emptyStates.
+Al seleccionar un proyecto X, navegás a:
+/projects/{projectId}?timeFilter={timeFilter}&basis=ECON
+1) Cargar Proyecto único (layout)
+Estado global (ProjectDataProvider):
+projectId (de la ruta)
+timeFilter (del query; default: mes actual)
+basis (default: ECON)
+Prefetch en paralelo (clave de caché incluye {projectId, period, basis}):
+GET /api/projects/{id}/complete-data?timeFilter={tf}&basis={basis}
+GET /api/projects/{id}/deviation-analysis?timeFilter={tf}&basis={basis}
+(opcional) GET /api/projects/{id}/performance-rankings?timeFilter={tf}
+Mientras cargan, mostrar skeletons. Si falla, mostrar fallback/banner (no stack trace).
+2) Propagación del filtro temporal global
+El selector en el header del proyecto cambia timeFilter en el provider.
+Invalida y refetchea todas las pestañas con las mismas keys.
+3) Render por pestaña (todas leen del mismo summary)
+Dashboard
+Usa summary de /complete-data:
+period, basis, activeMembers, totalHours, efficiencyPct,
+teamCostUSD, revenueUSD, markupUSD,
+emptyStates / hasData.
+Si emptyStates.costos=true → banner “Sin datos de Excel MAESTRO”.
+Si emptyStates.ingresos=true → banner “Sin ingresos detectados”.
+Equipo
+Usa /deviation-analysis:
+summary (mismos totales que Dashboard)
+deviations[] con:
+personnelId, personnelName, budgetedHours(K), actualHours(L), budgetedCost, actualCost, hourDeviation(L−K), costDeviation, deviationPercentage=(L/K−1)*100, severity, alertType.
+Ordenamientos: Criticidad (|Δ%|), Costo total (o Tarifa $/h si preferís), Productividad (L/K).
+Performance
+Reutiliza /complete-data (teamBreakdown con K/L/M por persona y series si las tenés).
+Ingresos / Costos (tablas)
+Ingresos: filas de Ventas Tomi convertidas a USD.
+Costos: podés reutilizar deviation-analysis (basis ECON) para totales y desglose.
+Endpoints (universales)
+GET /api/projects?timeFilter={timeFilter}
+GET /api/projects/{projectId}/complete-data?timeFilter={timeFilter}&basis={ECON|EXEC}
+GET /api/projects/{projectId}/deviation-analysis?timeFilter={timeFilter}&basis={ECON|EXEC}
+GET /api/projects/{projectId}/performance-rankings?timeFilter={timeFilter}
+Resumen esperado (mínimo)
+{
+  "summary": {
+    "period": "YYYY-MM",
+    "basis": "ECON",
+    "activeMembers": 0,
+    "totalHours": 0,
+    "efficiencyPct": 0,
+    "teamCostUSD": 0,
+    "revenueUSD": 0,
+    "markupUSD": 0,
+    "emptyStates": { "costos": false, "ingresos": false, "horas": false, "objetivos": false },
+    "hasData": { "costos": false, "ingresos": false }
+  }
+}
+Fila de desviación (Equipo)
+{
+  "personnelId": "string",
+  "personnelName": "string",
+  "budgetedHours": 0,
+  "actualHours": 0,
+  "budgetedCost": 0,
+  "actualCost": 0,
+  "hourDeviation": 0,
+  "costDeviation": 0,
+  "deviationPercentage": 0,
+  "severity": "critical|high|medium|low",
+  "alertType": "overrun|underrun|no-plan",
+  "deviationType": "hours"
+}
+Ejemplo dorado (para validar Huggies)
+Variables: projectId=39, timeFilter=august_2025, basis=ECON
+Smoke cURL
+curl -s "/api/projects/39/complete-data?timeFilter=august_2025&basis=ECON" | jq '.summary'
+curl -s "/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON" | jq '.summary, .deviations | length, .deviations[] | select(.personnelName=="Sol Ayala")'
+Valores esperados
+efficiencyPct ≈ 90.09
+teamCostUSD = 2436.09
+revenueUSD = 8450
+markupUSD = 6013.91
+Deviations (USD):
+Trini actual 867.49, budget 806.97, dev% +7.5
+Sol actual 773.74, budget 763.57, dev% +1.3
+Vanu actual 398.23, budget 398.23, dev% 0.0
+Aylu actual 231.00, budget 520.44, dev% −55.6
+Vicky actual 165.63, budget 197.65, dev% −16.2
+Notas técnicas (para que no falle)
+ESM only en rutas: await import() (no require()).
+Una sola función de dominio: computeProjectPeriodMetrics(projectId, timeFilter, basis).
+resolveTimeFilter compartido por todas las rutas.
+USD ya convertidos en backend; la UI solo formatea.
+Cache keys (SWR/React Query):
+['projects', period]
+['project', projectId, period, basis]
+['project', projectId, 'deviation', period, basis]
+Resumen para Replit (qué le estás pasando y por qué)
+Contexto: Tenemos vista de Proyectos y Proyecto único; las pestañas del Proyecto único volvieron a fallar por rutas legacy y require().
+Objetivo: Integrar rutas universales + motor único + filtro temporal global para que todas las pestañas lean la misma verdad y rendericen consistente para cualquier proyecto.
+Flujo: Clic en card → Project layout monta → prefetch paralelo de /complete-data y /deviation-analysis con {projectId, timeFilter, basis} → todas las pestañas leen de ahí y se re-renderizan al cambiar el filtro.
+Validación: Usar Huggies · august_2025 como golden (números exactos arriba).
+Con esto, tenés la guía de qué, para qué y cómo del flujo completo. Si querés, te armo un mini diagrama de secuencia o los handlers TS listos para pegar.
