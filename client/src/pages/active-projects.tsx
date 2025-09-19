@@ -355,7 +355,7 @@ function ProjectCard({
             <Button
               variant="default"
               size="sm"
-              onClick={() => onNavigate(`/active-projects/${project.id}`)}
+              onClick={() => onNavigate(`/projects/${project.id}`)}
               className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Eye className="h-3 w-3 mr-1" />
@@ -570,7 +570,7 @@ function ProjectCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => onNavigate(`/active-projects/${subproject.id}`)}
+                      onClick={() => onNavigate(`/projects/${subproject.id}`)}
                       className="h-7 px-2 text-xs"
                     >
                       <Eye className="h-3 w-3 mr-1" />

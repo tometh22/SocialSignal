@@ -36,9 +36,9 @@ import OperacionalTab from '@/components/project-tabs/OperacionalTab';
 function ProjectHeader() {
   const { projectId, timeFilter, basis, setTimeFilter, setBasis } = useProjectData();
 
-  // Query para información básica del proyecto
+  // Query para información básica del proyecto usando endpoint universal
   const { data: projectInfo, isLoading: isLoadingProject } = useQuery({
-    queryKey: ['/api/active-projects', 'projects'],
+    queryKey: ['/api/projects', 'projects'],
     enabled: !!projectId,
     select: (data: any) => data?.find((p: any) => p.id === projectId)
   });
