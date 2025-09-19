@@ -8219,7 +8219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         totalActiveMembers++;
 
-        // Calcular rateUSD promedio ponderado - CORREGIDO
+        // Calcular rateUSD usando Excel MAESTRO o tarifas históricas como fallback
         let rateUSD = 0;
         if (person.records.length > 0) {
           let totalWeightedRate = 0;
@@ -8230,16 +8230,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const recordRateARS = record.valorHoraPersona || 0;
             const fxRate = record.tipoCambio || defaultFxRate;
             
-            // Debug para entender los valores
-            console.log(`💰 Rate calc for ${personKey}: ${recordRateARS} ARS / ${fxRate} FX = ${recordRateARS / fxRate} USD`);
-            
-            const recordRateUSD = recordRateARS / fxRate;
-            totalWeightedRate += recordRateUSD * weight;
-            totalWeight += weight;
+            if (recordRateARS > 0) {
+              const recordRateUSD = recordRateARS / fxRate;
+              totalWeightedRate += recordRateUSD * weight;
+              totalWeight += weight;
+              console.log(`💰 Rate from Excel for ${personKey}: ${recordRateARS} ARS / ${fxRate} FX = ${recordRateUSD} USD`);
+            }
           }
-          rateUSD = totalWeight > 0 ? totalWeightedRate / totalWeight : 0;
           
-          console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
+          if (totalWeight > 0) {
+            rateUSD = totalWeightedRate / totalWeight;
+            console.log(`💰 Final rateUSD from Excel for ${personKey}: ${rateUSD} USD/hour`);
+          } else {
+            // Fallback: usar costo real dividido por horas para calcular tarifa
+            const totalCostUSD = person.records.reduce((sum, record) => {
+              const montoTotalUSD = record.montoTotalUSD || 0;
+              const costoTotal = record.costoTotal || 0;
+              const fxRate = record.tipoCambio || defaultFxRate;
+              
+              if (montoTotalUSD > 0) {
+                return sum + montoTotalUSD;
+              } else {
+                return sum + (costoTotal / fxRate);
+              }
+            }, 0);
+            
+            const totalHours = person.L > 0 ? person.L : person.M;
+            rateUSD = totalHours > 0 ? totalCostUSD / totalHours : 0;
+            console.log(`💰 Calculated rateUSD for ${personKey}: $${totalCostUSD} / ${totalHours}h = ${rateUSD} USD/hour`);
+          }
         }
 
         // Calcular costos según basis ECON: usar costos directos del Excel MAESTRO
