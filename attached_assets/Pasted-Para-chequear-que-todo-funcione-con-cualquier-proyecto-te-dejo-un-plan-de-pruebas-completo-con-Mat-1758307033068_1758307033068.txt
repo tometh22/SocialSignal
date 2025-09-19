@@ -1,0 +1,152 @@
+Para chequear que todo funcione con cualquier proyecto, te dejo un plan de pruebas completo con:
+Matriz de casos (qué cubrir).
+Invariantes que deben cumplirse SIEMPRE.
+Smokes multi-proyecto (bash + curl + jq).
+Asserts por endpoint.
+Tests automáticos (Jest/Supertest) listos para pegar.
+Pruebas de bordes (sin datos, K=0, monedas, etc.).
+Monitoreo y guardas anti-regresión.
+1) Matriz de casos (proyectos × períodos × bases)
+Cubrí al menos 4 tipos de proyecto reales:
+Fee mensual con ingresos USD y costos ARS
+Proyecto en ARS (ingresos Monto_ARS)
+Sin ingresos en el período
+Sin costos en el período (solo ingresos)
+Y combiná con filtros:
+Mes: july_2025, august_2025
+Trimestre: q3_2025
+Custom: start=2025-08-01&end=2025-08-31
+Y bases:
+ECON (default)
+EXEC (para validar que alternar la base no rompe nada)
+2) Invariantes a verificar (valen para cualquier proyecto)
+A. Consistencia entre endpoints
+/complete-data.summary.teamCostUSD = suma de actualCost en /deviation-analysis.deviations (±0.01).
+/complete-data.summary.efficiencyPct = (ΣL / ΣK)*100 (si ΣK=0 → 70).
+/complete-data.summary.revenueUSD = suma ingresos[].amountUSD.
+markupUSD = revenueUSD - teamCostUSD (±0.01).
+B. Por persona (deviation row)
+hourDeviation = actualHours - budgetedHours.
+deviationPercentage = K==0 ? 0 : ((L/K)-1)*100 (con signo).
+severity respeta umbrales (por defecto 5/15/30).
+C. Moneda
+Todos los costos y presupuestos vienen en USD ya convertidos (la UI no divide por FX).
+Ningún actualCost negativo.
+D. Estados vacíos
+Si no hay costos del período → summary.emptyStates.costos=true y no crashea.
+Si no hay ingresos del período → summary.emptyStates.ingresos=true y no crashea.
+E. Fuente
+Equipo/Costos salen de “Costos directos e indirectos” (o tu BD local equivalente).
+Ingresos salen de “Ventas Tomi” (o BD local equivalente).
+No hay mezcla de fuentes.
+3) Smokes multi-proyecto (copia/pega en tu terminal)
+Requiere jq. Ajustá la URL base si cambia.
+3.1 Descubrir proyectos y armar lista
+BASE="http://localhost:5000"
+TF="august_2025"
+curl -s "$BASE/api/projects?timeFilter=$TF" | jq -r '.[].id' > /tmp/projects.txt
+echo "Proyectos detectados:" && cat /tmp/projects.txt
+3.2 Smoke por proyecto (ECON y EXEC)
+while read -r PID; do
+  echo "==== Proyecto $PID · $TF · ECON ===="
+  SUM=$(curl -s "$BASE/api/projects/$PID/complete-data?timeFilter=$TF&basis=ECON" | jq '.summary')
+  DEV=$(curl -s "$BASE/api/projects/$PID/deviation-analysis?timeFilter=$TF&basis=ECON")
+  RANK=$(curl -s "$BASE/api/projects/$PID/performance-rankings?timeFilter=$TF" | jq '.summary // {}')
+
+  echo "Summary:" && echo "$SUM"
+  echo "Deviations length:" && echo "$DEV" | jq '.deviations | length'
+  echo "TeamCost vs sum(actualCost):"
+  TC=$(echo "$SUM" | jq -r '.teamCostUSD // .teamCost // 0')
+  SUMAC=$(echo "$DEV" | jq '[.deviations[].actualCost] | add // 0')
+  echo "  teamCostUSD=$TC  sumActualCosts=$SUMAC"
+  # Invariante ±0.01
+  python - <<PY
+tc=$TC; sac=$SUMAC
+assert abs(tc - sac) <= 0.02, f"TeamCostUSD mismatch: {tc} vs {sac}"
+print("  ✔ invariant OK")
+PY
+  echo
+
+  echo "==== Proyecto $PID · $TF · EXEC ===="
+  curl -s "$BASE/api/projects/$PID/complete-data?timeFilter=$TF&basis=EXEC" | jq '.summary'
+  curl -s "$BASE/api/projects/$PID/deviation-analysis?timeFilter=$TF&basis=EXEC" | jq '.summary, .deviations | length'
+  echo
+done < /tmp/projects.txt
+3.3 Golden (Huggies) — asserts duros
+PID=39
+curl -s "$BASE/api/projects/$PID/complete-data?timeFilter=august_2025&basis=ECON" | jq '.summary'
+curl -s "$BASE/api/projects/$PID/deviation-analysis?timeFilter=august_2025&basis=ECON" \
+ | jq '.deviations[] | select(.personnelName=="Sol Ayala")'
+Valores esperados (para comparar visualmente):
+efficiencyPct ≈ 90.09
+teamCostUSD = 2436.09
+revenueUSD = 8450
+markupUSD = 6013.91
+Por persona: Trini 867.49/806.97 (+7.5%), Sol 773.74/763.57 (+1.3%), Vanu 398.23/398.23 (0.0%), Aylu 231.00/520.44 (−55.6%), Vicky 165.63/197.65 (−16.2%)
+4) Asserts por endpoint (rápidos)
+/api/projects/:id/complete-data
+Debe traer summary.period, summary.basis, summary.emptyStates, summary.hasData.
+summary.teamCostUSD, summary.revenueUSD, summary.markupUSD, summary.totalHours, summary.efficiencyPct.
+/api/projects/:id/deviation-analysis
+deviations.length ≥ 0.
+Cada fila con: budgetedHours, actualHours, budgetedCost, actualCost, deviationPercentage, severity, alertType.
+Σ actualCost = summary.teamCost(USD) (±0.01).
+/api/projects/:id/performance-rankings
+summary.teamCostUSD y summary.period presentes.
+rankings.length ≥ teamBreakdown.length o explicado por reglas de ranking.
+/api/projects
+Cada card para el período con: revenueUSD, teamCostUSD, markupUSD, hours, efficiencyPct, banderas hasData/emptyStates.
+5) Tests automáticos (Jest/Supertest) — esqueletos
+5.1 Unit — parseo/FX/agregado
+test('parseDec ES/US/moneda', () => {
+  expect(parseDec('1.234,56')).toBeCloseTo(1234.56, 2);
+  expect(parseDec('$1,234.56')).toBeCloseTo(1234.56, 2);
+  expect(parseDec('(1.234,56)')).toBeCloseTo(-1234.56, 2);
+});
+
+test('fxForRow priorities', () => {
+  // fila con cotización → usa esa
+  // sin cotización → usa FX del período
+  // sin ambas → fallback global
+});
+
+test('aggregate by person sums K/L/M', () => {
+  // Multi-fila misma persona: suma K L M y costs ponderados
+});
+5.2 Contract — endpoints
+it('/complete-data has summary + invariants', async () => {
+  const r = await request(app).get('/api/projects/39/complete-data?timeFilter=august_2025&basis=ECON');
+  expect(r.status).toBe(200);
+  const s = r.body.summary;
+  expect(s.period).toBe('2025-08');
+  expect(s.teamCostUSD).toBeCloseTo(2436.09, 2);
+  expect(s.revenueUSD).toBeCloseTo(8450, 2);
+  expect(s.markupUSD).toBeCloseTo(6013.91, 2);
+});
+
+it('/deviation-analysis sums match teamCost', async () => {
+  const r = await request(app).get('/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON');
+  const sum = r.body.deviations.reduce((a: number, d: any) => a + d.actualCost, 0);
+  expect(sum).toBeCloseTo(r.body.summary.teamCost, 2);
+});
+5.3 Golden — Huggies (números exactos)
+Asserts sobre los 5 miembros clave, igual que arriba.
+6) Pruebas de bordes (imprescindibles)
+Sin costos: devolver emptyStates.costos=true, teamCostUSD=0, UI no crashea.
+Sin ingresos: emptyStates.ingresos=true, revenueUSD=0.
+K=0 (sin objetivo): efficiencyPct=70 (neutro).
+Moneda: ingresos en ARS → conversion correcta con FX; nunca doble conversión.
+Persona con múltiples filas → agregación correcta de K/L/M y costos.
+Periodo sin datos (custom fuera de rango) → todos los totales 0 + banderas vacías.
+Ambas bases (ECON/EXEC) responden sin error y no mezclan montos.
+7) Monitoreo y guardas
+Loguear por request: projectId, period, basis, fxSource(row|period|fallback), costRows, salesRows.
+Al arrancar, loggear rutas registradas (para evitar duplicados de endpoint).
+Alertar si Σ actualCost difiere de summary.teamCostUSD > 0.05 (guard clause de runtime).
+Con esto:
+Tenés smokes para correr en 1 minuto contra todos los proyectos.
+Tenés invariantes que te garantizan consistencia entre pestañas/endpoints.
+Tenés tests automáticos mínimos para fijar la regresión.
+Cubrís bordes (sin datos, K=0, monedas, multi-filas).
+Evitás volver a caer en conflictos de rutas o doble FX.
+¿Querés que te empaquete los smokes en un script npm run smoke:universal y los Jest en __tests__/universal.spec.ts?
