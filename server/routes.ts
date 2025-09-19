@@ -7858,7 +7858,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 🏢 ENDPOINT UNIVERSAL: Análisis de desviaciones del equipo
   // Integra completamente con Excel MAESTRO usando motor único
-  app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
+  // COMENTADO: Reemplazado por versión modular en routes/deviation.ts
+  /*app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) => {
     console.log(`🚀 UNIVERSAL DEVIATION ANALYSIS - Project ${req.params.id}`);
     
     try {
@@ -7911,7 +7912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("❌ Universal deviation analysis error:", error);
       res.status(500).json({ message: "Failed to generate deviation analysis" });
     }
-  });
+  });*/
 
   // Endpoint para recomendaciones
   app.get('/api/projects/:id/recommendations', requireAuth, async (req, res) => {

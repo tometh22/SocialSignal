@@ -1,0 +1,108 @@
+¡Estás a un paso! 🔧 Te dejo un plan quirúrgico y corto para cerrar el 11/10: /deviation-analysis vacío.
+1) Causas típicas de “vacío” en /deviation-analysis
+No estás llamando al motor único (o lo llamás sin basis/timeFilter).
+Aún filtra por timeEntries (legacy) o por actualHours > 0 antes de mapear.
+Mapeo a deviations[] espera otro shape (nombres distintos a los del motor).
+projectId string vs number → no matchea en storage.
+basis default distinto (EXEC en handler vs ECON en motor).
+2) Implementación de endpoint (thin wrapper, 100% confiable)
+Pega esto (ajustá imports/rutas a tu repo):
+// routes/deviation.ts (ESM)
+import type { Request, Response } from 'express';
+import { resolveTimeFilter } from '../services/time.js';
+import { computeProjectPeriodMetrics } from '../domain/metrics.js';
+
+const sev = (pct: number) => {
+  const ap = Math.abs(pct);
+  if (ap >= 30) return 'critical';
+  if (ap >= 15) return 'high';
+  if (ap >= 5)  return 'medium';
+  return 'low';
+};
+
+export async function deviationAnalysisHandler(req: Request, res: Response) {
+  try {
+    const projectId = String(req.params.id ?? req.query.projectId ?? '');
+    const timeFilter = String(req.query.timeFilter ?? '');
+    const basis = (String(req.query.basis ?? 'ECON').toUpperCase() === 'EXEC') ? 'EXEC' : 'ECON';
+
+    if (!projectId || !timeFilter) {
+      return res.status(400).json({ error: 'projectId and timeFilter are required' });
+    }
+
+    const tf = resolveTimeFilter(timeFilter); // {start,end, period:'YYYY-MM'}
+    const data = await computeProjectPeriodMetrics(projectId, tf, basis);
+
+    // data.teamBreakdown debe traer por persona: K, L, M, budgetUSD, actualUSD, name, id
+    const deviations = (data.teamBreakdown ?? []).map(p => {
+      const K = Number(p.K ?? 0);
+      const L = Number(p.L ?? 0);
+      const deviationPct = K === 0 ? 0 : ((L / K) - 1) * 100;
+      return {
+        personnelId: p.personId ?? p.id ?? p.name,
+        personnelName: p.name,
+        budgetedHours: K,
+        actualHours: L,
+        budgetedCost: Number(p.budgetUSD ?? 0),
+        actualCost: Number(p.actualUSD ?? 0),
+        hourDeviation: L - K,
+        costDeviation: Number(p.actualUSD ?? 0) - Number(p.budgetUSD ?? 0),
+        deviationPercentage: deviationPct,
+        severity: sev(deviationPct),
+        alertType: K === 0 ? 'no-plan' : (L >= K ? 'overrun' : 'underrun'),
+        deviationType: 'hours',
+      };
+    });
+
+    return res.json({
+      summary: {
+        period: data.summary?.period,      // 'YYYY-MM'
+        basis,
+        activeMembers: (data.teamBreakdown ?? []).filter(p => (p.L ?? 0) > 0).length,
+        totalHours: data.summary?.totalHours,
+        efficiencyPct: data.summary?.efficiencyPct,
+        teamCost: basis === 'ECON' ? data.summary?.teamCostUSD : data.summary?.teamCostUSD, // mismo nombre en front
+        emptyStates: data.summary?.emptyStates,
+        hasData: data.summary?.hasData,
+      },
+      deviations
+    });
+  } catch (e:any) {
+    return res.status(500).json({ error: 'deviation-analysis failed', detail: e?.message });
+  }
+}
+Claves del wrapper
+No filtra por actualHours > 0 antes de mapear (solo para activeMembers).
+Usa exactamente la salida del motor (budgetUSD/actualUSD ya en USD).
+Devuelve summary.period/basis/emptyStates para que la UI no crashee.
+Si tu app ya tiene router: router.get('/api/projects/:id/deviation-analysis', deviationAnalysisHandler)
+3) Smoke tests (pegar y ver)
+# 1) Deviation summary
+curl -s "/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON" | jq '.summary'
+
+# 2) Conteo y primeras filas
+curl -s "/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON" | jq '.deviations | length, .deviations[0]'
+
+# 3) Valores dorados por persona (ej: Sol)
+curl -s "/api/projects/39/deviation-analysis?timeFilter=august_2025&basis=ECON" | \
+jq '.deviations[] | select(.personnelName=="Sol Ayala")'
+Esperado (Huggies · aug_2025 · ECON)
+summary.efficiencyPct ≈ 90.09
+summary.teamCost = 2436.09
+length = 5
+Personas:
+Trini: actual 867.49, budget 806.97, dev% +7.5
+Sol: actual 773.74, budget 763.57, dev% +1.3
+Vanu: actual 398.23, budget 398.23, dev% 0.0
+Aylu: actual 231.00, budget 520.44, dev% −55.6
+Vicky: actual 165.63, budget 197.65, dev% −16.2
+4) Si sigue vacío, chequear en 2 minutos
+¿Llega data al motor? agrega logs en computeProjectPeriodMetrics: counts de filas y teamBreakdown.length.
+Params del handler: log projectId, timeFilter, basis, y tf.period.
+Tipos: asegura que projectId llegue como string a resolveProjectConfig.
+Front: la pestaña Equipo debe consumir este endpoint (no el legacy).
+5) Cerrar el ciclo (QA corto)
+/complete-data y /deviation-analysis deben dar los mismos totales (efficiencyPct, teamCost).
+emptyStates.costos/ingresos presentes → UI muestra banners y no crashea.
+Cache keys en front incluyen {projectId, period, basis}.
+Con este wrapper + smoke tests, el endpoint deja de devolver vacío y queda alineado 1:1 con el motor y con Dashboard/Performance. Si querés, te paso el mismo wrapper para EXEC o un test Jest con los asserts del golden.

@@ -90,8 +90,8 @@ export async function computeProjectPeriodMetrics(
   
   try {
     // Intentar usar datos locales primero (según checklist punto 1)
-    const directCosts = await storage.getDirectCosts(projectId);
-    const sales = await storage.getAllSales();
+    const directCosts = await storage.getDirectCostsByProject(projectId);
+    const sales = await storage.getGoogleSheetsSales();
     
     if (directCosts && directCosts.length > 0) {
       // Filtrar costos por período usando isDateInRange
