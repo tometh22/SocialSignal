@@ -9408,11 +9408,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }
       
-      // Months
+      // Months (English + Spanish support)
       const monthMap: Record<string, number> = {
         'january': 1, 'february': 2, 'march': 3, 'april': 4,
         'may': 5, 'june': 6, 'july': 7, 'august': 8,
-        'september': 9, 'october': 10, 'november': 11, 'december': 12
+        'september': 9, 'october': 10, 'november': 11, 'december': 12,
+        // Spanish months
+        'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+        'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+        'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
       };
       
       if (monthMap[period]) {
@@ -9489,15 +9493,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalHours += hoursReal;
           });
 
-          // Get revenue from "Ventas Tomi" (source única)
+          // Get revenue from "Ventas Tomi" (source única) - BÚSQUEDA POR NOMBRE
           let revenueUSD = 0;
           try {
-            const sales = await storage.getSalesByProject(project.id);
+            // 🎯 ARREGLADO: Buscar por nombre del proyecto usando snake_case
+            const projectName = project.quotation?.project_name || project.subproject_name;
+            const allSales = await storage.getGoogleSheetsSales();
+            const sales = allSales.filter(sale => sale.project_name === projectName);
+            
             const filteredSales = sales.filter((sale: any) => {
-              const saleDate = new Date(sale.año, sale.mes - 1, 15);
+              // 🎯 TEMPORAL FILTER: Convertir nombres de mes a números
+              const monthMap: { [key: string]: number } = {
+                'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+                'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+                'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+                'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
+              };
+              const monthNumber = monthMap[sale.month?.toLowerCase()] || parseInt(sale.month) || 1;
+              const saleDate = new Date(sale.year, monthNumber - 1, 15);
               const filterStart = new Date(timeFilterParsed.start);
               const filterEnd = new Date(timeFilterParsed.end);
-              return saleDate >= filterStart && saleDate <= filterEnd && sale.confirmado;
+              return saleDate >= filterStart && saleDate <= filterEnd;
             });
             
             revenueUSD = filteredSales.reduce((sum: number, sale: any) => {
