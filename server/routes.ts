@@ -7872,7 +7872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 🎯 USAR MOTOR ÚNICO - garantiza consistencia total con Dashboard y Performance  
-      const { computeProjectPeriodMetrics } = require('./domain/metrics');
+      const { computeProjectPeriodMetrics } = await import('./domain/metrics');
       const metrics = await computeProjectPeriodMetrics(projectId, timeFilter as string, basis as 'ECON' | 'EXEC');
       
       // Crear estructura de desviaciones desde teamBreakdown
@@ -9716,7 +9716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {
-    const { setupUniversalRoutes } = require('./routes/index');
+    const { setupUniversalRoutes } = await import('./routes/index');
     setupUniversalRoutes(app, requireAuth);
     console.log("✅ UNIVERSAL ROUTES INTEGRATED: Motor único activo para todos los endpoints");
   } catch (error) {
