@@ -1,0 +1,105 @@
+Te dejo un fix quirúrgico + checks para que ese endpoint deje de devolver summary: null y quede alineado con el motor único y el resto de pestañas.
+1) Por qué pasa
+Suele ser una de estas tres:
+Contrato no envuelto: el handler arma campos sueltos (estimatedHours, workedHours, totalCost…) y no arma summary.
+Adapter roto: el motor retorna PeriodMetrics pero el mapper del endpoint toma nombres viejos/otros paths.
+Ruta duplicada: otra definición de complete-data pisa tu handler bueno.
+2) Arreglo inmediato (thin wrapper estable)
+Pegá esto (ajustá imports/rutas a tu repo). Es solo un adapter de `PeriodMetrics → CompleteDataResponse**.
+// routes/complete-data.ts (ESM)
+import type { Request, Response } from 'express';
+import { resolveTimeFilter } from '../services/time.js';
+import { computeProjectPeriodMetrics } from '../domain/metrics.js';
+
+export async function completeDataHandler(req: Request, res: Response) {
+  try {
+    const projectId = String(req.params.id ?? req.query.projectId ?? '');
+    const timeFilter = String(req.query.timeFilter ?? '');
+    const basis = (String(req.query.basis ?? 'ECON').toUpperCase() === 'EXEC') ? 'EXEC' : 'ECON';
+    if (!projectId || !timeFilter) {
+      return res.status(400).json({ error: 'projectId and timeFilter are required' });
+    }
+
+    const tf = resolveTimeFilter(timeFilter);
+    const pm = await computeProjectPeriodMetrics(projectId, tf, basis);
+
+    // --- ADAPTER: PeriodMetrics -> CompleteDataResponse ---
+    const summary = {
+      period: pm.summary?.period,        // 'YYYY-MM'
+      basis,
+      activeMembers: (pm.teamBreakdown ?? []).filter(p => (p.L ?? 0) > 0).length,
+      totalHours: pm.summary?.totalHours,              // ΣL
+      efficiencyPct: pm.summary?.efficiencyPct,       // ΣL/ΣK*100 (K=0→70)
+      teamCostUSD: pm.summary?.teamCostUSD,           // Σ actualCost
+      revenueUSD: pm.summary?.revenueUSD,
+      markupUSD: pm.summary?.markupUSD,               // revenue - teamCost
+      emptyStates: pm.summary?.emptyStates ?? { costos:false, ingresos:false, horas:false, objetivos:false },
+      hasData: pm.summary?.hasData ?? { costos:true, ingresos:true }
+    };
+
+    const teamBreakdown = (pm.teamBreakdown ?? []).map(p => ({
+      personId: p.personId ?? p.id ?? p.name,
+      name: p.name,
+      K: p.K, L: p.L, M: p.M,
+      budgetUSD: p.budgetUSD,
+      actualUSD: p.actualUSD,            // ya en USD, no reconvertir en UI
+      rateUSD: p.rateUSD ?? null
+    }));
+
+    // Compat opcional (si el front viejo lo pide)
+    const legacy = {
+      estimatedHours: pm.summary?.sumK ?? pm.summary?.estimatedHours ?? null,
+      workedHours: pm.summary?.totalHours ?? null,
+      totalCost: pm.summary?.teamCostUSD ?? null,
+      markup: pm.summary?.markupUSD ?? null
+    };
+
+    return res.json({
+      summary,
+      teamBreakdown,
+      ingresos: pm.ingresos ?? [],
+      costos: pm.costos ?? [],
+      rankings: pm.rankings ?? [],
+      ...legacy   // <- quitar si no hace falta compat
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: 'complete-data failed', detail: e?.message });
+  }
+}
+Registrar 1 sola ruta y eliminar duplicadas:
+// routes/index.ts
+router.get('/api/projects/:id/complete-data', completeDataHandler); // única
+3) Smoke & asserts (para cerrar ya)
+A) /complete-data debe devolver summary
+BASE="http://localhost:5000"; PID=39; TF="august_2025"
+curl -s "$BASE/api/projects/$PID/complete-data?timeFilter=$TF&basis=ECON" | jq '.summary'
+# Esperado: period "2025-08", teamCostUSD 2436.09, revenueUSD 8450, markupUSD 6013.91, efficiencyPct ~90.09
+B) Invariante entre endpoints (mismo período/basis)
+DEV=$(curl -s "$BASE/api/projects/$PID/deviation-analysis?timeFilter=$TF&basis=ECON")
+CD=$(curl -s "$BASE/api/projects/$PID/complete-data?timeFilter=$TF&basis=ECON")
+echo "$DEV" | jq '[.deviations[].actualCost] | add'
+echo "$CD" | jq '.summary.teamCostUSD'
+# Deben coincidir ±0.01
+C) Cards de proyectos muestran lo mismo
+curl -s "$BASE/api/projects?timeFilter=$TF" | jq ".projects[] | select(.projectId==$PID) | {revenueUSD, teamCostUSD, markupUSD, efficiencyPct}"
+# Debe coincidir con /complete-data.summary
+4) Tests (Jest/Supertest) mínimos
+it('/complete-data returns summary', async () => {
+  const r = await request(app).get('/api/projects/39/complete-data?timeFilter=august_2025&basis=ECON');
+  expect(r.status).toBe(200);
+  const s = r.body.summary;
+  expect(s).toBeTruthy();
+  expect(s.period).toBe('2025-08');
+  expect(s.teamCostUSD).toBeCloseTo(2436.09, 2);
+  expect(s.revenueUSD).toBeCloseTo(8450, 2);
+  expect(s.markupUSD).toBeCloseTo(6013.91, 2);
+  expect(s.efficiencyPct).toBeGreaterThan(89.9);
+});
+5) Checklist de cierre rápido
+ No quedan rutas duplicadas de /complete-data.
+ Handler usa computeProjectPeriodMetrics y hace adapter → summary.
+ summary trae period/basis/emptyStates/hasData.
+ Invariante: teamCostUSD (complete-data) = Σ actualCost (deviation-analysis).
+ Cards (/projects) muestran los mismos totales que /complete-data.
+ Golden Huggies vuelve a pasar (2436.09 / 8450 / 6013.91 / 90.09%).
+Con ese adapter y la limpieza de rutas, /complete-data deja de devolver null, el Dashboard vuelve a tener datos y quedás 1:1 con Equipo/Performance en TODOS los proyectos. 🚀
