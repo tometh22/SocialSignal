@@ -108,146 +108,6 @@ function nullToUndefined(obj: any): any {
 }
 
 export function getMonthsInFilter(filter: string): number {
-      const monthMatch = filter.match(/^([a-z]+)_(\d{4})$/i);
-      if (monthMatch) {
-        const [, monthName, year] = monthMatch;
-        const monthNames = {
-          'enero': 0, 'january': 0, 'jan': 0,
-          'febrero': 1, 'february': 1, 'feb': 1,
-          'marzo': 2, 'march': 2, 'mar': 2,
-          'abril': 3, 'april': 3, 'apr': 3,
-          'mayo': 4, 'may': 4,
-          'junio': 5, 'june': 5, 'jun': 5,
-          'julio': 6, 'july': 6, 'jul': 6,
-          'agosto': 7, 'august': 7, 'aug': 7,
-          'septiembre': 8, 'september': 8, 'sep': 8,
-          'octubre': 9, 'october': 9, 'oct': 9,
-          'noviembre': 10, 'november': 10, 'nov': 10,
-          'diciembre': 11, 'december': 11, 'dec': 11
-        };
-        
-        const monthIndex = (monthNames as any)[monthName.toLowerCase()];
-        if (monthIndex !== undefined) {
-          startDate = new Date(parseInt(year), monthIndex, 1);
-          endDate = new Date(parseInt(year), monthIndex + 1, 0);
-          break;
-        }
-      }
-      
-      // Soporte para bimestres: "bimestre_1_2025", "bimestre_2_2025", etc.
-      const bimestreMatch = filter.match(/^bimestre_(\d)_(\d{4})$/i);
-      if (bimestreMatch) {
-        const [, bimestreNum, year] = bimestreMatch;
-        const bimestre = parseInt(bimestreNum);
-        if (bimestre >= 1 && bimestre <= 6) {
-          const startMonth = (bimestre - 1) * 2;
-          startDate = new Date(parseInt(year), startMonth, 1);
-          endDate = new Date(parseInt(year), startMonth + 2, 0);
-          break;
-        }
-      }
-      
-      // Soporte para trimestres específicos de años: "q1_2024", "q2_2023", etc.
-      const quarterYearMatch = filter.match(/^q(\d)_(\d{4})$/i);
-      if (quarterYearMatch) {
-        const [, quarterNum, year] = quarterYearMatch;
-        const quarter = parseInt(quarterNum);
-        if (quarter >= 1 && quarter <= 4) {
-          const startMonth = (quarter - 1) * 3;
-          startDate = new Date(parseInt(year), startMonth, 1);
-          endDate = new Date(parseInt(year), startMonth + 3, 0);
-          break;
-        }
-      }
-      
-      // Soporte para semestres: "semestre_1_2025", "semestre_2_2025"
-      const semestreMatch = filter.match(/^semestre_(\d)_(\d{4})$/i);
-      if (semestreMatch) {
-        const [, semestreNum, year] = semestreMatch;
-        const semestre = parseInt(semestreNum);
-        if (semestre === 1) {
-          startDate = new Date(parseInt(year), 0, 1); // Enero
-          endDate = new Date(parseInt(year), 5, 30); // Junio
-          break;
-        } else if (semestre === 2) {
-          startDate = new Date(parseInt(year), 6, 1); // Julio
-          endDate = new Date(parseInt(year), 11, 31); // Diciembre
-          break;
-        }
-      }
-      
-      // Soporte para períodos de múltiples meses: "ene_mar_2025", "jul_sep_2025", etc.
-      const multiMonthMatch = filter.match(/^([a-z]{3})_([a-z]{3})_(\d{4})$/i);
-      if (multiMonthMatch) {
-        const [, startMonthName, endMonthName, year] = multiMonthMatch;
-        const shortMonthNames = {
-          'ene': 0, 'jan': 0, 'feb': 1, 'mar': 2, 'abr': 3, 'apr': 3,
-          'may': 4, 'jun': 5, 'jul': 6, 'ago': 7, 'aug': 7,
-          'sep': 8, 'oct': 9, 'nov': 10, 'dic': 11, 'dec': 11
-        };
-        
-        const startMonthIndex = (shortMonthNames as any)[startMonthName.toLowerCase()];
-        const endMonthIndex = (shortMonthNames as any)[endMonthName.toLowerCase()];
-        
-        if (startMonthIndex !== undefined && endMonthIndex !== undefined) {
-          startDate = new Date(parseInt(year), startMonthIndex, 1);
-          endDate = new Date(parseInt(year), endMonthIndex + 1, 0);
-          break;
-        }
-      }
-      
-      // Soporte para años completos: "año_2024", "year_2025", etc.
-      const yearMatch = filter.match(/^(año|year)_(\d{4})$/i);
-      if (yearMatch) {
-        const [, , year] = yearMatch;
-        startDate = new Date(parseInt(year), 0, 1);
-        endDate = new Date(parseInt(year), 11, 31);
-        break;
-      }
-      
-      // Soporte para últimos N meses: "ultimos_3_meses", "last_6_months"
-      const lastMonthsMatch = filter.match(/^(ultimos|last)_(\d+)_(meses|months)$/i);
-      if (lastMonthsMatch) {
-        const [, , monthsCount] = lastMonthsMatch;
-        const months = parseInt(monthsCount);
-        endDate = new Date();
-        startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - months);
-        startDate.setDate(1); // Primer día del mes
-        break;
-      }
-      
-      // Soporte para días específicos: "ultimos_30_dias", "last_90_days"
-      const lastDaysMatch = filter.match(/^(ultimos|last)_(\d+)_(dias|days)$/i);
-      if (lastDaysMatch) {
-        const [, , daysCount] = lastDaysMatch;
-        const days = parseInt(daysCount);
-        endDate = new Date();
-        startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-        break;
-      }
-      
-      // Para filtros no reconocidos
-      console.log(`⚠️ Filtro temporal no reconocido: ${filter}`);
-      return null;
-  }
-
-  // Asegurar que startDate y endDate son objetos Date válidos
-  if (!(startDate instanceof Date) || isNaN(startDate.getTime())) {
-    console.warn(`⚠️ Invalid startDate for filter ${filter}, using fallback`);
-    startDate = new Date(2020, 0, 1);
-  }
-  if (!(endDate instanceof Date) || isNaN(endDate.getTime())) {
-    console.warn(`⚠️ Invalid endDate for filter ${filter}, using fallback`);
-    endDate = new Date(2030, 11, 31);
-  }
-  
-  console.log(`📅 Date range for filter ${filter}:`, startDate.toISOString(), 'to', endDate.toISOString());
-  return { startDate, endDate };
-}
-
-export function getMonthsInFilter(filter: string): number {
   switch (filter) {
     // Filtros mensuales
     case 'este_mes':
@@ -285,19 +145,34 @@ export function getMonthsInFilter(filter: string): number {
     case 'semestre_pasado':
     case 'current_semester':
     case 'last_semester':
-    case 'this-semester':
-    case 'last-semester':
+    case 'semestre_1_2025':
+    case 'semestre_2_2025':
       return 6;
     
     // Filtros anuales
     case 'este_año':
+    case 'año_pasado':
     case 'current_year':
+    case 'last_year':
     case 'this-year':
+    case 'last-year':
+    case '2025':
+    case '2024':
       return 12;
     
     default:
-      return 1;
+      return 12; // Por defecto, asumimos un año
   }
+}
+
+export function getMonthNumber(date: Date): number {
+  return date.getMonth() + 1; // getMonth() returns 0-11, we want 1-12
+}
+
+export function createRouter() {
+  const router = express.Router();
+  return router;
+}
 }
 
 // Helper function to parse time filters
@@ -521,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // TEMPORARY FORCE SYNC ENDPOINT
-  app.get('/api/debug/force-sync', async (req, res) => {
+  app.get('/api/debug/force-sync', requireAuth, async (req, res) => {
     try {
       console.log('🚀 Force sync triggered via debug endpoint');
       
