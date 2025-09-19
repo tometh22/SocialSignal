@@ -9514,15 +9514,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const markupUSD = revenueUSD - teamCostUSD;
           const efficiencyPct = totalHours > 0 ? (totalHours / Math.max(project.estimatedHours || 1, 1)) * 100 : 0;
 
+          // Get client info for UI
+          const clientInfo = project.clientId ? await storage.getClient(project.clientId) : null;
+          
           universalProjects.push({
+            // 🎯 NUEVO: Contrato coherente con motor único
+            summary: {
+              period: timeFilter,
+              basis: 'ECON',
+              revenueUSD: revenueUSD,
+              teamCostUSD: teamCostUSD,
+              markupUSD: markupUSD,
+              efficiencyPct: efficiencyPct,
+              totalHours: totalHours,
+              estimatedHours: project.estimatedHours || 0,
+              emptyStates: { 
+                ingresos: revenueUSD === 0, 
+                costos: teamCostUSD === 0 
+              },
+              hasData: { 
+                ingresos: revenueUSD > 0, 
+                costos: teamCostUSD > 0 
+              }
+            },
+
+            // 🎯 ALIAS LEGACY que la UI actual espera
+            id: project.id,
             projectId: project.id,
-            client: project.clientId ? (await storage.getClient(project.clientId))?.name || 'Unknown' : 'Unknown',
+            clientId: project.clientId,
             name: project.name,
-            revenueUSD: revenueUSD,
-            teamCostUSD: teamCostUSD,
-            markupUSD: markupUSD,
-            hoursL: totalHours,
-            efficiencyPct: efficiencyPct
+            status: project.status || 'active',
+            startDate: project.startDate,
+            expectedEndDate: project.expectedEndDate,
+            
+            // Datos del cliente para logos/UI
+            client: clientInfo,
+            clientName: clientInfo?.name || 'Unknown',
+            
+            // Quotation info para la UI
+            quotation: {
+              id: project.quotationId,
+              projectName: project.name,
+              projectType: project.projectType || 'one-shot',
+              estimatedHours: project.estimatedHours || 0,
+              totalAmount: revenueUSD,
+              baseCost: teamCostUSD
+            },
+            
+            // 🎯 CAMPOS CRÍTICOS que ProjectCard lee directamente
+            totalRealRevenue: revenueUSD,        // Facturación (azul)
+            workedCost: teamCostUSD,             // Costos (rojo)  
+            markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0, // Markup ratio (verde)
+            efficiency: efficiencyPct,           // % eficiencia
+            actualHours: totalHours,             // horas reales del período
+            targetHours: project.estimatedHours || totalHours, // horas objetivo
+            workedHours: totalHours,             // alias adicional
+            
+            // Métricas para compatibilidad
+            metrics: {
+              markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0,
+              efficiency: efficiencyPct,
+              budgetUtilization: project.estimatedHours > 0 ? (totalHours / project.estimatedHours) * 100 : 0
+            },
+            
+            // Direct costs para el cálculo de eficiencia Excel MAESTRO
+            directCosts: filteredCosts.map(cost => ({
+              ...cost,
+              horasObjetivo: cost.K || cost.hrs_objetivo || 0,
+              horasRealesAsana: cost.L || cost.hrs_reales || 0
+            }))
           });
 
         } catch (projectError) {

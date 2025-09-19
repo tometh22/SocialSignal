@@ -663,17 +663,19 @@ export default function ActiveProjectsRedesigned() {
     return filterMap[filter] || 'all';
   };
 
-  // 🎯 CORREGIDO: Datos de proyectos CON filtros temporales para periodMetrics
-  const { data: projects = [], isLoading: loadingProjects } = useQuery({
-    queryKey: ["/api/active-projects", timeFilter],
+  // 🎯 CORREGIDO: Usar endpoint universal /api/projects con motor único
+  const { data: projectsResponse = {}, isLoading: loadingProjects } = useQuery({
+    queryKey: ["/api/projects", timeFilter],
     queryFn: () => {
-      // Traer proyectos incluyendo filtro temporal para periodMetrics
-      const apiFilter = getTimeFilterForAPI(timeFilter);
-      const url = `/api/active-projects${apiFilter !== 'all' ? `?timeFilter=${apiFilter}` : ''}`;
-      console.log(`🔍 Active Projects API call with timeFilter:`, { timeFilter, apiFilter, url });
+      // Usar el endpoint /api/projects que tiene motor único y alias legacy
+      const url = `/api/projects?timeFilter=${timeFilter}`;
+      console.log(`🔍 Universal Projects API call with timeFilter:`, { timeFilter, url });
       return apiRequest(url, 'GET');
     }
   });
+  
+  // Extraer projects array de la respuesta
+  const projects = projectsResponse.projects || [];
 
   const { data: clients = [] } = useQuery({
     queryKey: ["/api/clients"],
