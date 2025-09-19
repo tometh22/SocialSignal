@@ -52,13 +52,13 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
   
   // Preferir timeFilter sobre dateFilter para consistencia con el sistema
   const queryParams = timeFilter 
-    ? `?timeFilter=${timeFilter}`
+    ? `?timeFilter=${timeFilter}&basis=ECON`
     : dateFilter 
-    ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}`
-    : '';
+    ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}&basis=ECON`
+    : '?basis=ECON';
 
   const { data: deviationData, isLoading, error } = useQuery<DeviationAnalysisData>({
-    queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilter || dateFilter],
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilter || dateFilter, 'ECON'],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
       const data = await response.json();
@@ -287,7 +287,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
           <div className="text-2xl font-bold text-purple-600">
             {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
-              (d.deviationType === 'ejecucion_optima' || d.alertType === 'on_target')
+              Math.abs((d.actualHours / Math.max(d.budgetedHours, 1)) - 1) <= 0.15
             ).length}
           </div>
           <div className="text-xs text-purple-600">±15% del objetivo</div>
@@ -444,7 +444,7 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: Tea
                       <td className="px-6 py-4 text-center">
                         <div className="space-y-1">
                           <div className={`text-lg font-bold ${getVarianceColor(deviation.deviationPercentage)}`}>
-                            {deviation.deviationPercentage > 0 ? '+' : ''}{Math.abs(deviation.deviationPercentage || 0).toFixed(1)}%
+                            {deviation.deviationPercentage >= 0 ? '+' : ''}{(deviation.deviationPercentage || 0).toFixed(1)}%
                           </div>
                           <div className="text-xs text-gray-500">
                             {(deviation.hourDeviation || 0) > 0 ? '+' : ''}{(deviation.hourDeviation || 0).toFixed(1)}h diferencia

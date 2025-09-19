@@ -1019,6 +1019,21 @@ const ProjectDetailsPage = () => {
     enabled: !!(unifiedData as any)?.project?.clientId,
   });
 
+  // Eficiencia del equipo desde deviation analysis (para header)
+  const { data: deviationAnalysisData } = useQuery({
+    queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilterForHook, 'ECON'],
+    queryFn: async () => {
+      const queryParams = timeFilterForHook 
+        ? `?timeFilter=${timeFilterForHook}&basis=ECON`
+        : '?basis=ECON';
+      const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
+      return response.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const efficiencyFromDeviationAPI = deviationAnalysisData?.summary?.efficiencyPct;
+
   // Datos derivados para compatibilidad con componentes existentes
   const project = (unifiedData as any)?.project;
   const isLoading = dataLoading;
@@ -3098,20 +3113,8 @@ const ProjectDetailsPage = () => {
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
                         <Target className="h-6 w-6 text-purple-600" />
                       </div>
-                      <div className="text-3xl font-bold text-purple-600 mb-1">
-                        {(() => {
-                          // Calcular horas objetivo total del Excel MAESTRO para el proyecto
-                          const excelTargetHours = unifiedData?.actuals?.teamBreakdown?.reduce((sum: number, member: any) => {
-                            return sum + (member.targetHours || 0);
-                          }, 0) || 0;
-                          
-                          const workedHours = costSummary?.filteredHours || 0;
-                          
-                          if (excelTargetHours === 0) return 'N/A';
-                          
-                          const efficiency = (workedHours / excelTargetHours) * 100;
-                          return `${efficiency.toFixed(0)}%`;
-                        })()}
+                      <div className="text-3xl font-bold text-purple-600 mb-1" data-testid="text-efficiency-header">
+                        {efficiencyFromDeviationAPI !== undefined ? `${efficiencyFromDeviationAPI.toFixed(1)}%` : 'N/A'}
                       </div>
                       <div className="text-sm font-medium text-gray-600">Eficiencia vs Objetivo</div>
                       <div className="text-xs text-gray-500 mt-1">horas reales vs objetivo estimado</div>
