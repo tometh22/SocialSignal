@@ -9901,6 +9901,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log("🚀 UNIVERSAL SYSTEM ENDPOINTS IMPLEMENTED - All endpoints now follow universal architecture with single data sources");
 
+  // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
+  // Importar y configurar todos los routers universales
+  try {
+    const { setupUniversalRoutes } = require('./routes/index');
+    setupUniversalRoutes(app, requireAuth);
+    console.log("✅ UNIVERSAL ROUTES INTEGRATED: Motor único activo para todos los endpoints");
+  } catch (error) {
+    console.error("❌ Error integrating universal routes:", error);
+    console.log("⚠️ Continuing with legacy endpoints");
+  }
+
   // Finalize routes setup and return server
   return httpServer;
 }
