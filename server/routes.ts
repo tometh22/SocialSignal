@@ -173,7 +173,6 @@ export function createRouter() {
   const router = express.Router();
   return router;
 }
-}
 
 // Helper function to parse time filters
 function parseTimeFilter(filter: string) {
