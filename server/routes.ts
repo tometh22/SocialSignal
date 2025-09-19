@@ -8242,9 +8242,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`💰 Final rateUSD for ${personKey}: ${rateUSD} USD/hour`);
         }
 
-        // Calcular costos según basis ECON: M * rateUSD
-        const actualCost = person.M * rateUSD;
-        console.log(`💰 ECON calculation for ${personKey}: ${person.M} hours × $${rateUSD.toFixed(2)}/hr = $${actualCost.toFixed(2)} USD`);
+        // Calcular costos según basis ECON: usar costos directos del Excel MAESTRO
+        let actualCost = 0;
+        if (person.records.length > 0) {
+          actualCost = person.records.reduce((sum, record) => {
+            const montoTotalUSD = record.montoTotalUSD || 0;
+            const costoTotal = record.costoTotal || 0;
+            
+            // Usar montoTotalUSD si está disponible, sino convertir costoTotal
+            if (montoTotalUSD > 0) {
+              console.log(`💰 ECON using montoTotalUSD for ${personKey}: ${montoTotalUSD} USD`);
+              return sum + montoTotalUSD;
+            } else {
+              const fxRate = record.tipoCambio || defaultFxRate;
+              const costUSD = costoTotal / fxRate;
+              console.log(`💰 ECON converting for ${personKey}: ${costoTotal} ARS / ${fxRate} FX = ${costUSD} USD`);
+              return sum + costUSD;
+            }
+          }, 0);
+          console.log(`💰 ECON total cost for ${personKey}: $${actualCost.toFixed(2)} USD from ${person.records.length} records`);
+        }
         
         // Calcular presupuesto usando tarifa estable USD por persona
         const budgetedCost = person.K * rateUSD;
