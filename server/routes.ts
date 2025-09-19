@@ -9558,16 +9558,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return costDate >= filterStart && costDate <= filterEnd;
           });
 
-          // Calculate universal metrics
-          let teamCostUSD = 0;
-          let totalHours = 0;
+          // Calculate universal metrics from FILTERED costs only
+          const teamCostUSD = filteredCosts.reduce((sum, cost) => {
+            const montoUSD = parseFloat(String(cost.montoTotalUSD || 0).replace(',', '.')) || 0;
+            return sum + montoUSD;
+          }, 0);
           
-          filteredCosts.forEach(cost => {
-            const montoUSD = parseDecimal(cost.montoTotalUSD || 0);
-            const hoursReal = parseDecimal(cost.L || cost.hrs_reales || 0);
-            teamCostUSD += montoUSD;
-            totalHours += hoursReal;
-          });
+          const actualHours = filteredCosts.reduce((sum, cost) => {
+            const hours = Number(cost.horasRealesAsana ?? cost.L ?? cost.hrs_reales) || 0;
+            return sum + hours;
+          }, 0);
+          
+          const targetHours = filteredCosts.reduce((sum, cost) => {
+            const hours = Number(cost.horasObjetivo ?? cost.K ?? cost.hrs_objetivo) || 0;
+            return sum + hours;
+          }, 0);
 
           // Get revenue from "Ventas Tomi" (source única) - BÚSQUEDA POR NOMBRE
           let revenueUSD = 0;
@@ -9630,9 +9635,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`⚠️ No sales data for project ${project.id}`);
           }
 
-          // Calculate markup
+          // Calculate markup and efficiency correctly
           const markupUSD = revenueUSD - teamCostUSD;
-          const efficiencyPct = totalHours > 0 ? (totalHours / Math.max(project.estimatedHours || 1, 1)) * 100 : 0;
+          const efficiencyPct = targetHours > 0 ? (actualHours / targetHours) * 100 : 0;
 
           // Get client info for UI
           const clientInfo = project.clientId ? await storage.getClient(project.clientId) : null;
@@ -9646,8 +9651,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               teamCostUSD: teamCostUSD,
               markupUSD: markupUSD,
               efficiencyPct: efficiencyPct,
-              totalHours: totalHours,
-              estimatedHours: project.estimatedHours || 0,
+              totalHours: actualHours,
+              estimatedHours: targetHours,
               emptyStates: { 
                 ingresos: revenueUSD === 0, 
                 costos: teamCostUSD === 0 
@@ -9684,17 +9689,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // 🎯 CAMPOS CRÍTICOS que ProjectCard lee directamente
             totalRealRevenue: revenueUSD,        // Facturación (azul)
             workedCost: teamCostUSD,             // Costos (rojo)  
-            markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0, // Markup ratio (verde)
+            markup: markupUSD,                   // Markup en USD (verde)
             efficiency: efficiencyPct,           // % eficiencia
-            actualHours: totalHours,             // horas reales del período
-            targetHours: project.estimatedHours || totalHours, // horas objetivo
-            workedHours: totalHours,             // alias adicional
+            actualHours: actualHours,            // horas reales del período
+            targetHours: targetHours,            // horas objetivo
+            workedHours: actualHours,            // alias adicional
             
             // Métricas para compatibilidad
             metrics: {
-              markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0,
+              markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0,  // Ratio para métricas
               efficiency: efficiencyPct,
-              budgetUtilization: project.estimatedHours > 0 ? (totalHours / project.estimatedHours) * 100 : 0
+              budgetUtilization: targetHours > 0 ? (actualHours / targetHours) * 100 : 0
             },
             
             // Direct costs para el cálculo de eficiencia Excel MAESTRO

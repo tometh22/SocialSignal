@@ -1,0 +1,79 @@
+racias por la captura: con eso alcanza para aislar el problema.
+El backend ya calcula bien (lo validamos con los curls), así que el fallo está en cómo la página “Proyectos activos” consume / mapea la respuesta de /api/projects?timeFilter=….
+Aquí tienes un “fix list” quirúrgico y ordenado para que las cards de proyectos se llenen siempre.
+1) Qué endpoint usa esta vista (y qué espera)
+La grilla llama /api/projects?timeFilter=… (no complete-data).
+La UI todavía lee nombres legacy en cada item de la lista:
+totalRealRevenue → Facturación (azul)
+workedCost → Costos del período (rojo)
+markup → Markup en $ (verde)
+efficiency → % eficiencia
+actualHours → horas reales del período
+targetHours → horas objetivo del período
+Tu motor único hoy devuelve todo en summary.*. Si no das alias legacy, la card cae a $0 / 0h / N/A.
+2) Adapter en el backend (único cambio seguro)
+Ajustá /api/projects para publicar alias legacy + bloque nuevo. Ejemplo de cada item:
+// /api/projects response (item)
+{
+  projectId: 39,
+  clientName: "Kimberly Clark",
+  projectName: "Fee Huggies",
+  status: "active",
+  projectType: "recurrente",
+
+  // Bloque universal (motor único)
+  summary: {
+    period: "2025-08",
+    basis: "ECON",
+    revenueUSD: 8450,
+    teamCostUSD: 2436.09,
+    markupUSD: 6013.91,
+    efficiencyPct: 90.1,
+    totalHours: 288.28,    // ΣL
+    estimatedHours: 320,   // ΣK
+    hasData: { ingresos: true, costos: true }
+  },
+
+  // ↓↓↓ Alias que la card usa hoy ↓↓↓
+  totalRealRevenue: 8450,       // azul
+  workedCost: 2436.09,          // rojo
+  markup: 6013.91,              // verde ($)
+  efficiency: 90.1,             // %
+  actualHours: 288.28,          // L
+  targetHours: 320              // K
+}
+Asegúrate de que todos estos campos sean Number (no strings “$8,450”).
+Si hoy traes strings, conviértelos antes de enviar (Number(value)).
+3) Evitá falsos ceros: normalizador en el frontend (defensivo)
+Mientras migrás, agrega un normalizador solo en esta vista por si alguna tarjeta recibe la forma nueva:
+const price   = item.totalRealRevenue ?? item.summary?.revenueUSD ?? 0;
+const cost    = item.workedCost      ?? item.summary?.teamCostUSD ?? 0;
+const markup$ = item.markup          ?? item.summary?.markupUSD   ?? 0;
+const hrs     = item.actualHours     ?? item.summary?.totalHours  ?? 0;
+const target  = item.targetHours     ?? item.summary?.estimatedHours ?? 0;
+const eff     = item.efficiency      ?? item.summary?.efficiencyPct ?? null;
+4) Filtro “Solo con actividad”
+Esa pastilla oculta cards con todo “cero”. Usá este criterio (el que espera negocio):
+const hasActivity = (hrs > 0) || (price > 0) || (cost > 0);
+Si usás solo hrs > 0, proyectos con facturación pero sin horas quedan ocultos.
+5) Cache keys (evitá valores viejos)
+Si usás React Query / SWR, la queryKey debe cambiar con el filtro:
+useQuery({
+  queryKey: ['projects', timeFilter, basis ?? 'ECON'],
+  queryFn: () => fetch(`/api/projects?timeFilter=${timeFilter}`).then(r => r.json())
+});
+Si la key no incluye timeFilter, te quedarás con una respuesta anterior de “todos 0”.
+6) Validación inmediata (cURL de humo)
+Con el server arriba:
+# 1) ¿Viene el Huggies en la lista con alias?
+curl -s "http://localhost:5000/api/projects?timeFilter=august_2025" \
+| jq '.projects[] | select(.projectId==39) | {totalRealRevenue, workedCost, markup, efficiency, actualHours, targetHours, summary}'
+
+# 2) Los números deben ser exactos:
+#   totalRealRevenue: 8450
+#   workedCost: 2436.09
+#   markup: 6013.91
+#   efficiency: ~90.1
+#   actualHours: 288.28
+#   targetHours: 320
+Si ese JSON sale bien → la UI se llena al refrescar.
