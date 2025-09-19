@@ -128,21 +128,31 @@ export async function computeProjectPeriodMetrics(
     console.log(`⚠️ Error accessing local DB, falling back to Google Sheets:`, localError instanceof Error ? localError.message : String(localError));
   }
   
-  // 4. FALLBACK a Google Sheets solo si no hay datos locales
+  // 4. ENHANCED FALLBACK: Only try Google Sheets if we have NO local data at all
+  let hadLocalData = costRows.length > 0 || ingRows.length > 0;
+  
   if (costRows.length === 0 || ingRows.length === 0) {
     try {
       const allCostRows = await readRows(cfg.sheetId, cfg.tabs.costos);
       const allIngRows = await readRows(cfg.sheetId, cfg.tabs.ingresos);
       
+      // Only use Google Sheets data if local data was completely missing
       if (costRows.length === 0) {
-        costRows = filterRowsByProjectAndPeriod(allCostRows, projectId, rng);
+        const sheetsCosts = filterRowsByProjectAndPeriod(allCostRows, projectId, rng);
+        costRows = sheetsCosts;
+        console.log(`📊 Google Sheets Costos - Proyecto ${projectId}: ${sheetsCosts.length} costos from sheets`);
       }
       if (ingRows.length === 0) {
-        ingRows = filterRowsByProjectAndPeriod(allIngRows, projectId, rng);
+        const sheetsIngresos = filterRowsByProjectAndPeriod(allIngRows, projectId, rng);
+        ingRows = sheetsIngresos;
+        console.log(`📊 Google Sheets Ingresos - Proyecto ${projectId}: ${sheetsIngresos.length} ingresos from sheets`);
       }
-      console.log(`📊 Google Sheets Fallback - Proyecto ${projectId}: ${costRows.length} costos, ${ingRows.length} ingresos`);
     } catch (sheetsError) {
-      console.log(`❌ Google Sheets also failed:`, sheetsError instanceof Error ? sheetsError.message : String(sheetsError));
+      console.log(`❌ Google Sheets failed, using local data only:`, sheetsError instanceof Error ? sheetsError.message : String(sheetsError));
+      // CRITICAL: Don't overwrite existing local data when sheets fail!
+      if (hadLocalData) {
+        console.log(`✅ Preserving local data - Proyecto ${projectId}: ${costRows.length} costos, ${ingRows.length} ingresos from database`);
+      }
     }
   }
   
