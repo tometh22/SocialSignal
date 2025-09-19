@@ -655,7 +655,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
 
-  // SINGLE SOURCE OF TRUTH - ENDPOINT CONSOLIDADO CON FILTROS TEMPORALES
+  // RUTA DUPLICADA ELIMINADA - Ahora usa completeDataHandler en routes/index.ts
+  /*
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     const timeFilter = req.query.timeFilter as string || 'all';
@@ -1921,6 +1922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to get complete project data" });
     }
   });
+  */
 
   // FEATURE FLAG: Sistema universal de rankings
   const USE_UNIVERSAL_RANKINGS = true; // FORCED: Always use universal system
@@ -9550,8 +9552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 2. UNIVERSAL PROJECT COMPLETE DATA ENDPOINT  
-  // GET /api/projects/:id/complete-data?timeFilter=august_2025&basis=ECON
+  // RUTA DUPLICADA ELIMINADA - Ahora usa completeDataHandler en routes/index.ts  
+  /*
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     console.log(`🚀 UNIVERSAL COMPLETE DATA - Project ${req.params.id}, TimeFilter: ${req.query.timeFilter}, Basis: ${req.query.basis}`);
     
@@ -9711,6 +9713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  */
 
   console.log("🚀 UNIVERSAL SYSTEM ENDPOINTS IMPLEMENTED - All endpoints now follow universal architecture with single data sources");
 
