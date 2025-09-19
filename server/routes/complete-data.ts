@@ -54,8 +54,27 @@ export async function completeDataHandler(req: Request, res: Response) {
     };
 
     console.log(`✅ COMPLETE-DATA RESPONSE: summary.teamCostUSD=${summary.teamCostUSD}, teamBreakdown.length=${teamBreakdown.length}`);
+    console.log(`🔍 DEBUG MAPPING: summary=${JSON.stringify(summary, null, 2)}`);
+
+    const actualsData = {
+      totalWorkedCost: summary.teamCostUSD,
+      totalWorkedRevenue: summary.revenueUSD, 
+      totalWorkedHours: summary.totalHours,
+      totalEntries: teamBreakdown.length,
+      teamBreakdown
+    };
+    console.log(`🔍 DEBUG ACTUALS: actuals=${JSON.stringify(actualsData, null, 2)}`);
 
     return res.json({
+      // 🎯 FRONTEND COMPATIBILITY: Map to expected structure
+      actuals: actualsData,
+      metrics: {
+        efficiency: summary.efficiencyPct,
+        markup: summary.markupUSD,
+        budgetUtilization: 0,
+        hoursDeviation: 0,
+        costDeviation: 0
+      },
       summary,
       teamBreakdown,
       ingresos: pm.ingresos ?? [],
