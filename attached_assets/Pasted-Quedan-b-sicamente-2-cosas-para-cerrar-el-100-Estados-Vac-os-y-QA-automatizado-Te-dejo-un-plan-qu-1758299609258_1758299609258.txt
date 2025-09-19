@@ -1,0 +1,73 @@
+Quedan básicamente 2 cosas para cerrar el 100%: Estados Vacíos y QA automatizado. Te dejo un plan quirúrgico para implementarlos + un mini “go/no-go” final.
+1) Estados vacíos (backend + frontend)
+Backend — enriquecer summary
+En el motor único (computeProjectPeriodMetrics) calculá y devolvé flags:
+const EPS = 1e-6;
+
+summary.emptyStates = {
+  costos: teamCostUSD <= EPS,            // no hay filas válidas de "Costos..."
+  ingresos: revenueUSD <= EPS,           // no hay filas válidas de "Ventas Tomi"
+  horas: totalHours <= EPS,              // ΣL
+  objetivos: sumK <= EPS                  // ΣK (evita mostrar eficiencia 70 si no hay plan)
+};
+summary.hasData = {
+  costos: !summary.emptyStates.costos,
+  ingresos: !summary.emptyStates.ingresos
+};
+Contrato de respuesta (ejemplo):
+{
+  "summary": {
+    "period": "2025-08",
+    "basis": "ECON",
+    "activeMembers": 5,
+    "totalHours": 288.28,
+    "efficiencyPct": 90.09,
+    "teamCostUSD": 2436.09,
+    "revenueUSD": 8450,
+    "markupUSD": 6013.91,
+    "emptyStates": { "costos": false, "ingresos": false, "horas": false, "objetivos": false },
+    "hasData": { "costos": true, "ingresos": true }
+  }
+}
+Frontend — mostrar banners/estados
+Cards de Proyectos:
+summary.emptyStates.costos → “Sin datos de Excel MAESTRO en el período”.
+summary.emptyStates.ingresos → “Sin ingresos detectados para el período”.
+Proyecto/Dashboard y Equipo:
+Si costos=true → ocultar métricas derivadas de costos y mostrar placeholder/botón “Conectar hoja”.
+Si objetivos=true → eficiencia = 70% (neutro) + tooltip “sin K para el período”.
+2) QA automatizado (unit + contract + regresión)
+Unit tests (Jest)
+parseDec (ES/US, símbolos, paréntesis negativos):
+"1.234,56" → 1234.56, "$1,234.56" → 1234.56, "(1.234,56)" → -1234.56.
+fxForRow:
+Prioriza cotización de la fila > FX del período > fallback.
+Agregado multi-fila por persona:
+Suma correcta de K, L, M y costos (±0.01).
+Contract tests (Supertest)
+GET /api/projects?timeFilter=august_2025
+Debe incluir summary.period, basis, hasData, emptyStates (en project summary o en payload raíz de cada card).
+GET /api/projects/:id/complete-data?...
+Totales coinciden con deviation-analysis (teamCost, efficiency).
+GET /api/projects/:id/deviation-analysis?...
+deviations[] incluye deviationPercentage con signo y severity acorde a umbrales.
+Regresión (datos “Golden” – Kimberly/aug_2025)
+Asserts exactos:
+Eficiencia 90.09%, Costos 2436.09, Ingresos 8450, Markup 6013.91.
+Por persona (actual/budget/Δ% horas) = los 5 valores validados.
+Performance / caché (rápido)
+Mock de readRows + contador de llamadas → cada endpoint debe leer una sola vez por tab/período.
+En front, keys con {projectId, period, basis} (SWR/React-Query).
+3) Checklist de salida (Go/No-Go)
+Debe verse en UI:
+ En Proyectos: banners correctos cuando faltan costos/ingresos.
+ En Proyecto/Dashboard: los mismos banners y sin métricas “rotas”.
+ En Equipo: signos correctos, contador “Ejecución Óptima” y ordenamientos OK.
+Debe pasar en API/tests:
+ summary.emptyStates y summary.hasData presentes en todos los endpoints de proyecto.
+ Golden tests de Kimberly/aug_2025 OK.
+ Contract tests de endpoints OK.
+ Unit tests de parseo/FX/agregado OK.
+Operación:
+ Logs incluyen projectId, period, basis, fxSource.
+ Sin hardcode de proyecto/hojas; resolveProjectConfig decide todo.

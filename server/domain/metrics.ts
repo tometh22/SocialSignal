@@ -16,6 +16,16 @@ export interface PeriodMetrics {
     teamCostUSD: number;
     revenueUSD: number;
     markupUSD: number;
+    emptyStates: {
+      costos: boolean;
+      ingresos: boolean;
+      horas: boolean;
+      objetivos: boolean;
+    };
+    hasData: {
+      costos: boolean;
+      ingresos: boolean;
+    };
   };
   teamBreakdown: PersonMetrics[];
   ingresos: { [key: string]: boolean }; // { "ingresos": true, "costos": true }
@@ -78,6 +88,21 @@ export async function computeProjectPeriodMetrics(
   // 8. markupUSD = revenueUSD - teamCost
   const markupUSD = revenueUSD - teamCost;
   
+  // 🎯 ESTADOS VACÍOS - Detectar datos faltantes
+  const EPS = 1e-6;
+  
+  const emptyStates = {
+    costos: teamCost <= EPS,           // no hay filas válidas de "Costos directos e indirectos"
+    ingresos: revenueUSD <= EPS,       // no hay filas válidas de "Ventas Tomi"
+    horas: sumL <= EPS,                // ΣL (horas trabajadas)
+    objetivos: sumK <= EPS             // ΣK (evita mostrar eficiencia 70 si no hay plan)
+  };
+
+  const hasData = {
+    costos: !emptyStates.costos,
+    ingresos: !emptyStates.ingresos
+  };
+  
   // 9. Construir teamBreakdown (con severidad y desviaciones) y devolver
   const teamBreakdown = Object.values(personGroups).map(person => ({
     ...person,
@@ -85,6 +110,8 @@ export async function computeProjectPeriodMetrics(
     deviationCost: person.actualCost - person.budgetCost,
     severity: calculateSeverity(person.actualHours, person.targetHours)
   }));
+  
+  console.log(`🎯 ESTADOS VACÍOS - Proyecto ${projectId}: costos=${emptyStates.costos}, ingresos=${emptyStates.ingresos}, horas=${emptyStates.horas}, objetivos=${emptyStates.objetivos}`);
   
   return {
     summary: {
@@ -95,7 +122,9 @@ export async function computeProjectPeriodMetrics(
       efficiencyPct: Math.round(efficiency * 100) / 100,
       teamCostUSD: Math.round(teamCost * 100) / 100,
       revenueUSD: Math.round(revenueUSD * 100) / 100,
-      markupUSD: Math.round(markupUSD * 100) / 100
+      markupUSD: Math.round(markupUSD * 100) / 100,
+      emptyStates,
+      hasData
     },
     teamBreakdown,
     ingresos: { "ingresos": ingRows.length > 0 },
