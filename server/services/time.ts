@@ -54,10 +54,36 @@ export function resolveTimeFilter(timeFilter: string): TimeFilter {
     }
   }
   
-  // Fallback to current month
+  // Relative filters: mes_pasado, last_month, este_mes, current_month, etc.
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  
+  if (timeFilter === 'mes_pasado' || timeFilter === 'last_month') {
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const endDay = new Date(prevYear, prevMonth + 1, 0).getDate();
+    
+    return {
+      kind: 'month',
+      start: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`,
+      end: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${endDay}`
+    };
+  }
+  
+  if (timeFilter === 'este_mes' || timeFilter === 'current_month') {
+    const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    return {
+      kind: 'month',
+      start: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`,
+      end: `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${endDay}`
+    };
+  }
+  
+  // Fallback to current month
+  const y = currentYear;
+  const m = currentMonth + 1;
   const endDay = new Date(y, m, 0).getDate();
   
   return {

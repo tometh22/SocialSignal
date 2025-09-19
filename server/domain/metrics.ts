@@ -102,7 +102,7 @@ export async function computeProjectPeriodMetrics(
         if (!monthMatch) return false;
         
         const monthNum = getMonthNumber(monthMatch[2]);
-        const dateStr = `${cost.año}-${monthNum}-01`;
+        const dateStr = `${cost.año}-${monthNum.padStart(2, '0')}-01`;
         const costDate = new Date(dateStr);
         
         return isDateInRange(costDate, rng);
@@ -117,7 +117,7 @@ export async function computeProjectPeriodMetrics(
         if (!sale.year || !sale.month) return false;
         
         const monthNum = getMonthNumber(sale.month);
-        const dateStr = `${sale.year}-${monthNum}-01`;
+        const dateStr = `${sale.year}-${monthNum.padStart(2, '0')}-01`;
         const saleDate = new Date(dateStr);
         
         return isDateInRange(saleDate, rng);

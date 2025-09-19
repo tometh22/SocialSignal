@@ -687,8 +687,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
 
-  // RUTA DUPLICADA ELIMINADA - Ahora usa completeDataHandler en routes/index.ts
+  // RUTA RESTAURADA TEMPORALMENTE PARA DEBUG
+  const { completeDataHandler } = await import('./routes/complete-data');
+  app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
   /*
+  // RUTA ORIGINAL COMENTADA
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
     const id = parseInt(req.params.id);
     const timeFilter = req.query.timeFilter as string || 'all';
