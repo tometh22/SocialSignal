@@ -149,8 +149,25 @@ export function getDateRangeForFilter(timeFilter: string): { startDate: Date; en
   // Este mes (mes actual)
   if (timeFilter === 'este_mes' || timeFilter === 'this_month') {
     return {
-      startDate: new Date(2025, 8, 1), // Septiembre 2025 (mes 8 en 0-based)
-      endDate: new Date(2025, 8, 30, 23, 59, 59) // 30 de septiembre
+      startDate: new Date(currentYear, currentMonth, 1),
+      endDate: new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+    };
+  }
+  
+  // Mes pasado (mes anterior)
+  if (timeFilter === 'mes_pasado' || timeFilter === 'last_month') {
+    console.log(`🎯 dateRange.ts - Processing mes_pasado`);
+    console.log(`🎯 Current: ${now.toISOString()} (month=${currentMonth})`);
+    
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    
+    console.log(`🎯 prevMonth=${prevMonth}, prevYear=${prevYear}`);
+    console.log(`🎯 Result: ${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01 to ${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-31`);
+    
+    return {
+      startDate: new Date(prevYear, prevMonth, 1),
+      endDate: new Date(prevYear, prevMonth + 1, 0, 23, 59, 59)
     };
   }
   

@@ -176,11 +176,34 @@ export function createRouter() {
 
 // Helper function to parse time filters
 function parseTimeFilter(filter: string) {
+  console.log(`🎯 LOCAL parseTimeFilter called with: ${filter}`);
   const now = new Date();
   let startDate = new Date(now.getFullYear(), 0, 1);
   let endDate = new Date(now.getFullYear(), 11, 31);
 
   switch (filter) {
+    case 'este_mes':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+      break;
+    case 'mes_pasado':
+      const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      startDate = new Date(prevYear, prevMonth, 1);
+      endDate = new Date(prevYear, prevMonth + 1, 0); // Last day of previous month
+      break;
+    case 'este_trimestre':
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      startDate = new Date(now.getFullYear(), currentQuarter * 3, 1);
+      endDate = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
+      break;
+    case 'trimestre_pasado':
+      const currentQuarterPrev = Math.floor(now.getMonth() / 3);
+      const prevQuarter = currentQuarterPrev === 0 ? 3 : currentQuarterPrev - 1;
+      const prevQuarterYear = currentQuarterPrev === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      startDate = new Date(prevQuarterYear, prevQuarter * 3, 1);
+      endDate = new Date(prevQuarterYear, prevQuarter * 3 + 3, 0);
+      break;
     case 'q1':
       startDate = new Date(now.getFullYear(), 0, 1);
       endDate = new Date(now.getFullYear(), 2, 31);
@@ -202,7 +225,10 @@ function parseTimeFilter(filter: string) {
       endDate = now;
       break;
     case 'all':
-      return { startDate: new Date(2020, 0, 1), endDate: new Date(2030, 11, 31) };
+      return { 
+        start: new Date(2020, 0, 1).toISOString().split('T')[0], 
+        end: new Date(2030, 11, 31).toISOString().split('T')[0] 
+      };
     default:
       if (filter.includes('_to_')) {
         const [startStr, endStr] = filter.split('_to_');
@@ -210,13 +236,19 @@ function parseTimeFilter(filter: string) {
         const customEndDate = new Date(endStr);
         
         if (!isNaN(customStartDate.getTime()) && !isNaN(customEndDate.getTime())) {
-          return { startDate: customStartDate, endDate: customEndDate };
+          return { 
+            start: customStartDate.toISOString().split('T')[0], 
+            end: customEndDate.toISOString().split('T')[0] 
+          };
         }
       }
       break;
   }
   
-  return { startDate, endDate };
+  return { 
+    start: startDate.toISOString().split('T')[0], 
+    end: endDate.toISOString().split('T')[0] 
+  };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -9391,6 +9423,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const parseDecimal = (v: any) => Number(String(v).replace(/\./g, '').replace(',', '.')) || 0;
   
   const getUniversalTimeFilter = (filter: string) => {
+    console.log(`🚨🚨🚨🚨 getUniversalTimeFilter TOP-LEVEL CALLED WITH: ${filter} 🚨🚨🚨🚨`);
+    console.log(`🔥🔥🔥 FUNCTION IS BEING EXECUTED! FILTER: ${filter} 🔥🔥🔥`);
     // Parse timeFilter according to user specification: july_2025, q3_2025, august_2025, etc.
     if (filter.includes('_')) {
       const [period, year] = filter.split('_');
@@ -9430,17 +9464,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
-    // Fallback
+    // Relative temporal filters
     const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth() + 1;
-    const endDay = new Date(y, m, 0).getDate();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-based (0=January, 8=September)
     
-    return {
-      kind: 'month',
-      start: `${y}-${String(m).padStart(2, '0')}-01`, 
-      end: `${y}-${String(m).padStart(2, '0')}-${endDay}`
-    };
+    switch (filter) {
+      case 'este_mes': {
+        const m = currentMonth + 1; // 1-based
+        const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+        return {
+          kind: 'month',
+          start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
+          end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`
+        };
+      }
+      
+      case 'mes_pasado': {
+        console.log(`🎯 getUniversalTimeFilter DEBUG: Processing mes_pasado`);
+        console.log(`🎯 Current: ${now.toISOString()} (month=${currentMonth})`);
+        
+        // Get previous month
+        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const m = prevMonth + 1; // 1-based
+        const endDay = new Date(prevYear, prevMonth + 1, 0).getDate();
+        
+        console.log(`🎯 prevMonth=${prevMonth}, prevYear=${prevYear}, m=${m}`);
+        console.log(`🎯 Result: ${prevYear}-${String(m).padStart(2, '0')}-01 to ${prevYear}-${String(m).padStart(2, '0')}-${endDay}`);
+        
+        return {
+          kind: 'month',
+          start: `${prevYear}-${String(m).padStart(2, '0')}-01`,
+          end: `${prevYear}-${String(m).padStart(2, '0')}-${endDay}`
+        };
+      }
+      
+      default: {
+        // Fallback: current month
+        const y = currentYear;
+        const m = currentMonth + 1;
+        const endDay = new Date(y, m, 0).getDate();
+        
+        return {
+          kind: 'month',
+          start: `${y}-${String(m).padStart(2, '0')}-01`, 
+          end: `${y}-${String(m).padStart(2, '0')}-${endDay}`
+        };
+      }
+    }
   };
 
   // 1. UNIVERSAL PROJECTS LISTING ENDPOINT

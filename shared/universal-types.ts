@@ -145,15 +145,75 @@ export function parseTimeFilter(filter: string): TimeFilter {
     }
   }
   
-  // Fallback: current month
+  // Relative temporal filters
   const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  const endDay = new Date(y, m, 0).getDate();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-based (0=January, 8=September)
+  
+  switch (filter) {
+    case 'este_mes': {
+      const m = currentMonth + 1; // 1-based
+      const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        kind: 'month',
+        start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
+        end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`
+      };
+    }
+    
+    case 'mes_pasado': {
+      // Get previous month
+      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      const m = prevMonth + 1; // 1-based
+      const endDay = new Date(prevYear, prevMonth + 1, 0).getDate();
+      
+      console.log(`🎯 SHARED parseTimeFilter DEBUG:`);
+      console.log(`   Current: ${now.toISOString()} (month=${currentMonth})`);
+      console.log(`   prevMonth=${prevMonth}, prevYear=${prevYear}, m=${m}`);
+      console.log(`   Result: ${prevYear}-${String(m).padStart(2, '0')}-01 to ${prevYear}-${String(m).padStart(2, '0')}-${endDay}`);
+      
+      return {
+        kind: 'month',
+        start: `${prevYear}-${String(m).padStart(2, '0')}-01`,
+        end: `${prevYear}-${String(m).padStart(2, '0')}-${endDay}`
+      };
+    }
+    
+    case 'este_trimestre': {
+      const quarter = Math.floor(currentMonth / 3);
+      const startMonth = quarter * 3 + 1;
+      const endMonth = startMonth + 2;
+      const endDay = new Date(currentYear, endMonth, 0).getDate();
+      return {
+        kind: 'quarter',
+        start: `${currentYear}-${String(startMonth).padStart(2, '0')}-01`,
+        end: `${currentYear}-${String(endMonth).padStart(2, '0')}-${endDay}`
+      };
+    }
+    
+    case 'trimestre_pasado': {
+      const currentQuarter = Math.floor(currentMonth / 3);
+      const prevQuarter = currentQuarter === 0 ? 3 : currentQuarter - 1;
+      const prevYear = currentQuarter === 0 ? currentYear - 1 : currentYear;
+      const startMonth = prevQuarter * 3 + 1;
+      const endMonth = startMonth + 2;
+      const endDay = new Date(prevYear, endMonth, 0).getDate();
+      return {
+        kind: 'quarter',
+        start: `${prevYear}-${String(startMonth).padStart(2, '0')}-01`,
+        end: `${prevYear}-${String(endMonth).padStart(2, '0')}-${endDay}`
+      };
+    }
+  }
+  
+  // Fallback: current month
+  const m = currentMonth + 1; // 1-based
+  const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
   
   return {
     kind: 'month',
-    start: `${y}-${String(m).padStart(2, '0')}-01`, 
-    end: `${y}-${String(m).padStart(2, '0')}-${endDay}`
+    start: `${currentYear}-${String(m).padStart(2, '0')}-01`, 
+    end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`
   };
 }
