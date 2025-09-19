@@ -8106,7 +8106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const projectId = parseInt(req.params.id);
-      const { timeFilter, basis = 'ECON', startDate, endDate } = req.query;
+      const { timeFilter = 'current_month', basis = 'ECON', startDate, endDate } = req.query;
       
       console.log(`🔍 PARAMS: timeFilter=${timeFilter}, basis=${basis}, startDate=${startDate}, endDate=${endDate}`);
       
@@ -9568,6 +9568,338 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // 🏢 UNIVERSAL SYSTEM ENDPOINTS - IMPLEMENTED FOR COMPLETE STANDARDIZATION
+  // Follows the specification from user captures for universal data processing
+
+  // Universal helper functions (inline to avoid import conflicts)
+  const parseDecimal = (v: any) => Number(String(v).replace(/\./g, '').replace(',', '.')) || 0;
+  
+  const getUniversalTimeFilter = (filter: string) => {
+    // Parse timeFilter according to user specification: july_2025, q3_2025, august_2025, etc.
+    if (filter.includes('_')) {
+      const [period, year] = filter.split('_');
+      const y = parseInt(year);
+      
+      // Quarters
+      if (period.startsWith('q')) {
+        const q = parseInt(period.slice(1));
+        const startMonth = (q - 1) * 3 + 1;
+        const endMonth = startMonth + 2;
+        return {
+          kind: 'quarter',
+          start: `${y}-${String(startMonth).padStart(2, '0')}-01`,
+          end: `${y}-${String(endMonth).padStart(2, '0')}-${new Date(y, endMonth, 0).getDate()}`
+        };
+      }
+      
+      // Months
+      const monthMap: Record<string, number> = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12
+      };
+      
+      if (monthMap[period]) {
+        const month = monthMap[period];
+        const endDay = new Date(y, month, 0).getDate();
+        return {
+          kind: 'month',
+          start: `${y}-${String(month).padStart(2, '0')}-01`,
+          end: `${y}-${String(month).padStart(2, '0')}-${endDay}`
+        };
+      }
+    }
+    
+    // Fallback
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    const endDay = new Date(y, m, 0).getDate();
+    
+    return {
+      kind: 'month',
+      start: `${y}-${String(m).padStart(2, '0')}-01`, 
+      end: `${y}-${String(m).padStart(2, '0')}-${endDay}`
+    };
+  };
+
+  // 1. UNIVERSAL PROJECTS LISTING ENDPOINT
+  // GET /api/projects?timeFilter=august_2025
+  app.get('/api/projects', requireAuth, async (req, res) => {
+    console.log(`🚀 UNIVERSAL PROJECTS LISTING - TimeFilter: ${req.query.timeFilter}`);
+    
+    try {
+      const { timeFilter = 'current_month' } = req.query;
+      const timeFilterParsed = getUniversalTimeFilter(timeFilter as string);
+      
+      // Get all projects
+      const allProjects = await storage.getActiveProjects();
+      console.log(`📊 Retrieved ${allProjects.length} projects for universal processing`);
+      
+      // Process each project with universal data
+      const universalProjects = [];
+      
+      for (const project of allProjects) {
+        try {
+          // Get unified data from Excel MAESTRO (same logic as complete-data endpoint)
+          const projectCosts = await storage.getDirectCostsByProject(project.id);
+          
+          // Filter by time period
+          const filteredCosts = projectCosts.filter(cost => {
+            let monthNumber = 1;
+            if (cost.mes.includes(' ')) {
+              monthNumber = parseInt(cost.mes.substring(0, 2));
+            } else {
+              const monthMap: { [key: string]: number } = {
+                'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+                'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
+              };
+              monthNumber = monthMap[cost.mes.toLowerCase()] || 1;
+            }
+            const costDate = new Date(cost.año, monthNumber - 1, 15);
+            const filterStart = new Date(timeFilterParsed.start);
+            const filterEnd = new Date(timeFilterParsed.end);
+            return costDate >= filterStart && costDate <= filterEnd;
+          });
+
+          // Calculate universal metrics
+          let teamCostUSD = 0;
+          let totalHours = 0;
+          
+          filteredCosts.forEach(cost => {
+            const montoUSD = parseDecimal(cost.montoTotalUSD || 0);
+            const hoursReal = parseDecimal(cost.L || cost.hrs_reales || 0);
+            teamCostUSD += montoUSD;
+            totalHours += hoursReal;
+          });
+
+          // Get revenue from "Ventas Tomi" (source única)
+          let revenueUSD = 0;
+          try {
+            const sales = await storage.getSalesByProject(project.id);
+            const filteredSales = sales.filter((sale: any) => {
+              const saleDate = new Date(sale.año, sale.mes - 1, 15);
+              const filterStart = new Date(timeFilterParsed.start);
+              const filterEnd = new Date(timeFilterParsed.end);
+              return saleDate >= filterStart && saleDate <= filterEnd && sale.confirmado;
+            });
+            
+            revenueUSD = filteredSales.reduce((sum: number, sale: any) => {
+              const montoUSD = parseDecimal(sale.montoUSD || 0);
+              const montoARS = parseDecimal(sale.montoARS || 0);
+              const fxRate = parseDecimal(sale.cotizacion || 1000);
+              return sum + (montoUSD > 0 ? montoUSD : montoARS / fxRate);
+            }, 0);
+          } catch (error) {
+            console.log(`⚠️ No sales data for project ${project.id}`);
+          }
+
+          // Calculate markup
+          const markupUSD = revenueUSD - teamCostUSD;
+          const efficiencyPct = totalHours > 0 ? (totalHours / Math.max(project.estimatedHours || 1, 1)) * 100 : 0;
+
+          universalProjects.push({
+            projectId: project.id,
+            client: project.clientId ? (await storage.getClient(project.clientId))?.name || 'Unknown' : 'Unknown',
+            name: project.name,
+            revenueUSD: revenueUSD,
+            teamCostUSD: teamCostUSD,
+            markupUSD: markupUSD,
+            hoursL: totalHours,
+            efficiencyPct: efficiencyPct
+          });
+
+        } catch (projectError) {
+          console.error(`❌ Error processing project ${project.id}:`, projectError);
+          // Continue with next project
+        }
+      }
+      
+      console.log(`✅ UNIVERSAL PROJECTS PROCESSED: ${universalProjects.length} projects with timeFilter=${timeFilter}`);
+      
+      res.json({
+        projects: universalProjects,
+        metadata: {
+          timeFilter: timeFilter,
+          period: timeFilterParsed,
+          engine: 'universal_motor',
+          source: 'Excel_MAESTRO_unified'
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error in universal projects listing:", error);
+      res.status(500).json({ 
+        message: "Failed to get universal projects listing",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // 2. UNIVERSAL PROJECT COMPLETE DATA ENDPOINT  
+  // GET /api/projects/:id/complete-data?timeFilter=august_2025&basis=ECON
+  app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
+    console.log(`🚀 UNIVERSAL COMPLETE DATA - Project ${req.params.id}, TimeFilter: ${req.query.timeFilter}, Basis: ${req.query.basis}`);
+    
+    try {
+      const projectId = parseInt(req.params.id);
+      const { timeFilter = 'current_month', basis = 'ECON' } = req.query;
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const project = await storage.getActiveProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const timeFilterParsed = getUniversalTimeFilter(timeFilter as string);
+      
+      // UNIFIED DATA PROCESSING - Single source of truth
+      // Costos from "Costos directos e indirectos" (Excel MAESTRO)
+      const projectCosts = await storage.getDirectCostsByProject(projectId);
+      console.log(`💰 Retrieved ${projectCosts.length} Excel MAESTRO cost records`);
+      
+      // Filter by time period
+      const filteredCosts = projectCosts.filter(cost => {
+        let monthNumber = 1;
+        if (cost.mes.includes(' ')) {
+          monthNumber = parseInt(cost.mes.substring(0, 2));
+        } else {
+          const monthMap: { [key: string]: number } = {
+            'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
+          };
+          monthNumber = monthMap[cost.mes.toLowerCase()] || 1;
+        }
+        const costDate = new Date(cost.año, monthNumber - 1, 15);
+        const filterStart = new Date(timeFilterParsed.start);
+        const filterEnd = new Date(timeFilterParsed.end);
+        return costDate >= filterStart && costDate <= filterEnd;
+      });
+
+      console.log(`💰 Filtered to ${filteredCosts.length} cost records for period`);
+      
+      // Calculate unified team data
+      const personGroups: Record<string, any[]> = {};
+      filteredCosts.forEach(cost => {
+        const personName = String(cost.persona || cost.detalle || 'Unknown');
+        if (!personGroups[personName]) personGroups[personName] = [];
+        personGroups[personName].push(cost);
+      });
+
+      const teamBreakdown = Object.entries(personGroups).map(([personName, costs]) => {
+        let totalHours = 0;
+        let totalCost = 0;
+        let targetHours = 0;
+
+        costs.forEach(cost => {
+          const L = parseDecimal(cost.L || cost.hrs_reales || 0);
+          const M = parseDecimal(cost.M || cost.hrs_facturacion || 0);
+          const K = parseDecimal(cost.K || cost.hrs_obj || 0);
+          const montoUSD = parseDecimal(cost.montoTotalUSD || 0);
+          
+          totalHours += L;
+          targetHours += K;
+          
+          // Use basis for cost calculation
+          if (basis === 'ECON') {
+            totalCost += montoUSD; // Direct from Excel MAESTRO
+          } else {
+            // EXEC basis would use L * rate, but Excel MAESTRO already provides final cost
+            totalCost += montoUSD;
+          }
+        });
+
+        return {
+          personnelId: null,
+          name: personName,
+          role: 'From Excel MAESTRO',
+          actualHours: totalHours,
+          actualCost: totalCost,
+          targetHours: targetHours,
+          efficiency: targetHours > 0 ? (totalHours / targetHours) * 100 : 0
+        };
+      });
+
+      // Summary calculations
+      const totalWorkedHours = teamBreakdown.reduce((sum, p) => sum + p.actualHours, 0);
+      const totalWorkedCost = teamBreakdown.reduce((sum, p) => sum + p.actualCost, 0);
+      const totalTargetHours = teamBreakdown.reduce((sum, p) => sum + p.targetHours, 0);
+      const efficiency = totalTargetHours > 0 ? (totalWorkedHours / totalTargetHours) * 100 : 0;
+
+      // Get revenue data from "Ventas Tomi" (ingresos source única)
+      let revenueUSD = 0;
+      try {
+        const sales = await storage.getSalesByProject(projectId);
+        const filteredSales = sales.filter((sale: any) => {
+          const saleDate = new Date(sale.año, sale.mes - 1, 15);
+          const filterStart = new Date(timeFilterParsed.start);
+          const filterEnd = new Date(timeFilterParsed.end);
+          return saleDate >= filterStart && saleDate <= filterEnd && sale.confirmado;
+        });
+        
+        revenueUSD = filteredSales.reduce((sum: number, sale: any) => {
+          const montoUSD = parseDecimal(sale.montoUSD || 0);
+          const montoARS = parseDecimal(sale.montoARS || 0);
+          const fxRate = parseDecimal(sale.cotizacion || 1000);
+          return sum + (montoUSD > 0 ? montoUSD : montoARS / fxRate);
+        }, 0);
+      } catch (error) {
+        console.log(`⚠️ No sales data for project ${projectId}`);
+      }
+
+      const markup = revenueUSD > 0 && totalWorkedCost > 0 ? revenueUSD / totalWorkedCost : 0;
+
+      const response = {
+        project: {
+          id: projectId,
+          name: project.name,
+          clientId: project.clientId,
+          status: project.status
+        },
+        summary: {
+          estimatedHours: project.estimatedHours || totalTargetHours,
+          workedHours: totalWorkedHours,
+          totalCost: totalWorkedCost,
+          revenueUSD: revenueUSD,
+          markup: markup,
+          efficiency: efficiency
+        },
+        teamBreakdown: teamBreakdown,
+        financials: {
+          revenueUSD: revenueUSD,
+          costUSD: totalWorkedCost,
+          profitUSD: revenueUSD - totalWorkedCost,
+          markupRatio: markup
+        },
+        metadata: {
+          projectId,
+          timeFilter,
+          timeFilterParsed,
+          basis,
+          engine: 'universal_motor',
+          costSource: 'Excel_MAESTRO_Costos_directos_e_indirectos',
+          revenueSource: 'Excel_MAESTRO_Ventas_Tomi'
+        }
+      };
+
+      console.log(`✅ UNIVERSAL COMPLETE DATA: Project ${projectId}, Hours: ${totalWorkedHours}, Cost: $${totalWorkedCost}, Revenue: $${revenueUSD}, Markup: ${markup}`);
+      
+      res.json(response);
+
+    } catch (error) {
+      console.error("❌ Error in universal complete data:", error);
+      res.status(500).json({ 
+        message: "Failed to get universal complete data",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  console.log("🚀 UNIVERSAL SYSTEM ENDPOINTS IMPLEMENTED - All endpoints now follow universal architecture with single data sources");
 
   // Finalize routes setup and return server
   return httpServer;
