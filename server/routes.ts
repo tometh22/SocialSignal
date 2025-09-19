@@ -9464,6 +9464,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get unified data from Excel MAESTRO (same logic as complete-data endpoint)
           const projectCosts = await storage.getDirectCostsByProject(project.id);
           
+          // Get project name from costs BEFORE filtering (so we have data to extract name from)
+          const projectNameFromCosts = projectCosts.length > 0 ? projectCosts[0].proyecto : null;
+          console.log(`🔍 DEBUG PROJECT ${project.id}: projectCosts.length=${projectCosts.length}, projectNameFromCosts="${projectNameFromCosts}"`);
+          
           // Filter by time period
           const filteredCosts = projectCosts.filter(cost => {
             let monthNumber = 1;
@@ -9496,10 +9500,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Get revenue from "Ventas Tomi" (source única) - BÚSQUEDA POR NOMBRE
           let revenueUSD = 0;
           try {
-            // 🎯 ARREGLADO: Buscar por nombre del proyecto usando snake_case
-            const projectName = project.quotation?.project_name || project.subproject_name;
+            // 🎯 FIXED: Use project name from directCosts since quotation.project_name is undefined
+            let projectName = project.quotation?.project_name || project.subproject_name;
+            
+            // Fallback: Use project name from costs BEFORE temporal filter was applied
+            if (!projectName && projectNameFromCosts) {
+              projectName = projectNameFromCosts;
+            }
+            
+            console.log(`🔍 DEBUG PROJECT ${project.id}: Looking for sales with projectName="${projectName}"`);
             const allSales = await storage.getGoogleSheetsSales();
-            const sales = allSales.filter(sale => sale.project_name === projectName);
+            const sales = allSales.filter(sale => sale.projectName === projectName);
+            console.log(`🔍 DEBUG PROJECT ${project.id}: Found ${sales.length} sales records`);
+            
+            // DEBUG: Log first sales record to see data structure
+            if (sales.length > 0) {
+              console.log(`🔍 DEBUG PROJECT ${project.id}: First sales record:`, JSON.stringify(sales[0], null, 2));
+            }
             
             const filteredSales = sales.filter((sale: any) => {
               // 🎯 TEMPORAL FILTER: Convertir nombres de mes a números
@@ -9513,15 +9530,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const saleDate = new Date(sale.year, monthNumber - 1, 15);
               const filterStart = new Date(timeFilterParsed.start);
               const filterEnd = new Date(timeFilterParsed.end);
-              return saleDate >= filterStart && saleDate <= filterEnd;
+              const passes = saleDate >= filterStart && saleDate <= filterEnd;
+              
+              // DEBUG TEMPORAL FILTERING
+              if (sale.projectName === "Fee Huggies") {
+                console.log(`🔍 TEMPORAL DEBUG: ${sale.month} ${sale.year} → monthNumber=${monthNumber}`);
+                console.log(`🔍 TEMPORAL DEBUG: saleDate=${saleDate.toISOString()}`);
+                console.log(`🔍 TEMPORAL DEBUG: filterStart=${filterStart.toISOString()}, filterEnd=${filterEnd.toISOString()}`);
+                console.log(`🔍 TEMPORAL DEBUG: passes=${passes}`);
+              }
+              
+              return passes;
             });
             
+            console.log(`🔍 DEBUG PROJECT ${project.id}: After temporal filter: ${filteredSales.length} sales records`);
+            
             revenueUSD = filteredSales.reduce((sum: number, sale: any) => {
-              const montoUSD = parseDecimal(sale.montoUSD || 0);
-              const montoARS = parseDecimal(sale.montoARS || 0);
-              const fxRate = parseDecimal(sale.cotizacion || 1000);
+              // 🎯 FIX: Use parseFloat for USD amounts (not parseDecimal which removes dots)
+              const montoUSD = parseFloat(sale.amountUsd) || 0;
+              const montoARS = parseFloat(sale.amountLocal) || 0;
+              const fxRate = parseFloat(sale.fxApplied) || 1000;
               return sum + (montoUSD > 0 ? montoUSD : montoARS / fxRate);
             }, 0);
+            
+            console.log(`🔍 DEBUG PROJECT ${project.id}: Final calculated revenueUSD: $${revenueUSD}`);
           } catch (error) {
             console.log(`⚠️ No sales data for project ${project.id}`);
           }
@@ -9790,6 +9822,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   */
+
+  // ==================== DEBUG ENDPOINT (TEMPORARY) ====================
+  // GET /api/debug/sales-data
+  app.get('/api/debug/sales-data', requireAuth, async (req, res) => {
+    try {
+      const allSales = await storage.getGoogleSheetsSales();
+      console.log(`📊 DEBUG: Found ${allSales.length} total sales records`);
+      
+      // Get unique project names
+      const uniqueProjectNames = [...new Set(allSales.map(sale => sale.projectName))];
+      console.log(`📊 DEBUG: Unique project names: ${uniqueProjectNames.join(', ')}`);
+      
+      // Show first few records structure
+      const sampleSales = allSales.slice(0, 3);
+      console.log(`📊 DEBUG: Sample sales data:`, JSON.stringify(sampleSales, null, 2));
+      
+      res.json({
+        totalRecords: allSales.length,
+        uniqueProjectNames: uniqueProjectNames,
+        sampleRecords: sampleSales
+      });
+    } catch (error) {
+      console.error('Error fetching sales data:', error);
+      res.status(500).json({ error: 'Failed to fetch sales data' });
+    }
+  });
 
   console.log("🚀 UNIVERSAL SYSTEM ENDPOINTS IMPLEMENTED - All endpoints now follow universal architecture with single data sources");
 
