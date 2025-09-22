@@ -1,0 +1,91 @@
+el listado está filtrando por “Active only” (solo proyectos con actividad en el período)
+los ingresos del período se están sumando sin convertir ARS→USD, por eso aparecen montos millonarios en USD y el “Profit = Revenue”.
+Abajo te dejo un rediseño operativo (simple y robusto) para que todas las cards se completen bien, con cualquier proyecto y cualquier filtro temporal.
+1) Contrato único de API para la página
+Endpoint listado
+GET /api/projects?timeFilter=:tf&activeOnly=:bool&search=:q
+Respuesta
+{
+  "period": { "start": "2025-09-01", "end": "2025-09-30", "label": "This Month" },
+  "totals": {
+    "revenueUSD": 0,
+    "costUSD": 0,
+    "profitUSD": 0,
+    "workedHours": 0,
+    "activeProjects": 0,
+    "totalProjects": 0
+  },
+  "projects": [
+    {
+      "projectId": 39,
+      "clientName": "Kimberly Clark",
+      "projectName": "Fee Huggies",
+      "type": "Fee",
+      "status": "active",
+      "period": { "revenueUSD": 8450, "costUSD": 2436.09, "profitUSD": 6013.91, "workedHours": 288.28, "efficiencyPct": 90.1 },
+      "hasActivity": true
+    }
+  ],
+  "debug": { "engine":"unified", "source":"excel+db", "fx":"monthly" }
+}
+Las cards superiores consumen totals.*.
+Cada card de proyecto consume projects[i].period.*.
+2) De dónde salen los datos (fuente y normalización)
+Ingresos (siempre de “Ventas Tomi”)
+Regla de conversión de moneda por fila:
+Si Monto_USD > 0 → usar eso.
+Si Monto_USD == 0 y Monto_ARS > 0 → convertir: usd = Monto_ARS / fx('ARSUSD', yyyy-mm).
+Ignorar filas Confirmado = "No" si quieras “solo facturado real”. Si querés “pipeline”, permitir confirmado=all vía query param.
+Esto evita sumar ARS como USD (lo que hoy te infla a ~2.9M).
+Costos (siempre de “Costos directos e indirectos”)
+costUSD por fila:
+Si Moneda Original USD > 0 → ese valor
+Si solo hay ARS → usd = ARS / fx('ARSUSD', yyyy-mm)
+workedHours por fila: tomar la columna de horas reales (la que usan en Equipo/Desviación).
+Filtrar por Proyecto y por rango del timeFilter.
+FX mensual
+Tabla simple { "2025-08": 1,345, "2025-09": 1,350, ... }
+fx(ARSUSD, "2025-08") retorna la cotización del mes.
+Si no existe, usar fallback configurado (o error visible en debug.fxMissing=true).
+3) Cómo funciona el filtro temporal (SIEMPRE IGUAL EN TODOS)
+timeFilter acepta:
+this_month, last_month
+august_2025, q3_2025
+custom&start=YYYY-MM-DD&end=YYYY-MM-DD
+La función resolveTimeFilter(tf) devuelve {start,end,label}.
+Ese rango se usa para filtrar ventas y costos del listado.
+4) Lógica de “actividad” y “agregados”
+hasActivity (para Active Only): revenueUSD > 0 || costUSD > 0 || workedHours > 0.
+totals (las 4 cards de arriba):
+revenueUSD = Σ projects[i].period.revenueUSD
+costUSD = Σ projects[i].period.costUSD
+profitUSD = revenueUSD - costUSD
+workedHours= Σ projects[i].period.workedHours
+activeProjects = count(projects where hasActivity == true)
+totalProjects = count(projects SIN filtros de “activeOnly” ni “search”)
+Con esto las cards de arriba siempre cuadran con la lista visible y no se quedan en ceros o con números imposibles.
+5) Orden exacto del pipeline (para que no se “rompa”)
+Back: GET /api/projects?timeFilter=tf&activeOnly=...
+Resuelve rango (resolveTimeFilter)
+Obtiene todos los proyectos (BD/app)
+Para cada proyecto:
+a. sales = fetchSales(projectId, start, end) (Ventas Tomi → normaliza moneda)
+b. costs = fetchDirectCosts(projectId, start, end) (Costos → normaliza moneda y horas)
+c. period = { revenueUSD: sum(sales.usd), costUSD: sum(costs.usd), workedHours: sum(costs.hours) }
+d. efficiencyPct si tienes horas objetivo (si no, null)
+e. hasActivity según regla
+Aplica activeOnly y search
+Calcula totals sobre el conjunto filtrado (o puedes ofrecer totalsAll si querés los agregados antes del filtro)
+Front:
+Estado de filtros: timeFilter, activeOnly, search
+Llama al endpoint y renderiza solo con la respuesta (no recalcula nada)
+Cards superiores salen de totals.*
+Cards de proyecto salen de projects[i].period.*
+6) Por qué ahora ves solo 3 proyectos y totales raros
+El botón dice “Active Only (3)”: estás viendo solo 3 con actividad en el mes (el resto tienen 0 en septiembre).
+El revenue de las cards superiores/Warner está inflado porque se sumaron ARS como USD (no se aplicó la conversión de la hoja de Ventas Tomi).
+Period Profit = Period Revenue → indica que costUSD = 0 (no se cargaron costos para ese período, o el código nunca los agregó a los totales).
+Con el pipeline de arriba, esos tres errores desaparecen:
+verás todos (o solo activos si el toggle está on),
+los USD salen bien convertidos,
+el profit = revenue – cost (ya no será igual al revenue).
