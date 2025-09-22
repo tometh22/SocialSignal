@@ -220,7 +220,7 @@ export class ActiveProjectsAggregator {
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
     // Get all sales from Google Sheets integration
-    const allSales = await this.storage.getAllSales();
+    const allSales = await this.storage.getGoogleSheetsSales();
     console.log(`💰 Retrieved ${allSales.length} total sales records`);
 
     const filteredSales: SalesRecord[] = [];
