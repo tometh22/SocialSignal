@@ -40,6 +40,10 @@ import {
   insertProjectFinancialTransactionSchema,
   insertGoogleSheetsSalesSchema,
   insertDirectCostSchema,
+  
+  // Active Projects API contracts
+  activeProjectsQuerySchema,
+  activeProjectsResponseSchema,
 
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -73,6 +77,7 @@ import {
   googleSheetsSales,
   directCosts
 } from "@shared/schema";
+import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, deleteOldFile } from "./upload";
@@ -259,6 +264,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup authentication with storage
   const { requireAuth } = setupAuth(app, storage);
+
+  // ==================== UNIFIED ACTIVE PROJECTS ENDPOINT ====================
+  // Single source of truth for "Proyectos Activos" page according to blueprint
+
+  app.get('/api/projects/active', requireAuth, async (req, res) => {
+    console.log(`🚀 UNIFIED ACTIVE PROJECTS ENDPOINT: Query=${JSON.stringify(req.query)}`);
+    
+    try {
+      // Validate query parameters with Zod
+      const queryValidation = activeProjectsQuerySchema.safeParse(req.query);
+      if (!queryValidation.success) {
+        console.error('❌ Query validation failed:', queryValidation.error);
+        return res.status(400).json({
+          error: 'Invalid query parameters',
+          details: queryValidation.error.issues
+        });
+      }
+
+      const { timeFilter, onlyActiveInPeriod, basis } = queryValidation.data;
+      console.log(`📊 Processing: timeFilter=${timeFilter}, onlyActiveInPeriod=${onlyActiveInPeriod}, basis=${basis}`);
+
+      // Create aggregator instance
+      const aggregator = new ActiveProjectsAggregator(storage);
+
+      // Get unified data using blueprint aggregator
+      const response = await aggregator.getActiveProjectsUnified(timeFilter, onlyActiveInPeriod);
+      
+      console.log(`✅ Successfully aggregated ${response.projects.length} projects`);
+      console.log(`💰 Portfolio: $${response.summary.portfolio.periodRevenueUSD.toFixed(2)} revenue, ${response.summary.portfolio.periodWorkedHours.toFixed(1)}h worked`);
+
+      // Validate response with Zod before sending
+      const responseValidation = activeProjectsResponseSchema.safeParse(response);
+      if (!responseValidation.success) {
+        console.error('❌ Response validation failed:', responseValidation.error);
+        return res.status(500).json({
+          error: 'Internal server error - invalid response format',
+          details: responseValidation.error.issues
+        });
+      }
+
+      return res.json(response);
+
+    } catch (error) {
+      console.error('❌ Error in unified active projects endpoint:', error);
+      
+      return res.status(500).json({
+        error: 'Failed to get active projects data',
+        message: error instanceof Error ? error.message : String(error),
+        engine: 'unified_aggregator'
+      });
+    }
+  });
 
   // Endpoint de prueba para deviation analysis (sin sanitización)
   app.get("/api/projects/:id/deviation-test", requireAuth, async (req, res) => {
