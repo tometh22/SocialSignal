@@ -102,7 +102,7 @@ app.get("/api/health", (req, res) => {
 // Register all API routes with auth middleware
 registerRoutes(app, requireAuth);
 
-const port = Number(process.env.PORT || process.env.REPL_SLUG ? 5000 : 3000);
+const port = Number(process.env.PORT || 5000);
 
 (async () => {
   try {

@@ -1,7 +1,7 @@
 # Project Management & Social Listening Platform
 
 ## Overview
-This platform is a comprehensive internal project management system for Epical Digital, covering the entire workflow from quotation generation to project execution and social listening analysis. Its primary purpose is to streamline project management, facilitate client and internal communication, and provide in-depth analytics for business decision-making. The system aims to enhance efficiency, transparency, and profitability in project delivery, offering capabilities for quotation management, project tracking, time entry, deliverable management, and robust financial and operational analytics.
+This platform is a comprehensive internal project management system for Epical Digital, designed to streamline project workflows from quotation to execution and social listening analysis. It aims to enhance efficiency, transparency, and profitability by providing tools for quotation management, project tracking, time entry, deliverable management, and robust financial and operational analytics.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -16,6 +16,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **UI Components**: Radix UI with Tailwind CSS
 - **Forms**: React Hook Form with Zod validation
 - **Build Tool**: Vite
+- **UI/UX Decisions**: Emphasis on clean, professional interfaces with consistent color schemes, intuitive layouts, and responsive design. Features like dynamic color indicators, clear typography, and enhanced visual hierarchies are implemented across dashboards and forms. Advanced features include a professional business intelligence dashboard, detailed financial analysis, and prediction/recommendation systems.
 
 ### Backend
 - **Runtime**: Node.js with Express.js
@@ -31,124 +32,34 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Connection Pooling**: Neon serverless connection pooling
 
 ### Core Modules & Features
-
-#### **Navigation Structure (Reorganized Aug 2025):**
-- **Principal**: Dashboard Ejecutivo
-- **Gestión Comercial**: Nueva Cotización, Cotizaciones, Clientes
-- **Gestión Operacional**: Proyectos Activos
-- **Análisis Financiero**: Resumen Financiero, Analytics & Reportes, Costos Indirectos
-- **Herramientas**: Excel MAESTRO, Configuración
-
-#### **Core Features:**
+- **Navigation Structure**: Principal (Executive Dashboard), Commercial Management (Quotations, Clients), Operational Management (Active Projects), Financial Analysis (Financial Summary, Analytics & Reports, Indirect Costs), Tools (Excel MAESTRO, Configuration).
 - **User Management**: Role-based access control.
 - **Client Management**: Client information, logo handling, and Google Sheets integration for automated client import.
 - **Quotation System**: Comprehensive quotation creation with team assignment and cost multipliers.
 - **Project Management**: Active project and subproject tracking with integrated financial management.
-- **Financial Management System**: Dual-purpose analysis separating operational sales (monthly revenue recognition) from financial transactions (real invoicing/collection tracking). Project-level financial management accessible via dedicated page (no internal tabs duplication).
+- **Financial Management System**: Dual-purpose analysis separating operational sales from financial transactions. Project-level financial management.
 - **Time Tracking**: Hourly and cost-based time entry.
 - **Deliverable Management**: MODO-style tracking with quality metrics.
 - **Chat System**: Project-based internal communication.
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), and predictive insights.
 - **Financial Overview**: Consolidated financial dashboard with operational vs financial analysis comparison.
-- **Google Sheets Integration**: Automated client import from "Activo" tab (column C) with duplicate prevention and batch processing. Complete Excel MAESTRO synchronization service with automatic imports from "Ventas Tomi" sheet every 30 minutes.
+- **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization service with automatic imports from "Ventas Tomi" sheet.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
-- **UI/UX Decisions**: Emphasis on clean, professional interfaces with consistent color schemes, intuitive layouts, and responsive design. Features like dynamic color indicators, clear typography, and enhanced visual hierarchies are implemented across dashboards and forms. Advanced features include a professional business intelligence dashboard, detailed financial analysis, and prediction/recommendation systems.
+- **Dual-Cost System**: Differentiates between real costs (cash outflow) and operational costs (team productivity analysis).
+- **Advanced Temporal Filtering**: Supports standard periods (quarters, months, years), custom date ranges, and relative periods.
+- **Architectural Redesign of "Proyectos Activos"**: Implemented a comprehensive blueprint with a single source of truth architecture, a unified backend aggregator (`server/domain/projectsActive.ts`), and a rewritten frontend (`client/src/pages/active-projects-v2.tsx`) using unified contracts. This ensures mathematical invariants for portfolio summaries.
+- **Unified Data Source**: All project-related data is now sourced exclusively from the Excel MAESTRO, consolidating sales and cost data.
 
 ### System Design Choices
-- **Unified Data Source**: Centralized data fetching (`/api/projects/:id/complete-data`) with temporal filtering for consistency across all modules.
-- **Modular Design**: Separation of concerns into distinct frontend and backend services, allowing for scalable development.
-- **Optimistic UI Updates**: Instant feedback for user actions (e.g., time entry, admin panel updates) to improve perceived performance.
-- **Robust Validation**: Extensive use of Zod for schema validation across the application to ensure data integrity.
+- **Unified Data Source**: Centralized data fetching with temporal filtering for consistency.
+- **Modular Design**: Separation of concerns for scalable development.
+- **Optimistic UI Updates**: Instant feedback for user actions.
+- **Robust Validation**: Extensive use of Zod for data integrity.
 - **Security**: Session-based authentication, input sanitization, file upload restrictions, and role-based access control.
-- **Financial Coherence**: Consistent application of business logic for markup, cost, and profit calculations across all reports and dashboards, including inflation and indirect costs.
-- **Dynamic Content**: Elimination of hardcoded values, relying on dynamic data integration from approved quotations.
-- **Dual-Cost System**: Complete implementation of real costs (actual cash outflow from freelancers) vs operational costs (total team productivity analysis). Full-time employees with fixed salaries generate only operational costs, while part-time/freelance workers generate both types. System verified as 100% mathematically consistent across all components (Aug 2025).
-- **Performance Optimization**: Advanced React Query caching strategies with intelligent stale times, optimized database indices, and elimination of excessive polling. Database integrity verified at 100% with zero orphaned records (Aug 2025).
-
-## Recent Implementation (Sep 2025)
-- **Sistema de Rankings Económicos Mejorado (Sep 3, 2025)**: Corrección definitiva de inconsistencias en rankings:
-  - **Filtro Robusto**: Solo incluye miembros con actividad real (horas O costo) Y datos estimados
-  - **Eliminación de Casos Problemáticos**: Excluye miembros con solo horas objetivo pero 0 horas reales
-  - **Validación Previa**: Logging detallado para identificar y filtrar datos incompletos
-  - **Consistencia Universal**: Lógica aplicada uniformemente en todos los filtros temporales y proyectos
-  - **Corrección de Timestamp**: Manejo seguro de fechas para evitar errores de sistema
-  - **Datos Auténticos**: Rankings basados exclusivamente en datos verificados del Excel MAESTRO
-- **Arreglo Sol Ayala Duplicados y Mapa de Calor (Sep 2, 2025)**: Sistema completamente corregido:
-  - **Deduplicación Automática**: Map-based consolidation usando nombres normalizados elimina duplicados
-  - **Mapa de Calor Funcional**: Corregido path de `analytics.economicRankings` a `rankings.economicMetrics`
-  - **Algoritmo de Scoring Robusto**: Normalización usando percentiles 10-90 para manejar outliers extremos
-  - **Curva de Suavizado**: Scores aplicando curva exponencial (x^0.8) para mayor realismo
-  - **Rango Calibrado**: Scores limitados a 5-95 puntos para evitar valores irreales
-  - **Sistema Verificado**: Sol Ayala aparece una sola vez, mapa de calor muestra datos deduplicados
-  - **Interpretación de Colores**: Verde >70, Amarillo 40-69, Rojo <40 puntos
-- **Sistema de Filtros Temporales Completo (Sep 2, 2025)**: Sistema completamente flexible para cualquier período temporal:
-  - **Filtros Estándar**: Q1-Q4 con trimestres fiscales correctos (Q1: Ene-Mar, Q2: Abr-May-Jun, Q3: Jul-Ago-Sep, Q4: Oct-Nov-Dic)
-  - **Rangos Personalizados**: "YYYY-MM-DD_to_YYYY-MM-DD" para cualquier período específico
-  - **Meses Individuales**: "mayo_2025", "june_2025", "january_2024" (español e inglés)
-  - **Bimestres**: "bimestre_1_2025" (Ene-Feb), "bimestre_2_2025" (Mar-Abr), hasta "bimestre_6_2025" (Nov-Dic)
-  - **Semestres**: "semestre_1_2025" (Ene-Jun), "semestre_2_2025" (Jul-Dic)
-  - **Años Completos**: "año_2024", "year_2025"
-  - **Períodos Múltiples**: "ene_mar_2025", "jul_sep_2025" (rangos de meses abreviados)
-  - **Períodos Relativos**: "ultimos_3_meses", "last_6_months", "ultimos_30_dias", "last_90_days"
-  - **Trimestres Específicos**: "q1_2024", "q2_2023" (cualquier año)
-  - **Períodos Especiales**: "huggies_period" para casos específicos de análisis
-  - **Problema Resuelto**: Sistema acepta cualquier combinación temporal que el usuario necesite
-- **Umbrales Corporativos de Alertas (Sep 2, 2025)**: Ajustados umbrales de exceso presupuestario:
-  - **15% tolerancia** antes de marcar como "excedido crítico" (rojo)
-  - **Niveles graduales**: Verde (normal), Amarillo (85-100%), Naranja (100-115%), Rojo (>115%)
-  - **Eliminación duplicaciones**: Mejorada deduplicación de miembros del equipo en backend
-- **Unificación de Fuente de Datos - COMPLETADA (Sep 1, 2025)**: Sistema completamente unificado para tomar TODOS los datos del Excel MAESTRO:
-  - **Problema Anterior**: Duplicación de fuentes - ventas desde Google Sheets y costos desde Excel MAESTRO
-  - **Solución Implementada**: 
-    - Nueva función `syncUnifiedExcelData()` que toma ventas + costos del mismo Excel MAESTRO
-    - Eliminación de `syncSales()` y `syncDirectCosts()` separados
-    - Una sola fuente de verdad para precio mensual y costo mensual
-    - Gestión temporal unificada con filtros coherentes
-  - **Arquitectura Simplificada**:
-    - AutoSyncService → Excel MAESTRO "Ventas Tomi" → precios + costos
-    - getProjectCostSummary() con filtros temporales integrados
-    - Dashboard utiliza datos coherentes del mismo período
-  - **Datos Verificados**: Sistema procesa correctamente precios e inflación desde la misma fuente temporal
-- **Integración Arquitectural de Costos Directos - COMPLETADA (Sep 1, 2025)**: Sistema completamente rediseñado para integrar Excel MAESTRO con la arquitectura existente:
-  - **Problema Arquitectural**: Datos del Excel MAESTRO existían como entidad separada sin integrarse al sistema principal de cálculos de costos
-  - **Solución Implementada**: 
-    - Modificación completa de `getProjectCostSummary()` en `server/storage.ts` para integrar ambas fuentes de datos
-    - Costos directos del Excel MAESTRO ahora se suman automáticamente a los time entries tradicionales
-    - Eliminación de componentes UI "forzados" - ahora usa la fuente única de datos del sistema principal
-    - Preservación de la lógica dual-cost existente (real vs operational)
-  - **Integración Técnica**:
-    - `directCostsFromExcel`: Suma de montos USD del Excel MAESTRO
-    - `timeEntriesCost`: Costos calculados tradicionalmente via time entries + personnel rates
-    - `totalCombinedCost`: Suma consolidada que respeta la arquitectura existente
-  - **Resultado Visual**: 
-    - Dashboard principal muestra valor correcto en USD desde fuente única integrada
-    - Pestaña Performance presenta desglose detallado con análisis de markup automático
-    - Sistema respeta completamente los componentes y arquitectura existentes
-  - **Datos Verificados**: Fee Huggies agosto 2025 muestra $2,436 USD desde Excel MAESTRO integrados al sistema principal
-  - **Impacto**: Sistema mantiene coherencia arquitectural mientras incorpora datos externos de manera nativa
-
-## Previous Implementation (Aug 2025)
-- **Automatic Excel MAESTRO Synchronization**: Implemented complete background service that synchronizes sales data from "Ventas Tomi" sheet every 30 minutes. Features include:
-  - AutoSyncService with configurable intervals
-  - Duplicate detection and automatic updates
-  - Real-time monitoring dashboard in Excel MAESTRO page
-  - Manual synchronization triggers
-  - Complete error handling and logging
-  - Automatic server startup initialization
-- **Sales Data Management**: Complete CRUD operations for Google Sheets sales import with proper data validation and temporal filtering.
-- **Monitoring Interface**: Real-time status monitoring for synchronization services with live updates every 30 seconds.
-- **Conditional Financial Logic (Aug 29, 2025)**: Implemented dual financial analysis system based on project creation date:
-  - **Legacy Projects** (pre-Sept 2025): Use real income data from Google Sheets vs actual costs for markup calculations
-  - **Future Projects** (post-Sept 2025): Use approved quotation pricing vs actual costs for markup calculations
-  - Dynamic dashboard labels and tooltips that adjust based on project type
-  - Seamless transition logic ensuring accuracy for both historical and forward-looking analysis
-- **Temporal Data Differentiation (Aug 29, 2025)**: Enhanced dashboard to distinguish real worked data from projected data:
-  - **Real Data**: Sales with status "completada" (past) + "activa" (current) for authentic revenue calculations
-  - **Projected Data**: Sales with status "proyectada" (future) displayed separately for planning purposes
-  - **Dashboard Cards**: Markup calculations use only real income vs actual costs, ensuring accurate performance metrics
-  - **New Card**: Added dedicated "Ingresos Proyectados" card to clearly separate estimates from actuals
-  - **Financial Coherence**: All metrics now properly differentiate between worked periods and projected periods
+- **Financial Coherence**: Consistent application of business logic for financial calculations.
+- **Dynamic Content**: Elimination of hardcoded values, relying on dynamic data integration.
+- **Performance Optimization**: Advanced React Query caching, optimized database indices, and reduced polling.
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL serverless database connection.
@@ -168,4 +79,3 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Recharts**: For professional charting in analytics dashboards.
 - **lucide-react**: For icons.
 - **cookie-parser**: For handling HTTP cookies.
-```
