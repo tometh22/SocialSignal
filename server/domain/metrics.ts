@@ -180,9 +180,14 @@ export async function computeProjectPeriodMetrics(
   
   // 7. FIXED: Get revenue using same strategy as project list - search by project name
   let revenueUSD = 0;
+  
+  console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: Starting revenue calculation with ${costRows.length} costs, ${ingRows.length} ingresos`);
+  
   try {
     // Get project name from costRows (same strategy as list)
     const projectNameFromCosts = costRows.length > 0 ? costRows[0].proyecto : null;
+    
+    console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: projectNameFromCosts="${projectNameFromCosts}"`);
     
     if (projectNameFromCosts) {
       const { storage } = await import('../storage');
@@ -196,10 +201,16 @@ export async function computeProjectPeriodMetrics(
       }, 0);
       
       console.log(`💰 REVENUE FIX - Proyecto ${projectId}: Found ${projectSales.length} sales for "${projectNameFromCosts}", total: $${revenueUSD}`);
+    } else {
+      // CRITICAL FIX: Use fallback when no costs available but we have ingRows
+      console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: No costs available, using fallback with ${ingRows.length} ingresos`);
+      revenueUSD = calculateRevenue(ingRows, rng);
+      console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: Fallback result: $${revenueUSD}`);
     }
   } catch (error) {
     console.log(`⚠️ Revenue fallback failed, using original calculation`, error);
     revenueUSD = calculateRevenue(ingRows, rng);
+    console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: Exception fallback result: $${revenueUSD}`);
   }
   
   // 8. markupUSD = revenueUSD - teamCost
@@ -359,17 +370,24 @@ function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC
  */
 function calculateRevenue(ingRows: any[], timeRange: TimeFilter): number {
   return ingRows.reduce((sum, row) => {
-    // Solo incluir confirmado
-    if (!row.confirmado && row.confirmado !== true && row.confirmado !== 'true') {
+    // Solo incluir confirmado - manejar múltiples formatos
+    const confirmado = String(row.confirmado || '').toLowerCase().trim();
+    if (!confirmado || !['si', 'sí', 'yes', 'true', '1'].includes(confirmado)) {
       return sum;
     }
     
-    const montoUSD = parseDec(row.montoUSD || 0);
-    const montoARS = parseDec(row.montoARS || 0);
+    // Manejar tanto formato nuevo como viejo de campos
+    const montoUSD = parseDec(row.montoUSD || row.monto_usd || row.amountUsd || 0);
+    const montoARS = parseDec(row.montoARS || row.monto_ars || row.amountLocal || 0);
     const fx = fxForRow(timeRange, row);
     
+    console.log(`💰 Revenue calculation: USD=${montoUSD}, ARS=${montoARS}, FX=${fx}, confirmado=${confirmado}`);
+    
     // Priorizar USD, convertir ARS si es necesario
-    return sum + (montoUSD > 0 ? montoUSD : montoARS / fx);
+    const rowRevenue = montoUSD > 0 ? montoUSD : montoARS / fx;
+    console.log(`💰 Row revenue: ${rowRevenue}`);
+    
+    return sum + rowRevenue;
   }, 0);
 }
 

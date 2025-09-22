@@ -36,10 +36,20 @@ export function resolveTimeFilter(timeFilter: string): TimeFilter {
     }
     
     // Months: january_2025, february_2025, july_2025, august_2025, etc.
+    // Soporte para español e inglés según especificaciones del usuario
     const monthMap: Record<string, number> = {
+      // Inglés
       'january': 1, 'february': 2, 'march': 3, 'april': 4,
       'may': 5, 'june': 6, 'july': 7, 'august': 8,
-      'september': 9, 'october': 10, 'november': 11, 'december': 12
+      'september': 9, 'october': 10, 'november': 11, 'december': 12,
+      // Español 
+      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+      'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+      'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+      // Abreviaciones españolas
+      'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4,
+      'may': 5, 'jun': 6, 'jul': 7, 'ago': 8,
+      'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
     };
     
     if (monthMap[period]) {
