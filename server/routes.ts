@@ -9543,11 +9543,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const projectNameFromCosts = projectCosts.length > 0 ? projectCosts[0].proyecto : null;
           console.log(`🔍 DEBUG PROJECT ${project.id}: projectCosts.length=${projectCosts.length}, projectNameFromCosts="${projectNameFromCosts}"`);
           
-          // Filter by time period AND 'Directo' only (según especificación)
+          // Filter by time period (TEMPORARILY removed 'Directo' filter while fixing Google Sheets access)
           const filteredCosts = projectCosts.filter(cost => {
-            // 🎯 FILTRO DIRECTO: Solo costos 'Directo', no 'Indirecto' (overhead)
-            const isDirecto = cost.directoIndirecto === 'Directo';
-            if (!isDirecto) return false;
+            // 🚨 TEMP: Filtro Directo deshabilitado temporalmente por problema acceso Google Sheets
+            // TODO: Re-habilitar cuando se arregle acceso: cost.directoIndirecto === 'Directo'
             
             // Filtro temporal
             let monthNumber = 1;
