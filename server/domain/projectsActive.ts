@@ -358,7 +358,8 @@ export class ActiveProjectsAggregator {
           clientName: sale.clientName,
           projectKey: sale.projectKey,
           sales: [],
-          costs: []
+          costs: [],
+          quotation: undefined // No quotation data available for Excel-only projects
         };
         projectsMap.set(sale.projectKey, projectData);
       }
@@ -379,7 +380,8 @@ export class ActiveProjectsAggregator {
           clientName: '',
           projectKey: cost.projectKey,
           sales: [],
-          costs: []
+          costs: [],
+          quotation: undefined // No quotation data available for Excel-only projects
         };
         projectsMap.set(cost.projectKey, projectData);
       }
@@ -429,11 +431,18 @@ export class ActiveProjectsAggregator {
       // Get client info
       const client = await this.storage.getClient(projectData.clientId);
 
+      const quotationType = projectData.quotation?.projectType;
+      const projectName = projectData.projectName;
+      console.log(`🔍 DEBUG: About to map - quotationType="${quotationType}", projectName="${projectName}"`);
+      
+      const mappedType = this.mapProjectType(quotationType, projectName);
+      console.log(`📋 Project "${projectName}": quotation=${!!projectData.quotation}, type mapped to="${mappedType}"`);
+      
       projectItems.push({
         projectId: projectData.projectId,
         clientId: projectData.clientId,
         name: projectData.projectName,
-        type: this.mapProjectType(projectData.quotation?.projectType),
+        type: mappedType,
         status: 'active', // Could be enhanced with actual status
         client: {
           id: projectData.clientId,
@@ -486,25 +495,56 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * Map quotation.projectType to API contract type
+   * Map quotation.projectType to API contract type with fallback inference
    */
-  private mapProjectType(quotationProjectType?: string): 'fee' | 'one-shot' | 'other' {
-    if (!quotationProjectType) return 'other';
+  private mapProjectType(quotationProjectType?: string, projectName?: string): 'fee' | 'one-shot' | 'other' {
+    console.log(`🔍 MAPPING PROJECT TYPE: quotation="${quotationProjectType}", project="${projectName}"`);
     
-    // Recurrente/Fee types
-    if (quotationProjectType === 'fee-mensual' || 
-        quotationProjectType === 'always-on' ||
-        quotationProjectType === 'recurring') {
-      return 'fee';
+    // Primary mapping from quotation.projectType
+    if (quotationProjectType) {
+      // Recurrente/Fee types
+      if (quotationProjectType === 'fee-mensual' || 
+          quotationProjectType === 'always-on' ||
+          quotationProjectType === 'recurring') {
+        console.log(`✅ Mapped "${quotationProjectType}" → 'fee' (recurrente from quotation)`);
+        return 'fee';
+      }
+      
+      // One-shot types
+      if (quotationProjectType === 'one-shot' || 
+          quotationProjectType === 'One Shot' ||
+          quotationProjectType === 'one-time') {
+        console.log(`✅ Mapped "${quotationProjectType}" → 'one-shot' (from quotation)`);
+        return 'one-shot';
+      }
+      
+      console.log(`⚠️ Unknown quotation.projectType "${quotationProjectType}" - falling back to name inference`);
     }
     
-    // One-shot types
-    if (quotationProjectType === 'one-shot' || 
-        quotationProjectType === 'One Shot') {
-      return 'one-shot';
+    // BULLETPROOF FALLBACK: Infer from project name for Excel-only projects
+    if (projectName) {
+      const nameLower = projectName.toLowerCase();
+      
+      // Infer recurrente if name contains "fee", "mensual", "monthly", "recurrent"
+      if (nameLower.includes('fee') || 
+          nameLower.includes('mensual') ||
+          nameLower.includes('monthly') ||
+          nameLower.includes('recurrent')) {
+        console.log(`✅ FALLBACK: Inferred "${projectName}" → 'fee' (recurrente from name)`);
+        return 'fee';
+      }
+      
+      // Infer one-shot if name contains "one-shot", "project", "campaign"
+      if (nameLower.includes('one-shot') ||
+          nameLower.includes('project') ||
+          nameLower.includes('campaign')) {
+        console.log(`✅ FALLBACK: Inferred "${projectName}" → 'one-shot' (from name)`);
+        return 'one-shot';
+      }
     }
     
-    // Default to other for unknown types
+    // Default to other if no inference possible
+    console.log(`⚠️ No inference possible - defaulting to 'other'`);
     return 'other';
   }
 
