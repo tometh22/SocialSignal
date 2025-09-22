@@ -41,7 +41,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       actualHours: p.actualHours ?? 0,
       actualCost: p.actualCost ?? 0,
       budgetedCost: p.budgetCost ?? 0,
-      rate: p.rate ?? null,
+      rate: null,
       efficiency: p.efficiency ?? 70
     }));
 
@@ -65,12 +65,16 @@ export async function completeDataHandler(req: Request, res: Response) {
     };
     console.log(`🔍 DEBUG ACTUALS: actuals=${JSON.stringify(actualsData, null, 2)}`);
 
-    return res.json({
+    // Calculate correct markup ratio
+    const correctMarkupRatio = summary.teamCostUSD > 0 ? (summary.revenueUSD / summary.teamCostUSD) : 0;
+    console.log(`🔍 MARKUP CALCULATION: ${summary.revenueUSD} / ${summary.teamCostUSD} = ${correctMarkupRatio}`);
+
+    const response = {
       // 🎯 FRONTEND COMPATIBILITY: Map to expected structure
       actuals: actualsData,
       metrics: {
         efficiency: summary.efficiencyPct,
-        markup: summary.markupUSD,
+        markup: correctMarkupRatio,
         budgetUtilization: 0,
         hoursDeviation: 0,
         costDeviation: 0
@@ -79,8 +83,15 @@ export async function completeDataHandler(req: Request, res: Response) {
       teamBreakdown,
       ingresos: pm.ingresos ?? [],
       costos: pm.costos ?? [],
-      ...legacy   // <- quitar si no hace falta compat
-    });
+      // Legacy compatibility (removed spread to prevent overwriting metrics)
+      estimatedHours: legacy.estimatedHours,
+      workedHours: legacy.workedHours,
+      totalCost: legacy.totalCost,
+      totalRealRevenue: summary.revenueUSD
+    };
+    
+    console.log(`🔍 FINAL RESPONSE MARKUP: ${response.metrics.markup}`);
+    return res.json(response);
   } catch (e: any) {
     console.error('❌ COMPLETE-DATA ERROR:', e.message);
     return res.status(500).json({ error: 'complete-data failed', detail: e?.message });
