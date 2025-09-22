@@ -1,0 +1,511 @@
+/**
+ * UNIFIED BACKEND AGGREGATOR FOR "PROYECTOS ACTIVOS" PAGE
+ * 
+ * Implements the blueprint specification for a single source of truth:
+ * - Single TimeFilter → ResolvedPeriod resolver
+ * - Data from "Ventas Tomi" and "Costos directos e indirectos" (Excel MAESTRO)
+ * - Merge by projectKey() normalization
+ * - Exact formula calculations
+ * - Portfolio summary by reduction (guarantees invariants)
+ */
+
+import { 
+  TimeFilter, 
+  ResolvedPeriod, 
+  ProjectMetrics, 
+  ProjectFlags, 
+  PortfolioSummary,
+  ActiveProjectItem,
+  ActiveProjectsResponse 
+} from "@shared/schema";
+
+import { parseMoneyAuto } from "../utils/money";
+import { projectKey } from "../utils/normalize";
+import type { IStorage } from "../storage";
+
+// ==================== TIME FILTER RESOLVER ====================
+// Unified resolver according to blueprint specification
+
+export function resolveTimeFilter(timeFilter: TimeFilter): ResolvedPeriod {
+  if (typeof timeFilter === 'object' && 'start' in timeFilter) {
+    return {
+      start: timeFilter.start,
+      end: timeFilter.end,
+      label: `${timeFilter.start} to ${timeFilter.end}`
+    };
+  }
+
+  const filter = timeFilter as string;
+  console.log(`🎯 UNIFIED resolveTimeFilter: Processing ${filter}`);
+
+  // Parse timeFilter according to blueprint: july_2025, q3_2025, agosto_2025, etc.
+  if (filter.includes('_')) {
+    const [period, year] = filter.split('_');
+    const y = parseInt(year);
+    
+    // Quarters
+    if (period.startsWith('q')) {
+      const q = parseInt(period.slice(1));
+      const startMonth = (q - 1) * 3 + 1;
+      const endMonth = startMonth + 2;
+      const endDay = new Date(y, endMonth, 0).getDate();
+      return {
+        start: `${y}-${String(startMonth).padStart(2, '0')}-01`,
+        end: `${y}-${String(endMonth).padStart(2, '0')}-${endDay}`,
+        label: `Q${q} ${y}`
+      };
+    }
+    
+    // Months (English + Spanish support)
+    const monthMap: Record<string, number> = {
+      'january': 1, 'february': 2, 'march': 3, 'april': 4,
+      'may': 5, 'june': 6, 'july': 7, 'august': 8,
+      'september': 9, 'october': 10, 'november': 11, 'december': 12,
+      // Spanish months
+      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+      'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+      'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+    };
+    
+    if (monthMap[period]) {
+      const month = monthMap[period];
+      const endDay = new Date(y, month, 0).getDate();
+      return {
+        start: `${y}-${String(month).padStart(2, '0')}-01`,
+        end: `${y}-${String(month).padStart(2, '0')}-${endDay}`,
+        label: `${period.charAt(0).toUpperCase() + period.slice(1)} ${y}`
+      };
+    }
+  }
+  
+  // Relative temporal filters
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-based
+  
+  switch (filter) {
+    case 'this_month':
+    case 'este_mes':
+    case 'current_month': {
+      const m = currentMonth + 1; // 1-based
+      const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
+        end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`,
+        label: 'This Month'
+      };
+    }
+    
+    case 'last_month':
+    case 'mes_pasado': {
+      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+      const m = prevMonth + 1; // 1-based
+      const endDay = new Date(prevYear, prevMonth + 1, 0).getDate();
+      return {
+        start: `${prevYear}-${String(m).padStart(2, '0')}-01`,
+        end: `${prevYear}-${String(m).padStart(2, '0')}-${endDay}`,
+        label: 'Last Month'
+      };
+    }
+    
+    default: {
+      // Fallback: current month
+      const m = currentMonth + 1;
+      const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+      return {
+        start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
+        end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`,
+        label: 'Current Month'
+      };
+    }
+  }
+}
+
+// ==================== CORE DATA STRUCTURES ====================
+
+interface SalesRecord {
+  projectKey: string;
+  projectName: string;
+  clientId: number;
+  clientName: string;
+  revenueUSD: number;
+  month: string;
+  year: number;
+  confirmedOnly: boolean;
+}
+
+interface CostRecord {
+  projectKey: string;
+  projectName: string;
+  costUSD: number;
+  hoursReal: number;
+  hoursTarget: number;
+  month: string;
+  year: number;
+}
+
+interface ProjectData {
+  projectId: number;
+  clientId: number;
+  projectName: string;
+  clientName: string;
+  projectKey: string;
+  sales: SalesRecord[];
+  costs: CostRecord[];
+}
+
+// ==================== DATA AGGREGATION ENGINE ====================
+
+export class ActiveProjectsAggregator {
+  constructor(private storage: IStorage) {}
+
+  /**
+   * MAIN AGGREGATION METHOD - Single source of truth
+   * Follows blueprint specification exactly
+   */
+  async getActiveProjectsUnified(timeFilter: TimeFilter, onlyActiveInPeriod: boolean = false): Promise<ActiveProjectsResponse> {
+    console.log(`🚀 UNIFIED AGGREGATOR: Processing timeFilter=${JSON.stringify(timeFilter)}, onlyActiveInPeriod=${onlyActiveInPeriod}`);
+
+    // 1. Resolve period - unified resolver
+    const period = resolveTimeFilter(timeFilter);
+    console.log(`📅 Period resolved: ${period.start} → ${period.end} (${period.label})`);
+
+    // 2. Get base project list
+    const allProjects = await this.storage.getActiveProjects();
+    console.log(`📊 Base projects retrieved: ${allProjects.length}`);
+
+    // 3. Get unified data from Excel MAESTRO sources
+    const salesData = await this.getSalesInPeriod(period);
+    const costsData = await this.getCostsInPeriod(period);
+    console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
+
+    // 4. Merge by projectKey - robust normalization
+    const projectsData = this.mergeProjectData(allProjects, salesData, costsData);
+    console.log(`📊 Projects merged: ${projectsData.length} with data`);
+
+    // 5. Calculate metrics for each project - exact formulas
+    const projectItems = await this.calculateProjectMetrics(projectsData, period);
+    console.log(`📊 Metrics calculated for ${projectItems.length} projects`);
+
+    // 6. Filter by activity if requested
+    const filteredProjects = onlyActiveInPeriod 
+      ? projectItems.filter(p => p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours)
+      : projectItems;
+    console.log(`📊 Final projects: ${filteredProjects.length} (filtered: ${onlyActiveInPeriod})`);
+
+    // 7. Calculate portfolio summary by REDUCTION (guarantees invariants)
+    const portfolioSummary = this.calculatePortfolioSummary(filteredProjects);
+
+    // 8. Verify invariants according to blueprint
+    this.verifyInvariants(filteredProjects, portfolioSummary);
+
+    return {
+      summary: {
+        portfolio: portfolioSummary,
+        period: period
+      },
+      projects: filteredProjects,
+      metadata: {
+        timeFilter: typeof timeFilter === 'string' ? timeFilter : `${timeFilter.start}_to_${timeFilter.end}`,
+        engine: 'unified_aggregator',
+        source: 'Excel_MAESTRO_unified'
+      }
+    };
+  }
+
+  /**
+   * Get sales data from "Ventas Tomi" sheet (Excel MAESTRO)
+   * Applies currency normalization with parseMoneyAuto()
+   */
+  private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
+    // Get all sales from Google Sheets integration
+    const allSales = await this.storage.getAllSales();
+    console.log(`💰 Retrieved ${allSales.length} total sales records`);
+
+    const filteredSales: SalesRecord[] = [];
+
+    for (const sale of allSales) {
+      // Temporal filtering
+      if (sale.year && sale.monthNumber) {
+        const saleDate = new Date(sale.year, sale.monthNumber - 1, 15); // Mid-month
+        const periodStart = new Date(period.start);
+        const periodEnd = new Date(period.end);
+        
+        if (saleDate < periodStart || saleDate > periodEnd) {
+          continue;
+        }
+      }
+
+      // Revenue calculation with robust currency normalization
+      let revenueUSD = 0;
+      if (sale.amountUsd && parseMoneyAuto(sale.amountUsd) > 0) {
+        revenueUSD = parseMoneyAuto(sale.amountUsd);
+      } else if (sale.amountLocal && sale.fxApplied) {
+        revenueUSD = parseMoneyAuto(sale.amountLocal) / parseMoneyAuto(sale.fxApplied);
+      }
+
+      // Skip if no valid revenue or not confirmed
+      const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
+      if (revenueUSD <= 0 || !isConfirmed) continue;
+
+      filteredSales.push({
+        projectKey: projectKey(sale.projectName || ''),
+        projectName: sale.projectName || '',
+        clientId: sale.clientId || 0,
+        clientName: sale.clientName || '',
+        revenueUSD,
+        month: String(sale.monthNumber || 0),
+        year: sale.year || 0,
+        confirmedOnly: isConfirmed
+      });
+    }
+
+    console.log(`💰 Sales filtered for period: ${filteredSales.length} records`);
+    return filteredSales;
+  }
+
+  /**
+   * Get costs/hours data from "Costos directos e indirectos" sheet (Excel MAESTRO)
+   * Filters ONLY "Directo" costs according to specification
+   */
+  private async getCostsInPeriod(period: ResolvedPeriod): Promise<CostRecord[]> {
+    // Get all direct costs from storage
+    const allCosts = await this.storage.getDirectCosts();
+    console.log(`🔧 Retrieved ${allCosts.length} total cost records`);
+
+    const filteredCosts: CostRecord[] = [];
+
+    for (const cost of allCosts) {
+      // Filter: ONLY "Directo" costs (not "Indirecto" overhead)
+      if (cost.tipoGasto !== 'Directo') continue;
+
+      // Temporal filtering
+      if (cost.año && cost.mes) {
+        // Parse month from "08 ago" format
+        const monthNum = parseInt(cost.mes.split(' ')[0]);
+        if (monthNum) {
+          const costDate = new Date(cost.año, monthNum - 1, 15);
+          const periodStart = new Date(period.start);
+          const periodEnd = new Date(period.end);
+          
+          if (costDate < periodStart || costDate > periodEnd) {
+            continue;
+          }
+        }
+      }
+
+      // Cost normalization with parseMoneyAuto
+      const costUSD = parseMoneyAuto(cost.montoTotalUSD || 0);
+      const hoursReal = parseMoneyAuto(cost.horasRealesAsana || cost.L || 0);
+      const hoursTarget = parseMoneyAuto(cost.horasObjetivo || cost.K || 0);
+
+      if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
+
+      filteredCosts.push({
+        projectKey: projectKey(cost.proyecto || ''),
+        projectName: cost.proyecto || '',
+        costUSD,
+        hoursReal,
+        hoursTarget,
+        month: cost.mes || '',
+        year: cost.año || 0
+      });
+    }
+
+    console.log(`🔧 Costs filtered for period: ${filteredCosts.length} records`);
+    return filteredCosts;
+  }
+
+  /**
+   * Merge project data by normalized projectKey()
+   * Handles aliases and normalization according to blueprint
+   */
+  private mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): ProjectData[] {
+    const projectsMap = new Map<string, ProjectData>();
+
+    // Initialize with base projects
+    for (const project of allProjects) {
+      const key = projectKey(project.name);
+      projectsMap.set(key, {
+        projectId: project.id,
+        clientId: project.clientId || 0,
+        projectName: project.name,
+        clientName: '', // Will be filled from sales/client data
+        projectKey: key,
+        sales: [],
+        costs: []
+      });
+    }
+
+    // Merge sales data
+    for (const sale of salesData) {
+      let projectData = projectsMap.get(sale.projectKey);
+      if (!projectData) {
+        // Create new project from sales data
+        projectData = {
+          projectId: 0, // Will need to be resolved
+          clientId: sale.clientId,
+          projectName: sale.projectName,
+          clientName: sale.clientName,
+          projectKey: sale.projectKey,
+          sales: [],
+          costs: []
+        };
+        projectsMap.set(sale.projectKey, projectData);
+      }
+      
+      projectData.sales.push(sale);
+      if (!projectData.clientName) projectData.clientName = sale.clientName;
+    }
+
+    // Merge costs data
+    for (const cost of costsData) {
+      let projectData = projectsMap.get(cost.projectKey);
+      if (!projectData) {
+        // Create new project from costs data
+        projectData = {
+          projectId: 0, // Will need to be resolved
+          clientId: 0,
+          projectName: cost.projectName,
+          clientName: '',
+          projectKey: cost.projectKey,
+          sales: [],
+          costs: []
+        };
+        projectsMap.set(cost.projectKey, projectData);
+      }
+      
+      projectData.costs.push(cost);
+    }
+
+    return Array.from(projectsMap.values());
+  }
+
+  /**
+   * Calculate metrics for each project using exact formulas from blueprint
+   */
+  private async calculateProjectMetrics(projectsData: ProjectData[], period: ResolvedPeriod): Promise<ActiveProjectItem[]> {
+    const projectItems: ActiveProjectItem[] = [];
+
+    for (const projectData of projectsData) {
+      // Calculate aggregated metrics
+      const revenueUSD = projectData.sales.reduce((sum, sale) => sum + sale.revenueUSD, 0);
+      const costUSD = projectData.costs.reduce((sum, cost) => sum + cost.costUSD, 0);
+      const workedHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursReal, 0);
+      const targetHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursTarget, 0);
+
+      // Calculate derived metrics - EXACT FORMULAS from blueprint
+      const markupUSD = revenueUSD - costUSD;
+      const markupRatio = costUSD > 0 ? revenueUSD / costUSD : (revenueUSD > 0 ? Infinity : null);
+      const efficiencyPct = targetHours > 0 ? (workedHours / targetHours) * 100 : null;
+
+      // Calculate flags
+      const flags: ProjectFlags = {
+        hasSales: revenueUSD > 0,
+        hasCosts: costUSD > 0,
+        hasHours: workedHours > 0
+      };
+
+      // Build metrics object
+      const metrics: ProjectMetrics = {
+        revenueUSD,
+        costUSD,
+        markupUSD,
+        markupRatio,
+        workedHours,
+        targetHours,
+        efficiencyPct
+      };
+
+      // Get client info
+      const client = await this.storage.getClient(projectData.clientId);
+
+      projectItems.push({
+        projectId: projectData.projectId,
+        clientId: projectData.clientId,
+        name: projectData.projectName,
+        type: 'fee', // Could be enhanced with actual project type
+        status: 'active', // Could be enhanced with actual status
+        client: {
+          id: projectData.clientId,
+          name: projectData.clientName || client?.name || 'Unknown',
+          logo: client?.logo || null
+        },
+        metrics,
+        flags,
+        period
+      });
+    }
+
+    return projectItems;
+  }
+
+  /**
+   * Calculate portfolio summary by REDUCTION of project metrics
+   * This guarantees mathematical invariants according to blueprint
+   */
+  private calculatePortfolioSummary(projects: ActiveProjectItem[]): PortfolioSummary {
+    console.log(`📊 Calculating portfolio summary for ${projects.length} projects`);
+
+    const summary = projects.reduce((acc, project) => {
+      return {
+        totalProjects: acc.totalProjects + 1,
+        activeProjects: acc.activeProjects + (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours ? 1 : 0),
+        periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSD,
+        periodCostUSD: acc.periodCostUSD + project.metrics.costUSD,
+        periodMarkupUSD: acc.periodMarkupUSD + project.metrics.markupUSD,
+        periodWorkedHours: acc.periodWorkedHours + project.metrics.workedHours
+      };
+    }, {
+      totalProjects: 0,
+      activeProjects: 0,
+      periodRevenueUSD: 0,
+      periodCostUSD: 0,
+      periodMarkupUSD: 0,
+      periodWorkedHours: 0
+    });
+
+    // Calculate aggregate ratios
+    const efficiencyPct = null; // Portfolio-level efficiency needs different calculation
+    const markupRatio = summary.periodCostUSD > 0 ? summary.periodRevenueUSD / summary.periodCostUSD : null;
+
+    return {
+      ...summary,
+      efficiencyPct,
+      markupRatio
+    };
+  }
+
+  /**
+   * Verify mathematical invariants according to blueprint
+   * Ensures Σ projects.metrics.revenueUSD === summary.portfolio.periodRevenueUSD
+   */
+  private verifyInvariants(projects: ActiveProjectItem[], portfolio: PortfolioSummary): void {
+    const projectRevenueSum = projects.reduce((sum, p) => sum + p.metrics.revenueUSD, 0);
+    const projectHoursSum = projects.reduce((sum, p) => sum + p.metrics.workedHours, 0);
+    
+    const revenueDiff = Math.abs(projectRevenueSum - portfolio.periodRevenueUSD);
+    const hoursDiff = Math.abs(projectHoursSum - portfolio.periodWorkedHours);
+    
+    console.log(`🔍 INVARIANT CHECK:`);
+    console.log(`   Project Revenue Sum: $${projectRevenueSum.toFixed(2)}`);
+    console.log(`   Portfolio Revenue:   $${portfolio.periodRevenueUSD.toFixed(2)}`);
+    console.log(`   Difference:          $${revenueDiff.toFixed(2)}`);
+    console.log(`   Hours Sum:           ${projectHoursSum.toFixed(2)}h`);
+    console.log(`   Portfolio Hours:     ${portfolio.periodWorkedHours.toFixed(2)}h`);
+    console.log(`   Hours Difference:    ${hoursDiff.toFixed(2)}h`);
+
+    // Allow small rounding differences (< $1 USD, < 0.1 hours)
+    if (revenueDiff > 1.0) {
+      console.error(`❌ REVENUE INVARIANT VIOLATION: Difference of $${revenueDiff.toFixed(2)} exceeds tolerance`);
+    }
+    if (hoursDiff > 0.1) {
+      console.error(`❌ HOURS INVARIANT VIOLATION: Difference of ${hoursDiff.toFixed(2)}h exceeds tolerance`);
+    }
+    
+    if (revenueDiff <= 1.0 && hoursDiff <= 0.1) {
+      console.log(`✅ INVARIANTS VERIFIED: All sums match within tolerance`);
+    }
+  }
+}
