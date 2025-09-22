@@ -431,7 +431,7 @@ export class ActiveProjectsAggregator {
         projectId: projectData.projectId,
         clientId: projectData.clientId,
         name: projectData.projectName,
-        type: 'fee', // Could be enhanced with actual project type
+        type: this.mapProjectType(project.quotation?.projectType),
         status: 'active', // Could be enhanced with actual status
         client: {
           id: projectData.clientId,
@@ -481,6 +481,29 @@ export class ActiveProjectsAggregator {
       efficiencyPct,
       markupRatio
     };
+  }
+
+  /**
+   * Map quotation.projectType to API contract type
+   */
+  private mapProjectType(quotationProjectType?: string): 'fee' | 'one-shot' | 'other' {
+    if (!quotationProjectType) return 'other';
+    
+    // Recurrente/Fee types
+    if (quotationProjectType === 'fee-mensual' || 
+        quotationProjectType === 'always-on' ||
+        quotationProjectType === 'recurring') {
+      return 'fee';
+    }
+    
+    // One-shot types
+    if (quotationProjectType === 'one-shot' || 
+        quotationProjectType === 'One Shot') {
+      return 'one-shot';
+    }
+    
+    // Default to other for unknown types
+    return 'other';
   }
 
   /**
