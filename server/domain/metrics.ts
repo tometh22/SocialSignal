@@ -1,7 +1,7 @@
 // domain/metrics.ts - MOTOR ÚNICO para todos los cálculos de proyecto
 
 import { resolveProjectConfig } from '../services/projects';
-import { resolveTimeFilter, isDateInRange, TimeFilter } from '../services/time';
+import { resolveTimeFilter, isDateInRange, TimeFilter, isRowInTimeRange } from '../services/time';
 import { parseDec } from '../services/number';
 import { fxForRow, rateUSD } from '../services/fx';
 import { readRows } from '../services/sheets';
@@ -198,10 +198,10 @@ export async function computeProjectPeriodMetrics(
       
       // Apply temporal filter to sales to match the period
       const filteredSales = projectSales.filter(sale => {
-        const confirmadoStr = String(sale.confirmado || '').toLowerCase().trim();
+        const confirmadoStr = String(sale.confirmed || '').toLowerCase().trim();
         const isConfirmed = ['si', 'sí', 'yes', 'true', '1'].includes(confirmadoStr);
         
-        console.log(`🔍 Sale debug: ${sale.id || 'no-id'}, confirmado="${sale.confirmado}" (${confirmadoStr}), confirmed=${isConfirmed}, mes="${sale.mes}", año="${sale.año}"`);
+        console.log(`🔍 Sale debug: ${sale.id || 'no-id'}, confirmed="${sale.confirmed}" (${confirmadoStr}), isConfirmed=${isConfirmed}, month="${sale.month}", year="${sale.year}"`);
         
         if (!isConfirmed) {
           console.log(`  ❌ Rejected: Not confirmed`);
@@ -219,7 +219,7 @@ export async function computeProjectPeriodMetrics(
       // Calculate revenue from filtered sales
       revenueUSD = filteredSales.reduce((sum, sale) => {
         const montoUSD = parseFloat(sale.amountUsd) || 0;
-        console.log(`💰 Sale entry: ${montoUSD} USD, confirmed: ${sale.confirmado}`);
+        console.log(`💰 Sale entry: ${montoUSD} USD, confirmed: ${sale.confirmed}`);
         return sum + montoUSD;
       }, 0);
       

@@ -111,3 +111,28 @@ export function isDateInRange(date: Date, timeRange: TimeFilter): boolean {
   const filterEnd = new Date(timeRange.end);
   return date >= filterStart && date <= filterEnd;
 }
+
+/**
+ * Verifica si una fila de sales está dentro del rango temporal 
+ * usando los campos correctos: confirmed, month, year, monthNumber
+ */
+export function isRowInTimeRange(sale: any, timeRange: TimeFilter): boolean {
+  // Verificar confirmación usando el campo correcto
+  const confirmed = sale.confirmed === 'SI';
+  if (!confirmed) {
+    return false;
+  }
+  
+  // Obtener año y mes usando los campos correctos 
+  const year = sale.year || 0;
+  const monthNumber = sale.monthNumber || 0;
+  
+  if (!year || !monthNumber) {
+    return false;
+  }
+  
+  // Crear fecha del primer día del mes
+  const saleDate = new Date(year, monthNumber - 1, 1);
+  
+  return isDateInRange(saleDate, timeRange);
+}
