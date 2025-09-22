@@ -13,8 +13,8 @@ export interface ProjectConfig {
 
 // Configuración por proyecto - REAL (sin hardcodeo)
 const PROJECT_CONFIGS: { [projectId: number]: Partial<ProjectConfig> } = {
-  39: { projectKey: "huggies", sheetId: "1uB_zF5mNLF9ynlKAcEh5k5rz7pnQZAZ6LCCxGlRG9rw" },
-  42: { projectKey: "otro_cliente", sheetId: "1uB_zF5mNLF9ynlKAcEh5k5rz7pnQZAZ6LCCxGlRG9rw" },
+  39: { projectKey: "huggies", sheetId: "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc" }, // Fixed: usar spreadsheet que funciona
+  42: { projectKey: "otro_cliente", sheetId: "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc" }, // Fixed: usar spreadsheet que funciona
   // TODO: Implementar con storage.getProjectConfig() cuando tengamos DB table
 };
 
@@ -28,7 +28,7 @@ export function resolveProjectConfig(projectId: number): ProjectConfig {
   const baseConfig: ProjectConfig = {
     projectId,
     projectKey: "default",
-    sheetId: "1uB_zF5mNLF9ynlKAcEh5k5rz7pnQZAZ6LCCxGlRG9rw", // Excel MAESTRO default
+    sheetId: "1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc", // Excel MAESTRO default
     tabs: {
       costos: "Costos directos e indirectos",
       ingresos: "Ventas Tomi"
