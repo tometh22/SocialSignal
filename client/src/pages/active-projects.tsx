@@ -442,13 +442,15 @@ function ProjectCard({
             </span>
           </div>
           
-          {/* 🎯 MÉTRICAS UNIFICADAS: Usar exclusivamente datos de useCompleteProjectData */}
+          {/* 🎯 NORMALIZADOR DEFENSIVO: Lee tanto formato nuevo como legacy */}
           {(() => {
-            // 🎯 FUENTE ÚNICA DE VERDAD: Mismos datos que la vista individual
-            const displayBilling = completeData?.totalRealRevenue ?? 0;
-            const displayCost = completeData?.workedCost ?? 0;
-            const workedHours = completeData?.workedHours ?? completeData?.actuals?.totalWorkedHours ?? 0;
-            const markup = completeData?.metrics?.markup ?? 0;
+            // 🎯 NORMALIZADOR DEFENSIVO: Compatible con ambos endpoints
+            const price = completeData?.totalRealRevenue ?? completeData?.actuals?.totalWorkedRevenue ?? 0;
+            const cost = completeData?.workedCost ?? completeData?.actuals?.totalWorkedCost ?? 0;
+            const hrs = completeData?.actualHours ?? completeData?.actuals?.totalWorkedHours ?? 0;
+            const eff = completeData?.efficiency ?? completeData?.metrics?.efficiency ?? null;
+            const markupRatio = completeData?.metrics?.markup ?? 0;
+            const markupUSD = price - cost; // Beneficio en USD para mostrar
             
             // Si no hay datos completos, mostrar estado de carga/error en lugar de fallbacks
             if (!completeData) {
@@ -468,19 +470,19 @@ function ProjectCard({
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <div className="text-sm font-bold text-blue-800">
-                    ${displayBilling.toLocaleString()}
+                    ${price.toLocaleString()}
                   </div>
                   <div className="text-xs text-blue-600">
                     {timeFilter !== 'all' ? 'Facturación del período' : 'Facturación total'}
                   </div>
                   <div className="text-xs text-blue-500 mt-1">
-                    {workedHours.toFixed(1)}h trabajadas
+                    {hrs.toFixed(1)}h trabajadas
                   </div>
                 </div>
                 
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                   <div className="text-sm font-bold text-red-800">
-                    ${displayCost.toLocaleString()}
+                    ${cost.toLocaleString()}
                   </div>
                   <div className="text-xs text-red-600">
                     {timeFilter !== 'all' ? 'Costos del período' : 'Costos totales'}
@@ -491,14 +493,12 @@ function ProjectCard({
                 </div>
                 
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                  <div className={`text-sm font-bold ${markup >= 1 ? 'text-green-800' : 'text-red-500'}`}>
-                    {markup > 0 ? markup + 'x' : 'N/A'}
+                  <div className="text-sm font-bold text-green-800">
+                    ${markupUSD.toLocaleString()}
                   </div>
-                  <div className="text-xs text-green-600">Markup</div>
-                  <div className={`text-xs mt-1 ${
-                    markup >= 1 ? 'text-green-500' : 'text-red-500'
-                  }`}>
-                    ${(displayBilling - displayCost).toLocaleString()} beneficio
+                  <div className="text-xs text-green-600">Markup (beneficio)</div>
+                  <div className="text-xs text-green-500 mt-1">
+                    {markupRatio > 0 ? `${markupRatio.toFixed(2)}x ratio` : 'Sin ratio'}
                   </div>
                 </div>
               </div>
