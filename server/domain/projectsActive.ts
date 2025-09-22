@@ -21,6 +21,7 @@ import {
 
 import { parseMoneyAuto } from "../utils/money";
 import { projectKey } from "../utils/normalize";
+import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
 
 // ==================== TIME FILTER RESOLVER ====================
@@ -237,13 +238,13 @@ export class ActiveProjectsAggregator {
         }
       }
 
-      // Revenue calculation with robust currency normalization
-      let revenueUSD = 0;
-      if (sale.amountUsd && parseMoneyAuto(sale.amountUsd) > 0) {
-        revenueUSD = parseMoneyAuto(sale.amountUsd);
-      } else if (sale.amountLocal && sale.fxApplied) {
-        revenueUSD = parseMoneyAuto(sale.amountLocal) / parseMoneyAuto(sale.fxApplied);
-      }
+      // Revenue calculation with FX conversion according to specification
+      // Rule: Si Monto_USD > 0 → usar eso. Si Monto_USD == 0 y Monto_ARS > 0 → convertir
+      const period = `${sale.year}-${String(sale.monthNumber || 0).padStart(2, '0')}`;
+      const montoUSD = parseMoneyAuto(sale.amountUsd || 0);
+      const montoARS = parseMoneyAuto(sale.amountLocal || 0);
+      
+      const revenueUSD = convertToUsd(montoUSD, montoARS, period);
 
       // Skip if no valid revenue or not confirmed
       const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
@@ -295,9 +296,14 @@ export class ActiveProjectsAggregator {
         }
       }
 
-      // Cost normalization with parseMoneyAuto
-      const costUSD = parseMoneyAuto(cost.montoTotalUSD || 0);
-      const hoursReal = parseMoneyAuto(cost.horasRealesAsana || cost.L || 0);
+      // Cost normalization with FX conversion according to specification  
+      // Rule: Si Moneda Original USD > 0 → ese valor. Si solo hay ARS → usd = ARS / fx
+      const period = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
+      const montoUSD = parseMoneyAuto(cost.montoTotalUSD || 0);
+      const montoARS = parseMoneyAuto(cost.montoTotalLocal || 0);
+      
+      const costUSD = convertToUsd(montoUSD, montoARS, period);
+      const hoursReal = parseMoneyAuto(cost.horasReales || cost.horasRealesAsana || cost.L || 0);
       const hoursTarget = parseMoneyAuto(cost.horasObjetivo || cost.K || 0);
 
       if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
