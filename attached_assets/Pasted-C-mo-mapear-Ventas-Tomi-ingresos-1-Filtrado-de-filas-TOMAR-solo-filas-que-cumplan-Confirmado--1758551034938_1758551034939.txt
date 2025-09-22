@@ -1,0 +1,119 @@
+Cómo mapear “Ventas Tomi” (ingresos)
+1) Filtrado de filas
+TOMAR solo filas que cumplan:
+Confirmado ∈ {“Si”, “sí”, “SI”} (case/acentos-insensitive)
+Año = año del período
+Mes = mes del período (mapa es→en: enero→01 … diciembre→12)
+Cliente y Proyecto del Excel deben mapear al projectId activo
+Nota: el filtro “Mes pasado” para hoy (sep/2025) debe resolver a agosto_2025.
+2) Normalización de nombres (cliente/proyecto)
+Para unir filas del Excel con tus proyectos:
+normalize(s): trim → lowercase → quitar acentos → colapsar espacios
+Clave canónica: key = normalize(cliente) + '::' + normalize(proyecto)
+Mantener un alias map (JSON) para resolver desvíos de escritura:
+{
+  "warner::fee marketing": "project:warner_fee_marketing",
+  "kimberly clark::fee huggies": "project:kimberly_huggies"
+}
+Si el par cliente/proyecto no matchea ningún alias, cae en “Proyecto sin nombre” del cliente (así evitás perder ventas, pero el objetivo es tener alias completos).
+3) Moneda y monto
+En cada fila:
+Si Monto_USD > 0 → amountUSD = parseDec(Monto_USD)
+Si Monto_USD = 0 y Monto_ARS > 0 → amountUSD = parseDec(Monto_ARS) / fx(periodo)
+Si en ingresos no tenés columna de cotización, usar la FX del período que ya usás en costos (misma base ECON); si no hay FX, registrar el caso como “pendiente de cotización” y excluir de cards hasta tenerla (evita markup ficticio).
+Ignorar Tipo_Venta para el cálculo del período (sirve solo para analytics); el filtro por Mes/Año ya delimita si es Fee del mes o un One Shot cargado ese mes.
+parseDec robusto (ES/US, miles, moneda y paréntesis negativos):
+const parseDec = (v: unknown): number => {
+  if (typeof v === 'number') return v;
+  const s = String(v || '').trim()
+    .replace(/\s+/g, '')
+    .replace(/\$/g, '')
+    .replace(/\((.*)\)/, '-$1')
+    .replace(/[.](?=.*\d{3}(?:[,.]|$))/g, '') // quita miles con punto
+    .replace(/,(?=\d{2}$)/, '.')              // coma decimal
+    .replace(/,/g, '');                       // resto comas
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+4) Agregación por proyecto-mes
+Agrupar por projectId y sumar:
+totalRealRevenueUSD(projectId, periodo) = Σ amountUSD de filas filtradas
+recuentoVentas(projectId, periodo)      = # filas filtradas
+5) Validaciones explícitas (evitan “números raros”)
+Duplicados: misma fila (cliente+proyecto+mes+año+monto+tipo) vista más de una vez → contar una sola (usar hash de fila).
+Negativos: permitirlos solo si el “Tipo_Venta” indica nota de crédito; si no, loggear y excluir.
+Moneda mixta (mismo proyecto con USD y ARS el mismo mes): convertir todos a USD con la misma FX del período antes de sumar.
+Qué espera la página “Proyectos Activos”
+Para cada card hace falta, del endpoint /api/projects?timeFilter=... o de /api/projects/:id/complete-data:
+{
+  projectId,
+  clientName,
+  // Métricas del período (NO históricas)
+  totalRealRevenueUSD,   // ← suma de Ventas Tomi filtradas
+  totalWorkedCostUSD,    // ← costos del período (base ECON)
+  totalWorkedHours,      // ← horas reales del período (de costos)
+  efficiencyPct,         // ← (ΣHorasReales / ΣHorasObjetivo) * 100
+  markupUSD: totalRealRevenueUSD - totalWorkedCostUSD,
+  markupRatio: totalRealRevenueUSD > 0 ? totalRealRevenueUSD / totalWorkedCostUSD : null
+}
+La card muestra:
+Precio al cliente = totalRealRevenueUSD
+Reales del período (h) = totalWorkedHours
+Eficiencia = efficiencyPct (o “N/A” si K=0)
+Bloques de abajo:
+Facturación (azul) = totalRealRevenueUSD
+Costos del período (rojo) = totalWorkedCostUSD
+Markup (verde) = markupUSD y markupRatio
+Si activás “Solo con actividad en el período”, la lista filtra totalRealRevenueUSD + totalWorkedCostUSD + totalWorkedHours > 0.
+Por qué Warner se ve mal ahora mismo (y cómo corregirlo)
+Lo que muestra tu captura:
+Warner aparece con “Proyecto sin nombre” y con importes enormes/incorrectos o $0 según pruebas previas. Eso suele pasar por mapeo fallido del nombre de proyecto en Ventas Tomi.
+Corrección concreta:
+Agregar alias:
+warner::fee marketing → project:warner_fee_marketing
+warner::fee insights → project:warner_fee_insights
+(todos los nombres reales que figuran en tu hoja para Warner)
+Verificar período “Mes pasado” = agosto_2025:
+Debe sumar solo la fila con Mes = Agosto, Año = 2025, Confirmado = Si
+Para Warner “Fee Marketing”, según tu hoja, típicamente USD 13,450 por mes (ejemplo de la captura). Entonces la card de ese proyecto, en agosto 2025, debe mostrar:
+Facturación: $13,450
+Costos/horas: lo que resulte de “Costos directos e indirectos” para agosto
+Markup: 13450 - costosUSDdelmes
+Asegurar que no entren filas de otros meses (evita ver totales anuales en “mes pasado”).
+Si Ventas Tomi trae filas en ARS para Warner (algún one-shot), convertir con la misma FX del período antes de sumar.
+Pruebas rápidas (que te aseguran la corrección)
+Smoke de ingresos por proyecto-mes
+(la API debería devolverte lo mismo que Ves en Ventas Tomi)
+GET /api/projects/{id}/complete-data?timeFilter=august_2025
+→ totalRealRevenueUSD === suma de Ventas Tomi (Warner, Agosto 2025, Confirmado SI)
+Warner – Fee Marketing (ejemplo esperado)
+Ventas Tomi muestra: $13,450 en Monto_USD (agosto/2025)
+Entonces:
+Card “Facturación del período” = $13,450
+“Precio al cliente” arriba = $13,450
+Filtro “Solo con actividad”
+Si para agosto un proyecto no tiene ventas ni costos ni horas → no debe aparecer.
+Errores típicos que provocan los números erróneos y su fix
+❌ Match por clientId solo → mezcla ventas de varios proyectos del mismo cliente.
+✅ Usar cliente::proyecto normalizado + alias map.
+❌ Sumar todos los meses del año bajo “mes pasado”.
+✅ Filtrar por Mes + Año del período.
+❌ Tratar Monto_ARS como USD.
+✅ Convertir con FX del período (misma base ECON).
+❌ Duplicar filas (copias en la hoja).
+✅ Hash de fila y deduplicación previa al sumatorio.
+❌ comas/puntos (1.234,56 → 1.23456).
+✅ parseDec robusto (arriba).
+Checklist para cerrar Warner (y el resto)
+ Alias cargados para todos los proyectos de Warner que aparecen en Ventas Tomi.
+ Resolver “mes pasado” → agosto_2025 (ya lo tenés andando).
+ Sumar solo filas Confirmado=Si de ese mes.
+ Usar Monto_USD; si viene Monto_ARS, convertir con FX del período.
+ Deduplicación ON.
+ /api/projects devuelve totalRealRevenueUSD > 0 para Warner en agosto_2025.
+ UI de Proyectos Activos muestra:
+Facturación: = totalRealRevenueUSD
+Costos: = totalWorkedCostUSD
+Markup: = diferencia + ratio
+Horas: = totalWorkedHours
+Si querés, te armo el alias map mínimo para Warner con los nombres exactos que ves en tu hoja (Fee Marketing, Fee Insights, etc.) y te dejo un juego de asserts para comparar API vs planilla. Con esto la card de Warner en “Mes pasado” debería quedar perfecta.
