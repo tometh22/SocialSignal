@@ -9698,7 +9698,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               baseCost: teamCostUSD
             },
             
-            // 🎯 CAMPOS CRÍTICOS que ProjectCard lee directamente
+            // 🎯 NUEVO CONTRATO: metrics.* según especificación
+            metrics: {
+              revenueUSD: revenueUSD,
+              costUSD: teamCostUSD,
+              markupUSD: markupUSD,
+              markupRatio: teamCostUSD > 0 ? revenueUSD / teamCostUSD : (revenueUSD > 0 ? Infinity : 0),
+              workedHours: actualHours,
+              targetHours: targetHours,
+              efficiencyPct: efficiencyPct
+            },
+            
+            // 🎯 FLAGS según especificación
+            flags: {
+              hasSales: revenueUSD > 0,
+              hasCosts: teamCostUSD > 0,
+              hasHours: actualHours > 0
+            },
+
+            // 🎯 CAMPOS LEGACY para backward compatibility
             totalRealRevenue: revenueUSD,        // Facturación (azul)
             workedCost: teamCostUSD,             // Costos (rojo)  
             markup: markupUSD,                   // Markup en USD (verde)
@@ -9706,13 +9724,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             actualHours: actualHours,            // horas reales del período
             targetHours: targetHours,            // horas objetivo
             workedHours: actualHours,            // alias adicional
-            
-            // Métricas para compatibilidad
-            metrics: {
-              markup: teamCostUSD > 0 ? revenueUSD / teamCostUSD : 0,  // Ratio para métricas
-              efficiency: efficiencyPct,
-              budgetUtilization: targetHours > 0 ? (actualHours / targetHours) * 100 : 0
-            },
             
             // Direct costs para el cálculo de eficiencia Excel MAESTRO
             directCosts: filteredCosts.map(cost => ({
@@ -9730,7 +9741,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ UNIVERSAL PROJECTS PROCESSED: ${universalProjects.length} projects with timeFilter=${timeFilter}`);
       
+      // Calculate portfolio summary according to specification
+      const portfolio = universalProjects.reduce((acc, project) => {
+        return {
+          totalProjects: acc.totalProjects + 1,
+          activeProjects: acc.activeProjects + (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours ? 1 : 0),
+          periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSD,
+          periodWorkedHours: acc.periodWorkedHours + project.metrics.workedHours
+        };
+      }, { totalProjects: 0, activeProjects: 0, periodRevenueUSD: 0, periodWorkedHours: 0 });
+
       res.json({
+        summary: {
+          portfolio: portfolio,
+          period: { 
+            start: timeFilterParsed.start, 
+            end: timeFilterParsed.end, 
+            label: timeFilter 
+          }
+        },
         projects: universalProjects,
         metadata: {
           timeFilter: timeFilter,
