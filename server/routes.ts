@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { db, pool } from "./db";
 import { z } from "zod";
 import { getDateRangeForFilter } from "./utils/dateRange";
+import { parseMoneyAuto } from "./utils/money";
+import { projectKey, normalizeKey } from "./utils/normalize";
 import { 
   insertClientSchema, 
   insertRoleSchema, 
@@ -9568,7 +9570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Calculate universal metrics from FILTERED costs only
           const teamCostUSD = filteredCosts.reduce((sum, cost) => {
-            const montoUSD = parseFloat(String(cost.montoTotalUSD || 0).replace(',', '.')) || 0;
+            const montoUSD = parseMoneyAuto(cost.montoTotalUSD);
             return sum + montoUSD;
           }, 0);
           
@@ -9595,7 +9597,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             console.log(`🔍 DEBUG PROJECT ${project.id}: Looking for sales with projectName="${projectName}"`);
             const allSales = await storage.getGoogleSheetsSales();
-            const sales = allSales.filter(sale => sale.projectName === projectName);
+            // 🎯 FIX: Use normalized project keys for robust matching (spaces, accents, etc.)
+            const normalizedProjectName = projectKey(projectName || '');
+            const sales = allSales.filter(sale => projectKey(sale.projectName || '') === normalizedProjectName);
             console.log(`🔍 DEBUG PROJECT ${project.id}: Found ${sales.length} sales records`);
             
             // DEBUG: Log first sales record to see data structure
@@ -9631,9 +9635,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`🔍 DEBUG PROJECT ${project.id}: After temporal filter: ${filteredSales.length} sales records`);
             
             revenueUSD = filteredSales.reduce((sum: number, sale: any) => {
-              // 🎯 FIX: Use parseFloat for USD amounts (not parseDecimal which removes dots)
-              const montoUSD = parseFloat(sale.amountUsd) || 0;
-              const montoARS = parseFloat(sale.amountLocal) || 0;
+              // 🎯 FIX: Use parseMoneyAuto for robust ES/US currency parsing
+              const montoUSD = parseMoneyAuto(sale.amountUsd);
+              const montoARS = parseMoneyAuto(sale.amountLocal);
               const fxRate = parseFloat(sale.fxApplied) || 1000;
               return sum + (montoUSD > 0 ? montoUSD : montoARS / fxRate);
             }, 0);

@@ -1,0 +1,126 @@
+Hotfix backend (único endpoint para la vista)
+1) Normalizador robusto de moneda (ES/US)
+// utils/money.ts
+export function parseMoneyAuto(v: unknown): number {
+  if (v == null) return 0;
+  let s = String(v).trim().replace(/\s|\$/g, '');
+
+  // Detectar último separador decimal (.,)
+  const lastSep = s.replace(/[0-9]/g, '').slice(-1); // '.' o ',' o ''
+  if (lastSep === ',') {
+    // Formato español: 29.230,00 -> 29230.00
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Formato inglés o mixto: 29,230.00 o 29230.00
+    s = s.replace(/,/g, '');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+2) Regla de ingresos (USD) — Ventas Tomi
+// domain/sales.ts
+const usd = row.Monto_USD
+  ? parseMoneyAuto(row.Monto_USD)
+  : parseMoneyAuto(row.Monto_ARS) / fxFor(row.Año, row.Mes); // usa cotización de la fila o del mes
+// incluir sólo confirmados
+if (!/si/i.test(String(row.Confirmado))) return 0;
+3) Regla de costos y horas — Costos directos e indirectos
+// domain/costs.ts
+const costUSD = row.Moneda_Original_USD
+  ? parseMoneyAuto(row.Moneda_Original_USD)
+  : parseMoneyAuto(row.Moneda_Original_ARS) / fxFor(row.Año, row.Mes);
+
+const worked = toNum(row['unidad de horas real Asana'])
+            || toNum(row['Cantidad de horas para facturación'])
+            || 0;
+
+const target = toNum(row['Cantidad de horas objetivo']) || 0;
+4) Normalización del “project key”
+// utils/normalize.ts
+export const normalizeKey = (s: string) =>
+  s.normalize('NFKD')
+   .replace(/[\u0300-\u036f]/g,'') // sin acentos
+   .replace(/\s+/g,' ')            // colapsar espacios
+   .trim()
+   .toLowerCase();
+
+// Mapa de alias (si aplica)
+const ALIAS: Record<string,string> = {
+  'fee mensual': 'fee marketing',
+  'fee huggies': 'fee huggies',      // ej: mantener
+  // agrega aquí equivalencias reales que tengas en los excels
+};
+export const projectKey = (s: string) => ALIAS[normalizeKey(s)] ?? normalizeKey(s);
+Usa este projectKey() tanto para agrupar ventas como costos antes de mergear con los proyectos de la app.
+5) Endpoint único y contrato estable
+GET /api/projects?timeFilter=august_2025&onlyActiveInPeriod=true
+Respuesta (resumen + projects):
+{
+  summary: {
+    portfolio: {
+      totalProjects, activeProjects,
+      periodRevenueUSD: Σ projects.metrics.revenueUSD,
+      periodWorkedHours: Σ projects.metrics.workedHours
+    },
+    period: { start, end, label }
+  },
+  projects: [{
+    projectId, client, name, status, type,
+    metrics: {
+      revenueUSD, costUSD, markupUSD, markupRatio,
+      workedHours, targetHours, efficiencyPct
+    },
+    flags: { hasSales, hasCosts, hasHours }
+  }]
+}
+Invariante: Σ projects.metrics.revenueUSD === summary.portfolio.periodRevenueUSD.
+Hotfix frontend (cards y filtros)
+Hook único
+const { data } = useQuery({
+  queryKey: ['/api/projects', { timeFilter, active, client, onlyActiveInPeriod }],
+});
+Cards superiores
+Total Proyectos → summary.portfolio.totalProjects
+Activos → summary.portfolio.activeProjects
+Facturación (franja violeta) → summary.portfolio.periodRevenueUSD
+Horas registradas → summary.portfolio.periodWorkedHours
+Cards de proyecto (lee SIEMPRE metrics.*)
+Precio al cliente → metrics.revenueUSD
+Reales del período → metrics.workedHours
+Eficiencia → metrics.efficiencyPct (si targetHours=0 → “N/A”)
+Fila “Métricas del período”
+Facturación (azul) → metrics.revenueUSD
+Costos (rojo) → metrics.costUSD
+Markup (verde) → label $markupUSD + subtítulo ratio (∞ si cost=0 && revenue>0)
+Solo con actividad
+Oculta en UI los proyectos con !(hasSales || hasCosts || hasHours) y recalcula las cuatro cards superiores desde projects filtrados o deja que venga ya resumido desde backend (ambas son válidas mientras respetes la invariante).
+Qué números deberías ver tras el fix
+Warner · Fee Marketing · agosto 2025
+Facturación del período ≈ $29,230 USD (o el Monto_USD que esté en la fila de agosto; lo que NO puede ser es $2.923.000).
+Esto sale directamente del fix del parser ES y de Monto_USD prioritario.
+Costos: suma USD de filas del mismo período en Costos directos e indirectos.
+Markup: revenue − cost; ratio = revenue / cost.
+Kimberly Clark · Fee Huggies · agosto 2025 (tu Golden Test)
+Ingresos: $8,450 USD
+Costos: $2,436.09 USD
+Markup: $6,013.91 (3.47x)
+Horas: 288.28h
+Eficiencia: 90.1%
+Pruebas rápidas (sin tocar UI)
+El agregado coincide
+Llama /api/projects?timeFilter=august_2025&onlyActiveInPeriod=true
+Verifica:
+Σ projects[*].metrics.revenueUSD === summary.portfolio.periodRevenueUSD
+Σ projects[*].metrics.workedHours === summary.portfolio.periodWorkedHours
+Sanidad Warner
+Busca el objeto cuyo name o projectId sea Warner/Fee Marketing.
+Comprueba que metrics.revenueUSD está ~29,230 y no 2,923,000.
+Sanidad Kimberly
+Comprueba que Huggies trae los valores del Golden Test arriba.
+Filtro temporal
+Cambia a este_mes / mes_pasado / q3_2025 y repite la verificación 1).
+Por qué ahora te salía “todo mal”
+Warners inflado: parser de moneda ES trató “29.230,00” como 2.923.000 (se quitaron separadores sin reponer el decimal).
+Otros en $0: no matcheaban por nombre entre hojas y la app (faltaba projectKey() + mapa de alias).
+Kimberly “a revisar”: UI seguía leyendo campos legacy (totalRealRevenue, workedCost) y no metrics.* del endpoint nuevo.
+Aplicando los 3 fixes (parser ES, projectKey/alias, y contrato metrics.* en UI) la lista se completa correctamente, respeta los filtros temporales y cuadra con Dashboard/Equipo/Performance.
