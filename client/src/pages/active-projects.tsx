@@ -272,7 +272,7 @@ function ProjectCard({
             {/* Métricas principales organizadas */}
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-lg font-bold text-green-700">${(completeData?.totalRealRevenue ?? 0).toLocaleString()}</div>
+                <div className="text-lg font-bold text-green-700">${(completeData?.totalRealRevenue ?? completeData?.actuals?.totalWorkedRevenue ?? 0).toLocaleString()}</div>
                 <div className="text-xs text-gray-600">Precio al cliente</div>
               </div>
               
@@ -822,9 +822,18 @@ export default function ActiveProjectsRedesigned() {
     const totalBudget = filteredProjects.reduce((sum: number, p: any) => sum + (p.quotation?.totalAmount || 0), 0);
     const totalHours = filteredProjects.reduce((sum: number, p: any) => sum + getProjectHours(p.id), 0);
     
-    // Calcular métricas específicas del período usando datos reales
-    const periodBilling = 0; // Will be calculated from completeData in each ProjectCard
-    const periodCost = 0; // Will be calculated from completeData in each ProjectCard
+    // 🎯 SUMA REAL: Calcular métricas del período sumando desde las filas
+    const periodBilling = projects.reduce((sum: number, project: any) => {
+      // Aplicar normalizador defensivo para cada proyecto
+      const revenue = project.totalRealRevenue ?? project.actuals?.totalWorkedRevenue ?? 0;
+      return sum + revenue;
+    }, 0);
+    
+    const periodCost = projects.reduce((sum: number, project: any) => {
+      // Aplicar normalizador defensivo para cada proyecto
+      const cost = project.workedCost ?? project.actuals?.totalWorkedCost ?? 0;
+      return sum + cost;
+    }, 0);
     
     return {
       total: filteredProjects.length,
