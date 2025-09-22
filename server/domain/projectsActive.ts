@@ -154,6 +154,7 @@ interface ProjectData {
   projectKey: string;
   sales: SalesRecord[];
   costs: CostRecord[];
+  quotation?: any; // Include quotation data for project type mapping
 }
 
 // ==================== DATA AGGREGATION ENGINE ====================
@@ -340,7 +341,8 @@ export class ActiveProjectsAggregator {
         clientName: '', // Will be filled from sales/client data
         projectKey: key,
         sales: [],
-        costs: []
+        costs: [],
+        quotation: project.quotation // Include quotation for project type mapping
       });
     }
 
@@ -431,7 +433,7 @@ export class ActiveProjectsAggregator {
         projectId: projectData.projectId,
         clientId: projectData.clientId,
         name: projectData.projectName,
-        type: this.mapProjectType(project.quotation?.projectType),
+        type: this.mapProjectType(projectData.quotation?.projectType),
         status: 'active', // Could be enhanced with actual status
         client: {
           id: projectData.clientId,
