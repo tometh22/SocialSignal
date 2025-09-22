@@ -9544,15 +9544,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔍 DEBUG PROJECT ${project.id}: projectCosts.length=${projectCosts.length}, projectNameFromCosts="${projectNameFromCosts}"`);
           
           // Filter by time period AND 'Directo' only (según especificación)
-          // 🔍 DEBUG: Check what values are in tipoGasto field
-          if (project.id === 39 && projectCosts.length > 0) {
-            console.log(`🔍 TIPO_GASTO DEBUG: First 3 costs for project ${project.id}:`, 
-              projectCosts.slice(0, 3).map(c => ({ mes: c.mes, tipoGasto: c.tipoGasto, proyecto: c.proyecto })));
-          }
-          
           const filteredCosts = projectCosts.filter(cost => {
             // 🎯 FILTRO DIRECTO: Solo costos 'Directo', no 'Indirecto' (overhead)
-            const isDirecto = cost.tipoGasto === 'Directo'; // FIXED: usar campo correcto 'tipoGasto'
+            const isDirecto = cost.tipoGasto === 'Directo';
             if (!isDirecto) return false;
             
             // Filtro temporal
