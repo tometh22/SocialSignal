@@ -46,10 +46,13 @@ interface VentaTomi {
   proyecto: string;
   mes: string;
   año: number;
-  monto_usd?: number;
-  monto_ars?: number;
-  tipo_venta: string;
+  montoUSD: number;     // Cambiado de monto_usd para consistencia
+  montoARS: number;     // Cambiado de monto_ars para consistencia
+  tipoVenta: string;    // Cambiado de tipo_venta para consistencia
   confirmado: string;
+  projectId: number;    // Nuevo: ID del proyecto resuelto por alias map
+  canonicalKey: string; // Nuevo: clave cliente::proyecto normalizada
+  rowHash: string;      // Nuevo: hash para deduplicación
 }
 
 interface CostoDirectoExcel {
@@ -1016,12 +1019,13 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Obtener datos de ventas desde la pestaña "Ventas Tomi"
+   * Obtener datos de ventas desde la pestaña "Ventas Tomi" según especificaciones exactas del usuario
+   * Implementa normalización de nombres, alias map, filtrado y conversión de monedas
    */
   async getVentasTomi(): Promise<VentaTomi[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
-      const range = 'Ventas Tomi!A:I'; // Ajustar según las columnas necesarias
+      const range = 'Ventas Tomi!A:Z'; // Extendido para capturar todas las columnas
       
       console.log('🔄 Obteniendo ventas desde Ventas Tomi...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
@@ -1039,8 +1043,8 @@ class GoogleSheetsWorkingService {
         return [];
       }
 
-      console.log(`📊 Procesando ${rows.length} filas de ventas`);
-      return this.processVentasData(rows);
+      console.log(`📊 Procesando ${rows.length} filas de ventas con normalizacion y alias map`);
+      return this.processVentasTomiWithNormalization(rows);
       
     } catch (error) {
       console.error('❌ Error obteniendo ventas de Tomi:', error);
@@ -1049,7 +1053,177 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Procesar los datos de ventas de la pestaña "Ventas Tomi"
+   * Función parseDec robusta según especificaciones exactas del usuario
+   * Maneja ES/US, miles, moneda y paréntesis negativos
+   */
+  private parseDec(v: unknown): number {
+    if (typeof v === 'number') return v;
+    const s = String(v || '').trim()
+      .replace(/\s+/g, '')
+      .replace(/\$/g, '')
+      .replace(/\((.*)\)/, '-$1')
+      .replace(/[.](?=.*\d{3}(?:[,.]|$))/g, '') // quita miles con punto
+      .replace(/,(?=\d{2}$)/, '.')              // coma decimal
+      .replace(/,/g, '');                       // resto comas
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  /**
+   * Normalización de nombres según especificaciones del usuario
+   * trim → lowercase → quitar acentos → colapsar espacios
+   */
+  private normalizeProjectName(s: string): string {
+    if (!s) return '';
+    return s.trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+      .replace(/\s+/g, ' ')            // colapsar espacios
+      .trim();
+  }
+
+  /**
+   * Alias map para resolver desvíos de escritura según especificaciones del usuario
+   * Mapea cliente::proyecto normalizado → projectId
+   */
+  private getProjectAliasMap(): Record<string, number> {
+    return {
+      "warner::fee marketing": 34,
+      "warner::fee insights": 34,
+      "kimberly clark::fee huggies": 39,
+      "play digital s.a (modo)::fee mensual": 42,
+      "coelsa::fee mensual": 43,
+      // Agregar más alias según sea necesario
+    };
+  }
+
+  /**
+   * Procesar datos de "Ventas Tomi" con normalización y alias map 
+   * según especificaciones exactas del usuario
+   */
+  private processVentasTomiWithNormalization(rows: any[][]): VentaTomi[] {
+    const result: VentaTomi[] = [];
+    const seenHashes = new Set<string>(); // Para deduplicación
+    
+    if (rows.length === 0) return result;
+
+    // La primera fila contiene los headers
+    const headers = rows[0];
+    console.log('📋 Headers de Ventas Tomi encontrados:', headers);
+
+    // Mapear las columnas según los headers del Excel MAESTRO
+    const columnMap = {
+      cliente: headers.findIndex(h => h === 'Cliente'),
+      proyecto: headers.findIndex(h => h === 'Proyecto'),
+      mes: headers.findIndex(h => h === 'Mes'),
+      año: headers.findIndex(h => h === 'Año' || h === 'Año '),
+      monto_usd: headers.findIndex(h => h === 'Monto_USD'),
+      monto_ars: headers.findIndex(h => h === 'Monto_ARS'),
+      tipo_venta: headers.findIndex(h => h === 'Tipo_Venta'),
+      confirmado: headers.findIndex(h => h === 'Confirmado')
+    };
+
+    console.log('🗺️ Mapeo de columnas Ventas Tomi:', columnMap);
+    
+    const aliasMap = this.getProjectAliasMap();
+    console.log('🔑 Alias map cargado:', aliasMap);
+
+    // Procesar cada fila de datos (saltar header)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+
+      try {
+        // Extraer datos de la fila
+        const cliente = row[columnMap.cliente] || '';
+        const proyecto = row[columnMap.proyecto] || '';
+        const mes = row[columnMap.mes] || '';
+        const año = row[columnMap.año] || '';
+        const montoUSD = row[columnMap.monto_usd] || '';
+        const montoARS = row[columnMap.monto_ars] || '';
+        const tipoVenta = row[columnMap.tipo_venta] || '';
+        const confirmado = row[columnMap.confirmado] || '';
+
+        // 1. FILTRADO: Solo filas confirmadas según especificaciones
+        const confirmadoNorm = String(confirmado).toLowerCase().trim();
+        if (!['si', 'sí', 'yes'].includes(confirmadoNorm)) {
+          continue; // Saltar filas no confirmadas
+        }
+
+        // 2. NORMALIZACIÓN: Crear clave canónica cliente::proyecto
+        const clienteNorm = this.normalizeProjectName(cliente);
+        const proyectoNorm = this.normalizeProjectName(proyecto);
+        const canonicalKey = `${clienteNorm}::${proyectoNorm}`;
+
+        // 3. ALIAS MAP: Resolver projectId usando alias map
+        const projectId = aliasMap[canonicalKey];
+        if (!projectId) {
+          console.log(`⚠️ Sin alias para "${canonicalKey}" - fila ${i+1}`);
+          continue; // Saltar si no hay mapeo
+        }
+
+        // 4. DEDUPLICACIÓN: Hash de fila para evitar duplicados
+        const rowHash = `${cliente}|${proyecto}|${mes}|${año}|${montoUSD}|${montoARS}|${tipoVenta}`;
+        if (seenHashes.has(rowHash)) {
+          console.log(`🔄 Fila duplicada detectada: ${rowHash}`);
+          continue;
+        }
+        seenHashes.add(rowHash);
+
+        // 5. CONVERSIÓN DE MONEDAS: USD directo, ARS/FX del período
+        let amountUSD = 0;
+        const parsedUSD = this.parseDec(montoUSD);
+        const parsedARS = this.parseDec(montoARS);
+        
+        if (parsedUSD > 0) {
+          amountUSD = parsedUSD;
+        } else if (parsedARS > 0) {
+          // TODO: Obtener FX del período - por ahora usar 1350 como default
+          const fxRate = 1350; // Esto debería venir de resolveFX(period)
+          amountUSD = parsedARS / fxRate;
+          console.log(`💱 Conversión ARS→USD: ${parsedARS} / ${fxRate} = ${amountUSD}`);
+        }
+
+        // 6. CREAR REGISTRO NORMALIZADO
+        const ventaRecord: VentaTomi = {
+          cliente: cliente,
+          proyecto: proyecto,
+          mes: mes,
+          año: parseInt(año) || new Date().getFullYear(),
+          montoUSD: amountUSD,
+          montoARS: parsedARS,
+          tipoVenta: tipoVenta,
+          confirmado: confirmado,
+          projectId: projectId,
+          canonicalKey: canonicalKey,
+          rowHash: rowHash
+        };
+
+        result.push(ventaRecord);
+        
+        if (result.length <= 5) {
+          console.log(`✅ Venta procesada [${result.length}]:`, {
+            canonical: canonicalKey,
+            projectId: projectId,
+            amountUSD: amountUSD,
+            mes: mes,
+            año: año
+          });
+        }
+
+      } catch (error) {
+        console.error(`❌ Error procesando fila ${i+1}:`, error);
+        continue;
+      }
+    }
+
+    console.log(`📊 Ventas Tomi procesadas: ${result.length} de ${rows.length-1} filas`);
+    return result;
+  }
+
+  /**
+   * Procesar los datos de ventas de la pestaña "Ventas Tomi" (método legacy)
    */
   private processVentasData(rows: any[][]): VentaTomi[] {
     const result: VentaTomi[] = [];
