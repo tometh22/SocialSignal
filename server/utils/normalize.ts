@@ -3,12 +3,14 @@
  * Maneja espacios, mayúsculas, acentos, alias "Fee mensual", "Fee Marketing", etc.
  */
 
-export const normalizeKey = (s: string) =>
-  s.normalize('NFKD')
-   .replace(/[\u0300-\u036f]/g,'') // sin acentos
-   .replace(/\s+/g,' ')            // colapsar espacios
-   .trim()
-   .toLowerCase();
+export const normalizeKey = (s: string | undefined | null) => {
+  if (!s) return '';
+  return s.normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g,'') // sin acentos
+    .replace(/\s+/g,' ')            // colapsar espacios
+    .trim()
+    .toLowerCase();
+};
 
 // Mapa de alias (agregar equivalencias reales que tengas en los excels)
 const ALIAS: Record<string,string> = {
@@ -17,4 +19,8 @@ const ALIAS: Record<string,string> = {
   // agrega aquí equivalencias reales que tengas en los excels
 };
 
-export const projectKey = (s: string) => ALIAS[normalizeKey(s)] ?? normalizeKey(s);
+export const projectKey = (s: string | undefined | null) => {
+  if (!s) return '';
+  const normalized = normalizeKey(s);
+  return ALIAS[normalized] ?? normalized;
+};
