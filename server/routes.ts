@@ -333,8 +333,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create aggregator instance
       const aggregator = new ActiveProjectsAggregator(storage);
 
-      // Get unified data using blueprint aggregator
-      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
+      // Get unified data using blueprint aggregator - WITHOUT activeOnly filter (we'll apply bulletproof rules here)
+      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, false);
       
       // Filter by search if provided
       let filteredProjects = aggregatorResponse.projects;
@@ -354,26 +354,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         activeProjects: filteredProjects.filter(p => 
           p.metrics.revenueUSD > 0 || p.metrics.costUSD > 0 || p.metrics.workedHours > 0
         ).length,
-        totalProjects: aggregatorResponse.projects.length // Count before activeOnly filter
+        totalProjects: aggregatorResponse.projects.length, // Count before activeOnly filter
+        profitUSD: 0 // Will be calculated next
       };
       totals.profitUSD = totals.revenueUSD - totals.costUSD;
 
-      // Transform projects to match the new contract
-      const projects = filteredProjects.map(p => ({
-        projectId: p.projectId,
-        clientName: p.client.name,
-        projectName: p.name,
-        type: p.type || 'Unknown',
-        status: p.status,
-        period: {
-          revenueUSD: p.metrics.revenueUSD,
-          costUSD: p.metrics.costUSD,
-          profitUSD: p.metrics.revenueUSD - p.metrics.costUSD,
-          workedHours: p.metrics.workedHours,
-          efficiencyPct: p.metrics.efficiencyPct || null
-        },
-        hasActivity: p.metrics.revenueUSD > 0 || p.metrics.costUSD > 0 || p.metrics.workedHours > 0
-      }));
+      // Transform projects to match the new contract WITH BULLETPROOF ACTIVE RULES
+      const projects = filteredProjects.map(p => {
+        // BULLETPROOF ACTIVE RULES according to user specification
+        const isRecurring = p.type === 'fee';
+        const isOneShot = p.type === 'one-shot';
+        const hasPeriodActivity = p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours;
+        const isActiveInPeriod = isRecurring || (isOneShot && hasPeriodActivity);
+
+        return {
+          projectId: p.projectId,
+          clientName: p.client.name,
+          projectName: p.name,
+          type: p.type || 'other',
+          status: p.status,
+          isRecurring,
+          isOneShot,
+          hasPeriodActivity,
+          isActiveInPeriod,
+          period: {
+            revenueUSD: p.metrics.revenueUSD,
+            costUSD: p.metrics.costUSD,
+            profitUSD: p.metrics.revenueUSD - p.metrics.costUSD,
+            workedHours: p.metrics.workedHours,
+            efficiencyPct: p.metrics.efficiencyPct || null
+          }
+        };
+      });
+
+      // Apply BULLETPROOF activeOnly filter AFTER calculating isActiveInPeriod
+      const finalProjects = activeOnly 
+        ? projects.filter(p => p.isActiveInPeriod) // Only show projects that are "active in period"
+        : projects; // Show all projects
+
+      console.log(`🎯 BULLETPROOF FILTER: ${projects.length} total → ${finalProjects.length} after activeOnly=${activeOnly}`);
+      console.log(`🎯 Recurrentes shown: ${finalProjects.filter(p => p.isRecurring).length}`);
+      console.log(`🎯 One-shot with activity: ${finalProjects.filter(p => p.isOneShot && p.hasPeriodActivity).length}`);
+      console.log(`🎯 One-shot without activity: ${finalProjects.filter(p => p.isOneShot && !p.hasPeriodActivity).length}`);
+
+      // Recalculate totals for the FINAL visible projects
+      const finalTotals = {
+        revenueUSD: finalProjects.reduce((sum, p) => sum + p.period.revenueUSD, 0),
+        costUSD: finalProjects.reduce((sum, p) => sum + p.period.costUSD, 0),
+        workedHours: finalProjects.reduce((sum, p) => sum + p.period.workedHours, 0),
+        activeProjects: finalProjects.filter(p => p.hasPeriodActivity).length,
+        totalProjects: aggregatorResponse.projects.length, // Total before any filters
+        profitUSD: 0 // Will be calculated next
+      };
+      finalTotals.profitUSD = finalTotals.revenueUSD - finalTotals.costUSD;
 
       // Build response according to new contract
       const response = {
@@ -382,8 +415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           end: aggregatorResponse.summary.period.end,
           label: aggregatorResponse.summary.period.label
         },
-        totals,
-        projects,
+        totals: finalTotals,
+        projects: finalProjects,
         debug: {
           engine: "unified",
           source: "excel+db", 
@@ -391,8 +424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      console.log(`✅ Successfully processed ${projects.length} projects`);
-      console.log(`💰 Totals: $${totals.revenueUSD.toFixed(2)} revenue, $${totals.costUSD.toFixed(2)} cost, ${totals.workedHours.toFixed(1)}h worked`);
+      console.log(`✅ BULLETPROOF ACTIVE PROJECTS: Successfully processed ${finalProjects.length} projects (filtered from ${aggregatorResponse.projects.length} total)`);
+      console.log(`💰 Final Totals: $${finalTotals.revenueUSD.toFixed(2)} revenue, $${finalTotals.costUSD.toFixed(2)} cost, ${finalTotals.workedHours.toFixed(1)}h worked`);
 
       return res.json(response);
 
