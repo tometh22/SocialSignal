@@ -1,0 +1,135 @@
+¡Lo resolvemos ya! Lo que ves (cards en $0 / 0h / N/A) no es del motor —los logs confirman que calcula bien—, es mapeo de campos entre /api/projects?timeFilter=… y la vista Proyectos Activos. Haz estos 3 cambios y queda:
+1) Backend: adapta la lista de proyectos (compatibilidad total)
+Asegúrate de que cada fila de /api/projects traiga el bloque universal summary y los alias legacy que la card lee hoy.
+// server/routes/projects.ts (o donde armes la respuesta)
+app.get('/api/projects', async (req, res) => {
+  const timeFilter = String(req.query.timeFilter ?? 'this_month');
+  const basis = String(req.query.basis ?? 'ECON');
+
+  const rows = await buildProjectList({ timeFilter, basis }); // usa el motor único
+
+  // Agrega un resumen opcional para los KPIs superiores
+  const pageSummary = rows.reduce(
+    (acc: any, p: any) => {
+      const rev = Number(p.summary?.revenueUSD ?? 0);
+      const hrs = Number(p.summary?.totalHours ?? 0);
+      acc.totalProjects += 1;
+      acc.active += (p.status === 'active') ? 1 : 0;
+      acc.totalRevenueUSD += rev;
+      acc.totalHours += hrs;
+      return acc;
+    },
+    { totalProjects: 0, active: 0, totalRevenueUSD: 0, totalHours: 0 }
+  );
+
+  res.json({ summary: pageSummary, projects: rows });
+});
+
+async function buildProjectList({ timeFilter, basis }: { timeFilter: string; basis: 'ECON' | 'EXEC' | string; }) {
+  const projects = await storage.getProjects(); // lo que uses
+  const out = [];
+
+  for (const p of projects) {
+    const m = await computeProjectPeriodMetrics({ projectId: p.id, timeFilter, basis: 'ECON' }); // motor único
+
+    // fila compatible con la UI actual
+    out.push({
+      projectId: p.id,
+      clientName: p.client.name,
+      projectName: p.quotation?.projectName ?? p.name,
+      status: p.status,                         // "active" | "paused" | "completed"
+      projectType: p.quotation?.projectType,    // "recurrente" | "one-time"
+
+      // BLOQUE UNIVERSAL (siempre)
+      summary: {
+        period: m.periodKey,                      // "2025-08"
+        basis: 'ECON',
+        revenueUSD: Number(m.revenueUSD),         // 8450
+        teamCostUSD: Number(m.teamCostUSD),       // 2436.09
+        markupUSD: Number(m.markupUSD),           // 6013.91
+        efficiencyPct: Number(m.efficiencyPct),   // 90.1
+        totalHours: Number(m.totalHours),         // 288.28
+        estimatedHours: Number(m.estimatedHours), // 320
+        hasData: m.hasData
+      },
+
+      // ALIASES LEGACY (lo que las cards estaban leyendo)
+      totalRealRevenue: Number(m.revenueUSD),
+      workedCost:      Number(m.teamCostUSD),
+      markup:          Number(m.markupUSD),       // ¡beneficio en USD, NO ratio!
+      efficiency:      Number(m.efficiencyPct),
+      actualHours:     Number(m.totalHours),
+      targetHours:     Number(m.estimatedHours),
+    });
+  }
+
+  return out;
+}
+Puntos clave:
+Devuelve números (no strings con $), si no, la UI suma “0”.
+markup aquí es beneficio (USD); si quieres ratio, exponlo como markupRatio aparte.
+2) Frontend: normalizador defensivo + KPIs superiores
+En pages/active-projects.tsx (o el hook que consume /api/projects), normaliza ambos formatos y arma los KPIs de cabecera con la suma de cada fila.
+const { data } = useQuery({
+  queryKey: ['projects', timeFilter, 'ECON'], // incluye filtro en la key
+  queryFn: () => fetch(`/api/projects?timeFilter=${timeFilter}`).then(r => r.json()),
+});
+
+const projects = data?.projects ?? [];
+
+const rows = projects.map((p: any) => {
+  const price   = p.totalRealRevenue ?? p.summary?.revenueUSD ?? 0;
+  const cost    = p.workedCost      ?? p.summary?.teamCostUSD ?? 0;
+  const hrs     = p.actualHours     ?? p.summary?.totalHours  ?? 0;
+  const target  = p.targetHours     ?? p.summary?.estimatedHours ?? 0;
+  const eff     = p.efficiency      ?? p.summary?.efficiencyPct ?? null;
+  const markup$ = p.markup          ?? p.summary?.markupUSD   ?? (price - cost);
+
+  return { ...p, price, cost, hrs, target, eff, markup$ };
+});
+
+// KPIs superiores (cards de cabecera)
+const kpi = rows.reduce((a: any, r: any) => {
+  a.totalProjects += 1;
+  a.active += (r.status === 'active') ? 1 : 0;
+  a.facturacionUSD += Number(r.price || 0);
+  a.horas += Number(r.hrs || 0);
+  return a;
+}, { totalProjects: 0, active: 0, facturacionUSD: 0, horas: 0 });
+
+// “Solo con actividad”
+const onlyWithActivity = filters.onlyActivePeriod;
+const list = onlyWithActivity
+  ? rows.filter(r => (r.hrs > 0) || (r.price > 0) || (r.cost > 0))
+  : rows;
+Así, aunque el backend todavía no exponga los alias, la card se rellena usando summary.
+3) Evita el fallo visual del “Markup”
+En la card de cada proyecto:
+// Beneficio en dólares:
+renderMoney(row.markup$)   // "$ 6,013.91"
+
+// Si además querés ratio (tooltip):
+const markupRatio = row.cost > 0 ? row.price / row.cost : null;
+renderBadge(markupRatio ? `${markupRatio.toFixed(2)}×` : '—');
+En tu captura salía un número larguísimo porque estabas mostrando el ratio crudo o un float gigantesco. Para la card verde usá beneficio USD; si querés ratio, muéstralo pequeño y redondeado.
+Checklist ultra-rápido (marca ✅ al aplicar)
+ /api/projects devuelve summary + aliases (totalRealRevenue, workedCost, markup, efficiency, actualHours, targetHours).
+ Valores numéricos, no strings.
+ Query key incluye timeFilter para evitar cache viejo.
+ Cabecera suma price y hrs (no confíes en campos globales).
+ Filtro “Solo con actividad” usa (hrs>0 || price>0 || cost>0).
+ Card de Markup muestra beneficio USD; ratio solo como etiqueta/tooltip.
+¿Cómo sabés que ya quedó?
+Abre /api/projects?timeFilter=august_2025 y verificá que para Huggies (id 39) veas:
+summary.revenueUSD: 8450
+summary.teamCostUSD: 2436.09
+summary.totalHours: 288.28
+y los alias: totalRealRevenue: 8450, workedCost: 2436.09, actualHours: 288.28, targetHours: 320, markup: 6013.91.
+La cabecera “Facturación” sube a $8,450 y “Horas registradas” a 288.28h.
+La card de Huggies muestra:
+Precio al cliente: $8,450
+Reales del período: 288.28h
+Eficiencia: ~90.1%
+Costos: $2,436.09
+Markup (beneficio): $6,013.91
+Si tras esto alguna card sigue en 0, pásame el JSON de /api/projects?timeFilter=august_2025 de 2–3 proyectos y te digo exactamente qué campo falta mapear.
