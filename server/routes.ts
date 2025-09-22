@@ -317,6 +317,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== NEW UNIFIED PROJECTS ENDPOINT ====================
+  // New contract according to user specification
+  app.get('/api/projects', requireAuth, async (req, res) => {
+    console.log(`🚀 NEW UNIFIED PROJECTS ENDPOINT: Query=${JSON.stringify(req.query)}`);
+    
+    try {
+      // Parse query parameters
+      const timeFilter = req.query.timeFilter as string || 'this_month';
+      const activeOnly = req.query.activeOnly === 'true';
+      const search = req.query.search as string || '';
+
+      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, search=${search}`);
+
+      // Create aggregator instance
+      const aggregator = new ActiveProjectsAggregator(storage);
+
+      // Get unified data using blueprint aggregator
+      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
+      
+      // Filter by search if provided
+      let filteredProjects = aggregatorResponse.projects;
+      if (search.trim()) {
+        const searchLower = search.toLowerCase();
+        filteredProjects = filteredProjects.filter(p => 
+          p.name.toLowerCase().includes(searchLower) ||
+          p.client.name.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Calculate totals according to specification
+      const totals = {
+        revenueUSD: filteredProjects.reduce((sum, p) => sum + p.period.revenueUSD, 0),
+        costUSD: filteredProjects.reduce((sum, p) => sum + p.period.costUSD, 0),
+        workedHours: filteredProjects.reduce((sum, p) => sum + p.period.workedHours, 0),
+        activeProjects: filteredProjects.filter(p => 
+          p.period.revenueUSD > 0 || p.period.costUSD > 0 || p.period.workedHours > 0
+        ).length,
+        totalProjects: aggregatorResponse.projects.length // Count before activeOnly filter
+      };
+      totals.profitUSD = totals.revenueUSD - totals.costUSD;
+
+      // Transform projects to match the new contract
+      const projects = filteredProjects.map(p => ({
+        projectId: p.id,
+        clientName: p.client.name,
+        projectName: p.name,
+        type: p.type || 'Unknown',
+        status: p.status,
+        period: {
+          revenueUSD: p.period.revenueUSD,
+          costUSD: p.period.costUSD,
+          profitUSD: p.period.revenueUSD - p.period.costUSD,
+          workedHours: p.period.workedHours,
+          efficiencyPct: p.metrics.efficiency || null
+        },
+        hasActivity: p.period.revenueUSD > 0 || p.period.costUSD > 0 || p.period.workedHours > 0
+      }));
+
+      // Build response according to new contract
+      const response = {
+        period: {
+          start: aggregatorResponse.summary.period.start,
+          end: aggregatorResponse.summary.period.end,
+          label: aggregatorResponse.summary.period.label
+        },
+        totals,
+        projects,
+        debug: {
+          engine: "unified",
+          source: "excel+db", 
+          fx: "monthly"
+        }
+      };
+
+      console.log(`✅ Successfully processed ${projects.length} projects`);
+      console.log(`💰 Totals: $${totals.revenueUSD.toFixed(2)} revenue, $${totals.costUSD.toFixed(2)} cost, ${totals.workedHours.toFixed(1)}h worked`);
+
+      return res.json(response);
+
+    } catch (error) {
+      console.error('❌ Error in new unified projects endpoint:', error);
+      
+      return res.status(500).json({
+        error: 'Failed to get projects data',
+        message: error instanceof Error ? error.message : String(error),
+        engine: 'unified'
+      });
+    }
+  });
+
   // Endpoint de prueba para deviation analysis (sin sanitización)
   app.get("/api/projects/:id/deviation-test", requireAuth, async (req, res) => {
     console.log(`🚀 TEST DEVIATION ANALYSIS - Project ${req.params.id}`);
