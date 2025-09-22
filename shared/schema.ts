@@ -1896,3 +1896,126 @@ export const nonBillableHoursRelations = relations(nonBillableHours, ({ one }) =
   category: one(indirectCostCategories, { fields: [nonBillableHours.categoryId], references: [indirectCostCategories.id] }),
   creator: one(users, { fields: [nonBillableHours.createdBy], references: [users.id] }),
 }));
+
+// ==================== ACTIVE PROJECTS API CONTRACTS ====================
+// Unified contracts for "Proyectos Activos" page according to blueprint specification
+
+// TimeFilter union type - exact specification from blueprint
+export const timeFilterSchema = z.union([
+  z.literal('this_month'),
+  z.literal('last_month'),
+  z.literal('current_month'),
+  z.literal('mes_pasado'),
+  z.literal('este_mes'),
+  z.literal('agosto_2025'),
+  z.literal('julio_2025'),
+  z.literal('septiembre_2025'),
+  z.literal('q1_2025'),
+  z.literal('q2_2025'), 
+  z.literal('q3_2025'),
+  z.literal('q4_2025'),
+  z.literal('this_quarter'),
+  z.literal('last_quarter'),
+  z.literal('this_year'),
+  z.literal('last_year'),
+  z.string().regex(/^month_\d+_\d{4}$/), // month_8_2025
+  z.string().regex(/^q\d_\d{4}$/),       // q1_2024  
+  z.string().regex(/^agosto_\d{4}$/),    // agosto_2025
+  z.string().regex(/^julio_\d{4}$/),     // julio_2025
+  z.string().regex(/^[a-z]+_\d{4}$/),    // any_month_year
+  z.object({
+    start: z.string(),  // ISO format YYYY-MM-DD
+    end: z.string()     // ISO format YYYY-MM-DD  
+  })
+]);
+
+export type TimeFilter = z.infer<typeof timeFilterSchema>;
+
+// ResolvedPeriod - exact specification from blueprint
+export const resolvedPeriodSchema = z.object({
+  start: z.string(),  // ISO format YYYY-MM-DD
+  end: z.string(),    // ISO format YYYY-MM-DD
+  label: z.string()   // Human-readable label
+});
+
+export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;
+
+// ProjectMetrics - exact specification from blueprint  
+export const projectMetricsSchema = z.object({
+  revenueUSD: z.number(),
+  costUSD: z.number(), 
+  markupUSD: z.number(),
+  markupRatio: z.number().nullable(),  // null if costUSD=0
+  workedHours: z.number(),
+  targetHours: z.number(),
+  efficiencyPct: z.number().nullable() // null if targetHours=0
+});
+
+export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;
+
+// Project flags - exact specification from blueprint
+export const projectFlagsSchema = z.object({
+  hasSales: z.boolean(),
+  hasCosts: z.boolean(),
+  hasHours: z.boolean()
+});
+
+export type ProjectFlags = z.infer<typeof projectFlagsSchema>;
+
+// Portfolio summary - exact specification from blueprint
+export const portfolioSummarySchema = z.object({
+  totalProjects: z.number(),
+  activeProjects: z.number(),
+  periodRevenueUSD: z.number(),
+  periodCostUSD: z.number(),
+  periodMarkupUSD: z.number(), 
+  periodWorkedHours: z.number(),
+  efficiencyPct: z.number().nullable(),
+  markupRatio: z.number().nullable()
+});
+
+export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;
+
+// Individual project in response - exact specification from blueprint
+export const activeProjectItemSchema = z.object({
+  projectId: z.number(),
+  clientId: z.number(),
+  name: z.string(),
+  type: z.enum(['fee', 'one-shot', 'other']),
+  status: z.enum(['active', 'paused', 'completed']),
+  client: z.object({
+    id: z.number(),
+    name: z.string(),
+    logo: z.string().nullable()
+  }),
+  metrics: projectMetricsSchema,
+  flags: projectFlagsSchema,
+  period: resolvedPeriodSchema
+});
+
+export type ActiveProjectItem = z.infer<typeof activeProjectItemSchema>;
+
+// Complete ActiveProjectsResponse - exact specification from blueprint
+export const activeProjectsResponseSchema = z.object({
+  summary: z.object({
+    portfolio: portfolioSummarySchema,
+    period: resolvedPeriodSchema
+  }),
+  projects: z.array(activeProjectItemSchema),
+  metadata: z.object({
+    timeFilter: z.string(),
+    engine: z.literal('unified_aggregator'),
+    source: z.literal('Excel_MAESTRO_unified')
+  })
+});
+
+export type ActiveProjectsResponse = z.infer<typeof activeProjectsResponseSchema>;
+
+// Query parameters for the endpoint - exact specification from blueprint
+export const activeProjectsQuerySchema = z.object({
+  timeFilter: timeFilterSchema.optional().default('this_month'),
+  onlyActiveInPeriod: z.boolean().optional().default(false),
+  basis: z.enum(['ECON', 'EXEC']).optional().default('ECON')
+});
+
+export type ActiveProjectsQuery = z.infer<typeof activeProjectsQuerySchema>;
