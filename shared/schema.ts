@@ -2014,7 +2014,12 @@ export type ActiveProjectsResponse = z.infer<typeof activeProjectsResponseSchema
 // Query parameters for the endpoint - exact specification from blueprint
 export const activeProjectsQuerySchema = z.object({
   timeFilter: timeFilterSchema.optional().default('this_month'),
-  onlyActiveInPeriod: z.boolean().optional().default(false),
+  onlyActiveInPeriod: z.union([z.boolean(), z.string()]).transform((val) => {
+    if (typeof val === 'string') {
+      return val === 'true' || val === '1';
+    }
+    return Boolean(val);
+  }).optional().default(false),
   basis: z.enum(['ECON', 'EXEC']).optional().default('ECON')
 });
 
