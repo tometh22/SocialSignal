@@ -9904,6 +9904,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   */
 
   // ==================== DEBUG ENDPOINT (TEMPORARY) ====================
+  // DEBUG: Endpoint temporal para buscar agosto 2025
+  app.get('/api/debug/august-sales', async (req, res) => {
+    try {
+      const allSales = await storage.getGoogleSheetsSales();
+      
+      // Buscar sales de agosto 2025 en múltiples formatos
+      const augustSales = allSales.filter(sale => {
+        const month = sale.month || sale.mes || '';
+        const year = sale.year || sale.año || 0;
+        const monthKey = sale.monthKey || '';
+        
+        return (
+          (month.toLowerCase().includes('agosto') || month.toLowerCase().includes('august')) && 
+          year == 2025
+        ) || monthKey === '2025-08';
+      });
+      
+      const warnerAugustSales = augustSales.filter(sale => sale.projectName === 'Fee Marketing');
+      
+      res.json({
+        totalAugustSales: augustSales.length,
+        warnerAugustSales: warnerAugustSales.length,
+        augustSales: augustSales.slice(0, 10),
+        warnerAugustSales: warnerAugustSales
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/debug/sales-data
   app.get('/api/debug/sales-data', requireAuth, async (req, res) => {
     try {

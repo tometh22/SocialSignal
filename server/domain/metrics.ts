@@ -194,13 +194,36 @@ export async function computeProjectPeriodMetrics(
       const allSales = await storage.getGoogleSheetsSales();
       const projectSales = allSales.filter(sale => sale.projectName === projectNameFromCosts!);
       
-      // Calculate revenue from matching sales (no temporal filter for now to match list behavior)
-      revenueUSD = projectSales.reduce((sum, sale) => {
+      console.log(`🔍 TEMPORAL FILTER DEBUG - Proyecto ${projectId}: ${projectSales.length} total sales found, applying filter: ${rng}`);
+      
+      // Apply temporal filter to sales to match the period
+      const filteredSales = projectSales.filter(sale => {
+        const confirmadoStr = String(sale.confirmado || '').toLowerCase().trim();
+        const isConfirmed = ['si', 'sí', 'yes', 'true', '1'].includes(confirmadoStr);
+        
+        console.log(`🔍 Sale debug: ${sale.id || 'no-id'}, confirmado="${sale.confirmado}" (${confirmadoStr}), confirmed=${isConfirmed}, mes="${sale.mes}", año="${sale.año}"`);
+        
+        if (!isConfirmed) {
+          console.log(`  ❌ Rejected: Not confirmed`);
+          return false;
+        }
+        
+        const inRange = isRowInTimeRange(sale, rng);
+        console.log(`  📅 Temporal check: inRange=${inRange} for period ${JSON.stringify(rng)}`);
+        
+        return inRange;
+      });
+      
+      console.log(`🔍 TEMPORAL FILTER DEBUG - Proyecto ${projectId}: ${filteredSales.length} sales after temporal filter`);
+      
+      // Calculate revenue from filtered sales
+      revenueUSD = filteredSales.reduce((sum, sale) => {
         const montoUSD = parseFloat(sale.amountUsd) || 0;
+        console.log(`💰 Sale entry: ${montoUSD} USD, confirmed: ${sale.confirmado}`);
         return sum + montoUSD;
       }, 0);
       
-      console.log(`💰 REVENUE FIX - Proyecto ${projectId}: Found ${projectSales.length} sales for "${projectNameFromCosts}", total: $${revenueUSD}`);
+      console.log(`💰 REVENUE FIX - Proyecto ${projectId}: Found ${filteredSales.length} filtered sales for "${projectNameFromCosts}", total: $${revenueUSD}`);
     } else {
       // CRITICAL FIX: Use fallback when no costs available but we have ingRows
       console.log(`🔍 REVENUE DEBUG - Proyecto ${projectId}: No costs available, using fallback with ${ingRows.length} ingresos`);
