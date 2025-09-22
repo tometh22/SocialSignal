@@ -9543,8 +9543,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const projectNameFromCosts = projectCosts.length > 0 ? projectCosts[0].proyecto : null;
           console.log(`🔍 DEBUG PROJECT ${project.id}: projectCosts.length=${projectCosts.length}, projectNameFromCosts="${projectNameFromCosts}"`);
           
-          // Filter by time period
+          // Filter by time period AND 'Directo' only (según especificación)
           const filteredCosts = projectCosts.filter(cost => {
+            // 🎯 FILTRO DIRECTO: Solo costos 'Directo', no 'Indirecto' (overhead)
+            const isDirecto = cost.directoIndirecto === 'Directo';
+            if (!isDirecto) return false;
+            
+            // Filtro temporal
             let monthNumber = 1;
             if (cost.mes.includes(' ')) {
               monthNumber = parseInt(cost.mes.substring(0, 2));
@@ -9670,7 +9675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: project.id,
             projectId: project.id,
             clientId: project.clientId,
-            name: project.name,
+            name: projectNameFromCosts || project.name,
             status: project.status || 'active',
             startDate: project.startDate,
             expectedEndDate: project.expectedEndDate,
@@ -9682,7 +9687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Quotation info para la UI
             quotation: {
               id: project.quotationId,
-              projectName: project.name,
+              projectName: projectNameFromCosts || project.name,
               projectType: project.projectType || 'one-shot',
               estimatedHours: project.estimatedHours || 0,
               totalAmount: revenueUSD,

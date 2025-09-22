@@ -1,0 +1,109 @@
+Para que Proyectos Activos muestre bien las cards (ventas, costos, markup y horas) y reaccione al filtro temporal, dejemos todo estandarizado y universal, usando Ventas Tomi para ingresos y Costos directos e indirectos para costos/horas.
+Qué leer de cada pestaña
+Ingresos (Ventas Tomi)
+Claves: Cliente, Proyecto, Mes, Año, Confirmado, Monto_USD, Monto_ARS.
+Monto USD del período:
+si Monto_USD>0 → usarlo.
+si Monto_USD=0 y Monto_ARS>0 → convertir con FX del período (misma FX que usás en costos).
+Filtrar por Mes/Año del timeFilter y Confirmado=Si.
+Costos + Horas (Costos directos e indirectos)
+Claves: Cliente, Proyecto, Mes, Año, Directo/Indirecto, Subtipo de costo,
+Cantidad de horas objetivo (K), unidades de horas reales Asana (L),
+Cantidad de horas para facturación (fallback de L),
+Moneda Original ARS, Moneda Original USD, Cotización, Monto Total USD.
+Costo USD de la fila:
+si Monto Total USD>0 → usarlo.
+si Moneda Original USD>0 → usarlo.
+si Moneda Original ARS>0 → dividir por Cotización.
+último recurso: horasFacturación * valorHoraARS / Cotización.
+Horas reales: L (o horas para facturación si L vacío).
+Horas objetivo: K.
+Para cards de proyecto usar Directo (lo indirecto normalmente es overhead; si querés incluirlo hacé que sea configurable).
+Filtrar por Mes/Año del timeFilter.
+Normalizá nombres con normalize(cliente)::normalize(proyecto) + alias map
+(ej.: warner::fee marketing → project:warner_fee_marketing) para que cada fila caiga en el projectId correcto.
+Cálculos por proyecto (del período)
+totalRealRevenueUSD   = Σ ventasUSD
+totalWorkedCostUSD    = Σ costosUSD (Directo)
+totalWorkedHours      = Σ horasReales (L)
+totalTargetHours      = Σ horasObjetivo (K)
+efficiencyPct         = totalTargetHours>0 ? (totalWorkedHours/totalTargetHours)*100 : null
+markupUSD             = totalRealRevenueUSD - totalWorkedCostUSD
+markupRatio           = totalWorkedCostUSD>0 ? totalRealRevenueUSD/totalWorkedCostUSD : null
+Contrato que debe devolver la API para las cards
+GET /api/projects?timeFilter=august_2025 → (portfolio)
+{
+  "projects": [
+    {
+      "projectId": 39,
+      "clientName": "Kimberly Clark",
+      "projectName": "Fee Huggies",
+      "period": "2025-08",
+      "totalRealRevenueUSD": 8450,
+      "totalWorkedCostUSD": 2436.09,
+      "totalWorkedHours": 288.28,
+      "efficiencyPct": 90.1,
+      "markupUSD": 6013.91,
+      "markupRatio": 3.47
+    }
+  ],
+  "portfolioHeader": {
+    "totalProjects": 14,
+    "activeProjects": 13,
+    "periodRevenueUSD": Σ totalRealRevenueUSD,
+    "periodHours": Σ totalWorkedHours
+  }
+}
+La card usa:
+“Precio al cliente” = totalRealRevenueUSD
+“Reales del período” (h) = totalWorkedHours
+“Eficiencia” = efficiencyPct (o N/A si K=0)
+Bloques: Facturación (azul) = totalRealRevenueUSD,
+Costos (rojo) = totalWorkedCostUSD,
+Markup (verde) = markupUSD y markupRatio.
+Filtro temporal (único y universal)
+resolveTimeFilter(timeFilter) → {start,end}
+mes_pasado (hoy=sep/2025) → 2025-08-01..2025-08-31
+este_mes → mes actual
+july_2025, august_2025, q3_2025, o {startDate,endDate} (custom)
+Se aplica igual en ingresos y costos antes de agrupar por proyecto.
+Cosas que aseguran que Warner (y todos) queden bien
+Alias map cliente/proyecto completo (Warner tiene varios “Fee”):
+warner::fee marketing, warner::fee insights, etc.
+parseDec robusto (ES/US, miles, paréntesis negativos).
+Deduplicación de ventas si hay filas duplicadas.
+FX del período consistente (misma que costos) para convertir ARS→USD.
+Solo Directo en cards (o bandera para incluir Indirecto).
+Mismo motor para /api/projects y /api/projects/:id/complete-data.
+Mini-pipeline de backend (pseudocódigo)
+const { start, end } = resolveTimeFilter(timeFilter);
+
+const salesRows   = getSalesRows(start,end);         // Ventas Tomi
+const costRows    = getCostRows(start,end);          // Costos directos e indirectos
+
+const grouped = new Map<ProjectId, Accum>();
+
+for (row of salesRows) {
+  const pid = toProjectId(row.cliente,row.proyecto);   // alias map
+  const usd = row.montoUSD>0 ? row.montoUSD : row.montoARS/fx(period);
+  grouped[pid].revenue += usd;
+}
+
+for (row of costRows) {
+  if (row.directoIndirecto!=='Directo') continue;      // configurable
+  const pid = toProjectId(row.cliente,row.proyecto);
+  const costUSD = row.montoTotalUSD || row.monedaUSD || row.monedaARS/fx(period) ||
+                  (row.horasFacturacion*row.valorHoraARS)/fx(period);
+  grouped[pid].cost   += costUSD;
+  grouped[pid].hours  += prefer(row.horasRealesAsana,row.horasFacturacion);
+  grouped[pid].target += row.horasObjetivo;
+}
+
+return buildProjectsResponse(grouped, {start,end});
+Pruebas rápidas que te confirman que quedó bien
+Fee Huggies · agosto_2025
+totalRealRevenueUSD = 8,450, totalWorkedCostUSD = 2,436.09,
+totalWorkedHours = 288.28, efficiencyPct ≈ 90.1, markup≈6,013.91 → la card debe mostrar exactamente eso.
+Warner · agosto_2025 (Fee Marketing)
+totalRealRevenueUSD debe ser exactamente el valor de Ventas Tomi (columna USD de agosto, confirmado),
+y costos/horas del mismo mes desde Costos directos e indirectos
