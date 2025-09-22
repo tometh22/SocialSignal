@@ -348,11 +348,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals according to specification
       const totals = {
-        revenueUSD: filteredProjects.reduce((sum, p) => sum + p.period.revenueUSD, 0),
-        costUSD: filteredProjects.reduce((sum, p) => sum + p.period.costUSD, 0),
-        workedHours: filteredProjects.reduce((sum, p) => sum + p.period.workedHours, 0),
+        revenueUSD: filteredProjects.reduce((sum, p) => sum + p.metrics.revenueUSD, 0),
+        costUSD: filteredProjects.reduce((sum, p) => sum + p.metrics.costUSD, 0),
+        workedHours: filteredProjects.reduce((sum, p) => sum + p.metrics.workedHours, 0),
         activeProjects: filteredProjects.filter(p => 
-          p.period.revenueUSD > 0 || p.period.costUSD > 0 || p.period.workedHours > 0
+          p.metrics.revenueUSD > 0 || p.metrics.costUSD > 0 || p.metrics.workedHours > 0
         ).length,
         totalProjects: aggregatorResponse.projects.length // Count before activeOnly filter
       };
@@ -360,19 +360,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Transform projects to match the new contract
       const projects = filteredProjects.map(p => ({
-        projectId: p.id,
+        projectId: p.projectId,
         clientName: p.client.name,
         projectName: p.name,
         type: p.type || 'Unknown',
         status: p.status,
         period: {
-          revenueUSD: p.period.revenueUSD,
-          costUSD: p.period.costUSD,
-          profitUSD: p.period.revenueUSD - p.period.costUSD,
-          workedHours: p.period.workedHours,
-          efficiencyPct: p.metrics.efficiency || null
+          revenueUSD: p.metrics.revenueUSD,
+          costUSD: p.metrics.costUSD,
+          profitUSD: p.metrics.revenueUSD - p.metrics.costUSD,
+          workedHours: p.metrics.workedHours,
+          efficiencyPct: p.metrics.efficiencyPct || null
         },
-        hasActivity: p.period.revenueUSD > 0 || p.period.costUSD > 0 || p.period.workedHours > 0
+        hasActivity: p.metrics.revenueUSD > 0 || p.metrics.costUSD > 0 || p.metrics.workedHours > 0
       }));
 
       // Build response according to new contract
