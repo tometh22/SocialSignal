@@ -20,6 +20,8 @@ import {
   projectAliases
 } from "@shared/schema";
 
+import { resolvePeriod } from "@shared/utils/timePeriod";
+
 import { parseMoneySmart, normalizeAmount } from "../utils/money";
 import { projectKey } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
@@ -31,104 +33,13 @@ import { CoverageCalculator } from "./coverage";
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
 
+/**
+ * 🎯 UNIFIED TEMPORAL RESOLVER - Using shared architecture
+ * @deprecated Use resolvePeriod directly from @shared/utils/timePeriod
+ */
 export function resolveTimeFilter(timeFilter: TimeFilter): ResolvedPeriod {
-  if (typeof timeFilter === 'object' && 'start' in timeFilter) {
-    return {
-      start: timeFilter.start,
-      end: timeFilter.end,
-      label: `${timeFilter.start} to ${timeFilter.end}`
-    };
-  }
-
-  const filter = timeFilter as string;
-  console.log(`🎯 UNIFIED resolveTimeFilter: Processing ${filter}`);
-
-  // Parse timeFilter according to blueprint: july_2025, q3_2025, agosto_2025, etc.
-  if (filter.includes('_')) {
-    const [period, year] = filter.split('_');
-    const y = parseInt(year);
-    
-    // Quarters
-    if (period.startsWith('q')) {
-      const q = parseInt(period.slice(1));
-      const startMonth = (q - 1) * 3 + 1;
-      const endMonth = startMonth + 2;
-      const endDay = new Date(y, endMonth, 0).getDate();
-      return {
-        start: `${y}-${String(startMonth).padStart(2, '0')}-01`,
-        end: `${y}-${String(endMonth).padStart(2, '0')}-${endDay}`,
-        label: `Q${q} ${y}`
-      };
-    }
-    
-    // Months (English + Spanish support) - CORRECTED MAPPING
-    const monthMap: Record<string, number> = {
-      'january': 1, 'february': 2, 'march': 3, 'april': 4,
-      'may': 5, 'june': 6, 'july': 7, 'august': 8,
-      'september': 9, 'october': 10, 'november': 11, 'december': 12,
-      // Spanish months
-      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
-      'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
-      'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
-    };
-    
-    console.log(`🔍 MONTH RESOLUTION: period="${period}", monthMap value=${monthMap[period]}`);
-    
-    if (monthMap[period]) {
-      const month = monthMap[period];
-      const endDay = new Date(y, month, 0).getDate();
-      const result = {
-        start: `${y}-${String(month).padStart(2, '0')}-01`,
-        end: `${y}-${String(month).padStart(2, '0')}-${endDay}`,
-        label: `${period.charAt(0).toUpperCase() + period.slice(1)} ${y}`
-      };
-      console.log(`✅ MONTH RESOLVED: ${filter} → ${result.start} to ${result.end}`);
-      return result;
-    }
-  }
-  
-  // Relative temporal filters
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-based
-  
-  switch (filter) {
-    case 'this_month':
-    case 'este_mes':
-    case 'current_month': {
-      const m = currentMonth + 1; // 1-based
-      const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-      return {
-        start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
-        end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`,
-        label: 'This Month'
-      };
-    }
-    
-    case 'last_month':
-    case 'mes_pasado': {
-      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-      const m = prevMonth + 1; // 1-based
-      const endDay = new Date(prevYear, prevMonth + 1, 0).getDate();
-      return {
-        start: `${prevYear}-${String(m).padStart(2, '0')}-01`,
-        end: `${prevYear}-${String(m).padStart(2, '0')}-${endDay}`,
-        label: 'Last Month'
-      };
-    }
-    
-    default: {
-      // Fallback: current month
-      const m = currentMonth + 1;
-      const endDay = new Date(currentYear, currentMonth + 1, 0).getDate();
-      return {
-        start: `${currentYear}-${String(m).padStart(2, '0')}-01`,
-        end: `${currentYear}-${String(m).padStart(2, '0')}-${endDay}`,
-        label: 'Current Month'
-      };
-    }
-  }
+  console.log(`🎯 UNIFIED resolveTimeFilter: Processing ${JSON.stringify(timeFilter)}`);
+  return resolvePeriod(timeFilter);
 }
 
 // ==================== CORE DATA STRUCTURES ====================
@@ -177,8 +88,8 @@ export class ActiveProjectsAggregator {
   async getActiveProjectsUnified(timeFilter: TimeFilter, onlyActiveInPeriod: boolean = false): Promise<ActiveProjectsResponse> {
     console.log(`🚀 UNIFIED AGGREGATOR: Processing timeFilter=${JSON.stringify(timeFilter)}, onlyActiveInPeriod=${onlyActiveInPeriod}`);
 
-    // 1. Resolve period - unified resolver
-    const period = resolveTimeFilter(timeFilter);
+    // 1. Resolve period - unified shared resolver
+    const period = resolvePeriod(timeFilter);
     console.log(`📅 Period resolved: ${period.start} → ${period.end} (${period.label})`);
 
     // 2. Get base project list
