@@ -1,7 +1,10 @@
 /**
  * Sistema de conversión FX mensual para ARS→USD
  * Basado en el rediseño operativo del usuario
+ * 🛡️ FIXED: Includes robust currency normalization with anti×100 detection
  */
+
+import { normalizeAmount } from "./money";
 
 // Tabla de cotizaciones mensuales ARS/USD
 const FX_RATES: Record<string, number> = {
@@ -44,19 +47,39 @@ export function arsToUsd(amountARS: number, period: string): number {
 }
 
 /**
- * Convierte un monto de moneda mixta a USD
- * Regla: Si Monto_USD > 0 → usar eso. Si Monto_USD == 0 y Monto_ARS > 0 → convertir
- * @param montoUSD Monto ya en USD
+ * 🛡️ BULLETPROOF Currency Converter with Anti-Corruption Detection
+ * Fixed: Applies robust normalization to USD amounts before using them
+ * Detects and corrects extreme corruption (trillions from Excel import)
+ * @param montoUSD Raw USD amount (possibly corrupted)
  * @param montoARS Monto en pesos argentinos
- * @param period Período para la conversión
- * @returns Monto total en USD
+ * @param period Período para la conversión FX
+ * @returns Monto total en USD (sanitized)
  */
 export function convertToUsd(montoUSD: number, montoARS: number, period: string): number {
-  if (montoUSD && montoUSD > 0) {
-    return montoUSD;
+  // 🛡️ STEP 1: Normalize USD amount with anti×100 + extreme corruption detection
+  const normalizedUSD = normalizeAmount(montoUSD);
+  const normalizedARS = normalizeAmount(montoARS);
+  
+  // 🚨 STEP 2: Extreme corruption detection (Excel import can produce trillions)
+  // If USD amount is suspiciously large compared to ARS equivalent
+  if (normalizedUSD > 0 && normalizedARS > 0) {
+    const expectedUSDFromARS = arsToUsd(normalizedARS, period);
+    const ratio = normalizedUSD / expectedUSDFromARS;
+    
+    // If USD is >1000x larger than ARS conversion, it's likely corrupted
+    if (ratio > 1000) {
+      console.log(`🔧 EXTREME CORRUPTION DETECTED: USD ${normalizedUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
+      console.log(`   Using ARS conversion instead: ${normalizedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
+      return expectedUSDFromARS;
+    }
   }
-  if (montoARS && montoARS > 0) {
-    return arsToUsd(montoARS, period);
+  
+  // 🎯 STEP 3: Standard logic with normalized values
+  if (normalizedUSD && normalizedUSD > 0) {
+    return normalizedUSD;
+  }
+  if (normalizedARS && normalizedARS > 0) {
+    return arsToUsd(normalizedARS, period);
   }
   return 0;
 }
