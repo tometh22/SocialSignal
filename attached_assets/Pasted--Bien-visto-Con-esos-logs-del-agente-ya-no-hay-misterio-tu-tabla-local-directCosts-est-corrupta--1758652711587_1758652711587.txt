@@ -1,0 +1,156 @@
+¡Bien visto! Con esos logs del agente ya no hay misterio: tu tabla local directCosts está corrupta (monthKey = “2025-01” para todo, cliente/proyecto vacíos y montos undefined). Eso explica:
+
+Warner con 1.85× (se están sumando costos que no son de agosto o de otro proyecto).
+
+Cards con “Unknown” (cliente/proyecto llegan vacíos).
+
+Totales inconsistentes (montoUSD nulo o mal parseado).
+
+A continuación te dejo un plan quirúrgico para arreglarlo de forma global (para todos los proyectos y cualquier filtro temporal), con pasos para reparar los datos y blindar el pipeline.
+
+1) Reparar el ETL de costos desde Google Sheets → directCosts
+1.1 Mapeo correcto de columnas
+
+De la hoja “Costos directos e indirectos” toma, por fila:
+
+cliente ← columna Cliente
+
+proyecto ← columna Proyecto
+
+mesTxt ← columna Mes (puede venir como “Agosto”, “Ago”, “08 Ago”)
+
+anio ← columna Año
+
+totalUSD ← columna Total USD (si no existe: totalARS / tipoCambio)
+
+horas ← Cantidad de Horas (reemplaza coma por punto)
+
+Nota: en tus capturas, “Total USD” es la buena (columna BC); evita re-convertir si ya viene en USD.
+
+1.2 Generar monthKey robusto
+const M = {
+  'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05','junio':'06',
+  'julio':'07','agosto':'08','septiembre':'09','octubre':'10','noviembre':'11','diciembre':'12',
+  'ene':'01','feb':'02','mar':'03','abr':'04','may':'05','jun':'06','jul':'07','ago':'08','sep':'09','oct':'10','nov':'11','dic':'12'
+};
+function monthKeyFrom(mesTxt: string, anio: number) {
+  const s = mesTxt.toLowerCase().trim();
+  // casos “08 ago”, “agosto”, “ago”
+  const mm = (s.match(/\b(\d{2})\b/)?.[1]) ?? M[s.split(/\s+/)[0]]; 
+  if (!mm) throw new Error(`Mes no reconocido: ${mesTxt}`);
+  return `${anio}-${mm}`;
+}
+
+1.3 Parseo de montos/horas seguro
+function parseMoney(x: any){ 
+  if (x == null || x === '') return 0;
+  const n = Number(String(x).replace(/[^\d.-]/g,'').replace(',', '.'));
+  // Anti ×100: si huele a export mal escalada
+  return (n > 1_000_000 && n % 100 === 0) ? n/100 : n;
+}
+function parseHours(x:any){
+  if (x == null || x === '') return 0;
+  return Number(String(x).replace(',','.'));
+}
+
+1.4 Normalizar llave de agrupación
+const norm = (s:string)=> s?.toLowerCase().trim().replace(/\s+/g,' ') ?? '';
+const key  = `${norm(cliente)}|${norm(proyecto)}`;
+
+1.5 Validación antes de guardar
+
+Descarta filas si: !cliente || !proyecto || totalUSD == null || isNaN(totalUSD).
+
+Recalcula siempre monthKey desde mesTxt + año (no confíes en el guardado anterior).
+
+Guarda: { key, cliente, proyecto, monthKey, totalUSD, horas }.
+
+2) Backfill / reparación de datos
+
+Respaldá la tabla:
+
+CREATE TABLE direct_costs_backup AS SELECT * FROM direct_costs;
+
+
+Vacía la tabla (o solo filas inválidas):
+
+DELETE FROM direct_costs 
+WHERE monthKey='2025-01' AND (cliente='' OR proyecto='' OR totalUSD IS NULL);
+-- o TRUNCATE si preferís reimportar todo
+
+
+Reimportá con el ETL corregido (paso 1).
+Cada fila debe entrar con: cliente, proyecto, monthKey, totalUSD, horas.
+
+3) Blindaje en el motor de agregación (por si vuelve a fallar algo)
+
+Ignorar cualquier fila con:
+
+!cliente || !proyecto || !monthKey
+
+totalUSD <= 0 && horas <= 0
+
+No uses el monthKey guardado previamente si puedes recomputarlo del registro bruto (si hay mes/año disponibles).
+
+Reglas de negocio (por proyecto/mes):
+
+revenueUSD = Σ ingresos[key, monthKey]        // hoja "Ventas Tomi"
+costUSD    = Σ costos[key, monthKey]          // hoja "Costos directos e indirectos"
+profitUSD   = revenueUSD - costUSD
+markupRatio = costUSD > 0 ? revenueUSD / costUSD : null   // mostrar “x.xx×”
+marginPct   = revenueUSD > 0 ? profitUSD / revenueUSD : null
+efficiency  = targetH > 0 ? workedH / targetH : null
+
+
+“Activo”:
+
+Fee → siempre activo.
+
+One Shot → activo solo si revenueUSD || costUSD || workedH en ese monthKey.
+
+4) Auditoría (te dice exactamente qué entra en cada total)
+
+Implementá/ajustá los endpoints:
+
+GET /api/debug/cost-audit?month=YYYY-MM
+Devuelve, por key, el detalle de filas incluidas y sumUSD.
+
+GET /api/debug/sales-audit?month=YYYY-MM
+Lo mismo para ventas.
+
+Chequeos rápidos:
+
+Warner · Fee Marketing (2025-08)
+
+curl -s "http://localhost:5000/api/debug/cost-audit?month=2025-08" \
+ | jq '.[] | select(.key=="warner|fee marketing") | {sumUSD, rows: (.rows|length)}'
+# => sumUSD debe ser 7005.2
+
+
+Golden test end-to-end
+
+curl -s "http://localhost:5000/api/projects/active?timeFilter=last_month&onlyActiveInPeriod=true" \
+ | jq '.projects[] | select(.key=="warner|fee marketing") | {revenueUSD, costUSD, markupRatio, marginPct, efficiencyPct}'
+# => 29230, 7005.2, 4.17..., ~0.76, ~66.8
+
+5) Qué debería quedar (valores “golden”)
+
+Warner · Fee Marketing (ago-2025)
+Revenue $29,230 · Cost $7,005.20 · Profit $22,224.80
+Markup 4.17× · Margin ~76.0% · Efficiency ~66.8%
+
+Kimberly · Fee Huggies (ago-2025)
+Revenue $8,450 · Cost $2,436.09 · Profit $6,013.91
+Markup 3.47× · Margin 71.2% · Efficiency 90.1%
+
+Resumen ultra-concreto
+
+Arreglá el import: mes/año → monthKey, columnas correctas, parseo seguro, llave cliente|proyecto.
+
+Reimportá directCosts (o corregí filas inválidas) y descartá registros sin datos clave.
+
+Blindaba el motor: ignora filas inválidas, no reconvertir USD, anti ×100.
+
+Auditá con los endpoints nuevos; validá los “golden values”.
+
+Con esto, la página de proyectos activos y todas las pestañas van a sumar exactamente lo mismo que el Excel, para cualquier proyecto y filtro temporal.

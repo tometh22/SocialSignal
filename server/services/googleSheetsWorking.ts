@@ -658,12 +658,24 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Convertir mes en español a número
+   * Convertir mes en español a número - FIXED: maneja formato "08 ago"
    */
   private parseMonthFromSpanish(mesSpanish: string): number {
     if (!mesSpanish) return 1;
     
     const mes = mesSpanish.toLowerCase().trim();
+    
+    // ARREGLO CRÍTICO: Manjar formato "08 ago", "05 may" desde Excel MAESTRO
+    const numberMatch = mes.match(/\b(\d{1,2})\b/);
+    if (numberMatch) {
+      const monthNum = parseInt(numberMatch[1]);
+      if (monthNum >= 1 && monthNum <= 12) {
+        console.log(`🗓️ PARSED MONTH: "${mesSpanish}" → ${monthNum}`);
+        return monthNum;
+      }
+    }
+    
+    // Fallback: diccionario tradicional
     const meses: Record<string, number> = {
       'enero': 1, 'ene': 1, '01': 1, '1': 1,
       'febrero': 2, 'feb': 2, '02': 2, '2': 2,
@@ -679,7 +691,16 @@ class GoogleSheetsWorkingService {
       'diciembre': 12, 'dic': 12, '12': 12
     };
     
-    return meses[mes] || 1;
+    // Buscar coincidencias de palabra completa o parcial
+    for (const [key, value] of Object.entries(meses)) {
+      if (mes.includes(key)) {
+        console.log(`🗓️ FALLBACK MONTH: "${mesSpanish}" → ${value} (matched "${key}")`);
+        return value;
+      }
+    }
+    
+    console.warn(`⚠️ MONTH PARSE FAILED: "${mesSpanish}" → defaulting to 1`);
+    return 1;
   }
 
   /**
