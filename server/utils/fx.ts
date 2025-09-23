@@ -76,7 +76,14 @@ export function convertToUsd(montoUSD: number, montoARS: number, period: string)
       return expectedUSDFromARS;
     }
     
-    // 🎯 SMART DETECTION (1000-1M): Check if USD is reasonable business value
+    // 🎯 SMART DETECTION (1000-1M): Ratios > 1250x always use ARS conversion
+    if (ratio > 1250) {
+      console.log(`🔧 HIGH CORRUPTION DETECTED: USD ${finalUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
+      console.log(`   Using ARS conversion instead: ${parsedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
+      return expectedUSDFromARS;
+    }
+    
+    // 🎯 MODERATE SMART DETECTION (1000-1250x): Check if USD is reasonable business value
     if (ratio > 1000) {
       // If USD amount is in reasonable business range (100-20000), trust it
       if (finalUSD >= 100 && finalUSD <= 20000) {

@@ -188,12 +188,10 @@ export class ActiveProjectsAggregator {
       // PERO aplicar fallback anti-×100 para datos legacy no normalizados
       let revenueUSD = parseFloat(sale.amountUsd || '0') || 0;
       
-      // 🔧 FALLBACK ANTI-×100: Para datos legacy (Warner Fee Marketing específicamente)
+      // 🔧 FALLBACK ANTI-×100: Para CUALQUIER dato legacy inflado ×100
       const isLegacyInflatedData = (
         revenueUSD >= 100_000 && 
-        revenueUSD % 100 === 0 &&
-        (sale.clientName || '').toLowerCase().includes('warner') &&
-        (sale.projectName || '').toLowerCase().includes('fee marketing')
+        revenueUSD % 100 === 0
       );
       
       if (isLegacyInflatedData) {
