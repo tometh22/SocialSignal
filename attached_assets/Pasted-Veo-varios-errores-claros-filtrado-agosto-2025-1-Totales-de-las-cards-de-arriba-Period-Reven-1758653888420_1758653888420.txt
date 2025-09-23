@@ -1,0 +1,144 @@
+Veo varios errores claros (filtrado = agosto 2025):
+
+1) Totales de las cards de arriba
+
+Period Revenue ($45.39K) ≈ correcto (29.23K Warner + 8.45K Huggies + 7.71K Modo).
+
+Period Profit (-$36,011.54T) imposible → viene de costos absurdos en varias cards.
+
+Period Hours (15.72k h) imposible para un mes → el filtro de mes no está afectando horas (estás sumando todo el histórico).
+
+2) Cards por proyecto
+
+Warner · Fee Marketing (debería)
+
+Revenue: $29,230 ✅
+
+Cost REAL: $7,005.20 (Excel “Costos directos e indirectos”, Total USD)
+
+Profit: $22,224.80
+
+Markup: ≈ 4.17× (29,230 / 7,005.2)
+
+Margin: ≈ 76.1% (profit / revenue)
+
+Horas: 666.7 h / 989 h → 66.8% eficiencia
+
+Lo que muestra la UI:
+
+Cost $6.05K, Profit $23.18K, Markup 4.83×, Margin 79.3%, 84.2% eficiencia, progreso 552.5h / 656.0h.
+👉 Estás subestimando costo, inflando profit/markup/margin y tomando horas objetivo/real de otras fuentes (o sin filtrar).
+
+Kimberly · Fee Huggies (debería)
+
+Revenue $8,450 ✅
+
+Cost REAL $2,436.09
+
+Profit $6,013.91
+
+Markup ≈ 3.47×
+
+Margin ≈ 71.2%
+
+Horas 288.3 h / 320 h → 90.1% eficiencia
+
+Lo que muestra la UI:
+
+Profits/costos en “T” (trillions), markup 0.00×, margin negativo absurdo, 10,320 h trabajadas.
+👉 El filtro de agosto no se aplica a costos ni horas para este proyecto y, además, hay parseo de moneda roto (o multiplicación accidental masiva).
+
+Qué está mal (en la capa de datos)
+
+Filtrado temporal inconsistente
+
+Ventas sí filtra agosto; costos y horas no (o solo a veces).
+
+Señal: period hours 15.72k, Huggies con 10,320h/320h.
+
+Normalización de números (costos)
+
+Al menos en Huggies/Modo el USD se está parseando mal → aparecen números gigantes (formateados en “T”).
+
+Debe leerse “8.450,00” / “2,436.09” sin multiplicaciones ni separadores locales.
+
+Keys de join proyecto/cliente
+
+Varias cards dicen “Unknown” → el join a catálogos/quotations falla o llega vacío; eso rompe mapeos y agregaciones.
+
+Bases de horas y objetivos
+
+Horas objetivo y trabajadas no salen del mismo origen ni pasan por el mismo filtro; por eso Warner muestra 656/552.5 en vez de 989/660.2.
+
+Arreglo mínimo, global y seguro (paso a paso)
+
+Unificar el filtro temporal
+
+Usa una sola función (p.ej. resolvePeriod(range) → {start,end,monthKey})
+
+Aplica esa misma función a ventas + costos + horas antes de agrupar.
+
+Normalizador de moneda robusto
+
+Una única función para todo:
+
+const toUSD = (raw: string|number|null) => {
+  if (raw == null) return 0;
+  const s = String(raw).replace(/\s/g,'')
+    .replace(/[.$]/g,'')       // quita miles tipo “1.234.567”
+    .replace(',', '.');        // coma decimal → punto
+  const n = Number(s.replace(/[^\d.-]/g,''));
+  return Number.isFinite(n) ? n : 0;
+};
+
+
+Úsala siempre para Monto_USD (ventas) y Total USD (costos).
+
+Una sola capa de agregación por proyecto
+
+Para cada proyecto y mes:
+
+revenue = Σ ventas normalizadas (filtro agosto)
+
+cost = Σ costos normalizados (filtro agosto)
+
+workedHours = Σ “Cantidad de Horas” de la hoja de costos (filtro agosto)
+
+targetHours = K/estimadas desde tu BD/quotation (mismo período o base vigente)
+
+profit = revenue − cost
+
+markup = cost>0 ? revenue/cost : null
+
+margin = revenue>0 ? profit/revenue : null
+
+Una función: computeProjectMetrics(projectId, period)
+
+Join estable proyecto/cliente
+
+Normaliza claves antes de agrupar:
+
+const key = (c,p) => `${c}`.trim().toLowerCase()+'|'+`${p}`.trim().toLowerCase();
+
+
+Aplica el mismo key() en ventas, costos y catálogo de proyectos.
+
+Guard-rails (evitar basura)
+
+Si costUSD > 10 * revenueUSD y revenueUSD>0 ⇒ flag suspectCosts=true (no formatees con “compact notation” para evitar “T”).
+
+Si workedHours > 5 * targetHours ⇒ revisa filtro de horas.
+
+Si falta client/proyecto ⇒ márcalo y exclúyelo del resumen hasta normalizar.
+
+Top cards (resumen)
+
+Suma solo proyectos visibles (tras filtros) y valores del período:
+
+Revenue = Σ revenue
+
+Profit = Σ profit
+
+Period Hours = Σ workedHours
+
+Active Projects = conteo de (recurrente) o (tiene ventas/costos/horas en el período)
