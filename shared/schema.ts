@@ -2049,3 +2049,84 @@ export const activeProjectsQuerySchema = z.object({
 });
 
 export type ActiveProjectsQuery = z.infer<typeof activeProjectsQuerySchema>;
+
+// ==================== ETL NORMALIZED TABLES ====================
+
+// Tabla normalizada de ventas
+export const salesNorm = pgTable("sales_norm", {
+  id: serial("id").primaryKey(),
+  projectKey: varchar("project_key", { length: 100 }).notNull(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
+  usd: numeric("usd", { precision: 12, scale: 2 }).notNull(),
+  sourceRowId: varchar("source_row_id", { length: 255 }).notNull(),
+  anomaly: varchar("anomaly", { length: 50 }), // 'x100_fixed', 'x10000_fixed', etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Unique constraint to make it idempotent
+  uniqueSource: unique().on(table.sourceRowId),
+  // Index for fast queries
+  projectMonthIdx: unique().on(table.projectKey, table.monthKey, table.sourceRowId)
+}));
+
+// Tabla normalizada de costos
+export const costsNorm = pgTable("costs_norm", {
+  id: serial("id").primaryKey(),
+  projectKey: varchar("project_key", { length: 100 }).notNull(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
+  usd: numeric("usd", { precision: 12, scale: 2 }).notNull(),
+  hoursWorked: numeric("hours_worked", { precision: 8, scale: 2 }),
+  sourceRowId: varchar("source_row_id", { length: 255 }).notNull(),
+  anomaly: varchar("anomaly", { length: 50 }), // 'x100_fixed', 'x10000_fixed', etc.
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Unique constraint to make it idempotent
+  uniqueSource: unique().on(table.sourceRowId),
+  // Index for fast queries
+  projectMonthIdx: unique().on(table.projectKey, table.monthKey, table.sourceRowId)
+}));
+
+// Tabla normalizada de objetivos (targets)
+export const targetsNorm = pgTable("targets_norm", {
+  id: serial("id").primaryKey(),
+  projectKey: varchar("project_key", { length: 100 }).notNull(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
+  targetHours: numeric("target_hours", { precision: 8, scale: 2 }).notNull(),
+  rateUSD: numeric("rate_usd", { precision: 10, scale: 2 }), // optional
+  sourceRowId: varchar("source_row_id", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Unique constraint to make it idempotent
+  uniqueSource: unique().on(table.sourceRowId),
+  // Index for fast queries
+  projectMonthIdx: unique().on(table.projectKey, table.monthKey, table.sourceRowId)
+}));
+
+// Insert schemas
+export const insertSalesNormSchema = createInsertSchema(salesNorm).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCostsNormSchema = createInsertSchema(costsNorm).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTargetsNormSchema = createInsertSchema(targetsNorm).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type SalesNorm = typeof salesNorm.$inferSelect;
+export type InsertSalesNorm = z.infer<typeof insertSalesNormSchema>;
+export type CostsNorm = typeof costsNorm.$inferSelect;
+export type InsertCostsNorm = z.infer<typeof insertCostsNormSchema>;
+export type TargetsNorm = typeof targetsNorm.$inferSelect;
+export type InsertTargetsNorm = z.infer<typeof insertTargetsNormSchema>;

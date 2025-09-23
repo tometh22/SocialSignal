@@ -10444,6 +10444,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   console.log("🚀 UNIVERSAL SYSTEM ENDPOINTS IMPLEMENTED - All endpoints now follow universal architecture with single data sources");
 
+  // 🔄 ETL ENDPOINTS - Idempotent data normalization
+  app.post("/api/etl/run", requireAuth, async (req, res) => {
+    try {
+      console.log('🚀 ETL API: Starting manual ETL process...');
+      
+      // Import ETL service and Google Sheets service
+      const { ETLService } = await import('./services/etl-service');
+      const googleSheetsServiceWorking = await import('./services/googleSheetsWorking');
+      
+      // Initialize ETL service
+      const etlService = new ETLService(db);
+      
+      // Run full ETL pipeline
+      const result = await etlService.runFullETL(googleSheetsServiceWorking.default);
+      
+      res.json({
+        success: result.success,
+        summary: {
+          ventas: { processed: result.ventas.processed, errors: result.ventas.errors.length },
+          costos: { processed: result.costos.processed, errors: result.costos.errors.length },
+          targets: { processed: result.targets.processed, errors: result.targets.errors.length }
+        },
+        details: result,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ ETL API Error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  app.get("/api/etl/status", requireAuth, async (req, res) => {
+    try {
+      // Get counts from normalized tables
+      const { salesNorm, costsNorm, targetsNorm } = await import('../shared/schema');
+      const { sql } = await import('drizzle-orm');
+      
+      const salesCount = await db.select({ count: sql`count(*)` }).from(salesNorm);
+      const costsCount = await db.select({ count: sql`count(*)` }).from(costsNorm);
+      const targetsCount = await db.select({ count: sql`count(*)` }).from(targetsNorm);
+      
+      res.json({
+        normalized_data: {
+          sales_records: salesCount[0]?.count || 0,
+          costs_records: costsCount[0]?.count || 0,
+          targets_records: targetsCount[0]?.count || 0
+        },
+        last_update: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ ETL Status Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Test endpoint for date parser
+  app.get("/api/etl/test-date-parser", requireAuth, async (req, res) => {
+    try {
+      const { testDateParser } = await import('./utils/date-parser');
+      
+      // Capture console output for test results
+      const originalLog = console.log;
+      const testResults: string[] = [];
+      console.log = (message: string) => {
+        testResults.push(message);
+        originalLog(message);
+      };
+      
+      testDateParser();
+      
+      // Restore console.log
+      console.log = originalLog;
+      
+      res.json({
+        test_results: testResults,
+        status: 'completed'
+      });
+      
+    } catch (error) {
+      console.error('❌ Date Parser Test Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {
