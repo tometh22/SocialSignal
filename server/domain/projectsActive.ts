@@ -328,6 +328,15 @@ export class ActiveProjectsAggregator {
       const montoARS = normalizeAmount(cost.costoTotal || 0); // costoTotal is the local cost amount
       
       const costUSD = convertToUsd(montoUSD, montoARS, costPeriod);
+      
+      // 🔍 DEBUG: Log cost values for Warner and Kimberly
+      if (cost.proyecto?.includes('Fee Marketing') || cost.proyecto?.includes('Fee Huggies')) {
+        console.log(`🔍 COST DEBUG: ${cost.cliente || 'N/A'} · ${cost.proyecto}`);
+        console.log(`   Raw montoTotalUSD: ${cost.montoTotalUSD} (type: ${typeof cost.montoTotalUSD})`);
+        console.log(`   Raw costoTotal: ${cost.costoTotal} (type: ${typeof cost.costoTotal})`);
+        console.log(`   Normalized montoUSD: ${montoUSD}, montoARS: ${montoARS}`);
+        console.log(`   Final costUSD: ${costUSD}, Hours: ${cost.horasRealesAsana}`);
+      }
       const hoursReal = normalizeAmount(cost.horasRealesAsana || 0);
       const hoursTarget = normalizeAmount(cost.horasObjetivo || 0);
 
