@@ -23,7 +23,7 @@ import {
 import { resolvePeriod } from "@shared/utils/timePeriod";
 
 import { parseMoneySmart, normalizeAmount } from "../utils/money";
-import { projectKey } from "../utils/normalize";
+import { canon, generateProjectKey, generateCanonicalFields } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
 import { db } from "../db";
@@ -45,6 +45,8 @@ export function resolveTimeFilter(timeFilter: TimeFilter): ResolvedPeriod {
 // ==================== CORE DATA STRUCTURES ====================
 
 interface SalesRecord {
+  clientCanon: string;
+  projectCanon: string;
   projectKey: string;
   projectName: string;
   clientId: number;
@@ -56,6 +58,8 @@ interface SalesRecord {
 }
 
 interface CostRecord {
+  clientCanon: string;
+  projectCanon: string;
   projectKey: string;
   projectName: string;
   costUSD: number;
@@ -191,8 +195,13 @@ export class ActiveProjectsAggregator {
       const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
       if (revenueUSD <= 0 || !isConfirmed) continue;
 
+      // Generate canonical fields for ETL consistency
+      const canonicalFields = generateCanonicalFields(sale.clientName, sale.projectName);
+      
       filteredSales.push({
-        projectKey: projectKey(sale.projectName || ''),
+        clientCanon: canonicalFields.clientCanon,
+        projectCanon: canonicalFields.projectCanon,
+        projectKey: canonicalFields.projectKey,
         projectName: sale.projectName || '',
         clientId: sale.clientId || 0,
         clientName: sale.clientName || '',
@@ -245,8 +254,9 @@ export class ActiveProjectsAggregator {
 
       if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
 
-      // Create aggregation key: exact project name
-      const aggregationKey = projectKey(cost.proyecto || '');
+      // Create canonical aggregation key: cliente|proyecto 
+      const canonicalFields = generateCanonicalFields(cost.cliente, cost.proyecto);
+      const aggregationKey = canonicalFields.projectKey;
       if (!aggregationKey) continue;
 
       // GOLDEN TEST COMPATIBILITY: Apply specific filters for Warner Fee Marketing
@@ -277,15 +287,21 @@ export class ActiveProjectsAggregator {
 
     // Convert aggregated costs back to filteredCosts format
     for (const [key, aggregated] of costAggregator.entries()) {
+      // Parse canonical key to extract client and project parts
+      const keyParts = key.split('|');
+      const clientCanon = keyParts[0] || '';
+      const projectCanon = keyParts[1] || '';
+      
       filteredCosts.push({
+        clientCanon,
+        projectCanon,
         projectKey: key,
-        projectName: key.replace(/[^\w\s]/g, '').trim(), // Clean project name
+        projectName: projectCanon, // Use canonical project name
         costUSD: aggregated.costUSD,
         hoursReal: aggregated.hoursReal,
         hoursTarget: aggregated.hoursTarget,
         month: period.start.substring(5, 7), // Extract month from period
         year: parseInt(period.start.substring(0, 4)), // Extract year from period
-        // aggregatedRecords: aggregated.count // Removed: not in CostRecord type
       });
     }
 
@@ -312,19 +328,19 @@ export class ActiveProjectsAggregator {
       
       // Use quotation.projectName as the actual project name (not project.name which is NULL)
       const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-      // Get client name from quotation - simple approach
-      const clientName = project.quotation?.clientName || 'Unknown';
+      // Get client name from quotation - no "Unknown" fallbacks, use canonical fields
+      const clientName = project.quotation?.clientName || '';
       
-      // Build canonical key: cliente|proyecto normalized (blueprint)
-      const canonicalKey = this.buildCanonicalKey(clientName, actualProjectName);
-      projectIdToCanonicalKey.set(project.id, canonicalKey);
+      // Generate canonical fields for ETL consistency
+      const canonicalFields = generateCanonicalFields(clientName, actualProjectName);
+      projectIdToCanonicalKey.set(project.id, canonicalFields.projectKey);
       
-      projectsMap.set(canonicalKey, {
+      projectsMap.set(canonicalFields.projectKey, {
         projectId: project.id,
         clientId: project.clientId || 0,
         projectName: actualProjectName,
         clientName: clientName,
-        projectKey: projectKey(actualProjectName),
+        projectKey: canonicalFields.projectKey,
         sales: [],
         costs: [],
         quotation: project.quotation // Include quotation for project type mapping
@@ -334,7 +350,7 @@ export class ActiveProjectsAggregator {
     // Map sales data: canonical key first, alias fallback (hybrid approach)
     console.log(`💰 Mapping ${salesData.length} sales records with hybrid approach...`);
     for (const sale of salesData) {
-      const canonicalKey = this.buildCanonicalKey(sale.clientName, sale.projectName);
+      const canonicalKey = generateProjectKey(sale.clientName, sale.projectName);
       let projectData = projectsMap.get(canonicalKey);
       let mappingMethod = "exact";
       
@@ -450,13 +466,13 @@ export class ActiveProjectsAggregator {
         return projectId;
       }
       
-      // 2. FALLBACK: Fuzzy matching with projectKey normalization
-      const targetKey = projectKey(projectName);
+      // 2. FALLBACK: Fuzzy matching with canonical normalization
+      const targetKey = canon(projectName);
       
       // Try exact fuzzy match
       for (const project of catalogProjects) {
         const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-        const catalogKey = projectKey(actualProjectName);
+        const catalogKey = canon(actualProjectName);
         if (catalogKey === targetKey) {
           console.log(`✅ FUZZY EXACT: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
           
@@ -469,7 +485,7 @@ export class ActiveProjectsAggregator {
       // Try partial fuzzy match
       for (const project of catalogProjects) {
         const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-        const catalogKey = projectKey(actualProjectName);
+        const catalogKey = canon(actualProjectName);
         if (catalogKey.includes(targetKey) || targetKey.includes(catalogKey)) {
           console.log(`🔍 FUZZY PARTIAL: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
           
