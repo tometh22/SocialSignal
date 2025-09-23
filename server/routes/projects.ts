@@ -163,6 +163,83 @@ router.post('/etl', async (req, res) => {
 });
 
 /**
+ * 🔄 POST /api/projects/etl-lineas-generales - Procesar datos en formato líneas generales
+ * Acepta datos en formato universal con reglas de preferencia ARS/USD
+ */
+router.post('/etl-lineas-generales', async (req, res) => {
+  try {
+    console.log('🔄 Líneas Generales ETL process initiated...');
+    
+    // Validar que se envíen datos
+    const { data, sourceType, autoDetect } = req.body;
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'Se requiere un array de datos en el campo "data"'
+      });
+    }
+    
+    // Auto-detección de formato si está habilitada
+    let detectionResult = null;
+    if (autoDetect === true) {
+      console.log('🔍 AUTO-DETECTION enabled, analyzing format...');
+      const { detectFormat } = await import('../utils/format-detector');
+      detectionResult = detectFormat(data);
+      console.log(`🔍 FORMAT DETECTED: ${detectionResult.format} (confidence: ${detectionResult.confidence})`);
+      
+      // Si no es formato líneas generales, sugerir el ETL apropiado
+      if (detectionResult.format !== 'lineas_generales' && detectionResult.confidence > 0.6) {
+        return res.status(200).json({
+          success: false,
+          detected: {
+            format: detectionResult.format,
+            confidence: detectionResult.confidence,
+            reasons: detectionResult.reasons
+          },
+          suggestion: `Data appears to be in '${detectionResult.format}' format. Consider using the appropriate ETL endpoint.`,
+          recommendedAction: detectionResult.format === 'ventas_tomi' ? 'Use POST /api/projects/etl instead' : 'Use a different ETL processor'
+        });
+      }
+    }
+    
+    // Validar sourceType opcional
+    const validSourceTypes = ['sales', 'costs', 'auto'];
+    const finalSourceType = validSourceTypes.includes(sourceType) ? sourceType : 'auto';
+    
+    console.log(`📊 Processing ${data.length} records as sourceType: ${finalSourceType}`);
+    
+    // Import y ejecutar el ETL de líneas generales
+    const { processLineasGenerales } = await import('../etl/lineas-generales-etl');
+    const result = await processLineasGenerales(data, finalSourceType);
+    
+    const response = {
+      success: true,
+      results: {
+        processed: result.processed,
+        normalized: result.normalized,
+        ventasInserted: result.ventasInserted,
+        costosInserted: result.costosInserted,
+        errors: result.errors,
+        anomalies: result.anomalies
+      },
+      sourceType: finalSourceType,
+      timestamp: new Date().toISOString(),
+      message: `Procesados ${result.processed} registros: ${result.ventasInserted} ventas, ${result.costosInserted} costos`
+    };
+    
+    console.log('✅ Líneas Generales ETL completed:', response.results);
+    res.json(response);
+    
+  } catch (error) {
+    console.error('❌ Error in Líneas Generales ETL endpoint:', error);
+    res.status(500).json({
+      error: 'Líneas Generales ETL process failed',
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+/**
  * 📊 GET /api/projects/summary - Solo resumen del portfolio
  */
 router.get('/summary', async (req, res) => {

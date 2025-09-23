@@ -187,7 +187,7 @@ async function normalizeSalesRecordNEW(record: any) {
   const result = {
     projectKey,
     monthKey,
-    usd: parseFloat(usd.toFixed(2)),
+    usd: usd.toFixed(2), // Convert to string for numeric DB field
     sourceRowId: record.id?.toString() || 'unknown',
     anomaly
   };
