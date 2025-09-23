@@ -1,0 +1,123 @@
+bajo tenés el plan “end-to-end” con qué leer, cómo calcular y qué validar para que no vuelva a romperse (incluye el bug del ×100 que viste en Warner).
+1) Fuente de verdad & mapeos (global)
+Ingresos → hoja “Ventas Tomi”
+Campos mínimos (case/espacios normalizados al cargar):
+cliente, proyecto, mes, año, tipo_venta (Fee / One Shot)
+monto_usd (si está vacío: usar monto_ars / tipo_cambio del mes)
+confirmado (SI/NO) → filtrar SI (o configurable)
+Costos/horas → hoja “Costos directos e indirectos”
+Campos mínimos:
+cliente, proyecto, mes, año
+total_usd (si vacío: total_ars / tipo_cambio del mes)
+horas_reales (Cantidad de horas), horas_objetivo (si existe)
+Key de emparejamiento cross-hojas
+Siempre construir una join key consistente:
+const key = (cliente + '|' + proyecto).trim().toLowerCase().normalize('NFKD');
+2) Lectura robusta desde Sheets
+Preferencia: pedir valores numéricos a la API:
+valueRenderOption: 'UNFORMATTED_VALUE'
+dateTimeRenderOption: 'FORMATTED_STRING'
+Fallback parser (si quedara algo como string):
+function parseMoney(input: unknown): number | null {
+  if (typeof input === 'number') return input;
+  if (typeof input !== 'string') return null;
+
+  // quitar currency & espacios
+  let s = input.replace(/[^\d.,-]/g, '').trim();
+
+  // decidir decimal (último separador) y remover el resto (miles)
+  const lastComma = s.lastIndexOf(',');
+  const lastDot   = s.lastIndexOf('.');
+  const dec = Math.max(lastComma, lastDot);
+  if (dec !== -1) {
+    const decimal = s[dec];                    // ',' o '.'
+    s = s.replace(/[.,]/g, '');                // quito todos
+    s = s.slice(0, dec) + '.' + s.slice(dec);  // re-inserto punto decimal
+  }
+  const n = Number(s);
+  if (!isFinite(n)) return null;
+
+  // 🛡️ anti ×100: si n>1e6 y existe una versión n/100 coherente, elegir la razonable
+  if (n > 1_000_000) {
+    const n2 = n / 100;
+    // heurísticas: n2 ∈ (1..500_000) y se parece a medianas de ese cliente/proyecto
+    return n2;
+  }
+  return n;
+}
+Esto corrige automáticamente Warner (2,923,000 → 29,230).
+3) Normalización temporal (unificada)
+type TimeFilter = 'this_month'|'last_month'|'q1_2025'|'august_2025'|{start:ISO,end:ISO};
+
+function resolveTimeFilter(tf: TimeFilter): {start: Date; end: Date} {
+  // … implementar monthKey = YYYY-MM para filtrar (mes/año) en ambas hojas
+}
+const monthKey = `${año}-${String(mesNum).padStart(2,'0')}`;
+4) Agregador por proyecto (un solo motor)
+Para cada key cliente|proyecto y el monthKey del filtro:
+RevenueUSD
+Sumar monto_usd (o monto_ars/tipo_cambio) de “Ventas Tomi” confirmadas.
+CostUSD & Horas
+Sumar total_usd (o total_ars/tipo_cambio) y horas_reales.
+horas_objetivo = suma o K del mes si lo tenés; si no, omití el objetivo y no muestres eficiencia.
+KPIs consistentes
+profitUSD   = revenueUSD - costUSD
+markupRatio = (costUSD > 0)    ? revenueUSD / costUSD     : null   // mostrar “x.xx×”
+marginPct   = (revenueUSD > 0) ? profitUSD / revenueUSD   : null   // mostrar “xx%”
+efficiency  = (targetHours>0)  ? workedHours/targetHours  : null   // “xx%”
+Estado activo
+tipo_venta === 'Fee' → Activo siempre (mostrar aun si no hay movimiento ese mes).
+tipo_venta === 'One Shot' → Activo sólo si (Revenue>0 || Cost>0 || Worked>0) en el periodo.
+5) Agregadores de portfolio (cards superiores)
+Con los proyectos visibles (según filtros y “Active only”):
+Period Revenue = Σ revenueUSD
+Period Profit = Σ profitUSD
+Period Hours = Σ workedHours
+Active Projects = count(proyectos visibles)
+No dupliques proyectos (depende del join key); si hay varias filas del mismo proyecto en el mes, se suman.
+6) Formato y UX (claridad)
+Dinero: Intl.NumberFormat('en-US',{style:'currency',currency:'USD'})
+Compacto (cards): notation:'compact' (ej. $2.92M)
+Markup: “x.xx×” (no %)
+Margin/Efficiency: “xx%”
+Horas: >=1000 → “1.27k h”, si no “1273.4h”
+Card de proyecto (orden): Revenue, Profit, Cost, Markup×, Margin%, Efficiency%
+Barra de progreso: worked / target si hay objetivo
+7) Guardas de sanidad (para cualquier proyecto)
+anti×100 (ya incluido en el parser)
+Si markupRatio > 20× y revenueUSD>50k → warn('markup outlier')
+Si abs((sumTotalUSD)-costUSD) / max(1,sumTotalUSD) > 0.25 → warn('cost mismatch')
+Loggear monthKey, key, sourceRowIds para poder auditar rápido
+8) Cache & invalidación
+Cache por (monthKey) en memoria o Redis 5–15 min.
+Invalidar al cambiar el filtro temporal, o al tocar el botón “Refresh”.
+9) Pruebas de aceptación (smoke global)
+Golden checks (agosto 2025):
+Warner · Fee Marketing
+Rev $29,230 · Cost $7,005.20 · Profit $22,224.80
+Markup 4.17×, Margin 76.0%, Eficiencia 66.8% (666.7h/989.0h)
+Kimberly · Fee Huggies
+Rev $8,450 · Cost $2,436.09 · Profit $6,013.91
+Markup 3.47×, Margin 71.2%, Eficiencia 90.1% (288.3h/320.0h)
+Multi-proyecto: para el monthKey del filtro, verificar:
+Σ project.revenue = Period Revenue
+Σ project.profit = Period Profit
+Σ project.hours = Period Hours
+“Active only” → Fee siempre, One-Shot sólo si hubo actividad.
+10) Qué cambiar puntualmente (checklist de implementación)
+Sheets client
+valueRenderOption: 'UNFORMATTED_VALUE'
+Normalizar encabezados y espacios
+Parser de moneda
+Reemplazar cualquier parseFloat/regex anterior por parseMoney() (arriba)
+Motor único
+Agregar funciones aggregateSalesByProjectMonth, aggregateCostsByProjectMonth
+Calcular KPIs con las fórmulas de la sección 4
+Estado activo
+Implementar regla Fee vs One-Shot (sección 4)
+UI
+Formateadores (dinero compacto, horas, markup×, margin%)
+Top cards = sumatorias de los proyectos visibles
+Card de proyecto con orden y barra de progreso
+Logs/guardas
+Añadir warnings de outliers y mismatch

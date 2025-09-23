@@ -33,32 +33,32 @@ export function parseMoneySmart(raw: unknown): number {
 }
 
 /**
- * 🛡️ SEGURO DE VIDA ANTI ×100
- * Si alguna ruta legacy produjo el número inflado, lo corregimos sin tocar datos
- * Detecta casos específicos de Warner Fee Marketing y otros valores inflados
+ * 🛡️ PARSER ROBUSTO CON ANTI ×100 (blueprint end-to-end)
+ * Maneja números puros de UNFORMATTED_VALUE y strings legacy con separadores
  */
 export function normalizeAmount(raw: unknown): number {
-  const smart = parseMoneySmart(raw); 
+  let n: number;
   
-  // 🎯 CORRECCIONES ESPECÍFICAS Warner Fee Marketing (×100 bug)
-  if (typeof raw === 'string') {
-    const str = raw.trim();
-    // Detectar valores específicos problemáticos de Warner
-    if (str === '2923000.00' || str === '2923000') return 29230.00;
-    if (str === '1345000.00' || str === '1345000') return 13450.00;
-    if (str === '1475000.00' || str === '1475000') return 14750.00;
+  // 1. Si ya es número (UNFORMATTED_VALUE), usarlo directamente
+  if (typeof raw === 'number') {
+    n = raw;
+  } else {
+    // 2. Si es string, usar parser robusto de separadores decimales
+    n = parseMoneySmart(raw);
   }
   
-  // Fallback: detección automática de ratio ×100
-  const digitsOnly = String(raw ?? '').replace(/[^\d\-]/g, '');
-  const inflated = Number(digitsOnly);
-
-  if (Number.isFinite(inflated) && inflated > 0 && smart > 0) {
-    const ratio = inflated / smart;
-    if (ratio > 95 && ratio < 105) return smart; // estaba ×100 → devolvé el correcto
+  // 3. 🛡️ ANTI ×100: si n > 1M, evaluar n/100 cuando sea razonable
+  if (n > 1_000_000) {
+    const n2 = n / 100;
+    // Heurística: n2 debe estar en rango razonable (1..500k) 
+    // y n debe tener patrón ×100 (terminado en 00 o múltiple exacto)
+    if (n2 >= 1 && n2 <= 500_000 && (n % 100 === 0 || n % 1000 === 0)) {
+      console.log(`🔧 ANTI×100: ${n} → ${n2} (pattern detected)`);
+      return n2;
+    }
   }
   
-  return smart;
+  return n;
 }
 
 /**
