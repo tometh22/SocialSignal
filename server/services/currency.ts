@@ -174,7 +174,7 @@ export async function normalizeCostTo(targetCurrency: CurrencyCode, cost: CostRe
   const isOriginallyUSD = hasUSDValue; // Los datos del Excel MAESTRO vienen en USD
   
   if (targetCurrency === 'ARS') {
-    if (isOriginallyUSD) {
+    if (isOriginallyUSD && cost.montoTotalUSD) {
       // 🔧 CORRECCIÓN: Convertir USD a ARS
       const exchangeRate = rate || await getPeriodRate(`${cost.mes}_${cost.año}`);
       return cost.montoTotalUSD * exchangeRate.rate;
@@ -185,7 +185,7 @@ export async function normalizeCostTo(targetCurrency: CurrencyCode, cost: CostRe
   }
   
   if (targetCurrency === 'USD') {
-    if (hasUSDValue) {
+    if (hasUSDValue && cost.montoTotalUSD) {
       // Si tenemos valor USD, usarlo directamente
       return cost.montoTotalUSD;
     } else {
