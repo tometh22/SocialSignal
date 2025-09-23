@@ -10226,133 +10226,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/debug/cost-audit - Diagnóstico quirúrgico de costos por proyecto/mes
-  app.get('/api/debug/cost-audit', requireAuth, async (req, res) => {
+  // GET /api/debug/cost-data-structure - Simple data structure inspection  
+  app.get('/api/debug/cost-data-structure', requireAuth, async (req, res) => {
     try {
-      const monthParam = req.query.month as string || '2025-08';
-      console.log(`🔍 COST AUDIT: Analyzing costs for month ${monthParam}`);
+      console.log(`🔍 DATA STRUCTURE INSPECTION: Examining direct costs`);
       
       // Get all direct costs
       const allCosts = await storage.getDirectCosts();
-      console.log(`📊 AUDIT: Retrieved ${allCosts.length} total cost records`);
+      console.log(`📊 STRUCTURE: Retrieved ${allCosts.length} total cost records`);
       
-      // DEBUG: Sample cost records to understand data structure
-      const sampleCosts = allCosts.slice(0, 5);
+      // Show first 10 records with ALL field names and values
+      const sampleCosts = allCosts.slice(0, 10);
       sampleCosts.forEach((cost, idx) => {
-        console.log(`📊 COST SAMPLE ${idx + 1}: monthKey="${cost.monthKey}", mes="${cost.mes}", año=${cost.año}, cliente="${cost.cliente}", proyecto="${cost.proyecto}"`);
+        console.log(`📊 COST RECORD ${idx + 1}:`);
+        console.log(`   ID: ${cost.id}`);
+        console.log(`   monthKey: "${cost.monthKey}"`);
+        console.log(`   mes: "${cost.mes}"`);
+        console.log(`   año: ${cost.año}`);
+        console.log(`   cliente: "${cost.cliente}"`);
+        console.log(`   proyecto: "${cost.proyecto}"`);
+        console.log(`   montoUSD: ${cost.montoUSD}`);
+        console.log(`   montoARS: ${cost.montoARS}`);
+        console.log(`   ---`);
       });
       
-      // Filter by monthKey (exact match) - using Spanish field names from schema
-      const monthCosts = allCosts.filter(cost => {
-        // Try direct monthKey first
-        if (cost.monthKey === monthParam) {
-          return true;
-        }
-        
-        // Fallback: construct from mes/año fields
-        const mes = cost.mes; // Spanish: "mes" instead of "month"
-        const año = cost.año; // Spanish: "año" instead of "year"
-        
-        if (!mes || !año) return false;
-        
-        // Convert month name to number if needed
-        const monthNum = typeof mes === 'string' && isNaN(Number(mes)) 
-          ? getMonthNumber(mes) 
-          : parseInt(mes.toString());
-        
-        if (!monthNum || monthNum < 1 || monthNum > 12) return false;
-        
-        const costMonthKey = `${año}-${monthNum.toString().padStart(2, '0')}`;
-        return costMonthKey === monthParam;
-      });
+      // Get unique monthKeys
+      const uniqueMonthKeys = [...new Set(allCosts.map(cost => cost.monthKey).filter(Boolean))];
+      console.log(`📊 STRUCTURE: Unique monthKeys found: ${uniqueMonthKeys.join(', ')}`);
       
-      // Helper function to convert month names to numbers
-      function getMonthNumber(monthName: string): number {
-        const months = {
-          'enero': 1, 'jan': 1, 'january': 1,
-          'febrero': 2, 'feb': 2, 'february': 2,
-          'marzo': 3, 'mar': 3, 'march': 3,
-          'abril': 4, 'apr': 4, 'april': 4,
-          'mayo': 5, 'may': 5,
-          'junio': 6, 'jun': 6, 'june': 6,
-          'julio': 7, 'jul': 7, 'july': 7,
-          'agosto': 8, 'aug': 8, 'august': 8,
-          'septiembre': 9, 'sep': 9, 'september': 9,
-          'octubre': 10, 'oct': 10, 'october': 10,
-          'noviembre': 11, 'nov': 11, 'november': 11,
-          'diciembre': 12, 'dec': 12, 'december': 12
-        };
-        return months[monthName.toLowerCase()] || 0;
-      }
-      console.log(`📊 AUDIT: Filtered to ${monthCosts.length} costs for ${monthParam}`);
+      // Get unique mes/año combinations
+      const uniqueMonthYear = [...new Set(allCosts.map(cost => 
+        cost.mes && cost.año ? `${cost.mes}-${cost.año}` : 'null'
+      ))];
+      console.log(`📊 STRUCTURE: Unique mes-año combinations: ${uniqueMonthYear.slice(0, 20).join(', ')}`);
       
-      // Group by normalized project key
-      const projectAudit = new Map();
-      
-      monthCosts.forEach(cost => {
-        const cliente = cost.cliente || 'unknown';
-        const proyecto = cost.proyecto || 'unknown';
-        const key = `${cliente.toLowerCase().trim()}|${proyecto.toLowerCase().trim()}`;
-        
-        // Parse cost USD
-        const montoUSD = cost.montoUSD || 0;
-        const montoARS = cost.montoARS || 0;
-        const exchangeRate = cost.exchangeRate || 1;
-        const costUSD = montoUSD || (montoARS / exchangeRate);
-        
-        if (!projectAudit.has(key)) {
-          projectAudit.set(key, {
-            key,
-            monthKey: monthParam,
-            client: cliente,
-            project: proyecto,
-            rows: [],
-            sumUSD: 0
-          });
-        }
-        
-        const audit = projectAudit.get(key);
-        audit.rows.push({
-          srcRowId: cost.id || 'unknown',
-          proyecto,
-          cliente,
-          usd: costUSD,
-          montoUSD: cost.montoUSD,
-          montoARS: cost.montoARS,
-          exchangeRate: cost.exchangeRate,
-          mes: cost.mes, // Spanish field name
-          año: cost.año, // Spanish field name
-          monthKey: cost.monthKey
-        });
-        audit.sumUSD += costUSD;
-      });
-      
-      // Convert to array and sort
-      const auditResults = Array.from(projectAudit.values())
-        .sort((a, b) => b.sumUSD - a.sumUSD);
-      
-      // Log Warner specifically
-      const warnerAudit = auditResults.find(audit => 
-        audit.key.includes('warner') && audit.key.includes('fee marketing')
+      // Check for August 2025 specifically
+      const august2025Direct = allCosts.filter(cost => cost.monthKey === '2025-08');
+      const august2025Constructed = allCosts.filter(cost => 
+        cost.año === 2025 && (
+          cost.mes === '08' || 
+          cost.mes === '8' || 
+          cost.mes?.toLowerCase()?.includes('agosto')
+        )
       );
-      if (warnerAudit) {
-        console.log(`🎯 WARNER AUDIT: ${warnerAudit.rows.length} rows, $${warnerAudit.sumUSD.toFixed(2)} total`);
-        warnerAudit.rows.forEach(row => {
-          console.log(`   - ${row.cliente} | ${row.proyecto} | $${row.usd} USD`);
-        });
-      }
+      
+      console.log(`🎯 AUGUST 2025: Direct monthKey match: ${august2025Direct.length} records`);
+      console.log(`🎯 AUGUST 2025: Constructed match: ${august2025Constructed.length} records`);
       
       res.json({
-        monthKey: monthParam,
-        totalCostRecords: allCosts.length,
-        filteredCostRecords: monthCosts.length,
-        projectsWithCosts: auditResults.length,
-        projects: auditResults
+        totalRecords: allCosts.length,
+        sampleRecords: sampleCosts.slice(0, 5),
+        uniqueMonthKeys,
+        uniqueMonthYear: uniqueMonthYear.slice(0, 20),
+        august2025DirectMatch: august2025Direct.length,
+        august2025ConstructedMatch: august2025Constructed.length,
+        august2025Samples: august2025Direct.slice(0, 3)
       });
       
     } catch (error) {
-      console.error('❌ Cost audit error:', error);
-      res.status(500).json({ error: 'Failed to audit costs' });
+      console.error('❌ Data structure inspection error:', error);
+      res.status(500).json({ error: 'Failed to inspect data structure' });
     }
   });
 
