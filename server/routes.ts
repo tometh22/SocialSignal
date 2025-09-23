@@ -10582,8 +10582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
-  // Main endpoint: GET /api/projects?timeFilter=...&activeOnly=true|false
-  app.get("/api/projects", requireAuth, async (req, res) => {
+  // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  
+  app.get("/api/stable/projects", requireAuth, async (req, res) => {
     try {
       const { UniversalAggregator } = await import('./services/universal-aggregator');
       const { getDateRangeForFilter } = await import('./utils/dateRange');
@@ -10593,8 +10593,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`🎯 STABLE PROJECTS ENDPOINT: timeFilter=${timeFilter}, activeOnly=${activeOnly}`);
       
-      // Get date range for timeFilter
-      const dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      // Get date range for timeFilter  
+      let dateRange = null;
+      try {
+        dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      } catch (error) {
+        console.warn(`Failed to parse timeFilter: ${timeFilter}`, error);
+      }
       
       // Build filters for aggregator
       const filters: any = {};
@@ -10674,8 +10679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Project detail endpoint: GET /api/projects/:key/complete-data?timeFilter=...
-  app.get("/api/projects/:key/complete-data", requireAuth, async (req, res) => {
+  // Project detail endpoint: GET /api/stable/projects/:key/complete-data?timeFilter=...
+  app.get("/api/stable/projects/:key/complete-data", requireAuth, async (req, res) => {
     try {
       const { UniversalAggregator } = await import('./services/universal-aggregator');
       const { getDateRangeForFilter } = await import('./utils/dateRange');
@@ -10807,8 +10812,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Performance rankings endpoint: GET /api/projects/:key/performance-rankings?timeFilter=...
-  app.get("/api/projects/:key/performance-rankings", requireAuth, async (req, res) => {
+  // Performance rankings endpoint: GET /api/stable/projects/:key/performance-rankings?timeFilter=...
+  app.get("/api/stable/projects/:key/performance-rankings", requireAuth, async (req, res) => {
     try {
       const { UniversalAggregator } = await import('./services/universal-aggregator');
       const { getDateRangeForFilter } = await import('./utils/dateRange');
