@@ -158,30 +158,45 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
 
       {/* Summary metrics - always visible */}
       <CardContent className="pt-0">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        {/* Metrics grid - 6 columns: Revenue, Profit, Cost, Markup, Margin, Efficiency */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600" data-testid={`text-revenue-${project.projectId}`}>
+            <div className="text-sm font-semibold text-green-600" data-testid={`text-revenue-${project.projectId}`}>
               {revenueDisplay}
             </div>
             <div className="text-xs text-gray-500">Revenue</div>
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-semibold" data-testid={`text-markup-${project.projectId}`}>
+            <div className={`text-sm font-semibold ${metrics.profitUSD >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid={`text-profit-${project.projectId}`}>
+              {f.usdCompact.format(metrics.profitUSD)}
+            </div>
+            <div className="text-xs text-gray-500">Profit</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-sm font-semibold text-orange-600" data-testid={`text-cost-${project.projectId}`}>
+              {f.usdCompact.format(metrics.costUSD)}
+            </div>
+            <div className="text-xs text-gray-500">Cost</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-sm font-semibold text-blue-600" data-testid={`text-markup-${project.projectId}`}>
               {markupDisplay}
             </div>
             <div className="text-xs text-gray-500">Markup</div>
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-semibold" data-testid={`text-hours-${project.projectId}`}>
-              {metrics.workedHours.toFixed(1)}h
+            <div className={`text-sm font-semibold ${(metrics.marginFrac && metrics.marginFrac >= 0) ? 'text-green-600' : 'text-red-600'}`} data-testid={`text-margin-${project.projectId}`}>
+              {metrics.marginFrac ? f.pct(metrics.marginFrac) : 'N/A'}
             </div>
-            <div className="text-xs text-gray-500">Worked</div>
+            <div className="text-xs text-gray-500">Margin</div>
           </div>
           
           <div className="text-center">
-            <div className="text-lg font-semibold" data-testid={`text-efficiency-${project.projectId}`}>
+            <div className={`text-sm font-semibold ${(metrics.efficiencyFrac && metrics.efficiencyFrac <= 1.05) ? 'text-green-600' : 'text-orange-600'}`} data-testid={`text-efficiency-${project.projectId}`}>
               {efficiencyDisplay}
             </div>
             <div className="text-xs text-gray-500">Efficiency</div>
@@ -223,7 +238,7 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
                   <div className="flex justify-between">
                     <span>Cost:</span>
                     <span className="font-mono" data-testid={`text-cost-detail-${project.projectId}`}>
-                      ${metrics.costUSD.toFixed(0)}
+                      {f.usd.format(metrics.costUSD)}
                     </span>
                   </div>
                   <div className="flex justify-between font-semibold">
@@ -340,7 +355,7 @@ export default function ActiveProjectsV2() {
 
   // ==================== COMPUTED VALUES ====================
 
-  const { projects = [], summary } = response || {};
+  const { projects = [], summary, period } = response || {};
   
   // Filter projects by search term
   const filteredProjects = useMemo(() => {
@@ -353,9 +368,9 @@ export default function ActiveProjectsV2() {
     );
   }, [projects, searchTerm]);
 
-  // Portfolio summary from response
-  const portfolioSummary = summary?.portfolio;
-  const periodInfo = summary?.period;
+  // Use new response structure
+  const portfolioSummary = summary;
+  const periodInfo = period;
 
   // ==================== HANDLERS ====================
 
@@ -452,7 +467,7 @@ export default function ActiveProjectsV2() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Period Revenue</p>
                     <p className="text-2xl font-bold text-green-600">
-                      ${portfolioSummary.periodRevenueUSD.toLocaleString()}
+                      {f.usdCompact.format(portfolioSummary.periodRevenueUSD)}
                     </p>
                   </div>
                   <DollarSign className="h-8 w-8 text-green-600" />
@@ -482,7 +497,7 @@ export default function ActiveProjectsV2() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Period Hours</p>
                     <p className="text-2xl font-bold text-blue-600">
-                      {portfolioSummary.periodWorkedHours.toFixed(1)}h
+                      {f.hours(portfolioSummary.periodWorkedHours)}
                     </p>
                   </div>
                   <Clock className="h-8 w-8 text-blue-600" />
@@ -589,11 +604,11 @@ export default function ActiveProjectsV2() {
         )}
 
         {/* Debug info in dev mode */}
-        {process.env.NODE_ENV === 'development' && response?.metadata && (
+        {process.env.NODE_ENV === 'development' && response && (
           <Card className="mt-6 border-dashed">
             <CardContent className="pt-4">
               <div className="text-sm text-gray-600">
-                <strong>Debug Info:</strong> Engine: {response.metadata.engine} | Source: {response.metadata.source} | Filter: {response.metadata.timeFilter}
+                <strong>Debug Info:</strong> Engine: unified_aggregator | Source: Excel_MAESTRO_unified | Filter: {typeof timeFilter === 'string' ? timeFilter : `${timeFilter.start}_to_${timeFilter.end}`}
               </div>
             </CardContent>
           </Card>

@@ -2027,18 +2027,11 @@ export const activeProjectItemSchema = z.object({
 
 export type ActiveProjectItem = z.infer<typeof activeProjectItemSchema>;
 
-// Complete ActiveProjectsResponse - exact specification from blueprint
+// Complete ActiveProjectsResponse - new simplified structure
 export const activeProjectsResponseSchema = z.object({
-  summary: z.object({
-    portfolio: portfolioSummarySchema,
-    period: resolvedPeriodSchema
-  }),
-  projects: z.array(activeProjectItemSchema),
-  metadata: z.object({
-    timeFilter: z.string(),
-    engine: z.literal('unified_aggregator'),
-    source: z.literal('Excel_MAESTRO_unified')
-  })
+  period: resolvedPeriodSchema,
+  summary: portfolioSummarySchema,
+  projects: z.array(activeProjectItemSchema)
 });
 
 export type ActiveProjectsResponse = z.infer<typeof activeProjectsResponseSchema>;
