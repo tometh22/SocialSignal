@@ -16,13 +16,16 @@ import {
   ProjectFlags, 
   PortfolioSummary,
   ActiveProjectItem,
-  ActiveProjectsResponse 
+  ActiveProjectsResponse,
+  projectAliases
 } from "@shared/schema";
 
 import { parseMoneyAuto } from "../utils/money";
 import { projectKey } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
+import { db } from "../db";
+import { eq, and } from "drizzle-orm";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -183,7 +186,7 @@ export class ActiveProjectsAggregator {
     console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
 
     // 4. Merge by projectId - bulletproof deduplication to avoid ARS/USD mixing
-    const { projects: projectsData, orphanRows } = this.mergeProjectData(allProjects, salesData, costsData);
+    const { projects: projectsData, orphanRows } = await this.mergeProjectData(allProjects, salesData, costsData);
     console.log(`📊 Projects merged: ${projectsData.length} with data, ${orphanRows} orphan rows (debug only)`);
 
     // 5. Calculate metrics for each project - exact formulas
@@ -328,7 +331,7 @@ export class ActiveProjectsAggregator {
    * Merge project data by projectId from catalog (bulletproof deduplication)
    * Groups everything by projectId to avoid mixing ARS/USD and duplicate records
    */
-  private mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): { projects: ProjectData[], orphanRows: number } {
+  private async mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): Promise<{ projects: ProjectData[], orphanRows: number }> {
     const projectsMap = new Map<number, ProjectData>();
     let orphanCount = 0;
 
@@ -356,7 +359,7 @@ export class ActiveProjectsAggregator {
     // Map sales data to projectId (resolve project names to catalog projectIds)
     console.log(`💰 Mapping ${salesData.length} sales records to projectIds...`);
     for (const sale of salesData) {
-      const projectId = this.resolveProjectIdFromName(sale.projectName, allProjects);
+      const projectId = await this.resolveProjectIdFromName(sale.projectName, sale.clientName, allProjects);
       
       if (projectId) {
         const projectData = projectsMap.get(projectId);
@@ -374,7 +377,9 @@ export class ActiveProjectsAggregator {
     // Map costs data to projectId (resolve project names to catalog projectIds)
     console.log(`🔧 Mapping ${costsData.length} cost records to projectIds...`);
     for (const cost of costsData) {
-      const projectId = this.resolveProjectIdFromName(cost.projectName, allProjects);
+      // For costs, we'll try to derive client name from project name or use a placeholder
+      const clientName = cost.clientName || ''; // Costs might not have explicit client names
+      const projectId = await this.resolveProjectIdFromName(cost.projectName, clientName, allProjects);
       
       if (projectId) {
         const projectData = projectsMap.get(projectId);
@@ -398,34 +403,125 @@ export class ActiveProjectsAggregator {
 
   /**
    * Resolve Excel project name to catalog projectId
-   * Uses fuzzy matching with projectKey normalization for bulletproof resolution
+   * NEW: Uses explicit project_aliases first, then falls back to fuzzy matching
    */
-  private resolveProjectIdFromName(projectName: string, catalogProjects: any[]): number | null {
+  private async resolveProjectIdFromName(
+    projectName: string, 
+    clientName: string, 
+    catalogProjects: any[]
+  ): Promise<number | null> {
     if (!projectName) return null;
     
-    const targetKey = projectKey(projectName); // Normalize the target name
-    
-    // Try exact match first
-    for (const project of catalogProjects) {
-      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-      const catalogKey = projectKey(actualProjectName);
-      if (catalogKey === targetKey) {
-        console.log(`✅ EXACT MATCH: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
-        return project.id;
+    try {
+      // 1. FIRST: Try explicit alias lookup (bulletproof)
+      const alias = await db
+        .select()
+        .from(projectAliases)
+        .where(
+          and(
+            eq(projectAliases.excelProject, projectName),
+            eq(projectAliases.excelClient, clientName || ''),
+            eq(projectAliases.isActive, true)
+          )
+        )
+        .limit(1);
+      
+      if (alias.length > 0) {
+        const projectId = alias[0].projectId;
+        
+        // Update match statistics
+        await db
+          .update(projectAliases)
+          .set({
+            lastMatchedAt: new Date(),
+            matchCount: alias[0].matchCount + 1
+          })
+          .where(eq(projectAliases.id, alias[0].id));
+        
+        console.log(`✅ ALIAS MATCH: "${clientName}" + "${projectName}" → projectId ${projectId} (confidence: ${alias[0].confidence})`);
+        return projectId;
       }
-    }
-    
-    // Try partial match for more flexible resolution
-    for (const project of catalogProjects) {
-      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-      const catalogKey = projectKey(actualProjectName);
-      if (catalogKey.includes(targetKey) || targetKey.includes(catalogKey)) {
-        console.log(`🔍 FUZZY MATCH: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
-        return project.id;
+      
+      // 2. FALLBACK: Fuzzy matching with projectKey normalization
+      const targetKey = projectKey(projectName);
+      
+      // Try exact fuzzy match
+      for (const project of catalogProjects) {
+        const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+        const catalogKey = projectKey(actualProjectName);
+        if (catalogKey === targetKey) {
+          console.log(`✅ FUZZY EXACT: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
+          
+          // Register successful match as alias candidate
+          await this.registerAliasCandidate(clientName, projectName, project.id, 1.0, 'exact');
+          return project.id;
+        }
       }
+      
+      // Try partial fuzzy match
+      for (const project of catalogProjects) {
+        const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+        const catalogKey = projectKey(actualProjectName);
+        if (catalogKey.includes(targetKey) || targetKey.includes(catalogKey)) {
+          console.log(`🔍 FUZZY PARTIAL: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
+          
+          // Register successful match as alias candidate
+          await this.registerAliasCandidate(clientName, projectName, project.id, 0.8, 'partial');
+          return project.id;
+        }
+      }
+      
+      return null; // No match found - will be tracked as orphan
+      
+    } catch (error) {
+      console.error(`❌ Error resolving project ID for "${clientName}" + "${projectName}":`, error);
+      return null;
     }
-    
-    return null; // No match found - will be tracked as orphan
+  }
+  
+  /**
+   * Register successful fuzzy match as alias candidate for future use
+   */
+  private async registerAliasCandidate(
+    clientName: string, 
+    projectName: string, 
+    projectId: number, 
+    confidence: number,
+    matchType: 'exact' | 'partial'
+  ): Promise<void> {
+    try {
+      // Check if alias already exists
+      const existing = await db
+        .select()
+        .from(projectAliases)
+        .where(
+          and(
+            eq(projectAliases.excelProject, projectName),
+            eq(projectAliases.excelClient, clientName || ''),
+            eq(projectAliases.projectId, projectId)
+          )
+        )
+        .limit(1);
+      
+      if (existing.length === 0) {
+        // Create new alias candidate
+        await db.insert(projectAliases).values({
+          projectId,
+          excelClient: clientName || '',
+          excelProject: projectName,
+          source: 'auto_detected',
+          confidence,
+          isActive: true,
+          notes: `Auto-detected from ${matchType} fuzzy match`,
+          matchCount: 1,
+          lastMatchedAt: new Date()
+        });
+        
+        console.log(`📝 NEW ALIAS: Created "${clientName}" + "${projectName}" → ${projectId} (${matchType}, confidence: ${confidence})`);
+      }
+    } catch (error) {
+      console.error(`❌ Error registering alias candidate:`, error);
+    }
   }
 
   /**
