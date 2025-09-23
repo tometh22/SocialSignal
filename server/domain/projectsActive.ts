@@ -246,6 +246,29 @@ export class ActiveProjectsAggregator {
     // Get all sales from Google Sheets integration
     const allSales = await this.storage.getGoogleSheetsSales();
     console.log(`💰 Retrieved ${allSales.length} total sales records`);
+    
+    // 🔍 DEBUG: Log ALL sales records to identify ×100 multiplier issues
+    console.log(`🔍 COMPLETE SALES AUDIT - Checking for ×100 parsing bugs:`);
+    for (const sale of allSales) {
+      const rawUSD = sale.amountUsd;
+      const rawARS = sale.amountLocal;
+      const parsedUSD = parseMoneyAuto(rawUSD || 0);
+      const parsedARS = parseMoneyAuto(rawARS || 0);
+      
+      // Flag suspicious values that might have ×100 multiplier issue
+      const isSuspicious = (typeof rawUSD === 'string' && rawUSD.includes('.') && parsedUSD > 100000) ||
+                          (typeof rawUSD === 'string' && rawUSD.length > 8 && parsedUSD > 50000);
+      
+      if (isSuspicious || sale.clientName?.includes('Warner') || sale.projectName?.includes('Marketing')) {
+        console.log(`🚨 ${isSuspicious ? 'SUSPICIOUS' : 'AUDIT'}: ${sale.clientName} · ${sale.projectName} (${sale.year}-${String(sale.monthNumber || 0).padStart(2, '0')})`);
+        console.log(`   Raw USD: "${rawUSD}" → Parsed: ${parsedUSD}`);
+        console.log(`   Raw ARS: "${rawARS}" → Parsed: ${parsedARS}`);
+        if (isSuspicious) {
+          const corrected = parsedUSD / 100;
+          console.log(`   🔧 CORRECTION NEEDED: ${parsedUSD} ÷ 100 = ${corrected}`);
+        }
+      }
+    }
 
     const filteredSales: SalesRecord[] = [];
 
