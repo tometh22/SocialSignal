@@ -318,7 +318,7 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
 // ==================== MAIN COMPONENT ====================
 
 export default function ActiveProjectsV2() {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('this_month');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('last_month');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [showOnlyActive, setShowOnlyActive] = useState(true);
