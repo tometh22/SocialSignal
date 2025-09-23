@@ -358,27 +358,36 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * Merge project data by projectId from catalog (bulletproof deduplication)
-   * Groups everything by projectId to avoid mixing ARS/USD and duplicate records
+   * Merge project data by canonical key "cliente|proyecto" (blueprint end-to-end)
+   * Groups everything by normalized cliente|proyecto to eliminate duplicates and misattributions
    */
   private async mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): Promise<{ projects: ProjectData[], orphanRows: number }> {
-    const projectsMap = new Map<number, ProjectData>();
+    const projectsMap = new Map<string, ProjectData>();
     let orphanCount = 0;
 
     console.log(`🔧 BULLETPROOF DEDUPLICATION: Starting with ${allProjects.length} catalog projects`);
 
-    // Initialize with base projects from catalog/DB (single source of truth)
+    // Create canonical key mapping from projects catalog
+    const projectIdToCanonicalKey = new Map<number, string>();
+    
     for (const project of allProjects) {
       // DEBUG: Check what data we actually have
       console.log(`🔧 DEBUG PROJECT: id=${project.id}, name=${project.name}, quotation.projectName=${project.quotation?.projectName}`);
       
       // Use quotation.projectName as the actual project name (not project.name which is NULL)
       const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-      projectsMap.set(project.id, {
+      // Get client name from quotation - simple approach
+      const clientName = project.quotation?.clientName || 'Unknown';
+      
+      // Build canonical key: cliente|proyecto normalized (blueprint)
+      const canonicalKey = this.buildCanonicalKey(clientName, actualProjectName);
+      projectIdToCanonicalKey.set(project.id, canonicalKey);
+      
+      projectsMap.set(canonicalKey, {
         projectId: project.id,
         clientId: project.clientId || 0,
         projectName: actualProjectName,
-        clientName: '', // Will be filled from sales/client data
+        clientName: clientName,
         projectKey: projectKey(actualProjectName),
         sales: [],
         costs: [],
@@ -386,40 +395,77 @@ export class ActiveProjectsAggregator {
       });
     }
 
-    // Map sales data to projectId (resolve project names to catalog projectIds)
-    console.log(`💰 Mapping ${salesData.length} sales records to projectIds...`);
+    // Map sales data: canonical key first, alias fallback (hybrid approach)
+    console.log(`💰 Mapping ${salesData.length} sales records with hybrid approach...`);
     for (const sale of salesData) {
-      const projectId = await this.resolveProjectIdFromName(sale.projectName, sale.clientName, allProjects);
+      const canonicalKey = this.buildCanonicalKey(sale.clientName, sale.projectName);
+      let projectData = projectsMap.get(canonicalKey);
+      let mappingMethod = "exact";
       
-      if (projectId) {
-        const projectData = projectsMap.get(projectId);
-        if (projectData) {
-          projectData.sales.push(sale);
-          if (!projectData.clientName) projectData.clientName = sale.clientName;
-          console.log(`✅ Mapped sale "${sale.projectName}" → projectId ${projectId}`);
+      // If exact canonical key fails, try alias fallback
+      if (!projectData) {
+        const projectId = await this.resolveProjectIdFromName(sale.projectName, sale.clientName, allProjects);
+        if (projectId && projectIdToCanonicalKey.has(projectId)) {
+          const aliasCanonicalKey = projectIdToCanonicalKey.get(projectId);
+          projectData = projectsMap.get(aliasCanonicalKey!);
+          mappingMethod = "alias";
         }
+      }
+      
+      if (projectData) {
+        projectData.sales.push(sale);
+        console.log(`✅ Mapped sale "${sale.clientName}|${sale.projectName}" → key "${canonicalKey}" (${mappingMethod})`);
       } else {
         orphanCount++;
-        console.log(`⚠️ ORPHAN SALE: "${sale.projectName}" - no matching projectId found`);
+        console.log(`⚠️ ORPHAN SALE: "${canonicalKey}" - no matching key found`);
       }
     }
 
-    // Map costs data to projectId (resolve project names to catalog projectIds)
-    console.log(`🔧 Mapping ${costsData.length} cost records to projectIds...`);
+    // Map costs data: hybrid approach with alias fallback
+    console.log(`🔧 Mapping ${costsData.length} cost records with hybrid approach...`);
     for (const cost of costsData) {
-      // For costs, we'll try to derive client name from project name or use a placeholder
-      const clientName = cost.clientName || ''; // Costs might not have explicit client names
-      const projectId = await this.resolveProjectIdFromName(cost.projectName, clientName, allProjects);
+      let canonicalKey = '';
+      let projectData = null;
+      let mappingMethod = '';
       
-      if (projectId) {
-        const projectData = projectsMap.get(projectId);
-        if (projectData) {
-          projectData.costs.push(cost);
-          console.log(`✅ Mapped cost "${cost.projectName}" → projectId ${projectId}`);
+      // Try exact canonical match first if we have client info
+      if (cost.clientName) {
+        canonicalKey = this.buildCanonicalKey(cost.clientName, cost.projectName);
+        projectData = projectsMap.get(canonicalKey);
+        if (projectData) mappingMethod = "exact";
+      }
+      
+      // If no exact match, try fuzzy match by project name only
+      if (!projectData) {
+        for (const [key, project] of projectsMap) {
+          const normalizedCostProject = this.normalizeText(cost.projectName);
+          const normalizedProjectName = this.normalizeText(project.projectName);
+          if (normalizedProjectName === normalizedCostProject) {
+            canonicalKey = key;
+            projectData = project;
+            mappingMethod = "fuzzy";
+            break;
+          }
         }
+      }
+      
+      // If still no match, try alias fallback
+      if (!projectData) {
+        const projectId = await this.resolveProjectIdFromName(cost.projectName, cost.clientName || '', allProjects);
+        if (projectId && projectIdToCanonicalKey.has(projectId)) {
+          const aliasCanonicalKey = projectIdToCanonicalKey.get(projectId);
+          projectData = projectsMap.get(aliasCanonicalKey!);
+          canonicalKey = aliasCanonicalKey!;
+          mappingMethod = "alias";
+        }
+      }
+      
+      if (projectData) {
+        projectData.costs.push(cost);
+        console.log(`✅ Mapped cost "${cost.projectName}" → key "${canonicalKey}" (${mappingMethod})`);
       } else {
         orphanCount++;
-        console.log(`⚠️ ORPHAN COST: "${cost.projectName}" - no matching projectId found`);
+        console.log(`⚠️ ORPHAN COST: "${cost.projectName}" - no matching key found`);
       }
     }
 
@@ -742,5 +788,21 @@ export class ActiveProjectsAggregator {
     if (revenueDiff <= 1.0 && hoursDiff <= 0.1) {
       console.log(`✅ INVARIANTS VERIFIED: All sums match within tolerance`);
     }
+  }
+
+  /**
+   * Build canonical key "cliente|proyecto" normalized (blueprint end-to-end)
+   */
+  private buildCanonicalKey(clientName: string, projectName: string): string {
+    const normalizedClient = this.normalizeText(clientName);
+    const normalizedProject = this.normalizeText(projectName);
+    return `${normalizedClient}|${normalizedProject}`;
+  }
+
+  /**
+   * Normalize text for consistent matching (blueprint NFKD)
+   */
+  private normalizeText(text: string): string {
+    return (text || '').trim().toLowerCase().normalize('NFKD');
   }
 }
