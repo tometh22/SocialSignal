@@ -185,8 +185,22 @@ export class ActiveProjectsAggregator {
       }
 
       // 🎯 USAR REVENUE YA NORMALIZADO: Storage ya aplicó anti-×100 y conversión FX
-      // Ya no necesitamos parseMoneyUnified() ni convertToUsd() - eso causa doble conversión
-      const revenueUSD = parseFloat(sale.amountUsd || '0') || 0;
+      // PERO aplicar fallback anti-×100 para datos legacy no normalizados
+      let revenueUSD = parseFloat(sale.amountUsd || '0') || 0;
+      
+      // 🔧 FALLBACK ANTI-×100: Para datos legacy (Warner Fee Marketing específicamente)
+      const isLegacyInflatedData = (
+        revenueUSD >= 100_000 && 
+        revenueUSD % 100 === 0 &&
+        (sale.clientName || '').toLowerCase().includes('warner') &&
+        (sale.projectName || '').toLowerCase().includes('fee marketing')
+      );
+      
+      if (isLegacyInflatedData) {
+        const originalValue = revenueUSD;
+        revenueUSD = revenueUSD / 100;
+        console.log(`🔧 FALLBACK ANTI-×100: ${sale.clientName}|${sale.projectName} → ${originalValue} / 100 = ${revenueUSD}`);
+      }
       
       // Skip if no valid revenue or not confirmed
       const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
