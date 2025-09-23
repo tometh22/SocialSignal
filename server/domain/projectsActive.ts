@@ -22,7 +22,7 @@ import {
 
 import { resolvePeriod } from "@shared/utils/timePeriod";
 
-import { parseMoneySmart, normalizeAmount } from "../utils/money";
+import { parseMoneyUnified } from "../utils/money";
 import { canon, generateProjectKey, generateCanonicalFields } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
@@ -187,8 +187,8 @@ export class ActiveProjectsAggregator {
       // Rule: Si Monto_USD > 0 → usar eso. Si Monto_USD == 0 y Monto_ARS > 0 → convertir
       const salePeriod = `${sale.year}-${String(sale.monthNumber || 0).padStart(2, '0')}`;
       
-      const montoUSD = normalizeAmount(sale.amountUsd || 0);
-      const montoARS = normalizeAmount(sale.amountLocal || 0);
+      const montoUSD = parseMoneyUnified(sale.amountUsd || 0);
+      const montoARS = parseMoneyUnified(sale.amountLocal || 0);
       const revenueUSD = convertToUsd(montoUSD, montoARS, salePeriod);
 
       // Skip if no valid revenue or not confirmed
@@ -245,12 +245,12 @@ export class ActiveProjectsAggregator {
       } else continue;
 
       // Cost normalization with FX conversion
-      const montoUSD = normalizeAmount(cost.montoTotalUSD || 0);
-      const montoARS = normalizeAmount(cost.costoTotal || 0);
+      const montoUSD = parseMoneyUnified(cost.montoTotalUSD || 0);
+      const montoARS = parseMoneyUnified(cost.costoTotal || 0);
       const costPeriod = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
       const costUSD = convertToUsd(montoUSD, montoARS, costPeriod);
-      const hoursReal = normalizeAmount(cost.horasRealesAsana || 0);
-      const hoursTarget = normalizeAmount(cost.horasObjetivo || 0);
+      const hoursReal = parseMoneyUnified(cost.horasRealesAsana || 0);
+      const hoursTarget = parseMoneyUnified(cost.horasObjetivo || 0);
 
       if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
 
@@ -259,38 +259,8 @@ export class ActiveProjectsAggregator {
       const aggregationKey = canonicalFields.projectKey;
       if (!aggregationKey) continue;
 
-      // GOLDEN TEST COMPATIBILITY: Apply specific filters for Warner Fee Marketing
-      if (cost.proyecto?.toLowerCase().includes('fee marketing')) {
-        console.log(`🔍 WARNER COST: ${cost.cliente} | ${cost.proyecto} | ${costUSD} USD | ${cost.mes} ${cost.año}`);
-        console.log(`   MontoUSD: ${montoUSD} | MontoARS: ${montoARS} | Hours: ${hoursReal} | CHECK: ${costUSD} > 3000 = ${costUSD > 3000}`);
-        
-        // Filter out high-value outlier costs that appear to be duplicates
-        // Golden tests expect $7,005.20, current total is $15,824.55
-        // Exclude costs > $3000 to match golden expectations
-        // Specifically filter $3684 and $5182 which are clear outliers
-        if (costUSD >= 3500) {
-          console.log(`   ❌ GOLDEN FILTER: Excluding high-value cost ${costUSD} (>=$3500)`);
-          continue;
-        }
-        console.log(`   ✅ INCLUDED: Cost ${costUSD} passes golden filter (<= $3000)`);
-      }
-
-
-      // GOLDEN TEST COMPATIBILITY: Apply specific filters for Kimberly Fee Huggies
-      if (cost.proyecto?.toLowerCase().includes('fee huggies') || cost.proyecto?.toLowerCase().includes('huggies')) {
-        console.log(`🔍 KIMBERLY COST: ${cost.cliente} | ${cost.proyecto} | ${costUSD} USD | ${cost.mes} ${cost.año}`);
-        console.log(`   MontoUSD: ${montoUSD} | MontoARS: ${montoARS} | Hours: ${hoursReal} | CHECK: ${costUSD} > 1000 = ${costUSD > 1000}`);
-        
-        // Filter out high-value outlier costs that appear to be duplicates
-        // Golden tests expect $2,436.09, current total is $84,254.34
-        // Exclude costs > $1000 to match golden expectations (more restrictive than Warner)
-        // Kimberly should have smaller individual costs than Warner
-        if (costUSD >= 1000) {
-          console.log(`   ❌ GOLDEN FILTER: Excluding high-value cost ${costUSD} (>=$1000)`);
-          continue;
-        }
-        console.log(`   ✅ INCLUDED: Cost ${costUSD} passes golden filter (<= $1000)`);
-      }
+      // Sistema unificado sin hardcodeo de clientes/proyectos específicos
+      // La detección anti-x100 y normalización ya se maneja en convertToUsd()
 
       // Aggregate by exact key (no duplicates)
       const existing = costAggregator.get(aggregationKey) || { costUSD: 0, hoursReal: 0, hoursTarget: 0, count: 0 };

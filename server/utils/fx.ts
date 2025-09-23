@@ -4,7 +4,7 @@
  * 🛡️ FIXED: Includes robust currency normalization with anti×100 detection
  */
 
-import { normalizeAmount } from "./money";
+import { parseMoneyUnified, detectAntiX100Generic } from "./money";
 
 // Tabla de cotizaciones mensuales ARS/USD
 const FX_RATES: Record<string, number> = {
@@ -47,59 +47,63 @@ export function arsToUsd(amountARS: number, period: string): number {
 }
 
 /**
- * 🛡️ BULLETPROOF Currency Converter with Anti-Corruption Detection
- * Fixed: Applies robust normalization to USD amounts before using them
- * Detects and corrects extreme corruption (trillions from Excel import)
+ * 🛡️ CONVERTIDOR DE MONEDA UNIFICADO CON ANTI-X100 GENÉRICO
+ * Usa parser unificado y detección anti-x100 genérica sin hardcodeo de clientes/proyectos
  * @param montoUSD Raw USD amount (possibly corrupted)
- * @param montoARS Monto en pesos argentinos
+ * @param montoARS Monto en pesos argentinos  
  * @param period Período para la conversión FX
  * @returns Monto total en USD (sanitized)
  */
 export function convertToUsd(montoUSD: number, montoARS: number, period: string): number {
-  // 🛡️ STEP 1: Normalize USD amount with anti×100 + extreme corruption detection
-  const normalizedUSD = normalizeAmount(montoUSD);
-  const normalizedARS = normalizeAmount(montoARS);
+  // 🛡️ STEP 1: Parser unificado para ambos valores
+  const parsedUSD = parseMoneyUnified(montoUSD);
+  const parsedARS = parseMoneyUnified(montoARS);
   
-  // 🚨 STEP 2: Intelligent Currency Detection
-  if (normalizedUSD > 0 && normalizedARS > 0) {
-    const expectedUSDFromARS = arsToUsd(normalizedARS, period);
-    const ratio = normalizedUSD / expectedUSDFromARS;
+  // 🛡️ STEP 2: Detección anti-x100 genérica por fila
+  const tipoCambio = getFxRate(period);
+  const antiX100Result = detectAntiX100Generic(parsedUSD, parsedARS, tipoCambio);
+  let finalUSD = antiX100Result.correctedUSD;
+  
+  // 🚨 STEP 3: Detección de corrupción extrema (sin hardcodeo de clientes)
+  if (parsedUSD > 0 && parsedARS > 0) {
+    const expectedUSDFromARS = arsToUsd(parsedARS, period);
+    const ratio = finalUSD / expectedUSDFromARS;
     
     // 🔧 EXTREME CORRUPTION (millions/billions): Always use ARS conversion
     if (ratio > 1000000) {
-      console.log(`🔧 EXTREME CORRUPTION DETECTED: USD ${normalizedUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
-      console.log(`   Using ARS conversion instead: ${normalizedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
+      console.log(`🔧 EXTREME CORRUPTION DETECTED: USD ${finalUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
+      console.log(`   Using ARS conversion instead: ${parsedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
       return expectedUSDFromARS;
     }
     
     // 🎯 SMART DETECTION (1000-1M): Check if USD is reasonable business value
     if (ratio > 1000) {
       // If USD amount is in reasonable business range (100-20000), trust it
-      if (normalizedUSD >= 100 && normalizedUSD <= 20000) {
-        console.log(`💡 SMART DETECTION: USD ${normalizedUSD} is reasonable business value despite ${ratio.toFixed(0)}x ratio - keeping USD`);
-        return normalizedUSD;
+      if (finalUSD >= 100 && finalUSD <= 20000) {
+        console.log(`💡 SMART DETECTION: USD ${finalUSD} is reasonable business value despite ${ratio.toFixed(0)}x ratio - keeping USD`);
+        return finalUSD;
       } else {
-        console.log(`🔧 HIGH CORRUPTION DETECTED: USD ${normalizedUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
-        console.log(`   Using ARS conversion instead: ${normalizedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
+        console.log(`🔧 HIGH CORRUPTION DETECTED: USD ${finalUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
+        console.log(`   Using ARS conversion instead: ${parsedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
         return expectedUSDFromARS;
       }
     }
     
     // 🔍 MODERATE RATIO (50-1000x): Prefer USD if reasonable
     if (ratio > 50) {
-      if (normalizedUSD >= 50 && normalizedUSD <= 15000) {
-        console.log(`✅ MODERATE RATIO: Keeping USD ${normalizedUSD} (ratio: ${ratio.toFixed(1)}x, reasonable value)`);
-        return normalizedUSD;
+      if (finalUSD >= 50 && finalUSD <= 15000) {
+        console.log(`✅ MODERATE RATIO: Keeping USD ${finalUSD} (ratio: ${ratio.toFixed(1)}x, reasonable value)`);
+        return finalUSD;
       }
     }
   }
   
-  // 🎯 STEP 3: Standard logic with normalized values
-  if (normalizedUSD && normalizedUSD > 0) {
-    return normalizedUSD;
+  // 🎯 STEP 4: Standard logic with parsed values
+  if (finalUSD && finalUSD > 0) {
+    return finalUSD;
   }
-  if (normalizedARS && normalizedARS > 0) {
-    return arsToUsd(normalizedARS, period);
+  if (parsedARS && parsedARS > 0) {
+    return arsToUsd(parsedARS, period);
   }
   return 0;
 }
