@@ -26,6 +26,7 @@ import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
+import { CoverageCalculator } from "./coverage";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -205,6 +206,16 @@ export class ActiveProjectsAggregator {
     // 8. Verify invariants according to blueprint
     this.verifyInvariants(filteredProjects, portfolioSummary);
 
+    // 9. Calculate Excel MAESTRO coverage metrics for health monitoring
+    let coverageMetrics = null;
+    try {
+      const coverageCalculator = new CoverageCalculator(this.storage);
+      coverageMetrics = await coverageCalculator.calculateCoverage(timeFilter);
+      console.log(`📊 COVERAGE: Integrated into aggregator response - ${(coverageMetrics.coverageRatio * 100).toFixed(1)}% coverage`);
+    } catch (error) {
+      console.error(`⚠️ COVERAGE: Error calculating coverage metrics for aggregator:`, error);
+    }
+
     return {
       summary: {
         portfolio: portfolioSummary,
@@ -214,7 +225,20 @@ export class ActiveProjectsAggregator {
       metadata: {
         timeFilter: typeof timeFilter === 'string' ? timeFilter : `${timeFilter.start}_to_${timeFilter.end}`,
         engine: 'unified_aggregator',
-        source: 'Excel_MAESTRO_unified'
+        source: 'Excel_MAESTRO_unified',
+        coverage: coverageMetrics ? {
+          coverageRatio: coverageMetrics.coverageRatio,
+          periodCoverageRatio: coverageMetrics.periodCoverageRatio,
+          orphanRows: coverageMetrics.orphanRows,
+          mappedProjects: coverageMetrics.mappedProjects,
+          catalogActiveProjects: coverageMetrics.catalogActiveProjects,
+          excelProjectsDistinct: coverageMetrics.excelProjectsDistinct,
+          healthStatus: coverageMetrics.coverageRatio > 0.8 ? 'HEALTHY' : 
+                      coverageMetrics.coverageRatio > 0.6 ? 'WARNING' : 'CRITICAL',
+          orphanStatus: coverageMetrics.orphanRows < 10 ? 'GOOD' : 
+                       coverageMetrics.orphanRows < 50 ? 'MODERATE' : 'HIGH',
+          lastCalculatedAt: coverageMetrics.calculatedAt
+        } : null
       }
     };
   }
