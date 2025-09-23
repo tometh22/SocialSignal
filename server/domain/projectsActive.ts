@@ -182,9 +182,9 @@ export class ActiveProjectsAggregator {
     const costsData = await this.getCostsInPeriod(period);
     console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
 
-    // 4. Merge by projectKey - robust normalization
-    const projectsData = this.mergeProjectData(allProjects, salesData, costsData);
-    console.log(`📊 Projects merged: ${projectsData.length} with data`);
+    // 4. Merge by projectId - bulletproof deduplication to avoid ARS/USD mixing
+    const { projects: projectsData, orphanRows } = this.mergeProjectData(allProjects, salesData, costsData);
+    console.log(`📊 Projects merged: ${projectsData.length} with data, ${orphanRows} orphan rows (debug only)`);
 
     // 5. Calculate metrics for each project - exact formulas
     const projectItems = await this.calculateProjectMetrics(projectsData, period);
@@ -325,71 +325,108 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * Merge project data by normalized projectKey()
-   * Handles aliases and normalization according to blueprint
+   * Merge project data by projectId from catalog (bulletproof deduplication)
+   * Groups everything by projectId to avoid mixing ARS/USD and duplicate records
    */
-  private mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): ProjectData[] {
-    const projectsMap = new Map<string, ProjectData>();
+  private mergeProjectData(allProjects: any[], salesData: SalesRecord[], costsData: CostRecord[]): { projects: ProjectData[], orphanRows: number } {
+    const projectsMap = new Map<number, ProjectData>();
+    let orphanCount = 0;
 
-    // Initialize with base projects
+    console.log(`🔧 BULLETPROOF DEDUPLICATION: Starting with ${allProjects.length} catalog projects`);
+
+    // Initialize with base projects from catalog/DB (single source of truth)
     for (const project of allProjects) {
-      const key = projectKey(project.name);
-      projectsMap.set(key, {
+      // DEBUG: Check what data we actually have
+      console.log(`🔧 DEBUG PROJECT: id=${project.id}, name=${project.name}, quotation.projectName=${project.quotation?.projectName}`);
+      
+      // Use quotation.projectName as the actual project name (not project.name which is NULL)
+      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+      projectsMap.set(project.id, {
         projectId: project.id,
         clientId: project.clientId || 0,
-        projectName: project.name,
+        projectName: actualProjectName,
         clientName: '', // Will be filled from sales/client data
-        projectKey: key,
+        projectKey: projectKey(actualProjectName),
         sales: [],
         costs: [],
         quotation: project.quotation // Include quotation for project type mapping
       });
     }
 
-    // Merge sales data
+    // Map sales data to projectId (resolve project names to catalog projectIds)
+    console.log(`💰 Mapping ${salesData.length} sales records to projectIds...`);
     for (const sale of salesData) {
-      let projectData = projectsMap.get(sale.projectKey);
-      if (!projectData) {
-        // Create new project from sales data
-        projectData = {
-          projectId: 0, // Will need to be resolved
-          clientId: sale.clientId,
-          projectName: sale.projectName,
-          clientName: sale.clientName,
-          projectKey: sale.projectKey,
-          sales: [],
-          costs: [],
-          quotation: undefined // No quotation data available for Excel-only projects
-        };
-        projectsMap.set(sale.projectKey, projectData);
-      }
+      const projectId = this.resolveProjectIdFromName(sale.projectName, allProjects);
       
-      projectData.sales.push(sale);
-      if (!projectData.clientName) projectData.clientName = sale.clientName;
+      if (projectId) {
+        const projectData = projectsMap.get(projectId);
+        if (projectData) {
+          projectData.sales.push(sale);
+          if (!projectData.clientName) projectData.clientName = sale.clientName;
+          console.log(`✅ Mapped sale "${sale.projectName}" → projectId ${projectId}`);
+        }
+      } else {
+        orphanCount++;
+        console.log(`⚠️ ORPHAN SALE: "${sale.projectName}" - no matching projectId found`);
+      }
     }
 
-    // Merge costs data
+    // Map costs data to projectId (resolve project names to catalog projectIds)
+    console.log(`🔧 Mapping ${costsData.length} cost records to projectIds...`);
     for (const cost of costsData) {
-      let projectData = projectsMap.get(cost.projectKey);
-      if (!projectData) {
-        // Create new project from costs data
-        projectData = {
-          projectId: 0, // Will need to be resolved
-          clientId: 0,
-          projectName: cost.projectName,
-          clientName: '',
-          projectKey: cost.projectKey,
-          sales: [],
-          costs: [],
-          quotation: undefined // No quotation data available for Excel-only projects
-        };
-        projectsMap.set(cost.projectKey, projectData);
-      }
+      const projectId = this.resolveProjectIdFromName(cost.projectName, allProjects);
       
-      projectData.costs.push(cost);
+      if (projectId) {
+        const projectData = projectsMap.get(projectId);
+        if (projectData) {
+          projectData.costs.push(cost);
+          console.log(`✅ Mapped cost "${cost.projectName}" → projectId ${projectId}`);
+        }
+      } else {
+        orphanCount++;
+        console.log(`⚠️ ORPHAN COST: "${cost.projectName}" - no matching projectId found`);
+      }
     }
 
-    return Array.from(projectsMap.values());
+    console.log(`🔧 BULLETPROOF DEDUPLICATION: Completed with ${orphanCount} orphan rows`);
+    
+    return { 
+      projects: Array.from(projectsMap.values()),
+      orphanRows: orphanCount
+    };
+  }
+
+  /**
+   * Resolve Excel project name to catalog projectId
+   * Uses fuzzy matching with projectKey normalization for bulletproof resolution
+   */
+  private resolveProjectIdFromName(projectName: string, catalogProjects: any[]): number | null {
+    if (!projectName) return null;
+    
+    const targetKey = projectKey(projectName); // Normalize the target name
+    
+    // Try exact match first
+    for (const project of catalogProjects) {
+      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+      const catalogKey = projectKey(actualProjectName);
+      console.log(`🔍 EXACT CHECK: "${projectName}" vs "${actualProjectName}" (${catalogKey} vs ${targetKey})`);
+      if (catalogKey === targetKey) {
+        console.log(`✅ EXACT MATCH: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
+        return project.id;
+      }
+    }
+    
+    // Try partial match for more flexible resolution
+    for (const project of catalogProjects) {
+      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+      const catalogKey = projectKey(actualProjectName);
+      if (catalogKey.includes(targetKey) || targetKey.includes(catalogKey)) {
+        console.log(`🔍 FUZZY MATCH: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
+        return project.id;
+      }
+    }
+    
+    return null; // No match found - will be tracked as orphan
   }
 
   /**
