@@ -10273,6 +10273,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🎯 AUGUST 2025: Direct monthKey match: ${august2025Direct.length} records`);
       console.log(`🎯 AUGUST 2025: Constructed match: ${august2025Constructed.length} records`);
       
+      // Now try to find August records using the real mes field format
+      const august2025RealFormat = allCosts.filter(cost => 
+        cost.año === 2025 && cost.mes === '08 ago'
+      );
+      console.log(`🎯 AUGUST 2025: Real format match ("08 ago"): ${august2025RealFormat.length} records`);
+      
+      if (august2025RealFormat.length > 0) {
+        const warnerCosts = august2025RealFormat.filter(cost => 
+          cost.cliente?.toLowerCase().includes('warner') || 
+          cost.proyecto?.toLowerCase().includes('marketing')
+        );
+        console.log(`🎯 WARNER COSTS: Found ${warnerCosts.length} Warner-related costs`);
+        warnerCosts.slice(0, 3).forEach(cost => {
+          console.log(`   - Cliente: "${cost.cliente}", Proyecto: "${cost.proyecto}"`);
+        });
+      }
+      
       res.json({
         totalRecords: allCosts.length,
         sampleRecords: sampleCosts.slice(0, 5),
@@ -10280,7 +10297,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         uniqueMonthYear: uniqueMonthYear.slice(0, 20),
         august2025DirectMatch: august2025Direct.length,
         august2025ConstructedMatch: august2025Constructed.length,
-        august2025Samples: august2025Direct.slice(0, 3)
+        august2025RealFormatMatch: august2025RealFormat.length,
+        august2025Samples: august2025RealFormat.slice(0, 3)
       });
       
     } catch (error) {
