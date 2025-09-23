@@ -561,27 +561,29 @@ export class ActiveProjectsAggregator {
       const workedHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursReal, 0);
       const targetHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursTarget, 0);
 
-      // Calculate derived metrics - EXACT FORMULAS from blueprint
-      const markupUSD = revenueUSD - costUSD;
-      const markupRatio = costUSD > 0 ? revenueUSD / costUSD : (revenueUSD > 0 ? Infinity : null);
-      const efficiencyPct = targetHours > 0 ? (workedHours / targetHours) * 100 : null;
+      // Calculate derived metrics - CORRECTED SEMANTICS
+      const profitUSD = (revenueUSD ?? 0) - (costUSD ?? 0);
+      const markupRatio = costUSD > 0 ? (revenueUSD / costUSD) : null; // show as "×"
+      const marginFrac = revenueUSD > 0 ? (profitUSD / revenueUSD) : null; // 0..1
+      const efficiencyFrac = targetHours > 0 ? (workedHours / targetHours) : null; // 0..1
 
       // Calculate flags
       const flags: ProjectFlags = {
-        hasSales: revenueUSD > 0,
-        hasCosts: costUSD > 0,
-        hasHours: workedHours > 0
+        hasSales: (revenueUSD ?? 0) > 0,
+        hasCosts: (costUSD ?? 0) > 0,
+        hasHours: (workedHours ?? 0) > 0
       };
 
       // Build metrics object
       const metrics: ProjectMetrics = {
         revenueUSD,
         costUSD,
-        markupUSD,
+        profitUSD,
         markupRatio,
+        marginFrac,
         workedHours,
         targetHours,
-        efficiencyPct
+        efficiencyFrac
       };
 
       // Get client info
@@ -627,7 +629,7 @@ export class ActiveProjectsAggregator {
         activeProjects: acc.activeProjects + (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours ? 1 : 0),
         periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSD,
         periodCostUSD: acc.periodCostUSD + project.metrics.costUSD,
-        periodMarkupUSD: acc.periodMarkupUSD + project.metrics.markupUSD,
+        periodProfitUSD: acc.periodProfitUSD + project.metrics.profitUSD,
         periodWorkedHours: acc.periodWorkedHours + project.metrics.workedHours
       };
     }, {
@@ -635,17 +637,17 @@ export class ActiveProjectsAggregator {
       activeProjects: 0,
       periodRevenueUSD: 0,
       periodCostUSD: 0,
-      periodMarkupUSD: 0,
+      periodProfitUSD: 0,
       periodWorkedHours: 0
     });
 
     // Calculate aggregate ratios
-    const efficiencyPct = null; // Portfolio-level efficiency needs different calculation
+    const efficiencyFrac = null; // Portfolio-level efficiency needs different calculation
     const markupRatio = summary.periodCostUSD > 0 ? summary.periodRevenueUSD / summary.periodCostUSD : null;
 
     return {
       ...summary,
-      efficiencyPct,
+      efficiencyFrac,
       markupRatio
     };
   }
