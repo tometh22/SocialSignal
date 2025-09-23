@@ -409,7 +409,6 @@ export class ActiveProjectsAggregator {
     for (const project of catalogProjects) {
       const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
       const catalogKey = projectKey(actualProjectName);
-      console.log(`🔍 EXACT CHECK: "${projectName}" vs "${actualProjectName}" (${catalogKey} vs ${targetKey})`);
       if (catalogKey === targetKey) {
         console.log(`✅ EXACT MATCH: "${projectName}" → "${actualProjectName}" (projectId ${project.id})`);
         return project.id;
