@@ -1,0 +1,74 @@
+Con esos números, el problema que sigue provocando que Warner muestre Markup 1.85× es que para agosto estás sumando $15.82K de costos cuando el Excel dice $7,005.20. Eso solo puede venir de una de estas tres cosas (o varias):
+No se está filtrando agosto en la hoja de costos (se suman varios meses).
+Se agregan costos de otros proyectos del mismo cliente (p. ej., “Fee Insights”).
+Se mezcla ARS/FX o se reconvierte (doble conversión o columna incorrecta).
+Abajo te dejo un plan quirúrgico para corregirlo de forma global para todos los proyectos.
+Fix preciso (global)
+A. Fuente y llaves (ingresos + costos)
+Llave única para agrupar:
+key = normalizar(cliente) + '|' + normalizar(proyecto)
+Ingresos (“Ventas Tomi”): usar monto_usd; si no existe, monto_ars / tipo_cambio.
+Costos (“Costos directos e indirectos”): usar total_usd; si no existe, total_ars / tipo_cambio.
+Normalizar = trim().toLowerCase().replace(/\s+/g,' ').
+B. Filtro temporal robusto
+Resolver el filtro (last_month, this_month, august_2025, q3_2025, rango) a monthKey = YYYY-MM.
+Agregar a cada fila un row.monthKey:
+Si hay columna explícita (p. ej. fechaMes o año+mes) → úsala.
+Si solo hay fecha completa → format(YYYY-MM).
+Filtrar SIEMPRE por row.monthKey === monthKey antes de agregar.
+C. Agregado por proyecto (un solo motor)
+Para cada key y monthKey:
+revenueUSD = Σ ingresos[key, monthKey]
+costUSD    = Σ costos[key, monthKey]
+workedH    = Σ horas_reales[key, monthKey]
+targetH    = Σ horas_objetivo[key, monthKey]
+
+profitUSD   = revenueUSD - costUSD
+markupRatio = costUSD > 0 ? revenueUSD / costUSD : null     // mostrar “x.xx×”
+marginPct   = revenueUSD > 0 ? profitUSD / revenueUSD : null // “xx.x%”
+efficiency  = targetH > 0 ? workedH / targetH : null         // “xx.x%”
+Estado activo
+Fee → siempre activo.
+One Shot → activo solo si revenueUSD || costUSD || workedH en el período.
+D. Anti-errores de importes (una vez)
+parseMoney() con:
+valueRenderOption: 'UNFORMATTED_VALUE' (si estás usando Sheets API).
+Sanitizar texto y detectar decimales.
+Anti ×100: si n > 1e6 y n % 100 === 0 → usar n / 100 (Warner arreglado sin tocar el Excel).
+Auditoría que te dice exactamente qué está fallando
+Implementá un endpoint temporal /api/debug/cost-audit?month=2025-08 que imprima, por proyecto, cuántas filas de costos incluiste y el total:
+[
+  {
+    key: "warner|fee marketing",
+    monthKey: "2025-08",
+    rows: [
+      { srcRowId: "...", proyecto: "Fee Marketing", cliente:"Warner", usd: 564.68 },
+      { ... }
+    ],
+    sumUSD: 7005.20
+  },
+  ...
+]
+Si en Warner ves:
+monthKey ≠ 2025-08 → no filtra por mes.
+filas con proyecto distinto → mezcla proyectos.
+sumUSD ≈ 15820 → doble conversión / columnas equivocadas.
+Qué deberían dar tus “golden values” (agosto-2025)
+Warner · Fee Marketing
+Revenue $29,230 · Cost $7,005.20 · Profit $22,224.80
+Markup 4.17× · Margin ~76.0% · Efficiency ~66.8% (≈ 660.2h / 989.0h)
+Kimberly · Fee Huggies
+Revenue $8,450 · Cost $2,436.09 · Profit $6,013.91
+Markup 3.47× · Margin 71.2% · Efficiency 90.1% (288.3h / 320.0h)
+Check rápido (sin tocar UI)
+Warner
+curl -s "/api/debug/cost-audit?month=2025-08" | jq '.[] | select(.key=="warner|fee marketing") | {sumUSD, rows: (.rows|length)}'
+→ Debe devolver sumUSD: 7005.2 y rows = cantidad de filas de esa planilla para agosto.
+Consistencia
+curl -s "/api/projects/active?timeFilter=last_month&onlyActiveInPeriod=true" | jq '.projects[] | select(.key=="warner|fee marketing") | {revenueUSD, costUSD, markupRatio}'
+→ Debe ser 29230, 7005.2, 4.17.
+TL;DR
+Falla actual: estás sumando costos de meses/proyectos que no corresponden (te da $15.82K vs $7.01K).
+Arreglo: filtrar por monthKey antes de agregar; agrupar por cliente|proyecto; usar total_usd (sin re-convertir).
+Verificación: endpoint de auditoría por proyecto/mes para ver exactamente qué filas entran y cuánto suman.
+Con eso, los números de las cards se alinean con el Excel para todos los proyectos y cualquier filtro temporal.
