@@ -158,15 +158,15 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * Get sales data from "Ventas Tomi" sheet (Excel MAESTRO)
-   * Applies currency normalization with normalizeAmount() - Anti ×100 bug
+   * 🎯 REFACTORIZADO: Get sales data from storage (datos ya normalizados)
+   * YA NO necesita conversión ad-hoc - storage maneja toda la normalización ARS/USD
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
-    // Get all sales from Google Sheets integration
+    // Get all sales from Google Sheets integration (YA NORMALIZADOS por storage)
     const allSales = await this.storage.getGoogleSheetsSales();
     console.log(`💰 Retrieved ${allSales.length} total sales records`);
     
-    // ✅ CURRENCY PARSING: Using normalizeAmount() to prevent ×100 multiplier bugs
+    // 🚀 USAR DATOS YA NORMALIZADOS: Sin conversión ad-hoc duplicada
 
     const filteredSales: SalesRecord[] = [];
 
@@ -183,17 +183,16 @@ export class ActiveProjectsAggregator {
         }
       }
 
-      // Revenue calculation with FX conversion according to specification
-      // Rule: Si Monto_USD > 0 → usar eso. Si Monto_USD == 0 y Monto_ARS > 0 → convertir
-      const salePeriod = `${sale.year}-${String(sale.monthNumber || 0).padStart(2, '0')}`;
+      // 🎯 USAR REVENUE YA NORMALIZADO: Storage ya aplicó anti-×100 y conversión FX
+      // Ya no necesitamos parseMoneyUnified() ni convertToUsd() - eso causa doble conversión
+      const revenueUSD = parseFloat(sale.amountUsd || '0') || 0;
       
-      const montoUSD = parseMoneyUnified(sale.amountUsd || 0);
-      const montoARS = parseMoneyUnified(sale.amountLocal || 0);
-      const revenueUSD = convertToUsd(montoUSD, montoARS, salePeriod);
-
       // Skip if no valid revenue or not confirmed
       const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
       if (revenueUSD <= 0 || !isConfirmed) continue;
+      
+      // 💰 LOGGING MEJORADO: Mostrar que usamos datos ya normalizados
+      console.log(`💰 DATOS NORMALIZADOS: ${sale.clientName}|${sale.projectName} → USD ${revenueUSD} (currency: ${sale.currency}, fx: ${sale.fxApplied || 'N/A'})`);
 
       // Generate canonical fields for ETL consistency
       const canonicalFields = generateCanonicalFields(sale.clientName, sale.projectName);
