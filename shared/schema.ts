@@ -1971,15 +1971,16 @@ export const resolvedPeriodSchema = z.object({
 
 export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;
 
-// ProjectMetrics - exact specification from blueprint  
+// ProjectMetrics - updated with correct semantics
 export const projectMetricsSchema = z.object({
   revenueUSD: z.number(),
   costUSD: z.number(), 
-  markupUSD: z.number(),
-  markupRatio: z.number().nullable(),  // null if costUSD=0
+  profitUSD: z.number(),              // revenue - cost
+  markupRatio: z.number().nullable(), // revenue / cost (show as "×")
+  marginFrac: z.number().nullable(),  // profit / revenue (0..1, show as %)
   workedHours: z.number(),
   targetHours: z.number(),
-  efficiencyPct: z.number().nullable() // null if targetHours=0
+  efficiencyFrac: z.number().nullable() // worked / target (0..1, show as %)
 });
 
 export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;
@@ -1993,16 +1994,16 @@ export const projectFlagsSchema = z.object({
 
 export type ProjectFlags = z.infer<typeof projectFlagsSchema>;
 
-// Portfolio summary - exact specification from blueprint
+// Portfolio summary - updated with correct semantics
 export const portfolioSummarySchema = z.object({
   totalProjects: z.number(),
   activeProjects: z.number(),
   periodRevenueUSD: z.number(),
   periodCostUSD: z.number(),
-  periodMarkupUSD: z.number(), 
+  periodProfitUSD: z.number(),         // revenue - cost
   periodWorkedHours: z.number(),
-  efficiencyPct: z.number().nullable(),
-  markupRatio: z.number().nullable()
+  efficiencyFrac: z.number().nullable(), // aggregate efficiency if applicable
+  markupRatio: z.number().nullable()   // aggregate markup ratio
 });
 
 export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;

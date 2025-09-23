@@ -1,0 +1,144 @@
+ese plan es el camino! Te dejo cómo implementarlo ya (sin ambigüedades) para que el resultado quede prolijo, consistente y fácil de mantener.
+1) Utilidades de formato (frontend)
+Crea src/utils/formatters.ts:
+export const f = {
+  usd: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }),
+  usdCompact: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }),
+  pct(v: number | null | undefined) {
+    if (v == null || Number.isNaN(v)) return "N/A";
+    // si te llega 0–1, se asume fracción; si te llega 0–100, se asume porcentaje
+    const frac = v > 1 ? v / 100 : v;
+    const decimals = frac >= 1 ? 0 : 1;
+    return `${(frac * 100).toFixed(decimals)}%`;
+  },
+  hours(h: number | null | undefined) {
+    if (!h) return "0h";
+    return h >= 1000 ? `${(h / 1000).toFixed(2)}k h` : `${Math.round(h)}h`;
+  },
+  markupX(ratio: number | null | undefined) {
+    if (!ratio || ratio <= 0) return "N/A";
+    return `${ratio.toFixed(ratio >= 10 ? 1 : 2)}×`;
+  },
+};
+2) Semántica correcta (backend)
+En el agregador que compone los KPIs por proyecto (donde hoy calculas revenue/cost/hours), ajusta:
+// después de tener revenueUSD, costUSD, workedHours, targetHours…
+const profitUSD  = (revenueUSD ?? 0) - (costUSD ?? 0);
+const markupRatio = costUSD > 0 ? (revenueUSD / costUSD) : null; // mostrar como “×”
+const marginFrac  = revenueUSD > 0 ? (profitUSD / revenueUSD) : null; // 0..1
+
+const efficiencyFrac = targetHours > 0 ? (workedHours / targetHours) : null;
+
+const metrics = {
+  revenueUSD,             // number
+  costUSD,                // number
+  profitUSD,              // number
+  markupRatio,            // number | null
+  marginFrac,             // number | null (0..1)
+  workedHours,            // number
+  targetHours,            // number
+  efficiencyFrac,         // number | null (0..1)
+};
+
+// flags para visibilidad “Active only”
+const hasSales = (revenueUSD ?? 0) > 0;
+const hasCosts = (costUSD ?? 0) > 0;
+const hasHours = (workedHours ?? 0) > 0;
+
+return { projectId, clientName, projectName, projectType, metrics, flags: { hasSales, hasCosts, hasHours } };
+Regla Active Only (server o client, donde te quede mejor):
+Fee / recurrente → siempre activo.
+One-shot → activo solo si hasSales || hasCosts || hasHours en el período.
+3) Estructura de respuesta (endpoint)
+Para /api/projects/active?timeFilter=... devuelve:
+{
+  "period": { "start":"2025-08-01","end":"2025-08-31","label":"Aug 2025" },
+  "summary": {
+    "periodRevenueUSD": 2939164.19,
+    "periodCostUSD": 30755.50,
+    "periodProfitUSD": 2899128.69,
+    "periodWorkedHours": 1273.4,
+    "activeProjects": 6,
+    "totalProjects": 14
+  },
+  "projects": [
+    {
+      "projectId": 39,
+      "clientName": "Kimberly Clark",
+      "projectName": "Fee Huggies",
+      "projectType": "Fee",
+      "metrics": {
+        "revenueUSD": 8450,
+        "costUSD": 2436.09,
+        "profitUSD": 6013.91,
+        "markupRatio": 3.47,
+        "marginFrac": 0.712,
+        "workedHours": 288.28,
+        "targetHours": 320,
+        "efficiencyFrac": 0.901
+      },
+      "flags": { "hasSales": true, "hasCosts": true, "hasHours": true }
+    }
+  ]
+}
+Esto evita ambigüedades: Profit es dinero, Margin es fracción, Markup es “×”, Efficiency es fracción.
+4) Cards superiores (frontend)
+// datos del endpoint
+const { summary, period } = data;
+
+<Card title="Period Revenue">
+  {f.usdCompact.format(summary.periodRevenueUSD)}
+</Card>
+<Card title="Period Profit">
+  {f.usdCompact.format(summary.periodProfitUSD)}
+</Card>
+<Card title="Period Hours">
+  {f.hours(summary.periodWorkedHours)}
+</Card>
+<Card title="Active Projects">
+  {summary.activeProjects} / {summary.totalProjects}
+</Card>
+<p className="text-xs text-muted">Period: {period.label} ({period.start}–{period.end})</p>
+Regla: los valores de estas 4 cards son suma de lo visible con el filtro actual (si tienes “Active Only”, sumas solo esos).
+5) Card de proyecto (frontend)
+Orden y formato legible:
+<h3>{p.projectName}</h3>
+<p className="text-sm text-muted">{p.clientName} · <Badge>{p.projectType}</Badge></p>
+
+<div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-2">
+  <Kpi label="Revenue"  value={f.usdCompact.format(m.revenueUSD)} />
+  <Kpi label="Profit"   value={f.usdCompact.format(m.profitUSD)} />
+  <Kpi label="Cost"     value={f.usdCompact.format(m.costUSD)} />
+  <Kpi label="Markup"   value={f.markupX(m.markupRatio)} />
+  <Kpi label="Margin"   value={f.pct(m.marginFrac)} />
+  <Kpi label="Efficiency" value={f.pct(m.efficiencyFrac)} />
+</div>
+
+<div className="mt-2">
+  <Progress value={Math.min(100, Math.max(0, (m.efficiencyFrac ?? 0) * 100))} />
+  <p className="text-xs text-muted mt-1">
+    {f.hours(m.workedHours)} / {f.hours(m.targetHours)}
+  </p>
+</div>
+6) Orden, búsqueda y “Active Only”
+const visible = showActiveOnly
+  ? projects.filter(p => p.projectType.includes("Fee") || p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours)
+  : projects;
+
+const searched = term
+  ? visible.filter(p => (p.projectName + p.clientName).toLowerCase().includes(term.toLowerCase()))
+  : visible;
+
+const sorted = [...searched].sort((a,b) =>
+  (b.metrics.revenueUSD ?? 0) - (a.metrics.revenueUSD ?? 0)
+  || (b.metrics.profitUSD ?? 0) - (a.metrics.profitUSD ?? 0)
+  || (b.metrics.workedHours ?? 0) - (a.metrics.workedHours ?? 0)
+);
+Clave anti-duplicado: en el server arma las filas por projectId y agrega (sum) los registros del período antes de responder. En el client NO vuelvas a “group by”.
+7) Filtro temporal estable
+En el server, una única función:
+function resolveTimeFilter(tf: string) {
+  // 'this_month' | 'last_month' | 'august_2025' | 'q3_2025' | 'custom'
+  // devuelve { start: 'YYYY-MM-DD', end: 'YYYY-MM-DD', label: 'Aug 2025' }
+}
+Y todas las consultas (ventas + costos + horas) usan el mismo rango start/end.

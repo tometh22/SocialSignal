@@ -1,0 +1,71 @@
+Hay dos cosas mezcladas: formato/UX y semántica de los KPIs. Te dejo un plan breve para que quede claro, prolijo y entendible.
+Qué corregir (rápido)
+1) Formateo de números
+Moneda (USD): usar Intl.NumberFormat con style: "currency", currency: "USD"
+Totales grandes en compacto: $2.923M (no 2,923,000.00).
+Importes medianos: $15.8K
+Decimales: 0–2 según magnitud.
+Horas: 1,273h (o 1.27k h), no 1273.4h.
+Porcentajes: 67% / 99.5% (1 decimal máx).
+Fechas de período: “Aug 01–31, 2025” (o “Aug 2025”).
+Quitar ceros ruidosos y “N/A” repetidos → “Sin datos este período”.
+2) Semántica de KPIs (evitar números absurdos)
+Profit = Revenue − Cost (no “markup”).
+Margin % = Profit / Revenue.
+Markup (x) = Revenue / Cost → mostrar como “×”, no en %.
+Ej: Warner: Revenue $2.923M, Cost $15.8K → Markup 184.7× (Margin 99.5%).
+El “18371%” confunde; en “×” se entiende en 1 segundo.
+Efficiency = Worked / Target (clamp 0–200%). Mostrar 66.8% y debajo “660.2h / 989.0h”.
+3) Estructura visual
+Cards superiores (sumatorias de lo visible con el filtro):
+Period Revenue, Period Profit, Period Hours, Active Projects.
+Subtítulo con rango exacto del período y último sync.
+Card de proyecto (lista):
+Título + Cliente + badges (Active, Fee/One-shot).
+Línea de KPIs en este orden:
+Revenue (verde), Profit (azul), Cost (gris), Efficiency (barra + %), Markup (×) y Margin % en texto suave.
+Fila de progreso: Worked/Target con barra y % a la derecha.
+Si One-shot sin actividad en el período: “Sin actividad en este período”.
+4) Orden y filtros
+Orden por Revenue del período desc. (luego Profit, luego Hours).
+Toggle “Active Only”:
+Fee = siempre visible.
+One-shot = visible si hay revenue/cost/hours en el período.
+Búsqueda por cliente/proyecto.
+El switch de período no debe duplicar proyectos: clave por projectId.
+Cómo se vería con tus datos (ejemplos)
+Top cards (mes pasado):
+Period Revenue: $2.939M
+Period Profit: $2.899M
+Period Hours: 1,273h
+Active Projects: 6 / 14
+Warner · Fee Marketing (mes pasado)
+Revenue: $2.923M · Cost: $15.8K · Profit: $2.907M
+Efficiency: 66.8% · 660.2h / 989.0h
+Markup: 184.7× · Margin: 99.5%
+Kimberly · Fee Huggies (agosto 2025, tu golden)
+Revenue: $8,450 · Cost: $2,436 · Profit: $6,014
+Efficiency: 90.1% · 288.3h / 320.0h
+Markup: 3.47× · Margin: 71.2%
+Implementación (mini-guía)
+Formateadores
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+const usdCompact = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 });
+const pct = (v:number)=> `${(v*100).toFixed(v>=1?0:1)}%`;
+const hours = (h:number)=> h>=1000 ? `${(h/1000).toFixed(2)}k h` : `${Math.round(h)}h`;
+Cálculos
+profit = revenue - cost;
+marginPct = cost > 0 ? profit / revenue : 0;     // mostrar como %
+markupX   = cost > 0 ? revenue / cost : null;     // mostrar como "X"
+eff = targetHours > 0 ? workedHours / targetHours : null; // %
+Reglas de visibilidad
+isRecurring = type.includes("Fee");
+hasPeriodActivity = (revenue + cost + workedHours) > 0;
+show = isRecurring || hasPeriodActivity; // cuando Active Only
+QA rápido (qué revisar visualmente)
+No hay “%, h, $” con 4+ decimales.
+Ningún “markup %” gigante: siempre “×” + “margin %”.
+La barra de progreso corresponde al ratio Worked/Target (y el % coincide).
+Las sumas superiores = suma de las cards visibles (con el toggle actual).
+One-shot sin datos no muestra 0s ruidosos: “Sin actividad en este período”.
+Fee siempre visible aunque tenga 0 en el período.
