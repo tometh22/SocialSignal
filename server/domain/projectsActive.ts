@@ -619,6 +619,17 @@ export class ActiveProjectsAggregator {
       const marginFrac = revenueUSD > 0 ? (profitUSD / revenueUSD) : null; // 0..1
       const efficiencyFrac = targetHours > 0 ? (workedHours / targetHours) : null; // 0..1
 
+      // Sanity guards and warnings (blueprint end-to-end validation)
+      if (markupRatio && markupRatio > 20) {
+        console.warn(`⚠️ SANITY: High markup ${markupRatio.toFixed(2)}× for project "${projectData.projectName}"`);
+      }
+      if (revenueUSD > 1000000) {
+        console.warn(`⚠️ SANITY: Large revenue $${revenueUSD.toLocaleString()} for project "${projectData.projectName}"`);
+      }
+      if (Math.abs(costUSD - revenueUSD) > revenueUSD * 0.9 && revenueUSD > 0) {
+        console.warn(`⚠️ SANITY: Cost/Revenue mismatch for project "${projectData.projectName}": cost=$${costUSD}, revenue=$${revenueUSD}`);
+      }
+
       // Calculate flags
       const flags: ProjectFlags = {
         hasSales: (revenueUSD ?? 0) > 0,
