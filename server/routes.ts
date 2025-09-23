@@ -10603,7 +10603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Build filters for aggregator
       const filters: any = {};
-      if (dateRange) {
+      if (dateRange && dateRange.start && dateRange.end) {
         filters.dateRange = {
           start: dateRange.start.toISOString().substring(0, 7), // YYYY-MM
           end: dateRange.end.toISOString().substring(0, 7)
@@ -10615,6 +10615,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter active projects if requested
       const filteredMetrics = activeOnly ? metricsArray.filter(m => m.isActive) : metricsArray;
+
+      // ⚖️ VALIDATE BUSINESS INVARIANTS AUTOMATICALLY
+      const invariantsResult = await aggregator.validateBusinessInvariants(filteredMetrics, filters);
+      if (!invariantsResult.isValid) {
+        console.warn(`⚠️ BUSINESS INVARIANTS VIOLATIONS (${invariantsResult.violations.length}):`);
+        invariantsResult.violations.forEach(v => console.warn(`   - ${v}`));
+      }
       
       // Calculate portfolio summary
       const portfolioSummary = {
@@ -10668,6 +10675,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         portfolioSummary,
         projects,
         period: filters.dateRange || 'all-time',
+        businessInvariants: {
+          isValid: invariantsResult.isValid,
+          violationsCount: invariantsResult.violations.length,
+          validationTimestamp: new Date().toISOString()
+        },
         timestamp: new Date().toISOString()
       });
       
@@ -10896,6 +10908,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error('❌ Performance Rankings Endpoint Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // ⚖️ BUSINESS INVARIANTS ENDPOINT - Validate business rules
+  app.get("/api/invariants/validate", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { getDateRangeForFilter } = await import('./utils/dateRange');
+      
+      const timeFilter = req.query.timeFilter as string;
+      console.log(`⚖️ BUSINESS INVARIANTS VALIDATION: timeFilter=${timeFilter}`);
+      
+      // Get date range for timeFilter  
+      let dateRange = null;
+      try {
+        dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      } catch (error) {
+        console.warn(`Failed to parse timeFilter: ${timeFilter}`, error);
+      }
+      
+      // Build filters for aggregator
+      const filters: any = {};
+      if (dateRange) {
+        filters.dateRange = {
+          start: dateRange.start.toISOString().substring(0, 7),
+          end: dateRange.end.toISOString().substring(0, 7)
+        };
+      }
+      
+      const aggregator = new UniversalAggregator(db);
+      const metricsArray = await aggregator.aggregateMultipleProjects(filters);
+      
+      // VALIDATE ALL BUSINESS INVARIANTS
+      const validationResult = await aggregator.validateBusinessInvariants(metricsArray, filters);
+      
+      res.json({
+        success: true,
+        period: filters.dateRange || 'all-time',
+        validation: {
+          isValid: validationResult.isValid,
+          violationsCount: validationResult.violations.length,
+          violations: validationResult.violations,
+          details: validationResult.details
+        },
+        metricsCount: metricsArray.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Business Invariants Validation Error:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : String(error) 
       });

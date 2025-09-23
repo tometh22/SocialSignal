@@ -332,4 +332,316 @@ export class UniversalAggregator {
     const project = projectName.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
     return `${client}|${project}`;
   }
+
+  /**
+   * ⚖️ BUSINESS INVARIANTS VALIDATION
+   * Validates all business rules automatically
+   */
+  async validateBusinessInvariants(
+    uiMetrics: UniversalMetrics[], 
+    filters?: { dateRange?: { start: string; end: string } }
+  ): Promise<{
+    isValid: boolean;
+    violations: string[];
+    details: any;
+  }> {
+    console.log('⚖️ VALIDATING BUSINESS INVARIANTS...');
+    
+    const violations: string[] = [];
+    const details: any = {
+      conservation: {},
+      unknownProjects: [],
+      kpiConsistency: {},
+      filterUniqueness: {}
+    };
+
+    try {
+      // 1. CONSERVACIÓN: UI totals must equal database totals
+      const conservationResult = await this.validateConservation(uiMetrics, filters);
+      if (!conservationResult.isValid) {
+        violations.push(...conservationResult.violations);
+      }
+      details.conservation = conservationResult.details;
+
+      // 2. SIN "UNKNOWN": No projects without names after normalization
+      const unknownResult = await this.validateNoUnknownProjects(uiMetrics);
+      if (!unknownResult.isValid) {
+        violations.push(...unknownResult.violations);
+      }
+      details.unknownProjects = unknownResult.unknownProjects;
+
+      // 3. KPIs CONSISTENTES: Business formulas must be correct
+      const kpiResult = this.validateKPIConsistency(uiMetrics);
+      if (!kpiResult.isValid) {
+        violations.push(...kpiResult.violations);
+      }
+      details.kpiConsistency = kpiResult.details;
+
+      // 4. FILTRO ÚNICO: Same monthKeys filter applied everywhere
+      const filterResult = await this.validateFilterUniqueness(filters);
+      if (!filterResult.isValid) {
+        violations.push(...filterResult.violations);
+      }
+      details.filterUniqueness = filterResult.details;
+
+      const isValid = violations.length === 0;
+      
+      console.log(`⚖️ INVARIANTS RESULT: ${isValid ? '✅ VALID' : '❌ VIOLATIONS'}`);
+      if (!isValid) {
+        console.log(`   Violations (${violations.length}):`);
+        violations.forEach(v => console.log(`   - ${v}`));
+      }
+
+      return { isValid, violations, details };
+
+    } catch (error) {
+      console.error('❌ Invariants validation error:', error);
+      violations.push(`Validation system error: ${error instanceof Error ? error.message : String(error)}`);
+      return { isValid: false, violations, details };
+    }
+  }
+
+  /**
+   * 1️⃣ CONSERVACIÓN: UI totals == Database totals
+   */
+  private async validateConservation(
+    uiMetrics: UniversalMetrics[],
+    filters?: { dateRange?: { start: string; end: string } }
+  ): Promise<{ isValid: boolean; violations: string[]; details: any }> {
+    
+    const violations: string[] = [];
+    
+    // Calculate UI totals
+    const uiTotals = {
+      revenueUSD: uiMetrics.reduce((sum, m) => sum + m.revenueUSD, 0),
+      costUSD: uiMetrics.reduce((sum, m) => sum + m.costUSD, 0),
+      workedHours: uiMetrics.reduce((sum, m) => sum + m.workedHours, 0)
+    };
+
+    // Build database filter conditions
+    let whereConditions = [];
+    if (filters?.dateRange) {
+      whereConditions.push(`month_key >= '${filters.dateRange.start}'`);
+      whereConditions.push(`month_key <= '${filters.dateRange.end}'`);
+    }
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Get database totals
+    const salesTotal = await this.db.select({ 
+      total: sql`COALESCE(SUM(CAST(usd AS DECIMAL)), 0)` 
+    }).from(salesNorm);
+    
+    const costsTotal = await this.db.select({ 
+      totalCost: sql`COALESCE(SUM(CAST(usd AS DECIMAL)), 0)`,
+      totalHours: sql`COALESCE(SUM(CAST(hours_worked AS DECIMAL)), 0)`
+    }).from(costsNorm);
+
+    const dbTotals = {
+      revenueUSD: Number(salesTotal[0]?.total || 0),
+      costUSD: Number(costsTotal[0]?.totalCost || 0),  
+      workedHours: Number(costsTotal[0]?.totalHours || 0)
+    };
+
+    // Check conservation with tolerance
+    const tolerance = 0.01; // 1 cent tolerance
+    const differences = {
+      revenueUSD: Math.abs(uiTotals.revenueUSD - dbTotals.revenueUSD),
+      costUSD: Math.abs(uiTotals.costUSD - dbTotals.costUSD),
+      workedHours: Math.abs(uiTotals.workedHours - dbTotals.workedHours)
+    };
+
+    if (differences.revenueUSD > tolerance) {
+      violations.push(`Revenue conservation violated: UI=$${uiTotals.revenueUSD}, DB=$${dbTotals.revenueUSD}, diff=$${differences.revenueUSD}`);
+    }
+    if (differences.costUSD > tolerance) {
+      violations.push(`Cost conservation violated: UI=$${uiTotals.costUSD}, DB=$${dbTotals.costUSD}, diff=$${differences.costUSD}`);
+    }
+    if (differences.workedHours > 0.01) {
+      violations.push(`Hours conservation violated: UI=${uiTotals.workedHours}h, DB=${dbTotals.workedHours}h, diff=${differences.workedHours}h`);
+    }
+
+    return {
+      isValid: violations.length === 0,
+      violations,
+      details: { uiTotals, dbTotals, differences, tolerance }
+    };
+  }
+
+  /**
+   * 2️⃣ SIN "UNKNOWN": No projects without proper names
+   */
+  private async validateNoUnknownProjects(
+    uiMetrics: UniversalMetrics[]
+  ): Promise<{ isValid: boolean; violations: string[]; unknownProjects: any[] }> {
+    
+    const violations: string[] = [];
+    const unknownProjects: any[] = [];
+
+    for (const metric of uiMetrics) {
+      const [clientName, projectName] = metric.projectKey.split('|');
+      
+      // Check for missing or unknown names
+      if (!clientName || clientName.trim() === '' || clientName.toLowerCase().includes('unknown')) {
+        unknownProjects.push({ projectKey: metric.projectKey, issue: 'Missing or unknown client name' });
+        violations.push(`Project has unknown client: ${metric.projectKey}`);
+      }
+      
+      if (!projectName || projectName.trim() === '' || projectName.toLowerCase().includes('unknown')) {
+        unknownProjects.push({ projectKey: metric.projectKey, issue: 'Missing or unknown project name' });
+        violations.push(`Project has unknown name: ${metric.projectKey}`);
+      }
+    }
+
+    return {
+      isValid: violations.length === 0,
+      violations,
+      unknownProjects
+    };
+  }
+
+  /**
+   * 3️⃣ KPIs CONSISTENTES: Business formulas must be mathematically correct
+   */
+  private validateKPIConsistency(
+    uiMetrics: UniversalMetrics[]
+  ): { isValid: boolean; violations: string[]; details: any } {
+    
+    const violations: string[] = [];
+    const inconsistentProjects: any[] = [];
+
+    for (const metric of uiMetrics) {
+      const issues: string[] = [];
+      
+      // Validate profit = revenue - cost
+      const expectedProfit = metric.revenueUSD - metric.costUSD;
+      if (Math.abs(metric.profitUSD - expectedProfit) > 0.01) {
+        issues.push(`Profit formula incorrect: got ${metric.profitUSD}, expected ${expectedProfit}`);
+      }
+
+      // Validate markup = revenue / cost (null if cost = 0)
+      if (metric.costUSD === 0) {
+        if (metric.markupRatio !== null) {
+          issues.push(`Markup should be null when cost=0, got ${metric.markupRatio}`);
+        }
+      } else {
+        const expectedMarkup = metric.revenueUSD / metric.costUSD;
+        if (metric.markupRatio === null || Math.abs(metric.markupRatio - expectedMarkup) > 0.001) {
+          issues.push(`Markup formula incorrect: got ${metric.markupRatio}, expected ${expectedMarkup}`);
+        }
+      }
+
+      // Validate margin = profit / revenue (null if revenue = 0)
+      if (metric.revenueUSD === 0) {
+        if (metric.marginPct !== null) {
+          issues.push(`Margin should be null when revenue=0, got ${metric.marginPct}`);
+        }
+      } else {
+        const expectedMargin = metric.profitUSD / metric.revenueUSD;
+        if (metric.marginPct === null || Math.abs(metric.marginPct - expectedMargin) > 0.001) {
+          issues.push(`Margin formula incorrect: got ${metric.marginPct}, expected ${expectedMargin}`);
+        }
+      }
+
+      if (issues.length > 0) {
+        inconsistentProjects.push({
+          projectKey: metric.projectKey,
+          monthKey: metric.monthKey,
+          issues,
+          metrics: {
+            revenueUSD: metric.revenueUSD,
+            costUSD: metric.costUSD,
+            profitUSD: metric.profitUSD,
+            markupRatio: metric.markupRatio,
+            marginPct: metric.marginPct
+          }
+        });
+        
+        violations.push(...issues.map(issue => `${metric.projectKey}@${metric.monthKey}: ${issue}`));
+      }
+    }
+
+    return {
+      isValid: violations.length === 0,
+      violations,
+      details: { inconsistentProjects }
+    };
+  }
+
+  /**
+   * 4️⃣ FILTRO ÚNICO: Same monthKeys applied to all data sources
+   */
+  private async validateFilterUniqueness(
+    filters?: { dateRange?: { start: string; end: string } }
+  ): Promise<{ isValid: boolean; violations: string[]; details: any }> {
+    
+    const violations: string[] = [];
+    
+    if (!filters?.dateRange) {
+      return {
+        isValid: true,
+        violations: [],
+        details: { message: 'No date filter applied, uniqueness not applicable' }
+      };
+    }
+
+    try {
+      // Get distinct monthKeys from each table within the filter range
+      const salesMonths = await this.db
+        .selectDistinct({ monthKey: salesNorm.monthKey })
+        .from(salesNorm)
+        .where(and(
+          sql`${salesNorm.monthKey} >= ${filters.dateRange.start}`,
+          sql`${salesNorm.monthKey} <= ${filters.dateRange.end}`
+        ));
+
+      const costsMonths = await this.db
+        .selectDistinct({ monthKey: costsNorm.monthKey })
+        .from(costsNorm)
+        .where(and(
+          sql`${costsNorm.monthKey} >= ${filters.dateRange.start}`,
+          sql`${costsNorm.monthKey} <= ${filters.dateRange.end}`
+        ));
+
+      const targetsMonths = await this.db
+        .selectDistinct({ monthKey: targetsNorm.monthKey })
+        .from(targetsNorm)
+        .where(and(
+          sql`${targetsNorm.monthKey} >= ${filters.dateRange.start}`,
+          sql`${targetsNorm.monthKey} <= ${filters.dateRange.end}`
+        ));
+
+      const salesSet = new Set(salesMonths.map((m: any) => m.monthKey));
+      const costsSet = new Set(costsMonths.map((m: any) => m.monthKey));
+      const targetsSet = new Set(targetsMonths.map((m: any) => m.monthKey));
+
+      const details = {
+        salesMonths: Array.from(salesSet).sort(),
+        costsMonths: Array.from(costsSet).sort(),
+        targetsMonths: Array.from(targetsSet).sort(),
+        filterRange: filters.dateRange
+      };
+
+      // For now, we just document the differences but don't require exact match
+      // since it's normal for different data sources to have different coverage
+      const hasData = salesSet.size > 0 || costsSet.size > 0 || targetsSet.size > 0;
+      
+      if (!hasData) {
+        violations.push(`No data found in any table for filter range ${filters.dateRange.start} to ${filters.dateRange.end}`);
+      }
+
+      return {
+        isValid: violations.length === 0,
+        violations,
+        details
+      };
+
+    } catch (error) {
+      violations.push(`Filter uniqueness validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      return {
+        isValid: false,
+        violations,
+        details: { error: String(error) }
+      };
+    }
+  }
 }
