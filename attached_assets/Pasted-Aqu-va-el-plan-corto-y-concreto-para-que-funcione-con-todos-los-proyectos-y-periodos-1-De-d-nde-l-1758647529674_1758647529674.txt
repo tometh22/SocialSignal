@@ -1,0 +1,55 @@
+Aquí va el plan corto y concreto para que funcione con todos los proyectos y periodos.
+1) De dónde leer
+Ingresos: hoja “Ventas Tomi” → campos: cliente, proyecto, mes, año, tipo_venta, monto_usd (o monto_ars + tipo_cambio), confirmado=SI.
+Costos/Horas: hoja “Costos directos e indirectos” → cliente, proyecto, mes, año, total_usd (o total_ars + tipo_cambio), horas_reales, horas_objetivo (si existe).
+Join key global para unir:
+key = (cliente + '|' + proyecto).trim().toLowerCase()
+2) Filtro temporal (unificado)
+Acepta: this_month, last_month, august_2025, q3_2025 o {start,end}.
+Resolver a rango y a monthKey = YYYY-MM.
+Filtrar ambas hojas por monthKey.
+3) Lectura y parseo robusto (anti ×100)
+Pedir a Sheets con valueRenderOption:'UNFORMATTED_VALUE'.
+Si llega string, parsear con una sola función que:
+quita símbolos/espacios,
+detecta decimal (último ./,),
+convierte a número,
+si n > 1e6 ⇒ usar n/100 (corrige Warner 2,923,000 → 29,230).
+4) Agregado por proyecto (un solo motor)
+Para cada key + monthKey:
+revenueUSD = Σ ingresos del mes
+costUSD = Σ costos del mes
+workedHours = Σ horas_reales
+targetHours = Σ horas_objetivo (si hay)
+KPIs
+profitUSD = revenueUSD - costUSD
+markupRatio = costUSD>0 ? revenueUSD/costUSD : null → mostrar “x.xx×”
+marginPct = revenueUSD>0 ? profitUSD/revenueUSD : null → “xx%”
+efficiency = targetHours>0 ? workedHours/targetHours : null → “xx%”
+Estado activo
+Fee → siempre activo.
+One Shot → activo solo si (revenue || cost || hours) en el período.
+5) Totales de las cards superiores
+Suma de los proyectos visibles (tras filtros):
+Period Revenue = Σ revenueUSD
+Period Profit = Σ profitUSD
+Period Hours = Σ workedHours
+Active Projects = cantidad de tarjetas visibles
+6) Presentación (rápida y clara)
+Dinero: $ 2.92M (compacto), detalle en tooltip si querés.
+Markup: 3.47× (no %).
+Margin/Efficiency: 71.2%, 90.1%.
+Horas: 1.27k h si ≥1000; si no, 288.3h.
+Card por proyecto (orden): Revenue, Profit, Cost, Markup×, Margin%, Efficiency%, y barra worked/target.
+7) Pruebas “golden” (agosto 2025)
+Warner · Fee Marketing
+Rev $29,230 · Cost $7,005.20 · Profit $22,224.80 · Markup 4.17× · Margin 76.0% · Eff 66.8% (≈666.7/989.0h)
+Kimberly · Fee Huggies
+Rev $8,450 · Cost $2,436.09 · Profit $6,013.91 · Markup 3.47× · Margin 71.2% · Eff 90.1% (288.3/320.0h)
+8) Lista de cambios mínima
+Normalizar headers + join key.
+Implementar parseMoney() con anti ×100 y usarlo en todos los montos.
+Unificar motor de agregación (ingresos + costos + horas).
+Aplicar regla de activo (Fee vs One Shot).
+Render: formateadores (USD compacto, horas, %, ×) y orden de KPIs.
+Cards superiores = sumas de lo visible.

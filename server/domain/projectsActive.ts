@@ -61,7 +61,7 @@ export function resolveTimeFilter(timeFilter: TimeFilter): ResolvedPeriod {
       };
     }
     
-    // Months (English + Spanish support)
+    // Months (English + Spanish support) - CORRECTED MAPPING
     const monthMap: Record<string, number> = {
       'january': 1, 'february': 2, 'march': 3, 'april': 4,
       'may': 5, 'june': 6, 'july': 7, 'august': 8,
@@ -72,14 +72,18 @@ export function resolveTimeFilter(timeFilter: TimeFilter): ResolvedPeriod {
       'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
     };
     
+    console.log(`🔍 MONTH RESOLUTION: period="${period}", monthMap value=${monthMap[period]}`);
+    
     if (monthMap[period]) {
       const month = monthMap[period];
       const endDay = new Date(y, month, 0).getDate();
-      return {
+      const result = {
         start: `${y}-${String(month).padStart(2, '0')}-01`,
         end: `${y}-${String(month).padStart(2, '0')}-${endDay}`,
         label: `${period.charAt(0).toUpperCase() + period.slice(1)} ${y}`
       };
+      console.log(`✅ MONTH RESOLVED: ${filter} → ${result.start} to ${result.end}`);
+      return result;
     }
   }
   
@@ -252,13 +256,14 @@ export class ActiveProjectsAggregator {
     const filteredSales: SalesRecord[] = [];
 
     for (const sale of allSales) {
-      // Temporal filtering
+      // Temporal filtering using monthKey (blueprint plan implementation)
       if (sale.year && sale.monthNumber) {
-        const saleDate = new Date(sale.year, sale.monthNumber - 1, 15); // Mid-month
-        const periodStart = new Date(period.start);
-        const periodEnd = new Date(period.end);
+        const monthKey = `${sale.year}-${String(sale.monthNumber).padStart(2, '0')}`;
+        const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+        const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
         
-        if (saleDate < periodStart || saleDate > periodEnd) {
+        // Exact monthKey matching (blueprint: filter by monthKey)
+        if (monthKey < periodStartKey || monthKey > periodEndKey) {
           continue;
         }
       }
@@ -306,19 +311,30 @@ export class ActiveProjectsAggregator {
       // Filter: ONLY "Directo" costs (not "Indirecto" overhead)
       if (cost.tipoGasto !== 'Directo') continue;
 
-      // Temporal filtering
+      // Temporal filtering using monthKey (blueprint plan implementation)
       if (cost.año && cost.mes) {
-        // Parse month from "08 ago" format
+        // Parse month from "08 ago" format and create monthKey
         const monthNum = parseInt(cost.mes.split(' ')[0]);
         if (monthNum) {
-          const costDate = new Date(cost.año, monthNum - 1, 15);
-          const periodStart = new Date(period.start);
-          const periodEnd = new Date(period.end);
+          const monthKey = `${cost.año}-${String(monthNum).padStart(2, '0')}`;
+          const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+          const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
           
-          if (costDate < periodStart || costDate > periodEnd) {
+          console.log(`🔍 COST FILTER: ${cost.proyecto} - monthKey: ${monthKey}, period: ${periodStartKey} to ${periodEndKey}`);
+          
+          // Exact monthKey matching (blueprint: filter by monthKey)
+          if (monthKey < periodStartKey || monthKey > periodEndKey) {
+            console.log(`❌ FILTERED OUT: ${cost.proyecto} (${monthKey} not in range)`);
             continue;
           }
+          console.log(`✅ PASSED FILTER: ${cost.proyecto} (${monthKey})`);
+        } else {
+          console.log(`❌ NO MONTH NUM: ${cost.proyecto} - mes: "${cost.mes}"`);
+          continue;
         }
+      } else {
+        console.log(`❌ NO DATE: ${cost.proyecto} - año: ${cost.año}, mes: "${cost.mes}"`);
+        continue;
       }
 
       // Cost normalization with FX conversion according to specification  
@@ -428,12 +444,8 @@ export class ActiveProjectsAggregator {
       let projectData = null;
       let mappingMethod = '';
       
-      // Try exact canonical match first if we have client info
-      if (cost.clientName) {
-        canonicalKey = this.buildCanonicalKey(cost.clientName, cost.projectName);
-        projectData = projectsMap.get(canonicalKey);
-        if (projectData) mappingMethod = "exact";
-      }
+      // Skip exact canonical match for costs (no clientName in CostRecord)
+      // Will rely on fuzzy match by project name
       
       // If no exact match, try fuzzy match by project name only
       if (!projectData) {
@@ -451,7 +463,7 @@ export class ActiveProjectsAggregator {
       
       // If still no match, try alias fallback
       if (!projectData) {
-        const projectId = await this.resolveProjectIdFromName(cost.projectName, cost.clientName || '', allProjects);
+        const projectId = await this.resolveProjectIdFromName(cost.projectName, '', allProjects);
         if (projectId && projectIdToCanonicalKey.has(projectId)) {
           const aliasCanonicalKey = projectIdToCanonicalKey.get(projectId);
           projectData = projectsMap.get(aliasCanonicalKey!);
