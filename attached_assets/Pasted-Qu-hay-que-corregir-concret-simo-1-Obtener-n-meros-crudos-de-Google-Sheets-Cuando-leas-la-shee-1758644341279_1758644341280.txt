@@ -1,0 +1,92 @@
+Qué hay que corregir (concretísimo)
+1) Obtener números “crudos” de Google Sheets
+Cuando leas la sheet, pedí UNFORMATTED_VALUE (o su equivalente en tu librería). Así los montos llegan como números, no como strings con símbolos.
+Si por cualquier motivo ya te llega string, aplicá el parser de abajo.
+2) Parser de moneda a prueba de locales
+Usá un parser que detecte el separador decimal (coma o punto) y elimine sólo los separadores de miles.
+// utils/money.ts
+export function parseMoneySmart(raw: unknown): number {
+  if (typeof raw === 'number') return raw;             // caso ideal
+  if (raw == null) return 0;
+
+  let s = String(raw).trim();
+
+  // quitar símbolos y espacios
+  s = s.replace(/[^\d.,\-]/g, '');
+
+  // casos típicos: "29,230.00" (US)  |  "29.230,00" (ES)
+  const hasComma = s.includes(',');
+  const hasDot   = s.includes('.');
+
+  if (hasComma && hasDot) {
+    // DECIMAL = el último separador que aparece
+    const last = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+    const dec  = s[last];
+
+    if (dec === ',') {
+      // "29.230,00" -> quitar miles ".", cambiar "," -> "."
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // "29,230.00" -> quitar miles ","
+      s = s.replace(/,/g, '');
+    }
+  } else if (hasComma && !hasDot) {
+    // Solo coma: si hay 2 dígitos luego de la coma, es decimal
+    const m = s.match(/,(\d{1,2})$/);
+    s = m ? s.replace(',', '.') : s.replace(/,/g, ''); // sino es miles
+  } else {
+    // Solo punto: si hay 2 dígitos luego del punto, es decimal; sino miles
+    const m = s.match(/\.(\d{1,2})$/);
+    s = m ? s : s.replace(/\./g, '');
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+Con esto, "$29,230.00" → 29230, "29.230,00" → 29230, "$8,450" → 8450. No vuelve a pasar el ×100.
+3) Reglas de ventas y costos (para Last Month = agosto 2025)
+Ventas (hoja “Ventas Tomi”)
+Filtro: mes = Agosto AND año = 2025.
+Usar siempre Monto_USD si > 0 (ya en USD).
+Si Monto_USD = 0 y hay Monto_ARS + TC → convertir una sola vez.
+Confirmado: respetar tu criterio (recomendado “SI”).
+Agrupar por normKey(cliente, proyecto).
+Costos (hoja “Costos directos e indirectos”)
+Filtro: agosto 2025.
+USD: prioridad montoTotalUSD > 0 → si no, costoTotal / tipoCambio → si no, costoTotal como USD.
+WorkedHours/Target: sumar del período por proyecto (worked = reales; target = objetivo/presu si está).
+4) KPIs (mismo cálculo en todas partes)
+profit      = revenue - cost
+markupRatio = cost > 0 ? revenue / cost : null      // mostrar como “x.xx×”
+marginPct   = revenue > 0 ? profit / revenue : null // “xx.x%”
+effPct      = target > 0 ? worked / target : null   // “xx.x%”
+Valores “golden” para cotejar YA (agosto 2025)
+Warner · Fee Marketing
+Revenue: $29,230.00
+Cost: $15,824.55
+Profit: $13,405.45
+Worked/Target: 660.2h / 989.0h → Eff 66.8%
+Markup: 1.85× (29230 / 15824.55)
+Margin: 45.9% (13405.45 / 29230)
+Ojo: antes teníamos 2.923M por el bug del parser; la cifra correcta de agosto es $29,230, como marcaste en la sheet.
+Kimberly · Fee Huggies (se mantiene)
+Revenue: $8,450
+Cost: $2,436.09
+Profit: $6,013.91
+Worked/Target: 288.28h / 320.0h → Eff 90.1%
+Markup: 3.47×
+Margin: 71.2%
+(Si tu sheet de Warner tiene otros meses con $29,230, está perfecto: pero para Last Month sólo debe considerar agosto).
+Guardas y verificaciones que te evitan sorpresas
+Debug por card: mostrar cuántas filas de ventas/costos se usaron y sus montos parseados (para auditar en 5s).
+Sanity check: si revenue > 100 * promedio 12m o markup > 20× → log warn en consola.
+Top cards: suman solo lo visible tras filtros (period + Active Only).
+Activo:
+Recurrente: siempre visible.
+One-shot: visible solo si hasSales || hasCosts || hasHours en el período.
+Checklist de fix rápido
+Cambiar lectura de Sheets a UNFORMATTED_VALUE.
+Aplicar parseMoneySmart donde aún llegue string.
+Recalcular agregados para agosto 2025.
+Validar Warner (29,230) y Huggies (8,450 / 2,436.09) en UI.
+Activar panel Debug Info por tarjeta para auditar filas y sumas.

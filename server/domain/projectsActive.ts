@@ -264,10 +264,20 @@ export class ActiveProjectsAggregator {
       // Revenue calculation with FX conversion according to specification
       // Rule: Si Monto_USD > 0 → usar eso. Si Monto_USD == 0 y Monto_ARS > 0 → convertir
       const salePeriod = `${sale.year}-${String(sale.monthNumber || 0).padStart(2, '0')}`;
+      
+      // 🔍 DEBUG: Log raw values and parsing results
+      console.log(`🔍 SALES DEBUG: ${sale.clientName} · ${sale.projectName}`);
+      console.log(`   Raw amountUsd: "${sale.amountUsd}" (type: ${typeof sale.amountUsd})`);
+      console.log(`   Raw amountLocal: "${sale.amountLocal}" (type: ${typeof sale.amountLocal})`);
+      
       const montoUSD = parseMoneyAuto(sale.amountUsd || 0);
       const montoARS = parseMoneyAuto(sale.amountLocal || 0);
       
+      console.log(`   Parsed USD: ${montoUSD}, Parsed ARS: ${montoARS}`);
+      
       const revenueUSD = convertToUsd(montoUSD, montoARS, salePeriod);
+      
+      console.log(`   Final revenueUSD: ${revenueUSD}`);
 
       // Skip if no valid revenue or not confirmed
       const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');

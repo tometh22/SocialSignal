@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseDec } from '../../shared/parse-utils';
 import { buildPeriod, normalizeMonth } from '../../shared/utils/dateNormalization';
+import { parseMoneySmart } from '../utils/money';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -366,79 +367,11 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Parsear valores monetarios que vienen con formato $X.XXX,XX (argentino) o $X,XXX.XX (americano)
+   * Parsear valores monetarios usando parseMoneySmart - robusto para US/ES locales
+   * FIXED: Maneja "$29,230.00" → 29230, "29.230,00" → 29230, "$8,450" → 8450
    */
   private parseMoneyValue(value: string): number {
-    if (!value) return 0;
-    
-    // Remover símbolo de peso y espacios
-    let cleaned = value.replace(/[$\s]/g, '');
-    
-    // 🚨 DETECCIÓN AUTOMÁTICA DE FORMATO:
-    // Si tiene punto al final (ej: "267.02") → formato americano (punto = decimal)
-    // Si tiene coma al final (ej: "267,02") → formato argentino (coma = decimal)
-    const hasDecimalPoint = /\.\d{1,2}$/.test(cleaned); // Punto seguido de 1-2 dígitos al final
-    const hasDecimalComma = /,\d{1,2}$/.test(cleaned);  // Coma seguida de 1-2 dígitos al final
-    const hasThreeDigitsAfterPoint = /\.\d{3}$/.test(cleaned); // Punto seguido de exactamente 3 dígitos (ej: .000)
-    
-    if (hasDecimalPoint && !hasDecimalComma && !hasThreeDigitsAfterPoint) {
-      // Formato americano claro: $267.02 → 267.02
-      cleaned = cleaned.replace(/,/g, ''); // Solo remover comas (miles)
-      // El punto ya es decimal, no tocar
-    } else if (hasDecimalComma && !hasDecimalPoint) {
-      // Formato argentino claro: $1.234,56 → 1234.56  
-      cleaned = cleaned.replace(/\./g, ''); // Remover puntos (miles)
-      cleaned = cleaned.replace(',', '.'); // Convertir coma decimal a punto
-    } else if (hasThreeDigitsAfterPoint) {
-      // Caso ambiguo como $420.000 - probablemente formato argentino con .000 como miles
-      // HEURÍSTICA: Si termina en .000, probablemente sean miles, no decimales
-      cleaned = cleaned.replace(/\.000$/, ''); // Remover .000 final
-      cleaned = cleaned.replace(/\./g, ''); // Remover otros puntos de miles
-    } else {
-      // Sin decimales claros, asumir entero y remover separadores
-      cleaned = cleaned.replace(/[,\.]/g, ''); // Remover separadores
-    }
-    
-    let parsed = parseDec(cleaned);
-    
-    // 🚨 VALIDACIÓN HEURÍSTICA PARA COSTOS ANORMALMENTE ALTOS
-    // DESHABILITADA: Esta lógica estaba causando problemas con ventas en pesos argentinos
-    // Los valores altos ($20,000+ ARS) son normales para ventas, no deben dividirse por 100
-    // TODO: Implementar validación específica por contexto (ventas vs costos) si es necesario
-    
-    /*
-    // Lógica original deshabilitada - causaba conversión incorrecta de pesos argentinos
-    if (parsed > 10000) {
-      const dividedBy100 = parsed / 100;
-      console.log(`🔧 AUTO-CORRECCIÓN: "${value}" → $${parsed.toLocaleString()} parece demasiado alto.`);
-      console.log(`    Aplicando corrección ÷100: $${parsed.toLocaleString()} → $${dividedBy100.toLocaleString()}`);
-      parsed = dividedBy100;
-    }
-    */
-    
-    // 🚨 CORRECCIÓN INTELIGENTE PARA FORMATO ESPAÑOL
-    const originalValue = value.replace(/[$\s]/g, '');
-    
-    // Detectar formato español con comas decimales que se parseó incorrectamente
-    const isSpanishDecimalFormat = hasDecimalComma && !hasDecimalPoint && originalValue.length <= 8;
-    const isProbablyMultipliedBy100 = parsed > 10000 && isSpanishDecimalFormat;
-    
-    if (isProbablyMultipliedBy100) {
-      const correctedValue = parsed / 100;
-      console.log(`🔧 AUTO-CORRECCIÓN FORMATO ESPAÑOL: "${value}" → ${parsed} ÷ 100 = ${correctedValue}`);
-      console.log(`   - Original: "${originalValue}" (formato español detectado)`);
-      console.log(`   - Cleaned: "${cleaned}"`);
-      console.log(`   - hasDecimalComma: ${hasDecimalComma}, hasDecimalPoint: ${hasDecimalPoint}`);
-      parsed = correctedValue;
-    } else if (originalValue && parsed > 10000 && originalValue.length <= 8) {
-      console.log(`⚠️ PARSING SOSPECHOSO: "${value}" → ${parsed} (revisar si necesita corrección)`);
-      console.log(`   - Original: "${originalValue}"`);
-      console.log(`   - Cleaned: "${cleaned}"`);
-      console.log(`   - hasDecimalPoint: ${hasDecimalPoint}, hasDecimalComma: ${hasDecimalComma}`);
-      console.log(`   - hasThreeDigitsAfterPoint: ${hasThreeDigitsAfterPoint}`);
-    }
-    
-    return isNaN(parsed) ? 0 : parsed;
+    return parseMoneySmart(value);
   }
 
   /**
