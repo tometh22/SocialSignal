@@ -4152,16 +4152,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const projectDirectCosts = await getFilteredDirectCosts(project.id, timeFilter, dateRange);
             
             if (projectDirectCosts && projectDirectCosts.length > 0) {
-              // 🛡️ FIXED: Sumar costos usando normalización anti-corrupción
-              const { convertToUsd } = await import('./fx');
+              // ✅ USAR CAMPOS EXACTOS: Sumar costos directamente del Excel (ya convertidos)
               const excelCost = projectDirectCosts.reduce((sum, cost) => {
-                const montoUSD = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : (cost.costoTotal || 0);
-                const montoARS = 0; // Campo no disponible, usar 0 para forzar detección por ratio
-                const period = `${cost.año || 2025}-${String(cost.mes || '08').padStart(2, '0')}`;
-                
-                // Aplicar conversión con detección de corrupción
-                const normalizedAmount = convertToUsd(montoUSD, montoARS, period);
-                return sum + (isNaN(normalizedAmount) ? 0 : normalizedAmount);
+                // montoTotalUSD ya está convertido en el Excel (Columna R)
+                const montoUSD = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : 0;
+                return sum + (isNaN(montoUSD) ? 0 : montoUSD);
               }, 0);
               const excelHours = projectDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
               
