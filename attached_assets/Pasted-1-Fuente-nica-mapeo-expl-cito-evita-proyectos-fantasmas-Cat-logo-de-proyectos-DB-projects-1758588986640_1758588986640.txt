@@ -1,0 +1,136 @@
+1) Fuente única + mapeo explícito (evita “proyectos fantasmas”)
+Catálogo de proyectos (DB): projects(id, clientName, projectName, projectType).
+Tabla de alias (critica): project_aliases(projectId, excelClient, excelProject)
+(1..N alias por proyecto si en el Excel aparece con variantes de nombre).
+Regla de oro: Toda fila de “Ventas Tomi” y “Costos directos e indirectos” DEBE mapearse a un projectId vía project_aliases.
+Si no mapea ⇒ fila huérfana (la reportamos y no la sumamos).
+2) Normalizador de Excel (ventas + costos) sin pérdidas
+Leer todas las filas (A:Z) sin límites ni filtros de vista.
+valueRender=UNFORMATTED_VALUE para que los importes vengan como número.
+Normalizar campos claves:
+Ventas Tomi: Cliente, Proyecto, Mes, Año, Tipo_Venta, Monto_ARS, Monto_USD, Confirmado.
+Costos: idem + horas reales/objetivo si las usás.
+Periodo: convertir {Mes, Año} → periodKey = YYYY-MM (mapeo español: “Agosto”→08).
+Moneda: por fila
+usd = (Monto_USD > 0) ? Monto_USD : (Monto_ARS / fx(ARSUSD, periodKey)).
+Así evitás los “números raros” por mezclar ARS con USD sin convertir.
+3) Métricas de cobertura (guardarraíl)
+Cada corrida del agregador debe producir y exponer:
+Cobertura global
+catalogTotal = proyectos en DB.
+excelProjectsDistinct = proyectos distintos detectados en Excel (después de mapear alias).
+mappedProjects = proyectos en Excel que mapean a un projectId.
+orphanRows.sales, orphanRows.costs = filas que NO mapearon (con ejemplos).
+coverageRatio = mappedProjects / excelProjectsDistinct.
+Cobertura por período (para el filtro activo)
+periodProjectsWithActivity = proyectos con ventas/costos/horas > 0 en el período.
+periodUnmappedRows.sales/costs.
+periodCoverageRatio.
+Por proyecto
+hasSalesRows, hasCostRows (totales y del período).
+isRecurring (siempre visible) / isOneShot (visible si hasPeriodActivity).
+Si coverageRatio < 1 o hay orphanRows > 0 ⇒ encender banner de alerta en la UI y bloquear totales agregados (mejor mostrar “Datos incompletos”).
+4) Endpoint de salud (para Proyectos Activos y DevOps)
+GET /api/health/excel-coverage?timeFilter=august_2025
+{
+  "period": "2025-08",
+  "catalogTotal": 14,
+  "excelProjectsDistinct": 14,
+  "mappedProjects": 14,
+  "coverageRatio": 1.0,
+  "periodProjectsWithActivity": 6,
+  "orphanRows": {
+    "sales": 0,
+    "costs": 0,
+    "examples": []
+  },
+  "fxMonth": "2025-08",
+  "lastImportAt": "2025-09-22T11:13:00Z"
+}
+La página de Proyectos Activos muestra un debug chip (oculto tras un caret) con estas métricas.
+Si orphanRows > 0 → mostrar lista de (Cliente, Proyecto, Mes, Año) que faltan en project_aliases.
+5) Reglas de visibilidad (recorrentes/one-shot) — sin sorpresas
+Recurrente (Fee): SIEMPRE aparece en la lista (aunque el período tenga 0 actividad).
+One-shot: solo aparece como activo si periodRevenue + periodCost + periodHours > 0.
+Con el toggle “Active Only” ON, ocultás los one-shot sin actividad del período.
+6) Agregación única por projectId (no duplicar cards)
+Toda agregación es con clave projectId (no por nombre).
+Si un projectId recibe varias filas (mismo mes o distintos), se suman.
+Si una fila no mapea → no se suma y se reporta en orphanRows.
+7) Sumas que deben cuadrar (las 4 tarjetas grandes)
+Para los proyectos visibles (tras filtros y toggle):
+Period Revenue = Σ project.period.revenueUSD
+Period Profit = Σ (project.period.revenueUSD - project.period.costUSD)
+Period Hours = Σ project.period.workedHours
+Active Projects = count(projects visibles)
+Estas 4 sumas se calculan solo con los proyectos mostrados (lo mismo que ve el usuario).
+8) Verificaciones rápidas (cURL) que te dicen si “están TODOS”
+A) Cobertura del período
+curl -s "http://localhost:5000/api/health/excel-coverage?timeFilter=august_2025" | jq
+B) Conteo de proyectos en listado (deben coincidir con DB cuando ActiveOnly=off)
+curl -s "http://localhost:5000/api/projects?timeFilter=august_2025&activeOnly=false" \
+| jq '.projects | length'
+C) ¿Hay huérfanos? (debería ser 0)
+curl -s "http://localhost:5000/api/health/excel-coverage?timeFilter=august_2025" \
+| jq '.orphanRows'
+D) Golden check (Kimberly · Aug-2025)
+curl -s "http://localhost:5000/api/projects?timeFilter=august_2025" \
+| jq '.projects[] | select(.projectName=="Fee Huggies") | {rev:.period.revenueUSD, cost:.period.costUSD, hours:.period.workedHours}'
+# Esperado: rev 8450, cost 2436.09, hours 288.28
+9) Pseudocódigo del reconciliador (cobertura 100%)
+const period = resolveTimeFilter(tf);      // "august_2025" -> {start,end,"2025-08"}
+const catalog = await db.getAllProjects(); // id, clientName, projectName, type
+const aliasMap = await db.getProjectAliases(); // { [excelKey]: projectId }
+
+const salesRows  = await excel.loadSales(period.start, period.end);  // Ventas Tomi
+const costsRows  = await excel.loadCosts(period.start, period.end);  // Costos directos e indirectos
+
+const orphans = { sales: [], costs: [] };
+
+function mapRowToProjectId(row) {
+  const key = `${row.Cliente}||${row.Proyecto}`.toLowerCase().trim();
+  return aliasMap[key] ?? null;
+}
+
+function usdFrom(row) {
+  if (row.Monto_USD > 0) return row.Monto_USD;
+  if (row.Monto_ARS > 0) return row.Monto_ARS / fx("ARSUSD", row.periodKey);
+  return 0;
+}
+
+const agg = new Map<number, { revenue: number; cost: number; hours: number }>();
+
+for (const r of salesRows) {
+  const pid = mapRowToProjectId(r);
+  if (!pid) { orphans.sales.push(sample(r)); continue; }
+  const a = agg.get(pid) ?? { revenue: 0, cost: 0, hours: 0 };
+  a.revenue += usdFrom(r);
+  agg.set(pid, a);
+}
+
+for (const r of costsRows) {
+  const pid = mapRowToProjectId(r);
+  if (!pid) { orphans.costs.push(sample(r)); continue; }
+  const a = agg.get(pid) ?? { revenue: 0, cost: 0, hours: 0 };
+  a.cost   += usdFrom(r);
+  a.hours  += safeNumber(r.horasReales);
+  agg.set(pid, a);
+}
+
+// Construye lista final asegurando incluir recurrentes aunque no estén en agg
+const projects = catalog.map(p => {
+  const a = agg.get(p.id) ?? { revenue: 0, cost: 0, hours: 0 };
+  const hasActivity = a.revenue + a.cost + a.hours > 0;
+  const isRecurring = p.projectType.toLowerCase().includes("fee");
+  const isActiveInPeriod = isRecurring || hasActivity;
+  return { projectId: p.id, clientName: p.clientName, projectName: p.projectName,
+           isRecurring, isOneShot: !isRecurring, hasPeriodActivity: hasActivity,
+           isActiveInPeriod, period: { revenueUSD: a.revenue, costUSD: a.cost,
+                                       profitUSD: a.revenue - a.cost, workedHours: a.hours }};
+});
+10) Señales de que “está trayendo TODOS”
+coverageRatio == 1 (o muy cercano, p. ej. 0.98 si faltan alias puntuales).
+orphanRows.sales == 0 y orphanRows.costs == 0.
+El número de cards con activeOnly=false = total de proyectos del catálogo (recurrentes + one-shot).
+Las sumas arriba coinciden con Σ de las cards visibles (prueba cruzada con cURL).
+Para Warner/Kimberly: los totales de período coinciden con las filas de Excel (validación Golden).

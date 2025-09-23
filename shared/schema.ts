@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -645,6 +645,37 @@ export const insertActiveProjectSchema = baseInsertActiveProjectSchema.extend({
   // Campo para presupuesto
   budget: z.number().optional(), // presupuesto total del proyecto
 });
+
+// ==================== PROJECT ALIASES FOR EXCEL MAPPING ====================
+// Explicit mapping table for Excel project names to active project IDs
+// Replaces fuzzy matching with explicit, reliable mappings
+export const projectAliases = pgTable("project_aliases", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  excelClient: varchar("excel_client", { length: 255 }).notNull(), // Client name as it appears in Excel
+  excelProject: varchar("excel_project", { length: 255 }).notNull(), // Project name as it appears in Excel
+  source: varchar("source", { length: 50 }).notNull().default("migration"), // "migration", "manual", "auto_detected"
+  confidence: doublePrecision("confidence").notNull().default(1.0), // 0.0-1.0 confidence score
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"), // Optional notes about this mapping
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+  lastMatchedAt: timestamp("last_matched_at"), // When this alias was last used for matching
+  matchCount: integer("match_count").notNull().default(0), // How many times this alias has been used
+}, (table) => ({
+  // Unique constraint to prevent duplicate mappings
+  uniqueExcelMapping: unique("unique_excel_mapping").on(table.excelClient, table.excelProject),
+}));
+
+export const insertProjectAliasSchema = createInsertSchema(projectAliases).omit({
+  id: true,
+  createdAt: true,
+  lastMatchedAt: true,
+  matchCount: true,
+});
+
+export type ProjectAlias = typeof projectAliases.$inferSelect;
+export type InsertProjectAlias = z.infer<typeof insertProjectAliasSchema>;
 
 // ==================== PLANTILLAS DE RECURRENCIA ====================
 // Plantillas para generar automáticamente subproyectos recurrentes
