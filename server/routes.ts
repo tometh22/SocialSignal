@@ -10506,31 +10506,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test endpoint for date parser
-  app.get("/api/etl/test-date-parser", requireAuth, async (req, res) => {
+  // Test endpoint for golden values using universal aggregator
+  app.get("/api/etl/test-golden-values", requireAuth, async (req, res) => {
     try {
-      const { testDateParser } = await import('./utils/date-parser');
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
       
-      // Capture console output for test results
-      const originalLog = console.log;
-      const testResults: string[] = [];
-      console.log = (message: string) => {
-        testResults.push(message);
-        originalLog(message);
-      };
-      
-      testDateParser();
-      
-      // Restore console.log
-      console.log = originalLog;
+      const aggregator = new UniversalAggregator(db);
+      const testResult = await aggregator.testGoldenValues();
       
       res.json({
-        test_results: testResults,
-        status: 'completed'
+        success: testResult.success,
+        results: testResult.results,
+        timestamp: new Date().toISOString()
       });
       
     } catch (error) {
-      console.error('❌ Date Parser Test Error:', error);
+      console.error('❌ Golden Values Test Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Universal aggregator endpoint - single project/month
+  app.get("/api/etl/aggregate/:projectKey/:monthKey", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { projectKey, monthKey } = req.params;
+      
+      const aggregator = new UniversalAggregator(db);
+      const metrics = await aggregator.aggregateByProject(
+        decodeURIComponent(projectKey), 
+        monthKey
+      );
+      
+      res.json({
+        success: true,
+        metrics,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Universal Aggregator Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Universal aggregator endpoint - bulk processing
+  app.post("/api/etl/aggregate-bulk", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      
+      const filters = req.body.filters || {};
+      const projectTypeMap = req.body.projectTypeMap ? new Map(req.body.projectTypeMap) : undefined;
+      
+      const aggregator = new UniversalAggregator(db);
+      const metricsArray = await aggregator.aggregateMultipleProjects(filters, projectTypeMap);
+      
+      res.json({
+        success: true,
+        metrics: metricsArray,
+        count: metricsArray.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Bulk Aggregator Error:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : String(error) 
       });
