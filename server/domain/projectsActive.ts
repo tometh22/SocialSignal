@@ -20,7 +20,7 @@ import {
   projectAliases
 } from "@shared/schema";
 
-import { parseMoneyAuto } from "../utils/money";
+import { parseMoneySmart, normalizeAmount } from "../utils/money";
 import { projectKey } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
 import type { IStorage } from "../storage";
@@ -240,7 +240,7 @@ export class ActiveProjectsAggregator {
 
   /**
    * Get sales data from "Ventas Tomi" sheet (Excel MAESTRO)
-   * Applies currency normalization with parseMoneyAuto()
+   * Applies currency normalization with normalizeAmount() - Anti ×100 bug
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
     // Get all sales from Google Sheets integration
@@ -252,8 +252,8 @@ export class ActiveProjectsAggregator {
     for (const sale of allSales) {
       const rawUSD = sale.amountUsd;
       const rawARS = sale.amountLocal;
-      const parsedUSD = parseMoneyAuto(rawUSD || 0);
-      const parsedARS = parseMoneyAuto(rawARS || 0);
+      const parsedUSD = normalizeAmount(rawUSD || 0);
+      const parsedARS = normalizeAmount(rawARS || 0);
       
       // Flag suspicious values that might have ×100 multiplier issue
       const isSuspicious = (typeof rawUSD === 'string' && rawUSD.includes('.') && parsedUSD > 100000) ||
@@ -293,8 +293,8 @@ export class ActiveProjectsAggregator {
       console.log(`   Raw amountUsd: "${sale.amountUsd}" (type: ${typeof sale.amountUsd})`);
       console.log(`   Raw amountLocal: "${sale.amountLocal}" (type: ${typeof sale.amountLocal})`);
       
-      const montoUSD = parseMoneyAuto(sale.amountUsd || 0);
-      const montoARS = parseMoneyAuto(sale.amountLocal || 0);
+      const montoUSD = normalizeAmount(sale.amountUsd || 0);
+      const montoARS = normalizeAmount(sale.amountLocal || 0);
       
       console.log(`   Parsed USD: ${montoUSD}, Parsed ARS: ${montoARS}`);
       
@@ -355,12 +355,12 @@ export class ActiveProjectsAggregator {
       // Cost normalization with FX conversion according to specification  
       // Rule: Si Moneda Original USD > 0 → ese valor. Si solo hay ARS → usd = ARS / fx
       const costPeriod = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
-      const montoUSD = parseMoneyAuto(cost.montoTotalUSD || 0);
-      const montoARS = parseMoneyAuto(cost.costoTotal || 0); // costoTotal is the local cost amount
+      const montoUSD = normalizeAmount(cost.montoTotalUSD || 0);
+      const montoARS = normalizeAmount(cost.costoTotal || 0); // costoTotal is the local cost amount
       
       const costUSD = convertToUsd(montoUSD, montoARS, costPeriod);
-      const hoursReal = parseMoneyAuto(cost.horasRealesAsana || 0);
-      const hoursTarget = parseMoneyAuto(cost.horasObjetivo || 0);
+      const hoursReal = normalizeAmount(cost.horasRealesAsana || 0);
+      const hoursTarget = normalizeAmount(cost.horasObjetivo || 0);
 
       if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
 
