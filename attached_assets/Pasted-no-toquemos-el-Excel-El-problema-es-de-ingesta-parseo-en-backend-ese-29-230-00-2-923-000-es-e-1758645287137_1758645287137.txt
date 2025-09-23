@@ -1,0 +1,106 @@
+no toquemos el Excel.
+El problema es de ingesta/parseo en backend (ese “$29,230.00 → 2,923,000” es el clásico bug de quitar coma y punto). Se arregla 100% del lado de código con una capa de normalización de moneda y pidiendo a Google Sheets los valores no formateados.
+Aquí va el plan quirúrgico, sin tocar la hoja.
+1) Leer SIEMPRE valores numéricos “crudos”
+En el lector de Sheets usá el flag correcto:
+// services/sheets.ts (o donde leas la sheet)
+sheets.spreadsheets.values.get({
+  spreadsheetId,
+  range,
+  valueRenderOption: 'UNFORMATTED_VALUE', // ← clave
+  dateTimeRenderOption: 'SERIAL_NUMBER',
+});
+Con esto, si en la celda hay 29 230.00, te llega 29230 (number), no “$29,230.00” (string).
+Si por restricciones tenés que seguir leyendo como string, pasá al Paso 2: parseo robusto.
+2) Parser de moneda robusto (anti ×100)
+Reemplazá cualquier parseo tipo replace(/[^\d]/g,'') por un parser que detecta el separador decimal. Úsalo para Ventas Tomi y Costos directos e indirectos.
+// utils/money.ts
+export function parseMoneySmart(raw: unknown): number {
+  if (typeof raw === 'number') return raw;
+  if (raw == null) return 0;
+
+  let s = String(raw).trim();
+  // quitar símbolos y espacios, dejar sólo dígitos, coma, punto y signo
+  s = s.replace(/[^\d.,\-]/g, '');
+
+  const hasC = s.includes(',');
+  const hasD = s.includes('.');
+
+  if (hasC && hasD) {
+    // último separador es el decimal
+    const last = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+    const dec  = s[last];
+    if (dec === ',') s = s.replace(/\./g, '').replace(',', '.'); // "29.230,00" → "29230.00"
+    else             s = s.replace(/,/g, '');                     // "29,230.00" → "29230.00"
+  } else if (hasC && !hasD) {
+    // sólo coma: si termina con 1-2 dígitos es decimal, sino miles
+    s = /,(\d{1,2})$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '');
+  } else if (hasD && !hasC) {
+    // sólo punto: si termina con 1-2 dígitos es decimal, sino miles
+    s = /\.(\d{1,2})$/.test(s) ? s : s.replace(/\./g, '');
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+“Seguro de vida” anti ×100
+Si alguna ruta legacy produjo el número inflado, lo corregimos sin tocar datos:
+export function normalizeAmount(raw: unknown): number {
+  const smart = parseMoneySmart(raw); // 29230
+  const digitsOnly = String(raw ?? '').replace(/[^\d\-]/g, '');
+  const inflated = Number(digitsOnly); // 2923000 si alguien quitó coma y punto
+
+  if (Number.isFinite(inflated) && inflated > 0) {
+    const ratio = inflated / (smart || 1);
+    if (ratio > 95 && ratio < 105) return smart; // estaba ×100 → devolvé el correcto
+  }
+  return smart;
+}
+Resultado: “$29,230.00” nunca más termina en 2,923,000.
+3) Reglas de negocio (misma base en todos lados)
+Ingresos (Ventas Tomi)
+Filtro temporal: mes = Agosto & año = 2025 (para Last Month).
+Valor: Monto_USD si > 0. Si no, Monto_ARS / tipoCambio.
+(Opcional) Confirmado: SI, según tu criterio.
+Agrupar por cliente + proyecto normalizados.
+Costos (Costos directos e indirectos)
+Filtro temporal: agosto 2025.
+USD: montoTotalUSD si > 0; si no, costoTotal / tipoCambio; si no, costoTotal.
+Horas: sumar workedHours del período; targetHours del presupuesto si existe.
+KPIs (consistentes en todo)
+profit      = revenue - cost
+markupRatio = cost > 0 ? revenue / cost : null   // mostrar como “x.xx×”
+marginPct   = revenue > 0 ? profit / revenue : null
+efficiency  = target > 0 ? worked / target : null
+4) Dónde conectar esto
+domain/projectsActive.ts (o tu agregador): usar normalizeAmount al mapear cada fila ANTES de sumar.
+domain/metrics.ts / complete-data: mismo criterio, así Proyecto único y Proyectos activos coinciden.
+services/sheets.ts: valueRenderOption: 'UNFORMATTED_VALUE' + fallback a parseMoneySmart.
+5) Validaciones rápidas que te protegen
+Sanity log (no bloqueante):
+if (markupRatio && markupRatio > 20) warn(...)
+if (revenueUSD > 1_000_000 && revenueUSD > 10 * median_12m) warn(...)
+Debug por card (opcional): al hacer hover, mostrar: filas de ventas usadas, total parseado, filas de costos usadas. Así auditás en 3 segundos.
+6) Qué deberías ver después (agosto 2025)
+Warner · Fee Marketing
+Revenue: $29,230.00
+Cost: $15,824.55
+Profit: $13,405.45
+Worked/Target: 660.2h / 989.0h → Eff 66.8%
+Markup: 1.85×
+Margin: 45.9%
+Kimberly · Fee Huggies
+Revenue: $8,450.00
+Cost: $2,436.09
+Profit: $6,013.91
+Worked/Target: 288.3h / 320.0h → Eff 90.1%
+Markup: 3.47×
+Margin: 71.2%
+7) Smokes para confirmar (sin tocar Excel)
+Warner (agosto): revenue = 29230, markup ≈ 1.85×.
+Huggies (agosto): revenue = 8450, cost ≈ 2436.09.
+Top cards (Last Month):
+Period Revenue = suma de los revenues por proyecto filtrados.
+Period Profit = suma de profits.
+Period Hours = Σ workedHours.
+Active Projects = recurrentes + one-shot con actividad en el período.

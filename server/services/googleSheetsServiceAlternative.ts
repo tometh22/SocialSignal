@@ -104,6 +104,8 @@ class GoogleSheetsServiceAlternative {
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
+        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
       const rows = response.data.values;
