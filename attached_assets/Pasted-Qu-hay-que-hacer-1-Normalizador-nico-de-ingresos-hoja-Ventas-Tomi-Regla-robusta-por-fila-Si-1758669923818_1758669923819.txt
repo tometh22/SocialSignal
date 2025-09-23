@@ -1,0 +1,69 @@
+Qué hay que hacer?
+1) Normalizador único de ingresos (hoja “Ventas Tomi”)
+Regla robusta por fila:
+Si Monto_USD > 0 ⇒ revenueUSD = Monto_USD
+Si Monto_USD == 0 y Monto_ARS > 0 ⇒ revenueUSD = Monto_ARS / fx(monthKey)
+Si ambos son 0 ⇒ descartar
+Sólo incluir si Confirmado == "Si"
+Anti×100: si Monto_USD >= 100_000 && Monto_ARS == 0 y Monto_USD % 100 == 0, probar Monto_USD/100 (loggear el fix)
+monthKey = YYYY-MM usando un parser de mes en español a prueba de “08 ago”, “Agosto”, etc.
+Código (backend/TypeScript)
+// services/dates.ts
+const ES_MONTHS = {
+  enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,
+  julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12
+};
+export function monthKeyFromSpanish(mesRaw: string, año: number){
+  const s = (mesRaw||"").toString().trim().toLowerCase();
+  // soporta "08 ago", "8 ago", "agosto", "Agosto  ", etc.
+  const m = Object.keys(ES_MONTHS).find(k=>s.includes(k)) 
+        ?? (/(\d{1,2})/).exec(s)?.[1];
+  const n = typeof m === "string" ? Number(m) : ES_MONTHS[m!];
+  if(!n || n<1 || n>12) throw new Error(`Mes inválido: ${mesRaw}`);
+  return `${año}-${String(n).padStart(2,'0')}`;
+}
+// services/fx.ts
+export function fxForMonth(monthKey: string): number {
+  // 1) si tenés tabla de FX por mes, usarla
+  // 2) fallback: FX del motor de costos (siempre coincide por mes)
+  // 3) último recurso: 1
+  return FX_TABLE[monthKey] ?? COST_ENGINE_FX[monthKey] ?? 1;
+}
+// services/sales.ts
+type RawSale = { Cliente:string; Proyecto:string; Mes:string; Año:number;
+                 Monto_ARS:number; Monto_USD:number; Confirmado:string; };
+
+export function normalizeSales(rows: RawSale[]){
+  const out: Array<{
+    client:string, project:string, monthKey:string,
+    currency:"ARS"|"USD", revenueUSD:number
+  }> = [];
+  for (const r of rows){
+    if ((r.Confirmado||"").toLowerCase()!=="si") continue;
+
+    const monthKey = monthKeyFromSpanish(r.Mes, r.Año);
+    const usdRaw   = Number(r.Monto_USD||0) || 0;
+    const arsRaw   = Number(r.Monto_ARS||0) || 0;
+
+    let usd = 0;
+    let currency: "ARS"|"USD" = "USD";
+
+    if (usdRaw > 0){
+      // Anti×100 defensivo
+      const maybeFix = (usdRaw >= 100_000 && arsRaw === 0 && usdRaw % 100 === 0)
+        ? usdRaw/100 : usdRaw;
+      usd = maybeFix; currency = "USD";
+    } else if (arsRaw > 0){
+      usd = arsRaw / fxForMonth(monthKey); currency = "ARS";
+    } else {
+      continue;
+    }
+
+    out.push({
+      client: (r.Cliente||"").trim(),
+      project: (r.Proyecto||"").trim(),
+      monthKey, currency, revenueUSD: usd
+    });
+  }
+  return out;
+}
