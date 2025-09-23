@@ -44,6 +44,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), and predictive insights.
 - **Financial Overview**: Consolidated financial dashboard with operational vs financial analysis comparison.
 - **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization service with automatic imports from "Ventas Tomi" sheet.
+- **Universal ETL System "Líneas Generales"**: Flexible data processing format supporting ARS/USD currency handling, intelligent field preferences ("Monto Total USD" over "Monto Original USD", "Cantidad de horas asana" over "Cantidad de Horas"), automatic format detection, anti-×100 pattern correction, and seamless integration with existing ETL infrastructure. Maintains golden test values (Warner Fee Marketing: $29,230, Kimberly Fee Huggies: $8,450 for August 2025). Includes automatic synchronization via AutoSyncService every 30 minutes with intelligent format detection.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
 - **Dual-Cost System**: Differentiates between real costs (cash outflow) and operational costs (team productivity analysis).
