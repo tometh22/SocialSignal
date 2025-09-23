@@ -78,6 +78,7 @@ import {
   directCosts
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
+import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
 import { upload, deleteOldFile } from "./upload";
@@ -3922,6 +3923,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching active projects count:", error);
       res.status(500).json({ message: "Failed to fetch active projects count", count: 0 });
+    }
+  });
+
+  // Excel MAESTRO Coverage Health Endpoint
+  app.get("/api/health/excel-coverage", requireAuth, async (req, res) => {
+    try {
+      const timeFilter = req.query.timeFilter as string;
+      console.log(`📊 HEALTH: Coverage metrics requested with timeFilter: ${timeFilter || 'none'}`);
+      
+      // Initialize coverage calculator
+      const coverageCalculator = new CoverageCalculator(storage);
+      
+      // Calculate comprehensive coverage metrics
+      const metrics = await coverageCalculator.calculateCoverage(timeFilter);
+      
+      console.log(`📊 HEALTH: Coverage calculated - ${(metrics.coverageRatio * 100).toFixed(1)}% coverage, ${metrics.orphanRows} orphans`);
+      
+      res.json({
+        success: true,
+        metrics,
+        summary: {
+          coveragePercentage: Math.round(metrics.coverageRatio * 100),
+          periodCoveragePercentage: Math.round(metrics.periodCoverageRatio * 100),
+          healthStatus: metrics.coverageRatio > 0.8 ? 'HEALTHY' : metrics.coverageRatio > 0.6 ? 'WARNING' : 'CRITICAL',
+          orphanStatus: metrics.orphanRows < 10 ? 'GOOD' : metrics.orphanRows < 50 ? 'MODERATE' : 'HIGH'
+        }
+      });
+      
+    } catch (error) {
+      console.error("❌ HEALTH: Error calculating Excel coverage metrics:", error);
+      res.status(500).json({ 
+        success: false,
+        error: "Failed to calculate coverage metrics",
+        details: String(error)
+      });
     }
   });
 
