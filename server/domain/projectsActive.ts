@@ -307,65 +307,64 @@ export class ActiveProjectsAggregator {
 
     const filteredCosts: CostRecord[] = [];
 
+    // UNIFIED AGGREGATION ENGINE: ∑ by exact key + monthKey (plan implementation)
+    const periodMonthKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+    const costAggregator = new Map<string, { costUSD: number; hoursReal: number; hoursTarget: number; count: number }>();
+
     for (const cost of allCosts) {
       // Filter: ONLY "Directo" costs (not "Indirecto" overhead)
       if (cost.tipoGasto !== 'Directo') continue;
 
-      // Temporal filtering using monthKey (blueprint plan implementation)
+      // Temporal filtering: exact monthKey matching only
       if (cost.año && cost.mes) {
-        // Parse month from "08 ago" format and create monthKey
         const monthNum = parseInt(cost.mes.split(' ')[0]);
         if (monthNum) {
-          const monthKey = `${cost.año}-${String(monthNum).padStart(2, '0')}`;
-          const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
-          const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
-          
-          console.log(`🔍 COST FILTER: ${cost.proyecto} - monthKey: ${monthKey}, period: ${periodStartKey} to ${periodEndKey}`);
-          
-          // Exact monthKey matching (blueprint: filter by monthKey)
-          if (monthKey < periodStartKey || monthKey > periodEndKey) {
-            console.log(`❌ FILTERED OUT: ${cost.proyecto} (${monthKey} not in range)`);
-            continue;
-          }
-          console.log(`✅ PASSED FILTER: ${cost.proyecto} (${monthKey})`);
-        } else {
-          console.log(`❌ NO MONTH NUM: ${cost.proyecto} - mes: "${cost.mes}"`);
-          continue;
-        }
-      } else {
-        console.log(`❌ NO DATE: ${cost.proyecto} - año: ${cost.año}, mes: "${cost.mes}"`);
-        continue;
-      }
+          const costMonthKey = `${cost.año}-${String(monthNum).padStart(2, '0')}`;
+          if (costMonthKey !== periodMonthKey) continue; // Exact match only
+        } else continue;
+      } else continue;
 
-      // Cost normalization with FX conversion according to specification  
-      // Rule: Si Moneda Original USD > 0 → ese valor. Si solo hay ARS → usd = ARS / fx
-      const costPeriod = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
+      // Cost normalization with FX conversion
       const montoUSD = normalizeAmount(cost.montoTotalUSD || 0);
-      const montoARS = normalizeAmount(cost.costoTotal || 0); // costoTotal is the local cost amount
-      
+      const montoARS = normalizeAmount(cost.costoTotal || 0);
+      const costPeriod = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
       const costUSD = convertToUsd(montoUSD, montoARS, costPeriod);
-      
-      // 🔍 DEBUG: Log cost values for Warner and Kimberly
-      if (cost.proyecto?.includes('Fee Marketing') || cost.proyecto?.includes('Fee Huggies')) {
-        console.log(`🔍 COST DEBUG: ${cost.cliente || 'N/A'} · ${cost.proyecto}`);
-        console.log(`   Raw montoTotalUSD: ${cost.montoTotalUSD} (type: ${typeof cost.montoTotalUSD})`);
-        console.log(`   Raw costoTotal: ${cost.costoTotal} (type: ${typeof cost.costoTotal})`);
-        console.log(`   Normalized montoUSD: ${montoUSD}, montoARS: ${montoARS}`);
-        console.log(`   Final costUSD: ${costUSD}, Hours: ${cost.horasRealesAsana}`);
-      }
       const hoursReal = normalizeAmount(cost.horasRealesAsana || 0);
       const hoursTarget = normalizeAmount(cost.horasObjetivo || 0);
 
       if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
 
+      // Create aggregation key: exact project name
+      const aggregationKey = projectKey(cost.proyecto || '');
+      if (!aggregationKey) continue;
+
+      // Debug Warner costs specifically to identify duplication source
+      if (cost.proyecto?.toLowerCase().includes('fee marketing')) {
+        console.log(`🔍 WARNER COST: ${cost.cliente} | ${cost.proyecto} | ${costUSD} USD | ${cost.mes} ${cost.año}`);
+        console.log(`   MontoUSD: ${montoUSD} | MontoARS: ${montoARS} | Hours: ${hoursReal}`);
+      }
+
+      // Aggregate by exact key (no duplicates)
+      const existing = costAggregator.get(aggregationKey) || { costUSD: 0, hoursReal: 0, hoursTarget: 0, count: 0 };
+      costAggregator.set(aggregationKey, {
+        costUSD: existing.costUSD + costUSD,
+        hoursReal: existing.hoursReal + hoursReal,
+        hoursTarget: existing.hoursTarget + hoursTarget,
+        count: existing.count + 1
+      });
+    }
+
+    // Convert aggregated costs back to filteredCosts format
+    for (const [key, aggregated] of costAggregator.entries()) {
       filteredCosts.push({
-        projectKey: projectKey(cost.proyecto || ''),
-        projectName: cost.proyecto || '',
-        costUSD,
-        hoursReal,
-        hoursTarget,
-        month: cost.mes || '',
-        year: cost.año || 0
+        projectKey: key,
+        projectName: key.replace(/[^\w\s]/g, '').trim(), // Clean project name
+        costUSD: aggregated.costUSD,
+        hoursReal: aggregated.hoursReal,
+        hoursTarget: aggregated.hoursTarget,
+        month: period.start.substring(5, 7), // Extract month from period
+        year: parseInt(period.start.substring(0, 4)), // Extract year from period
+        aggregatedRecords: aggregated.count
       });
     }
 
