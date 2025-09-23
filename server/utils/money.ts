@@ -30,20 +30,62 @@ export function parseMoneyUnified(raw: unknown): number {
  * 🛡️ DETECCIÓN ANTI-X100 GENÉRICA POR FILA
  * Calcula usdFromArs = montoARS / tipoCambio
  * Si abs(montoUSD - usdFromArs*100) <= 0.5 ⇒ corregir montoUSD = montoUSD/100, flag anomaly: 'x100_fixed'
+ * PLUS: Detección solo-USD para valores grandes con patrón x100
  */
 export function detectAntiX100Generic(montoUSD: number, montoARS: number, tipoCambio: number): { correctedUSD: number; anomaly?: string } {
-  if (!montoUSD || !montoARS || !tipoCambio || tipoCambio <= 0) {
+  if (!montoUSD || tipoCambio <= 0) {
     return { correctedUSD: montoUSD };
   }
 
-  const usdFromArs = montoARS / tipoCambio;
-  const difference = Math.abs(montoUSD - usdFromArs * 100);
+  // MODO 1: Detección con ARS (como especificaste originalmente)
+  if (montoARS && montoARS > 0) {
+    const usdFromArs = montoARS / tipoCambio;
+    const difference = Math.abs(montoUSD - usdFromArs * 100);
+    
+    // Si la diferencia es <= 0.5, es muy probable que sea un error x100
+    if (difference <= 0.5) {
+      const correctedUSD = montoUSD / 100;
+      console.log(`🔧 ANTI×100 GENÉRICO ARS: ${montoUSD} → ${correctedUSD} (diferencia: ${difference.toFixed(3)})`);
+      return { correctedUSD, anomaly: 'x100_fixed' };
+    }
+  }
   
-  // Si la diferencia es <= 0.5, es muy probable que sea un error x100
-  if (difference <= 0.5) {
-    const correctedUSD = montoUSD / 100;
-    console.log(`🔧 ANTI×100 GENÉRICO: ${montoUSD} → ${correctedUSD} (diferencia: ${difference.toFixed(3)})`);
-    return { correctedUSD, anomaly: 'x100_fixed' };
+  // MODO 2: Detección solo-USD para valores grandes (sales típicamente no tienen ARS)
+  // Detectar patrones x10000, x1000, x100 según magnitud
+  if (montoUSD > 50000) {
+    let candidate: number;
+    let divider: number;
+    let patternName: string;
+    
+    // Detectar x10000 para valores muy grandes (millones)
+    if (montoUSD > 10000000 && montoUSD % 10000 === 0) {
+      candidate = montoUSD / 10000;
+      divider = 10000;
+      patternName = 'x10000';
+    }
+    // Detectar x1000 para valores grandes (cientos de miles)
+    else if (montoUSD > 1000000 && montoUSD % 1000 === 0) {
+      candidate = montoUSD / 1000;
+      divider = 1000;
+      patternName = 'x1000';
+    }
+    // Detectar x100 para valores medianos (decenas de miles)
+    else if (montoUSD % 100 === 0 && montoUSD.toString().endsWith('00')) {
+      candidate = montoUSD / 100;
+      divider = 100;
+      patternName = 'x100';
+    }
+    else {
+      return { correctedUSD: montoUSD };
+    }
+    
+    // El candidato debe estar en rango business razonable
+    const isReasonableRange = candidate >= 100 && candidate <= 500000;
+    
+    if (isReasonableRange) {
+      console.log(`🔧 ANTI×${divider} GENÉRICO USD: ${montoUSD} → ${candidate} (patrón ${patternName} detectado)`);
+      return { correctedUSD: candidate, anomaly: `${patternName}_fixed` };
+    }
   }
   
   return { correctedUSD: montoUSD };
