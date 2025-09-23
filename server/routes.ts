@@ -292,8 +292,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get unified data using blueprint aggregator
       const response = await aggregator.getActiveProjectsUnified(timeFilter, onlyActiveInPeriod);
       
-      console.log(`✅ Successfully aggregated ${response.projects.length} projects`);
-      console.log(`💰 Portfolio: $${response.summary.portfolio.periodRevenueUSD.toFixed(2)} revenue, ${response.summary.portfolio.periodWorkedHours.toFixed(1)}h worked`);
+      console.log(`🔍 DEBUG: Response type:`, typeof response);
+      console.log(`🔍 DEBUG: Response is null:`, response === null);
+      console.log(`🔍 DEBUG: Response is undefined:`, response === undefined);
+      if (response) {
+        console.log(`🔍 DEBUG: Response keys:`, Object.keys(response));
+        console.log(`✅ Successfully aggregated ${response.projects?.length || 0} projects`);
+        console.log(`🔍 DEBUG: Summary exists:`, !!response.summary);
+        if (response.summary) {
+          console.log(`💰 Portfolio: $${response.summary.periodRevenueUSD.toFixed(2)} revenue, ${response.summary.periodWorkedHours.toFixed(1)}h worked`);
+        } else {
+          console.log(`❌ SUMMARY IS UNDEFINED!`);
+        }
+      } else {
+        console.log(`❌ ENTIRE RESPONSE IS NULL/UNDEFINED!`);
+      }
 
       // Validate response with Zod before sending
       const responseValidation = activeProjectsResponseSchema.safeParse(response);

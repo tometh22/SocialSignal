@@ -202,6 +202,7 @@ export class ActiveProjectsAggregator {
 
     // 7. Calculate portfolio summary by REDUCTION (guarantees invariants)
     const portfolioSummary = this.calculatePortfolioSummary(filteredProjects);
+    console.log(`🔍 DEBUG PORTFOLIO SUMMARY:`, JSON.stringify(portfolioSummary, null, 2));
 
     // 8. Verify invariants according to blueprint
     this.verifyInvariants(filteredProjects, portfolioSummary);
@@ -229,7 +230,9 @@ export class ActiveProjectsAggregator {
         periodProfitUSD: portfolioSummary.periodProfitUSD,
         periodWorkedHours: portfolioSummary.periodWorkedHours,
         activeProjects: portfolioSummary.activeProjects,
-        totalProjects: portfolioSummary.totalProjects
+        totalProjects: portfolioSummary.totalProjects,
+        efficiencyFrac: portfolioSummary.efficiencyFrac,
+        markupRatio: portfolioSummary.markupRatio
       },
       projects: filteredProjects
     };
