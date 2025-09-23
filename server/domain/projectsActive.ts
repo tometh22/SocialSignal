@@ -25,6 +25,7 @@ import { resolvePeriod } from "@shared/utils/timePeriod";
 import { parseMoneyUnified } from "../utils/money";
 import { canon, generateProjectKey, generateCanonicalFields } from "../utils/normalize";
 import { convertToUsd, extractPeriod } from "../utils/fx";
+import { monthKeyFromSpanish } from "../services/dates";
 import type { IStorage } from "../storage";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
@@ -234,14 +235,20 @@ export class ActiveProjectsAggregator {
       // Filter: ONLY "Directo" costs (not "Indirecto" overhead)
       if (cost.tipoGasto !== 'Directo') continue;
 
-      // Temporal filtering: exact monthKey matching only
+      // 🎯 FIXED: Temporal filtering usando parser español robusto
       if (cost.año && cost.mes) {
-        const monthNum = parseInt(cost.mes.split(' ')[0]);
-        if (monthNum) {
-          const costMonthKey = `${cost.año}-${String(monthNum).padStart(2, '0')}`;
+        try {
+          const costMonthKey = monthKeyFromSpanish(cost.mes, cost.año);
+          console.log(`🔧 COST TEMPORAL FILTER: "${cost.mes}" (${cost.año}) → "${costMonthKey}" vs period "${periodMonthKey}"`);
           if (costMonthKey !== periodMonthKey) continue; // Exact match only
-        } else continue;
-      } else continue;
+        } catch (error) {
+          console.warn(`🔧 COST MONTH PARSE ERROR: "${cost.mes}" → skipping entry`);
+          continue;
+        }
+      } else {
+        console.warn(`🔧 COST MISSING DATA: año="${cost.año}", mes="${cost.mes}" → skipping entry`);
+        continue;
+      }
 
       // Cost normalization with FX conversion
       const montoUSD = parseMoneyUnified(cost.montoTotalUSD || 0);
