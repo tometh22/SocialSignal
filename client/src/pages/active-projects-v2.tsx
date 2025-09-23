@@ -47,6 +47,7 @@ import type {
   ActiveProjectItem,
   TimeFilter 
 } from "@shared/schema";
+import { f } from "@/utils/formatters";
 
 // ==================== TYPES & INTERFACES ====================
 
@@ -64,22 +65,17 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
   // Calculate status indicators based on flags and metrics
   const hasData = flags.hasSales || flags.hasCosts || flags.hasHours;
   const isHealthy = metrics.markupRatio && metrics.markupRatio >= 1.15;
-  const isEfficient = metrics.efficiencyPct && metrics.efficiencyPct <= 105;
+  const isEfficient = metrics.efficiencyFrac && metrics.efficiencyFrac <= 1.05;
 
   // Format display values
-  const revenueDisplay = new Intl.NumberFormat('en-US', { 
-    style: 'currency', 
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(metrics.revenueUSD);
+  const revenueDisplay = f.usdCompact.format(metrics.revenueUSD);
 
   const markupDisplay = metrics.markupRatio 
-    ? `${((metrics.markupRatio - 1) * 100).toFixed(0)}%`
+    ? f.markupX(metrics.markupRatio)
     : 'N/A';
 
-  const efficiencyDisplay = metrics.efficiencyPct 
-    ? `${metrics.efficiencyPct.toFixed(0)}%`
+  const efficiencyDisplay = metrics.efficiencyFrac 
+    ? f.pct(metrics.efficiencyFrac)
     : 'N/A';
 
   const progressValue = metrics.targetHours > 0 
@@ -233,10 +229,10 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
                   <div className="flex justify-between font-semibold">
                     <span>Profit:</span>
                     <span 
-                      className={`font-mono ${metrics.markupUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      className={`font-mono ${metrics.profitUSD >= 0 ? 'text-green-600' : 'text-red-600'}`}
                       data-testid={`text-profit-detail-${project.projectId}`}
                     >
-                      ${metrics.markupUSD.toFixed(0)}
+                      {f.usd.format(metrics.profitUSD)}
                     </span>
                   </div>
                 </div>
@@ -265,7 +261,7 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
                     <span>Efficiency:</span>
                     <span 
                       className={`font-mono ${
-                        metrics.efficiencyPct && metrics.efficiencyPct <= 105 ? 'text-green-600' : 'text-orange-600'
+                        metrics.efficiencyFrac && metrics.efficiencyFrac <= 1.05 ? 'text-green-600' : 'text-orange-600'
                       }`}
                       data-testid={`text-efficiency-detail-${project.projectId}`}
                     >
@@ -470,9 +466,9 @@ export default function ActiveProjectsV2() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Period Profit</p>
                     <p className={`text-2xl font-bold ${
-                      portfolioSummary.periodMarkupUSD >= 0 ? 'text-green-600' : 'text-red-600'
+                      portfolioSummary.periodProfitUSD >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      ${portfolioSummary.periodMarkupUSD.toLocaleString()}
+                      {f.usdCompact.format(portfolioSummary.periodProfitUSD)}
                     </p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-blue-600" />
