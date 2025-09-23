@@ -2021,6 +2021,13 @@ export const activeProjectItemSchema = z.object({
     logo: z.string().nullable()
   }),
   metrics: projectMetricsSchema,
+  // Frontend compatibility fields - map from metrics
+  revenue: z.number().nullable(),
+  cost: z.number().nullable(),
+  profit: z.number().nullable(),
+  periodRevenueUSD: z.number().nullable(),
+  periodCostUSD: z.number().nullable(),
+  periodProfitUSD: z.number().nullable(),
   flags: projectFlagsSchema,
   period: resolvedPeriodSchema
 });

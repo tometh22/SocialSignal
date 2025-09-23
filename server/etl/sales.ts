@@ -67,8 +67,20 @@ export async function processSales(): Promise<SalesETLResult> {
       }
     }
     
+    console.log(`🔧 Processing completed. Total valid records: ${normalizedRecords.length}`);
+    
     // 4. Insertar registros normalizados en batch
     if (normalizedRecords.length > 0) {
+      // DEBUG: Check for null sourceRowId values before insert
+      const invalidRecords = normalizedRecords.filter(r => !r.sourceRowId);
+      if (invalidRecords.length > 0) {
+        console.error('❌ Found records with null sourceRowId:', invalidRecords);
+        throw new Error(`${invalidRecords.length} records have null sourceRowId`);
+      }
+      
+      console.log(`🔧 About to insert ${normalizedRecords.length} records`);
+      console.log('🔧 Sample record:', JSON.stringify(normalizedRecords[0], null, 2));
+      
       await db.insert(salesNorm).values(normalizedRecords);
       result.normalized = normalizedRecords.length;
       console.log(`✅ Inserted ${normalizedRecords.length} normalized sales records`);
@@ -86,19 +98,102 @@ export async function processSales(): Promise<SalesETLResult> {
 }
 
 /**
- * 🔧 NEW FUNCTION - Force reload and test
+ * 🔧 PRODUCTION ETL - Implementa reglas exactas especificadas
  */
 async function normalizeSalesRecordNEW(record: any) {
-  console.log(`🔥 ABSOLUTELY NEW VERSION: Processing record ID ${record?.id}`);
-  console.log(`📝 Data check: clientName="${record?.clientName}", projectName="${record?.projectName}", amountUsd="${record?.amountUsd}"`);
+  console.log(`🎯 PRODUCTION RULES: Processing record ID ${record?.id}: ${record?.clientName} | ${record?.projectName}`);
   
-  // Simple successful processing
-  return {
-    projectKey: `new_test_${record.id}`,
-    monthKey: record.monthKey || '2025-08',
-    usd: '200.00',
-    sourceRowId: record.id?.toString() || 'unknown'
+  // DEBUG: Check for null/undefined ID
+  if (!record.id) {
+    throw new Error(`Record has null/undefined ID: ${JSON.stringify(record)}`);
+  }
+  
+  // 1. FILTRAR: incluir solo confirmado en {"SI", "Sí", true} (case-insensitive)
+  const confirmed = String(record.confirmed || '').toLowerCase().trim();
+  if (!['si', 'sí', 'true', '1'].includes(confirmed)) {
+    throw new Error(`Record ${record.id} not confirmed: "${record.confirmed}"`);
+  }
+  
+  // 2. CLAVE DE PROYECTO: projectKey = canon(cliente) + '|' + canon(proyecto)
+  const clientName = record.clientName || '';
+  const projectName = record.projectName || '';
+  
+  if (!clientName.trim() || !projectName.trim()) {
+    throw new Error(`Record ${record.id} missing client/project: "${clientName}" | "${projectName}"`);
+  }
+  
+  const projectKey = `${canon(clientName)}|${canon(projectName)}`;
+  
+  // 3. MES/AÑO → monthKey: "YYYY-MM" con parser español
+  let monthKey: string;
+  try {
+    if (record.monthKey) {
+      // Ya está en formato YYYY-MM
+      monthKey = record.monthKey;
+    } else if (record.month && record.year) {
+      // Parsear mes español a número
+      const monthNumber = typeof record.month === 'number' 
+        ? record.month 
+        : parseSpanishMonth(record.month);
+      monthKey = `${record.year}-${monthNumber.toString().padStart(2, '0')}`;
+    } else {
+      throw new Error(`Cannot determine month/year from record`);
+    }
+  } catch (error) {
+    throw new Error(`Record ${record.id} invalid date: ${error}`);
+  }
+  
+  // 4. MONEDA con anti-x100
+  let usd = 0;
+  let anomaly = null;
+  
+  const montoUSD = parseFloat(record.amountUsd || '0');
+  const montoARS = parseFloat(record.amountLocal || '0');
+  const fx = parseFloat(record.fxApplied || '0');
+  
+  if (montoUSD > 0) {
+    usd = montoUSD;
+  } else if (montoARS > 0 && fx > 0) {
+    usd = montoARS / fx;
+  } else {
+    throw new Error(`Record ${record.id} no valid amount: USD=${montoUSD}, ARS=${montoARS}, FX=${fx}`);
+  }
+  
+  // Anti×100: si existe montoARS y fx, verificar corrupción
+  if (montoARS > 0 && fx > 0) {
+    const arsFx = montoARS / fx;
+    const diff = Math.abs(usd - arsFx * 100);
+    
+    if (diff <= 0.5) {
+      console.log(`🔧 ANTI×100 DETECTED: Record ${record.id}: ${usd} → ${usd/100} (diff: ${diff.toFixed(3)})`);
+      usd = usd / 100;
+      anomaly = 'x100_fixed';
+    }
+  }
+  
+  // 5. DETERMINAR TIPO
+  const salesType = String(record.salesType || '').toLowerCase();
+  let type: string;
+  if (salesType.includes('fee')) {
+    type = 'Fee';
+  } else if (salesType.includes('one shot') || salesType.includes('oneshot')) {
+    type = 'One Shot';
+  } else {
+    // Fallback basado en nombre del proyecto
+    type = projectName.toLowerCase().includes('fee') ? 'Fee' : 'One Shot';
+  }
+  
+  // 6. SALIDA NORMALIZADA - Formato exacto requerido por sales_norm table
+  const result = {
+    projectKey,
+    monthKey,
+    usd: parseFloat(usd.toFixed(2)),
+    sourceRowId: record.id?.toString() || 'unknown',
+    anomaly
   };
+  
+  console.log(`✅ Normalized record ID ${record.id}:`, result);
+  return result;
 }
 
 /**

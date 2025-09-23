@@ -606,6 +606,13 @@ export class ActiveProjectsAggregator {
           logo: client?.logoUrl || null
         },
         metrics,
+        // Map metrics to top-level fields for frontend compatibility
+        revenue: revenueUSD,
+        cost: costUSD,
+        profit: profitUSD,
+        periodRevenueUSD: revenueUSD,
+        periodCostUSD: costUSD,
+        periodProfitUSD: profitUSD,
         flags,
         period
       });
