@@ -357,15 +357,33 @@ export default function ActiveProjectsV2() {
 
   const { projects = [], summary, period } = response || {};
   
-  // Filter projects by search term
+  // Filter and sort projects
   const filteredProjects = useMemo(() => {
-    if (!searchTerm.trim()) return projects;
+    let filtered = projects;
     
-    const term = searchTerm.toLowerCase();
-    return projects.filter(project => 
-      project.name.toLowerCase().includes(term) ||
-      project.client.name.toLowerCase().includes(term)
-    );
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(project => 
+        project.name.toLowerCase().includes(term) ||
+        project.client.name.toLowerCase().includes(term)
+      );
+    }
+    
+    // Sort by Revenue desc → Profit desc → Hours desc (immutable with null safety)
+    const sortedProjects = filtered.slice();
+    return sortedProjects.sort((a, b) => {
+      // Primary sort: Revenue desc
+      const revenueDiff = (b.metrics.revenueUSD ?? 0) - (a.metrics.revenueUSD ?? 0);
+      if (revenueDiff !== 0) return revenueDiff;
+      
+      // Secondary sort: Profit desc
+      const profitDiff = (b.metrics.profitUSD ?? 0) - (a.metrics.profitUSD ?? 0);
+      if (profitDiff !== 0) return profitDiff;
+      
+      // Tertiary sort: Hours desc
+      return (b.metrics.workedHours ?? 0) - (a.metrics.workedHours ?? 0);
+    });
   }, [projects, searchTerm]);
 
   // Use new response structure
