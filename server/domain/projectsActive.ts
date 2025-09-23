@@ -216,30 +216,22 @@ export class ActiveProjectsAggregator {
       console.error(`⚠️ COVERAGE: Error calculating coverage metrics for aggregator:`, error);
     }
 
+    // Return structure according to user specification
     return {
-      summary: {
-        portfolio: portfolioSummary,
-        period: period
+      period: {
+        start: period.start,
+        end: period.end,
+        label: period.label
       },
-      projects: filteredProjects,
-      metadata: {
-        timeFilter: typeof timeFilter === 'string' ? timeFilter : `${timeFilter.start}_to_${timeFilter.end}`,
-        engine: 'unified_aggregator',
-        source: 'Excel_MAESTRO_unified',
-        coverage: coverageMetrics ? {
-          coverageRatio: coverageMetrics.coverageRatio,
-          periodCoverageRatio: coverageMetrics.periodCoverageRatio,
-          orphanRows: coverageMetrics.orphanRows,
-          mappedProjects: coverageMetrics.mappedProjects,
-          catalogActiveProjects: coverageMetrics.catalogActiveProjects,
-          excelProjectsDistinct: coverageMetrics.excelProjectsDistinct,
-          healthStatus: coverageMetrics.coverageRatio > 0.8 ? 'HEALTHY' : 
-                      coverageMetrics.coverageRatio > 0.6 ? 'WARNING' : 'CRITICAL',
-          orphanStatus: coverageMetrics.orphanRows < 10 ? 'GOOD' : 
-                       coverageMetrics.orphanRows < 50 ? 'MODERATE' : 'HIGH',
-          lastCalculatedAt: coverageMetrics.calculatedAt
-        } : null
-      }
+      summary: {
+        periodRevenueUSD: portfolioSummary.periodRevenueUSD,
+        periodCostUSD: portfolioSummary.periodCostUSD,
+        periodProfitUSD: portfolioSummary.periodProfitUSD,
+        periodWorkedHours: portfolioSummary.periodWorkedHours,
+        activeProjects: portfolioSummary.activeProjects,
+        totalProjects: portfolioSummary.totalProjects
+      },
+      projects: filteredProjects
     };
   }
 
