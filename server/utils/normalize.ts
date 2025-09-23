@@ -14,7 +14,7 @@ export const normalizeKey = (s: string | undefined | null) => {
 
 // Mapa de alias (agregar equivalencias reales que tengas en los excels)
 const ALIAS: Record<string,string> = {
-  'fee mensual': 'fee marketing',
+  // Remove incorrect alias that was causing "Fee mensual" to map to "Fee Marketing"
   'fee huggies': 'fee huggies',      // mantener
   // agrega aquí equivalencias reales que tengas en los excels
 };
