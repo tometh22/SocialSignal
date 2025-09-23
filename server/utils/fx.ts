@@ -60,17 +60,37 @@ export function convertToUsd(montoUSD: number, montoARS: number, period: string)
   const normalizedUSD = normalizeAmount(montoUSD);
   const normalizedARS = normalizeAmount(montoARS);
   
-  // 🚨 STEP 2: Extreme corruption detection (Excel import can produce trillions)
-  // If USD amount is suspiciously large compared to ARS equivalent
+  // 🚨 STEP 2: Intelligent Currency Detection
   if (normalizedUSD > 0 && normalizedARS > 0) {
     const expectedUSDFromARS = arsToUsd(normalizedARS, period);
     const ratio = normalizedUSD / expectedUSDFromARS;
     
-    // If USD is >1000x larger than ARS conversion, it's likely corrupted
-    if (ratio > 1000) {
+    // 🔧 EXTREME CORRUPTION (millions/billions): Always use ARS conversion
+    if (ratio > 1000000) {
       console.log(`🔧 EXTREME CORRUPTION DETECTED: USD ${normalizedUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
       console.log(`   Using ARS conversion instead: ${normalizedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
       return expectedUSDFromARS;
+    }
+    
+    // 🎯 SMART DETECTION (1000-1M): Check if USD is reasonable business value
+    if (ratio > 1000) {
+      // If USD amount is in reasonable business range (100-20000), trust it
+      if (normalizedUSD >= 100 && normalizedUSD <= 20000) {
+        console.log(`💡 SMART DETECTION: USD ${normalizedUSD} is reasonable business value despite ${ratio.toFixed(0)}x ratio - keeping USD`);
+        return normalizedUSD;
+      } else {
+        console.log(`🔧 HIGH CORRUPTION DETECTED: USD ${normalizedUSD} vs ARS-derived ${expectedUSDFromARS.toFixed(2)} (ratio: ${ratio.toFixed(0)}x)`);
+        console.log(`   Using ARS conversion instead: ${normalizedARS} ARS → ${expectedUSDFromARS.toFixed(2)} USD`);
+        return expectedUSDFromARS;
+      }
+    }
+    
+    // 🔍 MODERATE RATIO (50-1000x): Prefer USD if reasonable
+    if (ratio > 50) {
+      if (normalizedUSD >= 50 && normalizedUSD <= 15000) {
+        console.log(`✅ MODERATE RATIO: Keeping USD ${normalizedUSD} (ratio: ${ratio.toFixed(1)}x, reasonable value)`);
+        return normalizedUSD;
+      }
     }
   }
   
