@@ -10580,6 +10580,598 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
+  
+  // Main endpoint: GET /api/projects?timeFilter=...&activeOnly=true|false
+  app.get("/api/projects", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { getDateRangeForFilter } = await import('./utils/dateRange');
+      
+      const timeFilter = req.query.timeFilter as string;
+      const activeOnly = req.query.activeOnly === 'true';
+      
+      console.log(`🎯 STABLE PROJECTS ENDPOINT: timeFilter=${timeFilter}, activeOnly=${activeOnly}`);
+      
+      // Get date range for timeFilter
+      const dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      
+      // Build filters for aggregator
+      const filters: any = {};
+      if (dateRange) {
+        filters.dateRange = {
+          start: dateRange.start.toISOString().substring(0, 7), // YYYY-MM
+          end: dateRange.end.toISOString().substring(0, 7)
+        };
+      }
+      
+      const aggregator = new UniversalAggregator(db);
+      const metricsArray = await aggregator.aggregateMultipleProjects(filters);
+      
+      // Filter active projects if requested
+      const filteredMetrics = activeOnly ? metricsArray.filter(m => m.isActive) : metricsArray;
+      
+      // Calculate portfolio summary
+      const portfolioSummary = {
+        totalProjects: filteredMetrics.length,
+        activeProjects: filteredMetrics.filter(m => m.isActive).length,
+        periodRevenueUSD: filteredMetrics.reduce((sum, m) => sum + m.revenueUSD, 0),
+        periodCostUSD: filteredMetrics.reduce((sum, m) => sum + m.costUSD, 0),
+        periodProfitUSD: filteredMetrics.reduce((sum, m) => sum + m.profitUSD, 0),
+        periodWorkedHours: filteredMetrics.reduce((sum, m) => sum + m.workedHours, 0),
+        efficiencyFrac: null as number | null,
+        markupRatio: null as number | null
+      };
+      
+      // Calculate derived portfolio metrics
+      if (portfolioSummary.periodWorkedHours > 0 && portfolioSummary.periodRevenueUSD > 0) {
+        portfolioSummary.efficiencyFrac = portfolioSummary.periodRevenueUSD / portfolioSummary.periodWorkedHours;
+      }
+      if (portfolioSummary.periodCostUSD > 0) {
+        portfolioSummary.markupRatio = portfolioSummary.periodRevenueUSD / portfolioSummary.periodCostUSD;
+      }
+      
+      // Transform metrics to project format
+      const projects = filteredMetrics.map(m => {
+        // Extract client and project names from projectKey
+        const [clientName, projectName] = m.projectKey.split('|');
+        
+        return {
+          projectKey: m.projectKey,
+          clientName: clientName || 'Unknown',
+          projectName: projectName || clientName || 'Unknown',
+          type: m.projectKey.toLowerCase().includes('fee') ? 'fee' : 'one-shot',
+          metrics: {
+            revenueUSD: m.revenueUSD,
+            costUSD: m.costUSD,
+            profitUSD: m.profitUSD,
+            workedHours: m.workedHours,
+            targetHours: m.targetHours,
+            markupRatio: m.markupRatio,
+            marginPct: m.marginPct,
+            isActive: m.isActive
+          },
+          progress: {
+            efficiencyFrac: m.targetHours > 0 ? m.workedHours / m.targetHours : null,
+            hoursRemaining: m.targetHours > 0 ? Math.max(0, m.targetHours - m.workedHours) : null
+          }
+        };
+      });
+      
+      res.json({
+        success: true,
+        portfolioSummary,
+        projects,
+        period: filters.dateRange || 'all-time',
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Stable Projects Endpoint Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Project detail endpoint: GET /api/projects/:key/complete-data?timeFilter=...
+  app.get("/api/projects/:key/complete-data", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { getDateRangeForFilter } = await import('./utils/dateRange');
+      const { salesNorm, costsNorm, targetsNorm } = await import('../shared/schema');
+      const { eq, and, sql } = await import('drizzle-orm');
+      
+      const projectKey = decodeURIComponent(req.params.key);
+      const timeFilter = req.query.timeFilter as string;
+      
+      console.log(`🎯 PROJECT DETAIL: ${projectKey}, timeFilter=${timeFilter}`);
+      
+      // Get date range for timeFilter
+      const dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      
+      // Get aggregated metrics for the period
+      const aggregator = new UniversalAggregator(db);
+      let monthKey = 'all-time';
+      
+      if (dateRange) {
+        monthKey = dateRange.start.toISOString().substring(0, 7); // Use start month as representative
+      }
+      
+      // Get detailed data for the project
+      const salesQuery = db.select({
+        monthKey: salesNorm.monthKey,
+        usd: salesNorm.usd,
+        anomaly: salesNorm.anomaly,
+        sourceRowId: salesNorm.sourceRowId
+      })
+      .from(salesNorm)
+      .where(eq(salesNorm.projectKey, projectKey));
+      
+      const costsQuery = db.select({
+        monthKey: costsNorm.monthKey,
+        usd: costsNorm.usd,
+        hoursWorked: costsNorm.hoursWorked,
+        anomaly: costsNorm.anomaly,
+        sourceRowId: costsNorm.sourceRowId
+      })
+      .from(costsNorm)
+      .where(eq(costsNorm.projectKey, projectKey));
+      
+      const targetsQuery = db.select({
+        monthKey: targetsNorm.monthKey,
+        targetHours: targetsNorm.targetHours,
+        rateUSD: targetsNorm.rateUSD,
+        sourceRowId: targetsNorm.sourceRowId
+      })
+      .from(targetsNorm)
+      .where(eq(targetsNorm.projectKey, projectKey));
+      
+      const [salesData, costsData, targetsData] = await Promise.all([
+        salesQuery,
+        costsQuery,
+        targetsQuery
+      ]);
+      
+      // Filter by date range if specified
+      const filterByDateRange = (data: any[]) => {
+        if (!dateRange) return data;
+        const startMonth = dateRange.start.toISOString().substring(0, 7);
+        const endMonth = dateRange.end.toISOString().substring(0, 7);
+        return data.filter(d => d.monthKey >= startMonth && d.monthKey <= endMonth);
+      };
+      
+      const filteredSales = filterByDateRange(salesData);
+      const filteredCosts = filterByDateRange(costsData);
+      const filteredTargets = filterByDateRange(targetsData);
+      
+      // Get aggregated metrics
+      const metrics = dateRange && monthKey !== 'all-time' 
+        ? await aggregator.aggregateByProject(projectKey, monthKey)
+        : {
+            projectKey,
+            monthKey: 'all-time',
+            revenueUSD: filteredSales.reduce((sum, s) => sum + parseFloat(s.usd), 0),
+            costUSD: filteredCosts.reduce((sum, c) => sum + parseFloat(c.usd), 0),
+            workedHours: filteredCosts.reduce((sum, c) => sum + parseFloat(c.hoursWorked || '0'), 0),
+            targetHours: filteredTargets.reduce((sum, t) => sum + parseFloat(t.targetHours), 0),
+            profitUSD: 0,
+            markupRatio: null,
+            marginPct: null,
+            isActive: true,
+            salesRecordCount: filteredSales.length,
+            costsRecordCount: filteredCosts.length,
+            targetsRecordCount: filteredTargets.length
+          };
+      
+      if (metrics.monthKey === 'all-time') {
+        metrics.profitUSD = metrics.revenueUSD - metrics.costUSD;
+        metrics.markupRatio = metrics.costUSD > 0 ? metrics.revenueUSD / metrics.costUSD : null;
+        metrics.marginPct = metrics.revenueUSD > 0 ? metrics.profitUSD / metrics.revenueUSD : null;
+      }
+      
+      res.json({
+        success: true,
+        projectKey,
+        period: dateRange ? `${dateRange.start.toISOString().substring(0, 7)} to ${dateRange.end.toISOString().substring(0, 7)}` : 'all-time',
+        metrics,
+        details: {
+          sales: filteredSales.map(s => ({
+            monthKey: s.monthKey,
+            usd: parseFloat(s.usd),
+            anomaly: s.anomaly,
+            sourceRowId: s.sourceRowId
+          })),
+          costs: filteredCosts.map(c => ({
+            monthKey: c.monthKey,
+            usd: parseFloat(c.usd),
+            hoursWorked: parseFloat(c.hoursWorked || '0'),
+            anomaly: c.anomaly,
+            sourceRowId: c.sourceRowId
+          })),
+          targets: filteredTargets.map(t => ({
+            monthKey: t.monthKey,
+            targetHours: parseFloat(t.targetHours),
+            rateUSD: t.rateUSD ? parseFloat(t.rateUSD) : null,
+            sourceRowId: t.sourceRowId
+          }))
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Project Detail Endpoint Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Performance rankings endpoint: GET /api/projects/:key/performance-rankings?timeFilter=...
+  app.get("/api/projects/:key/performance-rankings", requireAuth, async (req, res) => {
+    try {
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { getDateRangeForFilter } = await import('./utils/dateRange');
+      
+      const projectKey = decodeURIComponent(req.params.key);
+      const timeFilter = req.query.timeFilter as string;
+      
+      console.log(`🎯 PERFORMANCE RANKINGS: ${projectKey}, timeFilter=${timeFilter}`);
+      
+      // Get date range for timeFilter
+      const dateRange = timeFilter ? getDateRangeForFilter(timeFilter) : null;
+      
+      // Build filters for aggregator
+      const filters: any = {};
+      if (dateRange) {
+        filters.dateRange = {
+          start: dateRange.start.toISOString().substring(0, 7),
+          end: dateRange.end.toISOString().substring(0, 7)
+        };
+      }
+      
+      const aggregator = new UniversalAggregator(db);
+      const allMetrics = await aggregator.aggregateMultipleProjects(filters);
+      
+      // Find the target project
+      const targetProject = allMetrics.find(m => m.projectKey === projectKey);
+      if (!targetProject) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Calculate rankings
+      const rankings = {
+        revenue: {
+          rank: allMetrics.filter(m => m.revenueUSD > targetProject.revenueUSD).length + 1,
+          total: allMetrics.length,
+          percentile: Math.round((1 - (allMetrics.filter(m => m.revenueUSD > targetProject.revenueUSD).length / allMetrics.length)) * 100)
+        },
+        profit: {
+          rank: allMetrics.filter(m => m.profitUSD > targetProject.profitUSD).length + 1,
+          total: allMetrics.length,
+          percentile: Math.round((1 - (allMetrics.filter(m => m.profitUSD > targetProject.profitUSD).length / allMetrics.length)) * 100)
+        },
+        efficiency: {
+          rank: null as number | null,
+          total: allMetrics.length,
+          percentile: null as number | null
+        },
+        markup: {
+          rank: null as number | null,
+          total: allMetrics.length,
+          percentile: null as number | null
+        }
+      };
+      
+      // Calculate efficiency ranking (revenue per hour)
+      const projectsWithEfficiency = allMetrics.filter(m => m.workedHours > 0);
+      if (targetProject.workedHours > 0 && projectsWithEfficiency.length > 0) {
+        const targetEfficiency = targetProject.revenueUSD / targetProject.workedHours;
+        rankings.efficiency.rank = projectsWithEfficiency.filter(m => (m.revenueUSD / m.workedHours) > targetEfficiency).length + 1;
+        rankings.efficiency.total = projectsWithEfficiency.length;
+        rankings.efficiency.percentile = Math.round((1 - (rankings.efficiency.rank - 1) / projectsWithEfficiency.length) * 100);
+      }
+      
+      // Calculate markup ranking
+      const projectsWithMarkup = allMetrics.filter(m => m.markupRatio !== null);
+      if (targetProject.markupRatio !== null && projectsWithMarkup.length > 0) {
+        rankings.markup.rank = projectsWithMarkup.filter(m => m.markupRatio! > targetProject.markupRatio!).length + 1;
+        rankings.markup.total = projectsWithMarkup.length;
+        rankings.markup.percentile = Math.round((1 - (rankings.markup.rank - 1) / projectsWithMarkup.length) * 100);
+      }
+      
+      res.json({
+        success: true,
+        projectKey,
+        period: filters.dateRange || 'all-time',
+        rankings,
+        targetMetrics: targetProject,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Performance Rankings Endpoint Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // 🐛 DEBUG/QA ENDPOINTS - Data verification and diagnostics
+  
+  // Debug: Completeness check - rows read vs normalized by source
+  app.get("/api/debug/completeness", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string; // YYYY-MM format
+      const { salesNorm, costsNorm, targetsNorm } = await import('../shared/schema');
+      const { sql } = await import('drizzle-orm');
+      
+      console.log(`🐛 DEBUG COMPLETENESS: period=${period}`);
+      
+      // Get counts from normalized tables
+      let whereClause = '';
+      if (period && period.match(/^\d{4}-\d{2}$/)) {
+        whereClause = ` WHERE month_key = '${period}'`;
+      }
+      
+      const salesCount = await db.select({ count: sql`count(*)` }).from(salesNorm);
+      const costsCount = await db.select({ count: sql`count(*)` }).from(costsNorm);
+      const targetsCount = await db.select({ count: sql`count(*)` }).from(targetsNorm);
+      
+      // Get raw data counts from Google Sheets service
+      let rawCounts = { sales: 0, costs: 0, targets: 0 };
+      try {
+        const googleSheetsServiceWorking = await import('./services/googleSheetsWorking');
+        const rawSales = await googleSheetsServiceWorking.default.getVentasTomi();
+        const rawCosts = await googleSheetsServiceWorking.default.getCostosDirectosIndirectos();
+        
+        rawCounts.sales = rawSales.length;
+        rawCounts.costs = rawCosts.length;
+        rawCounts.targets = 0; // Not implemented yet
+      } catch (error) {
+        console.warn('Could not fetch raw data counts:', error);
+      }
+      
+      const normalizedCounts = {
+        sales: salesCount[0]?.count || 0,
+        costs: costsCount[0]?.count || 0,
+        targets: targetsCount[0]?.count || 0
+      };
+      
+      res.json({
+        success: true,
+        period: period || 'all-time',
+        completeness: {
+          sales: {
+            raw: rawCounts.sales,
+            normalized: normalizedCounts.sales,
+            coverage: rawCounts.sales > 0 ? Math.round((normalizedCounts.sales / rawCounts.sales) * 100) : 0
+          },
+          costs: {
+            raw: rawCounts.costs,
+            normalized: normalizedCounts.costs,
+            coverage: rawCounts.costs > 0 ? Math.round((normalizedCounts.costs / rawCounts.costs) * 100) : 0
+          },
+          targets: {
+            raw: rawCounts.targets,
+            normalized: normalizedCounts.targets,
+            coverage: rawCounts.targets > 0 ? Math.round((normalizedCounts.targets / rawCounts.targets) * 100) : 0
+          }
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Debug Completeness Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Debug: Aggregates verification - source sums vs UI sums should match
+  app.get("/api/debug/aggregates", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string; // YYYY-MM format
+      const { UniversalAggregator } = await import('./services/universal-aggregator');
+      const { salesNorm, costsNorm, targetsNorm } = await import('../shared/schema');
+      const { sql, eq } = await import('drizzle-orm');
+      
+      console.log(`🐛 DEBUG AGGREGATES: period=${period}`);
+      
+      // Source sums from normalized tables
+      let monthFilter = '';
+      if (period && period.match(/^\d{4}-\d{2}$/)) {
+        monthFilter = ` WHERE month_key = '${period}'`;
+      }
+      
+      const sourceSums = {
+        salesTotal: 0,
+        costsTotal: 0,
+        hoursTotal: 0,
+        targetsTotal: 0
+      };
+      
+      // Get raw sums from database
+      const salesSum = await db.select({ 
+        total: sql`COALESCE(SUM(CAST(usd AS DECIMAL)), 0)` 
+      }).from(salesNorm);
+      
+      const costsSum = await db.select({ 
+        totalCost: sql`COALESCE(SUM(CAST(usd AS DECIMAL)), 0)`,
+        totalHours: sql`COALESCE(SUM(CAST(hours_worked AS DECIMAL)), 0)`
+      }).from(costsNorm);
+      
+      const targetsSum = await db.select({ 
+        total: sql`COALESCE(SUM(CAST(target_hours AS DECIMAL)), 0)` 
+      }).from(targetsNorm);
+      
+      sourceSums.salesTotal = Number(salesSum[0]?.total || 0);
+      sourceSums.costsTotal = Number(costsSum[0]?.totalCost || 0);
+      sourceSums.hoursTotal = Number(costsSum[0]?.totalHours || 0);
+      sourceSums.targetsTotal = Number(targetsSum[0]?.total || 0);
+      
+      // UI sums from aggregator
+      const aggregator = new UniversalAggregator(db);
+      const filters: any = {};
+      if (period) {
+        filters.dateRange = { start: period, end: period };
+      }
+      
+      const allMetrics = await aggregator.aggregateMultipleProjects(filters);
+      const uiSums = {
+        salesTotal: allMetrics.reduce((sum, m) => sum + m.revenueUSD, 0),
+        costsTotal: allMetrics.reduce((sum, m) => sum + m.costUSD, 0),
+        hoursTotal: allMetrics.reduce((sum, m) => sum + m.workedHours, 0),
+        targetsTotal: allMetrics.reduce((sum, m) => sum + m.targetHours, 0)
+      };
+      
+      // Calculate differences
+      const differences = {
+        sales: Math.abs(sourceSums.salesTotal - uiSums.salesTotal),
+        costs: Math.abs(sourceSums.costsTotal - uiSums.costsTotal),
+        hours: Math.abs(sourceSums.hoursTotal - uiSums.hoursTotal),
+        targets: Math.abs(sourceSums.targetsTotal - uiSums.targetsTotal)
+      };
+      
+      const tolerance = 0.01; // 1 cent tolerance
+      const isConsistent = {
+        sales: differences.sales < tolerance,
+        costs: differences.costs < tolerance,
+        hours: differences.hours < tolerance,
+        targets: differences.targets < tolerance
+      };
+      
+      const overallConsistency = Object.values(isConsistent).every(x => x);
+      
+      res.json({
+        success: true,
+        period: period || 'all-time',
+        aggregateComparison: {
+          sourceSums,
+          uiSums,
+          differences,
+          isConsistent,
+          overallConsistency,
+          tolerance
+        },
+        projectCount: allMetrics.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Debug Aggregates Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // Debug: Anomalies list - show detected and corrected anomalies
+  app.get("/api/debug/anomalies", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string; // YYYY-MM format
+      const { salesNorm, costsNorm } = await import('../shared/schema');
+      const { eq, and, isNotNull } = await import('drizzle-orm');
+      
+      console.log(`🐛 DEBUG ANOMALIES: period=${period}`);
+      
+      // Query for records with anomalies
+      let salesQuery = db.select({
+        projectKey: salesNorm.projectKey,
+        monthKey: salesNorm.monthKey,
+        usd: salesNorm.usd,
+        anomaly: salesNorm.anomaly,
+        sourceRowId: salesNorm.sourceRowId
+      })
+      .from(salesNorm)
+      .where(isNotNull(salesNorm.anomaly));
+      
+      let costsQuery = db.select({
+        projectKey: costsNorm.projectKey,
+        monthKey: costsNorm.monthKey,
+        usd: costsNorm.usd,
+        anomaly: costsNorm.anomaly,
+        sourceRowId: costsNorm.sourceRowId
+      })
+      .from(costsNorm)
+      .where(isNotNull(costsNorm.anomaly));
+      
+      // Add period filter if specified
+      if (period && period.match(/^\d{4}-\d{2}$/)) {
+        salesQuery = salesQuery.where(and(isNotNull(salesNorm.anomaly), eq(salesNorm.monthKey, period)));
+        costsQuery = costsQuery.where(and(isNotNull(costsNorm.anomaly), eq(costsNorm.monthKey, period)));
+      }
+      
+      const [salesAnomalies, costsAnomalies] = await Promise.all([
+        salesQuery,
+        costsQuery
+      ]);
+      
+      // Group anomalies by type
+      const anomaliesByType = {
+        'x10000': [],
+        'x1000': [],
+        'x100': [],
+        'other': []
+      } as { [key: string]: any[] };
+      
+      const processAnomalies = (anomalies: any[], source: string) => {
+        anomalies.forEach(anomaly => {
+          const record = {
+            source,
+            projectKey: anomaly.projectKey,
+            monthKey: anomaly.monthKey,
+            correctedUSD: parseFloat(anomaly.usd),
+            anomalyType: anomaly.anomaly,
+            sourceRowId: anomaly.sourceRowId
+          };
+          
+          if (anomaly.anomaly?.includes('x10000')) {
+            anomaliesByType['x10000'].push(record);
+          } else if (anomaly.anomaly?.includes('x1000')) {
+            anomaliesByType['x1000'].push(record);
+          } else if (anomaly.anomaly?.includes('x100')) {
+            anomaliesByType['x100'].push(record);
+          } else {
+            anomaliesByType['other'].push(record);
+          }
+        });
+      };
+      
+      processAnomalies(salesAnomalies, 'sales');
+      processAnomalies(costsAnomalies, 'costs');
+      
+      const totalAnomalies = salesAnomalies.length + costsAnomalies.length;
+      
+      res.json({
+        success: true,
+        period: period || 'all-time',
+        anomaliesDetected: {
+          total: totalAnomalies,
+          bySource: {
+            sales: salesAnomalies.length,
+            costs: costsAnomalies.length
+          },
+          byType: {
+            x10000: anomaliesByType['x10000'].length,
+            x1000: anomaliesByType['x1000'].length, 
+            x100: anomaliesByType['x100'].length,
+            other: anomaliesByType['other'].length
+          }
+        },
+        anomaliesList: anomaliesByType,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Debug Anomalies Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {
