@@ -275,10 +275,6 @@ export class ActiveProjectsAggregator {
         console.log(`   ✅ INCLUDED: Cost ${costUSD} passes golden filter (<= $3000)`);
       }
 
-      // 🔍 TEMPORAL DEBUG: Log all costs for diagnostics
-      if (costUSD > 0) {
-        console.log(`🔍 ALL COST: Cliente="${cost.cliente}" | Proyecto="${cost.proyecto}" | ${costUSD} USD | ${cost.mes} ${cost.año}`);
-      }
 
       // GOLDEN TEST COMPATIBILITY: Apply specific filters for Kimberly Fee Huggies
       if (cost.proyecto?.toLowerCase().includes('fee huggies') || cost.proyecto?.toLowerCase().includes('huggies')) {
