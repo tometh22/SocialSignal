@@ -4463,178 +4463,106 @@ export class DatabaseStorage implements IStorage {
     const result = { imported: 0, updated: 0, errors: [] as string[] };
     const importBatch = `batch_${Date.now()}`;
     
-    // Mapeo de meses en español a números
-    const monthMap: { [key: string]: number } = {
-      'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
-      'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
-    };
-
+    console.log(`🚀 NORMALIZADOR ÚNICO: Iniciando importación de ${salesData.length} registros...`);
+    
+    // 🎯 USAR NORMALIZADOR ÚNICO: Convertir datos crudos a formato estándar
+    const { normalizeSales } = await import('./services/sales');
+    
+    // Mapear datos de entrada al formato esperado por el normalizador
+    const rawSales = salesData.map(row => ({
+      Cliente: String(row.cliente || '').trim(),
+      Proyecto: String(row.proyecto || '').trim(), 
+      Mes: String(row.mes || '').trim(),
+      Año: parseInt(row.año) || new Date().getFullYear(),
+      Monto_ARS: Number(row.monto_ars || row.montoArs || 0) || 0,
+      Monto_USD: Number(row.monto_usd || row.montoUsd || 0) || 0,
+      Confirmado: String(row.confirmado || 'SI').trim()
+    }));
+    
+    // Normalizar TODAS las ventas usando lógica unificada
+    let normalizedSales;
+    try {
+      normalizedSales = normalizeSales(rawSales);
+      console.log(`✅ NORMALIZADOR: ${normalizedSales.length} ventas normalizadas exitosamente`);
+    } catch (error: any) {
+      result.errors.push(`Error en normalizador único: ${error.message}`);
+      return result;
+    }
+    
     // Función para calcular estado automáticamente
-    const calculateStatus = (month: number, year: number, salesType: string): string => {
+    const calculateStatus = (monthKey: string): string => {
       const now = new Date();
-      const currentMonth = now.getMonth() + 1;
-      const currentYear = now.getFullYear();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       
-      if (salesType.toLowerCase() === 'one shot') {
-        // Para proyectos one-shot, determinar basado en fechas (simplificado para este ejemplo)
-        if (year < currentYear || (year === currentYear && month < currentMonth)) {
-          return 'completada';
-        } else if (year === currentYear && month === currentMonth) {
-          return 'activa';
-        } else {
-          return 'proyectada';
-        }
+      if (monthKey < currentMonthKey) {
+        return 'completada';
+      } else if (monthKey === currentMonthKey) {
+        return 'activa';
       } else {
-        // Para fees mensuales
-        if (year < currentYear || (year === currentYear && month < currentMonth)) {
-          return 'completada';
-        } else if (year === currentYear && month === currentMonth) {
-          return 'activa';
-        } else {
-          return 'proyectada';
-        }
+        return 'proyectada';
       }
     };
 
-    for (let i = 0; i < salesData.length; i++) {
+    // Procesar cada venta normalizada
+    for (let i = 0; i < normalizedSales.length; i++) {
       try {
-        const row = salesData[i];
+        const normalized = normalizedSales[i];
         
-        // Validar datos requeridos
-        if (!row.cliente || !row.proyecto || !row.mes || !row.año) {
-          result.errors.push(`Fila ${i + 1}: Faltan datos requeridos (cliente, proyecto, mes, año)`);
-          continue;
-        }
+        // Extraer información del monthKey para compatibilidad
+        const [year, month] = normalized.monthKey.split('-');
+        const monthNumber = parseInt(month);
+        const yearNumber = parseInt(year);
+        
+        // Mapeo de números a nombres de meses para compatibilidad
+        const monthNames = [
+          '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+          'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+        ];
+        const monthName = monthNames[monthNumber] || 'desconocido';
+        
+        const confirmed = 'SI'; // Ya filtrado por normalizador
+        const salesType = 'fee'; // Default tipo de venta para compatibilidad
 
-        // Normalizar datos
-        const clientName = String(row.cliente).trim();
-        const projectName = String(row.proyecto).trim();
-        const monthName = String(row.mes).toLowerCase().trim();
-        const year = parseInt(row.año);
-        const salesType = String(row.tipo_venta || row.tipoVenta || 'fee').trim();
-        
-        // Convertir mes a número ANTES de usar en exchange rate lookup
-        const monthNumber = monthMap[monthName];
-        if (!monthNumber) {
-          result.errors.push(`Fila ${i + 1}: Mes '${monthName}' no reconocido`);
-          continue;
-        }
-        
-        // 🎯 CORRECCIÓN CRÍTICA: Mapeo correcto de campos de moneda con parsing mejorado
-        const rawAmountArs = row.monto_ars || row.montoArs || null;
-        const rawAmountUsd = row.monto_usd || row.montoUsd || null;
-        
-        // Helper function to parse Spanish locale numbers (e.g., "4.210.975,00")
-        const parseSpanishNumber = (value: any): number | null => {
-          if (value === null || value === undefined || value === '') return null;
-          const stringValue = String(value).trim();
-          if (stringValue === '' || stringValue === '0' || stringValue === '-') return null;
-          
-          try {
-            // Handle Spanish format: "4.210.975,00" → 4210975.00
-            const normalizedValue = stringValue
-              .replace(/\./g, '') // Remove thousands separators
-              .replace(/,/g, '.'); // Replace decimal comma with decimal point
-            
-            const parsed = parseFloat(normalizedValue);
-            return isNaN(parsed) || parsed <= 0 ? null : parsed;
-          } catch (error) {
-            console.warn(`⚠️ Failed to parse number: ${value}`);
-            return null;
-          }
-        };
-        
-        // Parse amounts with Spanish locale support
-        const parsedAmountArs = parseSpanishNumber(rawAmountArs);
-        const parsedAmountUsd = parseSpanishNumber(rawAmountUsd);
-        
-        // Determinar moneda principal basada en qué campo tiene datos
-        let currency = 'ARS'; // Default a ARS para Argentina
-        let amountArs: number | null = null;
-        let amountUsd: number | null = null;
-        let fxApplied: number | null = null;
-        let fxSource = 'Manual';
-        
-        if (parsedAmountUsd && parsedAmountUsd > 0) {
-          // Prefer USD when available
-          currency = 'USD';
-          amountUsd = parsedAmountUsd;
-          console.log(`💰 Using USD amount directly for ${clientName}-${projectName}: $${amountUsd}`);
-        } else if (parsedAmountArs && parsedAmountArs > 0) {
-          // Convert ARS to USD using dynamic exchange rate
-          currency = 'ARS';
-          amountArs = parsedAmountArs;
-          
-          // 🚨 CORRECCIÓN CRÍTICA: Usar tasa de cambio dinámica
-          try {
-            const exchangeRate = await this.getExchangeRateByMonth(year, monthNumber || 1);
-            
-            if (exchangeRate && exchangeRate.rate) {
-              const rate = parseFloat(String(exchangeRate.rate));
-              amountUsd = amountArs / rate;
-              fxApplied = rate;
-              fxSource = exchangeRate.source || 'Database';
-              console.log(`💱 ARS Sale: ARS $${amountArs.toLocaleString('es-AR', {minimumFractionDigits: 2})} → USD $${amountUsd.toFixed(2)} (rate: ${rate}) for ${clientName}-${projectName}`);
-            } else {
-              // Fallback to a warning and manual rate requirement
-              result.errors.push(`Fila ${i + 1}: No se encontró tasa de cambio para ${monthName} ${year}. Configure la tasa en el sistema.`);
-              continue; // Skip this row
-            }
-          } catch (error: any) {
-            result.errors.push(`Fila ${i + 1}: Error al obtener tasa de cambio: ${error.message}`);
-            continue; // Skip this row
-          }
-        } else {
-          result.errors.push(`Fila ${i + 1}: No se encontró monto válido en ARS o USD`);
-          continue;
-        }
-        
-        console.log(`💱 Sale mapping for ${clientName}-${projectName}: rawARS=${rawAmountArs}, rawUSD=${rawAmountUsd} → currency=${currency}, finalARS=${amountArs}, finalUSD=${amountUsd}, fxApplied=${fxApplied}`);
-        
-        const confirmed = String(row.confirmado || 'SI').toUpperCase();
-
-        // Calcular estado automáticamente
-        const status = calculateStatus(monthNumber, year, salesType);
+        // Calcular estado automáticamente usando monthKey
+        const status = calculateStatus(normalized.monthKey);
 
         // Buscar cliente y proyecto en el sistema
-        const client = await this.getClientByName(clientName);
+        const client = await this.getClientByName(normalized.client);
         const projects = await this.getActiveProjects();
         const project = projects.find(p => 
-          p.quotation?.projectName?.toLowerCase().includes(projectName.toLowerCase()) ||
-          p.quotation?.clientProjectName?.toLowerCase().includes(projectName.toLowerCase())
+          p.quotation?.projectName?.toLowerCase().includes(normalized.project.toLowerCase()) ||
+          p.quotation?.clientProjectName?.toLowerCase().includes(normalized.project.toLowerCase())
         );
 
         // Crear clave única para evitar duplicados
-        const uniqueKey = `${clientName}_${projectName}_${monthNumber}_${year}_${salesType}`.toLowerCase();
-
-        // Generar month_key (YYYY-MM)
-        const monthKey = `${year}-${String(monthNumber).padStart(2, '0')}`;
+        const uniqueKey = `${normalized.client}_${normalized.project}_${monthNumber}_${yearNumber}_${salesType}`.toLowerCase();
         
-        // Preparar datos para inserción con FX data completa
+        // 🎯 PREPARAR DATOS USANDO INFORMACIÓN YA NORMALIZADA
         const salesRecord: InsertGoogleSheetsSales = {
-          monthKey: monthKey, // NUEVO: Clave temporal única
-          clientName,
-          projectName,
+          monthKey: normalized.monthKey,
+          clientName: normalized.client,
+          projectName: normalized.project,
           month: monthName,
-          year,
+          year: yearNumber,
           salesType,
-          amountLocal: amountArs ? String(amountArs) : null, // 🎯 CAMPO CORRECTO PARA ARS
-          currency: currency, // 🎯 USAR MONEDA DETERMINADA CORRECTAMENTE
-          fxApplied: fxApplied ? String(fxApplied) : null, // 🎯 PERSISTIR TASA DE CAMBIO APLICADA
-          amountUsd: amountUsd ? String(amountUsd) : null,
-          fxSource: fxSource, // 🎯 PERSISTIR FUENTE DE LA TASA
-          fxAt: new Date(), // 🎯 TIMESTAMP DE CONVERSIÓN
+          amountLocal: normalized.currency === 'ARS' ? String(normalized.originalAmount) : null,
+          currency: normalized.currency,
+          fxApplied: normalized.fx ? String(normalized.fx) : null,
+          amountUsd: String(normalized.revenueUSD),
+          fxSource: normalized.fx ? 'MonthTable' : 'Direct',
+          fxAt: new Date(),
           confirmed,
           monthNumber,
           status,
-          // revenueType: salesType.toLowerCase() === 'fee' ? 'fee' : 'credit', // NUEVO (comentado hasta migración)
-          // recognizedMonth: monthKey, // NUEVO: Mes de reconocimiento (comentado hasta migración)
           clientId: client?.id || null,
           projectId: project?.id || null,
           rowNumber: i + 1,
           importBatch,
           uniqueKey
         };
+
+        // 💰 LOGGING MEJORADO: Mostrar información de normalización
+        console.log(`💰 NORMALIZADOR RESULT: ${normalized.client}|${normalized.project} → ${normalized.currency} ${normalized.originalAmount} → USD ${normalized.revenueUSD}${normalized.antiX100Applied ? ' [ANTI×100]' : ''}${normalized.fx ? ` [FX:${normalized.fx}]` : ''}`);
 
         // Intentar insertar o actualizar
         try {
@@ -4662,10 +4590,11 @@ export class DatabaseStorage implements IStorage {
         }
         
       } catch (error: any) {
-        result.errors.push(`Fila ${i + 1}: Error procesando - ${error.message}`);
+        result.errors.push(`Fila ${i + 1}: Error procesando venta normalizada - ${error.message}`);
       }
     }
-
+    
+    console.log(`✅ NORMALIZADOR ÚNICO: Procesamiento completado - ${result.imported} importadas, ${result.updated} actualizadas, ${result.errors.length} errores`);
     return result;
   }
 
