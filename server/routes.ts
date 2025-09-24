@@ -332,138 +332,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ==================== NEW UNIFIED PROJECTS ENDPOINT ====================
-  // New contract according to user specification
+  // ==================== CONSOLIDATED PROJECTS ENDPOINT ====================
+  // Uses ONLY ActiveProjectsAggregator for consistency with dual-currency support
   app.get('/api/projects', requireAuth, async (req, res) => {
-    console.log(`🚀 NEW UNIFIED PROJECTS ENDPOINT: Query=${JSON.stringify(req.query)}`);
+    console.log(`🚀 CONSOLIDATED PROJECTS ENDPOINT: Query=${JSON.stringify(req.query)}`);
     
     try {
-      // Parse query parameters
+      // Parse query parameters (match ActiveProjectsAggregator interface)
       const timeFilter = req.query.timeFilter as string || 'this_month';
-      const activeOnly = req.query.activeOnly === 'true';
-      const search = req.query.search as string || '';
-
-      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, search=${search}`);
-
-      // PASO 1: Resolver período explícitamente antes (quirúrgico)
-      const { start, end } = resolveTimeFilter(timeFilter);
+      const activeOnly = req.query.onlyActiveInPeriod === 'true';
       
-      // PASO 2: Guardas adicionales (evita crasheos)
-      if (!start || !end) {
-        return res.status(400).json({ error: 'Invalid timeFilter' });
-      }
+      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}`);
 
-      console.log(`📅 Resolved period: ${start} to ${end}`);
-
-      // Create aggregator instance
+      // Create aggregator instance  
       const aggregator = new ActiveProjectsAggregator(storage);
 
-      // Get unified data using blueprint aggregator - WITHOUT activeOnly filter (we'll apply bulletproof rules here)
-      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, false);
+      // Get unified data using blueprint aggregator with dual-currency support
+      const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
       
-      // Filter by search if provided
-      let filteredProjects = aggregatorResponse.projects;
-      if (search.trim()) {
-        const searchLower = search.toLowerCase();
-        filteredProjects = filteredProjects.filter(p => 
-          p.name.toLowerCase().includes(searchLower) ||
-          p.client.name.toLowerCase().includes(searchLower)
-        );
-      }
+      console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse.projects.length} projects from ActiveProjectsAggregator`);
+      console.log(`💰 Portfolio totals: $${aggregatorResponse.summary.portfolio.periodRevenueUSD.toFixed(2)} revenue`);
 
-      // Calculate totals according to specification
-      const totals = {
-        revenueUSD: filteredProjects.reduce((sum, p) => sum + p.metrics.revenueUSD, 0),
-        costUSD: filteredProjects.reduce((sum, p) => sum + p.metrics.costUSD, 0),
-        workedHours: filteredProjects.reduce((sum, p) => sum + p.metrics.workedHours, 0),
-        activeProjects: filteredProjects.filter(p => 
-          p.metrics.revenueUSD > 0 || p.metrics.costUSD > 0 || p.metrics.workedHours > 0
-        ).length,
-        totalProjects: aggregatorResponse.projects.length, // Count before activeOnly filter
-        profitUSD: 0 // Will be calculated next
-      };
-      totals.profitUSD = totals.revenueUSD - totals.costUSD;
-
-      // Transform projects to match the new contract WITH BULLETPROOF ACTIVE RULES
-      const projects = filteredProjects.map(p => {
-        // BULLETPROOF ACTIVE RULES according to user specification
-        const isRecurring = p.type === 'fee';
-        const isOneShot = p.type === 'one-shot';
-        const hasPeriodActivity = p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours;
-        const isActiveInPeriod = isRecurring || (isOneShot && hasPeriodActivity);
-
-        // VALIDACIONES DEFENSIVAS (evita crasheos)
-        const safeMetrics = p.metrics || { revenueUSD: 0, costUSD: 0, workedHours: 0, efficiencyPct: null };
-        
-        return {
-          projectId: p.projectId,
-          clientName: p.client?.name || 'Unknown Client',
-          projectName: p.name || 'Unknown Project',
-          type: p.type || 'other',
-          status: p.status || 'unknown',
-          isRecurring,
-          isOneShot,
-          hasPeriodActivity,
-          isActiveInPeriod,
-          period: {
-            revenueUSD: safeMetrics.revenueUSD || 0,
-            costUSD: safeMetrics.costUSD || 0,
-            profitUSD: (safeMetrics.revenueUSD || 0) - (safeMetrics.costUSD || 0),
-            workedHours: safeMetrics.workedHours || 0,
-            efficiencyPct: safeMetrics.efficiencyPct || null
-          }
-        };
-      });
-
-      // Apply BULLETPROOF activeOnly filter AFTER calculating isActiveInPeriod
-      const finalProjects = activeOnly 
-        ? projects.filter(p => p.isActiveInPeriod) // Only show projects that are "active in period"
-        : projects; // Show all projects
-
-      console.log(`🎯 BULLETPROOF FILTER: ${projects.length} total → ${finalProjects.length} after activeOnly=${activeOnly}`);
-      console.log(`🎯 Recurrentes shown: ${finalProjects.filter(p => p.isRecurring).length}`);
-      console.log(`🎯 One-shot with activity: ${finalProjects.filter(p => p.isOneShot && p.hasPeriodActivity).length}`);
-      console.log(`🎯 One-shot without activity: ${finalProjects.filter(p => p.isOneShot && !p.hasPeriodActivity).length}`);
-
-      // Recalculate totals for the FINAL visible projects
-      const finalTotals = {
-        revenueUSD: finalProjects.reduce((sum, p) => sum + p.period.revenueUSD, 0),
-        costUSD: finalProjects.reduce((sum, p) => sum + p.period.costUSD, 0),
-        workedHours: finalProjects.reduce((sum, p) => sum + p.period.workedHours, 0),
-        activeProjects: finalProjects.filter(p => p.hasPeriodActivity).length,
-        totalProjects: aggregatorResponse.projects.length, // Total before any filters
-        profitUSD: 0 // Will be calculated next
-      };
-      finalTotals.profitUSD = finalTotals.revenueUSD - finalTotals.costUSD;
-
-      // PASO 3: Incluir período calculado (nunca undefined)
-      const response = {
-        period: {
-          start,
-          end,
-          label: timeFilter
-        },
-        totals: finalTotals,
-        projects: finalProjects,
-        debug: {
-          engine: "unified",
-          source: "excel+db", 
-          fx: "monthly"
-        }
-      };
-
-      console.log(`✅ BULLETPROOF ACTIVE PROJECTS: Successfully processed ${finalProjects.length} projects (filtered from ${aggregatorResponse.projects.length} total)`);
-      console.log(`💰 Final Totals: $${finalTotals.revenueUSD.toFixed(2)} revenue, $${finalTotals.costUSD.toFixed(2)} cost, ${finalTotals.workedHours.toFixed(1)}h worked`);
-
-      return res.json(response);
+      return res.json(aggregatorResponse);
 
     } catch (error) {
-      console.error('❌ Error in new unified projects endpoint:', error);
+      console.error('❌ Error in consolidated projects endpoint:', error);
       
       return res.status(500).json({
         error: 'Failed to get projects data',
         message: error instanceof Error ? error.message : String(error),
-        engine: 'unified'
+        engine: 'consolidated_aggregator'
       });
     }
   });
@@ -9766,8 +9664,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 1. UNIVERSAL PROJECTS LISTING ENDPOINT
   // GET /api/projects?timeFilter=august_2025
-  app.get('/api/projects', requireAuth, async (req, res) => {
-    console.log(`🚀 UNIVERSAL PROJECTS LISTING - TimeFilter: ${req.query.timeFilter}`);
+  // DISABLED: Conflicting endpoint - consolidation uses only ActiveProjectsAggregator
+  // app.get('/api/projects', requireAuth, async (req, res) => {
+    console.log(`🚀 UNIVERSAL PROJECTS LISTING - DISABLED FOR CONSOLIDATION`);
     
     try {
       const { timeFilter = 'current_month' } = req.query;

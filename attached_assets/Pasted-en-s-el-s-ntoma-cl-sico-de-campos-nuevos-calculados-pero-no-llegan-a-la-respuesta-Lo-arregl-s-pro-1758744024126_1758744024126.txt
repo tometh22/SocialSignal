@@ -1,0 +1,136 @@
+enés el síntoma clásico de “campos nuevos calculados pero no llegan a la respuesta”. Lo arreglás propagando los 3 campos de moneda dual en TODA la cadena: types → aggregate → metrics → serializer (ruta). Aquí va el fix, concreto y en orden.
+
+1) Tipos (evita que TS “tire” los campos)
+
+Archivo: server/domain/types.ts (o donde esté ProjectMetrics)
+
+export type MoneyDisplay = { amount: number; currency: 'USD' | 'ARS' };
+
+export interface ProjectMetrics {
+  // legacy
+  revenueUSD: number;          // si lo necesitás para compatibilidad
+  costUSD: number;
+  profitUSD: number;
+  markupRatio?: number;
+  marginPct?: number;
+  workedHours?: number;
+  targetHours?: number;
+  efficiencyPct?: number;
+
+  // 🆕 dual-currency
+  revenueUSDNormalized: number;   // para TODOS los cálculos
+  revenueDisplay: MoneyDisplay;   // lo que se ve en la card (ARS para Coelsa)
+}
+
+2) Normalización por fila (elige moneda nativa de display)
+
+Archivo: server/services/sales.ts
+(la función que hoy llamás normalizeIncomeRow)
+
+const isFiniteNumber = (v:any) => typeof v === 'number' && Number.isFinite(v);
+
+function normalizeIncomeRow(row: any, fxByMonthKey: Record<string, number>, monthKey: string) {
+  const amountUsd = Number(row.amountUsd ?? row.Monto_USD ?? 0);
+  const amountArs = Number(row.amountLocal ?? row.Monto_ARS ?? 0);
+
+  let displayCurrency: 'USD'|'ARS';
+  let displayAmount = 0;
+  let usdNormalized = 0;
+
+  if (isFiniteNumber(amountUsd) && !isFiniteNumber(amountArs)) {
+    displayCurrency = 'USD';
+    displayAmount   = amountUsd;
+    usdNormalized   = amountUsd;
+  } else if (isFiniteNumber(amountArs) && !isFiniteNumber(amountUsd)) {
+    displayCurrency = 'ARS';
+    displayAmount   = amountArs;
+    usdNormalized   = amountArs / (fxByMonthKey[monthKey] || 1);
+  } else if (isFiniteNumber(amountUsd) && isFiniteNumber(amountArs)) {
+    // si llega doble, priorizamos USD como nativo de display para evitar ambigüedad
+    displayCurrency = 'USD';
+    displayAmount   = amountUsd;
+    usdNormalized   = amountUsd;
+  } else {
+    return null; // fila vacía
+  }
+
+  return { displayCurrency, displayAmount, usdNormalized };
+}
+
+3) Agregado por proyecto/período (propagá los 3 campos)
+
+Archivo: server/services/sales.ts
+(dentro de aggregateIncome(...))
+
+// después de agrupar filas por (client+project) y filtrar por periodo:
+const revenueUSDNormalized = sum(rows.map(r => r.usdNormalized));
+const displayCurrency = rows.find(r => r.displayCurrency)?.displayCurrency ?? 'USD';
+const revenueDisplayAmount =
+  sum(rows.filter(r => r.displayCurrency === displayCurrency).map(r => r.displayAmount));
+
+project.metrics.revenueUSDNormalized = revenueUSDNormalized;
+project.metrics.revenueDisplay = { amount: revenueDisplayAmount, currency: displayCurrency };
+// mantené revenueUSD si aún lo necesitás, pero NO lo uses para cálculos
+
+
+Importante: no “pises” estos campos más adelante.
+
+4) Cálculos de KPIs usando USD normalizado
+
+Archivo: server/domain/projectsActive.ts (o similar, donde armás metrics)
+
+const revenue = metrics.revenueUSDNormalized ?? 0;   // 🡐 usar este SIEMPRE
+const cost    = metrics.costUSD ?? 0;
+
+metrics.profitUSD  = revenue - cost;
+metrics.markupRatio = cost > 0 ? revenue / cost : null;
+metrics.marginPct   = revenue > 0 ? metrics.profitUSD / revenue : null;
+
+5) Serializer / Ruta (no borres campos nuevos)
+
+Archivo: server/routes.ts (endpoints /api/projects y/o /api/projects/active)
+
+No hagas pick()/destructuring que omita revenueDisplay y revenueUSDNormalized.
+
+Responde siempre el período calculado localmente:
+
+const { start, end, startKey, endKey } = resolveTimeFilter(timeFilter);
+return res.json({ period:{ start,end,startKey,endKey }, summary, projects });
+
+6) Front (cards)
+
+Mostrar metrics.revenueDisplay (muestra ARS para Coelsa).
+
+Header KPIs siguen en USD: usar summary.periodRevenueUSD / periodProfitUSD (calculados con normalizado).
+
+Smokes (copiar/pegar)
+BASE=http://localhost:5000; TF=august_2025
+
+# Periodo
+curl -s "$BASE/api/projects?timeFilter=$TF" | jq '.period'
+
+# Coelsa: card en ARS + KPIs en USD
+curl -s "$BASE/api/projects?timeFilter=$TF" | \
+jq '.projects[] | select(.client.name|test("coelsa";"i")) 
+    | {display:.metrics.revenueDisplay, usdNorm:.metrics.revenueUSDNormalized}'
+
+# Warner (USD)
+curl -s "$BASE/api/projects?timeFilter=$TF" | \
+jq '.projects[] | select(.client.name|test("warner";"i")) 
+    | {display:.metrics.revenueDisplay, usdNorm:.metrics.revenueUSDNormalized}'
+
+# Kimberly (USD)
+curl -s "$BASE/api/projects?timeFilter=$TF" | \
+jq '.projects[] | select(.client.name|test("kimberly";"i")) 
+    | {display:.metrics.revenueDisplay, usdNorm:.metrics.revenueUSDNormalized}'
+
+
+Criterio de aceptación (Coelsa):
+
+display.currency == "ARS"
+
+display.amount == Monto_ARS (Ventas Tomi · agosto)
+
+usdNorm == Monto_ARS / FX(agosto)
+
+Con esto, Coelsa se verá en ARS en las cards y el cálculo financiero seguirá en USD normalizado, y los campos dejarán de llegar null porque ahora existen en el tipo, se calculan en el agregado y no se eliminan en la ruta.
