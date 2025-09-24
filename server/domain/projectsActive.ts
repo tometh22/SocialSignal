@@ -175,12 +175,33 @@ export class ActiveProjectsAggregator {
       
       // Get raw sales data from Google Sheets (before normalization)
       console.log(`🔧 DUAL SALES DEBUG: About to call this.storage.getGoogleSheetsSales()`);
-      const allRawSales = await this.storage.getGoogleSheetsSales();
-      console.log(`💰 Retrieved ${allRawSales.length} total raw sales records`);
+      const dbSalesRecords = await this.storage.getGoogleSheetsSales();
+      console.log(`💰 Retrieved ${dbSalesRecords.length} total raw sales records from DB`);
+    
+    // 🔧 CRITICAL FIX: Map DB format (clientName, projectName, amountUsd) to expected format (Cliente, Proyecto, Monto_USD)
+    const allRawSales = dbSalesRecords.map(row => ({
+      Cliente: row.clientName || "",
+      Proyecto: row.projectName || "",
+      Mes: row.month || "",
+      Año: row.year || 2025,
+      Monto_ARS: Number(row.amountLocal) || 0,
+      Monto_USD: Number(row.amountUsd) || 0,
+      Confirmado: "Si", // Default to confirmed since it's in DB
+      Tipo_Venta: row.salesType || ""
+    }));
+    
+    console.log(`🔧 MAPEO DEBUG: Mapped ${allRawSales.length} records to aggregateIncome format`);
+    console.log(`🔧 MAPEO DEBUG: First record - Cliente: "${allRawSales[0]?.Cliente}", Proyecto: "${allRawSales[0]?.Proyecto}", Monto_USD: ${allRawSales[0]?.Monto_USD}`);
+    
+    // 🔧 DEBUG: Verificar period antes de manipular strings
+    console.log(`🔧 PERIOD DEBUG: period =`, period);
+    console.log(`🔧 PERIOD DEBUG: period.start = "${period.start}", period.end = "${period.end}"`);
     
     // Convert period to monthKey format
     const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
     const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
+    console.log(`🔧 PERIOD DEBUG: periodStartKey = "${periodStartKey}", periodEndKey = "${periodEndKey}"`);
+    console.log(`🔧 PERIOD DEBUG: About to call aggregateIncome() with ${allRawSales.length} mapped records`);
     
     // 🚀 USAR NUEVO AGREGADOR DUAL: aggregateIncome()
     const aggregatedIncomes = aggregateIncome(allRawSales, periodStartKey, periodEndKey);
