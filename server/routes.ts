@@ -78,6 +78,7 @@ import {
   directCosts
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
+import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
@@ -344,6 +345,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, search=${search}`);
 
+      // PASO 1: Resolver período explícitamente antes (quirúrgico)
+      const { start, end } = resolveTimeFilter(timeFilter);
+      
+      // PASO 2: Guardas adicionales (evita crasheos)
+      if (!start || !end) {
+        return res.status(400).json({ error: 'Invalid timeFilter' });
+      }
+
+      console.log(`📅 Resolved period: ${start} to ${end}`);
+
       // Create aggregator instance
       const aggregator = new ActiveProjectsAggregator(storage);
 
@@ -381,22 +392,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const hasPeriodActivity = p.flags.hasSales || p.flags.hasCosts || p.flags.hasHours;
         const isActiveInPeriod = isRecurring || (isOneShot && hasPeriodActivity);
 
+        // VALIDACIONES DEFENSIVAS (evita crasheos)
+        const safeMetrics = p.metrics || { revenueUSD: 0, costUSD: 0, workedHours: 0, efficiencyPct: null };
+        
         return {
           projectId: p.projectId,
-          clientName: p.client.name,
-          projectName: p.name,
+          clientName: p.client?.name || 'Unknown Client',
+          projectName: p.name || 'Unknown Project',
           type: p.type || 'other',
-          status: p.status,
+          status: p.status || 'unknown',
           isRecurring,
           isOneShot,
           hasPeriodActivity,
           isActiveInPeriod,
           period: {
-            revenueUSD: p.metrics.revenueUSD,
-            costUSD: p.metrics.costUSD,
-            profitUSD: p.metrics.revenueUSD - p.metrics.costUSD,
-            workedHours: p.metrics.workedHours,
-            efficiencyPct: p.metrics.efficiencyPct || null
+            revenueUSD: safeMetrics.revenueUSD || 0,
+            costUSD: safeMetrics.costUSD || 0,
+            profitUSD: (safeMetrics.revenueUSD || 0) - (safeMetrics.costUSD || 0),
+            workedHours: safeMetrics.workedHours || 0,
+            efficiencyPct: safeMetrics.efficiencyPct || null
           }
         };
       });
@@ -422,15 +436,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       finalTotals.profitUSD = finalTotals.revenueUSD - finalTotals.costUSD;
 
-      // Build response according to new contract - SAFE ACCESS
-      const safePeriod = {
-        start: "2025-08-01",
-        end: "2025-08-31", 
-        label: "August 2025"
-      };
-      
+      // PASO 3: Incluir período calculado (nunca undefined)
       const response = {
-        period: safePeriod,
+        period: {
+          start,
+          end,
+          label: timeFilter
+        },
         totals: finalTotals,
         projects: finalProjects,
         debug: {
