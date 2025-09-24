@@ -57,6 +57,10 @@ interface SalesRecord {
   month: string;
   year: number;
   confirmedOnly: boolean;
+  // 🚀 NUEVOS CAMPOS DUALES - Plan Quirúrgico
+  displayCurrency?: "ARS" | "USD";
+  revenueDisplay?: number;
+  revenueUSDNormalized?: number;
 }
 
 interface CostRecord {
