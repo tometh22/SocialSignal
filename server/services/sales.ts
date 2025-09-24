@@ -89,13 +89,12 @@ export function normalizeSales(rows: RawSale[]): NormalizedSale[] {
         currency = "USD";
         
       } else if (arsRaw > 0) {
-        // CASO ARS: Convertir usando FX del mes
+        // ✅ CASO ARS: RESPETAR MONEDA ORIGINAL - NO CONVERTIR
         originalAmount = arsRaw;
-        fx = fxForMonth(monthKey);
-        revenueUSD = arsRaw / fx;
+        revenueUSD = arsRaw; // Mantener valor en ARS, no convertir
         currency = "ARS";
         
-        console.log(`💱 NORMALIZADOR ARS→USD: ARS ${arsRaw} / ${fx} = USD ${revenueUSD.toFixed(2)} (${r.Cliente}|${r.Proyecto}|${monthKey})`);
+        console.log(`💰 NORMALIZADOR ARS: Manteniendo ARS ${arsRaw} (${r.Cliente}|${r.Proyecto}|${monthKey})`);
         
       } else {
         // CASO VACÍO: Ambos montos son 0, descartar
