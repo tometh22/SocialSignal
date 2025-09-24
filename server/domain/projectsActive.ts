@@ -30,6 +30,7 @@ import type { IStorage } from "../storage";
 import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { CoverageCalculator } from "./coverage";
+import { aggregateIncome, type DualNormalizedIncome } from "../services/sales";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -159,72 +160,60 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * 🎯 REFACTORIZADO: Get sales data from storage (datos ya normalizados)
-   * YA NO necesita conversión ad-hoc - storage maneja toda la normalización ARS/USD
+   * 🚀 NUEVO SISTEMA DUAL: Get sales data usando nuevo normalizador dual
+   * Respeta moneda original + calcula USD normalizado para KPIs
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
-    // Get all sales from Google Sheets integration (YA NORMALIZADOS por storage)
-    const allSales = await this.storage.getGoogleSheetsSales();
-    console.log(`💰 Retrieved ${allSales.length} total sales records`);
+    // 🚀 NUEVO SISTEMA DUAL: Usar aggregateIncome con moneda dual
     
-    // 🚀 USAR DATOS YA NORMALIZADOS: Sin conversión ad-hoc duplicada
-
+    // Get raw sales data from Google Sheets (before normalization)
+    const allRawSales = await this.storage.getGoogleSheetsSales();
+    console.log(`💰 Retrieved ${allRawSales.length} total raw sales records`);
+    
+    // Convert period to monthKey format
+    const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+    const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
+    
+    // 🚀 USAR NUEVO AGREGADOR DUAL: aggregateIncome()
+    const aggregatedIncomes = aggregateIncome(allRawSales, periodStartKey, periodEndKey);
+    console.log(`💰 DUAL AGREGADOR: ${aggregatedIncomes.size} proyectos únicos con ingresos duales`);
+    
+    // Convert dual aggregated incomes to legacy SalesRecord format for compatibility
     const filteredSales: SalesRecord[] = [];
-
-    for (const sale of allSales) {
-      // Temporal filtering using monthKey (blueprint plan implementation)
-      if (sale.year && sale.monthNumber) {
-        const monthKey = `${sale.year}-${String(sale.monthNumber).padStart(2, '0')}`;
-        const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
-        const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
-        
-        // Exact monthKey matching (blueprint: filter by monthKey)
-        if (monthKey < periodStartKey || monthKey > periodEndKey) {
-          continue;
-        }
-      }
-
-      // 🎯 USAR REVENUE YA NORMALIZADO: Storage ya aplicó anti-×100 y conversión FX
-      // PERO aplicar fallback anti-×100 para datos legacy no normalizados
-      let revenueUSD = parseFloat(sale.amountUsd || '0') || 0;
-      
-      // 🔧 FALLBACK ANTI-×100: Para CUALQUIER dato legacy inflado ×100
-      const isLegacyInflatedData = (
-        revenueUSD >= 100_000 && 
-        revenueUSD % 100 === 0
-      );
-      
-      if (isLegacyInflatedData) {
-        const originalValue = revenueUSD;
-        revenueUSD = revenueUSD / 100;
-        console.log(`🔧 FALLBACK ANTI-×100: ${sale.clientName}|${sale.projectName} → ${originalValue} / 100 = ${revenueUSD}`);
-      }
-      
-      // Skip if no valid revenue or not confirmed
-      const isConfirmed = String(sale.confirmed || '').toLowerCase().includes('si');
-      if (revenueUSD <= 0 || !isConfirmed) continue;
-      
-      // 💰 LOGGING MEJORADO: Mostrar que usamos datos ya normalizados
-      console.log(`💰 DATOS NORMALIZADOS: ${sale.clientName}|${sale.projectName} → USD ${revenueUSD} (currency: ${sale.currency}, fx: ${sale.fxApplied || 'N/A'})`);
-
+    
+    for (const [projectKey, income] of aggregatedIncomes) {
       // Generate canonical fields for ETL consistency
-      const canonicalFields = generateCanonicalFields(sale.clientName, sale.projectName);
+      const canonicalFields = generateCanonicalFields(income.clientName, income.projectName);
       
-      filteredSales.push({
+      // 🚀 NUEVO: Agregar campos duales a SalesRecord
+      const salesRecord: SalesRecord & {
+        displayCurrency?: "ARS" | "USD";
+        revenueDisplay?: number;
+        revenueUSDNormalized?: number;
+      } = {
         clientCanon: canonicalFields.clientCanon,
         projectCanon: canonicalFields.projectCanon,
         projectKey: canonicalFields.projectKey,
-        projectName: sale.projectName || '',
-        clientId: sale.clientId || 0,
-        clientName: sale.clientName || '',
-        revenueUSD,
-        month: String(sale.monthNumber || 0),
-        year: sale.year || 0,
-        confirmedOnly: isConfirmed
-      });
+        projectName: income.projectName,
+        clientId: 0, // Will be resolved later in merge
+        clientName: income.clientName,
+        revenueUSD: income.revenueUSDNormalized, // Use normalized USD for backward compatibility
+        month: periodStartKey.substring(5, 7),   // Extract month from period
+        year: parseInt(periodStartKey.substring(0, 4)), // Extract year from period
+        confirmedOnly: true, // Todos los records agregados ya están confirmados
+        
+        // 🚀 NUEVOS CAMPOS DUALES: Para mostrar en frontend
+        displayCurrency: income.displayCurrency,
+        revenueDisplay: income.revenueDisplay,
+        revenueUSDNormalized: income.revenueUSDNormalized
+      };
+      
+      filteredSales.push(salesRecord);
+      
+      console.log(`💰 DUAL RECORD: ${income.clientName}|${income.projectName} → Display: ${income.displayCurrency} ${income.revenueDisplay}, KPIs: USD ${income.revenueUSDNormalized}`);
     }
 
-    console.log(`💰 Sales filtered for period: ${filteredSales.length} records`);
+    console.log(`💰 DUAL SALES: ${filteredSales.length} records with dual currency support`);
     return filteredSales;
   }
 
