@@ -181,16 +181,29 @@ export type DualNormalizedIncome = {
  */
 export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
   try {
-    // Validar confirmación
-    const confirmed = (row.Confirmado || "").toLowerCase() === "si";
+    // 🔧 ADAPTER: Mapear campos de DB (inglés) a campos esperados (español)
+    const dbRow = {
+      Cliente: row.client_name || row.Cliente || "",
+      Proyecto: row.project_name || row.Proyecto || "",
+      Mes: row.month || row.Mes || "",
+      Año: row.year || row.Año || 2025,
+      Monto_ARS: row.amount_ars || row.Monto_ARS || 0,
+      Monto_USD: row.amount_usd || row.Monto_USD || 0,
+      Confirmado: row.confirmed || row.Confirmado || "",
+      Tipo_Venta: row.sales_type || row.revenue_type || row.Tipo_Venta || ""
+    };
+    
+    // Validar confirmación (aceptar SI/si/sí/Si)
+    const confirmedStr = (dbRow.Confirmado || "").toLowerCase();
+    const confirmed = confirmedStr.startsWith('s') || confirmedStr === 'si';
     if (!confirmed) return null;
     
     // Mapeo explícito de columnas
-    const clientName = (row.Cliente || "").trim();
-    const projectName = (row.Proyecto || "").trim();
-    const monthEs = (row.Mes || "").trim();
-    const year = Number(row.Año) || 2025;
-    const saleType = (row.Tipo_Venta || "").trim();
+    const clientName = (dbRow.Cliente || "").trim();
+    const projectName = (dbRow.Proyecto || "").trim();
+    const monthEs = (dbRow.Mes || "").trim();
+    const year = Number(dbRow.Año) || 2025;
+    const saleType = (dbRow.Tipo_Venta || "").trim();
     
     if (!clientName || !projectName || !monthEs) return null;
     
@@ -199,8 +212,8 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
     const monthKey = `${year}-${String(monthNum).padStart(2, '0')}`;
     
     // Parsear montos en formato español
-    const amountARS = parseNumberEs(row.Monto_ARS);
-    const amountUSD = parseNumberEs(row.Monto_USD);
+    const amountARS = parseNumberEs(dbRow.Monto_ARS);
+    const amountUSD = parseNumberEs(dbRow.Monto_USD);
     
     // Detectar moneda de display: prioridad a USD
     let displayCurrency: "ARS" | "USD";

@@ -1,0 +1,93 @@
+1) Lectura correcta de “Ventas Tomi” (dual-currency)
+
+Por cada fila:
+
+monthKey = YYYY-MM (usar parser robusto para español: “Agosto”, “ago”, “08 ago” → 8).
+
+montoARS = parseNumberEs(Monto_ARS), montoUSD = parseNumberEs(Monto_USD).
+
+confirmed = String(Confirmado).toLowerCase().startsWith('s') (aceptar “Si/Sí/sí/si”).
+
+Moneda nativa para la card:
+
+si montoUSD > 0 → revenueNativeAmount = montoUSD, revenueCurrency = 'USD'
+
+si montoUSD === 0 → revenueNativeAmount = montoARS, revenueCurrency = 'ARS'
+
+USD normalizado para KPIs/cálculos:
+
+si USD → revenueUSDNormalized = montoUSD
+
+si ARS → revenueUSDNormalized = montoARS / fxForMonth(monthKey)
+
+IMPORTANTE: No conviertas ARS a USD para mostrar en la card. Solo normaliza a USD para sumar/comparar.
+
+2) Usar siempre revenueUSDNormalized en los cálculos
+
+Reemplazar en el motor:
+
+// antes (mal)
+profitUSD   = revenueUSD - costUSD;
+markupRatio = costUSD > 0 ? revenueUSD / costUSD : null;
+
+// después (bien)
+profitUSD   = revenueUSDNormalized - costUSD;
+markupRatio = costUSD > 0 ? revenueUSDNormalized / costUSD : null;
+marginPct   = revenueUSDNormalized > 0 ? profitUSD / revenueUSDNormalized : null;
+
+
+KPIs superiores (portfolio) = sumas de revenueUSDNormalized.
+
+En la card del proyecto, mostrar revenueNativeAmount + revenueCurrency.
+
+3) Arreglar el filtro temporal (la causa del “0 sales”)
+
+Asegurar que el mismo resolvedor se use en toda la API (august_2025, last_month, etc.).
+
+Validar que el monthKey que sale del parser coincide con el que usa el filtro (ej.: "2025-08").
+
+Incluir confirmed === true solo si esa condición es requerida para la vista; si no, exponer un flag.
+
+4) Endpoints de depuración (para terminar con el “0 sales”)
+
+Agregar 2 endpoints de debug y usarlos ya:
+
+GET /api/debug/sales?timeFilter=august_2025 →
+
+{
+  "totalRaw": N,
+  "filtered": M,
+  "byProject":[{"client":"Warner","project":"Fee Marketing","count":1,"sumUSDNorm":29230}, ...],
+  "samples":[ { "monthKey":"2025-08", "revenueCurrency":"USD", "revenueNativeAmount":29230, "revenueUSDNormalized":29230 } ]
+}
+
+
+GET /api/debug/fx?monthKey=2025-08 → devolver FX utilizado.
+
+5) Smokes que deben pasar (copiar/pegar)
+BASE="http://localhost:5000"; TF="august_2025"
+
+# Ventas crudas del período (debe listar Warner, Kimberly y Coelsa)
+curl -s "$BASE/api/debug/sales?timeFilter=$TF" | jq '.filtered, .byProject[0:5]'
+
+# Warner (Ago 2025) – valores golden
+curl -s "$BASE/api/projects/<ID_Warner>/complete-data?timeFilter=$TF" \
+| jq '{revUSDNorm:.period.revenueUSDNormalized, costUSD:.period.costUSD, markup:.period.markupRatio, margin:.period.marginPct}'
+
+# Kimberly Huggies (Ago 2025) – 3.47× / ~71.2%
+curl -s "$BASE/api/projects/<ID_Huggies>/complete-data?timeFilter=$TF" \
+| jq '{revUSDNorm:.period.revenueUSDNormalized, costUSD:.period.costUSD, markup:.period.markupRatio, margin:.period.marginPct}'
+
+# Coelsa (Ago 2025) – card en ARS y KPIs en USD
+curl -s "$BASE/api/projects?timeFilter=$TF" \
+| jq '.projects[] | select(.clientName=="Coelsa") | {display:.metrics.revenueDisplay, revUSDNorm:.metrics.revenueUSDNormalized}'
+
+6) Criterios de aceptación (globales, para cualquier proyecto)
+
+Cards: ingreso en moneda nativa (ARS/ USD según la fila de “Ventas Tomi”).
+
+KPIs superiores: USD normalizado (suma de todos los proyectos).
+
+Cálculos (profit, markup, margin) siempre con revenueUSDNormalized.
+
+Filtro temporal consistente (mismo resolver en todas las rutas).

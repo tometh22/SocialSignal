@@ -168,11 +168,15 @@ export class ActiveProjectsAggregator {
    * Respeta moneda original + calcula USD normalizado para KPIs
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
-    // 🚀 NUEVO SISTEMA DUAL: Usar aggregateIncome con moneda dual
+    console.log(`🔧 DUAL SALES DEBUG: Starting getSalesInPeriod for period ${period.start} → ${period.end}`);
     
-    // Get raw sales data from Google Sheets (before normalization)
-    const allRawSales = await this.storage.getGoogleSheetsSales();
-    console.log(`💰 Retrieved ${allRawSales.length} total raw sales records`);
+    try {
+      // 🚀 NUEVO SISTEMA DUAL: Usar aggregateIncome con moneda dual
+      
+      // Get raw sales data from Google Sheets (before normalization)
+      console.log(`🔧 DUAL SALES DEBUG: About to call this.storage.getGoogleSheetsSales()`);
+      const allRawSales = await this.storage.getGoogleSheetsSales();
+      console.log(`💰 Retrieved ${allRawSales.length} total raw sales records`);
     
     // Convert period to monthKey format
     const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
@@ -219,6 +223,12 @@ export class ActiveProjectsAggregator {
 
     console.log(`💰 DUAL SALES: ${filteredSales.length} records with dual currency support`);
     return filteredSales;
+    
+    } catch (error) {
+      console.error(`❌ DUAL SALES ERROR in getSalesInPeriod:`, error);
+      console.error(`❌ DUAL SALES ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      return []; // Return empty array on error
+    }
   }
 
   /**
