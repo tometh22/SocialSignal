@@ -5,6 +5,7 @@
 
 import { monthKeyFromSpanish } from './dates';
 import { fxForMonth } from './fx';
+import { getFxRate } from '../utils/fx';
 
 /**
  * Tipo de datos de venta cruda del Excel
@@ -125,6 +126,147 @@ export function normalizeSales(rows: RawSale[]): NormalizedSale[] {
 }
 
 /**
+ * 🔧 UTILIDADES PARA NUEVO NORMALIZADOR DUAL
+ */
+
+/**
+ * Parseador de números en formato español: "3.718.825,50" → 3718825.50
+ */
+export function parseNumberEs(value: string | number): number {
+  if (typeof value === 'number') return value;
+  if (!value || typeof value !== 'string') return 0;
+  
+  // Remover espacios y convertir comas por puntos
+  const clean = value.toString().trim()
+    .replace(/\./g, '')  // Remover puntos (separadores de miles)
+    .replace(/,/g, '.'); // Convertir comas a puntos decimales
+  
+  const parsed = parseFloat(clean);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Convierte mes en español a número: "Agosto" → 8
+ */
+export function spanishMonthToNumber(monthEs: string): number {
+  const months: Record<string, number> = {
+    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+    'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+    'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+  };
+  
+  const normalized = monthEs.toLowerCase().trim();
+  return months[normalized] || 1;
+}
+
+/**
+ * 💰 NUEVO TIPO: Ingreso normalizado con moneda dual
+ */
+export type DualNormalizedIncome = {
+  clientName: string;
+  projectName: string;
+  monthKey: string;
+  saleType: string;
+  displayCurrency: "ARS" | "USD";
+  revenueDisplay: number;        // Valor en moneda original
+  revenueUSDNormalized: number;  // Valor normalizado para cálculos
+  confirmed: boolean;
+  fx?: number;                   // Rate usado si se convirtió
+  antiX100Applied?: boolean;
+};
+
+/**
+ * 🚀 NUEVO NORMALIZADOR DUAL - Respeta moneda original + normaliza para cálculos
+ * Mapeo explícito según especificaciones del usuario
+ */
+export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
+  try {
+    // Validar confirmación
+    const confirmed = (row.Confirmado || "").toLowerCase() === "si";
+    if (!confirmed) return null;
+    
+    // Mapeo explícito de columnas
+    const clientName = (row.Cliente || "").trim();
+    const projectName = (row.Proyecto || "").trim();
+    const monthEs = (row.Mes || "").trim();
+    const year = Number(row.Año) || 2025;
+    const saleType = (row.Tipo_Venta || "").trim();
+    
+    if (!clientName || !projectName || !monthEs) return null;
+    
+    // Generar monthKey: "2025-08"
+    const monthNum = spanishMonthToNumber(monthEs);
+    const monthKey = `${year}-${String(monthNum).padStart(2, '0')}`;
+    
+    // Parsear montos en formato español
+    const amountARS = parseNumberEs(row.Monto_ARS);
+    const amountUSD = parseNumberEs(row.Monto_USD);
+    
+    // Detectar moneda de display: prioridad a USD
+    let displayCurrency: "ARS" | "USD";
+    let revenueDisplay: number;
+    let revenueUSDNormalized: number;
+    let fx: number | undefined;
+    let antiX100Applied = false;
+    
+    if (amountUSD > 0) {
+      // CASO USD: Usar valor USD directamente
+      displayCurrency = "USD";
+      
+      // Aplicar anti-×100 defensivo 
+      const shouldApplyAntiX100 = (
+        amountUSD >= 100_000 && 
+        amountARS === 0 && 
+        amountUSD % 100 === 0
+      );
+      
+      if (shouldApplyAntiX100) {
+        revenueDisplay = amountUSD / 100;
+        antiX100Applied = true;
+        console.log(`🔧 DUAL NORMALIZADOR ANTI×100: ${amountUSD} → ${revenueDisplay} (${clientName}|${projectName}|${monthKey})`);
+      } else {
+        revenueDisplay = amountUSD;
+      }
+      
+      revenueUSDNormalized = revenueDisplay; // USD = USD
+      
+    } else if (amountARS > 0) {
+      // CASO ARS: Mostrar en ARS, normalizar para cálculos
+      displayCurrency = "ARS";
+      revenueDisplay = amountARS;
+      
+      // Normalizar a USD usando FX del mes
+      const fxRate = getFxRate(monthKey);
+      fx = fxRate;
+      revenueUSDNormalized = amountARS / fxRate;
+      
+      console.log(`💱 DUAL NORMALIZADOR ARS: Mostrar ARS ${amountARS}, calcular USD ${revenueUSDNormalized.toFixed(2)} (FX=${fx}) (${clientName}|${projectName}|${monthKey})`);
+      
+    } else {
+      // CASO VACÍO: Sin datos
+      return null;
+    }
+    
+    return {
+      clientName,
+      projectName,
+      monthKey,
+      saleType,
+      displayCurrency,
+      revenueDisplay: Number(revenueDisplay.toFixed(2)),
+      revenueUSDNormalized: Number(revenueUSDNormalized.toFixed(2)),
+      confirmed: true,
+      ...(fx && { fx }),
+      ...(antiX100Applied && { antiX100Applied })
+    };
+    
+  } catch (error: any) {
+    console.error(`❌ DUAL NORMALIZADOR: Error procesando fila:`, error.message, row);
+    return null;
+  }
+}
+
+/**
  * Obtiene estadísticas del proceso de normalización
  */
 export function getNormalizationStats(normalized: NormalizedSale[]): {
@@ -215,4 +357,74 @@ export function groupSalesByProject(sales: NormalizedSale[]): Map<string, Normal
   }
   
   return groups;
+}
+
+/**
+ * 🚀 NUEVO AGREGADOR DUAL - Filtra y agrupa ingresos con moneda dual
+ * Según especificaciones del usuario para sistema dual
+ */
+export function aggregateIncome(
+  incomeRows: any[], 
+  startMonthKey: string, 
+  endMonthKey: string
+): Map<string, {
+  clientName: string;
+  projectName: string;
+  displayCurrency: "ARS" | "USD";
+  revenueDisplay: number;
+  revenueUSDNormalized: number;
+  saleType: string;
+  isActive: boolean;
+  records: DualNormalizedIncome[];
+}> {
+  const aggregated = new Map();
+  
+  // Normalizar todas las filas
+  const normalizedIncomes: DualNormalizedIncome[] = [];
+  for (const row of incomeRows) {
+    const normalized = normalizeIncomeRow(row);
+    if (normalized) {
+      normalizedIncomes.push(normalized);
+    }
+  }
+  
+  // Filtrar por período
+  const filtered = normalizedIncomes.filter(income => 
+    income.monthKey >= startMonthKey && income.monthKey <= endMonthKey
+  );
+  
+  console.log(`📊 AGREGADOR DUAL: ${normalizedIncomes.length} ingresos → ${filtered.length} en período ${startMonthKey}..${endMonthKey}`);
+  
+  // Agrupar por (cliente, proyecto)
+  for (const income of filtered) {
+    const key = `${income.clientName}|${income.projectName}`;
+    
+    if (!aggregated.has(key)) {
+      aggregated.set(key, {
+        clientName: income.clientName,
+        projectName: income.projectName,
+        displayCurrency: income.displayCurrency, // Usar primera moneda encontrada
+        revenueDisplay: 0,
+        revenueUSDNormalized: 0,
+        saleType: income.saleType,
+        isActive: false,
+        records: []
+      });
+    }
+    
+    const proj = aggregated.get(key);
+    proj.revenueDisplay += income.revenueDisplay;
+    proj.revenueUSDNormalized += income.revenueUSDNormalized;
+    proj.records.push(income);
+    
+    // Determinar si está activo
+    if (income.saleType.toLowerCase().includes("fee")) {
+      proj.isActive = true; // Recurrentes siempre activos
+    } else if (income.revenueDisplay > 0) {
+      proj.isActive = true; // One-shot activos si tienen ingresos en período
+    }
+  }
+  
+  console.log(`📊 AGREGADOR DUAL: ${aggregated.size} proyectos únicos agregados`);
+  return aggregated;
 }

@@ -1,0 +1,210 @@
+Objetivo
+Arreglar la página Active Projects para que:
+
+los ingresos se lean correctamente de la hoja “Ventas Tomi”,
+
+se muestren en su moneda nativa (ARS o USD) en cada card,
+
+pero todos los cálculos (profit, markup, margin, KPIs de cabecera) se hagan en USD normalizado usando el FX del mes del registro,
+
+y respete los filtros temporales (this_month, last_month, YYYY-MM, Qx_YYYY).
+
+1) Mapeo explícito de columnas (Ventas Tomi)
+
+Crear/ajustar un normalizador normalizeIncomeRow(row) con este contrato:
+
+Cliente → clientName (string, trim)
+
+Proyecto → projectName (string, trim)
+
+Mes → monthEs (“Enero”, “Febrero”, … “Agosto”, etc.)
+
+Año → year (number)
+
+Tipo_Venta → saleType (“Fee” | “One Shot” | otros)
+
+Monto_ARS → amountARS (number | null; usar parser ES: coma decimal, puntos de miles)
+
+Monto_USD → amountUSD (number | null; parser idem)
+
+Confirmado → confirmed (boolean: “Si” → true)
+
+Derivados:
+
+monthKey = YYYY-MM (p.ej. “2025-08”)
+
+displayCurrency:
+
+"ARS" si amountARS > 0
+
+"USD" en otro caso
+
+revenueDisplay:
+
+si displayCurrency === "ARS" → amountARS
+
+si displayCurrency === "USD" → amountUSD
+
+revenueUSDNormalized:
+
+si displayCurrency === "USD" → amountUSD
+
+si displayCurrency === "ARS" → amountARS / fx(monthKey)
+(fx = ARS por USD del mes; ejemplo agosto 2025: 1,345 ARS/USD)
+
+Importante: NO conviertas ingresos si vienen en USD; SÍ normaliza a USD cuando vengan en ARS (solo para cálculos).
+
+Utilidades necesarias:
+
+parseNumberEs("3.718.825") -> 3718825
+
+spanishMonthToNumber("Agosto") -> 8
+
+getFx(monthKey): retorna ARS por USD del mes (ya lo usamos en costos).
+
+2) Agregador por proyecto y período
+
+Crear/ajustar aggregateIncome(periodRange) que:
+
+filtra por monthKey dentro del rango del filtro,
+
+agrupa por (clientName, projectName),
+
+suma:
+
+revenueDisplay en su moneda nativa (mantener displayCurrency por proyecto),
+
+revenueUSDNormalized en USD (para cálculos globales),
+
+marca isActive:
+
+recurrentes (“Fee”) → activos siempre,
+
+one-shot → activos solo si tienen ingresos o costos en el período.
+
+3) Unificación con Costos & Cálculos
+
+Dado el costo del período en USD (costUSD) y horas:
+
+profitUSD = revenueUSDNormalized - costUSD
+
+markup = (costUSD > 0) ? (revenueUSDNormalized / costUSD) : null (mostrar como “×”, ej. 3.47×)
+
+marginPct = (revenueUSDNormalized > 0) ? (profitUSD / revenueUSDNormalized) : null
+
+efficiencyPct y hours = como ya salían de costos.
+
+Devolver por proyecto (cards):
+
+{
+  "client": "…",
+  "project": "…",
+  "type": "Fee|One-Shot",
+  "period": "YYYY-MM",
+  "displayCurrency": "ARS|USD",
+  "revenueDisplay": 3718825,        // moneda nativa
+  "revenueUSDNormalized": 2764.9,   // USD (solo cálculos)
+  "costUSD": 2436.09,
+  "profitUSD": 328.81,
+  "markup": 1.14,
+  "marginPct": 11.9,
+  "workedHours": 288.28,
+  "targetHours": 320,
+  "efficiencyPct": 90.1
+}
+
+
+Cabecera (totales):
+
+Period Revenue = Σ revenueUSDNormalized (USD)
+
+Period Profit = Σ profitUSD (USD)
+
+Period Hours = Σ workedHours
+
+Active Projects = cantidad según regla anterior
+
+La card de cada proyecto muestra revenueDisplay con su símbolo (ARS/USD)
+pero los KPIs y profit se calculan en USD normalizado.
+
+4) Filtros temporales (deben afectar ingresos y costos)
+
+Aceptar:
+
+this_month, last_month, YYYY-MM, q1_2025 …
+La función resolveTimeFilter() retorna [startMonthKey, endMonthKey].
+Usarla en ingresos y costos.
+
+5) Endpoints y contrato
+
+GET /api/projects/active?timeFilter=...&onlyActiveInPeriod=true
+
+Devuelve summary (cabecera en USD) + projects[] (cards con displayCurrency + revenueDisplay).
+
+GET /api/projects/:id/complete-data?timeFilter=...
+
+Misma lógica de normalización para ese proyecto.
+
+6) Pruebas de aceptación (agosto 2025)
+
+Ejecutar:
+
+BASE="http://localhost:5000"
+TF="2025-08"
+
+# Warner · Fee Marketing (USD en hoja)
+curl -s "$BASE/api/projects/active?timeFilter=$TF" | jq '
+ .projects[] | select(.project=="Fee Marketing" and .client=="Warner")
+ | {displayCurrency, revenueDisplay, revenueUSDNormalized, costUSD, markup, marginPct}
+'
+
+# Kimberly Clark · Fee Huggies (USD en hoja)
+curl -s "$BASE/api/projects/active?timeFilter=$TF" | jq '
+ .projects[] | select(.project=="Fee Huggies" and .client=="Kimberly Clark")
+ | {displayCurrency, revenueDisplay, revenueUSDNormalized, costUSD, markup, marginPct}
+'
+
+# Coelsa · Fee mensual (ARS en hoja → normalizar)
+curl -s "$BASE/api/projects/active?timeFilter=$TF" | jq '
+ .projects[] | select(.client=="Coelsa" and .project=="Fee mensual")
+ | {displayCurrency, revenueDisplay, revenueUSDNormalized}
+'
+
+
+Esperado (redondeado):
+
+Warner
+
+displayCurrency: "USD"
+
+revenueDisplay ≈ 29230
+
+revenueUSDNormalized ≈ 29230
+
+Kimberly Fee Huggies
+
+displayCurrency: "USD"
+
+revenueDisplay ≈ 8450
+
+revenueUSDNormalized ≈ 8450
+
+Coelsa (Agosto)
+
+displayCurrency: "ARS"
+
+revenueDisplay ≈ 3718825
+
+revenueUSDNormalized ≈ 2765 (usando FX agosto=1345 ARS/USD)
+
+Cabecera (summary):
+
+periodRevenueUSD = suma de revenueUSDNormalized de todos
+
+periodProfitUSD = suma de profitUSD
+
+7) Debug útil (opcional)
+
+GET /api/debug/income-map?timeFilter=2025-08 → dump mapeado {client, project, monthKey, displayCurrency, revenueDisplay, revenueUSDNormalized}
+
+Log por fila cuando displayCurrency === "ARS" y fx no está disponible.
