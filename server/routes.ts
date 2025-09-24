@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==================== CONSOLIDATED PROJECTS ENDPOINT ====================
   // Uses ONLY ActiveProjectsAggregator for consistency with dual-currency support
   app.get('/api/projects', requireAuth, async (req, res) => {
-    console.log(`🚀 CONSOLIDATED PROJECTS ENDPOINT: Query=${JSON.stringify(req.query)}`);
+    console.log(`🔥🔥🔥 MY CONSOLIDATED ENDPOINT IS RUNNING 🔥🔥🔥 Query=${JSON.stringify(req.query)}`);
     
     try {
       // Parse query parameters (match ActiveProjectsAggregator interface)
@@ -350,8 +350,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get unified data using blueprint aggregator with dual-currency support
       const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
       
-      console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse.projects.length} projects from ActiveProjectsAggregator`);
-      console.log(`💰 Portfolio totals: $${aggregatorResponse.summary.portfolio.periodRevenueUSD.toFixed(2)} revenue`);
+      console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
+      console.log(`🔍 DEBUG AGGREGATOR RESPONSE STRUCTURE:`, JSON.stringify(aggregatorResponse, null, 2));
+      
+      // Safe access to summary with debugging
+      if (aggregatorResponse?.summary?.periodRevenueUSD) {
+        console.log(`💰 Portfolio totals: $${aggregatorResponse.summary.periodRevenueUSD.toFixed(2)} revenue, ${aggregatorResponse.period?.displayCurrency || 'USD'} display: ${aggregatorResponse.period?.revenueDisplay || 0}`);
+      } else {
+        console.log(`❌ PROBLEM: aggregatorResponse.summary is ${aggregatorResponse?.summary}, period is ${aggregatorResponse?.period}`);
+      }
 
       return res.json(aggregatorResponse);
 
@@ -9665,8 +9672,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 1. UNIVERSAL PROJECTS LISTING ENDPOINT
   // GET /api/projects?timeFilter=august_2025
   // DISABLED: Conflicting endpoint - consolidation uses only ActiveProjectsAggregator
-  // app.get('/api/projects', requireAuth, async (req, res) => {
-    console.log(`🚀 UNIVERSAL PROJECTS LISTING - DISABLED FOR CONSOLIDATION`);
+  /* 
+  app.get('/api/projects', requireAuth, async (req, res) => {
+    console.log(`🚀 UNIVERSAL PROJECTS LISTING - TimeFilter: ${req.query.timeFilter}`);
     
     try {
       const { timeFilter = 'current_month' } = req.query;
@@ -9919,7 +9927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : String(error)
       });
     }
-  });
+  }); 
+  */ // END DISABLED: Conflicting handler completely commented out
 
   // RUTA DUPLICADA ELIMINADA - Ahora usa completeDataHandler en routes/index.ts  
   /*

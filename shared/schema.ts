@@ -2012,7 +2012,10 @@ export const portfolioSummarySchema = z.object({
   periodProfitUSD: z.number(),         // revenue - cost
   periodWorkedHours: z.number(),
   efficiencyFrac: z.number().nullable(), // aggregate efficiency if applicable
-  markupRatio: z.number().nullable()   // aggregate markup ratio
+  markupRatio: z.number().nullable(),   // aggregate markup ratio
+  // 🚀 DUAL CURRENCY FIELDS at portfolio level
+  displayCurrency: z.enum(["ARS", "USD"]).optional().nullable(), // Dominant currency in portfolio
+  revenueDisplay: z.number().optional().nullable()               // Total revenue in display currency
 });
 
 export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;

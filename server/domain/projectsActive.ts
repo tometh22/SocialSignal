@@ -147,7 +147,10 @@ export class ActiveProjectsAggregator {
       period: {
         start: period.start,
         end: period.end,
-        label: period.label
+        label: period.label,
+        // 🚀 DUAL-CURRENCY FIELDS AT PORTFOLIO LEVEL
+        displayCurrency: portfolioSummary.displayCurrency,
+        revenueDisplay: portfolioSummary.revenueDisplay
       },
       summary: {
         periodRevenueUSD: portfolioSummary.periodRevenueUSD,
@@ -719,8 +722,14 @@ export class ActiveProjectsAggregator {
   private calculatePortfolioSummary(projects: ActiveProjectItem[]): PortfolioSummary {
     console.log(`📊 Calculating portfolio summary for ${projects.length} projects`);
 
+    // 🚀 DUAL-CURRENCY AGGREGATION: Collect portfolio display currency and revenue
+    const currencyMap = new Map<string, number>(); // currency → total display revenue
+    let portfolioRevenueDisplay = 0;
+    let portfolioDisplayCurrency: "ARS" | "USD" | null = null;
+
     const summary = projects.reduce((acc, project) => {
-      return {
+      // Standard USD metrics aggregation
+      const updatedAcc = {
         totalProjects: acc.totalProjects + 1,
         activeProjects: acc.activeProjects + (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours ? 1 : 0),
         periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSD,
@@ -728,6 +737,15 @@ export class ActiveProjectsAggregator {
         periodProfitUSD: acc.periodProfitUSD + project.metrics.profitUSD,
         periodWorkedHours: acc.periodWorkedHours + project.metrics.workedHours
       };
+
+      // 🚀 DUAL-CURRENCY: Aggregate display currency and revenue
+      if (project.period.displayCurrency && project.period.revenueDisplay > 0) {
+        const currency = project.period.displayCurrency;
+        const currentTotal = currencyMap.get(currency) || 0;
+        currencyMap.set(currency, currentTotal + project.period.revenueDisplay);
+      }
+
+      return updatedAcc;
     }, {
       totalProjects: 0,
       activeProjects: 0,
@@ -737,6 +755,25 @@ export class ActiveProjectsAggregator {
       periodWorkedHours: 0
     });
 
+    // 🚀 DETERMINE PORTFOLIO DISPLAY CURRENCY: Use majority or USD fallback
+    if (currencyMap.size === 1) {
+      // All projects use same currency → use that currency
+      const [currency, amount] = currencyMap.entries().next().value;
+      portfolioDisplayCurrency = currency;
+      portfolioRevenueDisplay = amount;
+    } else if (currencyMap.size > 1) {
+      // Mixed currencies → find the largest by revenue volume
+      let maxAmount = 0;
+      for (const [currency, amount] of currencyMap.entries()) {
+        if (amount > maxAmount) {
+          maxAmount = amount;
+          portfolioDisplayCurrency = currency;
+          portfolioRevenueDisplay = amount;
+        }
+      }
+      console.log(`📊 MIXED CURRENCIES DETECTED: ${currencyMap.size} currencies, using dominant ${portfolioDisplayCurrency} (${portfolioRevenueDisplay})`);
+    }
+
     // Calculate aggregate ratios
     const efficiencyFrac = null; // Portfolio-level efficiency needs different calculation
     const markupRatio = summary.periodCostUSD > 0 ? summary.periodRevenueUSD / summary.periodCostUSD : null;
@@ -744,7 +781,10 @@ export class ActiveProjectsAggregator {
     return {
       ...summary,
       efficiencyFrac,
-      markupRatio
+      markupRatio,
+      // 🚀 NEW DUAL-CURRENCY FIELDS
+      displayCurrency: portfolioDisplayCurrency,
+      revenueDisplay: portfolioRevenueDisplay
     };
   }
 
