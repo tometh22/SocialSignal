@@ -1,0 +1,137 @@
+Abajo te dejo el plan quirúrgico (cambios mínimos, claros), qué tocar, cómo calcular y cómo validarlo con curls.
+
+1) Normalizar ingresos con moneda nativa + USD normalizado
+
+Objetivo:
+
+En cards por proyecto mostrar el ingreso en su moneda nativa (ARS o USD).
+
+En KPIs de cabecera y cálculos usar USD normalizado (para sumar y comparar contra costos).
+
+Cambios (backend)
+
+Archivo sugerido: server/domain/sales.ts (o donde lees “Ventas Tomi”).
+
+Parseo robusto de fila
+
+// columnas en GS: Cliente, Proyecto, Mes, Año, Tipo_Venta, Monto_ARS, Monto_USD, Confirmado
+const month = spanishMonthToNumber(row.Mes);        // "agosto" → 8
+const year  = Number(row.Año);
+const monthKey = `${year}-${String(month).padStart(2,'0')}`; // 2025-08
+
+const montoARS = parseNumberEs(row.Monto_ARS);      // "3.718.825" → 3718825
+const montoUSD = parseNumberEs(row.Monto_USD);      // "8.450"     → 8450
+const confirmed = String(row.Confirmado).toLowerCase().startsWith('s');
+
+const hasUSD = montoUSD > 0;
+const revenueNativeAmount = hasUSD ? montoUSD : montoARS;
+const revenueCurrency = hasUSD ? 'USD' : 'ARS';
+
+// USD normalizado: si viene en USD, tal cual; si viene en ARS, convertir con FX del período:
+const fx = await fxForMonth(monthKey);              // p.ej. 1.345 ARS→USD (promedio/periodo)
+const revenueUSDNormalized = hasUSD ? montoUSD : (montoARS / fx);
+
+return {
+  client: row.Cliente,
+  project: row.Proyecto,
+  monthKey,
+  type: row.Tipo_Venta,
+  confirmed,
+  revenueNativeAmount,
+  revenueCurrency,          // ← para UI de cards
+  revenueUSDNormalized,     // ← para KPIs y cálculos
+};
+
+
+Agregación por período/proyecto
+
+// suma USD normalizado para KPIs y cálculos
+sumRevenueUSDNormalized = Σ revenueUSDNormalized (filtrado por projectId y monthKey en rango);
+
+// además, conservar “display” nativo por proyecto/período:
+displayRevenue = {
+  amount: Σ revenueNativeAmount (mismo filtro),
+  currency: (si en el período hay ARS → 'ARS', si solo USD → 'USD')
+};
+
+2) Reemplazar cálculos para que NO usen revenueUSD “legacy”
+
+Archivo sugerido: server/domain/projectsActive.ts (o motor de agregación).
+
+Antes (mal):
+
+const profitUSD = revenueUSD - costUSD;
+const markupRatio = costUSD > 0 ? (revenueUSD / costUSD) : null;
+
+
+Después (bien, usando USD normalizado):
+
+const profitUSD = revenueUSDNormalized - costUSD;  // costUSD ya normalizado
+const markupRatio = costUSD > 0 ? (revenueUSDNormalized / costUSD) : null;
+const marginPct   = revenueUSDNormalized > 0 ? (profitUSD / revenueUSDNormalized) : null;
+
+// para la card:
+card.revenueDisplay = displayRevenue; // { amount, currency } (nativo)
+// para KPIs cabecera:
+portfolio.periodRevenueUSD = Σ(revenueUSDNormalized);
+portfolio.periodProfitUSD  = Σ(revenueUSDNormalized - costUSD);
+
+3) Frontend (solo formato)
+
+En la card del proyecto: si revenueDisplay.currency === 'ARS', mostrar ARS (y opcional “≈ $X USD” en pequeño).
+
+En KPIs superiores siempre mostrar USD (sumas normalizadas).
+
+4) Smoke tests (agosto 2025)
+
+Usa exactamente estos curls para validar que cerramos el circuito end-to-end.
+
+BASE="http://localhost:5000"; TF="august_2025"
+
+# A) Warner · Fee Marketing
+curl -s "$BASE/api/projects/39/complete-data?timeFilter=$TF" | \
+jq '{project: .projectName, revenueUSDNormalized: .period.revenueUSDNormalized, costUSD: .period.costUSD, markup: .period.markupRatio, marginPct: .period.marginPct}'
+
+# Esperado aprox:
+# revenueUSDNormalized ≈ 29230
+# costUSD ≈ 7005.20
+# markup ≈ 4.17
+# marginPct ≈ 0.76
+
+# B) Kimberly · Fee Huggies
+curl -s "$BASE/api/projects/39/deviation-analysis?timeFilter=$TF&basis=ECON" | \
+jq '.summary | {teamCostUSD: .teamCost, efficiency: .efficiencyPct}'
+
+# Esperado aprox:
+# teamCostUSD ≈ 2436.09
+# efficiency ≈ 90.1
+
+# C) Coelsa (ARS nativo)
+curl -s "$BASE/api/projects?timeFilter=$TF" | \
+jq '.projects[] | select(.clientName=="Coelsa") | {name: .projectName, revenueDisplay: .metrics.revenueDisplay, kpisUSD: {revUSDNorm: .metrics.revenueUSDNormalized}}'
+
+# Esperado:
+# revenueDisplay.currency == "ARS" y amount ≈ 3,7M ARS (según spreadsheet)
+# revUSDNorm > 0 (convertido con FX del período) – solo para sumas/KPIs
+
+5) Criterios de aceptación
+
+Cards: muestran ingresos nativos (ARS/ USD correctos por proyecto).
+
+KPIs: sumas consistentes en USD (periodRevenueUSD y periodProfitUSD).
+
+Cálculos (profit, markup, margin) SIEMPRE usan revenueUSDNormalized.
+
+Warner (08/2025): 29.23K vs 7.01K → 4.17×, ~76%.
+
+Huggies (08/2025): 3.47×, ~71.2%.
+
+Coelsa (08/2025): card en ARS, KPIs superiores incluyen su conversión a USD.
+
+6) Por qué ahora sí escala a “TODOS los proyectos”
+
+La regla de moneda es por fila de “Ventas Tomi”: USD si Monto_USD>0, ARS si no → sin tocar el Excel.
+
+Los cálculos siempre se hacen con el campo normalizado (USD), independiente de la moneda nativa.
+
+La UI respeta la moneda nativa (mejor UX), y los KPIs siempre comparan manzanas con manzanas (USD).

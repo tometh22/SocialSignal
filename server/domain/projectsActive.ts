@@ -549,39 +549,40 @@ export class ActiveProjectsAggregator {
     const projectItems: ActiveProjectItem[] = [];
 
     for (const projectData of projectsData) {
-      // Calculate aggregated metrics
-      const revenueUSD = projectData.sales.reduce((sum, sale) => sum + sale.revenueUSD, 0);
+      // Calculate aggregated metrics - USING USD NORMALIZED FOR DUAL CURRENCY
+      const revenueUSDNormalized = projectData.sales.reduce((sum, sale) => sum + (sale.revenueUSDNormalized || sale.revenueUSD), 0);
+      const revenueUSD = revenueUSDNormalized; // Backward compatibility
       const costUSD = projectData.costs.reduce((sum, cost) => sum + cost.costUSD, 0);
       const workedHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursReal, 0);
       const targetHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursTarget, 0);
 
-      // Calculate derived metrics - CORRECTED SEMANTICS
-      const profitUSD = (revenueUSD ?? 0) - (costUSD ?? 0);
-      const markupRatio = costUSD > 0 ? (revenueUSD / costUSD) : null; // show as "×"
-      const marginFrac = revenueUSD > 0 ? (profitUSD / revenueUSD) : null; // 0..1
+      // Calculate derived metrics - USING USD NORMALIZED (PLAN QUIRÚRGICO)
+      const profitUSD = (revenueUSDNormalized ?? 0) - (costUSD ?? 0);
+      const markupRatio = costUSD > 0 ? (revenueUSDNormalized / costUSD) : null; // show as "×"
+      const marginFrac = revenueUSDNormalized > 0 ? (profitUSD / revenueUSDNormalized) : null; // 0..1
       const efficiencyFrac = targetHours > 0 ? (workedHours / targetHours) : null; // 0..1
 
       // Sanity guards and warnings (blueprint end-to-end validation)
       if (markupRatio && markupRatio > 20) {
         console.warn(`⚠️ SANITY: High markup ${markupRatio.toFixed(2)}× for project "${projectData.projectName}"`);
       }
-      if (revenueUSD > 1000000) {
-        console.warn(`⚠️ SANITY: Large revenue $${revenueUSD.toLocaleString()} for project "${projectData.projectName}"`);
+      if (revenueUSDNormalized > 1000000) {
+        console.warn(`⚠️ SANITY: Large revenue $${revenueUSDNormalized.toLocaleString()} for project "${projectData.projectName}"`);
       }
-      if (Math.abs(costUSD - revenueUSD) > revenueUSD * 0.9 && revenueUSD > 0) {
-        console.warn(`⚠️ SANITY: Cost/Revenue mismatch for project "${projectData.projectName}": cost=$${costUSD}, revenue=$${revenueUSD}`);
+      if (Math.abs(costUSD - revenueUSDNormalized) > revenueUSDNormalized * 0.9 && revenueUSDNormalized > 0) {
+        console.warn(`⚠️ SANITY: Cost/Revenue mismatch for project "${projectData.projectName}": cost=$${costUSD}, revenue=$${revenueUSDNormalized}`);
       }
 
-      // Calculate flags
+      // Calculate flags - USING USD NORMALIZED
       const flags: ProjectFlags = {
-        hasSales: (revenueUSD ?? 0) > 0,
+        hasSales: (revenueUSDNormalized ?? 0) > 0,
         hasCosts: (costUSD ?? 0) > 0,
         hasHours: (workedHours ?? 0) > 0
       };
 
-      // Build metrics object
+      // Build metrics object - WITH DUAL CURRENCY SUPPORT
       const metrics: ProjectMetrics = {
-        revenueUSD,
+        revenueUSD: revenueUSDNormalized, // For backward compatibility
         costUSD,
         profitUSD,
         markupRatio,
@@ -613,11 +614,11 @@ export class ActiveProjectsAggregator {
           logo: client?.logoUrl || null
         },
         metrics,
-        // Map metrics to top-level fields for frontend compatibility
-        revenue: revenueUSD,
+        // Map metrics to top-level fields for frontend compatibility - USD NORMALIZED
+        revenue: revenueUSDNormalized,
         cost: costUSD,
         profit: profitUSD,
-        periodRevenueUSD: revenueUSD,
+        periodRevenueUSD: revenueUSDNormalized,
         periodCostUSD: costUSD,
         periodProfitUSD: profitUSD,
         flags,
