@@ -178,17 +178,29 @@ export class ActiveProjectsAggregator {
       const dbSalesRecords = await this.storage.getGoogleSheetsSales();
       console.log(`💰 Retrieved ${dbSalesRecords.length} total raw sales records from DB`);
     
-    // 🔧 CRITICAL FIX: Map DB format (clientName, projectName, amountUsd) to expected format (Cliente, Proyecto, Monto_USD)
-    const allRawSales = dbSalesRecords.map(row => ({
-      Cliente: row.clientName || "",
-      Proyecto: row.projectName || "",
-      Mes: row.month || "",
-      Año: row.year || 2025,
-      Monto_ARS: Number(row.amountLocal) || 0,
-      Monto_USD: Number(row.amountUsd) || 0,
-      Confirmado: "Si", // Default to confirmed since it's in DB
-      Tipo_Venta: row.salesType || ""
-    }));
+    // 🔧 CRITICAL FIX: Map DB format with proper dual currency support
+    const allRawSales = dbSalesRecords.map(row => {
+      // Implementar regla de moneda nativa según user specs
+      const currency = row.currency || 'ARS';
+      const amountLocal = Number(row.amountLocal) || 0;
+      const amountUsd = Number(row.amountUsd) || 0;
+      
+      return {
+        Cliente: row.clientName || "",
+        Proyecto: row.projectName || "",
+        Mes: row.month || "",
+        Año: row.year || 2025,
+        // 🚀 DUAL CURRENCY: Mapear según moneda nativa
+        Monto_ARS: currency === 'ARS' ? amountLocal : 0,
+        Monto_USD: currency === 'USD' ? amountLocal : amountUsd,
+        Confirmado: row.confirmed || "Si", 
+        Tipo_Venta: row.salesType || "",
+        // 🚀 NUEVO: Campos para regla de moneda nativa
+        amountLocal,
+        currency,
+        amountUsd
+      };
+    });
     
     console.log(`🔧 MAPEO DEBUG: Mapped ${allRawSales.length} records to aggregateIncome format`);
     console.log(`🔧 MAPEO DEBUG: First record - Cliente: "${allRawSales[0]?.Cliente}", Proyecto: "${allRawSales[0]?.Proyecto}", Monto_USD: ${allRawSales[0]?.Monto_USD}`);

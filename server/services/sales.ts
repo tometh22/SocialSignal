@@ -181,14 +181,18 @@ export type DualNormalizedIncome = {
  */
 export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
   try {
-    // 🔧 ADAPTER: Mapear campos de DB (inglés) a campos esperados (español)
+    // 🔧 ADAPTER: Mapear campos de DB con nueva regla de moneda nativa
     const dbRow = {
       Cliente: row.client_name || row.Cliente || "",
       Proyecto: row.project_name || row.Proyecto || "",
       Mes: row.month || row.Mes || "",
       Año: row.year || row.Año || 2025,
-      Monto_ARS: row.amount_ars || row.Monto_ARS || 0,
-      Monto_USD: row.amount_usd || row.Monto_USD || 0,
+      // 🚀 NUEVO: Usar campos nativos del mapeo actualizado
+      Monto_ARS: row.Monto_ARS || 0,
+      Monto_USD: row.Monto_USD || 0,
+      amountLocal: row.amountLocal || 0,
+      currency: row.currency || 'USD',
+      amountUsd: row.amountUsd || 0,
       Confirmado: row.confirmed || row.Confirmado || "",
       Tipo_Venta: row.sales_type || row.revenue_type || row.Tipo_Venta || ""
     };
@@ -211,54 +215,61 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
     const monthNum = spanishMonthToNumber(monthEs);
     const monthKey = `${year}-${String(monthNum).padStart(2, '0')}`;
     
-    // Parsear montos en formato español
-    const amountARS = parseNumberEs(dbRow.Monto_ARS);
-    const amountUSD = parseNumberEs(dbRow.Monto_USD);
+    // 🚀 IMPLEMENTAR REGLA DE MONEDA NATIVA EXACTA del usuario
+    // Helper functions
+    const isNumber = (val: any) => val != null && !isNaN(Number(val)) && Number(val) > 0;
+    const toNumber = (val: any) => parseNumberEs(val);
     
-    // Detectar moneda de display: prioridad a USD
-    let displayCurrency: "ARS" | "USD";
-    let revenueDisplay: number;
-    let revenueUSDNormalized: number;
+    // 🔧 DEBUG: Verificar valores de entrada
+    console.log(`🔧 NATIVE CURRENCY DEBUG: Cliente="${clientName}", Proyecto="${projectName}"`);
+    console.log(`🔧 DB FIELDS: Monto_USD=${dbRow.Monto_USD}, Monto_ARS=${dbRow.Monto_ARS}, amountLocal=${dbRow.amountLocal}, currency=${dbRow.currency}, amountUsd=${dbRow.amountUsd}`);
+    
+    const hasUsd = isNumber(dbRow.Monto_USD) || isNumber(dbRow.amountUsd);
+    const hasArs = isNumber(dbRow.Monto_ARS) || isNumber(dbRow.amountLocal && dbRow.currency === 'ARS');
+    
+    console.log(`🔧 DETECTION: hasUsd=${hasUsd}, hasArs=${hasArs}`);
+    
+    let nativeCurrency: 'USD' | 'ARS' = 'USD';
+    let nativeAmount = 0;
+    let usdNormalized = 0;
     let fx: number | undefined;
     let antiX100Applied = false;
     
-    if (amountUSD > 0) {
-      // CASO USD: Usar valor USD directamente
-      displayCurrency = "USD";
+    if (hasUsd && !hasArs) {
+      // CASO: Solo USD
+      nativeCurrency = 'USD';
+      nativeAmount = toNumber(dbRow.Monto_USD || dbRow.amountUsd);
+      usdNormalized = nativeAmount;
+      console.log(`💰 NATIVE CURRENCY USD: Display USD ${nativeAmount}, KPIs USD ${usdNormalized} (${clientName}|${projectName}|${monthKey})`);
       
-      // Aplicar anti-×100 defensivo 
-      const shouldApplyAntiX100 = (
-        amountUSD >= 100_000 && 
-        amountARS === 0 && 
-        amountUSD % 100 === 0
-      );
+    } else if (hasArs && !hasUsd) {
+      // CASO: Solo ARS - MOSTRAR ARS, calcular USD para KPIs
+      nativeCurrency = 'ARS';
+      nativeAmount = toNumber(dbRow.Monto_ARS || (dbRow.currency === 'ARS' ? dbRow.amountLocal : 0));
       
-      if (shouldApplyAntiX100) {
-        revenueDisplay = amountUSD / 100;
-        antiX100Applied = true;
-        console.log(`🔧 DUAL NORMALIZADOR ANTI×100: ${amountUSD} → ${revenueDisplay} (${clientName}|${projectName}|${monthKey})`);
-      } else {
-        revenueDisplay = amountUSD;
-      }
-      
-      revenueUSDNormalized = revenueDisplay; // USD = USD
-      
-    } else if (amountARS > 0) {
-      // CASO ARS: Mostrar en ARS, normalizar para cálculos
-      displayCurrency = "ARS";
-      revenueDisplay = amountARS;
-      
-      // Normalizar a USD usando FX del mes
+      // Normalizar a USD usando FX del mes (solo para KPIs)
       const fxRate = getFxRate(monthKey);
       fx = fxRate;
-      revenueUSDNormalized = amountARS / fxRate;
+      usdNormalized = nativeAmount / fxRate;
       
-      console.log(`💱 DUAL NORMALIZADOR ARS: Mostrar ARS ${amountARS}, calcular USD ${revenueUSDNormalized.toFixed(2)} (FX=${fx}) (${clientName}|${projectName}|${monthKey})`);
+      console.log(`💱 NATIVE CURRENCY ARS: Display ARS ${nativeAmount}, KPIs USD ${usdNormalized.toFixed(2)} (FX=${fx}) (${clientName}|${projectName}|${monthKey})`);
+      
+    } else if (hasUsd && hasArs) {
+      // CASO: Ambos - Preferir USD (dato ya expresado en USD)
+      nativeCurrency = 'USD';
+      nativeAmount = toNumber(dbRow.Monto_USD || dbRow.amountUsd);
+      usdNormalized = nativeAmount;
+      console.log(`💰 NATIVE CURRENCY USD (mixed): Display USD ${nativeAmount}, KPIs USD ${usdNormalized} (${clientName}|${projectName}|${monthKey})`);
       
     } else {
-      // CASO VACÍO: Sin datos
+      // CASO: Fila vacía → descartar
       return null;
     }
+    
+    // Asignar valores finales
+    const displayCurrency = nativeCurrency;
+    const revenueDisplay = nativeAmount;
+    const revenueUSDNormalized = usdNormalized;
     
     return {
       clientName,

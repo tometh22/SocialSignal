@@ -1,0 +1,84 @@
+Regla de moneda nativa (por fila de venta)
+
+const hasUsd = isNumber(row.amountUsd) || isNumber(row['Monto_USD']);
+const hasArs = isNumber(row.amountArs) || isNumber(row['Monto_ARS']);
+
+let nativeCurrency: 'USD' | 'ARS' | 'MIX' = 'USD';
+let nativeAmount = 0;
+let usdNormalized = 0;
+
+if (hasUsd && !hasArs) {
+  nativeCurrency = 'USD';
+  nativeAmount = toNumber(row.amountUsd ?? row['Monto_USD']);
+  usdNormalized = nativeAmount;
+} else if (hasArs && !hasUsd) {
+  nativeCurrency = 'ARS';
+  nativeAmount = toNumber(row.amountArs ?? row['Monto_ARS']);
+  usdNormalized = nativeAmount / fx[monthKey];   // sólo para KPIs
+} else if (hasUsd && hasArs) {
+  // Si viene doble, preferí USD (dato ya expresado en USD)
+  nativeCurrency = 'USD';
+  nativeAmount = toNumber(row.amountUsd ?? row['Monto_USD']);
+  usdNormalized = nativeAmount;
+} else {
+  // fila vacía → descartar
+  continue;
+}
+
+
+Principio:
+
+Mostrar en la card la moneda nativa (lo que haya en la hoja: ARS o USD).
+
+Calcular KPIs siempre en USD normalizado (usdNormalized).
+
+Agregación por proyecto (suma por período)
+
+Agrupá por projectKey y sumá por período:
+
+display.amount = Σ(nativeAmount)
+
+display.currency = nativeCurrency (si detectás mezcla, poner MIX y dejar badge)
+
+revenueUSDNormalized = Σ(usdNormalized)
+
+Front-end (mostrarlo bien)
+
+En cada card:
+
+Revenue (grande) → formatNative(display.amount, display.currency)
+
+Markup, Margin, Profit → calcular desde revenueUSDNormalized y costUSD
+
+KPIs de cabecera (portfolio) → siempre en USD (suma de revenueUSDNormalized).
+
+Test mínimo para validar Coelsa (agosto 2025)
+BASE=http://localhost:5000
+TF=august_2025
+
+# Ver Coelsa en /projects/active
+curl -s "$BASE/api/projects/active?timeFilter=$TF" \
+| jq '.projects[]
+      | select(.client.name|ascii_downcase|contains("coelsa"))
+      | select(.name|ascii_downcase|contains("fee"))
+      | {display: {amount: .metrics.revenueDisplay.amount, currency: .metrics.revenueDisplay.currency},
+         revenueUSDNormalized: .metrics.revenueUSDNormalized}'
+
+
+Criterios de aceptación (Coelsa, agosto):
+
+display.currency == "ARS" ✅
+
+display.amount == Monto_ARS de “Ventas Tomi” para Coelsa ese mes ✅
+
+revenueUSDNormalized == Monto_ARS / FX(mes) (sólo para KPIs) ✅
+
+Errores típicos que provocan lo que ves
+
+Storage/DB no trae amountArs → el backend cree que todo es USD.
+
+Agregador usa amountUsd para el display en lugar de “nativo vs normalizado”.
+
+Filtro temporal aplica a ventas, pero la moneda nativa se pierde al agrupar.
+
+Aplicando estas 4 correcciones, cualquier proyecto que tenga ingresos en ARS (como Coelsa) se mostrará en ARS en la card, mientras que los KPIs seguirán siendo coherentes en USD.
