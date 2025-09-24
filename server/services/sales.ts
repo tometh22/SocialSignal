@@ -8,6 +8,13 @@ import { fxForMonth } from './fx';
 import { getFxRate } from '../utils/fx';
 
 /**
+ * Verificar si un valor es un número finito válido
+ */
+function isFiniteNumber(value: any): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+/**
  * Tipo de datos de venta cruda del Excel
  */
 type RawSale = { 
@@ -224,8 +231,8 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
     console.log(`🔧 NATIVE CURRENCY DEBUG: Cliente="${clientName}", Proyecto="${projectName}"`);
     console.log(`🔧 DB FIELDS: Monto_USD=${dbRow.Monto_USD}, Monto_ARS=${dbRow.Monto_ARS}, amountLocal=${dbRow.amountLocal}, currency=${dbRow.currency}, amountUsd=${dbRow.amountUsd}`);
     
-    const hasUsd = isNumber(dbRow.Monto_USD) || isNumber(dbRow.amountUsd);
-    const hasArs = isNumber(dbRow.Monto_ARS) || isNumber(dbRow.amountLocal && dbRow.currency === 'ARS');
+    const hasUsd = isFiniteNumber(dbRow.Monto_USD) || isFiniteNumber(dbRow.amountUsd);
+    const hasArs = isFiniteNumber(dbRow.Monto_ARS) || isFiniteNumber(dbRow.amountLocal && dbRow.currency === 'ARS');
     
     console.log(`🔧 DETECTION: hasUsd=${hasUsd}, hasArs=${hasArs}`);
     
@@ -255,11 +262,24 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
       console.log(`💱 NATIVE CURRENCY ARS: Display ARS ${nativeAmount}, KPIs USD ${usdNormalized.toFixed(2)} (FX=${fx}) (${clientName}|${projectName}|${monthKey})`);
       
     } else if (hasUsd && hasArs) {
-      // CASO: Ambos - Preferir USD (dato ya expresado en USD)
-      nativeCurrency = 'USD';
-      nativeAmount = toNumber(dbRow.Monto_USD || dbRow.amountUsd);
-      usdNormalized = nativeAmount;
-      console.log(`💰 NATIVE CURRENCY USD (mixed): Display USD ${nativeAmount}, KPIs USD ${usdNormalized} (${clientName}|${projectName}|${monthKey})`);
+      // CASO: Ambos - Respetar currency original (ARS vs USD)
+      if (dbRow.currency === 'ARS') {
+        // Mostrar ARS, convertir a USD para KPIs
+        nativeCurrency = 'ARS';
+        nativeAmount = toNumber(dbRow.Monto_ARS || (dbRow.currency === 'ARS' ? dbRow.amountLocal : 0));
+        
+        const fxRate = getFxRate(monthKey);
+        fx = fxRate;
+        usdNormalized = nativeAmount / fxRate;
+        
+        console.log(`💱 NATIVE CURRENCY ARS (mixed): Display ARS ${nativeAmount}, KPIs USD ${usdNormalized.toFixed(2)} (FX=${fx}) (${clientName}|${projectName}|${monthKey})`);
+      } else {
+        // Mostrar USD (fallback)
+        nativeCurrency = 'USD';
+        nativeAmount = toNumber(dbRow.Monto_USD || dbRow.amountUsd);
+        usdNormalized = nativeAmount;
+        console.log(`💰 NATIVE CURRENCY USD (mixed): Display USD ${nativeAmount}, KPIs USD ${usdNormalized} (${clientName}|${projectName}|${monthKey})`);
+      }
       
     } else {
       // CASO: Fila vacía → descartar

@@ -1962,11 +1962,15 @@ export const timeFilterSchema = z.union([
 
 export type TimeFilter = z.infer<typeof timeFilterSchema>;
 
-// ResolvedPeriod - exact specification from blueprint
+// ResolvedPeriod - exact specification from blueprint with dual currency support
 export const resolvedPeriodSchema = z.object({
   start: z.string(),  // ISO format YYYY-MM-DD
   end: z.string(),    // ISO format YYYY-MM-DD
-  label: z.string()   // Human-readable label
+  label: z.string(),   // Human-readable label
+  
+  // 🚀 DUAL CURRENCY FIELDS for native display
+  displayCurrency: z.enum(["ARS", "USD"]).optional().nullable(), // Original currency detected
+  revenueDisplay: z.number().optional().nullable()               // Amount in native currency
 });
 
 export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;

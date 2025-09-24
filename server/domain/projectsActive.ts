@@ -594,8 +594,11 @@ export class ActiveProjectsAggregator {
    */
   private async calculateProjectMetrics(projectsData: ProjectData[], period: ResolvedPeriod): Promise<ActiveProjectItem[]> {
     const projectItems: ActiveProjectItem[] = [];
+    
+    console.log(`🚀 CALCULATE METRICS: Starting with ${projectsData.length} projects`);
 
     for (const projectData of projectsData) {
+      console.log(`🔍 PROCESSING PROJECT: ${projectData.projectName} with ${projectData.sales.length} sales`);
       // Calculate aggregated metrics - USING USD NORMALIZED FOR DUAL CURRENCY
       const revenueUSDNormalized = projectData.sales.reduce((sum, sale) => sum + (sale.revenueUSDNormalized || sale.revenueUSD), 0);
       const revenueUSD = revenueUSDNormalized; // Backward compatibility
@@ -626,6 +629,25 @@ export class ActiveProjectsAggregator {
         hasCosts: (costUSD ?? 0) > 0,
         hasHours: (workedHours ?? 0) > 0
       };
+
+      // 🚀 EXTRACT DUAL CURRENCY FIELDS from sales
+      let displayCurrency: "ARS" | "USD" | null = null;
+      let revenueDisplay = 0;
+      
+      console.log(`🔍 DUAL EXTRACTION: Project "${projectData.projectName}" has ${projectData.sales.length} sales`);
+      
+      // Aggregate display values from dual sales records
+      for (const sale of projectData.sales) {
+        console.log(`🔍 DUAL SALE: displayCurrency=${sale.displayCurrency}, revenueDisplay=${sale.revenueDisplay}, client=${sale.client}, project=${sale.project}`);
+        if (sale.displayCurrency && sale.revenueDisplay !== undefined) {
+          if (!displayCurrency) {
+            displayCurrency = sale.displayCurrency; // Use first currency found
+          }
+          revenueDisplay += sale.revenueDisplay;
+        }
+      }
+      
+      console.log(`🚀 DUAL RESULT: Project "${projectData.projectName}" → displayCurrency=${displayCurrency}, revenueDisplay=${revenueDisplay}`);
 
       // Build metrics object - WITH DUAL CURRENCY SUPPORT
       const metrics: ProjectMetrics = {
@@ -669,8 +691,22 @@ export class ActiveProjectsAggregator {
         periodCostUSD: costUSD,
         periodProfitUSD: profitUSD,
         flags,
-        period
+        // 🚀 ENHANCED PERIOD with dual currency fields
+        period: {
+          ...period,
+          displayCurrency,
+          revenueDisplay
+        }
       });
+      
+      // 🔍 DEBUG: Verificar objeto period ANTES del return
+      if (projectData.clientName?.toLowerCase().includes('coelsa')) {
+        console.log(`🔍 COELSA DEBUG: About to return project with period:`, JSON.stringify({
+          ...period,
+          displayCurrency,
+          revenueDisplay
+        }, null, 2));
+      }
     }
 
     return projectItems;
