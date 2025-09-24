@@ -1975,7 +1975,15 @@ export const resolvedPeriodSchema = z.object({
 
 export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;
 
-// ProjectMetrics - updated with dual currency support
+// Dual-currency display type (structured approach from user suggestions)
+export const moneyDisplaySchema = z.object({
+  amount: z.number(),
+  currency: z.enum(["ARS", "USD"])
+});
+
+export type MoneyDisplay = z.infer<typeof moneyDisplaySchema>;
+
+// ProjectMetrics - updated with dual currency support (user suggestions implemented)
 export const projectMetricsSchema = z.object({
   revenueUSD: z.number(),             // Legacy compatibility (USD normalized)
   costUSD: z.number(), 
@@ -1987,9 +1995,8 @@ export const projectMetricsSchema = z.object({
   efficiencyFrac: z.number().nullable(), // worked / target (0..1, show as %)
   
   // 🚀 DUAL CURRENCY FIELDS: Native display + USD for KPIs
-  displayCurrency: z.enum(["ARS", "USD"]).optional(), // Original currency detected
-  revenueDisplay: z.number().optional(),               // Amount in native currency
-  revenueUSDNormalized: z.number().optional()          // Amount normalized to USD for KPIs
+  revenueUSDNormalized: z.number(),                    // Amount normalized to USD for ALL calculations
+  revenueDisplay: moneyDisplaySchema.optional()       // Structured display: {amount, currency}
 });
 
 export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;

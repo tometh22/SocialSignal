@@ -641,7 +641,7 @@ export class ActiveProjectsAggregator {
       
       // Aggregate display values from dual sales records
       for (const sale of projectData.sales) {
-        console.log(`🔍 DUAL SALE: displayCurrency=${sale.displayCurrency}, revenueDisplay=${sale.revenueDisplay}, client=${sale.client}, project=${sale.project}`);
+        console.log(`🔍 DUAL SALE: displayCurrency=${sale.displayCurrency}, revenueDisplay=${sale.revenueDisplay}`);
         if (sale.displayCurrency && sale.revenueDisplay !== undefined) {
           if (!displayCurrency) {
             displayCurrency = sale.displayCurrency; // Use first currency found
@@ -652,16 +652,19 @@ export class ActiveProjectsAggregator {
       
       console.log(`🚀 DUAL RESULT: Project "${projectData.projectName}" → displayCurrency=${displayCurrency}, revenueDisplay=${revenueDisplay}`);
 
-      // Build metrics object - WITH DUAL CURRENCY SUPPORT
+      // Build metrics object - WITH DUAL CURRENCY SUPPORT (user suggestions implemented)
       const metrics: ProjectMetrics = {
         revenueUSD: revenueUSDNormalized, // For backward compatibility
+        revenueUSDNormalized,            // 🚀 Use THIS for all calculations
         costUSD,
         profitUSD,
         markupRatio,
         marginFrac,
         workedHours,
         targetHours,
-        efficiencyFrac
+        efficiencyFrac,
+        // 🚀 STRUCTURED DISPLAY following user suggestions
+        revenueDisplay: displayCurrency ? { amount: revenueDisplay, currency: displayCurrency } : undefined
       };
 
       // Get client info
@@ -732,17 +735,17 @@ export class ActiveProjectsAggregator {
       const updatedAcc = {
         totalProjects: acc.totalProjects + 1,
         activeProjects: acc.activeProjects + (project.flags.hasSales || project.flags.hasCosts || project.flags.hasHours ? 1 : 0),
-        periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSD,
+        periodRevenueUSD: acc.periodRevenueUSD + project.metrics.revenueUSDNormalized,
         periodCostUSD: acc.periodCostUSD + project.metrics.costUSD,
         periodProfitUSD: acc.periodProfitUSD + project.metrics.profitUSD,
         periodWorkedHours: acc.periodWorkedHours + project.metrics.workedHours
       };
 
-      // 🚀 DUAL-CURRENCY: Aggregate display currency and revenue
-      if (project.period.displayCurrency && project.period.revenueDisplay > 0) {
-        const currency = project.period.displayCurrency;
+      // 🚀 DUAL-CURRENCY: Aggregate display currency and revenue (using metrics.revenueDisplay per user suggestions)
+      if (project.metrics.revenueDisplay && project.metrics.revenueDisplay.amount > 0) {
+        const currency = project.metrics.revenueDisplay.currency;
         const currentTotal = currencyMap.get(currency) || 0;
-        currencyMap.set(currency, currentTotal + project.period.revenueDisplay);
+        currencyMap.set(currency, currentTotal + project.metrics.revenueDisplay.amount);
       }
 
       return updatedAcc;
@@ -758,16 +761,19 @@ export class ActiveProjectsAggregator {
     // 🚀 DETERMINE PORTFOLIO DISPLAY CURRENCY: Use majority or USD fallback
     if (currencyMap.size === 1) {
       // All projects use same currency → use that currency
-      const [currency, amount] = currencyMap.entries().next().value;
-      portfolioDisplayCurrency = currency;
-      portfolioRevenueDisplay = amount;
+      const firstEntry = currencyMap.entries().next().value;
+      if (firstEntry) {
+        const [currency, amount] = firstEntry;
+        portfolioDisplayCurrency = currency as "ARS" | "USD";
+        portfolioRevenueDisplay = amount;
+      }
     } else if (currencyMap.size > 1) {
       // Mixed currencies → find the largest by revenue volume
       let maxAmount = 0;
       for (const [currency, amount] of currencyMap.entries()) {
         if (amount > maxAmount) {
           maxAmount = amount;
-          portfolioDisplayCurrency = currency;
+          portfolioDisplayCurrency = currency as "ARS" | "USD";
           portfolioRevenueDisplay = amount;
         }
       }
