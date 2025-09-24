@@ -1,0 +1,115 @@
+quí tenés un checklist concreto (universal, sin ejemplos de proyectos). Marcá cada ítem y vas a saber si la vista de Proyectos Activos quedó bien.
+
+Backend · Ingesta (Excel → normalizado)
+
+ Resolver período único resolvePeriod(timeFilter) → {start,end, monthKeys[]} y se usa igual en ventas, costos y horas.
+
+ Parser ES de números parseNumberEs() (miles “.”, decimales “,”) y meses spanishMonthToNumber() → monthKey = YYYY-MM.
+
+ Clave canónica projectKey = canon(cliente)+'|'+canon(proyecto) (lowercase, sin tildes/espacios extras).
+
+ Ventas (“Ventas Tomi”): por fila guardar en sales_norm
+
+ projectKey, monthKey, type, confirmed
+
+ revenueNativeAmount (= Monto_USD si >0; si no, Monto_ARS)
+
+ revenueCurrency (“USD”/“ARS”)
+
+ revenueUSDNormalized (= Monto_USD o Monto_ARS/FX_mes)
+
+ No convertir para display; solo normalizar para cálculos.
+
+ Costos (“Costos directos e indirectos”) → costs_norm
+
+ projectKey, monthKey, hoursWorked (= “Cantidad de Horas”)
+
+ costUSD (= “Total USD”; si falta, ARS/FX_mes)
+
+ No reconvertir USD a ARS en backend.
+
+ Objetivos (si existen) → targets_norm: projectKey, monthKey, targetHours.
+
+Backend · Agregación y KPIs
+
+ Agrupar por projectKey + monthKey (en la ventana) y calcular:
+
+ revenueUSDNormalized = Σ sales_norm.revenueUSDNormalized
+
+ revenueDisplay = { amount: Σ revenueNativeAmount, currency: mayoritaria }
+
+ costUSD = Σ costs_norm.costUSD
+
+ workedHours = Σ costs_norm.hoursWorked
+
+ targetHours = Σ targets_norm.targetHours
+
+ profitUSD = revenueUSDNormalized - costUSD
+
+ markupRatio = costUSD>0 ? revenueUSDNormalized/costUSD : null
+
+ marginPct = revenueUSDNormalized>0 ? profitUSD/revenueUSDNormalized : null
+
+ Estado activo
+
+ Recurrente (“Fee”): siempre activo; se muestra con ceros si no hay movimiento (según toggle).
+
+ One-shot: activo solo si hay ingresos/costos/horas en el período.
+
+ Endpoints
+
+ GET /api/projects?timeFilter=...&onlyActiveInPeriod=... → summary (USD normalizado) + projects[].
+
+ GET /api/projects/:key/complete-data?timeFilter=... → detalle con los mismos campos.
+
+ (Dev) GET /api/debug/sales?..., .../costs?..., .../fx?... para auditar rápido.
+
+Frontend · Cards y Cabecera
+
+ Cards muestran moneda nativa: usar metrics.revenueDisplay.amount + currency.
+
+ KPIs de card (profit, markup ×, margin %) calculados con USD normalizado.
+
+ Cabecera (summary) suma solo normalizados:
+
+ periodRevenueUSD = Σ revenueUSDNormalized
+
+ periodProfitUSD = Σ profitUSD
+
+ periodWorkedHours = Σ workedHours
+
+ activeProjects = #projects visibles
+
+ Formatters
+
+ USD/ARS con Intl.NumberFormat (compact donde aplique).
+
+ Markup como x.xx×, Margin como %.
+
+ Horas: k h si >1000.
+
+QA · Invariantes (automáticos)
+
+ Conservación:
+
+ Σ(UI revenueUSDNormalized) == Σ(sales_norm.revenueUSDNormalized) (en ventana)
+
+ Σ(UI costUSD) == Σ(costs_norm.costUSD)
+
+ Σ(UI workedHours) == Σ(costs_norm.hoursWorked)
+
+ Filtro único: al cambiar el timeFilter cambian ventas, costos y horas de forma consistente.
+
+ Sin “Unknown”: ningún proyecto carece de cliente/proyecto tras canon().
+
+ Divisor cero: si no hay cost/revenue, KPIs devuelven null y UI muestra N/A.
+
+Diagnóstico rápido (debe pasar)
+
+ GET /api/debug/sales?timeFilter=PERIODO → filtered > 0 si hay ventas en el período.
+
+ GET /api/debug/costs?timeFilter=PERIODO → totales razonables (sin ceros ni trillones).
+
+ GET /api/projects?timeFilter=PERIODO → todas las recurrentes visibles; las one-shot solo si hubo movimiento.
+
+ Cabecera sin “T” enormes; horas del período en magnitud real.

@@ -58,9 +58,9 @@ export function fxForMonth(monthKey: string): number {
   try {
     // Crear TimeFilter compatible para obtener FX existente
     const timeFilter: TimeFilter = {
+      kind: 'custom',
       start: `${monthKey}-01`,
-      end: `${monthKey}-31`,
-      label: `Month ${monthKey}`
+      end: `${monthKey}-31`
     };
     const existingFx = getFXSync(timeFilter);
     if (existingFx && existingFx > 0 && existingFx !== 1000) {

@@ -390,6 +390,17 @@ export function aggregateIncome(
   isActive: boolean;
   records: DualNormalizedIncome[];
 }> {
+  console.log(`🔧 AGREGADOR DEBUG: Processing ${incomeRows.length} raw income rows for period ${startMonthKey} → ${endMonthKey}`);
+  console.log(`🔧 AGREGADOR DEBUG: First 3 raw rows:`, incomeRows.slice(0, 3).map(r => ({ 
+    Cliente: r.Cliente, 
+    Proyecto: r.Proyecto, 
+    Mes: r.Mes, 
+    Año: r.Año, 
+    Confirmado: r.Confirmado,
+    Monto_ARS: r.Monto_ARS,
+    Monto_USD: r.Monto_USD
+  })));
+  
   const aggregated = new Map();
   
   // Normalizar todas las filas
