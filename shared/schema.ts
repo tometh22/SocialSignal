@@ -1971,16 +1971,21 @@ export const resolvedPeriodSchema = z.object({
 
 export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;
 
-// ProjectMetrics - updated with correct semantics
+// ProjectMetrics - updated with dual currency support
 export const projectMetricsSchema = z.object({
-  revenueUSD: z.number(),
+  revenueUSD: z.number(),             // Legacy compatibility (USD normalized)
   costUSD: z.number(), 
   profitUSD: z.number(),              // revenue - cost
   markupRatio: z.number().nullable(), // revenue / cost (show as "×")
   marginFrac: z.number().nullable(),  // profit / revenue (0..1, show as %)
   workedHours: z.number(),
   targetHours: z.number(),
-  efficiencyFrac: z.number().nullable() // worked / target (0..1, show as %)
+  efficiencyFrac: z.number().nullable(), // worked / target (0..1, show as %)
+  
+  // 🚀 DUAL CURRENCY FIELDS: Native display + USD for KPIs
+  displayCurrency: z.enum(["ARS", "USD"]).optional(), // Original currency detected
+  revenueDisplay: z.number().optional(),               // Amount in native currency
+  revenueUSDNormalized: z.number().optional()          // Amount normalized to USD for KPIs
 });
 
 export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;

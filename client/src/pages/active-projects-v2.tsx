@@ -67,8 +67,12 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
   const isHealthy = metrics.markupRatio && metrics.markupRatio >= 1.15;
   const isEfficient = metrics.efficiencyFrac && metrics.efficiencyFrac <= 1.05;
 
-  // Format display values
-  const revenueDisplay = f.usdCompact.format(metrics.revenueUSD);
+  // 🚀 DUAL CURRENCY: Format display values using native currency
+  const revenueDisplay = f.currency(
+    metrics.revenueDisplay ?? metrics.revenueUSD, 
+    metrics.displayCurrency, 
+    true // compact format
+  );
 
   const markupDisplay = metrics.markupRatio 
     ? f.markupX(metrics.markupRatio)
