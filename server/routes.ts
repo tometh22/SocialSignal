@@ -102,6 +102,10 @@ import {
   type CurrencyCode 
 } from "./services/currency";
 
+// 🚀 INCOME SOT - Nueva fuente única de verdad para ingresos
+import * as income from './domain/income';
+import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
+
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
   if (obj === null) return undefined;
@@ -181,6 +185,98 @@ export function getMonthNumber(date: Date): number {
 export function createRouter() {
   const router = express.Router();
   return router;
+}
+
+function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
+  // 🚀 INCOME SOT ENDPOINTS - Nueva fuente única de verdad para ingresos
+  
+  // GET /api/income?period=YYYY-MM → IncomeResult
+  app.get("/api/income", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      logIncomeSOT(`GET /api/income called with period=${period}`);
+      
+      const result = await income.getIncomeByPeriod(period as income.PeriodKey);
+      
+      logIncomeSOT(`Income result: ${result.projects.length} projects, $${result.summary.periodRevenueUSD.toFixed(2)} USD total`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Income SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // GET /api/portfolio/income?period=YYYY-MM → PortfolioIncome
+  app.get("/api/portfolio/income", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      logIncomeSOT(`GET /api/portfolio/income called with period=${period}`);
+      
+      const result = await income.getPortfolioIncome(period as income.PeriodKey);
+      
+      logIncomeSOT(`Portfolio income: $${result.periodRevenueUSD.toFixed(2)} USD, ${result.projectsWithIncome}/${result.totalProjects} projects`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Portfolio Income SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // GET /api/projects/:id/income?period=YYYY-MM → ProjectIncome  
+  app.get("/api/projects/:id/income", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const period = req.query.period as string;
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ 
+          error: "ID de proyecto inválido" 
+        });
+      }
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      logIncomeSOT(`GET /api/projects/${projectId}/income called with period=${period}`);
+      
+      const result = await income.getIncomeByProject(projectId, period as income.PeriodKey);
+      
+      logIncomeSOT(`Project ${projectId} income: ${result.revenueDisplay?.currency} ${result.revenueDisplay?.amount || 0}, $${result.revenueUSDNormalized.toFixed(2)} USD normalized`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Project Income SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
 }
 
 // Helper function to parse time filters
@@ -11175,6 +11271,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.error("❌ Error integrating universal routes:", error);
     console.log("⚠️ Continuing with legacy endpoints");
   }
+
+  // 🚀 CONFIGURAR INCOME SOT ENDPOINTS
+  setupIncomeSOTEndpoints(app, requireAuth);
+  console.log("✅ INCOME SOT ENDPOINTS: Fuente única de verdad para ingresos configurada");
 
   // Finalize routes setup and return server
   return httpServer;
