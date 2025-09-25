@@ -1,0 +1,260 @@
+0) Estructura de carpetas
+server/domain/income/
+├─ index.ts            // API pública del dominio (SoT)
+├─ types.ts            // Tipos canónicos
+├─ parser.ts           // Parseo seguro "Ventas Tomi"
+├─ business-rules.ts   // Reglas de negocio (filtro, agregación, normalización)
+├─ data-access.ts      // Lectura desde DB/Sheets (staging)
+└─ fx.ts               // FX por período con cache
+
+1) Tipos canónicos (estables)
+// types.ts
+export type PeriodKey =
+  `${number}-${'01'|'02'|'03'|'04'|'05'|'06'|'07'|'08'|'09'|'10'|'11'|'12'}`;
+
+export type MoneyDisplay = { amount: number; currency: 'USD'|'ARS' };
+
+export type IncomeRow = {
+  clientName: string;     // "Cliente"
+  projectName: string;    // "Proyecto"
+  monthEs: string;        // "Mes" (p.e. "Agosto")
+  year: number;           // "Año"
+  type: string;           // "Tipo_Venta"
+  amountARS: number;      // "Monto_ARS" ya parseado (número)
+  amountUSD: number;      // "Monto_USD" ya parseado (número)
+  confirmed: boolean;     // "Confirmado" (Si/No)
+};
+
+export type ProjectIncome = {
+  projectId: number | null;                // resuelto por nombre (si aplica)
+  clientName: string;
+  projectName: string;
+  revenueDisplay: MoneyDisplay;            // moneda nativa p/ UI
+  revenueUSDNormalized: number;            // USD normalizado p/ KPIs
+  records: Array<{ currency:'USD'|'ARS'; amount:number }>;
+};
+
+export type PortfolioIncome = {
+  period: PeriodKey;
+  periodRevenueUSD: number;                // suma normalizada
+  projectsWithIncome: number;
+  totalProjects: number;
+};
+
+export type IncomeResult = {
+  period: PeriodKey;
+  projects: ProjectIncome[];
+  summary: PortfolioIncome;
+};
+
+2) Helpers críticos (parsers & fechas)
+// parser.ts
+export const parseNumberEs = (v: unknown): number => {
+  if (v == null) return 0;
+  // "4.359.857" -> "4359857", "1.750" -> "1750", "29,230.00" (por si acaso) -> "29230.00"
+  const s = String(v).trim().replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const MES = {
+  'enero': 1,'febrero': 2,'marzo': 3,'abril': 4,'mayo': 5,'junio': 6,
+  'julio': 7,'agosto': 8,'septiembre': 9,'setiembre': 9,'octubre':10,'noviembre':11,'diciembre':12
+} as const;
+
+export const spanishMonthToNumber = (mesEs: string): number => {
+  const k = mesEs.normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().trim();
+  const n = (MES as any)[k];
+  if (!n) throw new Error(`Mes inválido: "${mesEs}"`);
+  return n;
+};
+
+export const periodKeyOf = (mesEs: string, year: number): `${number}-${string}` => {
+  const m = spanishMonthToNumber(mesEs);
+  return `${year}-${String(m).padStart(2,'0')}`;
+};
+
+export const isYes = (v: any) => String(v ?? '').trim().toLowerCase().replace('í','i') === 'si';
+
+3) Acceso a datos y mapeo de columnas
+// data-access.ts
+import { parseNumberEs, isYes } from './parser';
+import type { IncomeRow } from './types';
+
+// Lee desde tu staging/DB (o adapter de Sheets) y **mapea** nombres reales a lógicos:
+export async function fetchSalesRawForPeriod(period: string): Promise<IncomeRow[]> {
+  const rows = await db.sales.getRowsForPeriod(period); // o getAll + filtro por periodo
+  return rows.map((r:any) => ({
+    clientName:  r.clientName ?? r.Cliente ?? '',
+    projectName: r.projectName ?? r.Proyecto ?? '',
+    monthEs:     r.month ?? r.Mes ?? '',
+    year:        Number(r.year ?? r.Año ?? 0),
+    type:        r.type ?? r.Tipo_Venta ?? '',
+    amountARS:   parseNumberEs(r.amountLocal ?? r.Monto_ARS),
+    amountUSD:   parseNumberEs(r.amountUsd   ?? r.Monto_USD),
+    confirmed:   isYes(r.confirmed ?? r.Confirmado),
+  }));
+}
+
+
+Importante: este mapeo cubre los tres nombres posibles (camel/snake/español). Si tu staging ya usa sólo clientName, projectName, month, year, amountUsd, amountLocal, confirmed, deja sólo esos.
+
+4) FX y cache
+// fx.ts
+const cache = new Map<string, number>(); // key: period "YYYY-MM" -> fx
+
+export async function getFx(period: string): Promise<number> {
+  if (cache.has(period)) return cache.get(period)!;
+  // Lee de tu tabla "tipo de cambio" por mes; fallback explícito si no existe
+  const fx = await db.fx.get(period); // p.ej. 1345 para 2025-08
+  if (!fx) throw new Error(`FX no disponible para período ${period}`);
+  cache.set(period, fx);
+  return fx;
+}
+
+5) Reglas de negocio (filtro, normalización, agregación)
+// business-rules.ts
+import type { IncomeRow, ProjectIncome, IncomeResult, PortfolioIncome } from './types';
+import { periodKeyOf } from './parser';
+import { getFx } from './fx';
+
+type GroupKey = string; // `${clientName}|${projectName}`
+
+export async function buildIncomeResult(period: string, rows: IncomeRow[], totalProjects: number): Promise<IncomeResult> {
+  // 1) Filtro temporal + confirmados
+  const accepted = rows.filter(r => r.confirmed && periodKeyOf(r.monthEs, r.year) === period);
+
+  // 2) Agrupar por proyecto (cliente + proyecto)
+  const groups = new Map<GroupKey, IncomeRow[]>();
+  for (const r of accepted) {
+    if (!r.clientName || !r.projectName) continue;
+    const k = `${r.clientName}|||${r.projectName}`;
+    (groups.get(k) ?? groups.set(k, []).get(k)!).push(r);
+  }
+
+  const fx = await getFx(period);
+  const projects: ProjectIncome[] = [];
+
+  for (const [k, list] of groups) {
+    const [clientName, projectName] = k.split('|||');
+
+    // Regla de moneda nativa (display):
+    // Si hay algún USD > 0 en el proyecto/periodo → display USD, else si hay ARS > 0 → display ARS
+    const sumUSD = list.reduce((a,r)=>a+(r.amountUSD||0),0);
+    const sumARS = list.reduce((a,r)=>a+(r.amountARS||0),0);
+
+    const revenueDisplay =
+      sumUSD > 0 ? { amount: sumUSD, currency: 'USD' as const } :
+      sumARS > 0 ? { amount: sumARS, currency: 'ARS' as const } :
+      { amount: 0, currency: 'USD' as const };
+
+    // Normalización a USD para KPIs (regla estricta por registro)
+    const revenueUSDNormalized = list.reduce((acc, r) => {
+      if (r.amountUSD > 0) return acc + r.amountUSD;
+      if (r.amountARS > 0) return acc + (r.amountARS / fx);
+      return acc;
+    }, 0);
+
+    projects.push({
+      projectId: await resolveProjectId(clientName, projectName), // o null si no aplica
+      clientName, projectName,
+      revenueDisplay,
+      revenueUSDNormalized,
+      records: list.map(r => r.amountUSD > 0
+        ? ({ currency: 'USD' as const, amount: r.amountUSD })
+        : ({ currency: 'ARS' as const, amount: r.amountARS })
+      ),
+    });
+  }
+
+  const periodRevenueUSD = projects.reduce((a,p)=>a+p.revenueUSDNormalized,0);
+  const summary: PortfolioIncome = {
+    period,
+    periodRevenueUSD,
+    projectsWithIncome: projects.filter(p => p.revenueUSDNormalized > 0).length,
+    totalProjects
+  };
+
+  return { period, projects, summary };
+}
+
+// Resolver ID de proyecto (si tenés tabla de proyectos)
+async function resolveProjectId(client: string, project: string): Promise<number|null> {
+  const row = await db.projects.findByClientAndName(client, project);
+  return row?.id ?? null;
+}
+
+6) API pública del dominio
+// index.ts
+import { fetchSalesRawForPeriod } from './data-access';
+import { buildIncomeResult } from './business-rules';
+import type { PeriodKey, IncomeResult, ProjectIncome, PortfolioIncome } from './types';
+
+export async function getIncomeByPeriod(period: PeriodKey): Promise<IncomeResult> {
+  const rows = await fetchSalesRawForPeriod(period);
+  const totalProjects = await db.projects.countActive(); // o todos
+  return buildIncomeResult(period, rows, totalProjects);
+}
+
+export async function getIncomeByProject(projectId: number, period: PeriodKey): Promise<ProjectIncome> {
+  const { projects } = await getIncomeByPeriod(period);
+  const p = projects.find(p => p.projectId === projectId);
+  return p ?? {
+    projectId, clientName: '', projectName: '',
+    revenueDisplay: { amount: 0, currency: 'USD' },
+    revenueUSDNormalized: 0, records: []
+  };
+}
+
+export async function getPortfolioIncome(period: PeriodKey): Promise<PortfolioIncome> {
+  const { summary } = await getIncomeByPeriod(period);
+  return summary;
+}
+
+7) Endpoints HTTP (contrato estable)
+// routes.ts (extracto)
+app.get('/api/income',         async (req,res)=> res.json(await income.getIncomeByPeriod(req.query.period)));
+app.get('/api/portfolio/income',async (req,res)=> res.json(await income.getPortfolioIncome(req.query.period)));
+app.get('/api/projects/:id/income', async (req,res)=> res.json(await income.getIncomeByProject(Number(req.params.id), req.query.period)));
+
+8) Wiring en las pantallas (todos consumen SoT)
+
+Proyectos Activos: GET /api/income?period=YYYY-MM
+
+Mostrar revenueDisplay en la card.
+
+Calcular KPIs con revenueUSDNormalized.
+
+Vista Proyecto: GET /api/projects/:id/income?period=YYYY-MM
+
+Misma regla de presentación/cálculo.
+
+Dashboard General: GET /api/portfolio/income?period=YYYY-MM
+
+Top card “Period Revenue” = periodRevenueUSD.
+
+Con esto, todas las páginas comparten la misma lógica y los mismos números.
+
+9) Aceptación rápida (agosto 2025)
+
+Warner · Fee Marketing → Display USD 29,230 · Normalized 29,230
+
+Kimberly · Fee Huggies → Display USD 8,450 · Normalized 8,450
+
+Coelsa · Fee mensual → Display ARS 4.359.857 · Normalized 4,359,857 / FX(2025-08)
+
+Vertical Media (ago) → 0 (no hay venta ese mes)
+
+10) Checklist de despliegue
+
+ Crear módulo server/domain/income con archivos anteriores.
+
+ Conectar data-access al origen real (staging/DB).
+
+ Exponer endpoints 3×.
+
+ Cambiar Proyectos Activos, Vista Proyecto y Dashboard a consumir estos endpoints.
+
+ Correr pruebas de aceptación con el período 2025-08 y cotejar con la hoja.
+
+ (Opcional) Endpoint de debug GET /api/debug/income-rows?period=YYYY-MM devolviendo filas aceptadas/rechazadas + motivo.
