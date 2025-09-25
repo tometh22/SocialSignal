@@ -2,7 +2,7 @@
  * UNIFIED ACTIVE PROJECTS PAGE V2
  * 
  * Implements the blueprint specification:
- * - Single useQuery to GET /api/projects/active
+ * - Single useQuery to GET /api/projects
  * - Replaces multiple hooks with unified data source
  * - Maintains familiar UI but powered by aggregated data
  * - Uses ProjectMetrics, PortfolioSummary, TimeFilter contracts
@@ -338,14 +338,14 @@ export default function ActiveProjectsV2() {
     error, 
     refetch 
   } = useQuery<ActiveProjectsResponse>({
-    queryKey: ['/api/projects/active', timeFilter, showOnlyActive],
+    queryKey: ['/api/projects', timeFilter, showOnlyActive],
     queryFn: async () => {
       const params = new URLSearchParams({
         timeFilter: typeof timeFilter === 'string' ? timeFilter : `${timeFilter.start}_to_${timeFilter.end}`,
         onlyActiveInPeriod: String(showOnlyActive)
       });
 
-      const res = await fetch(`/api/projects/active?${params}`);
+      const res = await fetch(`/api/projects?${params}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || `HTTP ${res.status}: ${res.statusText}`);
