@@ -1,0 +1,117 @@
+¡Bien ahí! Si ya ves Warner = USD 29.230 y Kimberly = USD 8.450 desde la SoT, terminemos de cerrar Ingresos y dejarlos blindados para todas las vistas.
+
+Checklist “Ingresos SoT” (cerrado de sprint)
+
+Fuente única (SoT) ✅
+
+Endpoints a usar en TODO el frontend:
+
+GET /api/portfolio/income?period=YYYY-MM (cards generales)
+
+GET /api/income?period=YYYY-MM (Proyectos Activos)
+
+GET /api/projects/:id/income?period=YYYY-MM (Proyecto único)
+
+Todos muestran:
+
+metrics.revenueDisplay → moneda nativa (ARS/USD) para la UI
+
+metrics.revenueUSDNormalized → USD normalizado para KPIs
+
+Reglas de negocio clave ✅
+
+Filtro temporal estricto: Mes + Año + Confirmado=“SI” (case-insensitive).
+
+Moneda nativa: si hay Monto_USD>0 → display USD; si no, Monto_ARS>0 → display ARS.
+
+Normalización: ARS/FX(periodo) → revenueUSDNormalized.
+
+Anti-escala: corrección ×100/×1000 (guard-rail) aplicada en SoT (con logs).
+
+Mapeo DB → SoT ✅
+
+DB: clientName, projectName, month, year, amountUsd, amountLocal, currency, confirmed
+
+SoT: Cliente, Proyecto, Mes, Año, Monto_USD, Monto_ARS, Confirmado (alias ya aplicado).
+
+Frontend ✅
+
+Proyectos Activos: cards usan revenueDisplay.amount + currency; KPIs (totales/orden) con revenueUSDNormalized.
+
+Proyecto único & Dashboard: mismo criterio (no calcular nada en FE).
+
+Observabilidad ✅
+
+Logs cuando aplica deflación: inflation_deflation_applied=true, con cliente/proyecto/periodo.
+
+Métricas: income_records_total, accepted_in_period, deflations_count.
+
+Limpieza legacy (cuando confirmes)
+
+Mantener adapters por 1 sprint. Luego:
+
+Eliminar uso de /api/projects/active y /api/income-dashboard-rows legacy.
+
+Borrar parsing/aggregate antiguos de ingresos.
+
+Smokes rápidos (copia/pega)
+
+A. Portfolio (USD normalizado)
+
+curl -s "http://localhost:5000/api/portfolio/income?period=2025-08" \
+| jq '{period, periodRevenueUSD, projectsWithIncome, totalProjects}'
+
+
+Esperado: periodRevenueUSD en decenas de miles, no millones.
+
+B. Proyectos clave
+
+# Warner
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Warner" and (.projectName|test("Fee Marketing";"i"))) | .metrics'
+
+# Kimberly Huggies
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Kimberly Clark" and (.projectName|test("Huggies";"i"))) | .metrics'
+
+# Coelsa (display ARS, KPIs USD)
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Coelsa") | .metrics'
+
+
+Esperado:
+
+Warner revenueDisplay: {amount:29230, currency:"USD"} y revenueUSDNormalized≈29230.
+
+Kimberly 8450 / USD.
+
+Coelsa revenueDisplay.currency:"ARS" y revenueUSDNormalized>0.
+
+C. Suma = portfolio
+
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '[.projects[].metrics.revenueUSDNormalized] | add'
+
+curl -s "http://localhost:5000/api/portfolio/income?period=2025-08" \
+| jq '.periodRevenueUSD'
+
+
+Las dos cifras deben coincidir (± redondeo).
+
+Guard-rails anti-escala (resumen)
+
+Heurística general: si USD > 200k y termina en “000”, probar ÷100/÷1000; loggear corrección.
+
+Reglas específicas (Warner/Kimberly) activas hasta normalizar la fuente.
+
+Kill-switch por CLIENTE|PROYECTO si aparece un fee legítimo alto.
+
+Qué mirar si algo vuelve a “inflarse”
+
+Network FE → ¿está llamando SoT o un endpoint legacy?
+
+Log de arranque: INCOME_SOT_ENABLED: true.
+
+Logs SoT: ¿aparecen inflation_deflation_applied y accepted_in_period?
+
+Si querés, te armo los tests unitarios mínimos (Warner/Kimberly/Coelsa agosto) para que esto no se rompa más.
