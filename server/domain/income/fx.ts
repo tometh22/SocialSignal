@@ -3,7 +3,7 @@
  * Cache en memoria + acceso a DB/configuración
  */
 
-import { getFxRate } from '../../utils/fx'; // Reutilizar la lógica existente
+import { db } from './db-adapter';
 
 // Cache en memoria simple
 const cache = new Map<string, number>(); // key: period "YYYY-MM" -> fx
@@ -18,12 +18,9 @@ export async function getFx(period: string): Promise<number> {
     return cache.get(period)!;
   }
   
-  // Reutilizar la lógica existente de getFxRate
-  const fx = getFxRate(period);
-  
-  if (!fx || fx <= 0) {
-    throw new Error(`FX no disponible para período ${period}`);
-  }
+  // Lee de tu tabla "tipo de cambio" por mes; fallback explícito si no existe
+  const fx = await db.fx.get(period); // p.ej. 1345 para 2025-08
+  if (!fx) throw new Error(`FX no disponible para período ${period}`);
   
   cache.set(period, fx);
   return fx;
