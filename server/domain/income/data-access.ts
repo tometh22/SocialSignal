@@ -3,7 +3,7 @@
  * Mapea nombres reales a campos lógicos
  */
 
-import { parseNumberEs, isYes } from './parser';
+import { parseNumberEs, parseUSDWithDeflation, isYes } from './parser';
 import type { IncomeRow } from './types';
 import { storage } from '../../storage';
 
@@ -15,17 +15,45 @@ export async function fetchSalesRawForPeriod(period: string): Promise<IncomeRow[
   // Obtener todos los sales records desde Google Sheets Sales
   const rows = await storage.getGoogleSheetsSales();
   
-  return rows.map((r: any) => ({
-    // Mapeo flexible de nombres de columnas desde GoogleSheetsSales
-    clientName:  r.clientName ?? r.Cliente ?? r.client_name ?? '',
-    projectName: r.projectName ?? r.Proyecto ?? r.project_name ?? '',
-    monthEs:     r.month ?? r.Mes ?? r.month_es ?? '',
-    year:        Number(r.year ?? r.Año ?? r.year ?? 0),
-    type:        r.type ?? r.Tipo_Venta ?? r.tipo_venta ?? '',
-    amountARS:   parseNumberEs(r.amountLocal ?? r.Monto_ARS ?? r.amount_ars ?? 0),
-    amountUSD:   parseNumberEs(r.amountUsd ?? r.Monto_USD ?? r.amount_usd ?? 0),
-    confirmed:   isYes(r.confirmed ?? r.Confirmado ?? r.confirmado ?? 'No'),
-  }));
+  return rows.map((r: any, index: number) => {
+    // 🔍 DEBUG: Log first 10 records to understand structure
+    if (index < 10) {
+      console.log(`🔍 RAW RECORD ${index}:`, {
+        clientName: r.clientName,
+        projectName: r.projectName,
+        month: r.month,
+        year: r.year,
+        amountUsd: r.amountUsd,
+        amountLocal: r.amountLocal,
+        currency: r.currency
+      });
+    }
+    
+    // 🔍 DEBUG: Log Warner specifically (broader filter)
+    if (r.clientName?.toLowerCase().includes('warner') || r.Cliente?.toLowerCase().includes('warner')) {
+      console.log('🔍 RAW WARNER FROM STORAGE:', {
+        clientName: r.clientName,
+        projectName: r.projectName,
+        month: r.month,
+        year: r.year,
+        amountUsd: r.amountUsd,
+        amountLocal: r.amountLocal,
+        currency: r.currency
+      });
+    }
+    
+    return {
+      // Mapeo flexible de nombres de columnas desde GoogleSheetsSales
+      clientName:  r.clientName ?? r.Cliente ?? r.client_name ?? '',
+      projectName: r.projectName ?? r.Proyecto ?? r.project_name ?? '',
+      monthEs:     r.month ?? r.Mes ?? r.month_es ?? '',
+      year:        Number(r.year ?? r.Año ?? r.year ?? 0),
+      type:        r.type ?? r.Tipo_Venta ?? r.tipo_venta ?? '',
+      amountARS:   parseNumberEs(r.amountLocal ?? r.Monto_ARS ?? r.amount_ars ?? 0),
+      amountUSD:   parseUSDWithDeflation(r.amountUsd ?? r.Monto_USD ?? r.amount_usd ?? 0),
+      confirmed:   isYes(r.confirmed ?? r.Confirmado ?? r.confirmado ?? 'No'),
+    };
+  });
 }
 
 /**

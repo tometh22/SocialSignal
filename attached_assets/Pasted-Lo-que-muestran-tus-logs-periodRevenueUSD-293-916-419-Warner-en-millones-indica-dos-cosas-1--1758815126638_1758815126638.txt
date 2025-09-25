@@ -1,0 +1,178 @@
+Lo que muestran tus logs (“periodRevenueUSD: 293,916,419”, Warner en millones) indica dos cosas:
+(1) a veces no estás pegando a la SoT (o el flag no queda activo) y/o
+(2) la SoT aún está leyendo montos sin normalizar para Warner (×100/×1000).
+
+Te dejo un procedimiento corto y QUÍRÚRGICO para aislar y arreglarlo, con checks que podés correr tal cual.
+
+0) Qué debe quedar verdadero cuando “está bien”
+
+Warner · Fee Marketing · 2025-08 → USD 29,230 (display USD 29,230; normalized 29,230)
+
+Kimberly · Fee Huggies · 2025-08 → USD 8,450
+
+Coelsa · Fee mensual · 2025-08 → display ARS 4.359.857 y normalized USD ≈ 4.359.857 / FX(2025-08)
+
+Portfolio 2025-08 (suma normalized) ≈ 29,230 + 8,450 + (Coelsa en USD) + (otros correctos) → decenas de miles, NO cientos de millones.
+
+1) Verificá que estás usando la SoT (y no legacy)
+
+A. Ping directo a la SoT (nuevo endpoint):
+
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | {clientName, projectName, revenueDisplay, revenueUSDNormalized}'
+
+
+Esperado: Warner con revenueDisplay.amount=29230 y currency="USD".
+
+Si ves Warner ≈ 2,923,000 → la normalización no se aplicó.
+
+B. Verificá que los “legacy adapters” realmente usan SoT:
+
+curl -s "http://localhost:5000/api/income-dashboard-rows?timeFilter=2025-08" \
+| jq '.rows | length, .rows[0]'
+
+
+Si devuelve 75 registros (raw) en vez de ~5 → el adapter está cayendo a legacy.
+
+Forzá el flag en servidor (no en shell):
+
+Log al boot: console.log("INCOME_SOT_ENABLED:", process.env.INCOME_SOT_ENABLED)
+
+Asegurate de setearlo donde inicia el server (dotenv / env del proceso), no sólo en un curl.
+
+2) Testeá la normalización fila a fila (Warner/Coelsa)
+
+Añadí (temporalmente) un log en el parser/normalizer de la SoT, justo tras construir revenueDisplay:
+
+// server/domain/income/parser.ts o business-rules.ts (donde normalizás cada fila)
+if (row.Cliente?.includes('Warner') && row.Proyecto?.includes('Fee Marketing') && row.Año==2025 && row.Mes=='ago') {
+  console.log('SoT WARNER 2025-08 -> USD:', row.Monto_USD, 'ARS:', row.Monto_ARS);
+}
+if (row.Cliente?.includes('Coelsa') && row.Año==2025 && row.Mes=='ago') {
+  console.log('SoT COELSA 2025-08 -> USD:', row.Monto_USD, 'ARS:', row.Monto_ARS);
+}
+
+
+Volvé a llamar:
+
+curl -s "http://localhost:5000/api/income?period=2025-08" >/dev/null
+
+
+Esperado:
+
+Warner: Monto_USD ~ 29230 (no millones), Monto_ARS 0.
+
+Coelsa: Monto_ARS ≈ 4359857 (o el valor correcto en tu sheet), Monto_USD 0.
+
+Si Warner te imprime 2923000 → el origen que llega a la SoT viene ×100/×1000. No toques Excel: corrigilo en el parser (parseNumberEs) o en el mapeo DB→SoT (ver 3).
+
+3) Confirmá el mapeo DB → SoT (nombres y escala)
+
+Ya detectamos antes desajustes entre DB y el agregador. Revalidá el aliasing que entra a la SoT:
+
+DB columns reales: clientName, projectName, month, year, amountUsd, amountLocal, currency, confirmed.
+
+SoT rows esperados: Cliente, Proyecto, Mes, Año, Monto_USD, Monto_ARS, Confirmado.
+
+Chequeo mínimo en el adaptador de acceso a datos (SoT data-access.ts):
+
+const rowSot = {
+  Cliente: db.clientName ?? '',
+  Proyecto: db.projectName ?? '',
+  Mes: db.month ?? '',        // "ago", "jul", etc. si tu parser lo espera así
+  Año: Number(db.year) || 0,
+  Confirmado: db.confirmed ?? 'SI',
+  Monto_USD: db.currency === 'USD' ? db.amountUsd : 0,
+  Monto_ARS: db.currency === 'ARS' ? db.amountLocal : 0,
+};
+
+
+Si acá Monto_USD ya viene 2923000, el problema es previo (carga a DB). Igual, la SoT lo puede “sanear” con parseNumberEs + regla anti-escala (abajo).
+
+4) Regla anti-escala (anti ×100/×1000) en SoT — sin tocar Excel
+
+Sumá una validación conservadora en el parser sólo para montos USD (fees mensuales razonables):
+
+function desinflarSiEscala(valueUSD: number): number {
+  // Simple y seguro: si termina en "000" y es > 200k, probar /100 y /1000
+  if (valueUSD > 200000 && valueUSD % 1000 === 0) return valueUSD / 100;
+  if (valueUSD > 2000000 && valueUSD % 1000 === 0) return valueUSD / 1000;
+  return valueUSD;
+}
+
+// úsalo después de parseNumberEs sobre Monto_USD:
+const usdParsed = parseNumberEs(row.Monto_USD);
+const usdFixed  = desinflarSiEscala(usdParsed);
+
+
+Es un guard-rail temporal para Warner que no toca el Excel. Dejá un log:
+
+if (usdParsed !== usdFixed) {
+  console.warn('⚠️ SoT USD deflated', { client: row.Cliente, project: row.Proyecto, usdParsed, usdFixed });
+}
+
+5) Asegurá que todas las páginas lean la SoT (o el adapter)
+
+Proyectos activos: usar /api/projects?timeFilter=YYYY-MM (ya mapeado a SoT) o el adapter /api/income-dashboard-rows (verificado que use SoT).
+
+Vista proyecto: /api/projects/:id/income?period=YYYY-MM.
+
+Dashboard general: /api/portfolio/income?period=YYYY-MM.
+
+👉 Haz un grep en el frontend para detectar endpoints legacy que siguen sin pasar por el adapter/SoT:
+
+rg -n "income-dashboard-rows|projects/active|complete-data|/incomes" client/src
+
+
+Reemplazá por los nuevos endpoints SoT o asegurate que esos legacy golpeen el adapter (ver 1B).
+
+6) Smokes mínimos (copiar/pegar)
+
+A. Portfolio (SoT)
+
+curl -s "http://localhost:5000/api/portfolio/income?period=2025-08" \
+| jq '{period, periodRevenueUSD, projectsWithIncome, totalProjects}'
+
+
+periodRevenueUSD en decenas de miles, no >1e6.
+
+B. Warner / Kimberly / Coelsa
+
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Warner" and .projectName|test("Fee Marketing";"i")) | .metrics'
+
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Kimberly Clark" and .projectName|test("Huggies";"i")) | .metrics'
+
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Coelsa") | .metrics'
+
+
+Warner: revenueDisplay.amount=29230, currency="USD"
+
+Kimberly: 8450 / USD
+
+Coelsa: revenueDisplay.currency="ARS" y revenueUSDNormalized>0.
+
+Si después de esto sigue 293,916,419
+
+Ese número viene de otra ruta o otro proceso. Dos últimos checks:
+
+¿Qué endpoint está llamando el frontend?
+Abre la pestaña Network y revisa la URL exacta: si pega a /api/projects/active?timeFilter=... o a /api/complete-data?... (legacy puro), no va a usar la SoT. Cambialo a los nuevos endpoints o al adapter.
+
+¿El server que responde es el mismo proceso con el flag activo?
+En el boot del server imprimí:
+
+console.log('INCOME_SOT_ENABLED:', process.env.INCOME_SOT_ENABLED);
+
+
+y buscá ese log. Si no aparece, estás hitteando otro servidor/build.
+
+Cierre
+
+Con estos 6 pasos dejás ingresos consistentes: display en moneda nativa y KPIs en USD normalizado.
+
+La clave es forzar que todas las páginas llamen a SoT o adapter (no legacy), y sanear Warner con anti-escala en la SoT.
+
+Si querés, te paso un PR checklist de 5 commits atómicos para aplicar todo esto sin dolor.
