@@ -68,9 +68,11 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
   const isEfficient = metrics.efficiencyFrac && metrics.efficiencyFrac <= 1.05;
 
   // 🚀 DUAL CURRENCY: Format display values using native currency
+  const revenueAmount = metrics.revenueDisplay?.amount ?? metrics.revenueUSD;
+  const revenueCurrency = metrics.revenueDisplay?.currency ?? 'USD';
   const revenueDisplay = f.currency(
-    metrics.revenueDisplay ?? metrics.revenueUSD, 
-    metrics.displayCurrency, 
+    revenueAmount, 
+    revenueCurrency, 
     true // compact format
   );
 
