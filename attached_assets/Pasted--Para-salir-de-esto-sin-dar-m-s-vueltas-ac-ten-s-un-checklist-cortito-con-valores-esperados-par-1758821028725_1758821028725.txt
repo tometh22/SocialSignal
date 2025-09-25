@@ -1,0 +1,136 @@
+. Para salir de esto sin dar más vueltas, acá tenés un checklist cortito, con valores esperados, para que verifiques ingresos de agosto contra “Ventas Tomi” y detectes exactamente dónde se rompe (backend SoT vs front o adapter).
+
+Checklist de verificación (INGRESOS – Agosto 2025)
+0) ¿Qué debería haber en agosto? (fuente: hoja “Ventas Tomi” con Confirmado = Si)
+
+Warner · Fee Marketing → USD 29,230
+
+Kimberly Clark · Fee Huggies → USD 8,450
+
+Play Digital S.A (Modo) · Fee mensual → ARS 4,596,700
+
+Coelsa · Fee mensual → ARS 4,359,857
+
+Detroit · Fee mensual → ARS 1,071,885
+
+Vertical Media → 0 (no hay venta en agosto)
+
+Nota FX: el total en USD normalizado debe ser
+29,230 + 8,450 + 4,596,700/FX + 4,359,857/FX + 1,071,885/FX
+Con FX 1260–1345 esto da ~45.1–45.6K USD.
+(Si tu servicio FX dice otro valor, usá ese mismo en ambos lados.)
+
+1) Backend – SoT (tiene que decir lo mismo que el Excel)
+1.1 Portafolio del periodo
+
+GET /api/portfolio/income?period=2025-08
+✔️ Debe devolver algo así:
+
+{
+  "period": "2025-08",
+  "periodRevenueUSD": ~45500,      // ~45–46K según FX
+  "projectsWithIncome": 5,
+  "totalProjects": ...
+}
+
+
+🔴 Si ves $809K acá, el error está en la SoT (sumando mal, usando display nativo, o sin FX).
+
+1.2 Proyectos del periodo
+
+GET /api/income?period=2025-08
+✔️ Debe incluir 5 proyectos con estos campos (por proyecto):
+
+{
+  "clientName": "Warner",
+  "projectName": "Fee Marketing",
+  "revenueDisplay": { "amount": 29230, "currency": "USD" },
+  "revenueUSDNormalized": 29230
+}
+
+
+Casos clave a chequear:
+
+Kimberly → revenueDisplay.amount = 8450, currency = "USD", revenueUSDNormalized = 8450
+
+Modo → revenueDisplay = { amount: 4596700, "currency":"ARS" }, revenueUSDNormalized = 4596700 / FX
+
+Coelsa → revenueDisplay = { amount: 4359857, "currency":"ARS" }, revenueUSDNormalized = 4359857 / FX
+
+Detroit → revenueDisplay = { amount: 1071885, "currency":"ARS" }, revenueUSDNormalized = 1071885 / FX
+
+🔴 Si revenueDisplay viene en USD para Coelsa/Modo/Detroit (debería ser ARS), o si revenueUSDNormalized no coincide con ARS/FX, el problema es de normalización.
+
+2) Adapter legacy (si el front todavía pega a endpoints viejos)
+
+GET /api/income-dashboard-rows?timeFilter=last_month
+✔️ Debe devolver exactamente los 5 del SoT, no 75.
+Si devuelve 75, el adapter no está usando la SoT (feature flag / routing).
+
+3) Frontend – tarjetas
+3.1 Cards de proyecto (fila)
+
+“Revenue” debe mostrar metrics.revenueDisplay.amount + metrics.revenueDisplay.currency:
+
+Warner/Kimberly → USD 29.23K / USD 8.45K
+
+Modo/Coelsa/Detroit → ARS 4.60M / 4.36M / 1.07M
+
+“Profit/Markup/Margin” deben usar metrics.revenueUSDNormalized (no el display).
+
+🔴 Si Coelsa aparece como $771.42K (USD) o similares, la card está mostrando el display en ARS con símbolo USD o está usando el normalized sin FX.
+
+3.2 Cards de cabecera (arriba de todo)
+
+Period Revenue = suma de revenueUSDNormalized de los proyectos del periodo (los 5) → ~45–46K USD
+
+Period Profit = suma de profitUSD (si ya tenés costos correctos), o N/A si no.
+
+🔴 Si acá ves $809K, la cabecera está:
+
+Sumando display nativo (ARS grandes) como si fueran USD, o
+
+Usando el aggregator legacy en vez de /api/portfolio/income.
+
+4) 5 fallas típicas (y el fix directo)
+
+Cabecera suma mal (809K)
+
+Fix: que la UI consuma GET /api/portfolio/income?period=YYYY-MM y muestre periodRevenueUSD.
+
+Coelsa/Modo/Detroit muestran USD en la card
+
+Fix: en UI usar metrics.revenueDisplay.currency para el símbolo.
+Si ARS → mostrar ARS, no USD.
+
+Adapter devuelve 75 filas
+
+Fix: encender feature flag y/o reencaminar a SoT (confirmar en logs: LEGACY ADAPTER → Using SoT).
+
+Doble/ausente deflación (Warner/Kimberly inflados)
+
+Fix: deflación solo en el parser SoT, antes de agrupar. No repetir en front.
+
+FX distinto en SoT vs Excel
+
+Fix: leer el FX del servicio de FX para 2025-08; el total debe moverse ≈45.1–45.6K según 1260–1345.
+
+5) Validación final (lo que tenés que ver)
+
+GET /api/portfolio/income?period=2025-08 → ~$45K USD
+
+GET /api/income?period=2025-08 → Warner 29,230 USD; Kimberly 8,450 USD; Modo/Coelsa/Detroit en ARS + normalized = ARS/FX
+
+Front:
+
+Coelsa/Modo/Detroit con símbolo ARS en “Revenue”
+
+Cabecera ~$45K USD (no $809K)
+
+Si querés, pegame (aquí mismo) los dos JSON:
+
+/api/portfolio/income?period=2025-08
+
+Primeros 5 items de /api/income?period=2025-08
+
+y te digo en una línea dónde se está rompiendo (SoT, adapter o front). Te acompaño hasta que la cabecera marque esos ~$45K y las cards muestren ARS/USD correctos. 💪

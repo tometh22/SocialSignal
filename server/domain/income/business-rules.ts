@@ -78,16 +78,24 @@ export async function buildIncomeResult(
     const [clientName, projectName] = k.split('|||');
 
     // 5) REGLA DE MONEDA NATIVA (DISPLAY)
-    // Si hay algún USD > 0 en el proyecto/periodo → display USD
-    // Else si hay ARS > 0 → display ARS
-    // Else → display USD con 0
+    // Preservar moneda original: usar ARS si hay ARS significativo, sino USD
+    // ARS significativo = ARS > USD * 100 (detectar que es la moneda principal)
     const sumUSD = list.reduce((a, r) => a + (r.amountUSD || 0), 0);
     const sumARS = list.reduce((a, r) => a + (r.amountARS || 0), 0);
 
+    console.log(`💱 CURRENCY DEBUG for ${clientName}/${projectName}:`);
+    console.log(`   sumARS: ${sumARS.toLocaleString()}`);
+    console.log(`   sumUSD: ${sumUSD.toLocaleString()}`);
+    console.log(`   sumUSD * 100: ${(sumUSD * 100).toLocaleString()}`);
+    console.log(`   sumARS > sumUSD * 100? ${sumARS > sumUSD * 100}`);
+
     const revenueDisplay =
+      sumARS > sumUSD * 100 ? { amount: sumARS, currency: 'ARS' as const } :
       sumUSD > 0 ? { amount: sumUSD, currency: 'USD' as const } :
       sumARS > 0 ? { amount: sumARS, currency: 'ARS' as const } :
       { amount: 0, currency: 'USD' as const };
+
+    console.log(`💱 RESULT for ${clientName}/${projectName}: ${revenueDisplay.currency} ${revenueDisplay.amount.toLocaleString()}`);
 
     // 6) NORMALIZACIÓN A USD PARA KPIs (regla estricta por registro)
     const revenueUSDNormalized = list.reduce((acc, r) => {
@@ -110,10 +118,12 @@ export async function buildIncomeResult(
       projectName,
       revenueDisplay,
       revenueUSDNormalized,
-      records: list.map(r => r.amountUSD > 0
-        ? ({ currency: 'USD' as const, amount: r.amountUSD })
-        : ({ currency: 'ARS' as const, amount: r.amountARS })
-      ),
+      records: list.flatMap(r => {
+        const records: Array<{currency: 'USD' | 'ARS', amount: number}> = [];
+        if (r.amountUSD > 0) records.push({ currency: 'USD', amount: r.amountUSD });
+        if (r.amountARS > 0) records.push({ currency: 'ARS', amount: r.amountARS });
+        return records.length > 0 ? records : [{ currency: 'USD', amount: 0 }];
+      }),
     });
   }
 
