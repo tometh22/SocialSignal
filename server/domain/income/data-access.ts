@@ -3,7 +3,7 @@
  * Mapea nombres reales a campos lógicos
  */
 
-import { parseNumberEs, isYes } from './parser';
+import { parseNumberEs, parseUSDWithDeflation, isYes } from './parser';
 import type { IncomeRow } from './types';
 import { db } from './db-adapter';
 
@@ -20,7 +20,7 @@ export async function fetchSalesRawForPeriod(period: string): Promise<IncomeRow[
     year:        Number(r.year ?? r.Año ?? 0),
     type:        r.type ?? r.Tipo_Venta ?? '',
     amountARS:   parseNumberEs(r.amountLocal ?? r.Monto_ARS),
-    amountUSD:   parseNumberEs(r.amountUsd ?? r.Monto_USD),
+    amountUSD:   parseUSDWithDeflation(r.amountUsd ?? r.Monto_USD),
     confirmed:   isYes(r.confirmed ?? r.Confirmado),
   }));
 }
