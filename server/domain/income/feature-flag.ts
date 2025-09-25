@@ -8,7 +8,7 @@
  * Durante FASE 1: false = usa sistema viejo, true = usa SoT
  * Durante FASE 2+: siempre true
  */
-export const INCOME_SOT_ENABLED = process.env.INCOME_SOT_ENABLED === 'true' || false;
+export const INCOME_SOT_ENABLED = process.env.INCOME_SOT_ENABLED === 'true' || true; // Activado para testing
 
 /**
  * Utilidad para logging condicional del SoT
