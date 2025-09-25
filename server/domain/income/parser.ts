@@ -76,6 +76,25 @@ export const parseUSDWithDeflation = (v: unknown): number => {
   return usdFixed;
 };
 
+/**
+ * Parser ARS con detección de centavos inflados ×100
+ */
+export const parseARSWithDeflation = (v: unknown): number => {
+  const arsParsed = parseNumberEs(v);
+  const arsFixed = deflateIfScaledARS(arsParsed);
+  
+  if (arsParsed !== arsFixed) {
+    console.warn('⚠️ Valor ARS inflado corregido:', { original: arsParsed, fixed: arsFixed });
+  }
+  
+  return arsFixed;
+};
+
+function deflateIfScaledARS(val: number): number {
+  // Heurística segura: si supera 20M (probable conversión a centavos x100)
+  return (val > 20_000_000) ? val / 100 : val;
+}
+
 // Mapeo de meses en español a números
 const MES = {
   'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,

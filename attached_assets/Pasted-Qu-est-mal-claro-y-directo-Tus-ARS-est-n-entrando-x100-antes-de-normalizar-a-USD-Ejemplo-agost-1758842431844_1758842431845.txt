@@ -1,0 +1,81 @@
+Qué está mal (claro y directo)
+
+Tus ARS están entrando x100 antes de normalizar a USD.
+Ejemplo agosto (lo que se ve hoy vs lo que debería):
+
+Modo: 459,670,000 ARS (mostrado) pero en “Ventas Tomi” es 4,596,700 ARS → x100
+
+Coelsa: 435,985,700 ARS vs 4,359,857 ARS → x100
+
+Detroit: 107,188,500 ARS vs 1,071,885 ARS → x100
+
+Si dividís esos ARS inflados por 1300 te da: 353,592 + 335,374 + 82,453 → y con Warner (29,230) + Kimberly (8,450) = 809,099.
+O sea: el portfolio suma USD normalizados de ARS mal inflados (x100), no de los reales.
+
+Dónde mirar (probable origen)
+
+En la SoT (no el front), en el paso que arma revenueDisplay para ARS. Dos patrones típicos:
+
+Se convirtió a centavos (×100) pero el sistema trabaja en unidades.
+
+Se “limpió” Monto_ARS en texto y luego se multiplicó por 100 “para quitar decimales”.
+
+Puntos candidatos:
+
+server/domain/income/parser.ts (o normalizeIncomeRow)
+
+cualquier helper de money que haga amount * 100 para ARS
+
+una regla “anti-100” solo aplicada a USD (no a ARS)
+
+Arreglo quirúrgico (3 cambios)
+
+No escalar ARS al construir el display:
+
+// correcto
+const amountARS = parseNumberEs(row.Monto_ARS);   // → 4359857 (no 435985700)
+revenueDisplay = { amount: amountARS, currency: 'ARS' };
+
+
+Normalización a USD siempre desde ARS en unidades:
+
+revenueUSDNormalized = amountARS / fx(period);   // con fx=1260–1345
+
+
+Anti-escala también para ARS (igual que hiciste para USD):
+
+function deflateIfScaledARS(val: number): number {
+  // heurística segura: si supera 2e7 y el string original terminaba en ",00" o " .00", divide x100
+  return (val > 20_000_000) ? val / 100 : val;
+}
+
+
+Aplicalo justo después de parsear Monto_ARS y antes de setear revenueDisplay y revenueUSDNormalized.
+
+Verificación express (tiene que dar así)
+
+GET /api/income?period=2025-08
+
+Modo → revenueDisplay: { amount: 4596700, currency: "ARS" }, revenueUSDNormalized ≈ 4596700/FX
+
+Coelsa → { 4359857, "ARS" }, ≈ 4359857/FX
+
+Detroit → { 1071885, "ARS" }, ≈ 1071885/FX
+
+Warner → { 29230, "USD" }, = 29230
+
+Kimberly → { 8450, "USD" }, = 8450
+
+GET /api/portfolio/income?period=2025-08
+
+periodRevenueUSD ≈ 45–46K (según FX del mes).
+
+Guardrail para que no vuelva a pasar
+
+Log temporal en SoT (solo en dev):
+
+raw.Monto_ARS, parsedARS, deflatedARS, display.amount, normalizedUSD.
+
+Test de humo: assert de agosto 2025 → ~45K.
+
+Con esto, el total de cabecera baja de $809,099 a ~$45K y las cards siguen mostrando ARS/USD correctos. Si querés, pegá acá el JSON de /api/income?period=2025-08 (solo la parte de Modo/Coelsa/Detroit) y te confirmo si ya bajaron de x100.
