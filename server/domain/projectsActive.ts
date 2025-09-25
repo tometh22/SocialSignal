@@ -31,6 +31,7 @@ import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { CoverageCalculator } from "./coverage";
 import { aggregateIncome, type DualNormalizedIncome } from "../services/sales";
+import * as income from "./income";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -171,98 +172,60 @@ export class ActiveProjectsAggregator {
    * Respeta moneda original + calcula USD normalizado para KPIs
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
-    console.log(`🔧 DUAL SALES DEBUG: Starting getSalesInPeriod for period ${period.start} → ${period.end}`);
+    console.log(`🚀 INCOME SOT: Using Income SoT for period ${period.start} → ${period.end}`);
     
     try {
-      // 🚀 NUEVO SISTEMA DUAL: Usar aggregateIncome con moneda dual
+      // 🎯 USAR INCOME SOT - Sistema completo con reglas anti-escala
       
-      // Get raw sales data from Google Sheets (before normalization)
-      console.log(`🔧 DUAL SALES DEBUG: About to call this.storage.getGoogleSheetsSales()`);
-      const dbSalesRecords = await this.storage.getGoogleSheetsSales();
-      console.log(`💰 Retrieved ${dbSalesRecords.length} total raw sales records from DB`);
-    
-    // 🔧 CRITICAL FIX: Map DB format with proper dual currency support
-    const allRawSales = dbSalesRecords.map(row => {
-      // Implementar regla de moneda nativa según user specs
-      const currency = row.currency || 'ARS';
-      const amountLocal = Number(row.amountLocal) || 0;
-      const amountUsd = Number(row.amountUsd) || 0;
+      // Convert period to Income SoT format (YYYY-MM)
+      const periodKey = period.start.substring(0, 7) as `${number}-${string}`; // "2025-08-01" → "2025-08"
+      console.log(`🎯 INCOME SOT: Requesting data for period "${periodKey}"`);
       
-      return {
-        Cliente: row.clientName || "",
-        Proyecto: row.projectName || "",
-        Mes: row.month || "",
-        Año: row.year || 2025,
-        // 🚀 DUAL CURRENCY: Mapear según moneda nativa
-        Monto_ARS: currency === 'ARS' ? amountLocal : 0,
-        Monto_USD: currency === 'USD' ? amountLocal : amountUsd,
-        Confirmado: row.confirmed || "Si", 
-        Tipo_Venta: row.salesType || "",
-        // 🚀 NUEVO: Campos para regla de moneda nativa
-        amountLocal,
-        currency,
-        amountUsd
-      };
-    });
-    
-    console.log(`🔧 MAPEO DEBUG: Mapped ${allRawSales.length} records to aggregateIncome format`);
-    console.log(`🔧 MAPEO DEBUG: First record - Cliente: "${allRawSales[0]?.Cliente}", Proyecto: "${allRawSales[0]?.Proyecto}", Monto_USD: ${allRawSales[0]?.Monto_USD}`);
-    
-    // 🔧 DEBUG: Verificar period antes de manipular strings
-    console.log(`🔧 PERIOD DEBUG: period =`, period);
-    console.log(`🔧 PERIOD DEBUG: period.start = "${period.start}", period.end = "${period.end}"`);
-    
-    // Convert period to monthKey format
-    const periodStartKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
-    const periodEndKey = period.end.substring(0, 7);     // "2025-08-31" → "2025-08"
-    console.log(`🔧 PERIOD DEBUG: periodStartKey = "${periodStartKey}", periodEndKey = "${periodEndKey}"`);
-    console.log(`🔧 PERIOD DEBUG: About to call aggregateIncome() with ${allRawSales.length} mapped records`);
-    
-    // 🚀 USAR NUEVO AGREGADOR DUAL: aggregateIncome()
-    const aggregatedIncomes = aggregateIncome(allRawSales, periodStartKey, periodEndKey);
-    console.log(`💰 DUAL AGREGADOR: ${aggregatedIncomes.size} proyectos únicos con ingresos duales`);
-    
-    // Convert dual aggregated incomes to legacy SalesRecord format for compatibility
-    const filteredSales: SalesRecord[] = [];
-    
-    for (const [projectKey, income] of aggregatedIncomes) {
-      // Generate canonical fields for ETL consistency
-      const canonicalFields = generateCanonicalFields(income.clientName, income.projectName);
+      // Get income data using Income SoT (includes anti-scale rules)
+      const incomeData = await income.getIncomeByPeriod(periodKey);
+      console.log(`🎯 INCOME SOT: Retrieved ${incomeData.projects.length} projects`);
       
-      // 🚀 NUEVO: Agregar campos duales a SalesRecord
-      const salesRecord: SalesRecord & {
-        displayCurrency?: "ARS" | "USD";
-        revenueDisplay?: number;
-        revenueUSDNormalized?: number;
-      } = {
-        clientCanon: canonicalFields.clientCanon,
-        projectCanon: canonicalFields.projectCanon,
-        projectKey: canonicalFields.projectKey,
-        projectName: income.projectName,
-        clientId: 0, // Will be resolved later in merge
-        clientName: income.clientName,
-        revenueUSD: income.revenueUSDNormalized, // Use normalized USD for backward compatibility
-        month: periodStartKey.substring(5, 7),   // Extract month from period
-        year: parseInt(periodStartKey.substring(0, 4)), // Extract year from period
-        confirmedOnly: true, // Todos los records agregados ya están confirmados
+      // Convert Income SoT projects to SalesRecord format for compatibility
+      const filteredSales: SalesRecord[] = [];
+      
+      for (const project of incomeData.projects) {
+        // Generate canonical fields for ETL consistency
+        const canonicalFields = generateCanonicalFields(project.clientName, project.projectName);
         
-        // 🚀 NUEVOS CAMPOS DUALES: Para mostrar en frontend
-        displayCurrency: income.displayCurrency,
-        revenueDisplay: income.revenueDisplay,
-        revenueUSDNormalized: income.revenueUSDNormalized
-      };
-      
-      filteredSales.push(salesRecord);
-      
-      console.log(`💰 DUAL RECORD: ${income.clientName}|${income.projectName} → Display: ${income.displayCurrency} ${income.revenueDisplay}, KPIs: USD ${income.revenueUSDNormalized}`);
-    }
+        // 🚀 INCOME SOT INTEGRATION: Usar datos con reglas anti-escala aplicadas
+        const salesRecord: SalesRecord & {
+          displayCurrency?: "ARS" | "USD";
+          revenueDisplay?: number;
+          revenueUSDNormalized?: number;
+        } = {
+          clientCanon: canonicalFields.clientCanon,
+          projectCanon: canonicalFields.projectCanon,
+          projectKey: canonicalFields.projectKey,
+          projectName: project.projectName,
+          clientId: 0, // Will be resolved later in merge
+          clientName: project.clientName,
+          revenueUSD: project.revenueUSDNormalized, // Valor correcto con reglas anti-escala
+          month: periodKey.substring(5, 7),   // Extract month from period
+          year: parseInt(periodKey.substring(0, 4)), // Extract year from period
+          confirmedOnly: true, // Todos los records del Income SoT ya están confirmados
+          
+          // 🚀 DUAL CURRENCY: Valores correctos del Income SoT
+          displayCurrency: project.revenueDisplay.currency as "ARS" | "USD",
+          revenueDisplay: project.revenueDisplay.amount,
+          revenueUSDNormalized: project.revenueUSDNormalized
+        };
+        
+        filteredSales.push(salesRecord);
+        
+        console.log(`💰 INCOME SOT RECORD: ${project.clientName}|${project.projectName} → Display: ${project.revenueDisplay.currency} ${project.revenueDisplay.amount}, USD: ${project.revenueUSDNormalized}`);
+      }
 
-    console.log(`💰 DUAL SALES: ${filteredSales.length} records with dual currency support`);
-    return filteredSales;
-    
+      console.log(`💰 INCOME SOT: ${filteredSales.length} records with anti-scale rules applied`);
+      return filteredSales;
+      
     } catch (error) {
-      console.error(`❌ DUAL SALES ERROR in getSalesInPeriod:`, error);
-      console.error(`❌ DUAL SALES ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      console.error(`❌ INCOME SOT ERROR in getSalesInPeriod:`, error);
+      console.error(`❌ INCOME SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
       return []; // Return empty array on error
     }
   }
