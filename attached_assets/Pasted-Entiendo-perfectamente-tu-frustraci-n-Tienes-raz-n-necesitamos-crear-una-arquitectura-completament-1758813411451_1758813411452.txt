@@ -1,0 +1,111 @@
+Entiendo perfectamente tu frustración. Tienes razón, necesitamos crear una arquitectura completamente nueva y más limpia para los ingresos. He revisado tus instrucciones detalladas y las imágenes adjuntas, y veo que quieres un enfoque totalmente diferente con una única fuente de verdad.
+
+📋 PLAN DETALLADO PARA ARREGLAR INGRESOS
+🎯 OBJETIVO
+Crear un sistema de ingresos completamente nuevo con una única fuente de verdad (server/domain/income/) que reemplace toda la lógica dispersa actual.
+
+🔍 ANÁLISIS DEL ESTADO ACTUAL
+Basándome en tus instrucciones, veo que actualmente:
+
+Los ingresos están dispersos en múltiples lugares
+No hay una API canónica única
+Las diferentes pantallas usan diferentes fuentes de datos
+Falta consistencia en tipos y formatos
+📝 PLAN DE IMPLEMENTACIÓN
+FASE 1: Crear la Fuente de Verdad (SoT)
+1.1 Crear estructura del módulo de ingresos
+
+server/domain/income/
+├── index.ts          // API pública del dominio
+├── types.ts          // Tipos canónicos
+├── parser.ts         // Parser seguro de "Ventas Tomi"
+├── business-rules.ts // Reglas de negocio
+└── data-access.ts    // Acceso a datos (staging/DB/Sheets)
+1.2 Implementar tipos canónicos exactos
+
+PeriodKey: formato "YYYY-MM" estricto
+MoneyDisplay: {amount: number, currency: 'USD'|'ARS'}
+ProjectIncome: estructura completa con metadata
+IncomeResult y PortfolioIncome: agregaciones
+1.3 Crear parser seguro de ES
+
+Función parseNumberEs() que evita ×100 y maneja separadores
+Validación de campos requeridos
+Detección automática de formato
+FASE 2: Implementar Reglas de Negocio
+2.1 Filtro temporal estricto
+
+Solo incluir filas donde Mes + Año == period Y Confirmado == "Si"
+Sin carry-over entre períodos
+2.2 Lógica de moneda nativa
+
+Si Monto_USD > 0 → revenueDisplay = {amount: amountUSD, currency: 'USD'}
+Else if Monto_ARS > 0 → revenueDisplay = {amount: amountARS, currency: 'ARS'}
+Else → registro inválido (rechazar)
+2.3 Normalización a USD para KPIs
+
+Si nativo es USD → revenueUSDNormalized = amountUSD
+Si nativo es ARS → revenueUSDNormalized = amountARS / fx(period)
+2.4 Agrupación por proyecto
+
+Agrupar por clientName + projectName dentro del período
+Sumar montos tanto nativos como normalizados
+FASE 3: API del Dominio
+3.1 Implementar funciones principales
+
+export async function getIncomeByPeriod(period: PeriodKey): Promise<IncomeResult>
+export async function getIncomeByProject(projectId: number, period: PeriodKey): Promise<ProjectIncome>
+export async function getPortfolioIncome(period: PeriodKey): Promise<PortfolioIncome>
+3.2 Integración con datos existentes
+
+Lectura desde el servicio de sales existente
+Mapeo de columnas según especificación adjunta
+Validaciones y rechazos según reglas
+FASE 4: Endpoints HTTP
+4.1 Crear nuevos endpoints
+
+GET /api/income?period=2025-08           → IncomeResult
+GET /api/projects/:id/income?period=2025-08 → ProjectIncome  
+GET /api/portfolio/income?period=2025-08    → PortfolioIncome
+4.2 Mantener compatibilidad temporal
+
+Los endpoints existentes siguen funcionando temporalmente
+Migración gradual de consumidores
+FASE 5: Migración de Consumidores
+5.1 Actualizar pantallas principales
+
+Proyectos Activos: usar getIncomeByPeriod()
+Vista de proyecto: usar getIncomeByProject()
+Dashboard General: usar getPortfolioIncome()
+5.2 Eliminar lógica duplicada
+
+Remover cálculos de ingresos dispersos
+Consolidar en la nueva SoT
+FASE 6: Validación
+6.1 Casuística mínima (agosto 2025)
+
+Warner Fee Marketing: display USD 29,230 y normalized 29,230
+Kimberly Fee Huggies: display USD 8,450 y normalized 8,450
+Coelsa Fee mensual: display ARS 4.359.857 y normalized = 4,359,857 / fx(2025-08)
+Vertical Media: revenue 0 (sin venta en agosto)
+6.2 Smoke tests automatizados
+
+Tests de los 3 endpoints principales
+Verificación de valores exactos vs casuística
+Validación de formatos y tipos
+🔧 DEPENDENCIAS Y CONSIDERACIONES
+Dependencias externas:
+
+Servicio de FX existente (server/services/fx.ts)
+Servicio de sales (server/services/sales.ts)
+Tipos de período existentes
+Riesgos identificados:
+
+Cambio de API puede romper frontend temporalmente
+Necesito mapear IDs de proyectos correctamente
+Validar que el FX service tiene datos para agosto 2025
+Puntos de verificación:
+
+Después de FASE 1: Tipos compilando correctamente
+Después de FASE 3: API devolviendo datos básicos
+Después de FASE 6: Smoke tests pasando al 100%

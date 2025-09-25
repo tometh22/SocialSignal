@@ -1,0 +1,122 @@
+Para tirar abajo la arquitectura vieja sin romper nada te recomiendo un plan “Strangler Pattern” en 3 fases, con flag de activación y borrado limpio. Abajo te dejo los pasos concretos y el checklist para cada fase.
+
+Fase 0 — Congelar y auditar (hoy)
+
+Congelar cambios en todo lo que compute ingresos “a mano”.
+
+Inventario (rg/grep) de símbolos a deprecar:
+aggregateIncome, normalizeIncomeRow, getSalesInPeriod, parsers ES duplicados, endpoints antiguos que calculan ingresos, jobs ETL que los alimentan, helpers de FX duplicados.
+
+Crear feature flag global: INCOME_SOT_ENABLED=true|false.
+
+Tests de contrato (snapshots) sobre 4 casos: Warner Fee Marketing, Kimberly Fee Huggies, Coelsa Fee mensual (ARS), Vertical Media (sin venta). Estos tests serán tu red de seguridad antes/después.
+
+Fase 1 — Estrangular (reemplazar por dentro, sin cambiar contratos)
+
+Objetivo: que todo lea ingresos desde server/domain/income/* (SoT), pero los endpoints y tipos expuestos se sigan viendo iguales.
+
+Adapters de compatibilidad (capa fina):
+
+/api/projects/active → llamar a income.getIncomeByPeriod(period) y adaptar la respuesta al shape viejo.
+
+Cualquier selector/servicio viejo que sumaba ingresos → reescribir para consumir la SoT.
+
+Dark launch / shadow:
+
+Con INCOME_SOT_ENABLED=false sigue la vieja ruta pero en paralelo logueás el cálculo nuevo y comparás (diferencia tolerada ≤ 0.5%).
+
+Telemetría mínima:
+
+Contadores: income_sot_projects, income_sot_delta_usd.
+
+Log de “rechazos” de filas por validación (mes/año/confirmado).
+
+Activar flag en staging y pasar los tests de contrato + smoke tests reales (agosto 2025).
+
+Activar flag en prod con canary (p.ej. 10% tráfico o por usuario interno) + monitoreo 48–72h.
+
+Fase 2 — Migrar consumidores (UI/servicios)
+
+Objetivo: que todas las pantallas usen la SoT sin adapter.
+
+Proyectos Activos → consumir GET /api/income?period=YYYY-MM.
+
+Card por proyecto: metrics.revenueDisplay (moneda nativa).
+
+KPIs (suma/ratios): metrics.revenueUSDNormalized.
+
+Vista de Proyecto → GET /api/projects/:id/income?period=YYYY-MM.
+
+Dashboard General → GET /api/portfolio/income?period=YYYY-MM.
+
+Eliminar lógica duplicada en frontend (sumas o formateos que rompan la regla de moneda nativa).
+
+Fase 3 — Borrado real (delete con seguridad)
+
+Objetivo: limpieza total del legado.
+
+Checklist “antes de borrar”
+
+ Flag INCOME_SOT_ENABLED=true en todos los ambientes por ≥ 1 semana sin incidentes.
+
+ Todos los consumidores usan los endpoints nuevos.
+
+ Tests de contrato verdes.
+
+ Métricas de adopción: 100% de proyectos con revenueDisplay y revenueUSDNormalized.
+
+Borrar código (en PRs pequeños y reversibles):
+
+ server/services/sales.ts (agregadores viejos), parsers ES duplicados.
+
+ Endpoints antiguos que computaban ingresos.
+
+ Jobs ETL que populaban tablas/herramientas no usadas por SoT.
+
+ Cualquier helper FX duplicado (mantener solo el de income/fx.ts).
+
+DB / ETL
+
+ Marcar tablas viejas read-only una semana.
+
+ Crear view temporal que simule el schema viejo apuntando a la SoT (por si algo quedó colgado).
+
+ Ticket para drop definitivo de tablas viejas (otra semana después).
+
+Eliminar el flag y la capa de adapters.
+
+Scripts útiles (orientativos)
+
+Inventario de referencias
+
+rg -n "aggregateIncome|normalizeIncomeRow|getSalesInPeriod|Monto_USD|Monto_ARS|Confirmado" server/
+
+
+Detectar endpoints viejos
+
+rg -n "api/projects/active|complete-data" server/
+
+
+Buscar FX duplicado
+
+rg -n "getFx|exchangeRate" server/
+
+Definición de “Done” (ingresos)
+
+Fuente única: server/domain/income/*.
+
+Todas las pantallas leen solo de los 3 endpoints nuevos.
+
+revenueDisplay (ARS/USD nativo) en UI + revenueUSDNormalized para KPIs.
+
+Tests de contrato verificando: Warner, Kimberly, Coelsa, Vertical Media.
+
+Métricas: periodRevenueUSD en dashboard coincide con suma normalizada por período.
+
+Consejos prácticos
+
+PRs pequeños y mensurables: 1) adapters + flag, 2) migración cada pantalla, 3) borrado.
+
+Registro de “rechazos” de filas (mes/año/confirmado) para detectar data issues de Sheets sin culpar al código.
+
+Manual de datos junto al repo (README_income.md) con mapeo de columnas, reglas de confirmación y moneda nativa.
