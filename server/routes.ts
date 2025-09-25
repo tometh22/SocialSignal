@@ -120,6 +120,50 @@ function nullToUndefined(obj: any): any {
   return obj;
 }
 
+// Utility function to convert legacy timeFilter to period format (YYYY-MM)
+function convertTimeFilterToPeriod(timeFilter: string): string | null {
+  // Handle formats like "2025-08", "Q3 2025", "August 2025", etc.
+  if (/^\d{4}-\d{2}$/.test(timeFilter)) {
+    return timeFilter; // Already in YYYY-MM format
+  }
+  
+  // Handle quarter formats (Q1 2025, Q2 2025, etc.)
+  const quarterMatch = timeFilter.match(/Q(\d)\s+(\d{4})/);
+  if (quarterMatch) {
+    const quarter = parseInt(quarterMatch[1]);
+    const year = quarterMatch[2];
+    const month = ((quarter - 1) * 3 + 1).toString().padStart(2, '0');
+    return `${year}-${month}`;
+  }
+  
+  // Handle month names (August 2025, etc.)
+  const monthMatch = timeFilter.match(/(\w+)\s+(\d{4})/);
+  if (monthMatch) {
+    const monthName = monthMatch[1].toLowerCase();
+    const year = monthMatch[2];
+    const monthMap: {[key: string]: string} = {
+      'january': '01', 'enero': '01',
+      'february': '02', 'febrero': '02',
+      'march': '03', 'marzo': '03',
+      'april': '04', 'abril': '04',
+      'may': '05', 'mayo': '05',
+      'june': '06', 'junio': '06',
+      'july': '07', 'julio': '07',
+      'august': '08', 'agosto': '08',
+      'september': '09', 'septiembre': '09',
+      'october': '10', 'octubre': '10',
+      'november': '11', 'noviembre': '11',
+      'december': '12', 'diciembre': '12'
+    };
+    const month = monthMap[monthName];
+    if (month) {
+      return `${year}-${month}`;
+    }
+  }
+  
+  return null; // Unable to convert
+}
+
 export function getMonthsInFilter(filter: string): number {
   switch (filter) {
     // Filtros mensuales
@@ -9262,12 +9306,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Income Dashboard Rows endpoint - Obtener datos de ingresos para la tabla del dashboard
+  // Income Dashboard Rows endpoint - COMPATIBILITY ADAPTER for legacy UI
   app.get('/api/income-dashboard-rows', requireAuth, async (req, res) => {
     try {
       const { projectId, timeFilter, clientName, revenueType, status } = req.query;
       
-      console.log('🔍 Income Dashboard Rows - Request params:', { projectId, timeFilter, clientName, revenueType, status });
+      console.log('🔧 LEGACY ADAPTER: Income Dashboard Rows - Request params:', { projectId, timeFilter, clientName, revenueType, status });
+      
+      // 🚀 NEW: Use Income SoT if enabled, fallback to legacy system
+      if (INCOME_SOT_ENABLED) {
+        logIncomeSOT(`LEGACY ADAPTER: Using SoT for income-dashboard-rows with filters: ${JSON.stringify({ projectId, timeFilter, clientName, revenueType, status })}`);
+        
+        // Convert timeFilter to period format
+        const period = timeFilter && timeFilter !== 'all' ? convertTimeFilterToPeriod(timeFilter as string) : null;
+        
+        if (period) {
+          // Get data from new SoT system
+          const incomeData = await income.getIncomeByPeriod(period);
+          
+          // Transform to legacy format
+          const legacyRecords = incomeData.projects
+            .filter(project => {
+              if (projectId && project.projectId !== parseInt(projectId as string)) return false;
+              if (clientName && !project.clientName.toLowerCase().includes((clientName as string).toLowerCase())) return false;
+              return true;
+            })
+            .map(project => ({
+              id: project.projectId || Math.random(),
+              client_name: project.clientName,
+              project_name: project.projectName,
+              amount_usd: project.revenueUSDNormalized,
+              original_amount: project.revenueDisplay.amount,
+              currency: project.revenueDisplay.currency,
+              month_key: period,
+              revenue_type: 'monthly_fee', // Default for compatibility
+              status: 'confirmed' // Default for compatibility
+            }));
+          
+          logIncomeSOT(`LEGACY ADAPTER: Returning ${legacyRecords.length} records from SoT`);
+          return res.json(legacyRecords);
+        }
+      }
+      
+      // FALLBACK: Original legacy implementation
+      console.log('🔧 LEGACY ADAPTER: Falling back to original implementation');
       
       // Obtener datos de ventas/ingresos (fuente: pestaña "Ventas Tomi" del Excel MAESTRO)
       let salesData;
@@ -9342,18 +9424,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ========== NEW ENDPOINTS: Motor Universal para Pestañas ==========
   
-  // ENDPOINT: Project Incomes - Tabla detalle Ventas Tomi
+  // ENDPOINT: Project Incomes - COMPATIBILITY ADAPTER for legacy UI
   app.get('/api/projects/:id/incomes', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.id);
     const timeFilter = req.query.timeFilter as string || 'all';
     
-    console.log(`📊 INCOMES API: GET /projects/${projectId}/incomes?timeFilter=${timeFilter}`);
+    console.log(`🔧 LEGACY ADAPTER: GET /projects/${projectId}/incomes?timeFilter=${timeFilter}`);
     
     if (isNaN(projectId)) {
       return res.status(400).json({ message: "Invalid project ID" });
     }
 
     try {
+      // 🚀 NEW: Use Income SoT if enabled, fallback to legacy system
+      if (INCOME_SOT_ENABLED) {
+        logIncomeSOT(`LEGACY ADAPTER: Using SoT for /projects/${projectId}/incomes with timeFilter=${timeFilter}`);
+        
+        // Convert timeFilter to period format
+        const period = timeFilter && timeFilter !== 'all' ? convertTimeFilterToPeriod(timeFilter) : null;
+        
+        if (period) {
+          // Get data from new SoT system for specific project
+          const projectIncomeData = await income.getProjectIncome(projectId, period);
+          
+          if (projectIncomeData) {
+            // Transform to legacy format
+            const legacyIncomes = [{
+              id: Math.random(),
+              project_id: projectId,
+              client_name: projectIncomeData.clientName,
+              project_name: projectIncomeData.projectName,
+              amount_usd: projectIncomeData.revenueUSDNormalized,
+              original_amount: projectIncomeData.revenueDisplay.amount,
+              currency: projectIncomeData.revenueDisplay.currency,
+              month: period.split('-')[1], // Extract month number
+              year: parseInt(period.split('-')[0]),
+              month_key: period,
+              revenue_type: 'monthly_fee',
+              status: 'confirmed'
+            }];
+            
+            logIncomeSOT(`LEGACY ADAPTER: Returning project income from SoT: $${projectIncomeData.revenueUSDNormalized} USD`);
+            return res.json(legacyIncomes);
+          } else {
+            // No income for this project in this period
+            logIncomeSOT(`LEGACY ADAPTER: No income found for project ${projectId} in period ${period}`);
+            return res.json([]);
+          }
+        }
+      }
+      
+      // FALLBACK: Original legacy implementation
+      console.log('🔧 LEGACY ADAPTER: Falling back to original implementation');
+      
       // 1. Obtener ventas del proyecto filtradas por período
       const allSales = await storage.getGoogleSheetsSalesByProject(projectId);
       
