@@ -122,6 +122,33 @@ function spanishMonthToNumber(monthStr: string): string {
   return monthStr; // Retornar original si no se puede procesar
 }
 
+// ==================== PERIOD CONSTRUCTION ====================
+
+function isNonEmpty(value: string | undefined | null): boolean {
+  return value !== undefined && value !== null && value.trim() !== '';
+}
+
+function buildFromMesAnio(mes: string | undefined, año: string | undefined): string {
+  if (!mes || !año) {
+    return '';
+  }
+  
+  const monthNum = spanishMonthToNumber(mes);
+  const yearStr = String(año).trim();
+  
+  // Validar que tenemos un año válido
+  if (!/^\d{4}$/.test(yearStr)) {
+    return '';
+  }
+  
+  // Validar que el mes es válido
+  if (!/^\d{2}$/.test(monthNum)) {
+    return '';
+  }
+  
+  return `${yearStr}-${monthNum}`;
+}
+
 // ==================== FIELD EXTRACTION ====================
 
 function extractField(record: RawCostRecord, mappings: string[]): string | undefined {
@@ -200,34 +227,30 @@ export function parseCostRecord(
   const confirmedRaw = extractField(record, COLUMN_MAPPINGS.confirmed);
   const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
-  // ⚠️ REQUIRED FIELDS - Usar month_key como fuente de verdad
-  if (!clientName || !monthKeyRaw) {
-    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - missing required fields:`, {
-      clientName: !!clientName,
-      monthKeyRaw: !!monthKeyRaw,
-      monthRaw: !!monthRaw, // debugging
-      yearRaw: !!yearRaw    // debugging
-    });
+  // ⚠️ REQUIRED FIELDS - clientName es obligatorio
+  if (!clientName) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - missing clientName`);
     return null;
   }
   
-  // 🔍 CONFIRMATION CHECK - DESHABILITADO (no existe en DB actual)
-  // Nota: La validación de "confirmado" no aplica a la estructura actual de la DB
-  // Todos los registros en DB se consideran confirmados por defecto
-  
-  // 🎯 PERIOD EXTRACTION - Usar month_key directo (formato YYYY-MM)
-  const period: PeriodKey = monthKeyRaw as PeriodKey;
-  
-  // 🔧 VALIDACIÓN: Verificar formato YYYY-MM
-  const periodRegex = /^\d{4}-\d{2}$/;
-  if (!periodRegex.test(period)) {
-    console.log(`🔍 COST PARSER: Invalid period format at row ${rowIndex}:`, { 
+  // 🎯 PERIOD EXTRACTION - Plan exacto: month_key prioritario, fallback a mes+año solo si falta
+  const periodKey = isNonEmpty(monthKeyRaw) 
+    ? String(monthKeyRaw) 
+    : buildFromMesAnio(monthRaw, yearRaw);
+    
+  // 🔧 VALIDACIÓN: Verificar formato YYYY-MM exacto
+  if (!/^\d{4}-\d{2}$/.test(periodKey)) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - bad periodKey:`, { 
+      periodKey,
       monthKeyRaw, 
-      period,
+      monthRaw,
+      yearRaw,
       expectedFormat: 'YYYY-MM'
     });
     return null;
   }
+  
+  const period: PeriodKey = periodKey as PeriodKey;
   
   // 🔍 AMOUNTS
   const arsAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.arsAmount);

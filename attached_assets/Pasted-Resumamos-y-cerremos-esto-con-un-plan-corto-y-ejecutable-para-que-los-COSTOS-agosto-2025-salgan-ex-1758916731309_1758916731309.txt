@@ -1,0 +1,137 @@
+Resumamos y cerremos esto con un plan corto y ejecutable para que los COSTOS (agosto 2025) salgan exactos y confiables en todas las vistas.
+
+1) Causas raíz (confirmadas)
+
+USD corrupto en BD (monto_total_usd astronómico).
+
+month_key vs mes/año: filas con mes="08 ago" pero month_key="2025-01" → caían en agosto por parsing.
+
+FX de costos: debía ser 1345 (no 1260).
+
+Cache: devolviendo resultados viejos tras arreglos.
+
+2) Parches mínimos (código)
+
+Aplica estos 3 cambios y recompila.
+
+(A) Periodo: usar month_key como verdad
+// costs/parser.ts
+const periodKey =
+  isNonEmpty(row.month_key) ? String(row.month_key) :
+  buildFromMesAnio(row.mes, row["año"]);  // fallback sólo si falta month_key
+if (!/^\d{4}-\d{2}$/.test(periodKey)) skip("bad periodKey");
+
+(B) Moneda & anticorrupción USD (costos)
+// costs/business-rules.ts
+const fx = getFxCosts(periodKey); // 1345 en 2025-08
+
+const usdRaw = asNumber(row.monto_total_usd);
+const arsRaw = asNumber(row.costo_total);
+
+const usdFromArs = isFinite(arsRaw) ? arsRaw / fx : null;
+
+// 1) Si USD es astronómico o > 100k, IGNORAR USD y usar ARS/fx
+const usdLooksCorrupt =
+  !isFinite(usdRaw) ||
+  usdRaw > 100_000 ||
+  (usdFromArs && isFinite(usdRaw) && Math.abs(usdRaw - usdFromArs) / Math.max(usdRaw, usdFromArs) > 0.35);
+
+if (!usdLooksCorrupt && isFinite(usdRaw) && usdRaw > 0) {
+  costDisplay = { amount: usdRaw, currency: "USD" };
+  costUSDNormalized = usdRaw;
+} else if (isFinite(arsRaw) && arsRaw > 0) {
+  costDisplay = { amount: arsRaw, currency: "ARS" };
+  costUSDNormalized = arsRaw / fx;
+} else {
+  skip("no valid amounts");
+}
+
+(C) Filtro por tipo y período
+// costs/parser.ts (o rules)
+if (!["directo","directos"].includes(String(row.tipo_gasto||row.tipoGasto).toLowerCase())) skip("not direct");
+
+// luego del parse:
+if (parsed.periodKey !== requestedPeriod) skip("other period");
+
+
+Nota FX: asegúrate de eliminar cualquier fallback a 1260. getFxCosts("2025-08") debe devolver 1345 desde la tabla exchange_rates.
+
+3) SQL de saneo (opcional pero recomendado; corre sólo si validás antes)
+
+3.1 Detectar inconsistencias de período
+
+-- Filas con mes "ago" 2025 cuyo month_key NO es 2025-08
+SELECT id, cliente, proyecto, mes, "año", month_key
+FROM direct_costs
+WHERE "año" = 2025 AND mes ILIKE '%ago%' AND month_key <> '2025-08';
+
+
+3.2 Duplicados por cliente/proyecto en agosto
+
+SELECT cliente, proyecto, month_key, COUNT(*) cnt, SUM(costo_total) ars, SUM(monto_total_usd) usd
+FROM direct_costs
+WHERE month_key='2025-08'
+GROUP BY 1,2,3
+HAVING COUNT(*)>1
+ORDER BY cnt DESC, ars DESC;
+
+
+3.3 USD corrupto
+
+SELECT id, cliente, proyecto, month_key, monto_total_usd
+FROM direct_costs
+WHERE month_key='2025-08' AND (monto_total_usd > 100000 OR monto_total_usd IS NULL);
+
+
+Si necesitás corregir: ejecutá primero el SELECT equivalente y luego el UPDATE/DELETE dentro de una transacción. Evitá tocar el Excel; saneá sólo registros evidentemente corruptos (p.ej., month_key mal seteado o USD astronómico).
+
+4) Forzar datos frescos (sin caché)
+
+Agrega/usa ?source=fresh en /api/costs y que realmente saltee el cache.
+
+O expón /api/costs/cache/clear (interno) para invalidar el periodo consultado.
+
+5) Smoke tests (esperados exactos)
+
+Ejecuta después de los parches y sin caché:
+
+BASE="http://localhost:5000"; P="2025-08"
+
+# Ledger de los 4
+curl -s "$BASE/api/costs?period=$P&source=fresh" \
+| jq '.projects
+ | map(select(.clientName|test("Warner|Kimberly|Coelsa|Modo"; "i")))
+ | map({client:.clientName, project:.projectName,
+        display: (.costDisplay.currency + " " + (.costDisplay.amount|tostring)),
+        usd: .costUSDNormalized})'
+
+# Totales por verificación rápida
+curl -s "$BASE/api/costs?period=$P&source=fresh" \
+| jq '[.projects[]
+      | select(.clientName|test("Warner|Kimberly|Coelsa|Modo";"i"))
+      | {k:(.clientName+"|"+.projectName),v:.costUSDNormalized}]
+      | from_entries' 
+
+
+Valores esperados (agosto 2025):
+
+Coelsa: ARS 553.002 → USD ~411,15
+
+Modo (Play): ARS 497.550 → USD ~369,93
+
+Kimberly Huggies: ARS 3.276.539 → USD 2.436,09
+
+Warner Fee Marketing: ARS 9.421.993 → USD 7.005,20
+
+La suma de estos cuatro = USD ~10.222,37.
+(Si salen más proyectos en agosto, el portfolio total será mayor; estos cuatro deben matchear milimétricamente.)
+
+6) Si algo no cuadra, mira aquí
+
+¿/api/costs sigue usando cache? → usa source=fresh o limpia cache.
+
+¿FX ≠ 1345 en agosto? → revisa getFxCosts y exchange_rates.
+
+¿Sigue entrando enero como agosto? → el parser debe usar month_key.
+
+¿Warner/Kimberly altos? → verifica SELECT ... HAVING COUNT(*)>1 y USD corrupto; si hay más de 1 fila real en agosto, valida con tu Excel qué filas deben sumarse.
