@@ -1,0 +1,200 @@
+Tipos canónicos
+type PeriodKey = `${number}-${'01'|'02'|'03'|'04'|'05'|'06'|'07'|'08'|'09'|'10'|'11'|'12'}`;
+
+type MoneyDisplay = { amount: number; currency: 'USD'|'ARS' };
+
+type ProjectCost = {
+  clientName: string;
+  projectName: string;
+  period: PeriodKey;
+  // display (moneda nativa)
+  costDisplay: MoneyDisplay;
+  // normalizado a USD para KPIs
+  costUSDNormalized: number;
+  // metadata
+  kind: 'Directo'|'Indirecto';
+  sourceRowCount: number;
+};
+
+type CostsResult = {
+  period: PeriodKey;
+  projects: ProjectCost[];
+  portfolioCostUSD: number; // suma de costUSDNormalized
+};
+
+2) Reglas de negocio (idénticas a ingresos)
+
+Filtro temporal estricto
+Incluir sólo filas con:
+
+Mes + Año == period
+
+Confirmado == "Si"
+
+Cliente y Proyecto no vacíos
+
+Moneda nativa (display)
+
+Si Monto_USD > 0 ⇒ costDisplay = { amount: Monto_USD, currency: 'USD' }
+
+Sino si Monto_ARS > 0 ⇒ costDisplay = { amount: Monto_ARS, currency: 'ARS' }
+
+Sino descartar fila (no suma).
+
+Normalización a USD para KPIs
+
+Si nativo USD ⇒ costUSDNormalized = Monto_USD
+
+Si nativo ARS ⇒ costUSDNormalized = Monto_ARS / fx(period)
+(usa el mismo servicio FX que ingresos).
+
+Anti-escala (igual que ingresos)
+Aplicar deflación también para ARS y USD:
+
+Si el parsed es sospechosamente grande dado el formato (…,00 vs entero), dividir x100.
+
+Regla específica opcional por proyecto si detectás un patrón (como hicimos con Warner).
+
+Agrupación
+Agrupar por clientName + projectName (dentro del periodo) y sumar:
+
+costDisplay.amount por moneda nativa (si hay mezcla, conservar la que tenga monto > 0 por mayoría; el KPI siempre usa USD normalizado)
+
+costUSDNormalized (suma directa)
+
+Asignación (Directo/Indirecto)
+
+Directo: tiene proyecto asignado ⇒ va a la card del proyecto.
+
+Indirecto: si viene sin proyecto (overhead) ⇒ tres opciones (configurable):
+
+exclude (por defecto ahora, para no contaminar cards)
+
+portfolio-only (entra al portfolio, no a cards)
+
+allocate-by-hours (reparto proporcional a horas del período) ← dejar para fase 2.
+
+3) Data mapping desde Google Sheets / staging
+
+Para el parser espera estos alias (acepta español e inglés/camel):
+
+Cliente ↔ clientName | client_name
+
+Proyecto ↔ projectName | project_name
+
+Mes ↔ month
+
+Año ↔ year
+
+Confirmado ↔ confirmed
+
+Tipo_Costo (opcional) ↔ kind (Directo/Indirecto)
+
+Monto_ARS ↔ amount_ars | amountLocal | monto_ars
+
+Monto_USD ↔ amount_usd | amountUsd | monto_usd
+
+Mes en español (“ago”, “ago.”, “agosto”) ⇒ convertir a 08 con el mismo spanishMonthToNumber() que arreglamos.
+
+4) Endpoints HTTP (simétricos a ingresos)
+
+GET /api/costs?period=YYYY-MM → CostsResult
+
+GET /api/projects/:id/costs?period=YYYY-MM → ProjectCost (uno)
+
+GET /api/portfolio/costs?period=YYYY-MM → { period, portfolioCostUSD }
+
+(Deja adapters en los endpoints legacy que hoy consumen costos y enrútalos al SoT, como hicimos con ingresos.)
+
+5) Integración con métricas de proyecto
+
+Al agregador de Proyectos Activos pásale ahora ingresos y costos del SoT:
+
+profitUSD   = revenueUSDNormalized - costUSDNormalized;
+markupRatio = costUSDNormalized > 0 ? revenueUSDNormalized / costUSDNormalized : null; // “×”
+marginPct   = revenueUSDNormalized > 0 ? profitUSD / revenueUSDNormalized : null;      // “%”
+
+
+En UI:
+
+Display: revenueDisplay y costDisplay (moneda nativa)
+
+KPIs: todo contra ...USDNormalized
+
+6) Checklist de verificación (contra el Excel)
+
+Pestaña: “Costos directos e indirectos”
+Período de prueba: agosto 2025 (o el que elijas)
+
+A. Filtro & conteo
+
+ Filtrar en Sheets por: Mes=Agosto, Año=2025, Confirmado=“Si”.
+
+ El total de filas válidas debe coincidir con CostsResult.projects[].sourceRowCount (agregado por proyecto).
+
+B. Valores por proyecto (golden tests)
+
+Para cada Cliente+Proyecto con actividad en agosto:
+
+ Sumar Total USD (si existe) ⇒ debe igualar costDisplay cuando currency=USD.
+
+ Si el costo está en ARS ⇒ sumar Total ARS ⇒ costDisplay.amount en ARS coincide.
+
+ costUSDNormalized = (ARS/FX) ó (USD tal cual).
+
+Ejemplos que ya vimos en tus capturas (ajusta si tu Excel difiere):
+
+Warner · Fee Marketing (ago-2025): tabla de personas ⇒ Total USD ≈ 7,005.20 → costDisplay = USD 7,005.20 y costUSDNormalized = 7,005.20.
+
+Kimberly · Fee Huggies (ago-2025): Total USD ≈ 2,436 (si esa es tu suma) → mismos reflejos.
+
+Modo / Coelsa / Detroit (ago-2025): si los costos están en ARS, comparar “Total ARS” y luego validar ARS/FX en costUSDNormalized.
+
+C. Totales de portfolio
+
+ En Sheets: suma de (USD directos) + (ARS directos/FX) del período = X
+
+ API /api/portfolio/costs?period=YYYY-MM ⇒ portfolioCostUSD = X
+
+D. Anti-escala
+
+ Revisa en logs 2 o 3 filas con ARS y USD: raw → parsed → deflated → normalized.
+
+ Asegúrate que no haya ×100 en ARS (p. ej. 1,071,885 y no 107,188,500).
+
+7) Pruebas de humo (curl rápidas)
+# 1) Portfolio del período
+curl -s "/api/portfolio/costs?period=2025-08"
+
+# 2) Listado por proyecto
+curl -s "/api/costs?period=2025-08" | jq '.projects | map({clientName,projectName,costDisplay,costUSDNormalized})'
+
+# 3) Proyecto puntual (Warner id=34 de ejemplo)
+curl -s "/api/projects/34/costs?period=2025-08"
+
+8) Qué hacemos con Indirectos (overhead)
+
+Ahora: exclude (para no ensuciar cards).
+Opciones siguientes (feature-flag):
+
+portfolio-only: entra a KPIs globales pero no a cards.
+
+allocate-by-hours: prorrateo por horas del período (necesita horas del SoT de horas).
+
+Resumen de implementación
+
+Crear server/domain/costs/ con tipos, parser ES, anti-escala y reglas.
+
+Mapear columnas (es/ing/camel) y mes español.
+
+Normalizar a USD (FX del mes), sin escalar ARS.
+
+Exponer endpoints /api/costs* y adapters legacy.
+
+Integrar en agregador para profit/markup/margin.
+
+Correr checklist vs Excel (por proyecto + portfolio).
+
+Guardrails: logs de auditoría y test de humo para un período patrón.
+
+Con esto los costos quedan tan sólidos como los ingresos: misma semántica, mismas reglas, mismos contratos. Si querés, te armo los golden tests para los proyectos que me digas (con los valores exactos de tu Excel) para dejarlo blindado.
