@@ -1,0 +1,117 @@
+o veo: el SoT de costos está leyendo columnas equivocadas y además está aplicando reglas de ingresos (anti-x100), por eso aparecen montos absurdos. Vamos a dejarlo simple y verificable.
+
+Checklist de reparación (copiar/pegar a tu issue)
+1) Fuente correcta
+
+ Leer sólo la pestaña “Costos directos e indirectos” (no “Ventas Tomi”).
+
+ Endpoint de auditoría: GET /api/costs/debug?period=2025-08&include=raw=true debe listar filas de esa pestaña.
+
+2) Mapeo canónico de columnas (con alias)
+
+Usá estos alias en el parser; tomá el primero que exista:
+
+Cliente: ["Cliente","cliente","client","clientName"]
+
+Proyecto: ["Proyecto","proyecto","project","projectName"]
+
+Mes: ["Mes","mes","month"] → acepta "agosto", "Ago", "08 ago".
+
+Año: ["Año","anio","año","year"]
+
+Tipo de gasto (para filtrar directos): ["Tipo","tipo","Tipo_Gasto","tipoGasto"]
+
+Confirmado: ["Confirmado","confirmado","confirmed"] → “Si” = true
+
+Total ARS: ["Total ARS","Monto_ARS","costoTotalARS","total_ars"]
+
+Total USD: ["Total USD","Monto_USD","costoTotalUSD","total_usd"]
+
+Si Total USD > 0 ⇒ moneda nativa = USD.
+Si Total USD = 0 y Total ARS > 0 ⇒ nativa = ARS.
+Si ambos > 0 ⇒ warning en auditor y usa USD.
+
+3) Reglas de negocio
+
+ Filtro temporal: incluir sólo filas donde mes+año == periodo y Confirmado == "Si".
+
+ Sólo Directo: Tipo in {"Directo","Directos"}. Los “Indirecto(s)” fuera del portfolio (pueden ir a otro endpoint).
+
+ Sin anti-x100 en costos (esa regla era para ingresos Warner).
+Único guard: si usd > 0 y ars > 0 y abs(usd - ars/FX) / usd > 0.5 ⇒ log de inconsistencia, no “deflar”.
+
+ Normalización:
+
+Si nativa USD ⇒ costUSDNormalized = TotalUSD.
+
+Si nativa ARS ⇒ costUSDNormalized = TotalARS / FX("YYYY-MM"). (usamos 1,260 para 2025-08)
+
+ Agrupar por (cliente, proyecto, periodo) sumando nativos y normalizados.
+
+4) Auditor mínimo (imprescindible)
+
+GET /api/costs/debug?period=2025-08 → devuelve:
+
+{
+  "period": "2025-08",
+  "fx": 1260,
+  "acceptedRows": 40,
+  "rejected": {"unconfirmed": n1, "indirect": n2, "badDate": n3, "empty": n4},
+  "byProject": [
+    {
+      "client":"Warner",
+      "project":"Fee Marketing",
+      "rows": 1,
+      "native": {"amount":7005.20,"currency":"USD"},
+      "normalizedUSD":7005.20,
+      "samples":[{"Mes":"Agosto","Año":2025,"Total USD":"7005.20"}]
+    }
+  ]
+}
+
+
+Debe permitir verificar rápido: fuente, moneda, montos y filtros.
+
+5) Golden checks (AGO-2025)
+
+ Warner · Fee Marketing → USD 7,005.20 (de la tabla de personas).
+costDisplay = USD 7,005.20, costUSDNormalized = 7,005.20.
+
+ Kimberly · Fee Huggies → USD ≈ 2,440 (tu hoja muestra ~2.44K).
+
+ Coelsa / Modo / Detroit
+
+Display en ARS (los costos están en ARS).
+
+Normalized = ARS / 1260.
+
+ PortfolioCostUSD = suma exacta de todos los costUSDNormalized directos y confirmados.
+
+6) Qué revisar si el total sigue mal
+
+ acceptedRows ≠ conteo de filas en Sheets (mes/año/Si/Directo).
+
+ Algún proyecto muestra USD cuando en Sheets ese costo está en ARS.
+
+ Aparecen “Indirecto(s)” en el portfolio.
+
+ El auditor muestra ambos ARS y USD > 0 en la misma fila (error de origen).
+
+ Fecha mal parseada (debe aceptar "08 ago" → 2025-08).
+
+Resultado esperado (rápida sanity)
+
+Para AGO-2025, el portfolio de costos en USD normalizado debería ser, a grandes rasgos:
+
+Warner         ~ 7,005.20
+Kimberly       ~ 2,440.00
+Coelsa         ~ (Costos ARS Coelsa / 1260)
+Modo (Play)    ~ (Costos ARS Modo / 1260)
+Detroit        ~ (Costos ARS Detroit / 1260)
+----------------------------------------------
+Total ≈ suma de arriba
+
+
+Si corrés el auditor y ves esos valores (y monedas) por proyecto, la card de Period Cost y los profits van a cerrar.
+
+¿Listo? Corré el debug con Warner/Kimberly/Coelsa y compará con la hoja. Con eso localizamos al toque cualquier fuga.
