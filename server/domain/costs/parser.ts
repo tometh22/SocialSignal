@@ -23,15 +23,26 @@ const COLUMN_MAPPINGS = {
   month: ['mes', 'month'],
   year: ['año', 'year', 'anio'],
   
-  // Validación
-  confirmed: ['confirmado', 'confirmed'],
+  // Validación - CORRECCIÓN: debe buscar columnas de confirmación específicas
+  confirmed: ['confirmado', 'confirmed', 'Confirmado', 'estado', 'status'],
   
   // Tipo de costo
-  kind: ['tipo_costo', 'kind', 'type', 'tipo'],
+  kind: ['tipo_costo', 'kind', 'type', 'tipo', 'categoria', 'category'],
   
-  // Montos
-  arsAmount: ['monto_ars', 'amount_ars', 'amountLocal', 'ars', 'pesos'],
-  usdAmount: ['monto_usd', 'amount_usd', 'amountUsd', 'usd', 'dolares']
+  // 🔧 CORRECCIÓN CRÍTICA: Mapear columnas de COSTO REAL, no fees facturados
+  // Estas columnas contienen los costos de personal/tiempo, no los montos facturados
+  arsAmount: [
+    'total_costo_ars', 'costo_ars', 'total_ars_costo', 'costo_total_ars',
+    'total_ars', 'Total ARS', 'costo_pesos', 'total_pesos',
+    'Costo ARS', 'Costo Total ARS', 'Total Costo ARS'
+  ],
+  usdAmount: [
+    'total_costo_usd', 'costo_usd', 'total_usd_costo', 'costo_total_usd', 
+    'total_usd', 'Total USD', 'costo_dolares', 'total_dolares',
+    'Costo USD', 'Costo Total USD', 'Total Costo USD', 'Total USD Costo',
+    // 🎯 Patrones específicos que hemos visto en los datos
+    'Total USD ', 'Total USD\t', 'total usd', 'TOTAL USD'
+  ]
 };
 
 // ==================== SPANISH MONTH CONVERSION ====================
@@ -229,6 +240,14 @@ export function parseCostRecord(
 export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
   console.log(`🔍 COST PARSER: Starting batch parse of ${records.length} records`);
   
+  // 🔍 DEBUG: Mostrar columnas de los primeros registros para entender la estructura
+  if (records.length > 0) {
+    console.log(`🔍 COLUMNS DEBUG: Showing available columns from first few records`);
+    for (let i = 0; i < Math.min(3, records.length); i++) {
+      debugAvailableColumns(records[i], i);
+    }
+  }
+  
   const results: ParsedCostRecord[] = [];
   let skipped = 0;
   
@@ -247,6 +266,19 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
 }
 
 // ==================== DEBUGGING UTILS ====================
+
+// 🔍 DEBUG: Mostrar todas las columnas disponibles en un registro
+export function debugAvailableColumns(record: RawCostRecord, index: number = 0): void {
+  console.log(`🔍 AVAILABLE COLUMNS FOR ROW ${index}:`);
+  const keys = Object.keys(record);
+  keys.forEach(key => {
+    const value = (record as any)[key];
+    const type = typeof value;
+    const preview = String(value).substring(0, 50);
+    console.log(`  📋 ${key}: ${type} = "${preview}${String(value).length > 50 ? '...' : ''}"`);
+  });
+  console.log(`📊 Total columns: ${keys.length}`);
+}
 
 export function debugCostRecord(record: RawCostRecord): void {
   console.log('🔍 COST DEBUG RECORD:', {
