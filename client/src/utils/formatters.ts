@@ -3,8 +3,8 @@ export const f = {
   usdCompact: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }),
   
   // 🚀 DUAL CURRENCY FORMATTERS: Support for ARS and USD
-  ars: new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }),
-  arsCompact: new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", notation: "compact", maximumFractionDigits: 0 }),
+  ars: new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0, currencyDisplay: "code" }),
+  arsCompact: new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", notation: "compact", maximumFractionDigits: 0, currencyDisplay: "code" }),
   
   // 🚀 SMART CURRENCY FORMATTER: Automatically choose ARS or USD based on currency
   currency(amount: number | null | undefined, currency: "ARS" | "USD" | null | undefined, compact: boolean = false) {
