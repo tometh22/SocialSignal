@@ -106,6 +106,9 @@ import {
 import * as income from './domain/income';
 import { INCOME_SOT_ENABLED, logIncomeSOT } from './domain/income/feature-flag';
 
+// 🚀 COSTS SOT - Nueva fuente única de verdad para costos
+import * as costs from './domain/costs';
+
 // Helper function to convert null values to undefined for Zod validation
 function nullToUndefined(obj: any): any {
   if (obj === null) return undefined;
@@ -316,6 +319,129 @@ function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
       
     } catch (error) {
       console.error('❌ Project Income SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+}
+
+// 🚀 COSTS SOT ENDPOINTS - Nueva fuente única de verdad para costos
+function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
+  
+  // GET /api/costs?period=YYYY-MM → CostsResult
+  app.get("/api/costs", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      console.log(`🚀 COSTS SOT: GET /api/costs called with period=${period}`);
+      
+      const result = await costs.getCostsForPeriod(period as any);
+      
+      console.log(`🎯 COSTS SOT: Costs result: ${result.projects.length} projects, $${result.portfolioCostUSD.toFixed(2)} USD total`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Costs SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // GET /api/portfolio/costs?period=YYYY-MM → PortfolioCostSummary
+  app.get("/api/portfolio/costs", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      console.log(`🚀 COSTS SOT: GET /api/portfolio/costs called with period=${period}`);
+      
+      const result = await costs.getPortfolioCosts(period as any);
+      
+      console.log(`🎯 COSTS SOT: Portfolio costs: $${result.portfolioCostUSD.toFixed(2)} USD, ${result.projectCount} projects`);
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Portfolio Costs SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // GET /api/projects/:clientName/:projectName/costs?period=YYYY-MM → ProjectCost
+  app.get("/api/projects/:clientName/:projectName/costs", requireAuth, async (req, res) => {
+    try {
+      const { clientName, projectName } = req.params;
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      console.log(`🚀 COSTS SOT: GET /api/projects/${clientName}/${projectName}/costs called with period=${period}`);
+      
+      const result = await costs.getCostsForProject(clientName, projectName, period as any);
+      
+      if (result) {
+        console.log(`🎯 COSTS SOT: Project ${clientName}/${projectName} costs: ${result.costDisplay.currency} ${result.costDisplay.amount}, $${result.costUSDNormalized.toFixed(2)} USD normalized`);
+      } else {
+        console.log(`🎯 COSTS SOT: No costs found for project ${clientName}/${projectName}`);
+      }
+      
+      res.json(result);
+      
+    } catch (error) {
+      console.error('❌ Project Costs SoT Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // GET /api/costs/debug?period=YYYY-MM → Debug information
+  app.get("/api/costs/debug", requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string;
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ 
+          error: "Parámetro 'period' requerido en formato YYYY-MM" 
+        });
+      }
+
+      console.log(`🚀 COSTS SOT: Debug endpoint called for period=${period}`);
+      
+      // Run debug function
+      await costs.debugAllProjectCosts(period as any);
+      
+      // Run validation
+      const isValid = await costs.validateCostSystem(period as any);
+      
+      res.json({ 
+        period,
+        validationPassed: isValid,
+        message: `Debug information logged to console for period ${period}`
+      });
+      
+    } catch (error) {
+      console.error('❌ Costs Debug Error:', error);
       res.status(500).json({ 
         error: error instanceof Error ? error.message : String(error) 
       });
@@ -11398,6 +11524,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 🚀 CONFIGURAR INCOME SOT ENDPOINTS
   setupIncomeSOTEndpoints(app, requireAuth);
   console.log("✅ INCOME SOT ENDPOINTS: Fuente única de verdad para ingresos configurada");
+
+  // 🚀 CONFIGURAR COSTS SOT ENDPOINTS
+  setupCostsSOTEndpoints(app, requireAuth);
+  console.log("✅ COSTS SOT ENDPOINTS: Fuente única de verdad para costos configurada");
 
   // Finalize routes setup and return server
   return httpServer;
