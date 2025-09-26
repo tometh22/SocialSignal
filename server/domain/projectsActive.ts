@@ -32,6 +32,7 @@ import { eq, and } from "drizzle-orm";
 import { CoverageCalculator } from "./coverage";
 import { aggregateIncome, type DualNormalizedIncome } from "../services/sales";
 import * as income from "./income";
+import * as costs from "./costs";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -231,89 +232,61 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * Get costs/hours data from "Costos directos e indirectos" sheet (Excel MAESTRO)
-   * Filters ONLY "Directo" costs according to specification
+   * 🚀 COSTS SoT: Get costs/hours data using new Source of Truth system
+   * Replaces legacy Excel MAESTRO approach with unified cost system
    */
   private async getCostsInPeriod(period: ResolvedPeriod): Promise<CostRecord[]> {
-    // Get all direct costs from storage
-    const allCosts = await this.storage.getDirectCosts();
-    console.log(`🔧 Retrieved ${allCosts.length} total cost records`);
+    try {
+      // Extract period key from ResolvedPeriod
+      const periodKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+      
+      console.log(`🚀 COSTS SOT: Getting costs for period ${periodKey}`);
+      
+      // Get costs data using Costs SoT (includes anti-scale rules)
+      const costsData = await costs.getCostsForPeriod(periodKey as any);
+      console.log(`🎯 COSTS SOT: Retrieved ${costsData.projects.length} projects`);
 
-    const filteredCosts: CostRecord[] = [];
+      const filteredCosts: CostRecord[] = [];
 
-    // UNIFIED AGGREGATION ENGINE: ∑ by exact key + monthKey (plan implementation)
-    const periodMonthKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
-    const costAggregator = new Map<string, { costUSD: number; hoursReal: number; hoursTarget: number; count: number }>();
-
-    for (const cost of allCosts) {
-      // Filter: ONLY "Directo" costs (not "Indirecto" overhead)
-      if (cost.tipoGasto !== 'Directo') continue;
-
-      // 🎯 FIXED: Temporal filtering usando parser español robusto
-      if (cost.año && cost.mes) {
-        try {
-          const costMonthKey = monthKeyFromSpanish(cost.mes, cost.año);
-          console.log(`🔧 COST TEMPORAL FILTER: "${cost.mes}" (${cost.año}) → "${costMonthKey}" vs period "${periodMonthKey}"`);
-          if (costMonthKey !== periodMonthKey) continue; // Exact match only
-        } catch (error) {
-          console.warn(`🔧 COST MONTH PARSE ERROR: "${cost.mes}" → skipping entry`);
+      // Transform costs SoT data to legacy CostRecord format
+      for (const project of costsData.projects) {
+        // Only include direct costs (exclude indirect/overhead)
+        if (project.kind !== 'Directo') {
+          console.log(`🔧 COSTS SOT: Skipping indirect cost for ${project.clientName}|${project.projectName}`);
           continue;
         }
-      } else {
-        console.warn(`🔧 COST MISSING DATA: año="${cost.año}", mes="${cost.mes}" → skipping entry`);
-        continue;
+
+        // Generate canonical fields for consistency with rest of system
+        const canonicalFields = generateCanonicalFields(project.clientName, project.projectName);
+        
+        // Create CostRecord compatible with existing aggregator
+        const costRecord: CostRecord = {
+          clientCanon: canonicalFields.clientCanon,
+          projectCanon: canonicalFields.projectCanon,
+          projectKey: canonicalFields.projectKey,
+          projectName: project.projectName,
+          costUSD: project.costUSDNormalized, // Uses normalized USD amount with anti-scale
+          hoursReal: 0, // TODO: Hours integration when available in costs SoT
+          hoursTarget: 0, // TODO: Hours integration when available in costs SoT
+          month: period.start.substring(5, 7), // Extract month from period
+          year: parseInt(period.start.substring(0, 4)), // Extract year from period
+        };
+        
+        filteredCosts.push(costRecord);
+        
+        console.log(`💰 COSTS SOT RECORD: ${project.clientName}|${project.projectName} → Display: ${project.costDisplay.currency} ${project.costDisplay.amount}, USD: ${project.costUSDNormalized}`);
       }
 
-      // Cost normalization with FX conversion
-      const montoUSD = parseMoneyUnified(cost.montoTotalUSD || 0);
-      const montoARS = parseMoneyUnified(cost.costoTotal || 0);
-      const costPeriod = `${cost.año}-${String(parseInt(cost.mes?.split(' ')[0] || '0') || 0).padStart(2, '0')}`;
-      const costUSD = convertToUsd(montoUSD, montoARS, costPeriod);
-      const hoursReal = parseMoneyUnified(cost.horasRealesAsana || 0);
-      const hoursTarget = parseMoneyUnified(cost.horasObjetivo || 0);
-
-      if (costUSD <= 0 && hoursReal <= 0 && hoursTarget <= 0) continue;
-
-      // Create canonical aggregation key: cliente|proyecto 
-      const canonicalFields = generateCanonicalFields(cost.cliente, cost.proyecto);
-      const aggregationKey = canonicalFields.projectKey;
-      if (!aggregationKey) continue;
-
-      // Sistema unificado sin hardcodeo de clientes/proyectos específicos
-      // La detección anti-x100 y normalización ya se maneja en convertToUsd()
-
-      // Aggregate by exact key (no duplicates)
-      const existing = costAggregator.get(aggregationKey) || { costUSD: 0, hoursReal: 0, hoursTarget: 0, count: 0 };
-      costAggregator.set(aggregationKey, {
-        costUSD: existing.costUSD + costUSD,
-        hoursReal: existing.hoursReal + hoursReal,
-        hoursTarget: existing.hoursTarget + hoursTarget,
-        count: existing.count + 1
-      });
-    }
-
-    // Convert aggregated costs back to filteredCosts format
-    for (const [key, aggregated] of costAggregator.entries()) {
-      // Parse canonical key to extract client and project parts
-      const keyParts = key.split('|');
-      const clientCanon = keyParts[0] || '';
-      const projectCanon = keyParts[1] || '';
+      console.log(`💰 COSTS SOT: ${filteredCosts.length} records with anti-scale rules applied`);
+      return filteredCosts;
       
-      filteredCosts.push({
-        clientCanon,
-        projectCanon,
-        projectKey: key,
-        projectName: projectCanon, // Use canonical project name
-        costUSD: aggregated.costUSD,
-        hoursReal: aggregated.hoursReal,
-        hoursTarget: aggregated.hoursTarget,
-        month: period.start.substring(5, 7), // Extract month from period
-        year: parseInt(period.start.substring(0, 4)), // Extract year from period
-      });
+    } catch (error) {
+      console.error(`❌ COSTS SOT ERROR in getCostsInPeriod:`, error);
+      console.error(`❌ COSTS SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      
+      // Fallback to empty array on error
+      return [];
     }
-
-    console.log(`🔧 Costs filtered for period: ${filteredCosts.length} records`);
-    return filteredCosts;
   }
 
   /**
