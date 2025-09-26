@@ -335,8 +335,9 @@ export class ActiveProjectsAggregator {
       
       // Use quotation.projectName as the actual project name (not project.name which is NULL)
       const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
-      // Get client name from quotation - no "Unknown" fallbacks, use canonical fields
-      const clientName = project.quotation?.clientName || '';
+      // Get client name from quotation.client (correct structure from storage)
+      const clientName = project.quotation?.client?.name || '';
+      console.log(`🔧 DEBUG CLIENT: projectId=${project.id}, clientName="${clientName}", quotation.client=${JSON.stringify(project.quotation?.client)}`);
       
       // Generate canonical fields for ETL consistency
       const canonicalFields = generateCanonicalFields(clientName, actualProjectName);
@@ -390,18 +391,10 @@ export class ActiveProjectsAggregator {
       // Skip exact canonical match for costs (no clientName in CostRecord)
       // Will rely on fuzzy match by project name
       
-      // If no exact match, try fuzzy match by project name only
+      // DISABLED: Fuzzy matching caused incorrect project grouping for similar names
+      // Now using only alias-based mapping for better precision
       if (!projectData) {
-        for (const [key, project] of projectsMap) {
-          const normalizedCostProject = this.normalizeText(cost.projectName);
-          const normalizedProjectName = this.normalizeText(project.projectName);
-          if (normalizedProjectName === normalizedCostProject) {
-            canonicalKey = key;
-            projectData = project;
-            mappingMethod = "fuzzy";
-            break;
-          }
-        }
+        console.log(`🔧 SKIPPING FUZZY: "${cost.projectName}" - fuzzy matching disabled to prevent conflicts`);
       }
       
       // If still no match, try alias fallback
