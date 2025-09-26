@@ -64,41 +64,47 @@ export async function normalizeCostToUSD(
   record: ParsedCostRecord
 ): Promise<{ usdNormalized: number; costDisplay: MoneyDisplay }> {
   
-  // 🚀 CORRIGIDO: Detectar valores USD corruptos y usar solo ARS válidos
-  // Solo usar USD si es un valor razonable (< $100,000), sino usar ARS
-  const USD_CORRUPTION_THRESHOLD = 100000; // $100K - cualquier valor mayor probablemente está corrupto
+  // 🎯 PLAN EXACTO: Moneda & anticorrupción USD (costos)
+  const fx = await getFx(record.period); // 1345 en 2025-08
   
-  if (record.usdAmount && record.usdAmount > 0 && record.usdAmount < USD_CORRUPTION_THRESHOLD) {
-    console.log(`💰 COST USD NATIVE: ${record.usdAmount} USD (valid USD amount)`);
+  const usdRaw = record.usdAmount;
+  const arsRaw = record.arsAmount;
+  
+  const usdFromArs = (arsRaw !== null && isFinite(arsRaw)) ? arsRaw / fx : null;
+  
+  // 1) Si USD es astronómico o > 100k, IGNORAR USD y usar ARS/fx
+  const usdLooksCorrupt = 
+    !usdRaw ||
+    !isFinite(usdRaw) ||
+    usdRaw > 100_000 ||
+    (usdFromArs && isFinite(usdRaw) && Math.abs(usdRaw - usdFromArs) / Math.max(usdRaw, usdFromArs) > 0.35);
+  
+  if (!usdLooksCorrupt && isFinite(usdRaw) && usdRaw > 0) {
+    console.log(`💰 COST USD NATIVE: ${usdRaw} USD (valid USD amount)`);
     return {
-      usdNormalized: record.usdAmount,
-      costDisplay: { amount: record.usdAmount, currency: 'USD' }
+      usdNormalized: usdRaw,
+      costDisplay: { amount: usdRaw, currency: 'USD' }
     };
-  }
-  
-  if (record.usdAmount && record.usdAmount >= USD_CORRUPTION_THRESHOLD) {
-    console.log(`⚠️ COST USD CORRUPTED: ${record.usdAmount} USD (too high, using ARS instead)`);
-  }
-  
-  if (record.arsAmount && record.arsAmount > 0) {
-    // Usar FX rate para costos (debe ser 1345 para agosto 2025)
-    const fxRate = await getFx(record.period);
-    const usdNormalized = record.arsAmount / fxRate;
+  } else if (arsRaw !== null && isFinite(arsRaw) && arsRaw > 0) {
+    if (usdRaw && usdRaw > 100_000) {
+      console.log(`⚠️ COST USD CORRUPTED: ${usdRaw} USD (too high, using ARS instead)`);
+    }
     
-    console.log(`💱 COST FX: ARS ${record.arsAmount} / ${fxRate} = USD ${usdNormalized.toFixed(2)} (${record.period})`);
+    const usdNormalized = arsRaw / fx;
+    console.log(`💱 COST FX: ARS ${arsRaw} / ${fx} = USD ${usdNormalized.toFixed(2)} (${record.period})`);
     
     return {
       usdNormalized,
-      costDisplay: { amount: record.arsAmount, currency: 'ARS' }
+      costDisplay: { amount: arsRaw, currency: 'ARS' }
+    };
+  } else {
+    // skip("no valid amounts") según plan
+    console.warn(`⚠️ COST: No valid amount for ${record.clientName}|${record.projectName} in ${record.period}`);
+    return {
+      usdNormalized: 0,
+      costDisplay: { amount: 0, currency: 'USD' }
     };
   }
-  
-  // Fallback: zero cost
-  console.warn(`⚠️ COST: No valid amount for ${record.clientName}|${record.projectName} in ${record.period}`);
-  return {
-    usdNormalized: 0,
-    costDisplay: { amount: 0, currency: 'USD' }
-  };
 }
 
 // ==================== AGGREGATION BY PROJECT ====================
