@@ -23,14 +23,14 @@ const fx = {
     // Parsear período "YYYY-MM" a year/month
     const [year, month] = period.split('-').map(Number);
     
-    // Fallback temporal para agosto 2025 según checklist (FX 1260)
-    if (year === 2025 && month === 8) {
-      console.log('🔧 Using fallback FX rate for 2025-08: 1260');
-      return 1260;
+    const exchangeRate = await storage.getExchangeRateByMonth(year, month);
+    if (exchangeRate?.rate) {
+      console.log(`💱 USING BD FX RATE: ${period} = ${exchangeRate.rate}`);
+      return Number(exchangeRate.rate);
     }
     
-    const exchangeRate = await storage.getExchangeRateByMonth(year, month);
-    return exchangeRate?.rate ? Number(exchangeRate.rate) : null;
+    console.warn(`⚠️ FX RATE NOT FOUND: ${period}`);
+    return null;
   }
 };
 

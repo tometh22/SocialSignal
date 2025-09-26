@@ -55,70 +55,8 @@ export function filterCostsByPeriod(
   return filtered;
 }
 
-// ==================== INTELLIGENT DEFLATION ====================
-
-/**
- * 🔧 INTELLIGENT DEFLATION: Detecta y corrige valores astronómicamente inflados
- * 
- * Análisis: Algunos registros en la BD tienen valores inflados por factores de 10^12+
- * Ejemplos: Warner $12.9 billones vs valor esperado ~$7,005
- * 
- * Estrategia: Detectar valores > 1M y aplicar deflación iterativa hasta llegar a rango normal
- */
-function applyIntelligentDeflation(amount: number): number {
-  if (amount <= 0) return amount;
-  
-  // Umbral de detección: valores mayores a $1M probablemente están inflados
-  const INFLATION_THRESHOLD = 1_000_000;
-  
-  if (amount <= INFLATION_THRESHOLD) {
-    // Valor normal, no requiere deflación
-    return amount;
-  }
-  
-  let deflated = amount;
-  let iterations = 0;
-  const MAX_ITERATIONS = 10; // Evitar loops infinitos
-  
-  // Aplicar deflación iterativa con diferentes factores
-  while (deflated > INFLATION_THRESHOLD && iterations < MAX_ITERATIONS) {
-    
-    // Probar deflación por 100 (patrón común de x100 inflation)
-    if (deflated / 100 > 1 && deflated / 100 < INFLATION_THRESHOLD) {
-      deflated = deflated / 100;
-      console.log(`🔧 DEFLATION: Applied /100 - ${amount} → ${deflated}`);
-      break;
-    }
-    
-    // Probar deflación por 1000 (casos extremos)
-    if (deflated / 1000 > 1 && deflated / 1000 < INFLATION_THRESHOLD) {
-      deflated = deflated / 1000;
-      console.log(`🔧 DEFLATION: Applied /1000 - ${amount} → ${deflated}`);
-      break;
-    }
-    
-    // Para casos astronómicos (>10^12), usar deflación agresiva
-    if (deflated > 1e12) {
-      deflated = deflated / 1e12;
-      console.log(`🔧 DEFLATION: Applied /1e12 (astronomical) - ${amount} → ${deflated}`);
-      break;
-    }
-    
-    // Fallback: dividir por 10 iterativamente
-    deflated = deflated / 10;
-    iterations++;
-    
-    console.log(`🔧 DEFLATION: Iteration ${iterations} - ${amount} → ${deflated}`);
-  }
-  
-  // Si después de todas las iteraciones sigue siendo muy grande, usar un valor conservador
-  if (deflated > INFLATION_THRESHOLD) {
-    console.warn(`⚠️ DEFLATION: Could not normalize ${amount}, using fallback value 1000`);
-    deflated = 1000; // Valor conservador para evitar distorsión
-  }
-  
-  return deflated;
-}
+// ==================== NO DEFLATION FOR COSTS ====================
+// Costos usan valores RAW de la base de datos - sin anti-scale ni deflación
 
 // ==================== USD NORMALIZATION ====================
 
@@ -126,30 +64,32 @@ export async function normalizeCostToUSD(
   record: ParsedCostRecord
 ): Promise<{ usdNormalized: number; costDisplay: MoneyDisplay }> {
   
-  // 🚀 NATIVE CURRENCY PRIORITY: USD first, then ARS
-  if (record.usdAmount && record.usdAmount > 0) {
-    // 🔧 Aplicar deflación inteligente para corregir valores inflados
-    const deflatedUSD = applyIntelligentDeflation(record.usdAmount);
-    
+  // 🚀 CORRIGIDO: Detectar valores USD corruptos y usar solo ARS válidos
+  // Solo usar USD si es un valor razonable (< $100,000), sino usar ARS
+  const USD_CORRUPTION_THRESHOLD = 100000; // $100K - cualquier valor mayor probablemente está corrupto
+  
+  if (record.usdAmount && record.usdAmount > 0 && record.usdAmount < USD_CORRUPTION_THRESHOLD) {
+    console.log(`💰 COST USD NATIVE: ${record.usdAmount} USD (valid USD amount)`);
     return {
-      usdNormalized: deflatedUSD,
-      costDisplay: { amount: deflatedUSD, currency: 'USD' }
+      usdNormalized: record.usdAmount,
+      costDisplay: { amount: record.usdAmount, currency: 'USD' }
     };
   }
   
+  if (record.usdAmount && record.usdAmount >= USD_CORRUPTION_THRESHOLD) {
+    console.log(`⚠️ COST USD CORRUPTED: ${record.usdAmount} USD (too high, using ARS instead)`);
+  }
+  
   if (record.arsAmount && record.arsAmount > 0) {
-    // 🔧 Aplicar deflación inteligente a valores ARS también
-    const deflatedARS = applyIntelligentDeflation(record.arsAmount);
-    
-    // Get FX rate for the period
+    // Usar FX rate para costos (debe ser 1345 para agosto 2025)
     const fxRate = await getFx(record.period);
-    const usdNormalized = deflatedARS / fxRate;
+    const usdNormalized = record.arsAmount / fxRate;
     
-    console.log(`💱 COST FX: ARS ${record.arsAmount} → ${deflatedARS} (deflated) / ${fxRate} = USD ${usdNormalized.toFixed(2)} (${record.period})`);
+    console.log(`💱 COST FX: ARS ${record.arsAmount} / ${fxRate} = USD ${usdNormalized.toFixed(2)} (${record.period})`);
     
     return {
       usdNormalized,
-      costDisplay: { amount: deflatedARS, currency: 'ARS' }
+      costDisplay: { amount: record.arsAmount, currency: 'ARS' }
     };
   }
   

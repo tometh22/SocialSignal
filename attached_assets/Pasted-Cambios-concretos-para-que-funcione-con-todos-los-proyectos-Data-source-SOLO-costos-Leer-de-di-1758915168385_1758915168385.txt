@@ -1,0 +1,83 @@
+Cambios concretos (para que funcione con todos los proyectos)
+
+Data source (SOLO costos)
+
+Leer de direct_costs / “Costos directos e indirectos”.
+
+Columnas a mapear exactamente:
+
+cliente → clientName
+
+proyecto → projectName
+
+mes (ej. “08 ago”) + año → periodKey (“2025-08”)
+
+costoTotal (ARS), montoTotalUSD (USD)
+
+tipoGasto → filtrar “Directo/Directos”
+
+Eliminar cualquier regla anti-×100/×1000 en costos.
+
+Regla de moneda & normalización (por fila)
+
+Si montoTotalUSD > 0 →
+costDisplay = {amount: montoTotalUSD, currency: "USD"} y costUSDNormalized = montoTotalUSD.
+
+Si solo hay costoTotal (ARS) →
+costDisplay = {amount: costoTotal, currency: "ARS"} y costUSDNormalized = costoTotal / fx(periodKey).
+
+FX de costos (agosto 2025) = 1.345. Asegurar que costos usen este FX (no el 1.260 de ingresos).
+
+Filtro temporal robusto
+
+Construir periodKey = YYYY-MM desde mes (ES) + año (soporta “08 ago”, “05 may”…).
+
+Filtrar exclusivamente por periodKey.
+
+Agregación
+
+Agrupar por clientName + projectName + periodKey.
+
+Sumar por proyecto: sum(costDisplay.nativo) y sum(costUSDNormalized).
+
+Endpoints SoT de costos (ya listos o ajustar)
+
+GET /api/costs?period=YYYY-MM → lista por proyecto (incluye costDisplay, costUSDNormalized).
+
+GET /api/projects/:client/:project/costs?period=YYYY-MM → detalle.
+
+GET /api/portfolio/costs?period=YYYY-MM → totales del período.
+
+Active Projects / Proyecto Único / Dashboard deben consumir estos endpoints.
+
+Checklists rápidos (contra el Excel)
+
+A. Ledger por proyecto (agosto)
+
+Warner Fee Marketing → nativo: AR$ 9.421.993, USD norm: ~7.005,20
+
+Kimberly Fee Huggies → nativo: AR$ 3.276.539, USD norm: ~2.436,09
+
+Coelsa Fee mensual → nativo: AR$ 553.002, USD norm: ~411,15
+
+Modo Fee mensual → nativo: AR$ 497.550, USD norm: ~369,93
+
+Ningún valor en “billones” ni deflaciones raras.
+
+B. Invariantes
+
+portfolio.costUSDNormalized = suma de todos los proyectos del período.
+
+Si aparece ARS en costDisplay, la card del proyecto muestra ARS; los KPI agregados usan USD normalized.
+
+FX de costos agosto = 1.345 (si ves ~1.260, el total se infla ~8–10%).
+
+Señales de error típicas (y la causa)
+
+Números astronómicos → aún se está leyendo una importación corrupta o quedó alguna “anti-scale” activa en costos.
+
+Warner/Kimberly dan el fee (29.230/8.450) → el pipeline está leyendo ventas en lugar de costos.
+
+USD de Coelsa/Modo demasiado grandes → usando 1.260 en lugar de 1.345 para costos.
+
+Si implementás exactamente esas 5 reglas arriba, las cards y el portfolio deberían mostrar Coelsa/Modo en ARS, Warner/Kimberly en USD, y los KPI en USD normalizado con los valores de la tabla.
