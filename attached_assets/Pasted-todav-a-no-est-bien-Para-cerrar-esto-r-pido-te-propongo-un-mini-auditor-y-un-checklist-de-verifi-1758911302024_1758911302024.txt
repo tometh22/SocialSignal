@@ -1,0 +1,109 @@
+todavía no está bien. Para cerrar esto rápido te propongo un “mini-auditor” y un checklist de verificación sólo para COSTOS (idéntico a lo que hicimos con ingresos).
+
+Qué puede estar rompiendo el total
+
+Filtrado de período (mes/año en español) no aplicado igual que en ingresos.
+
+Filas no confirmadas incluidas.
+
+Indirectos mezclados con directos.
+
+Duplicados (misma fila contada dos veces).
+
+Anti-escala aplicado donde no corresponde (o doble deflación).
+
+Checklist de verificación (contra el Excel)
+
+Usá siempre la pestaña “Costos directos e indirectos”.
+
+A. Filtro base (en Sheets y API):
+
+ Mes = Agosto, Año = 2025, Confirmado = “Si”.
+
+ Contá cuántas filas quedan → ese número debe coincidir con el conteo del auditor (abajo).
+
+B. Por proyecto (golden checks):
+
+ Warner · Fee Marketing (ago-2025)
+
+En tu tabla de personas: Total USD ≈ 7,005.20 →
+costDisplay = USD 7,005.20 y costUSDNormalized = 7,005.20.
+
+(y el ratio esperado del proyecto te da ~4.17×: 29,230 / 7,005.2)
+
+ Kimberly · Fee Huggies (ago-2025)
+
+Tomá Total USD del bloque del proyecto (en tus capturas ronda ~2.44K).
+
+Debe aparecer igual en costDisplay y en costUSDNormalized.
+
+ Coelsa / Modo / Detroit (si los costos están en ARS)
+
+costDisplay = ARS (Total ARS de la fila/proyecto).
+
+costUSDNormalized = ARS / FX(2025-08) (usamos 1,260).
+
+C. Portfolio (sólo directos):
+
+ En Sheets: sumá USD directos + (ARS directos / 1,260).
+
+ Debe igualar exactamente /api/portfolio/costs?period=2025-08 → portfolioCostUSD.
+
+Auditor express (para detectar el desvío)
+
+Pedile a Replit/servidor que exponga (o ejecutá si ya está) estos endpoints/consultas:
+
+1) Ledger de costos aceptados (debug):
+
+GET /api/costs/debug?period=2025-08
+# Debe listar CADA fila aceptada con:
+# {client, project, monthKey, confirmed, native:{amount,currency}, normalizedUSD, kind, sourceId}
+
+
+2) Resumen agrupado (lo que ve la UI):
+
+GET /api/costs?period=2025-08
+# projects[].{clientName,projectName,costDisplay,costUSDNormalized,sourceRowCount}
+
+
+3) Totales del portfolio:
+
+GET /api/portfolio/costs?period=2025-08
+# {period, portfolioCostUSD, acceptedRows, rejectedRows}
+
+
+Qué mirar:
+
+acceptedRows = filas filtradas en Sheets (A).
+
+sourceRowCount por proyecto = suma de filas que viste en Sheets.
+
+Ningún proyecto debe tener currency mal (ej: Coelsa en USD si en excel está en ARS).
+
+kind: por ahora “Directo”; si aparece “Indirecto”, está entrando overhead (hay que excluir o prorratear).
+
+Cambios concretos a aplicar si falla
+
+Filtro estricto en costos: Mes+Año == period && Confirmado == 'Si'.
+
+Excluir indirectos (de momento): no agregarlos a cards ni al portfolio.
+
+Anti-escala: aplicar sólo cuando el raw es claramente ×100/×1000; no deflacionar ARS que ya son enteros.
+
+Agrupación por client+project+period y sumas:
+
+costUSDNormalized: suma directa.
+
+costDisplay: conservar moneda nativa (si hay mezcla rara, gana USD si >0; si no, ARS).
+
+Resultado esperado mínimo (agosto-2025)
+
+Warner cost = USD ~7,005.20
+
+Kimberly cost = USD ~2.44K (según tu tabla)
+
+Coelsa/MODO/Detroit: ARS en display y ARS/1260 en normalized
+
+PortfolioCostUSD = suma exacta de lo anterior (sin indirectos, sin duplicados, sin ×100).
+
+Si ejecutás el ledger y me pasás 3–4 filas (Warner/Kimberly/Coelsa), te digo exactamente dónde se está yendo la suma.

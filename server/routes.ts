@@ -415,7 +415,7 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
     }
   });
 
-  // GET /api/costs/debug?period=YYYY-MM → Debug information
+  // GET /api/costs/debug?period=YYYY-MM → Detailed debug with ledger
   app.get("/api/costs/debug", requireAuth, async (req, res) => {
     try {
       const period = req.query.period as string;
@@ -428,17 +428,57 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
 
       console.log(`🚀 COSTS SOT: Debug endpoint called for period=${period}`);
       
-      // Run debug function
+      // Get raw source data for ledger
+      const sourceData = await costs.getSourceCostData();
+      const filteredData = sourceData.filter(record => record.period === period);
+      
+      // Get processed results
+      const costsResult = await costs.getCostsForPeriod(period as any);
+      const portfolioResult = await costs.getPortfolioCosts(period as any);
+      
+      // Run console debug
       await costs.debugAllProjectCosts(period as any);
       
       // Run validation
       const isValid = await costs.validateCostSystem(period as any);
       
-      res.json({ 
+      // Build detailed response
+      const debugInfo = {
         period,
         validationPassed: isValid,
-        message: `Debug information logged to console for period ${period}`
-      });
+        rawDataStats: {
+          totalRecords: sourceData.length,
+          periodRecords: filteredData.length,
+          acceptedRows: filteredData.filter(r => r.confirmed === 'Si' && r.kind === 'Directo').length,
+          rejectedRows: filteredData.filter(r => r.confirmed !== 'Si' || r.kind !== 'Directo').length
+        },
+        ledger: filteredData.map(record => ({
+          client: record.clientName,
+          project: record.projectName,
+          period: record.period,
+          confirmed: record.confirmed || 'N/A',
+          native: { amount: record.nativeAmount, currency: record.nativeCurrency },
+          normalizedUSD: record.usdAmount,
+          kind: record.kind,
+          sourceId: record.sourceId || 'N/A'
+        })),
+        aggregatedResults: costsResult.projects.map(p => ({
+          clientName: p.clientName,
+          projectName: p.projectName,
+          costDisplay: p.costDisplay,
+          costUSDNormalized: p.costUSDNormalized,
+          sourceRowCount: p.sourceRowCount,
+          kind: p.kind
+        })),
+        portfolioSummary: {
+          portfolioCostUSD: portfolioResult.portfolioCostUSD,
+          directCostsUSD: portfolioResult.directCostsUSD,
+          indirectCostsUSD: portfolioResult.indirectCostsUSD,
+          projectCount: portfolioResult.projectCount
+        }
+      };
+      
+      res.json(debugInfo);
       
     } catch (error) {
       console.error('❌ Costs Debug Error:', error);

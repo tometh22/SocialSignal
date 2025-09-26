@@ -137,25 +137,58 @@ export async function getProjectCostMetrics(
 // ==================== DEBUGGING & UTILITIES ====================
 
 /**
- * Debug: listar todos los proyectos con costos
+ * 🔍 MINI-AUDITOR: Análisis detallado de cada fila de costos
  */
 export async function debugAllProjectCosts(period: PeriodKey): Promise<void> {
-  console.log(`🔍 COSTS DEBUG: Listing all project costs for ${period}`);
+  console.log(`📊 COSTS MINI-AUDITOR: Starting detailed audit for period ${period}`);
   
   try {
-    const result = await getCostsForPeriod(period);
+    // 1) Get raw parsed data to show what we're working with
+    const allData = await getCostData();
+    console.log(`📊 RAW DATA: Total ${allData.length} records from source`);
     
-    console.log(`📊 COSTS DEBUG: Found ${result.projects.length} projects with costs:`);
+    // 2) Apply temporal filter to see what passes
+    const filtered = allData.filter(record => record.period === period);
+    console.log(`📊 PERIOD FILTER: ${filtered.length} records match period ${period}`);
+    
+    // 3) Show EACH filtered record in detail (ledger)
+    console.log(`📊 DETAILED LEDGER FOR ${period}:`);
+    filtered.forEach((record, index) => {
+      console.log(`  ${index + 1}) ${record.clientName} | ${record.projectName} | ${record.period}`);
+      console.log(`     📅 Period: ${record.period} | ✅ Confirmed: ${record.confirmed || 'N/A'}`);
+      console.log(`     💰 Native: ${record.nativeCurrency} ${record.nativeAmount}`);
+      console.log(`     💵 USD: ${record.usdAmount} | 🏷️ Kind: ${record.kind}`);
+      console.log(`     🔢 Source ID: ${record.sourceId || 'N/A'}`);
+      console.log('');
+    });
+    
+    // 4) Now show aggregated results
+    const result = await getCostsForPeriod(period);
+    console.log(`📊 AGGREGATED RESULTS: ${result.projects.length} projects with costs:`);
     
     for (const project of result.projects) {
       console.log(`  • ${project.clientName} | ${project.projectName} | ${project.kind} → ${project.costDisplay.currency} ${project.costDisplay.amount.toFixed(2)} (USD ${project.costUSDNormalized.toFixed(2)})`);
+      console.log(`    📊 Source rows: ${project.sourceRowCount}`);
     }
     
+    // 5) Portfolio totals
     console.log(`💰 Total Portfolio: ${result.portfolioCostUSD.toFixed(2)} USD`);
     
+    // 6) Show filtering stats  
+    const acceptedRows = filtered.filter(r => r.confirmed === 'Si' && r.kind === 'Directo').length;
+    const rejectedRows = filtered.length - acceptedRows;
+    console.log(`📊 FILTER STATS: ${acceptedRows} accepted, ${rejectedRows} rejected`);
+    
   } catch (error) {
-    console.error('❌ COSTS DEBUG: Error:', error);
+    console.error('❌ COSTS MINI-AUDITOR: Error:', error);
   }
+}
+
+/**
+ * 🔍 EXPORT HELPER: Access to source data for auditing
+ */
+export async function getSourceCostData() {
+  return await getCostData();
 }
 
 /**
