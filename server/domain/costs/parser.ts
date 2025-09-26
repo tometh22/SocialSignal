@@ -12,39 +12,58 @@ import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind } from './typ
 
 // ==================== COLUMN MAPPING ====================
 
+// 🎯 MAPEO CANÓNICO - aliases exactos del checklist del usuario
 const COLUMN_MAPPINGS = {
-  // 🔧 CORRECCIÓN FINAL: Usar nombres exactos de columnas de direct_costs table
+  // Cliente: ["Cliente","cliente","client","clientName"]
+  clientName: ['Cliente', 'cliente', 'client', 'clientName'],
   
-  // Cliente - CORRECTO: columna se llama 'cliente'
-  clientName: ['cliente', 'client', 'clientName', 'client_name'],
+  // Proyecto: ["Proyecto","proyecto","project","projectName"]  
+  projectName: ['Proyecto', 'proyecto', 'project', 'projectName'],
   
-  // Proyecto - CORRECTO: columna se llama 'proyecto'
-  projectName: ['proyecto', 'project', 'projectName', 'project_name'],
+  // Mes: ["Mes","mes","month"] → acepta "agosto", "Ago", "08 ago"
+  month: ['Mes', 'mes', 'month'],
   
-  // Temporal - CORRECTO: columnas se llaman 'mes' y 'año'
-  month: ['mes', 'month'],
-  year: ['año', 'year', 'anio'],
+  // Año: ["Año","anio","año","year"]
+  year: ['Año', 'anio', 'año', 'year'],
   
-  // Validación - usar tipoGasto como proxy de confirmado
-  confirmed: ['confirmado', 'confirmed', 'Confirmado', 'tipoGasto'],
+  // Tipo de gasto (para filtrar directos): ["Tipo","tipo","Tipo_Gasto","tipoGasto"]
+  kind: ['Tipo', 'tipo', 'Tipo_Gasto', 'tipoGasto'],
   
-  // Tipo de costo - CORRECTO: columna se llama 'tipoGasto'
-  kind: ['tipoGasto', 'tipo_gasto', 'kind', 'type', 'tipo', 'categoria', 'category'],
+  // Confirmado: ["Confirmado","confirmado","confirmed"] → "Si" = true
+  confirmed: ['Confirmado', 'confirmado', 'confirmed'],
   
-  // 🎯 CORRECCIÓN CRÍTICA: Usar columnas EXACTAS de la tabla direct_costs
-  // ARS amount - no está disponible directamente, usar costoTotal si es ARS
-  arsAmount: [
-    'costoTotal', // Costo en moneda local, podría ser ARS
-    'total_costo_ars', 'costo_ars'
-  ],
+  // Total ARS: ["Total ARS","Monto_ARS","costoTotalARS","total_ars"]
+  arsAmount: ['Total ARS', 'Monto_ARS', 'costoTotalARS', 'total_ars'],
   
-  // USD amount - CORRECTO: columna se llama 'montoTotalUSD'
-  usdAmount: [
-    'montoTotalUSD', 'costoTotal', // Primary: montoTotalUSD, fallback: costoTotal
-    'total_costo_usd', 'costo_usd', 'total_usd_costo', 'costo_total_usd', 
-    'total_usd', 'Total USD', 'costo_dolares', 'total_dolares'
-  ]
+  // Total USD: ["Total USD","Monto_USD","costoTotalUSD","total_usd"]
+  usdAmount: ['Total USD', 'Monto_USD', 'costoTotalUSD', 'total_usd']
 };
+
+// ==================== CURRENCY DETECTION ====================
+
+function detectNativeCurrency(usdAmount: number | null, arsAmount: number | null): {
+  native: 'USD' | 'ARS' | null;
+  warning?: string;
+} {
+  // 🎯 CHECKLIST: Si Total USD > 0 ⇒ moneda nativa = USD
+  if (usdAmount && usdAmount > 0) {
+    // 🎯 CHECKLIST: Si ambos > 0 ⇒ warning en auditor
+    if (arsAmount && arsAmount > 0) {
+      return {
+        native: 'USD',
+        warning: `Dual currency row: USD ${usdAmount}, ARS ${arsAmount} - using USD`
+      };
+    }
+    return { native: 'USD' };
+  }
+  
+  // 🎯 CHECKLIST: Si Total USD = 0 y Total ARS > 0 ⇒ nativa = ARS
+  if (arsAmount && arsAmount > 0) {
+    return { native: 'ARS' };
+  }
+  
+  return { native: null };
+}
 
 // ==================== SPANISH MONTH CONVERSION ====================
 
@@ -122,50 +141,6 @@ function extractNumericField(record: RawCostRecord, mappings: string[]): number 
   return isNaN(parsed) ? null : parsed;
 }
 
-// ==================== ANTI-SCALE LOGIC ====================
-
-interface AntiScaleResult {
-  original: number;
-  scaled: number;
-  wasScaled: boolean;
-  reason?: string;
-}
-
-function applyAntiScale(amount: number, currency: 'ARS' | 'USD'): AntiScaleResult {
-  const original = amount;
-  
-  // 🚀 ANTI-SCALE ARS: Detectar valores inflados (terminan en muchos ceros)
-  if (currency === 'ARS' && amount > 20_000_000) {
-    const lastTwo = amount % 100;
-    if (lastTwo === 0 && amount > 50_000_000) {
-      return {
-        original,
-        scaled: amount / 100,
-        wasScaled: true,
-        reason: `ARS anti-scale: ${amount} → ${amount / 100} (divide by 100)`
-      };
-    }
-  }
-  
-  // 🚀 ANTI-SCALE USD: Detectar patrones específicos
-  if (currency === 'USD' && amount > 100_000) {
-    const lastTwo = amount % 100;
-    if (lastTwo === 0 && amount.toString().endsWith('00')) {
-      return {
-        original,
-        scaled: amount / 100,
-        wasScaled: true,
-        reason: `USD anti-scale: ${amount} → ${amount / 100} (divide by 100)`
-      };
-    }
-  }
-  
-  return {
-    original,
-    scaled: amount,
-    wasScaled: false
-  };
-}
 
 // ==================== MAIN PARSER ====================
 
@@ -193,9 +168,8 @@ export function parseCostRecord(
   }
   
   // 🔍 CONFIRMATION CHECK
-  // 🔧 CORRECCIÓN CRÍTICA: "Directo" e "Indirecto" son tipos de costo válidos confirmados
-  const confirmedValues = ['si', 'yes', 'directo', 'indirecto', 'direct', 'indirect', 'confirmado', 'confirmed'];
-  if (confirmedRaw && !confirmedValues.includes(confirmedRaw.toLowerCase())) {
+  // 🎯 CHECKLIST: Confirmado → "Si" = true (exacto del usuario)
+  if (confirmedRaw && confirmedRaw.toLowerCase().trim() !== 'si') {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not confirmed: "${confirmedRaw}"`);
     return null;
   }
@@ -221,39 +195,39 @@ export function parseCostRecord(
     return null;
   }
   
-  // 🚀 APPLY ANTI-SCALE
+  // 🎯 CHECKLIST: Sin anti-x100 en costos (esa regla era para ingresos)
+  // Usar valores directos sin deflación
   let arsAmount: number | null = null;
   let usdAmount: number | null = null;
   
   if (arsAmountRaw && arsAmountRaw > 0) {
-    const antiScale = applyAntiScale(arsAmountRaw, 'ARS');
-    arsAmount = antiScale.scaled;
-    if (antiScale.wasScaled) {
-      console.log(`🚀 COST ANTI-SCALE: ${antiScale.reason}`);
-    }
+    arsAmount = arsAmountRaw;
   }
   
   if (usdAmountRaw && usdAmountRaw > 0) {
-    const antiScale = applyAntiScale(usdAmountRaw, 'USD');
-    usdAmount = antiScale.scaled;
-    if (antiScale.wasScaled) {
-      console.log(`🚀 COST ANTI-SCALE: ${antiScale.reason}`);
-    }
+    usdAmount = usdAmountRaw;
   }
   
-  // 🔍 COST KIND
-  let kind: CostKind = 'Directo'; // Default
-  if (kindRaw) {
-    const kindLower = kindRaw.toLowerCase();
-    if (kindLower.includes('indirecto') || kindLower.includes('indirect')) {
-      kind = 'Indirecto';
-    }
+  // 🎯 CHECKLIST: Detectar moneda nativa
+  const currencyDetection = detectNativeCurrency(usdAmount, arsAmount);
+  if (currencyDetection.warning) {
+    console.log(`⚠️ DUAL CURRENCY: ${currencyDetection.warning}`);
   }
   
-  // If no project name, it's likely indirect
-  if (!projectName || projectName.trim() === '') {
-    kind = 'Indirecto';
+  // 🔍 COST KIND - FILTRO DIRECTO
+  // 🎯 CHECKLIST: Sólo Directo: Tipo in {"Directo","Directos"}
+  if (!kindRaw) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - no tipo de gasto`);
+    return null;
   }
+  
+  const kindLower = kindRaw.toLowerCase().trim();
+  if (!['directo', 'directos'].includes(kindLower)) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not directo: "${kindRaw}"`);
+    return null;
+  }
+  
+  const kind: CostKind = 'Directo';
   
   console.log(`✅ COST PARSED: ${clientName} | ${projectName || 'overhead'} | ${period} | ARS:${arsAmount} USD:${usdAmount} | ${kind}`);
   
