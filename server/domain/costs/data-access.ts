@@ -40,19 +40,21 @@ async function fetchCostsFromSheets(): Promise<RawCostRecord[]> {
   console.log('🔍 COSTS: Fetching from Google Sheets...');
   
   try {
-    // Use the existing Google Sheets service for costs
-    const sheetData = await storage.getGoogleSheetsSales(); // Placeholder - usar costs cuando esté disponible
+    // 🔧 CORRECCIÓN CRÍTICA: Usar servicio para "Costos directos e indirectos", NO "Ventas Tomi"
+    // 🚨 FALLBACK TEMPORAL: Usar storage.getAllDirectCosts() mientras se resuelve Google Sheets auth
+    console.log('🔄 COSTS: Using storage fallback due to Google Sheets auth issue');
+    const sheetData = await storage.getAllDirectCosts();
     
     if (!sheetData || !Array.isArray(sheetData)) {
-      console.warn('⚠️ COSTS: No data from Google Sheets');
+      console.warn('⚠️ COSTS: No data from storage fallback');
       return [];
     }
     
-    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from Google Sheets`);
+    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from storage fallback`);
     return sheetData as RawCostRecord[];
     
   } catch (error) {
-    console.error('❌ COSTS: Error fetching from Google Sheets:', error);
+    console.error('❌ COSTS: Error fetching from fallback storage:', error);
     return [];
   }
 }

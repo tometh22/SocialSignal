@@ -13,35 +13,36 @@ import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind } from './typ
 // ==================== COLUMN MAPPING ====================
 
 const COLUMN_MAPPINGS = {
-  // Cliente
+  // 🔧 CORRECCIÓN FINAL: Usar nombres exactos de columnas de direct_costs table
+  
+  // Cliente - CORRECTO: columna se llama 'cliente'
   clientName: ['cliente', 'client', 'clientName', 'client_name'],
   
-  // Proyecto  
+  // Proyecto - CORRECTO: columna se llama 'proyecto'
   projectName: ['proyecto', 'project', 'projectName', 'project_name'],
   
-  // Temporal
+  // Temporal - CORRECTO: columnas se llaman 'mes' y 'año'
   month: ['mes', 'month'],
   year: ['año', 'year', 'anio'],
   
-  // Validación - CORRECCIÓN: debe buscar columnas de confirmación específicas
-  confirmed: ['confirmado', 'confirmed', 'Confirmado', 'estado', 'status'],
+  // Validación - usar tipoGasto como proxy de confirmado
+  confirmed: ['confirmado', 'confirmed', 'Confirmado', 'tipoGasto'],
   
-  // Tipo de costo
-  kind: ['tipo_costo', 'kind', 'type', 'tipo', 'categoria', 'category'],
+  // Tipo de costo - CORRECTO: columna se llama 'tipoGasto'
+  kind: ['tipoGasto', 'tipo_gasto', 'kind', 'type', 'tipo', 'categoria', 'category'],
   
-  // 🔧 CORRECCIÓN CRÍTICA: Mapear columnas de COSTO REAL, no fees facturados
-  // Estas columnas contienen los costos de personal/tiempo, no los montos facturados
+  // 🎯 CORRECCIÓN CRÍTICA: Usar columnas EXACTAS de la tabla direct_costs
+  // ARS amount - no está disponible directamente, usar costoTotal si es ARS
   arsAmount: [
-    'total_costo_ars', 'costo_ars', 'total_ars_costo', 'costo_total_ars',
-    'total_ars', 'Total ARS', 'costo_pesos', 'total_pesos',
-    'Costo ARS', 'Costo Total ARS', 'Total Costo ARS'
+    'costoTotal', // Costo en moneda local, podría ser ARS
+    'total_costo_ars', 'costo_ars'
   ],
+  
+  // USD amount - CORRECTO: columna se llama 'montoTotalUSD'
   usdAmount: [
+    'montoTotalUSD', 'costoTotal', // Primary: montoTotalUSD, fallback: costoTotal
     'total_costo_usd', 'costo_usd', 'total_usd_costo', 'costo_total_usd', 
-    'total_usd', 'Total USD', 'costo_dolares', 'total_dolares',
-    'Costo USD', 'Costo Total USD', 'Total Costo USD', 'Total USD Costo',
-    // 🎯 Patrones específicos que hemos visto en los datos
-    'Total USD ', 'Total USD\t', 'total usd', 'TOTAL USD'
+    'total_usd', 'Total USD', 'costo_dolares', 'total_dolares'
   ]
 };
 
@@ -63,8 +64,39 @@ const SPANISH_MONTHS: Record<string, string> = {
 };
 
 function spanishMonthToNumber(monthStr: string): string {
-  const cleaned = monthStr.toLowerCase().replace(/[.\s]/g, '');
-  return SPANISH_MONTHS[cleaned] || monthStr;
+  const cleaned = monthStr.toLowerCase().trim();
+  
+  // 🔧 CORRECCIÓN: Manejar formato "NN MMM" (ej: "08 ago", "05 may")
+  const formatMatch = cleaned.match(/^(\d{1,2})\s*(.+)$/);
+  if (formatMatch) {
+    const [, numberPart, namePart] = formatMatch;
+    
+    // Verificar si el nombre del mes existe en nuestro mapeo
+    const monthFromName = SPANISH_MONTHS[namePart.replace(/[.\s]/g, '')];
+    if (monthFromName) {
+      // Usar el número extraído, pero verificar que coincida con el nombre
+      const paddedNumber = numberPart.padStart(2, '0');
+      if (paddedNumber === monthFromName) {
+        return paddedNumber;
+      }
+      // Si no coinciden, confiar en el nombre del mes
+      return monthFromName;
+    }
+    
+    // Si no encontramos el nombre, usar el número si está en rango válido
+    const monthNum = parseInt(numberPart);
+    if (monthNum >= 1 && monthNum <= 12) {
+      return numberPart.padStart(2, '0');
+    }
+  }
+  
+  // Formato original: buscar directamente en el mapeo
+  const directMatch = SPANISH_MONTHS[cleaned.replace(/[.\s]/g, '')];
+  if (directMatch) {
+    return directMatch;
+  }
+  
+  return monthStr; // Retornar original si no se puede procesar
 }
 
 // ==================== FIELD EXTRACTION ====================
@@ -161,7 +193,9 @@ export function parseCostRecord(
   }
   
   // 🔍 CONFIRMATION CHECK
-  if (confirmedRaw && confirmedRaw.toLowerCase() !== 'si' && confirmedRaw.toLowerCase() !== 'yes') {
+  // 🔧 CORRECCIÓN CRÍTICA: "Directo" e "Indirecto" son tipos de costo válidos confirmados
+  const confirmedValues = ['si', 'yes', 'directo', 'indirecto', 'direct', 'indirect', 'confirmado', 'confirmed'];
+  if (confirmedRaw && !confirmedValues.includes(confirmedRaw.toLowerCase())) {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not confirmed: "${confirmedRaw}"`);
     return null;
   }
