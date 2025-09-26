@@ -20,11 +20,15 @@ const COLUMN_MAPPINGS = {
   // Proyecto: usar estructura real de DB  
   projectName: ['proyecto', 'Proyecto', 'project', 'projectName'],
   
-  // Mes: usar estructura real de DB
+  // 🚨 CORRECCIÓN CRÍTICA: Usar month_key (correcto) en lugar de mes+año (corrupto)
+  // Mes: usar estructura real de DB (DEPRECADO - datos corruptos)
   month: ['mes', 'Mes', 'month'],
   
-  // Año: usar estructura real de DB
+  // Año: usar estructura real de DB (DEPRECADO - datos corruptos)
   year: ['año', 'Año', 'anio', 'year'],
+  
+  // 🎯 NUEVO: Month Key - campo correcto para período (formato YYYY-MM)
+  monthKey: ['month_key', 'monthKey', 'period'],
   
   // Tipo de gasto: usar estructura real de DB
   kind: ['tipoGasto', 'Tipo', 'tipo', 'Tipo_Gasto'],
@@ -185,17 +189,24 @@ export function parseCostRecord(
   // 🔍 EXTRACT FIELDS
   const clientName = extractField(record, COLUMN_MAPPINGS.clientName);
   const projectName = extractField(record, COLUMN_MAPPINGS.projectName);
+  
+  // 🚨 CORRECCIÓN CRÍTICA: Usar month_key (correcto) en lugar de mes+año (corrupto)
+  const monthKeyRaw = extractField(record, COLUMN_MAPPINGS.monthKey);
+  
+  // 🚫 DEPRECADO: Campos corruptos mes+año (conservar por debugging)
   const monthRaw = extractField(record, COLUMN_MAPPINGS.month);
   const yearRaw = extractField(record, COLUMN_MAPPINGS.year);
+  
   const confirmedRaw = extractField(record, COLUMN_MAPPINGS.confirmed);
   const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
-  // ⚠️ REQUIRED FIELDS
-  if (!clientName || !monthRaw || !yearRaw) {
+  // ⚠️ REQUIRED FIELDS - Usar month_key como fuente de verdad
+  if (!clientName || !monthKeyRaw) {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - missing required fields:`, {
       clientName: !!clientName,
-      monthRaw: !!monthRaw,
-      yearRaw: !!yearRaw
+      monthKeyRaw: !!monthKeyRaw,
+      monthRaw: !!monthRaw, // debugging
+      yearRaw: !!yearRaw    // debugging
     });
     return null;
   }
@@ -204,16 +215,19 @@ export function parseCostRecord(
   // Nota: La validación de "confirmado" no aplica a la estructura actual de la DB
   // Todos los registros en DB se consideran confirmados por defecto
   
-  // 🔍 PERIOD CONSTRUCTION
-  const monthStr = spanishMonthToNumber(monthRaw);
-  const year = parseInt(yearRaw);
+  // 🎯 PERIOD EXTRACTION - Usar month_key directo (formato YYYY-MM)
+  const period: PeriodKey = monthKeyRaw as PeriodKey;
   
-  if (isNaN(year) || monthStr.length !== 2) {
-    console.log(`🔍 COST PARSER: Invalid period at row ${rowIndex}:`, { monthRaw, yearRaw, monthStr, year });
+  // 🔧 VALIDACIÓN: Verificar formato YYYY-MM
+  const periodRegex = /^\d{4}-\d{2}$/;
+  if (!periodRegex.test(period)) {
+    console.log(`🔍 COST PARSER: Invalid period format at row ${rowIndex}:`, { 
+      monthKeyRaw, 
+      period,
+      expectedFormat: 'YYYY-MM'
+    });
     return null;
   }
-  
-  const period: PeriodKey = `${year}-${monthStr}` as PeriodKey;
   
   // 🔍 AMOUNTS
   const arsAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.arsAmount);

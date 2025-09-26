@@ -91,6 +91,10 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
 export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fresh' = 'auto'): Promise<ParsedCostRecord[]> {
   console.log(`🚀 COSTS DATA ACCESS: Fetching from source "${source}"`);
   
+  // 🚨 FORCE CACHE CLEAR: Clear all cache to test new parser
+  console.log('🗑️ COSTS DEBUG: Forcibly clearing ALL cache to test new parser');
+  costCache.clear();
+  
   // 🗑️ FRESH: Invalidate cache if fresh requested
   if (source === 'fresh') {
     invalidateCache();
