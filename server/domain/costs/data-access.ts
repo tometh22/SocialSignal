@@ -34,6 +34,17 @@ function isCacheValid(cache: CostDataCache): boolean {
   return age < CACHE_TTL_MS;
 }
 
+function invalidateCache(source?: string): void {
+  if (source) {
+    const key = getCacheKey(source);
+    costCache.delete(key);
+    console.log(`🗑️ COSTS: Cache invalidated for source "${source}"`);
+  } else {
+    costCache.clear();
+    console.log('🗑️ COSTS: All cache invalidated');
+  }
+}
+
 // ==================== GOOGLE SHEETS ACCESS ====================
 
 async function fetchCostsFromSheets(): Promise<RawCostRecord[]> {
@@ -77,13 +88,19 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
 
 // ==================== UNIFIED DATA ACCESS ====================
 
-export async function getCostData(source: 'sheets' | 'database' | 'auto' = 'auto'): Promise<ParsedCostRecord[]> {
+export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fresh' = 'auto'): Promise<ParsedCostRecord[]> {
   console.log(`🚀 COSTS DATA ACCESS: Fetching from source "${source}"`);
+  
+  // 🗑️ FRESH: Invalidate cache if fresh requested
+  if (source === 'fresh') {
+    invalidateCache();
+    source = 'auto'; // Continue with auto logic
+  }
   
   const cacheKey = getCacheKey(source);
   const cached = costCache.get(cacheKey);
   
-  // Check cache first
+  // Check cache first (unless fresh was requested)
   if (cached && isCacheValid(cached)) {
     console.log(`✅ COSTS: Using cached data (${cached.parsedRecords.length} records)`);
     return cached.parsedRecords;

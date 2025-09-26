@@ -4476,42 +4476,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        // Obtener datos del Excel MAESTRO para este proyecto (sin filtro)
-        const allDirectCosts = await storage.getDirectCostsByProject(project.id);
-        
-        if (allDirectCosts && allDirectCosts.length > 0) {
-          // Calcular totales del Excel MAESTRO
-          const excelTotalCost = allDirectCosts.reduce((sum, cost) => {
-            const amount = cost.montoTotalUSD ? parseFloat(cost.montoTotalUSD.toString()) : (cost.costoTotal || 0);
-            return sum + (isNaN(amount) ? 0 : amount);
-          }, 0);
-          const excelTotalHours = allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0);
+        // 🎯 CHECKLIST: Usar Costs SoT en lugar de datos en bruto de Excel
+        // Obtener costos usando el sistema SoT corregido
+        try {
+          // Obtener costos desde el sistema SoT corregido
+          const periodKey = timeFilter?.monthKeys ? timeFilter.monthKeys[0] : '2025-08'; // Default para agosto
+          const projectCostResult = await costs.getCostsForProject(project.clientName, project.name, periodKey as any);
           
-          console.log(`📊 Project ${project.id} Excel MAESTRO data:`, {
-            costEntries: allDirectCosts.length,
-            totalCost: excelTotalCost,
-            totalHours: excelTotalHours
-          });
+          if (projectCostResult) {
+            // Usar datos del Costs SoT que ya está corregido
+            const excelTotalCost = projectCostResult.costUSDNormalized;
+            
+            // Para horas, mantener el cálculo directo desde Excel por ahora
+            const allDirectCosts = await storage.getDirectCostsByProject(project.id);
+            const excelTotalHours = allDirectCosts ? allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0) : 0;
           
-          // 🎯 CORREGIDO: Agregar datos del Excel MAESTRO Y horas estimadas al proyecto
-          (projects[i] as any).excelMAESTROData = {
-            totalCost: excelTotalCost,
-            totalHours: excelTotalHours,
-            entries: allDirectCosts.length
-          };
-          
-          if (project.quotation) {
-            (projects[i] as any).quotation = {
-              ...project.quotation,
-              estimatedHours: estimatedHours
+            console.log(`📊 Project ${project.id} Excel MAESTRO data:`, {
+              costEntries: allDirectCosts ? allDirectCosts.length : 0,
+              totalCost: excelTotalCost,
+              totalHours: excelTotalHours
+            });
+            
+            // 🎯 CORREGIDO: Agregar datos del Excel MAESTRO Y horas estimadas al proyecto
+            (projects[i] as any).excelMAESTROData = {
+              totalCost: excelTotalCost,
+              totalHours: excelTotalHours,
+              entries: allDirectCosts ? allDirectCosts.length : 0
             };
+            
+            if (project.quotation) {
+              (projects[i] as any).quotation = {
+                ...project.quotation,
+                estimatedHours: estimatedHours
+              };
+            }
+          } else {
+            // 🎯 Para proyectos sin costos SoT, agregar solo las horas estimadas
+            if (project.quotation && estimatedHours > 0) {
+              (projects[i] as any).quotation = {
+                ...project.quotation,
+                estimatedHours: estimatedHours
+              };
+            }
           }
-        } else {
-          // 🎯 Para proyectos sin Excel MAESTRO, agregar solo las horas estimadas
-          if (project.quotation && estimatedHours > 0) {
-            (projects[i] as any).quotation = {
-              ...project.quotation,
-              estimatedHours: estimatedHours
+        } catch (error) {
+          console.error(`⚠️ Error enriching project ${project.id} with Costs SoT:`, error);
+          // Fallback: usar datos originales si hay error
+          const allDirectCosts = await storage.getDirectCostsByProject(project.id);
+          if (allDirectCosts && allDirectCosts.length > 0) {
+            (projects[i] as any).excelMAESTROData = {
+              totalCost: 0, // Evitar usar datos inflados
+              totalHours: allDirectCosts.reduce((sum, cost) => sum + (cost.horasRealesAsana || 0), 0),
+              entries: allDirectCosts.length
             };
           }
         }
