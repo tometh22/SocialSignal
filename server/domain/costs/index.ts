@@ -28,7 +28,14 @@ export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult>
   
   try {
     // 1. Fetch all cost data
+    console.log(`🔍 COSTS SoT DEBUG: About to call getCostData()`);
     const allCostRecords = await getCostData();
+    console.log(`🔍 COSTS SoT DEBUG: getCostData() returned ${allCostRecords.length} records`);
+    
+    if (allCostRecords.length > 0) {
+      console.log(`🔍 COSTS SoT DEBUG: First record keys:`, Object.keys(allCostRecords[0]));
+      console.log(`🔍 COSTS SoT DEBUG: First record sample:`, allCostRecords[0]);
+    }
     
     // 2. 🎯 NEW: Get Income SoT data to determine currency display
     console.log(`💰 COSTS SoT: Getting Income SoT data for period ${period} to determine currency display`);
@@ -168,10 +175,9 @@ export async function debugAllProjectCosts(period: PeriodKey): Promise<void> {
     console.log(`📊 DETAILED LEDGER FOR ${period}:`);
     filtered.forEach((record, index) => {
       console.log(`  ${index + 1}) ${record.clientName} | ${record.projectName} | ${record.period}`);
-      console.log(`     📅 Period: ${record.period} | ✅ Confirmed: ${record.confirmed || 'N/A'}`);
-      console.log(`     💰 Native: ${record.nativeCurrency} ${record.nativeAmount}`);
-      console.log(`     💵 USD: ${record.usdAmount} | 🏷️ Kind: ${record.kind}`);
-      console.log(`     🔢 Source ID: ${record.sourceId || 'N/A'}`);
+      console.log(`     📅 Period: ${record.period}`);
+      console.log(`     💰 ARS: ${record.arsAmount} | USD: ${record.usdAmount}`);
+      console.log(`     🏷️ Kind: ${record.kind} | 🔢 Source Row: ${record.sourceRow}`);
       console.log('');
     });
     
@@ -188,9 +194,9 @@ export async function debugAllProjectCosts(period: PeriodKey): Promise<void> {
     console.log(`💰 Total Portfolio: ${result.portfolioCostUSD.toFixed(2)} USD`);
     
     // 6) Show filtering stats  
-    const acceptedRows = filtered.filter(r => r.confirmed === 'Si' && r.kind === 'Directo').length;
-    const rejectedRows = filtered.length - acceptedRows;
-    console.log(`📊 FILTER STATS: ${acceptedRows} accepted, ${rejectedRows} rejected`);
+    const directRows = filtered.filter(r => r.kind === 'Directo').length;
+    const indirectRows = filtered.filter(r => r.kind === 'Indirecto').length;
+    console.log(`📊 FILTER STATS: ${directRows} direct, ${indirectRows} indirect costs`);
     
   } catch (error) {
     console.error('❌ COSTS MINI-AUDITOR: Error:', error);

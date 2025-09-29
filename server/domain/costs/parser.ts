@@ -230,6 +230,8 @@ export function parseCostRecord(
   // ⚠️ REQUIRED FIELDS - clientName es obligatorio
   if (!clientName) {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - missing clientName`);
+    console.log(`🔍 COST PARSER DEBUG: Available keys in record:`, Object.keys(record));
+    console.log(`🔍 COST PARSER DEBUG: Record sample:`, record);
     return null;
   }
   
@@ -247,6 +249,8 @@ export function parseCostRecord(
       yearRaw,
       expectedFormat: 'YYYY-MM'
     });
+    console.log(`🔍 COST PARSER DEBUG: clientName="${clientName}", projectName="${projectName}"`);
+    console.log(`🔍 COST PARSER DEBUG: Full record sample:`, record);
     return null;
   }
   

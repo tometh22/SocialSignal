@@ -1,0 +1,60 @@
+Entiendo el problema. Mis fixes funcionan, pero la lógica de display de moneda está incorrecta. Los costos deben mostrarse en la moneda nativa del proyecto (basada en revenueDisplay.currency), no siempre normalizados a USD.
+
+Voy a verificar el checklist paso a paso:
+
+Investigated API response discrepancies
+🔍 1. VERIFICACIÓN BACKEND API
+
+Executed curl -s "http://localhost:5000/api/costs?period=2025-08&source=fresh" | jq '.projects[] | {client: .clientName, project: .projectName, costDisplay: .costDisplay, costUSDNormalized: .costUSDNormalized}'
+
+Decided on display currency logic (6 seconds)
+❌ PROBLEMAS IDENTIFICADOS:
+
+Currency Display: Todos muestran ARS, pero Kimberly/Warner deberían mostrar USD
+Valores muy diferentes:
+Coelsa: Actual ARS 82,510 vs Esperado ARS 553,002 (6.7x diferencia)
+Modo: Actual ARS 4,312 vs Esperado ARS 497,550 (115x diferencia)
+Necesito verificar cómo se determina costDisplay.currency. Debe basarse en revenueDisplay.currency del Income SoT:
+
+Opened server/domain/costs/business-rules.ts
+
+Decided on currency display logic (12 seconds)
+🎯 PROBLEMA IDENTIFICADO: La moneda display se determina por los datos del costo, NO por la moneda del proyecto (revenueDisplay.currency).
+
+🔧 LÓGICA ACTUAL (INCORRECTA):
+
+// Líneas 175-186: Elige USD si hay datos USD, sino ARS
+if (usdDisplays.length > 0) {
+  finalDisplay = { amount: totalUSD, currency: 'USD' };
+}
+✅ LÓGICA CORRECTA: La moneda debe basarse en revenueDisplay.currency del Income SoT.
+
+Necesito verificar los datos raw primero para entender las diferencias de valores:
+
+Executed SQL query -- Datos raw específicos para los proyectos del checklist SELECT cliente, proyecto, month_key, costo_total, monto_total_usd, tipo_gasto FROM direct_costs WHERE month_key='2025-08' AND (cliente ILIKE '%coelsa%' OR cliente ILIKE '%modo%' OR cliente ILIKE '%kimberly%' OR cliente ILIKE '%warner%') ORDER BY cliente, costo_total DESC;
+
+Decided on currency display logic (13 seconds)
+🔍 ANÁLISIS DATOS RAW:
+
+Los valores actuales están matemáticamente correctos según los datos en BD:
+
+Coelsa: ARS 82,510 (≠ esperado 553K)
+Modo: ARS 4,312 (≠ esperado 497K)
+Kimberly: ARS 104M → USD 77,374 (≠ esperado USD 2,436)
+Warner: ARS 9.96M → USD 7,409 (✅ cerca del esperado USD 7,005)
+El problema principal es la lógica de currency display. Necesito arreglar eso primero:
+
+Decided on currency display logic (11 seconds)
+Veo que el flujo actual no tiene acceso al Income SoT para determinar la moneda display. Necesito modificarlo para que consulte ambos sistemas. Voy a buscar cómo acceder al Income SoT:
+
+Planned income display currency integration (5 seconds)
+¡Perfecto! Veo que el Income SoT tiene getIncomeByPeriod(period) que retorna proyectos con revenueDisplay.currency. Voy a modificar el sistema para usar esa información.
+
+Check backend costs with exact values
+
+Decided on currency display logic
+🔧 2. ARREGLANDO CURRENCY DISPLAY LOGIC
+Voy a modificar el sistema para que use revenueDisplay.currency del Income SoT. Primero modifico aggregateCostsByProject para recibir información de monedas:
+
+Decided on debugging error handling
+Los errores LSP son de código debugging. Voy a probar la implementación principal primero

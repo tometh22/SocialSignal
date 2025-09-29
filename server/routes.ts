@@ -449,18 +449,17 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
         rawDataStats: {
           totalRecords: sourceData.length,
           periodRecords: filteredData.length,
-          acceptedRows: filteredData.filter(r => r.confirmed === 'Si' && r.kind === 'Directo').length,
-          rejectedRows: filteredData.filter(r => r.confirmed !== 'Si' || r.kind !== 'Directo').length
+          directRows: filteredData.filter(r => r.kind === 'Directo').length,
+          indirectRows: filteredData.filter(r => r.kind === 'Indirecto').length
         },
         ledger: filteredData.map(record => ({
-          client: record.clientName,
-          project: record.projectName,
+          clientName: record.clientName,
+          projectName: record.projectName,
           period: record.period,
-          confirmed: record.confirmed || 'N/A',
-          native: { amount: record.nativeAmount, currency: record.nativeCurrency },
-          normalizedUSD: record.usdAmount,
+          arsAmount: record.arsAmount,
+          usdAmount: record.usdAmount,
           kind: record.kind,
-          sourceId: record.sourceId || 'N/A'
+          sourceRow: record.sourceRow
         })),
         aggregatedResults: costsResult.projects.map(p => ({
           clientName: p.clientName,

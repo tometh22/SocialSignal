@@ -62,6 +62,13 @@ async function fetchCostsFromSheets(): Promise<RawCostRecord[]> {
     }
     
     console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from storage fallback`);
+    
+    // 🔍 DEBUG: Log first record to see exact structure
+    if (sheetData.length > 0) {
+      console.log(`🔍 COSTS DEBUG: First record keys:`, Object.keys(sheetData[0]));
+      console.log(`🔍 COSTS DEBUG: First record sample:`, sheetData[0]);
+    }
+    
     return sheetData as RawCostRecord[];
     
   } catch (error) {
