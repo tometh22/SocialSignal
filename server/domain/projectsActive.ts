@@ -75,6 +75,10 @@ interface CostRecord {
   hoursTarget: number;
   month: string;
   year: number;
+  // 🚀 DUAL CURRENCY FIELDS
+  displayCurrency?: "ARS" | "USD";
+  costDisplay?: number;
+  costUSDNormalized?: number;
 }
 
 interface ProjectData {
@@ -270,6 +274,10 @@ export class ActiveProjectsAggregator {
           hoursTarget: 0, // TODO: Hours integration when available in costs SoT
           month: period.start.substring(5, 7), // Extract month from period
           year: parseInt(period.start.substring(0, 4)), // Extract year from period
+          // 🚀 DUAL CURRENCY FIELDS from Costs SoT
+          displayCurrency: project.costDisplay.currency,
+          costDisplay: project.costDisplay.amount,
+          costUSDNormalized: project.costUSDNormalized
         };
         
         filteredCosts.push(costRecord);
@@ -534,7 +542,8 @@ export class ActiveProjectsAggregator {
       // Calculate aggregated metrics - USING USD NORMALIZED FOR DUAL CURRENCY
       const revenueUSDNormalized = projectData.sales.reduce((sum, sale) => sum + (sale.revenueUSDNormalized || sale.revenueUSD), 0);
       const revenueUSD = revenueUSDNormalized; // Backward compatibility
-      const costUSD = projectData.costs.reduce((sum, cost) => sum + cost.costUSD, 0);
+      const costUSDNormalized = projectData.costs.reduce((sum, cost) => sum + (cost.costUSDNormalized || cost.costUSD), 0);
+      const costUSD = costUSDNormalized; // Backward compatibility
       const workedHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursReal, 0);
       const targetHours = projectData.costs.reduce((sum, cost) => sum + cost.hoursTarget, 0);
 
@@ -581,11 +590,31 @@ export class ActiveProjectsAggregator {
       
       console.log(`🚀 DUAL RESULT: Project "${projectData.projectName}" → displayCurrency=${displayCurrency}, revenueDisplay=${revenueDisplay}`);
 
+      // 🚀 EXTRACT DUAL CURRENCY FIELDS from costs
+      let costDisplayCurrency: "ARS" | "USD" | null = null;
+      let costDisplayAmount = 0;
+      
+      console.log(`🔍 DUAL COST EXTRACTION: Project "${projectData.projectName}" has ${projectData.costs.length} costs`);
+      
+      // Aggregate display values from dual cost records
+      for (const cost of projectData.costs) {
+        console.log(`🔍 DUAL COST: displayCurrency=${cost.displayCurrency}, costDisplay=${cost.costDisplay}`);
+        if (cost.displayCurrency && cost.costDisplay !== undefined) {
+          if (!costDisplayCurrency) {
+            costDisplayCurrency = cost.displayCurrency; // Use first currency found
+          }
+          costDisplayAmount += cost.costDisplay;
+        }
+      }
+      
+      console.log(`🚀 DUAL COST RESULT: Project "${projectData.projectName}" → costDisplayCurrency=${costDisplayCurrency}, costDisplayAmount=${costDisplayAmount}`);
+
       // Build metrics object - WITH DUAL CURRENCY SUPPORT (user suggestions implemented)
       const metrics: ProjectMetrics = {
         revenueUSD: revenueUSDNormalized, // For backward compatibility
         revenueUSDNormalized,            // 🚀 Use THIS for all calculations
         costUSD,
+        costUSDNormalized,               // 🚀 Use THIS for all calculations
         profitUSD,
         markupRatio,
         marginFrac,
@@ -593,7 +622,8 @@ export class ActiveProjectsAggregator {
         targetHours,
         efficiencyFrac,
         // 🚀 STRUCTURED DISPLAY following user suggestions
-        revenueDisplay: displayCurrency ? { amount: revenueDisplay, currency: displayCurrency } : undefined
+        revenueDisplay: displayCurrency ? { amount: revenueDisplay, currency: displayCurrency } : undefined,
+        costDisplay: costDisplayCurrency ? { amount: costDisplayAmount, currency: costDisplayCurrency } : undefined
       };
 
       // Get client info

@@ -76,6 +76,20 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
     true // compact format
   );
 
+  // 🚀 DUAL CURRENCY: Format cost in native currency
+  const costAmount = metrics.costDisplay?.amount ?? metrics.costUSD;
+  const costCurrency = metrics.costDisplay?.currency ?? 'USD';
+  const costDisplay = f.currency(
+    costAmount,
+    costCurrency,
+    true // compact format
+  );
+  const costDisplayFull = f.currency(
+    costAmount,
+    costCurrency,
+    false // full format for details
+  );
+
   const markupDisplay = metrics.markupRatio 
     ? f.markupX(metrics.markupRatio)
     : 'N/A';
@@ -182,7 +196,7 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
           
           <div className="text-center">
             <div className="text-sm font-semibold text-orange-600" data-testid={`text-cost-${project.projectId}`}>
-              {f.usdCompact.format(metrics.costUSD)}
+              {costDisplay}
             </div>
             <div className="text-xs text-gray-500">Cost</div>
           </div>
@@ -244,7 +258,7 @@ function ProjectCard({ project, isExpanded, onToggleExpand }: ProjectCardProps) 
                   <div className="flex justify-between">
                     <span>Cost:</span>
                     <span className="font-mono" data-testid={`text-cost-detail-${project.projectId}`}>
-                      {f.usd.format(metrics.costUSD)}
+                      {costDisplayFull}
                     </span>
                   </div>
                   <div className="flex justify-between font-semibold">

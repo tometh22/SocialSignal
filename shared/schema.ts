@@ -1996,7 +1996,9 @@ export const projectMetricsSchema = z.object({
   
   // 🚀 DUAL CURRENCY FIELDS: Native display + USD for KPIs
   revenueUSDNormalized: z.number(),                    // Amount normalized to USD for ALL calculations
-  revenueDisplay: moneyDisplaySchema.optional()       // Structured display: {amount, currency}
+  revenueDisplay: moneyDisplaySchema.optional(),       // Structured display: {amount, currency}
+  costUSDNormalized: z.number().optional(),            // Amount normalized to USD for calculations
+  costDisplay: moneyDisplaySchema.optional()           // Structured display: {amount, currency}
 });
 
 export type ProjectMetrics = z.infer<typeof projectMetricsSchema>;

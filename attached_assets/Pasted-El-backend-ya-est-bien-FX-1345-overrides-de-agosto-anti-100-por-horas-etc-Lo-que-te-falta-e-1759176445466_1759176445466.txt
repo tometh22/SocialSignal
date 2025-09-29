@@ -1,0 +1,107 @@
+El backend ya está bien (FX=1345, overrides de agosto, anti-×100 por horas, etc.). Lo que te falta es pintar los costos en moneda nativa en el front. Hoy las cards están mostrando el costUSDNormalized (o nada) en lugar del costDisplay.
+
+Aquí tienes el plan corto para dejarlo OK en el front:
+
+1) Qué debe venir del API (costos)
+
+Para cada proyecto en GET /api/costs?period=2025-08 y en los agregadores que consume Active Projects:
+
+metrics.costDisplay: { amount: number, currency: 'ARS'|'USD' }
+
+metrics.costUSDNormalized: number (solo para cálculos)
+
+metrics.overridden?: boolean (opcional, bandera de reconciler)
+
+Sanity check rápido (copia y pega):
+
+curl -s "http://localhost:5000/api/costs?period=2025-08&source=fresh" \
+| jq '.projects[] | select(.clientName|IN("Play Digital S.A (Modo)","Coelsa","Warner","Kimberly Clark")) 
+      | {clientName, projectName, costDisplay, costUSDNormalized}'
+
+
+Deberías ver:
+
+Modo → costDisplay: {amount: 497550, currency: "ARS"}
+
+Coelsa → costDisplay: {amount: 553002, currency: "ARS"}
+
+Warner → currency: "USD", amount ≈ 7005.2
+
+Kimberly → currency: "USD", amount ≈ 2436.09
+
+2) Qué cambiar en el front (Active Projects)
+
+En la card del proyecto estás usando algo tipo:
+
+// ❌ Hoy (muestra USD normalizado o 0)
+const cost = project.metrics.cost || project.metrics.costUSDNormalized;
+const costStr = formatUSD(cost);
+
+
+Cámbialo a:
+
+// ✅ Mostrar SIEMPRE la moneda nativa en la card
+const costDisplay = project.metrics?.costDisplay; // {amount, currency}
+const costStr = formatMoney(costDisplay.amount, costDisplay.currency); 
+
+
+Si usas un componente Money:
+
+<Money value={project.metrics.costDisplay.amount} currency={project.metrics.costDisplay.currency} />
+
+
+Mantén los cálculos con USD:
+
+Markup = revenueUSDNormalized / costUSDNormalized
+
+Margin = (revenueUSDNormalized - costUSDNormalized) / revenueUSDNormalized
+
+3) Dónde tocar (guía rápida)
+
+DTO/serializer que alimenta Active Projects:
+
+Asegúrate de incluir metrics.costDisplay y metrics.costUSDNormalized.
+
+Componente ActiveProjectCard (o equivalente):
+
+Sustituir lectura de costo por metrics.costDisplay.
+
+Dejar KPIs (markup/margin) usando los normalizados.
+
+Money formatter:
+
+Soporte de “ARS” sin forzar símbolo “$” de USD (si usas Intl, new Intl.NumberFormat('es-AR', { style:'currency', currency: 'ARS' }) y en-US para USD).
+
+Badges/tooltip (opcional):
+
+Si metrics.overridden === true, muestra un puntito/tooltip “valor reconciliado (2025-08)”.
+
+4) Pruebas de aceptación (UI)
+
+Modo: Cost debe verse ARS 497.550
+
+Coelsa: Cost debe verse ARS 553.002
+
+Warner: Cost debe verse USD 7.005,20 (o $7.01K si abrevias)
+
+Kimberly: Cost debe verse USD 2.436,09
+
+Markup/Margin no cambian (siguen con USD normalizado).
+
+Header “Period Revenue / Period Profit” no se rompe.
+
+5) Check rápido de cálculo (por si dudas)
+# Totales USD normalizados del período:
+curl -s "http://localhost:5000/api/portfolio/income?period=2025-08" | jq '{usd: .periodRevenueUSD}'
+curl -s "http://localhost:5000/api/portfolio/costs?period=2025-08&source=fresh" | jq '{usd: .periodCostUSD}'
+
+
+Profit ≈ income.usd - costs.usd, coincide con la card de “Period Profit”.
+
+6) Pitfalls comunes
+
+❌ Usar metrics.cost o period.cost (legacy) → no trae la moneda nativa.
+
+❌ Formatear siempre como USD → ARS se verá como “$”.
+
+❌ Tomar costDisplay.amount para markup/margin → debe ser costUSDNormalized.
