@@ -18,6 +18,105 @@ import { getCostData, getCostDataForProject } from './data-access';
 import { processCostsForPeriod } from './business-rules';
 import * as income from '../income';
 
+// ==================== PERIOD RECONCILER (TEMPORAL) ====================
+// 🎯 Overrides temporales para agosto 2025 mientras se completa la DB
+// REMOVER cuando direct_costs esté completa
+
+interface CostOverride {
+  clientKey: string;  // slugify(lower(trim(cliente)))
+  projectKey: string; // slugify(lower(trim(proyecto)))
+  period: PeriodKey;
+  nativeAmount: number;
+  nativeCurrency: 'USD' | 'ARS';
+}
+
+const COST_OVERRIDES_2025_08: CostOverride[] = [
+  {
+    clientKey: 'warner',
+    projectKey: 'fee-marketing',
+    period: '2025-08',
+    nativeAmount: 7005.20,
+    nativeCurrency: 'USD'
+  },
+  {
+    clientKey: 'kimberly-clark',
+    projectKey: 'fee-huggies',
+    period: '2025-08',
+    nativeAmount: 2436.09,
+    nativeCurrency: 'USD'
+  },
+  {
+    clientKey: 'play-digital-sa-modo',
+    projectKey: 'fee-mensual',
+    period: '2025-08',
+    nativeAmount: 497550,
+    nativeCurrency: 'ARS'
+  },
+  {
+    clientKey: 'coelsa',
+    projectKey: 'fee-mensual',
+    period: '2025-08',
+    nativeAmount: 553002,
+    nativeCurrency: 'ARS'
+  }
+];
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-');
+}
+
+function applyPeriodReconciler(
+  projects: ProjectCost[], 
+  period: PeriodKey,
+  fxRate: number
+): ProjectCost[] {
+  
+  // Solo aplicar overrides para agosto 2025
+  if (period !== '2025-08') {
+    return projects;
+  }
+  
+  console.log(`🔧 RECONCILER: Applying period overrides for ${period}`);
+  
+  const overridesMap = new Map<string, CostOverride>();
+  for (const override of COST_OVERRIDES_2025_08) {
+    const key = `${override.clientKey}|${override.projectKey}`;
+    overridesMap.set(key, override);
+  }
+  
+  return projects.map(project => {
+    const clientKey = slugify(project.clientName);
+    const projectKey = slugify(project.projectName);
+    const key = `${clientKey}|${projectKey}`;
+    
+    const override = overridesMap.get(key);
+    
+    if (override) {
+      const costUSDNormalized = override.nativeCurrency === 'USD' 
+        ? override.nativeAmount
+        : override.nativeAmount / fxRate;
+      
+      console.log(`✅ RECONCILER OVERRIDE: ${project.clientName} | ${project.projectName} → ${override.nativeCurrency} ${override.nativeAmount} (was ${project.costDisplay.currency} ${project.costDisplay.amount})`);
+      
+      return {
+        ...project,
+        costDisplay: {
+          amount: override.nativeAmount,
+          currency: override.nativeCurrency
+        },
+        costUSDNormalized
+      };
+    }
+    
+    return project;
+  });
+}
+
 // ==================== PUBLIC API ====================
 
 /**
@@ -51,6 +150,16 @@ export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult>
     
     // 4. Process for the specific period (with currency info)
     const result = await processCostsForPeriod(allCostRecords, period, {}, projectCurrencyMap);
+    
+    // 5. 🎯 Apply period reconciler (temporal overrides for 2025-08)
+    const fxRate = 1345; // Hard-coded for 2025-08 per requirements
+    result.projects = applyPeriodReconciler(result.projects, period, fxRate);
+    
+    // 6. Recalculate portfolio total after overrides
+    result.portfolioCostUSD = result.projects.reduce(
+      (sum, p) => sum + p.costUSDNormalized, 
+      0
+    );
     
     console.log(`✅ COSTS SoT: Returned ${result.projects.length} projects, total ${result.portfolioCostUSD.toFixed(2)} USD`);
     

@@ -1,0 +1,115 @@
+Qué hacer ahora (sin sync)
+
+Mantener el SoT de Costos con estas reglas ya activas
+
+Filtrar por month_key='2025-08' y LOWER(TRIM(tipo_gasto)) IN ('directo','directos').
+
+FX = 1345 (sin fallback 1260).
+
+Ignorar monto_total_usd si >100000 o si difiere >35% de costo_total/fx.
+
+Anti×100 horas: si horas_reales_asana y valor_hora_persona>0 y horas_reales_asana>300, dividir coste entre 100 (una sola vez) y loguear ANTI_x100_HOURS.
+
+Fijar la app ya con un “Reconciler” de período (temporal y no destructivo)
+
+Cargar una tabla/JSON de overrides que se suma al cálculo del SoT únicamente cuando period='2025-08'.
+
+Claves: clientKey, projectKey, month_key, override_native_amount, override_native_currency.
+
+Para los 4 casos (agosto 2025):
+
+Warner · Fee Marketing → USD 7005.20
+
+Kimberly · Fee Huggies → USD 2436.09
+
+Play (Modo) · Fee mensual → ARS 497550
+
+Coelsa · Fee mensual → ARS 553002
+
+Lógica:
+
+Si el SoT devuelve valor para ese proyecto/mes, reemplazar por el override (porque sabemos que faltan filas).
+
+Si no hay override, usar el valor del SoT tal cual.
+
+Esto deja la UI correcta ya (cards + KPIs) y es fácil de retirar cuando la DB esté completa.
+
+Checklist de verificación (5 minutos)
+
+GET /api/costs?period=2025-08&source=fresh debe incluir:
+
+Warner → costUSDNormalized ≈ 7005.20
+
+Kimberly → costUSDNormalized ≈ 2436.09
+
+Modo → costDisplay = { amount: 497550, currency:'ARS' } y costUSDNormalized ≈ 369.93
+
+Coelsa → costDisplay = { amount: 553002, currency:'ARS' } y costUSDNormalized ≈ 411.16
+
+GET /api/costs/debug?period=2025-08:
+
+ledger sin usd_raw > 100000 usados.
+
+Logs con ANTI_x100_HOURS sólo si hubo horas >300.
+
+Auditoría (read-only, sin tocar datos)
+
+Ejecutá estos SELECT para entender la brecha (comparás contra tus “golden”):
+
+1) Conteo y sumas por cliente/proyecto
+
+SELECT cliente, proyecto, COUNT(*) AS rows,
+       SUM(costo_total) AS ars_sum,
+       SUM(monto_total_usd) AS usd_sum
+FROM direct_costs
+WHERE month_key='2025-08'
+  AND LOWER(TRIM(tipo_gasto)) IN ('directo','directos')
+  AND LOWER(TRIM(cliente)) IN ('warner','kimberly clark','play digital s.a (modo)','coelsa')
+GROUP BY cliente, proyecto
+ORDER BY cliente, proyecto;
+
+
+2) Detección de outliers por horas (candidatos a ×100)
+
+SELECT cliente, proyecto, persona, horas_reales_asana, valor_hora_persona, costo_total
+FROM direct_costs
+WHERE month_key='2025-08'
+  AND LOWER(TRIM(tipo_gasto)) IN ('directo','directos')
+  AND horas_reales_asana IS NOT NULL
+  AND valor_hora_persona IS NOT NULL
+  AND horas_reales_asana > 300
+ORDER BY horas_reales_asana DESC;
+
+
+3) Data mínima que falta (por qué no llegamos al golden)
+Compará ars_sum/fx contra el golden:
+
+Si ars_sum/fx ≪ golden → faltan filas.
+
+Si ars_sum/fx ≈ golden pero SoT difiere → revisar reglas de exclusión (tipo_gasto, trims, etc.).
+
+¿Por qué propongo “override” temporal?
+
+Porque hoy los gaps grandes (Modo, Coelsa, Kimberly) son por faltantes en direct_costs. El override:
+
+No toca la BD.
+
+Es reversible.
+
+Te deja la UI y KPIs exactos mientras terminás la auditoría/sync.
+
+Criterio de “done” hoy
+
+Las cards de /active-projects muestran exactamente:
+
+Coelsa: ARS 4,359,857 revenue, ARS 553,002 cost (USD KPIs ≈ 411.16)
+
+Modo: ARS 4,596,700 revenue, ARS 497,550 cost (USD KPIs ≈ 369.93)
+
+Kimberly: USD 8,450 revenue, USD 2,436.09 cost
+
+Warner: USD 29,230 revenue, USD 7,005.20 cost
+
+debug confirma que no se consumen USD corruptos y que el anti×100 sólo se aplicó en filas por horas >300.
+
+Si te sirve, en el próximo paso te paso el snippet JSON del reconciler de período y la función que lo aplica al resultado del SoT (para pegar directo).
