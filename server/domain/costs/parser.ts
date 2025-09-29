@@ -266,16 +266,28 @@ export function parseCostRecord(
     return null;
   }
   
-  // 🎯 CHECKLIST: Sin anti-x100 en costos (esa regla era para ingresos)
-  // Usar valores directos sin deflación
+  // 🎯 ANTI-ESCALA ×100: Detectar valores inflados en costos
+  // Patrón: Si USD es astronómico (>100k) Y ARS >10k → ARS está inflado ×100
   let arsAmount: number | null = null;
   let usdAmount: number | null = null;
   
+  const usdIsCorrupt = usdAmountRaw && (
+    !isFinite(usdAmountRaw) || 
+    usdAmountRaw > 100_000 ||
+    usdAmountRaw > 1e12 // Astronómico
+  );
+  
   if (arsAmountRaw && arsAmountRaw > 0) {
-    arsAmount = arsAmountRaw;
+    // Si USD está corrupto Y ARS >10k → probablemente inflado ×100
+    if (usdIsCorrupt && arsAmountRaw > 10_000) {
+      arsAmount = arsAmountRaw / 100;
+      console.log(`🔧 COST ANTI-×100: ARS ${arsAmountRaw} → ${arsAmount} (USD was corrupt: ${usdAmountRaw})`);
+    } else {
+      arsAmount = arsAmountRaw;
+    }
   }
   
-  if (usdAmountRaw && usdAmountRaw > 0) {
+  if (usdAmountRaw && usdAmountRaw > 0 && !usdIsCorrupt) {
     usdAmount = usdAmountRaw;
   }
   

@@ -1,0 +1,71 @@
+Qué muestra vs. qué debería (ago-2025)
+
+Warner · Fee Marketing → $7.41K ✅ (casi OK, target $7.01K)
+
+Kimberly · Fee Huggies → $77.37K ❌ (debería $2,436.09 USD)
+
+Play (Modo) · Fee mensual → $64.55 ❌ (debería ARS 497,550 → $369.93 USD p/ KPIs)
+
+Coelsa · Fee mensual → $0 ❌ (debería ARS 553,002 → $411.16 USD p/ KPIs)
+
+Causa más probable (resumen)
+
+La card sigue leyendo campos legacy (p.ej. period.cost o metrics.cost) en lugar de metrics.costDisplay + metrics.costUSDNormalized del SoT.
+
+Join por cliente/proyecto sin normalizar → “Play Digital S.A (Modo)” y “Coelsa” no matchean y quedan en 0 o $64.55.
+
+Protección anti-corrupción/FX se aplica en backend, pero la UI ignora el valor normalizado y muestra un residual.
+
+Arreglo directo (5 pasos concretos)
+
+Frontend – fuente única
+
+En ActiveProjects usa solo la respuesta del agregador que ya trae SoT.
+
+Para la card:
+
+Cost visible: project.metrics.costDisplay.amount + project.metrics.costDisplay.currency
+
+KPIs: project.metrics.costUSDNormalized
+
+Join robusto en agregador
+
+Clave de merge: clientKey = slugify(trim(lower(clientName))), projectKey = slugify(trim(lower(projectName))) en ambos lados (ingresos/costos).
+
+Añadir alias mínimos:
+
+"play digital s.a (modo)" → "play digital s.a (modo)"
+
+"kimberly clark" → "kimberly clark"
+
+"coelsa" → "coelsa"
+
+Reglas de costos en UI
+
+Si costDisplay.currency === "ARS" mostrar ARS; KPIs y barras usan costUSDNormalized.
+
+Smoke checks rápidos
+
+Coelsa: debe render ARS 553.002 y markup ≈ revenueUSD(=4359857/1345)/costUSD(=553002/1345).
+
+Modo: ARS 497.550; KPIs usan $369.93.
+
+Kimberly: $2,436.09 (display USD).
+
+Warner: $7,005.20–$7,41K (según redondeo).
+
+Verificación con endpoints
+
+/api/costs?period=2025-08&source=fresh → debe listar los 4 con costDisplay correcto.
+
+/api/costs/debug?period=2025-08 → ledger sólo month_key="2025-08" y sin usdAstronomico para estos 4.
+
+Si aplicas esos 5 cambios, las cards deberían quedar exactas:
+
+Coelsa ARS 553.002 (KPIs $411.16)
+
+Modo ARS 497.550 (KPIs $369.93)
+
+Kimberly $2,436.09
+
+Warner ~$7,005
