@@ -20,7 +20,8 @@ import * as income from '../income';
 
 // ==================== PERIOD RECONCILER (TEMPORAL) ====================
 // 🎯 Overrides temporales para agosto 2025 mientras se completa la DB
-// REMOVER cuando direct_costs esté completa
+// TODO: Remove period overrides once direct_costs is complete for 2025-08
+// Este reconciler NO toca la DB y es completamente reversible
 
 interface CostOverride {
   clientKey: string;  // slugify(lower(trim(cliente)))
@@ -182,14 +183,20 @@ export async function getCostsForProject(
   
   console.log(`🚀 COSTS SoT: Getting costs for project "${clientName}" - "${projectName}" in ${period}`);
   
+  // Validate inputs
+  if (!clientName || !projectName) {
+    console.log(`⚠️ COSTS SoT: Invalid inputs - clientName: "${clientName}", projectName: "${projectName}"`);
+    return null;
+  }
+  
   try {
     // Get all costs for the period
     const periodResult = await getCostsForPeriod(period);
     
     // Find the specific project
     const projectCost = periodResult.projects.find(p => 
-      p.clientName.toLowerCase() === clientName.toLowerCase() &&
-      p.projectName.toLowerCase() === projectName.toLowerCase()
+      p.clientName?.toLowerCase() === clientName.toLowerCase() &&
+      p.projectName?.toLowerCase() === projectName.toLowerCase()
     );
     
     if (projectCost) {

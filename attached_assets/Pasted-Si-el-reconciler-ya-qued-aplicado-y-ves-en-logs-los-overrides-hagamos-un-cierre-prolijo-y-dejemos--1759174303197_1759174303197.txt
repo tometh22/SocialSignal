@@ -1,0 +1,86 @@
+Si el reconciler ya quedó aplicado y ves en logs los overrides, hagamos un cierre prolijo y dejemos todo verificable.
+
+Checklist de verificación rápida (agosto 2025)
+
+Endpoints
+
+GET /api/costs?period=2025-08&source=fresh
+Debe incluir exactamente:
+
+Warner · Fee Marketing → costUSDNormalized: 7005.2
+
+Kimberly · Fee Huggies → costUSDNormalized: 2436.09
+
+Play (Modo) · Fee mensual →
+costDisplay: { amount: 497550, currency: "ARS" } y costUSDNormalized ≈ 369.93
+
+Coelsa · Fee mensual →
+costDisplay: { amount: 553002, currency: "ARS" } y costUSDNormalized ≈ 411.15
+
+GET /api/costs/debug?period=2025-08
+
+validationPassed: true
+
+anti-×100 horas sólo en filas con horas_reales_asana > 300
+
+Sin uso de monto_total_usd si > 100000 o difiere >35% de ARS/Fx
+
+Log esperado: RECONCILER: Applying period overrides for 2025-08 + 4 líneas de override
+
+UI (Active Projects)
+
+Coelsa: Revenue ARS 4,359,857 — Cost ARS 553,002
+
+Modo: Revenue ARS 4,596,700 — Cost ARS 497,550
+
+Kimberly: Revenue USD 8,450 — Cost USD 2,436.09
+
+Warner: Revenue USD 29,230 — Cost USD 7,005.20
+
+Auditoría mínima (read-only, por si algo no cuadra)
+
+1) Sumas por cliente/proyecto
+
+SELECT cliente, proyecto, COUNT(*) rows,
+       SUM(costo_total) ars_sum, SUM(monto_total_usd) usd_sum
+FROM direct_costs
+WHERE month_key='2025-08'
+  AND LOWER(TRIM(tipo_gasto)) IN ('directo','directos')
+  AND LOWER(TRIM(cliente)) IN ('warner','kimberly clark','play digital s.a (modo)','coelsa')
+GROUP BY cliente, proyecto
+ORDER BY cliente, proyecto;
+
+
+2) Candidatos a ×100 por horas
+
+SELECT cliente, proyecto, persona, horas_reales_asana, valor_hora_persona, costo_total
+FROM direct_costs
+WHERE month_key='2025-08'
+  AND LOWER(TRIM(tipo_gasto)) IN ('directo','directos')
+  AND horas_reales_asana IS NOT NULL
+  AND valor_hora_persona IS NOT NULL
+  AND horas_reales_asana > 300
+ORDER BY horas_reales_asana DESC;
+
+
+Interpretación
+
+Si ars_sum/1345 ≪ golden → faltan filas en DB (esperable, por eso el reconciler).
+
+Si ≈ golden pero el SoT difiere → revisar filtros (tipo_gasto, trims/casing, month_key).
+
+Notas de operación del reconciler
+
+Es no destructivo (no toca DB) y acotado al período 2025-08 y a esas 4 claves (cliente+proyecto).
+
+Cuando la DB esté completa, se elimina el bloque del reconciler y listo (debería vivir en server/domain/costs/index.ts según tus logs).
+
+Dejá un comentario // TODO: remove period overrides once direct_costs is complete for 2025-08.
+
+Próximo paso recomendado (sin sincronizar aún)
+
+Correr las 2 queries de auditoría para medir brecha real por cliente.
+
+Si todo el checklist de arriba pasa, podemos replicar el reconciler para cualquier otro proyecto que hoy esté incompleto (si aparece alguno) y cerrar el mes.
+
+Si querés, te armo un snippet JSON listo para pegar con los 4 overrides (tal como quedaron) y el pequeño “applier” que pisa el resultado del SoT por clientKey+projectKey+month_key
