@@ -389,6 +389,13 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
       const { clientName, projectName } = req.params;
       const period = req.query.period as string;
       
+      // 🎯 GUARD: Validar inputs requeridos
+      if (!clientName || !projectName) {
+        return res.status(400).json({ 
+          error: "Parámetros 'clientName' y 'projectName' son requeridos" 
+        });
+      }
+      
       if (!period || !/^\d{4}-\d{2}$/.test(period)) {
         return res.status(400).json({ 
           error: "Parámetro 'period' requerido en formato YYYY-MM" 
@@ -4478,6 +4485,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // 🎯 CHECKLIST: Usar Costs SoT en lugar de datos en bruto de Excel
         // Obtener costos usando el sistema SoT corregido
         try {
+          // 🎯 GUARD: Validar que el proyecto tiene clientName y name antes de llamar SoT
+          if (!project.clientName || !project.name) {
+            console.log(`⚠️ Skipping Costs SoT for project ${project.id}: missing clientName or name`);
+            continue;
+          }
+          
           // Obtener costos desde el sistema SoT corregido
           const periodKey = timeFilter?.monthKeys ? timeFilter.monthKeys[0] : '2025-08'; // Default para agosto
           const projectCostResult = await costs.getCostsForProject(project.clientName, project.name, periodKey as any);
