@@ -1,0 +1,207 @@
+Aquí tenés un checklist integral para dar por cerrado todo el sistema (Ingresos + Costos) con SoT, frontend y operación. Está dividido por áreas, con pasos verificables y criterios de aceptación.
+
+✅ 1) Fuente Única de Verdad (SoT) – Ingresos
+
+ Tipos canónicos: PeriodKey (YYYY-MM), MoneyDisplay {amount, currency}, revenueUSDNormalized.
+
+ Parser ES: números con . miles y , decimales; sin ×100.
+
+ Reglas:
+
+ Filtrado por periodo solo con month_key.
+
+ Confirmado = “Si”.
+
+ Moneda nativa:
+
+ Si Monto_USD > 0 → revenueDisplay = USD.
+
+ Si Monto_ARS > 0 → revenueDisplay = ARS y revenueUSDNormalized = ARS / FX(period).
+
+ Anti-escala ingresos: corrección de casos conocidos (Warner/Kimberly) aplicada solo en ingresos.
+
+ Endpoints:
+
+ GET /api/income?period=YYYY-MM
+
+ GET /api/portfolio/income?period=YYYY-MM
+
+ GET /api/projects/:id/income?period=YYYY-MM
+
+ Golden (2025-08):
+
+ Warner Fee Marketing → USD 29,230 (display) / 29,230 (normalized).
+
+ Kimberly Fee Huggies → USD 8,450 / 8,450.
+
+✅ 2) Fuente Única de Verdad (SoT) – Costos
+
+ Tipos canónicos: costDisplay, costUSDNormalized.
+
+ Datos: tabla direct_costs (no ventas).
+
+ Parser:
+
+ Usa solo month_key para el periodo.
+
+ Incluye solo tipo_gasto ∈ {Directo, Directos}.
+
+ Maneja Decimal/strings a número.
+
+ FX:
+
+ Toma de exchange_rates (sin fallback hardcodeado).
+
+ 2025-08 → 1345 (ARS→USD).
+
+ Anti-corrupción costos:
+
+ Ignorar USD nativo > 100.000 (astronómicos).
+
+ Calcular con ARS/FX si USD está corrupto.
+
+ Anti-×100 solo si el costo proviene de horas: si horas_reales_asana > 300 y valor_hora_persona>0 → dividir por 100 y loggear ANTI_X100_HOURS.
+
+ Reconciler temporal 2025-08 (no toca DB):
+
+ Warner Fee Marketing → USD 7,005.20.
+
+ Kimberly Fee Huggies → USD 2,436.09.
+
+ Play Digital (Modo) Fee mensual → ARS 497,550 (→ USD 369.93 normalized).
+
+ Coelsa Fee mensual → ARS 553,002 (→ USD 411.15 normalized).
+
+ Comentado con TODO y flag de transparencia en respuestas.
+
+ Endpoints:
+
+ GET /api/costs?period=YYYY-MM[&source=fresh]
+
+ GET /api/portfolio/costs?period=YYYY-MM
+
+ GET /api/costs/debug?period=YYYY-MM (auditoría: raw, accepted, ledger, summary).
+
+ Golden (2025-08): valores anteriores visibles en endpoints (display nativo + normalized correcto).
+
+✅ 3) Agregador de Proyectos Activos (backend)
+
+ Merge de ingresos y costos por projectKey (cliente+proyecto+periodo), no por nombre suelto.
+
+ metrics por proyecto incluye:
+
+ revenueDisplay (nativo) y revenueUSDNormalized.
+
+ costDisplay (nativo) y costUSDNormalized.
+
+ profit = revenueUSDNormalized - costUSDNormalized.
+
+ markup = revenueUSDNormalized / costUSDNormalized (manejo de cero/NaN).
+
+ margin = profit / revenueUSDNormalized.
+
+ Adapters legacy (si existen) usan SoT bajo INCOME_SOT_ENABLED/equivalentes.
+
+✅ 4) Frontend
+
+ Active Projects:
+
+ Toma metrics.costDisplay y metrics.revenueDisplay para mostrar moneda nativa.
+
+ KPIs (profit/markup/margin) basados en normalized USD.
+
+ Proyectos con mismo nombre (p.ej. “Fee mensual”) no se mezclan entre clientes.
+
+ Vista Proyecto:
+
+ Cards muestran display nativo y detalle del período.
+
+ Dashboard general:
+
+ Totales usan normalized USD (sumas coherentes).
+
+ Prueba visual (2025-08):
+
+ Warner: Cost USD ~7.01K / Revenue USD 29.23K.
+
+ Kimberly: Cost USD ~2.44K / Revenue USD 8.45K.
+
+ Modo: Cost ARS ~497.6K / Revenue ARS ~4.6M.
+
+ Coelsa: Cost ARS ~553.0K / Revenue ARS ~4.4M.
+
+✅ 5) Observabilidad & Auditoría
+
+ Logs clave:
+
+ USING FX FROM DB: 2025-08 = 1345.
+
+ COST USD CORRUPTED cuando aplique.
+
+ ANTI_X100_HOURS cuando aplique.
+
+ RECONCILER: Applying period overrides for 2025-08 (mientras esté activo).
+
+ Endpoint debug (/api/costs/debug) devuelve:
+
+ validationPassed: true.
+
+ rawDataStats, acceptedRows, aggregatedResults, portfolioSummary.
+
+ source=fresh fuerza bypass de caché y muestra en logs que no usa cached.
+
+✅ 6) Tests & Golden
+
+ Smoke para 2025-08 (9 casos) pasan:
+
+ Modo/Coelsa ARS nativos correctos.
+
+ Warner/Kimberly USD nativos correctos.
+
+ Normalización USD consistente con FX 1345.
+
+ Golden assertions en tests o cuaderno de verificación con los 4 proyectos.
+
+✅ 7) Seguridad, rendimiento y resiliencia
+
+ Feature-flags de migración documentados (p.ej. INCOME_SOT_ENABLED).
+
+ Timeouts/caché controlados (y source=fresh operativo).
+
+ Manejo de NaN/∞ en KPIs (sin romper UI).
+
+ Sin uso de endpoints legacy para cálculos nuevos.
+
+✅ 8) Documentación & Operación
+
+ Comentario TODO para remover reconciler cuando direct_costs esté completo (2025-08).
+
+ Guía de soporte: cómo validar un período (curl + qué mirar en logs).
+
+ Registro de “decisiones de datos” (por qué anti-×100 horas, por qué ignorar USD >100k).
+
+ Notas de despliegue: “front depende de metrics.costDisplay/revenueDisplay”.
+
+🧪 Mini-script de verificación rápida (2025-08)
+
+Ingresos
+
+curl -s '/api/income?period=2025-08' | jq '.projects[] | select(.clientName|IN("Warner","Kimberly Clark")) | {clientName, projectName, revenueDisplay, revenueUSDNormalized}'
+
+
+Costos
+
+curl -s '/api/costs?period=2025-08&source=fresh' | jq '.projects[] | select(.clientName|IN("Warner","Kimberly Clark","Play Digital S.A (Modo)","Coelsa")) | {clientName, projectName, costDisplay, costUSDNormalized}'
+
+
+Debug
+
+curl -s '/api/costs/debug?period=2025-08' | jq '{validationPassed, portfolioSummary}'
+
+
+Active Projects (backend)
+
+curl -s '/api/projects?timeFilter=2025-08' | jq '.projects[] | select(.client.name|IN("Warner","Kimberly Clark","Play Digital S.A (Modo)","Coelsa")) | {client:.client.name, project:.name, revenue:.metrics.revenueDisplay, cost:.metrics.costDisplay}'
+
+
+Si algo de este checklist no te marca “✔”, decime cuál punto y lo ajustamos puntualmente.

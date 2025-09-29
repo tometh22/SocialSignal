@@ -183,11 +183,11 @@ export class ActiveProjectsAggregator {
       // 🎯 USAR INCOME SOT - Sistema completo con reglas anti-escala
       
       // Convert period to Income SoT format (YYYY-MM)
-      const periodKey = period.start.substring(0, 7) as `${number}-${string}`; // "2025-08-01" → "2025-08"
+      const periodKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
       console.log(`🎯 INCOME SOT: Requesting data for period "${periodKey}"`);
       
       // Get income data using Income SoT (includes anti-scale rules)
-      const incomeData = await income.getIncomeByPeriod(periodKey);
+      const incomeData = await income.getIncomeByPeriod(periodKey as any);
       console.log(`🎯 INCOME SOT: Retrieved ${incomeData.projects.length} projects`);
       
       // Convert Income SoT projects to SalesRecord format for compatibility
