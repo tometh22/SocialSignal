@@ -34,6 +34,9 @@ export type ProjectCost = {
   // 🚀 METADATA
   kind: CostKind;
   sourceRowCount: number;
+  
+  // 🎯 RECONCILIATION: Indica si el valor fue ajustado por reconciler temporal
+  overridden?: boolean;
 };
 
 // ==================== AGGREGATE RESULT ====================

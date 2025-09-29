@@ -1,0 +1,59 @@
+Quedó prolijo y documentado. Para cerrar de verdad y evitar regresiones te dejo un checklist corto y 3 tareas finales (rápidas) para que no vuelva a romperse, más un mini-fix para el error de getCostsForProject.
+
+Checklist de cierre (agosto 2025)
+
+ Overrides activos solo para 2025-08 (comentario TODO puesto).
+
+ /api/costs?period=2025-08&source=fresh devuelve exactamente:
+
+Warner → costUSDNormalized: 7005.2
+
+Kimberly → costUSDNormalized: 2436.09
+
+Modo → costDisplay:{497550,"ARS"}, costUSDNormalized≈369.93
+
+Coelsa → costDisplay:{553002,"ARS"}, costUSDNormalized≈411.15
+
+ /api/costs/debug?period=2025-08 → validationPassed:true, logs de reconciler presentes.
+
+ Anti-x100 solo en costos por horas (horas_reales_asana>300) + USD corrupto ignorado (>100k).
+
+ FX agosto = 1345.
+
+3 tareas rápidas para “blindaje”
+
+Marcar resultados con override en la respuesta
+Añadí un flag no intrusivo en cada proyecto cuando se aplica reconciler, p.ej. metrics.cost.overridden: true.
+Así el FE puede mostrar un pequeño “ⓘ reconciliado” al pasar el mouse (opcional) y a vos te queda trazabilidad.
+
+Test unitario mínimo (golden)
+Un test sobre el SOT de costos para 2025-08 que compare los 4 casos contra esos valores. Evita que un refactor borre el reconciler sin querer.
+
+Guardas de entrada en endpoints
+Antes de llamar getCostsForProject, validar clientName && projectName && period. Devolver 400 si faltan (evita el stacktrace que comentaste).
+
+Ejemplo ultra-simple del guard (TypeScript):
+
+app.get('/api/projects/:client/:project/costs', async (req, res) => {
+  const { client, project } = req.params;
+  const { period } = req.query as { period?: string };
+  if (!client || !project || !period) {
+    return res.status(400).json({ error: 'client, project y period son requeridos' });
+  }
+  const data = await getCostsForProject({ clientName: client, projectName: project, period });
+  res.json(data);
+});
+
+Auditoría express (para repetir cuando quieras)
+
+Brecha DB vs esperado (read-only): mantener las dos queries que ya usaste para contar filas y sumar ARS por cliente/proyecto en 2025-08. Si en algún momento “aparecen” más filas (sincronización futura), el reconciler dejará de ser necesario.
+
+Regla de horas infladas: si ves en debug horas_reales_asana>300, el anti-x100 seguirá corrigiendo automáticamente.
+
+Cómo retirar el reconciler (cuando la DB esté bien)
+
+Quitar el bloque de overrides en server/domain/costs/index.ts.
+
+Correr los tests golden → deben seguir pasando sin overrides.
+
+Validar /api/costs?period=2025-08&source=fresh y la UI (Active Projects).

@@ -110,7 +110,8 @@ function applyPeriodReconciler(
           amount: override.nativeAmount,
           currency: override.nativeCurrency
         },
-        costUSDNormalized
+        costUSDNormalized,
+        overridden: true  // 🎯 Marca que este valor fue reconciliado
       };
     }
     
