@@ -1,0 +1,75 @@
+Qué ves en la app vs. qué debería dar
+
+Warner — Cost: $7.41K USD (OK-ish, debería ser $7.005K USD).
+
+Kimberly — Cost: $77.37K USD (mal, debería ser $2.436K USD).
+
+Modo — Cost: $64.55 USD (mal, debería ser ARS 497.550 ≈ $369.93 USD).
+
+Coelsa — Cost: $0 (mal, debería ser ARS 553.002 ≈ $411.16 USD).
+
+Patrones del error:
+
+Se está mostrando el costo en USD aunque el proyecto sea ARS (Modo, Coelsa).
+
+Kimberly suma filas/valores espurios o toma monto_total_usd corrupto.
+
+Warner casi bien → filtro temporal/FX bien; falta cerrar delta (≈$392).
+
+Regla de negocio correcta (costos)
+
+Display (lo que ve la card):
+
+Si el ingreso del proyecto es USD, el cost debe mostrarse en USD (ya normalizado).
+
+Si el ingreso del proyecto es ARS, el cost debe mostrarse en ARS (nativo).
+
+Cálculos (markup/margin/KPI): siempre con revenueUSDNormalized y costUSDNormalized.
+
+Arreglos concretos (backend)
+
+SoT de costos – elegir moneda nativa correctamente
+
+Si revenueDisplay.currency === 'USD' ⇒
+costDisplay = { amount: costUSDNormalized, currency: 'USD' }.
+
+Si revenueDisplay.currency === 'ARS' ⇒
+costDisplay = { amount: costo_total, currency: 'ARS' }.
+
+Normalización USD consistente
+
+costUSDNormalized =
+
+si monto_total_usd es razonable (≤ 100.000) usarlo;
+
+si es astronómico o nulo ⇒ usar costo_total / fx('2025-08') (1345).
+
+Filtro temporal
+
+Usar month_key exactamente = "2025-08" (no reconstruir desde mes/año).
+
+Agregación por proyecto (dedupe)
+
+groupBy (clientName, projectName, month_key) y sumar solo:
+
+costo_total de tipo_gasto in ('Directo','Directos');
+
+no sumar filas de otros meses (asegurado por month_key).
+
+Protecciones
+
+trimLower en cliente/proyecto para emparejar nombres (espacios/casing).
+
+Nunca mezclar monto_total_usd si costo_total/fx y USD difieren >35% (tratar USD como corrupto).
+
+Arreglos concretos (frontend)
+
+La card de Cost debe leer metrics.costDisplay (no costUSD/legacy).
+
+Markup/Margin:
+
+markup = revenueUSDNormalized / costUSDNormalized
+
+margin = (revenueUSDNormalized - costUSDNormalized) / revenueUSDNormalized
+
+Para proyectos ARS, no forzar símbolo USD en el cost.
