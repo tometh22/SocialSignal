@@ -362,39 +362,36 @@ export class ActiveProjectsAggregator {
       }
     }
 
-    // Map costs data: hybrid approach with alias fallback
-    console.log(`🔧 Mapping ${costsData.length} cost records with hybrid approach...`);
+    // Map costs data: use projectKey from Costs SoT for exact matching
+    console.log(`🔧 Mapping ${costsData.length} cost records using projectKey...`);
     for (const cost of costsData) {
-      let canonicalKey = '';
-      let projectData = null;
-      let mappingMethod = '';
+      // Use the projectKey that comes from Costs SoT (already normalized and includes client+project)
+      const costProjectKey = cost.projectKey;
+      let projectData = projectsMap.get(costProjectKey);
+      let mappingMethod = "exact";
       
-      // Skip exact canonical match for costs (no clientName in CostRecord)
-      // Will rely on fuzzy match by project name
-      
-      // DISABLED: Fuzzy matching caused incorrect project grouping for similar names
-      // Now using only alias-based mapping for better precision
+      // If exact projectKey fails, try alias fallback (for legacy compatibility)
       if (!projectData) {
-        console.log(`🔧 SKIPPING FUZZY: "${cost.projectName}" - fuzzy matching disabled to prevent conflicts`);
-      }
-      
-      // If still no match, try alias fallback
-      if (!projectData) {
-        const projectId = await this.resolveProjectIdFromName(cost.projectName, '', allProjects);
+        // Extract client and project from projectKey for alias lookup
+        // projectKey format: "clientCanon|projectCanon"
+        const parts = costProjectKey.split('|');
+        const clientPart = parts[0] || '';
+        const projectPart = parts[1] || cost.projectName;
+        
+        const projectId = await this.resolveProjectIdFromName(projectPart, clientPart, allProjects);
         if (projectId && projectIdToCanonicalKey.has(projectId)) {
           const aliasCanonicalKey = projectIdToCanonicalKey.get(projectId);
           projectData = projectsMap.get(aliasCanonicalKey!);
-          canonicalKey = aliasCanonicalKey!;
           mappingMethod = "alias";
         }
       }
       
       if (projectData) {
         projectData.costs.push(cost);
-        console.log(`✅ Mapped cost "${cost.projectName}" → key "${canonicalKey}" (${mappingMethod})`);
+        console.log(`✅ Mapped cost "${cost.projectKey}" → project "${projectData.projectName}" (${mappingMethod})`);
       } else {
         orphanCount++;
-        console.log(`⚠️ ORPHAN COST: "${cost.projectName}" - no matching key found`);
+        console.log(`⚠️ ORPHAN COST: "${cost.projectKey}" - no matching project found`);
       }
     }
 

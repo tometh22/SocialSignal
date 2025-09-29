@@ -1,0 +1,90 @@
+bien visto — en tu captura el Costo de Modo aparece ~ARS 1,1M y Coelsa sale en $0, lo que delata un bug de merge: el agregador está sumando los costos de Coelsa dentro del proyecto de Modo (1,050,552 ≈ 497,550 + 553,002).
+El front ya está leyendo metrics.costDisplay (bien), así que el problema está en el join de costos en el backend.
+
+Qué está mal
+
+Se está armando el costo del proyecto con un key demasiado amplio (o mal normalizado) y los costos de Coelsa y Modo caen en el mismo bucket.
+
+Por eso Modo muestra ARS ~1.1M y Coelsa queda en $0.
+
+Arreglo (backend, agregador de Active Projects)
+
+Asegurate que el join de costos use la misma clave exacta (normalizada) que ingresos:
+
+Clave recomendada (per-period):
+
+key = `${normalize(clientName)}|${normalize(projectName)}|${period}`
+
+
+Con normalize = trim + toLowerCase + collapseSpaces.
+
+Pasos dentro del agregador (projectsActive.ts o equivalente):
+
+Construí un mapa de costos por clave:
+
+const costByKey = new Map<string, { display: MoneyDisplay; usd: number }>();
+for (const c of costsFromSoT) {
+  const key = makeKey(c.clientName, c.projectName, period);
+  costByKey.set(key, { display: c.costDisplay, usd: c.costUSDNormalized });
+}
+
+
+Al construir cada fila de proyecto:
+
+const key = makeKey(project.clientName, project.projectName, period);
+const cost = costByKey.get(key) ?? { display: {amount: 0, currency: nativeCurrency}, usd: 0 };
+
+metrics.costDisplay = cost.display;
+metrics.costUSDNormalized = cost.usd;
+
+
+No reutilices un acumulador global ni busques por client solo; siempre usa la clave compuesta (cliente+proyecto+period).
+
+importante: usá la misma función normalize() que ya empleás para ingresos; no mezcles normalizadores distintos.
+
+Checklist de verificación (rápido)
+
+API — valores base:
+
+curl -s "http://localhost:5000/api/costs?period=2025-08&source=fresh" \
+| jq '.projects[] | select(.clientName|IN("Play Digital S.A (Modo)","Coelsa","Warner","Kimberly Clark")) 
+      | {clientName, projectName, costDisplay, costUSDNormalized}'
+
+
+Deberías ver:
+
+Modo → costDisplay: {amount: 497550, currency:"ARS"}, costUSDNormalized ≈ 369.93
+
+Coelsa → costDisplay: {amount: 553002, currency:"ARS"}, costUSDNormalized ≈ 411.15
+
+Warner → USD ≈ 7005.20
+
+Kimberly → USD ≈ 2436.09
+
+API — cross-check por proyecto (si tenés endpoint por proyecto):
+
+curl -s "http://localhost:5000/api/projects/Play%20Digital%20S.A%20(Modo)/Fee%20mensual/costs?period=2025-08"
+curl -s "http://localhost:5000/api/projects/Coelsa/Fee%20mensual/costs?period=2025-08"
+
+
+Ambos deben dar sus costos por separado (no sumados).
+
+UI (Active Projects)
+
+Modo: Cost ⇒ ARS 497.550
+
+Coelsa: Cost ⇒ ARS 553.002
+
+Warner: Cost ⇒ USD 7.005,20
+
+Kimberly: Cost ⇒ USD 2.436,09
+
+KPIs (markup/margin) sin cambios (usan *_USDNormalized).
+
+Smoke de regresión
+
+Cambiar el período en el filtro: no debe mezclar meses.
+
+Recargar con source=fresh al menos una vez y confirmar que no vuelve el sumado.
+
+Si querés, te dejo el pequeño patch para la función makeKey() y el uso en el agregador; pero con estas instrucciones ya lo dejás fino.
