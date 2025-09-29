@@ -37,6 +37,8 @@ export type NormalizedSale = {
   currency: "ARS" | "USD";
   revenueUSD: number;
   originalAmount: number;
+  originalAmountARS?: number;
+  originalAmountUSD?: number;
   fx?: number;
   antiX100Applied?: boolean;
 };
@@ -75,6 +77,16 @@ export function normalizeSales(rows: RawSale[]): NormalizedSale[] {
       let fx: number | undefined;
       let antiX100Applied = false;
       let originalAmount = 0;
+      let originalAmountARS: number | undefined;
+      let originalAmountUSD: number | undefined;
+      
+      // Guardar valores originales si existen
+      if (arsRaw > 0) {
+        originalAmountARS = arsRaw;
+      }
+      if (usdRaw > 0) {
+        originalAmountUSD = usdRaw;
+      }
       
       if (usdRaw > 0) {
         // CASO USD: Aplicar anti-×100 defensivo
@@ -117,6 +129,8 @@ export function normalizeSales(rows: RawSale[]): NormalizedSale[] {
         currency,
         revenueUSD: Number(revenueUSD.toFixed(2)),
         originalAmount,
+        ...(originalAmountARS && { originalAmountARS }),
+        ...(originalAmountUSD && { originalAmountUSD }),
         ...(fx && { fx }),
         ...(antiX100Applied && { antiX100Applied })
       };
@@ -291,7 +305,7 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
     const revenueDisplay = nativeAmount;
     const revenueUSDNormalized = usdNormalized;
     
-    return {
+    const result: any = {
       clientName,
       projectName,
       monthKey,
@@ -299,10 +313,13 @@ export function normalizeIncomeRow(row: any): DualNormalizedIncome | null {
       displayCurrency,
       revenueDisplay: Number(revenueDisplay.toFixed(2)),
       revenueUSDNormalized: Number(revenueUSDNormalized.toFixed(2)),
-      confirmed: true,
-      ...(fx && { fx }),
-      ...(antiX100Applied && { antiX100Applied })
+      confirmed: true
     };
+    
+    if (fx) result.fx = fx;
+    if (antiX100Applied) result.antiX100Applied = antiX100Applied;
+    
+    return result;
     
   } catch (error: any) {
     console.error(`❌ DUAL NORMALIZADOR: Error procesando fila:`, error.message, row);

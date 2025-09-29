@@ -56,8 +56,26 @@ function desinflarSiEscala(valueUSD: number): number {
 
 export const parseNumberEs = (v: unknown): number => {
   if (v == null) return 0;
-  // "4.359.857" -> "4359857", "1.750" -> "1750", "29,230.00" (por si acaso) -> "29230.00"
-  const s = String(v).trim().replace(/\./g, '').replace(',', '.');
+  const str = String(v).trim();
+  
+  // Detectar formato: si tiene punto seguido de 2 dígitos al final, es decimal americano
+  // Ejemplo: "2277.78" o "29230.00"
+  // Si tiene múltiples puntos o punto NO seguido de 2 dígitos, es formato español
+  // Ejemplo: "4.359.857" o "1.750"
+  
+  const dotCount = (str.match(/\./g) || []).length;
+  const hasDecimalPoint = /\.\d{2}$/.test(str); // Punto seguido de exactamente 2 dígitos al final
+  
+  let s: string;
+  if (dotCount === 1 && hasDecimalPoint) {
+    // Formato americano: punto como decimal (2277.78)
+    s = str.replace(',', ''); // Eliminar comas si las hay
+  } else {
+    // Formato español: punto como separador de miles, coma como decimal
+    // "4.359.857" -> "4359857", "1.750" -> "1750", "29.230,00" -> "29230.00"
+    s = str.replace(/\./g, '').replace(',', '.');
+  }
+  
   const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 };

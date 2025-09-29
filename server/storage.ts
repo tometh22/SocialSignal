@@ -4474,8 +4474,8 @@ export class DatabaseStorage implements IStorage {
       Proyecto: String(row.proyecto || '').trim(), 
       Mes: String(row.mes || '').trim(),
       Año: parseInt(row.año) || new Date().getFullYear(),
-      Monto_ARS: Number(row.monto_ars || row.montoArs || 0) || 0,
-      Monto_USD: Number(row.monto_usd || row.montoUsd || 0) || 0,
+      Monto_ARS: Number(row.monto_ars || row.montoArs || row.montoARS || 0) || 0,
+      Monto_USD: Number(row.monto_usd || row.montoUsd || row.montoUSD || 0) || 0,
       Confirmado: String(row.confirmado || 'SI').trim()
     }));
     
@@ -4538,6 +4538,7 @@ export class DatabaseStorage implements IStorage {
         const uniqueKey = `${normalized.client}_${normalized.project}_${monthNumber}_${yearNumber}_${salesType}`.toLowerCase();
         
         // 🎯 PREPARAR DATOS USANDO INFORMACIÓN YA NORMALIZADA
+        // Guardar AMBOS valores cuando están disponibles (ARS y USD)
         const salesRecord: InsertGoogleSheetsSales = {
           monthKey: normalized.monthKey,
           clientName: normalized.client,
@@ -4545,10 +4546,10 @@ export class DatabaseStorage implements IStorage {
           month: monthName,
           year: yearNumber,
           salesType,
-          amountLocal: normalized.currency === 'ARS' ? String(normalized.originalAmount) : null,
+          amountLocal: normalized.originalAmountARS ? String(normalized.originalAmountARS) : null,
           currency: normalized.currency,
           fxApplied: normalized.fx ? String(normalized.fx) : null,
-          amountUsd: String(normalized.revenueUSD),
+          amountUsd: normalized.originalAmountUSD ? String(normalized.originalAmountUSD) : String(normalized.revenueUSD),
           fxSource: normalized.fx ? 'MonthTable' : 'Direct',
           fxAt: new Date(),
           confirmed,

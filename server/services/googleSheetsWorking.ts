@@ -1053,7 +1053,14 @@ class GoogleSheetsWorkingService {
       "warner::fee insights": 34,
       "kimberly clark::fee huggies": 39,
       "play digital s.a (modo)::fee mensual": 42,
+      "play digital s.a (modo)::fee_mensual": 42,
+      "play digital sa (modo)::fee mensual": 42,
+      "play digital sa (modo)::fee_mensual": 42,
+      "play digital::fee mensual": 42,
+      "modo::fee mensual": 42,
       "coelsa::fee mensual": 43,
+      "detroit::fee mensual": 44,
+      "vertical media::fee mensual": 41,
       // Agregar más alias según sea necesario
     };
   }
