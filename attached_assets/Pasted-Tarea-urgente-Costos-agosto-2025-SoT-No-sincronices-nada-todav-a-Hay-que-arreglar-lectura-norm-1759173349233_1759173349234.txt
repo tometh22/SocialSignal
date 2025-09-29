@@ -1,0 +1,87 @@
+Tarea urgente – Costos agosto 2025 (SoT)
+
+No sincronices nada todavía. Hay que arreglar lectura/normalización primero.
+
+Reglas obligatorias del SoT de costos (backend)
+
+Periodo: filtrar exclusivamente por month_key = 'YYYY-MM'. No uses mes/año.
+
+Incluir solo: LOWER(TRIM(tipo_gasto)) IN ('directo','directos').
+
+Moneda nativa:
+
+Si monto_total_usd ≤ 100,000 y pasa validación → nativo USD.
+
+Si monto_total_usd > 100,000 (astronómico) → ignorar USD y usar ARS.
+
+FX: usar 1345 para 2025-08 (leer de exchange_rates), sin fallback 1260.
+
+Anti-x100 solo para costos calculados por horas
+Si hay horas_reales_asana y valor_hora_persona:
+
+si horas_reales_asana > 300 → divide horas_reales_asana por 100 (redondeo a 2 dec) o divide costo_total por 100 (aplicar exactamente una de las dos, no ambas).
+
+Loggear ANTI_x100_HOURS con {persona, cliente, proyecto, horas_raw, horas_fix}.
+
+Agregación por proyecto: agrupar por clientKey = slugify(lower(trim(cliente))), projectKey = slugify(lower(trim(proyecto))), month_key.
+Sumar ARS (post anti-x100) y sumar USD (solo válidos).
+costUSDNormalized = (ARS_sum / fx) + USD_valid_sum.
+
+Salida (por proyecto):
+
+{
+  costDisplay: { amount: number, currency: 'ARS'|'USD' }, // nativo
+  costUSDNormalized: number // para KPIs
+}
+
+
+Valores que deben dar en 2025-08 (golden):
+
+Warner · Fee Marketing → USD 7,005.20
+
+Kimberly · Fee Huggies → USD 2,436.09
+
+Play (Modo) · Fee mensual → ARS 497,550 (→ USD 369.93 para KPIs)
+
+Coelsa · Fee mensual → ARS 553,002 (→ USD 411.16 para KPIs)
+
+SQL de control (no modificar datos)
+
+-- Ver filas crudas del mes
+SELECT cliente, proyecto, month_key, tipo_gasto,
+       costo_total AS ars_raw, monto_total_usd AS usd_raw,
+       horas_reales_asana, valor_hora_persona
+FROM direct_costs
+WHERE month_key='2025-08'
+  AND LOWER(TRIM(tipo_gasto)) IN ('directo','directos')
+  AND LOWER(TRIM(cliente)) IN ('warner','kimberly clark','play digital s.a (modo)','coelsa')
+ORDER BY cliente, proyecto, ars_raw DESC;
+
+
+Tests automatizables (deben pasar):
+
+/api/costs?period=2025-08&source=fresh devuelve los 4 proyectos con:
+
+Warner.costUSDNormalized ≈ 7005.20
+
+Kimberly.costUSDNormalized ≈ 2436.09
+
+Modo.costDisplay = {amount: 497550, currency:'ARS'} y costUSDNormalized ≈ 369.93
+
+Coelsa.costDisplay = {amount: 553002, currency:'ARS'} y costUSDNormalized ≈ 411.16
+
+/api/costs/debug?period=2025-08:
+
+ledger sin usd_raw > 100000 usados.
+
+Para personas con horas descomunales, aparece ANTI_x100_HOURS en logs.
+
+Frontend (cards) – usar SoT sí o sí
+
+Mostrar costos con metrics.costDisplay.
+
+Usar KPIs con metrics.costUSDNormalized.
+
+Nada de leer campos legacy (period.cost, etc.).
+
+Criterio de “done”: UI muestra exactamente los 4 golden anteriores. Adjuntar en el log final: totales por proyecto, FX aplicado y si se activó ANTI_x100_HOURS.

@@ -40,7 +40,12 @@ const COLUMN_MAPPINGS = {
   arsAmount: ['costoTotal', 'costo_total', 'Total ARS', 'Monto_ARS', 'costoTotalARS'],
   
   // Total USD: estructura real de DB con variantes snake_case y camelCase
-  usdAmount: ['montoTotalUSD', 'montoTotalUsd', 'monto_total_usd', 'Total USD', 'Monto_USD', 'costoTotalUSD']
+  usdAmount: ['montoTotalUSD', 'montoTotalUsd', 'monto_total_usd', 'Total USD', 'Monto_USD', 'costoTotalUSD'],
+  
+  // 🎯 ANTI-×100: Campos para detectar costos calculados por horas
+  hoursReal: ['horas_reales_asana', 'horasRealesAsana', 'horas_reales', 'hoursReal'],
+  hourlyRate: ['valor_hora_persona', 'valorHoraPersona', 'hourlyRate', 'valor_hora'],
+  persona: ['persona', 'Persona', 'person', 'nombre']
 };
 
 // ==================== CURRENCY DETECTION ====================
@@ -266,27 +271,35 @@ export function parseCostRecord(
     return null;
   }
   
-  // 🎯 ANTI-ESCALA ×100: Detectar valores inflados en costos
-  // Patrón: Si USD es astronómico (>100k) Y ARS >10k → ARS está inflado ×100
+  // 🎯 ANTI-×100 PARA COSTOS CALCULADOS POR HORAS
+  // Regla: Si hay horas_reales_asana Y valor_hora_persona, y horas > 300 → dividir costo_total por 100
+  const hoursReal = extractNumericField(record, COLUMN_MAPPINGS.hoursReal);
+  const hourlyRate = extractNumericField(record, COLUMN_MAPPINGS.hourlyRate);
+  const persona = extractField(record, COLUMN_MAPPINGS.persona);
+  
   let arsAmount: number | null = null;
   let usdAmount: number | null = null;
   
+  // Detectar si es un costo calculado por horas
+  const isHourBasedCost = hoursReal && hoursReal > 0 && hourlyRate && hourlyRate > 0;
+  
+  // Detectar USD corrupto (astronómico)
   const usdIsCorrupt = usdAmountRaw && (
     !isFinite(usdAmountRaw) || 
-    usdAmountRaw > 100_000 ||
-    usdAmountRaw > 1e12 // Astronómico
+    usdAmountRaw > 100_000
   );
   
   if (arsAmountRaw && arsAmountRaw > 0) {
-    // Si USD está corrupto Y ARS >10k → probablemente inflado ×100
-    if (usdIsCorrupt && arsAmountRaw > 10_000) {
-      arsAmount = arsAmountRaw / 100;
-      console.log(`🔧 COST ANTI-×100: ARS ${arsAmountRaw} → ${arsAmount} (USD was corrupt: ${usdAmountRaw})`);
+    // 🎯 REGLA ANTI-×100: Solo para costos calculados por horas con horas > 300
+    if (isHourBasedCost && hoursReal! > 300) {
+      arsAmount = Math.round((arsAmountRaw / 100) * 100) / 100; // Redondeo a 2 decimales
+      console.log(`🔧 ANTI_×100_HOURS: {persona: "${persona}", cliente: "${clientName}", proyecto: "${projectName}", horas_raw: ${hoursReal}, horas_fix: ${(hoursReal! / 100).toFixed(2)}, costo_raw: ${arsAmountRaw}, costo_fix: ${arsAmount}}`);
     } else {
       arsAmount = arsAmountRaw;
     }
   }
   
+  // USD: Ignorar si está corrupto (astronómico)
   if (usdAmountRaw && usdAmountRaw > 0 && !usdIsCorrupt) {
     usdAmount = usdAmountRaw;
   }
