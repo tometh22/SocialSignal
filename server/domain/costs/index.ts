@@ -16,6 +16,7 @@ import type {
 
 import { getCostData, getCostDataForProject } from './data-access';
 import { processCostsForPeriod } from './business-rules';
+import * as income from '../income';
 
 // ==================== PUBLIC API ====================
 
@@ -26,11 +27,23 @@ export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult>
   console.log(`🚀 COSTS SoT: Getting costs for period ${period}`);
   
   try {
-    // Fetch all cost data
+    // 1. Fetch all cost data
     const allCostRecords = await getCostData();
     
-    // Process for the specific period
-    const result = await processCostsForPeriod(allCostRecords, period);
+    // 2. 🎯 NEW: Get Income SoT data to determine currency display
+    console.log(`💰 COSTS SoT: Getting Income SoT data for period ${period} to determine currency display`);
+    const incomeResult = await income.getIncomeByPeriod(period);
+    
+    // 3. Create project currency map: clientName|projectName → revenueDisplay.currency
+    const projectCurrencyMap = new Map<string, 'USD' | 'ARS'>();
+    for (const project of incomeResult.projects) {
+      const key = `${project.clientName}|${project.projectName}`;
+      projectCurrencyMap.set(key, project.revenueDisplay.currency as 'USD' | 'ARS');
+      console.log(`📊 CURRENCY MAP: ${key} → ${project.revenueDisplay.currency}`);
+    }
+    
+    // 4. Process for the specific period (with currency info)
+    const result = await processCostsForPeriod(allCostRecords, period, {}, projectCurrencyMap);
     
     console.log(`✅ COSTS SoT: Returned ${result.projects.length} projects, total ${result.portfolioCostUSD.toFixed(2)} USD`);
     

@@ -125,7 +125,8 @@ interface ProjectCostGroup {
 }
 
 export async function aggregateCostsByProject(
-  records: ParsedCostRecord[]
+  records: ParsedCostRecord[],
+  projectCurrencyMap?: Map<string, 'USD' | 'ARS'>
 ): Promise<ProjectCost[]> {
   console.log(`💰 COST AGGREGATION: Starting with ${records.length} records`);
   
@@ -166,23 +167,22 @@ export async function aggregateCostsByProject(
   const projectCosts: ProjectCost[] = [];
   
   for (const group of groups.values()) {
-    // Determine final display currency (prioritize the dominant one)
-    const usdDisplays = group.costDisplays.filter(d => d.currency === 'USD');
-    const arsDisplays = group.costDisplays.filter(d => d.currency === 'ARS');
+    // 🎯 NEW: Determine display currency based on Income SoT revenueDisplay.currency
+    const projectKey = `${group.clientName}|${group.projectName}`;
+    const revenueDisplayCurrency = projectCurrencyMap?.get(projectKey) || 'ARS'; // Default to ARS
     
     let finalDisplay: MoneyDisplay;
     
-    if (usdDisplays.length > 0) {
-      // Prefer USD if present
-      const totalUSD = usdDisplays.reduce((sum, d) => sum + d.amount, 0);
-      finalDisplay = { amount: totalUSD, currency: 'USD' };
-    } else if (arsDisplays.length > 0) {
-      // Fallback to ARS
+    if (revenueDisplayCurrency === 'USD') {
+      // Project revenue is USD → show cost in USD (normalized)
+      finalDisplay = { amount: group.totalUSDNormalized, currency: 'USD' };
+      console.log(`💱 COST DISPLAY: ${projectKey} → USD (revenue is USD) = ${group.totalUSDNormalized.toFixed(2)}`);
+    } else {
+      // Project revenue is ARS → show cost in ARS (native)
+      const arsDisplays = group.costDisplays.filter(d => d.currency === 'ARS');
       const totalARS = arsDisplays.reduce((sum, d) => sum + d.amount, 0);
       finalDisplay = { amount: totalARS, currency: 'ARS' };
-    } else {
-      // No valid displays
-      finalDisplay = { amount: 0, currency: 'USD' };
+      console.log(`💱 COST DISPLAY: ${projectKey} → ARS (revenue is ARS) = ${totalARS.toFixed(2)}`);
     }
     
     const projectCost: ProjectCost = {
@@ -250,7 +250,8 @@ export function handleIndirectCosts(
 export async function processCostsForPeriod(
   allRecords: ParsedCostRecord[],
   period: PeriodKey,
-  rules: Partial<CostBusinessRules> = {}
+  rules: Partial<CostBusinessRules> = {},
+  projectCurrencyMap?: Map<string, 'USD' | 'ARS'>
 ): Promise<CostsResult> {
   
   const config = { ...DEFAULT_COST_RULES, ...rules };
@@ -269,8 +270,8 @@ export async function processCostsForPeriod(
     };
   }
   
-  // 2. Aggregate by project
-  const projectCosts = await aggregateCostsByProject(periodRecords);
+  // 2. Aggregate by project (with currency display info from Income SoT)
+  const projectCosts = await aggregateCostsByProject(periodRecords, projectCurrencyMap);
   
   // 3. Handle indirect costs
   const { directCosts, indirectCosts, portfolioTotal } = handleIndirectCosts(
