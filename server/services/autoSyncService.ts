@@ -109,50 +109,17 @@ export class AutoSyncService {
 
       // 1. Obtener datos de ventas desde Excel MAESTRO "Ventas Tomi"
       const salesData = await googleSheetsWorkingService.getVentasTomi();
-      let salesResult = { imported: 0, updated: 0, errors: [] };
-      let lineasGeneralesResult = { processed: 0, errors: [] };
+      let salesResult: { imported: number; updated: number; errors: string[] } = { imported: 0, updated: 0, errors: [] };
+      let lineasGeneralesResult: { processed: number; errors: string[] } = { processed: 0, errors: [] };
       
       if (salesData.length > 0) {
         console.log(`📈 Procesando ${salesData.length} registros de ventas...`);
         
-        // AUTO-DETECCIÓN DE FORMATO
-        console.log('🔍 AUTO-SYNC: Detectando formato de datos...');
-        const { detectFormat } = await import('../utils/format-detector');
-        const detection = detectFormat(salesData);
-        
-        console.log(`🔍 AUTO-SYNC FORMAT DETECTED: ${detection.format} (confidence: ${detection.confidence})`);
-        
-        // Si es formato "líneas generales", usar el ETL especializado
-        if (detection.format === 'lineas_generales' && detection.confidence > 0.7) {
-          console.log('🚀 AUTO-SYNC: Usando ETL de líneas generales...');
-          
-          try {
-            const { processLineasGenerales } = await import('../etl/lineas-generales-etl');
-            const result = await processLineasGenerales(salesData, 'auto');
-            
-            lineasGeneralesResult = {
-              processed: result.processed,
-              errors: result.errors
-            };
-            
-            console.log(`✅ Líneas Generales sincronizadas: ${result.processed} procesados, ${result.ventasInserted} ventas, ${result.costosInserted} costos`);
-          } catch (error: any) {
-            const errorMsg = `Error procesando líneas generales: ${error.message}`;
-            console.error('❌', errorMsg);
-            lineasGeneralesResult.errors.push(errorMsg);
-          }
-        } 
-        // Si es formato "ventas tomi", usar el proceso existente
-        else if (detection.format === 'ventas_tomi' || detection.confidence <= 0.7) {
-          console.log('🚀 AUTO-SYNC: Usando ETL de Ventas Tomi (formato estándar)...');
-          salesResult = await storage.importSalesFromGoogleSheets(salesData);
-          console.log(`✅ Ventas Tomi sincronizadas: ${salesResult.imported} nuevas, ${salesResult.updated} actualizadas`);
-        }
-        else {
-          const errorMsg = `Formato desconocido detectado: ${detection.format}`;
-          console.warn(`⚠️ AUTO-SYNC: ${errorMsg}`);
-          salesResult.errors.push(errorMsg);
-        }
+        // IMPORTACIÓN DIRECTA: Los datos de getVentasTomi() ya están procesados y normalizados
+        // No necesitan pasar por el detector de formato ni ETL adicional
+        console.log('🚀 AUTO-SYNC: Importando ventas pre-procesadas desde Ventas Tomi...');
+        salesResult = await storage.importSalesFromGoogleSheets(salesData);
+        console.log(`✅ Ventas Tomi sincronizadas: ${salesResult.imported} nuevas, ${salesResult.updated} actualizadas`);
       } else {
         console.log('⚠️ No se encontraron datos de ventas en Excel MAESTRO');
       }
@@ -229,7 +196,6 @@ export class AutoSyncService {
             // Actualizar la venta con el ID del proyecto correcto, preservando montos ya calculados
             await storage.updateGoogleSheetsSales(sale.id, {
               projectId: projectId,
-              lastUpdated: new Date(),
               // Preservar campos de montos que ya fueron calculados durante importSalesFromGoogleSheets
               amountLocal: sale.amountLocal,
               amountUsd: sale.amountUsd,

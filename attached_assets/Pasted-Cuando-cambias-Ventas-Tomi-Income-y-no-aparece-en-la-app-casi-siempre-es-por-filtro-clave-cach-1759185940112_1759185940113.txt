@@ -1,0 +1,101 @@
+Cuando cambias “Ventas Tomi” (Income) y no aparece en la app, casi siempre es por filtro/clave, caché, o mapeo de columnas. Te dejo un checklist corto y comandos para verificar en 2–3 minutos.
+
+🧭 Checklist rápido (Modo · Agosto 2025)
+1) La fila en “Ventas Tomi”
+
+ Cliente exactamente: Play Digital S.A (Modo)
+
+ Proyecto exactamente: Fee mensual
+
+ Mes/Año: Agosto y 2025 (recuerda: el SoT arma period=2025-08)
+
+ Confirmado: Si
+
+ Monto: usa una columna:
+
+Si cobrás en ARS → Monto_ARS (> 0) y Monto_USD = 0
+
+Si cobrás en USD → Monto_USD (> 0) y Monto_ARS = 0
+(si ambos > 0, se descarta por reglas; si ambos 0, la fila no entra)
+
+ Tipo_Venta (Fee/One Shot) no afecta el cálculo, pero sí el agrupado visual.
+
+Modo en agosto debería ser ARS (display ARS; normalized = ARS / 1345).
+
+2) Verificar que el backend SoT lo tomó
+A. Lista del período (Income SoT)
+curl -s "http://localhost:5000/api/income?period=2025-08" \
+| jq '.projects[] | select(.clientName=="Play Digital S.A (Modo)" and .projectName=="Fee mensual") | {clientName, projectName, revenueDisplay, revenueUSDNormalized}'
+
+
+Esperás ver revenueDisplay: {amount: <tu nuevo ARS>, currency:"ARS"}
+
+Y revenueUSDNormalized ≈ ARS/1345.
+
+B. Portfolio del período (resumen)
+curl -s "http://localhost:5000/api/portfolio/income?period=2025-08" | jq .
+
+
+Sirve para confirmar que el total sube/baja acorde a tu cambio.
+
+Si acá ya ves el número nuevo, el backend está bien y lo pendiente es cache/agg/frontend.
+
+3) Active Projects (agregador / frontend)
+A. Datos que consume la pantalla
+# Agregador de proyectos (usa SoT por dentro)
+curl -s "http://localhost:5000/api/projects?timeFilter=2025-08" \
+| jq '.projects[] | select(.client.name=="Play Digital S.A (Modo)" and .name=="Fee mensual") | {client: .client.name, project: .name, revenue: .metrics.revenueDisplay}'
+
+
+Si esto trae el valor viejo:
+
+ Pulsá Refresh en la UI (borra caché de la vista).
+
+ Repite el curl anterior.
+
+ Si sigue viejo, el agregador puede tener caché en memoria: reiniciar server vacía la caché.
+
+Si tu backend tiene parámetro para forzar fresco (igual que costs), probá:
+
+curl -s "http://localhost:5000/api/projects?timeFilter=2025-08&fresh=true" | jq '...'   # si está habilitado
+
+4) Causas típicas (y cómo las detectás)
+
+No pasa el filtro temporal
+Mes/Año mal (o escrito distinto) → no aparece en /api/income?period=2025-08.
+
+Confirmado ≠ "Si"
+Queda fuera. Revisa la celda exacta (mayúsculas, tildes no aplican).
+
+Ambas columnas de monto con valor
+Reglas de negocio descartan o eligen la nativa y normalizan mal. Dejá solo una (>0).
+
+Nombre cliente/proyecto con espacios invisibles
+“Play Digital S.A (Modo) ” (espacio final) rompe el match → no aparece en /api/projects?....
+Solución: limpiar el texto en la sheet o en el parser (trim).
+
+Caché del agregador
+Si /api/income ya refleja el cambio y /api/projects no, es caché → Refresh o restart.
+
+Anti-escala de ingresos
+Solo aplica a casos puntuales (Warner/Kimberly). Modo ARS no debería tocarse.
+
+5) Qué debería verse (Agosto 2025)
+
+Active Projects (Modo)
+
+Revenue: ARS <tu nuevo valor>
+
+Cost: ARS 497,6K (por reconciler)
+
+Markup/Margin calculados con USD normalized (ARS/1345)
+
+6) Si sigue sin aparecer
+
+Decime qué arrojan exactamente estos dos JSON (pega solo el bloque del proyecto Modo):
+
+/api/income?period=2025-08 (bloque de Modo)
+
+/api/projects?timeFilter=2025-08 (bloque de Modo)
+
+Con eso te digo al toque si es un tema de datos, mapeo, o caché y te doy el fix puntual.
