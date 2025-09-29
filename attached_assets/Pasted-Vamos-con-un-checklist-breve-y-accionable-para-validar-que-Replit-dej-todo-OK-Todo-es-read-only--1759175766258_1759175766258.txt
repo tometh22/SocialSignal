@@ -1,0 +1,116 @@
+Vamos con un checklist breve y accionable para validar que Replit dejó todo OK!
+(Todo es read-only; no toca datos.)
+
+1) Endpoints y respuestas (API)
+
+ Ping usuario: GET /api/current-user → JSON válido (no HTML).
+
+ Income SoT (ago-2025):
+GET /api/income?period=2025-08 → aparecen Warner, Kimberly, Coelsa, Modo.
+
+ Warner → revenueDisplay.currency = "USD", revenueUSDNormalized = 29230
+
+ Kimberly → "USD", revenueUSDNormalized = 8450
+
+ Coelsa → revenueDisplay.currency = "ARS", revenueDisplay.amount = 4359857
+
+ Modo → "ARS", amount = 4596700
+
+ Portfolio Income:
+GET /api/portfolio/income?period=2025-08 → period = "2025-08" y el total ≈ 45.5K USD (según tus cálculos).
+
+ Costs SoT (ago-2025):
+GET /api/costs?period=2025-08&source=fresh
+
+ Warner → costUSDNormalized = 7005.2
+
+ Kimberly → costUSDNormalized = 2436.09
+
+ Coelsa → costDisplay = { amount: 553002, currency: "ARS" }, costUSDNormalized ≈ 411.15
+
+ Modo → costDisplay = { amount: 497550, currency: "ARS" }, costUSDNormalized ≈ 369.93
+
+ Costs Debug (auditor):
+GET /api/costs/debug?period=2025-08
+
+ validationPassed: true
+
+ fx.rate = 1345
+
+ period = "2025-08" (no mezcla otros meses)
+
+ Adapters legacy:
+GET /api/income-dashboard-rows?timeFilter=2025-08 y
+GET /api/projects/:id/incomes?timeFilter=2025-08 → devuelven 5 registros (usan SoT), no 75 legacy.
+
+2) Reglas de negocio clave
+
+ Moneda nativa en cards:
+Ingresos/Costos muestran ARS para Coelsa/Modo y USD para Warner/Kimberly.
+
+ KPIs normalizados: Totales y ratios usan USD normalizado (no revenueUSD legacy).
+
+ Filtro temporal estricto: Solo month_key = "2025-08" (sin arrastre de enero).
+
+ Anti-x100 en costos: Solo si horas_reales_asana > 300 (y tiene valor_hora_persona); verás en logs ANTI_×100_HOURS.
+
+ USD corrupto en costos: Ignorado si monto_total_usd > 100000; cae a ARS / fx.
+
+ FX correcto: Agosto 2025 usa 1345 (no 1260).
+
+3) Overrides/reconciler (temporal)
+
+ Solo aplican para 2025-08 y exclusivamente a:
+
+Warner Fee Marketing → USD 7005.20
+
+Kimberly Fee Huggies → USD 2436.09
+
+Coelsa Fee mensual → ARS 553002
+
+Modo Fee mensual → ARS 497550
+
+ La respuesta de costos incluye flag (si lo habilitaron) tipo metrics.cost.overridden: true en esos proyectos.
+
+ Existe un TODO claro en el código para quitar overrides cuando la DB esté completa.
+
+4) UI (tres vistas)
+
+ Proyectos Activos: cards muestran moneda nativa; cabecera/porfolio en USD.
+
+ Vista Proyecto: coincide con los valores del SoT para 2025-08 (ingresos y costos).
+
+ Dashboard General: KPIs usan USD normalizado; totales = suma de proyectos.
+
+5) Integridad y cálculos
+
+ Suma portfolio:
+Ingresos USD normalizados ≈ 29230 + 8450 + 4359857/1345 + 4596700/1345 ≈ 45.5K USD.
+
+ Profit/Margen en proyectos = IngresosUSDNorm – CostosUSDNorm y (profit / ingresos).
+
+6) Errores y caché
+
+ Endpoints de proyecto validan parámetros: si falta client/project/period → HTTP 400, no stacktrace.
+
+ source=fresh fuerza no usar caché (ver log “Using cached data” ausente en esa llamada).
+
+7) Logs que deberían verse (indicativos)
+
+ ✅ INCOME SOT ENDPOINTS configured al arrancar.
+
+ 🚀 INCOME SoT: getIncomeByPeriod(2025-08) y 🚀 COSTS SoT: getCostsByPeriod(2025-08)
+
+ 💱 USING BD FX RATE: 2025-08 = 1345
+
+ (Costos) ANTI_×100_HOURS cuando corresponda.
+
+ (Reconciler) 🔧 RECONCILER: Applying period overrides for 2025-08.
+
+Tip rápido (si algo no cuadra)
+
+Repetí los 4 endpoints marcados arriba con source=fresh.
+
+Confirmá FX=1345 y que month_key sea 2025-08 en el debug.
+
+Si un número no matchea Excel y overrides están activos, debería salir exactamente el valor esperado en ese mes.
