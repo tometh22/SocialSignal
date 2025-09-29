@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
+import { autoSyncService } from "./services/autoSyncService";
 import cors from 'cors';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
@@ -111,6 +112,10 @@ const port = Number(process.env.PORT || 5000);
     // Initialize database connection and data
     await initializeDatabase();
     console.log("💾 Database initialized successfully");
+
+    // Start automatic synchronization service
+    autoSyncService.start();
+    console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
 
     const server = app.listen(port, "0.0.0.0", () => {
       console.log(`🚀 Server running on port ${port}`);
