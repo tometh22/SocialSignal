@@ -4,28 +4,32 @@ import path from 'path';
 
 export interface AnomalyConfig {
   lookback_months: number;
+  lookahead_months?: number;
+  use_future_baseline?: boolean;
   low_ratio_threshold: number;
   high_ratio_threshold: number;
   min_baseline_points: number;
   mode: 'detect' | 'autocorrect';
-  strategy: 'median' | 'prev_valid';
+  strategy: 'median' | 'prev_valid' | 'nearest_valid';
   max_gap_months: number;
   usd_tolerance_pct: number;
   log_level: string;
   min_baseline_usd?: number;
   lower_clamp_ratio?: number;
   upper_clamp_ratio?: number;
+  expected_usd_band?: { low: number; high: number };
 }
 
 interface ConfigOverride {
   projectKey: string;
   low_ratio_threshold?: number;
   high_ratio_threshold?: number;
-  strategy?: 'median' | 'prev_valid';
+  strategy?: 'median' | 'prev_valid' | 'nearest_valid';
   min_baseline_points?: number;
   min_baseline_usd?: number;
   lower_clamp_ratio?: number;
   upper_clamp_ratio?: number;
+  expected_usd_band?: { low: number; high: number };
 }
 
 interface ConfigFile {
@@ -109,6 +113,7 @@ export function temporalGuard(input: {
   fx: number;
   montoUSDFromOrigin: number | null;
   historyUSDNormalized: number[];
+  historyFutureUSDNormalized?: number[];
 }): AnomalyDecision {
   const { 
     projectKey, 
@@ -117,7 +122,8 @@ export function temporalGuard(input: {
     costNative, 
     fx, 
     montoUSDFromOrigin, 
-    historyUSDNormalized 
+    historyUSDNormalized,
+    historyFutureUSDNormalized = []
   } = input;
 
   const cfg = getConfigForProject(projectKey);
@@ -148,8 +154,14 @@ export function temporalGuard(input: {
 
   if (cfg.mode === 'autocorrect') {
     const prevValid = historyUSDNormalized.find(x => Number.isFinite(x) && x >= minBaselineUSD) ?? null;
+    const nextValid = (cfg.use_future_baseline && historyFutureUSDNormalized.length > 0)
+      ? historyFutureUSDNormalized.find(x => Number.isFinite(x) && x >= minBaselineUSD) ?? null
+      : null;
     
-    if (cfg.strategy === 'prev_valid' && prevValid) {
+    if (cfg.strategy === 'nearest_valid') {
+      fixedUSD = prevValid ?? nextValid ?? baselineUSD;
+      reason = prevValid ? 'AUTO_FROM_PREV_VALID' : (nextValid ? 'AUTO_FROM_NEXT_VALID' : 'AUTO_FROM_MEDIAN');
+    } else if (cfg.strategy === 'prev_valid' && prevValid) {
       fixedUSD = prevValid;
       reason = 'AUTO_FROM_PREV_VALID';
     } else {
@@ -157,8 +169,18 @@ export function temporalGuard(input: {
       reason = 'AUTO_FROM_MEDIAN';
     }
     
-    // Clamp contra prev_valid si existe
-    if (prevValid && fixedUSD) {
+    // Clamp a banda esperada (prioritario)
+    if (cfg.expected_usd_band && fixedUSD) {
+      const { low, high } = cfg.expected_usd_band;
+      const originalFixed = fixedUSD;
+      fixedUSD = Math.min(high, Math.max(low, fixedUSD));
+      
+      if (fixedUSD !== originalFixed) {
+        flags.push('CLAMPED_TO_EXPECTED_BAND');
+      }
+    }
+    // Clamp contra prev_valid si existe (fallback si no hay banda)
+    else if (prevValid && fixedUSD) {
       const lowerClampRatio = cfg.lower_clamp_ratio ?? 0.6;
       const upperClampRatio = cfg.upper_clamp_ratio ?? 1.4;
       const lo = prevValid * lowerClampRatio;
@@ -171,7 +193,7 @@ export function temporalGuard(input: {
       }
     }
     
-    console.log(`🔧 TCG: ${projectKey} ${monthKey} - ratio=${ratio.toFixed(2)}, baseline=${baselineUSD.toFixed(0)}, fixed=${fixedUSD.toFixed(0)}`);
+    console.log(`🔧 TCG: ${projectKey} ${monthKey} - ratio=${ratio.toFixed(2)}, baseline=${baselineUSD.toFixed(0)}, fixed=${fixedUSD.toFixed(0)}, reason=${reason}`);
   } else {
     reason = 'DETECTED_ONLY';
   }
