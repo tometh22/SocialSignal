@@ -12,6 +12,9 @@ export interface AnomalyConfig {
   max_gap_months: number;
   usd_tolerance_pct: number;
   log_level: string;
+  min_baseline_usd?: number;
+  lower_clamp_ratio?: number;
+  upper_clamp_ratio?: number;
 }
 
 interface ConfigOverride {
@@ -19,6 +22,10 @@ interface ConfigOverride {
   low_ratio_threshold?: number;
   high_ratio_threshold?: number;
   strategy?: 'median' | 'prev_valid';
+  min_baseline_points?: number;
+  min_baseline_usd?: number;
+  lower_clamp_ratio?: number;
+  upper_clamp_ratio?: number;
 }
 
 interface ConfigFile {
@@ -83,9 +90,9 @@ export function getConfigForProject(projectKey: string): AnomalyConfig {
   return config.defaults;
 }
 
-export function buildBaselineUSD(history: number[]): number | null {
-  const values = history.filter(x => Number.isFinite(x) && x > 0);
-  if (values.length < 2) return null;
+export function buildBaselineUSD(history: number[], minUSD: number = 0): number | null {
+  const values = history.filter(x => Number.isFinite(x) && x >= minUSD);
+  if (values.length < 1) return null;
 
   values.sort((a, b) => a - b);
   const mid = Math.floor(values.length / 2);
@@ -120,7 +127,8 @@ export function temporalGuard(input: {
     nativeCurrency === 'ARS' ? costNative / fx : costNative
   );
 
-  const baselineUSD = buildBaselineUSD(historyUSDNormalized);
+  const minBaselineUSD = cfg.min_baseline_usd ?? 0;
+  const baselineUSD = buildBaselineUSD(historyUSDNormalized, minBaselineUSD);
   if (!baselineUSD) {
     return { isAnomaly: false, flags };
   }
@@ -139,12 +147,28 @@ export function temporalGuard(input: {
   let reason = '';
 
   if (cfg.mode === 'autocorrect') {
-    if (cfg.strategy === 'prev_valid' && historyUSDNormalized.length > 0) {
-      fixedUSD = historyUSDNormalized[0];
+    const prevValid = historyUSDNormalized.find(x => Number.isFinite(x) && x >= minBaselineUSD) ?? null;
+    
+    if (cfg.strategy === 'prev_valid' && prevValid) {
+      fixedUSD = prevValid;
       reason = 'AUTO_FROM_PREV_VALID';
     } else {
       fixedUSD = baselineUSD;
       reason = 'AUTO_FROM_MEDIAN';
+    }
+    
+    // Clamp contra prev_valid si existe
+    if (prevValid && fixedUSD) {
+      const lowerClampRatio = cfg.lower_clamp_ratio ?? 0.6;
+      const upperClampRatio = cfg.upper_clamp_ratio ?? 1.4;
+      const lo = prevValid * lowerClampRatio;
+      const hi = prevValid * upperClampRatio;
+      const originalFixed = fixedUSD;
+      fixedUSD = Math.min(hi, Math.max(lo, fixedUSD));
+      
+      if (fixedUSD !== originalFixed) {
+        flags.push('CLAMPED_TO_PREV_RANGE');
+      }
     }
     
     console.log(`🔧 TCG: ${projectKey} ${monthKey} - ratio=${ratio.toFixed(2)}, baseline=${baselineUSD.toFixed(0)}, fixed=${fixedUSD.toFixed(0)}`);
