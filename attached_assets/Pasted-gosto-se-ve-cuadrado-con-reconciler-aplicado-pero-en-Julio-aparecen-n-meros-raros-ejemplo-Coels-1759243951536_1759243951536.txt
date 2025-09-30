@@ -1,0 +1,66 @@
+gosto se ve cuadrado (con reconciler aplicado), pero en Julio aparecen números raros (ejemplo: Coelsa con ARS 82,160 cuando debería ser ARS 2.16M).
+
+Ahí hay varias pistas:
+
+🔍 Posibles causas técnicas
+
+Bug decimal ×100 no corregido en Julio
+
+En Agosto aplicamos la regla anti-×100 para horas y valores inflados.
+
+Si Julio no pasó por reconciler y había datos con “coma/punto” mal parseados, la corrección puede no haber impactado.
+
+Ejemplo típico: un 82,160.00 leído como 82160 en lugar de 8,216,000.
+
+Falta de ARS/USD dual en ese mes
+
+Si en google_sheets_sales para Julio solo vino un campo (ej. ARS) y no USD, el normalizador puede estar guardando mal el amount_usd o calculando con FX incorrecto.
+
+month_key corrupto en sync de Julio
+
+Si en la planilla había “07/2025” en texto, puede haberse guardado mal en DB (2025-07 vs 2025-07-01).
+
+El SoT actual filtra estrictamente por month_key → si está mal, cae en vacío o agarra filas incorrectas.
+
+FX equivocado en julio
+
+El log dice: para julio 2025 usa FX 1300 automáticamente.
+
+Si los costos de Coelsa (ARS 2,160,000) se dividen por 1300 = USD 1,661. → justo se parece al “USD 961” que ves en Kimberly. Puede que el parser haya hecho la conversión donde no correspondía.
+
+Overrides solo aplicados en agosto
+
+Julio no tiene reconciler → cualquier fila corrupta en DB queda tal cual, por eso ves números incoherentes.
+
+🛠 Cómo debuggear rápido
+
+Consultar la DB cruda de Julio
+
+SELECT * FROM direct_costs WHERE month_key='2025-07';
+SELECT * FROM google_sheets_sales WHERE month_key='2025-07';
+
+
+Ver si costo_total está en millones o en miles.
+
+Revisar si hay amount_usd calculado raro.
+
+Probar endpoint debug
+
+GET /api/costs/debug?period=2025-07
+
+
+Mirar flags: ¿aparecen ANTI_X100_HOURS o USD_CORRUPTED_IGNORED?
+
+Ver ledger por proyecto.
+
+Comparar contra Sheets originales
+
+Validar que en “Costos directos e indirectos” para julio figure el mismo ARS que esperás.
+
+🎯 Mi hipótesis
+
+En Julio no está entrando el fix decimal (o no hay dual currency en origen), y además el FX se está aplicando sobre valores que deberían quedarse en ARS. → Resultado:
+
+Se muestran montos chicos en USD.
+
+El display en ARS aparece truncado (82,160 en lugar de 2.16M).

@@ -1,0 +1,196 @@
+Acá tenés el checklist de validación para JULIO (2025-07), de punta a punta, para detectar exactamente dónde se rompe (ETL → DB → SoT → Aggregator → Front). Seguí el orden y anota el primer paso que falle.
+
+1) Verificación en DB (origen “crudo”)
+
+Objetivo: confirmar que los números base de julio están bien cargados (sin ×100 ni FX mal aplicado).
+
+SQL – Ingresos
+
+-- ¿Existen filas y con dual currency?
+SELECT client_name, project_name, month_key, amount_local, amount_usd
+FROM google_sheets_sales
+WHERE month_key='2025-07'
+ORDER BY client_name, project_name;
+
+
+Esperá ver:
+
+amount_local en ARS para Modo/Coelsa y en USD para Warner/Kimberly (según su moneda nativa).
+
+Si hay ambos montos en origen: se guardan ambos (no nulos).
+
+SQL – Costos
+
+-- Montos de costos “crudos” por proyecto
+SELECT cliente, proyecto, month_key, costo_total, monto_total_usd,
+       horas_reales_asana, valor_hora_persona, tipo_gasto
+FROM direct_costs
+WHERE month_key='2025-07'
+ORDER BY cliente, proyecto;
+
+
+Chequeos rápidos:
+
+Coherencia ARS: si esperás ~ARS 2,160,000 y ves 82,160, hay problema de parseo decimal previo al insert.
+
+monto_total_usd debe estar NULL o razonable. Si ves valores ridículos, el ETL convirtió cuando no debía.
+
+Horas: si horas_reales_asana > 300 y hay valor_hora_persona → el SoT debería aplicar ANTI_X100_HOURS (se corregirá más adelante, pero acá solo verificás el dato crudo).
+
+Si acá ya están mal los números → corregir ETL/Sync y reinsertar julio antes de seguir.
+
+2) Endpoints de auditoría (SoT)
+
+Objetivo: ver cómo el SoT está interpretando julio y qué flags dispara.
+
+Costs – Debug
+
+GET /api/costs/debug?period=2025-07
+
+
+Revisar en el JSON:
+
+validationPassed: true/false
+
+FX_USED: 1300 (julio)
+
+Flags por fila: ANTI_X100_HOURS, USD_CORRUPTED_IGNORED, FX_USED
+
+Ledger por proyecto: compara nativeDisplay vs usdNormalized y el detalle de filas fuente.
+
+Income – (opcional)
+
+GET /api/income?period=2025-07
+GET /api/portfolio/income?period=2025-07
+
+
+Corroborá que display use la moneda nativa y que exista USDNormalized consistente.
+
+Si el debug ya muestra números “chicos” (p.ej., 82,160 en ARS cuando debería ser 2.16M), el problema viene de DB o del parser del SoT (p. ej., parseNumberEs() no se aplicó en el flujo que carga julio).
+
+3) Aggregator “Active Projects”
+
+Objetivo: validar el merge y los KPIs.
+
+GET /api/projects?period=2025-07
+
+
+Chequeos:
+
+Cada card debe tener:
+metrics.revenueDisplay, metrics.costDisplay, metrics.revenueUSDNormalized, metrics.costUSDNormalized.
+
+Confirmá projectKey correcto (cliente+proyecto canonicalizados).
+
+Si revenueDisplay/costDisplay no respetan la moneda nativa → hay problema en el mapeo de display.
+
+4) Frontend
+
+Objetivo: confirmar que el front solo refleja lo que entrega la API (no re-formatea mal).
+
+Refrescá con fuente fresca: primero corré
+
+GET /api/costs?period=2025-07&source=fresh
+
+
+luego refrescá el dashboard.
+
+Revisá formateo K/M: si la API devuelve 2,160,000 y el front muestra 82,160, el bug es del formatter (ej.: string→number previo al notación K/M).
+
+5) Árbol de decisión (diagnóstico rápido)
+
+A. DB incorrecta (valores ya “chicos”)
+→ Arreglar ETL/Sync de julio:
+
+Reaplicar parseNumberEs() al cargar.
+
+Asegurar dual currency cuando exista.
+
+Nunca calcular USD en el ETL para campos ARS: solo guardar origen + amount_usd si está explícito.
+
+Reinsertar julio y re-correr SoT (?source=fresh).
+
+B. DB OK pero /debug mal
+→ Revisar SoT:
+
+¿Se está aplicando parseNumberEs() antes de normalizar?
+
+¿Se pisa amount_local con amount_usd por error de mapeo?
+
+¿Reglas de moneda nativa por cliente están correctas? (Warner/Kimberly USD-native; Modo/Coelsa ARS-native).
+
+Ver que FX solo afecte USDNormalized, no Display.
+
+C. /debug OK pero /projects mal
+→ Bug en Aggregator:
+
+Ver cálculo de metrics.costDisplay / metrics.revenueDisplay (no convertir aquí).
+
+Validar que projectKey no mezcle filas de otro cliente.
+
+D. API OK pero Front mal
+→ Bug de formatter:
+
+Asegurar que el front reciba number (no string) y aplique K/M a partir del value numérico.
+
+No re-convertir moneda en el front.
+
+6) Fixes inmediatos (si DB de julio viene mal)
+
+Reparar parseo en ETL
+
+Usar parseNumberEs() para todas las columnas numéricas de costos/ingresos.
+
+Bloquear casos:
+
+Si número tiene coma como separador de miles y punto como decimal (US) → conservar el punto decimal.
+
+Si tiene punto como miles y coma decimal (ES) → convertir adecuadamente.
+
+Reglas de moneda nativa (SoT)
+
+Display = moneda de origen por cliente/proyecto.
+
+USDNormalized =
+
+Si viene amount_usd limpio → usarlo.
+
+Si solo hay ARS → dividir por FX del mes (tabla exchange_rates).
+
+Nunca aplicar FX sobre algo que ya está en USD.
+
+Re-sync julio y bypassear caché
+
+POST /api/direct-costs/sync   (o el sync que uses)
+GET  /api/costs?period=2025-07&source=fresh
+GET  /api/costs/debug?period=2025-07
+
+7) Golden tests (para que no vuelva a pasar)
+
+Caso ARS grande (Coelsa/Modo): 2,160,000.00 → debe quedar 2.16M display ARS; USDNormalized = 2,160,000 / 1300 ≈ 1,661.54.
+
+Caso USD nativo (Warner/Kimberly): USD 8,450 display USD y USDNormalized = 8,450 (sin FX).
+
+Horas > 300 con valor hora: debe activar ANTI_X100_HOURS y ajustar costo.
+
+USD astronómico > 100,000 en costos: ignorar monto_total_usd y recalcular desde ARS/FX.
+
+8) Checklist express (paso a paso para tu equipo)
+
+DB julio: correr los 2 SELECT de arriba y guardar screenshot.
+
+/costs/debug 2025-07: revisar flags + ledger (guardar JSON).
+
+/projects 2025-07: verificar displays y normalized.
+
+Front: forzar ?source=fresh, chequear formateo K/M.
+
+Hallazgo: anotar primera capa que falla (DB / SoT / Aggregator / Front).
+
+Corregir la capa identificada.
+
+Re-sync + repetir pasos 1→4.
+
+Agregar caso a golden tests.
+
+Con esto localizás y cerrás el desvío de julio sin tocar agosto ni el reconciler.
