@@ -1,0 +1,172 @@
+erfecto. Acá tenés un checklist operativo para validar, punto por punto, que en Replit quedó TODO bien aplicado (código, config, ETL, SoT/TCG, API y front). Copiá-pegá los comandos tal cual.
+
+1) Arranque correcto del código (sin versión vieja)
+
+Reiniciá el proceso y confirmá timestamp nuevo en logs (“Start_application …”).
+
+Verificá que cargó business-rules.ts y temporal-guard.ts (buscá tus logs).
+
+Deben aparecer marcas tipo: COST AGGREGATION, TCG DEBUG, TCG AUTOCORRECT.
+
+Si no aparece nada del TCG: el server está corriendo una build vieja → reiniciar y limpiar cache.
+
+2) Config cargada (anomaly.yaml)
+
+Confirmá que el archivo existe y se parsea:
+
+Log esperado al boot: ANOMALY_CFG loaded ... version: 1.0.
+
+Verificá overrides para los projectKey (en minúsculas y sin tildes):
+
+play digital s a modo|fee mensual
+
+coelsa|fee mensual
+
+Claves que deben existir (al menos para Modo):
+
+min_baseline_usd: 300
+
+lookahead_months: 2
+
+use_future_baseline: true
+
+strategy: nearest_valid
+
+expected_usd_band: {low: 300, high: 450}
+
+(opcional) force_tcg: true
+
+3) ETL/Sync (guards activos)
+
+sanitizeUSD() debe estar llamado al insertar en direct_costs:
+
+Regla: si nativo=ARS → no calcular USD; solo guardar monto_total_usd si viene válido.
+
+Corta astronómicos (>1,000,000) o usd==ars para ARS-native.
+
+isDirect por igualdad estricta (no includes):
+
+const t = (tipo_gasto||'').trim().toLowerCase();
+const isDirect = t === 'directo' || t === 'directos';
+
+
+Anti-×100-hours: se aplica cuando horas_reales_asana > 300 aunque valor_hora_persona=0.
+
+4) DB cruda coherente (JUL 2025)
+
+Ejecutá:
+
+-- Modo & Coelsa en julio
+SELECT id, cliente, proyecto, month_key, costo_total, monto_total_usd,
+       horas_reales_asana, valor_hora_persona
+FROM direct_costs
+WHERE month_key='2025-07' AND (cliente ILIKE '%modo%' OR cliente ILIKE '%coelsa%')
+ORDER BY cliente, proyecto;
+
+-- FX julio
+SELECT * FROM exchange_rates WHERE year=2025 AND month=7;
+
+
+Validá:
+
+Modo JUL existe (id=399) y horas no son imposibles (si siguen en 2067, aplicar el fix /100).
+
+monto_total_usd NULL o razonable (no notación científica / astronómico).
+
+FX julio correcto (ej. 1300).
+
+5) SoT de costos + TCG en acción
+
+Forzá procesamiento fresco:
+
+curl -s "http://localhost:5000/api/costs?period=2025-07&source=fresh" \
+| jq '.projects[] | select(.clientName|test("Modo|Coelsa";"i")) | {clientName, projectName, costDisplay, costUSDNormalized, anomaly}'
+
+
+Criterios de aceptación:
+
+Coelsa JUL: anomaly debe incluir ANOMALY_TEMPORAL y/o AUTO_FROM_* (corrige a ~300 USD si el crudo era 60–70 USD).
+
+Modo JUL:
+
+Debe aparecer en la lista (si no aparece, falla el filtro de directos o el projectKey).
+
+costUSDNormalized ∈ [300, 450] (banda esperada).
+
+anomaly contenga: ANTI_X100_HOURS (si aplicó), ANOMALY_TEMPORAL, NEAREST_VALID y CLAMPED_TO_EXPECTED_BAND (si configuraste banda).
+
+6) Endpoint de debug (trazabilidad)
+curl -s "http://localhost:5000/api/costs/debug?period=2025-07" \
+| jq '.aggregatedResults[] | select(.clientName|test("Modo|Coelsa";"i")) | {clientName,projectName, costUSDNormalized, baselineUSD, anomaly, includedRecords: (.includedRecords|length), excludedRecords: (.excludedRecords|length)}'
+
+
+Criterios:
+
+baselineUSD presente (prev o next válido).
+
+excludedRecords = 0 para Modo (si >0, mirar drop_reason).
+
+Flags de Modo y Coelsa visibles (mismo set que arriba).
+
+7) Aggregator (projectKey canonicalizado)
+
+Confirmá que projectKey se construye con función canon (normalize diacríticos, toLowerCase, slug):
+
+El mismo canon() se usa para buscar overrides en config.
+
+En logs debe aparecer algo como:
+
+COST AGGREGATION: Created N project groups for 2025-07
+
+✅ COST PROJECT: play digital s a modo|fee mensual ...
+
+8) Frontend (solo reflejo, sin “re-convertir”)
+
+Después del ?source=fresh, refrescá dashboard.
+
+Validá:
+
+Display nativo: ARS para Modo/Coelsa, USD para Warner/Kimberly.
+
+KPIs usan USDNormalized del backend (no re-aplica FX en el front).
+
+Formato K/M correcto (si API entrega 520000 ARS, front muestra ~“ARS 0.52M”).
+
+9) Pruebas de no-regresión rápidas
+
+Caso horas>300 y rate=0 entra al SoT y aplica anti-×100.
+
+USD astronómico en DB es ignorado por SoT (usa ARS/FX).
+
+Faltan baselines válidos: con use_future_baseline:true + banda esperada, TCG autocorrige.
+
+projectKey con mayúsculas/tildes sigue aplicando overrides (por el canon).
+
+10) Si falla algún punto
+
+No aparece Modo en /costs → revisar isDirect, month_key, y projectKey canon.
+
+TCG no corre → confirmá force_tcg/use_future_baseline y que haya logs TCG DEBUG.
+
+Valor fuera de banda → revisá expected_usd_band y lookahead_months.
+
+Sigue USD astronómico → chequear sanitizeUSD() en ETL y limpiar monto_total_usd corruptos de JUL:
+
+UPDATE direct_costs
+SET monto_total_usd = NULL
+WHERE month_key='2025-07' AND (monto_total_usd > 1000000 OR monto_total_usd = costo_total);
+
+Smoke test express (todo en 1 minuto)
+# 1) Fresh process
+curl -s "http://localhost:5000/api/costs?period=2025-07&source=fresh" >/dev/null
+
+# 2) Modo & Coelsa resumen
+curl -s "http://localhost:5000/api/costs?period=2025-07" \
+| jq '.projects[] | select(.clientName|test("Modo|Coelsa";"i")) | {clientName, projectName, costDisplay, costUSDNormalized, anomaly}'
+
+# 3) Debug detalla baseline y flags
+curl -s "http://localhost:5000/api/costs/debug?period=2025-07" \
+| jq '.aggregatedResults[] | select(.clientName|test("Modo|Coelsa";"i")) | {clientName, projectName, baselineUSD, anomaly, included: (.includedRecords|length), excluded: (.excludedRecords|length)}'
+
+
+Con esto validás rápido si Replit dejó todo bien: código cargado, config aplicada, guards funcionando, TCG corrigiendo, API coherente y front sin re-inventar la conversión.
