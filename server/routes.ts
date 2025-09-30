@@ -474,7 +474,8 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
           costDisplay: p.costDisplay,
           costUSDNormalized: p.costUSDNormalized,
           sourceRowCount: p.sourceRowCount,
-          kind: p.kind
+          kind: p.kind,
+          anomaly: p.anomaly
         })),
         portfolioSummary: {
           portfolioCostUSD: portfolioResult.portfolioCostUSD,

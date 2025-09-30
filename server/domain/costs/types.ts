@@ -37,6 +37,17 @@ export type ProjectCost = {
   
   // 🎯 RECONCILIATION: Indica si el valor fue ajustado por reconciler temporal
   overridden?: boolean;
+  
+  // 🛡️ TCG (Temporal Consistency Guard): Información de detección de anomalías
+  anomaly?: {
+    detected: boolean;
+    ratio?: number;
+    baselineUSD?: number;
+    originalUSD?: number;
+    fixedUSD?: number;
+    reason?: string;
+    flags: string[];
+  };
 };
 
 // ==================== AGGREGATE RESULT ====================

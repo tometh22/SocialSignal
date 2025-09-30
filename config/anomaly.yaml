@@ -1,0 +1,20 @@
+version: 1.0
+
+defaults:
+  lookback_months: 3
+  low_ratio_threshold: 0.35
+  high_ratio_threshold: 2.5
+  min_baseline_points: 2
+  mode: "autocorrect"
+  strategy: "median"
+  max_gap_months: 6
+  usd_tolerance_pct: 25
+  log_level: "info"
+
+overrides:
+  - projectKey: "coelsa|fee-mensual"
+    low_ratio_threshold: 0.5
+    strategy: "prev_valid"
+  
+  - projectKey: "play-digital-sa-modo|fee-mensual"
+    low_ratio_threshold: 0.5

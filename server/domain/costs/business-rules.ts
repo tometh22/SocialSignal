@@ -21,6 +21,10 @@ import type {
 // Reutilizar el servicio FX de income
 import { getFx } from '../income/fx';
 
+// TCG (Temporal Consistency Guard) para detección de anomalías
+import { temporalGuard, AnomalyDecision } from './temporal-guard';
+import { getCostData } from './data-access';
+
 // ==================== BUSINESS RULES CONFIG ====================
 
 const DEFAULT_COST_RULES: CostBusinessRules = {
@@ -107,6 +111,58 @@ export async function normalizeCostToUSD(
   }
 }
 
+// ==================== TEMPORAL ANOMALY DETECTION ====================
+
+/**
+ * Obtiene historial de costos USD normalizados para un proyecto
+ * Lookback: hasta 6 meses anteriores
+ */
+async function getProjectCostHistory(
+  clientName: string,
+  projectName: string,
+  currentPeriod: PeriodKey
+): Promise<number[]> {
+  try {
+    const allRecords = await getCostData();
+    const projectKey = `${clientName}|${projectName}`.toLowerCase();
+    
+    const history: number[] = [];
+    const [year, month] = currentPeriod.split('-').map(Number);
+    
+    for (let i = 1; i <= 6; i++) {
+      let lookbackMonth = month - i;
+      let lookbackYear = year;
+      
+      if (lookbackMonth <= 0) {
+        lookbackMonth += 12;
+        lookbackYear -= 1;
+      }
+      
+      const lookbackPeriod = `${lookbackYear}-${String(lookbackMonth).padStart(2, '0')}` as PeriodKey;
+      
+      const periodRecords = allRecords.filter(r => {
+        const matchesProject = `${r.clientName}|${r.projectName}`.toLowerCase() === projectKey;
+        const matchesPeriod = r.period === lookbackPeriod;
+        return matchesProject && matchesPeriod;
+      });
+      
+      if (periodRecords.length > 0) {
+        let totalUSD = 0;
+        for (const record of periodRecords) {
+          const { usdNormalized } = await normalizeCostToUSD(record);
+          totalUSD += usdNormalized;
+        }
+        history.push(totalUSD);
+      }
+    }
+    
+    return history;
+  } catch (error) {
+    console.warn(`⚠️ TCG: Could not get history for ${clientName}|${projectName}:`, error);
+    return [];
+  }
+}
+
 // ==================== AGGREGATION BY PROJECT ====================
 
 interface ProjectCostGroup {
@@ -122,6 +178,9 @@ interface ProjectCostGroup {
   
   // For debugging
   rawRecords: ParsedCostRecord[];
+  
+  // TCG anomaly detection
+  anomalyDecision?: AnomalyDecision;
 }
 
 export async function aggregateCostsByProject(
@@ -167,22 +226,54 @@ export async function aggregateCostsByProject(
   const projectCosts: ProjectCost[] = [];
   
   for (const group of groups.values()) {
-    // 🎯 NEW: Determine display currency based on Income SoT revenueDisplay.currency
+    // 🛡️ TEMPORAL CONSISTENCY GUARD (TCG): Detectar y corregir anomalías temporales
     const projectKey = `${group.clientName}|${group.projectName}`;
+    const history = await getProjectCostHistory(group.clientName, group.projectName, group.period);
+    
+    const fx = await getFx(group.period);
+    const arsDisplays = group.costDisplays.filter(d => d.currency === 'ARS');
+    const totalARS = arsDisplays.reduce((sum, d) => sum + d.amount, 0);
+    const nativeCurrency = totalARS > 0 ? 'ARS' : 'USD';
+    const costNative = nativeCurrency === 'ARS' ? totalARS : group.totalUSDNormalized;
+    
+    const anomalyDecision = temporalGuard({
+      projectKey,
+      monthKey: group.period,
+      nativeCurrency,
+      costNative,
+      fx,
+      montoUSDFromOrigin: nativeCurrency === 'USD' ? group.totalUSDNormalized : null,
+      historyUSDNormalized: history
+    });
+    
+    // Aplicar corrección si hay anomalía y autocorrect activado
+    let finalUSDNormalized = group.totalUSDNormalized;
+    let flags: string[] = [];
+    
+    if (anomalyDecision.isAnomaly && anomalyDecision.fixedUSD) {
+      finalUSDNormalized = anomalyDecision.fixedUSD;
+      flags = anomalyDecision.flags;
+      console.log(`🔧 TCG AUTOCORRECT: ${projectKey} ${group.period} - ${group.totalUSDNormalized.toFixed(0)} → ${finalUSDNormalized.toFixed(0)} USD`);
+    }
+    
+    group.anomalyDecision = anomalyDecision;
+    
+    // 🎯 NEW: Determine display currency based on Income SoT revenueDisplay.currency
     const revenueDisplayCurrency = projectCurrencyMap?.get(projectKey) || 'ARS'; // Default to ARS
     
     let finalDisplay: MoneyDisplay;
     
     if (revenueDisplayCurrency === 'USD') {
       // Project revenue is USD → show cost in USD (normalized)
-      finalDisplay = { amount: group.totalUSDNormalized, currency: 'USD' };
-      console.log(`💱 COST DISPLAY: ${projectKey} → USD (revenue is USD) = ${group.totalUSDNormalized.toFixed(2)}`);
+      finalDisplay = { amount: finalUSDNormalized, currency: 'USD' };
+      console.log(`💱 COST DISPLAY: ${projectKey} → USD (revenue is USD) = ${finalUSDNormalized.toFixed(2)}`);
     } else {
-      // Project revenue is ARS → show cost in ARS (native)
-      const arsDisplays = group.costDisplays.filter(d => d.currency === 'ARS');
-      const totalARS = arsDisplays.reduce((sum, d) => sum + d.amount, 0);
-      finalDisplay = { amount: totalARS, currency: 'ARS' };
-      console.log(`💱 COST DISPLAY: ${projectKey} → ARS (revenue is ARS) = ${totalARS.toFixed(2)}`);
+      // Project revenue is ARS → show cost in ARS (reconstituted from fixed USD)
+      const fixedARS = nativeCurrency === 'ARS' && anomalyDecision.fixedUSD 
+        ? Math.round(anomalyDecision.fixedUSD * fx)
+        : totalARS;
+      finalDisplay = { amount: fixedARS, currency: 'ARS' };
+      console.log(`💱 COST DISPLAY: ${projectKey} → ARS (revenue is ARS) = ${fixedARS.toFixed(2)}`);
     }
     
     const projectCost: ProjectCost = {
@@ -190,14 +281,24 @@ export async function aggregateCostsByProject(
       projectName: group.projectName,
       period: group.period,
       costDisplay: finalDisplay,
-      costUSDNormalized: group.totalUSDNormalized,
+      costUSDNormalized: finalUSDNormalized,
       kind: group.kind,
-      sourceRowCount: group.sourceRowCount
+      sourceRowCount: group.sourceRowCount,
+      anomaly: anomalyDecision.isAnomaly ? {
+        detected: true,
+        ratio: anomalyDecision.ratio,
+        baselineUSD: anomalyDecision.baselineUSD ?? undefined,
+        originalUSD: group.totalUSDNormalized,
+        fixedUSD: anomalyDecision.fixedUSD ?? undefined,
+        reason: anomalyDecision.reason,
+        flags: anomalyDecision.flags
+      } : undefined
     };
     
     projectCosts.push(projectCost);
     
-    console.log(`✅ COST PROJECT: ${group.clientName} | ${group.projectName} | ${group.kind} → Display: ${finalDisplay.currency} ${finalDisplay.amount.toFixed(2)}, USD: ${group.totalUSDNormalized.toFixed(2)}`);
+    const flagsStr = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
+    console.log(`✅ COST PROJECT: ${group.clientName} | ${group.projectName} | ${group.kind} → Display: ${finalDisplay.currency} ${finalDisplay.amount.toFixed(2)}, USD: ${finalUSDNormalized.toFixed(2)}${flagsStr}`);
   }
   
   return projectCosts;

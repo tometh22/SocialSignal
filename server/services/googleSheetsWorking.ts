@@ -123,6 +123,49 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * 🛡️ GUARD ETL: Sanitizar USD corrupto antes de guardar en DB
+   * Previene: astronómicos, USD=ARS cuando nativeCurrency='ARS', desviaciones FX extremas
+   */
+  private sanitizeUSD(input: {
+    nativeCurrency: 'ARS' | 'USD';
+    costoARS?: number | null;
+    montoUSD?: number | null;
+    fx?: number | null;
+  }): number | null {
+    const { nativeCurrency, costoARS, montoUSD, fx } = input;
+    
+    if (!montoUSD || montoUSD === 0) return null;
+
+    // 1) Prohibir USD == ARS cuando moneda nativa es ARS
+    if (nativeCurrency === 'ARS' && costoARS && costoARS > 0) {
+      const diff = Math.abs(montoUSD - costoARS);
+      const tolerance = 0.01 * Math.max(1, costoARS);
+      if (diff <= tolerance) {
+        console.log(`🛡️ GUARD ETL: USD==ARS detectado (${montoUSD}), descartando USD`);
+        return null;
+      }
+    }
+
+    // 2) Cortar astronómicos o valores no finitos
+    if (!Number.isFinite(montoUSD) || montoUSD > 1_000_000) {
+      console.log(`🛡️ GUARD ETL: USD astronómico detectado (${montoUSD}), descartando`);
+      return null;
+    }
+
+    // 3) Si hay ARS y FX, verificar coherencia (tolerancia 200% por volatilidad FX)
+    if (costoARS && costoARS > 0 && fx && fx > 0) {
+      const impliedUSD = costoARS / fx;
+      const diffPct = Math.abs(montoUSD - impliedUSD) / Math.max(1, impliedUSD) * 100;
+      if (diffPct > 200) {
+        console.log(`🛡️ GUARD ETL: Desviación FX extrema (${diffPct.toFixed(0)}%), descartando USD`);
+        return null;
+      }
+    }
+
+    return montoUSD;
+  }
+
+  /**
    * Probar conexión con Google Sheets usando archivo JSON
    */
   async testConnection(): Promise<boolean> {
@@ -1328,6 +1371,14 @@ class GoogleSheetsWorkingService {
           const monthNumber = this.parseMonthFromSpanish(costo.mes);
           const monthKey = `${costo.año}-${String(monthNumber).padStart(2, '0')}`;
           
+          // 🛡️ APLICAR GUARD ETL: Sanitizar USD antes de guardar
+          const sanitizedUSD = this.sanitizeUSD({
+            nativeCurrency: 'ARS', // Los costos son siempre en ARS
+            costoARS: costoTotal,
+            montoUSD: costo.montoTotalUSD,
+            fx: costo.tipoCambio
+          });
+          
           const directCostData = {
             monthKey: monthKey, // NUEVO: Clave temporal única
             persona: costo.persona,
@@ -1344,7 +1395,7 @@ class GoogleSheetsWorkingService {
             valorHoraPersona: valorHora || 0,
             costoTotal: costoTotal,
             tipoCambio: costo.tipoCambio,
-            montoTotalUSD: costo.montoTotalUSD,
+            montoTotalUSD: sanitizedUSD, // 🛡️ USD sanitizado
             projectId: projectId,
             personnelId: personnelId,
             importBatch: importBatch,
