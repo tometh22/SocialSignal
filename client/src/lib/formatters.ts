@@ -13,11 +13,11 @@ export const formatCurrency = (amount: number, shortVersion: boolean = false): s
   }).format(amount);
   
   if (shortVersion) {
-    // Versión corta para espacios pequeños (ej: $1.2k en lugar de $1,234.56)
+    // Versión corta para espacios pequeños (ej: $1.23k en lugar de $1,234.56)
     if (Math.abs(amount) >= 1000000) {
-      return `$${(amount / 1000000).toFixed(1)}M`;
+      return `$${(amount / 1000000).toFixed(2)}M`;
     } else if (Math.abs(amount) >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}k`;
+      return `$${(amount / 1000).toFixed(2)}k`;
     } else {
       return formatted;
     }
