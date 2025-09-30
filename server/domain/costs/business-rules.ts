@@ -22,7 +22,7 @@ import type {
 import { getFx } from '../income/fx';
 
 // TCG (Temporal Consistency Guard) para detección de anomalías
-import { temporalGuard, AnomalyDecision } from './temporal-guard';
+import { temporalGuard, getConfigForProject, AnomalyDecision } from './temporal-guard';
 import { getCostData } from './data-access';
 
 // ==================== BUSINESS RULES CONFIG ====================
@@ -116,19 +116,23 @@ export async function normalizeCostToUSD(
 /**
  * Obtiene historial de costos USD normalizados para un proyecto
  * Lookback: hasta 6 meses anteriores
+ * Lookahead: hasta N meses posteriores (si use_future_baseline está habilitado)
  */
 async function getProjectCostHistory(
   clientName: string,
   projectName: string,
-  currentPeriod: PeriodKey
-): Promise<number[]> {
+  currentPeriod: PeriodKey,
+  lookaheadMonths: number = 0
+): Promise<{ past: number[]; future: number[] }> {
   try {
     const allRecords = await getCostData();
     const projectKey = `${clientName}|${projectName}`.toLowerCase();
     
-    const history: number[] = [];
+    const past: number[] = [];
+    const future: number[] = [];
     const [year, month] = currentPeriod.split('-').map(Number);
     
+    // Lookback (past)
     for (let i = 1; i <= 6; i++) {
       let lookbackMonth = month - i;
       let lookbackYear = year;
@@ -152,14 +156,44 @@ async function getProjectCostHistory(
           const { usdNormalized } = await normalizeCostToUSD(record);
           totalUSD += usdNormalized;
         }
-        history.push(totalUSD);
+        past.push(totalUSD);
       }
     }
     
-    return history;
+    // Lookahead (future)
+    if (lookaheadMonths > 0) {
+      for (let i = 1; i <= lookaheadMonths; i++) {
+        let lookaheadMonth = month + i;
+        let lookaheadYear = year;
+        
+        if (lookaheadMonth > 12) {
+          lookaheadMonth -= 12;
+          lookaheadYear += 1;
+        }
+        
+        const lookaheadPeriod = `${lookaheadYear}-${String(lookaheadMonth).padStart(2, '0')}` as PeriodKey;
+        
+        const periodRecords = allRecords.filter(r => {
+          const matchesProject = `${r.clientName}|${r.projectName}`.toLowerCase() === projectKey;
+          const matchesPeriod = r.period === lookaheadPeriod;
+          return matchesProject && matchesPeriod;
+        });
+        
+        if (periodRecords.length > 0) {
+          let totalUSD = 0;
+          for (const record of periodRecords) {
+            const { usdNormalized } = await normalizeCostToUSD(record);
+            totalUSD += usdNormalized;
+          }
+          future.push(totalUSD);
+        }
+      }
+    }
+    
+    return { past, future };
   } catch (error) {
     console.warn(`⚠️ TCG: Could not get history for ${clientName}|${projectName}:`, error);
-    return [];
+    return { past: [], future: [] };
   }
 }
 
@@ -228,7 +262,15 @@ export async function aggregateCostsByProject(
   for (const group of groups.values()) {
     // 🛡️ TEMPORAL CONSISTENCY GUARD (TCG): Detectar y corregir anomalías temporales
     const projectKey = `${group.clientName}|${group.projectName}`;
-    const history = await getProjectCostHistory(group.clientName, group.projectName, group.period);
+    const cfg = getConfigForProject(projectKey);
+    const lookaheadMonths = cfg.lookahead_months ?? 0;
+    
+    const { past: historyUSDNormalized, future: historyFutureUSDNormalized } = await getProjectCostHistory(
+      group.clientName, 
+      group.projectName, 
+      group.period,
+      lookaheadMonths
+    );
     
     const fx = await getFx(group.period);
     const arsDisplays = group.costDisplays.filter(d => d.currency === 'ARS');
@@ -243,7 +285,8 @@ export async function aggregateCostsByProject(
       costNative,
       fx,
       montoUSDFromOrigin: nativeCurrency === 'USD' ? group.totalUSDNormalized : null,
-      historyUSDNormalized: history
+      historyUSDNormalized,
+      historyFutureUSDNormalized
     });
     
     // Aplicar corrección si hay anomalía y autocorrect activado
