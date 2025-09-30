@@ -2,11 +2,13 @@ version: 1.0
 
 defaults:
   lookback_months: 6
+  lookahead_months: 2
+  use_future_baseline: true
   low_ratio_threshold: 0.35
   high_ratio_threshold: 2.5
   min_baseline_points: 2
   mode: "autocorrect"
-  strategy: "median"
+  strategy: "nearest_valid"
   max_gap_months: 6
   usd_tolerance_pct: 25
   log_level: "info"
@@ -16,13 +18,16 @@ defaults:
 
 overrides:
   - projectKey: "play digital s.a (modo)|fee mensual"
-    strategy: "prev_valid"
+    strategy: "nearest_valid"
     min_baseline_points: 1
-    min_baseline_usd: 150
+    min_baseline_usd: 300
     low_ratio_threshold: 0.5
+    expected_usd_band:
+      low: 300
+      high: 450
   
   - projectKey: "coelsa|fee mensual"
-    strategy: "prev_valid"
+    strategy: "nearest_valid"
     min_baseline_points: 1
     min_baseline_usd: 300
     low_ratio_threshold: 0.5

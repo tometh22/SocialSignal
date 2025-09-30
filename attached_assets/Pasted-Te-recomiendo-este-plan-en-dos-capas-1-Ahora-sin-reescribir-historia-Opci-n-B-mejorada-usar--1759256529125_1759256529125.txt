@@ -1,0 +1,80 @@
+Te recomiendo este plan, en dos capas:
+
+1) Ahora (sin reescribir historia)
+
+Opción B mejorada: usar look-ahead + bandas esperadas por proyecto.
+Ventajas: corrige julio de Modo a ~USD 350–400 sin tocar Ene–May y sin “mentir” contabilidad.
+
+Config sugerida (config/anomaly.yaml):
+
+defaults:
+  lookback_months: 6
+  lookahead_months: 2        # ← NUEVO: permite usar agosto como referencia
+  use_future_baseline: true  # ← NUEVO
+  mode: "autocorrect"
+  strategy: "nearest_valid"  # prev_valid si existe; sino next_valid
+  min_baseline_usd: 50
+  lower_clamp_ratio: 0.6
+  upper_clamp_ratio: 1.4
+
+overrides:
+  - projectKey: "play digital s.a (modo)|fee mensual"
+    min_baseline_usd: 300         # ignora históricos bajos
+    expected_usd_band: {low: 300, high: 450}  # ← NUEVO: banda dura
+    strategy: "nearest_valid"
+  - projectKey: "coelsa|fee mensual"
+    min_baseline_usd: 300
+    strategy: "nearest_valid"
+
+
+Toque mínimo en TCG (pseudocódigo):
+
+const prevValid = getPrevValidUSD(..., lookback_months, cfg.min_baseline_usd);
+const nextValid = cfg.use_future_baseline ? getNextValidUSD(..., cfg.lookahead_months, cfg.min_baseline_usd) : null;
+
+let fixedUSD = prevValid ?? nextValid ?? baselineMedian;
+
+if (cfg.expected_usd_band) {
+  const {low, high} = cfg.expected_usd_band;
+  fixedUSD = Math.min(high, Math.max(low, fixedUSD));   // clamp a banda esperada
+  flags.push('CLAMPED_TO_EXPECTED_BAND');
+} else if (prevValid) {
+  // clamp suave alrededor del prevValid
+  const lo = prevValid * (cfg.lower_clamp_ratio ?? 0.6);
+  const hi = prevValid * (cfg.upper_clamp_ratio ?? 1.4);
+  fixedUSD = Math.min(hi, Math.max(lo, fixedUSD));
+  flags.push('CLAMPED_TO_PREV_RANGE');
+}
+
+
+Runbook express:
+
+Actualizá YAML + TCG (lookahead + banda).
+
+GET /api/costs?period=2025-07&source=fresh
+
+GET /api/costs/debug?period=2025-07 → esperá flags ANOMALY_TEMPORAL, NEAREST_VALID, CLAMPED_TO_EXPECTED_BAND.
+
+En “Active Projects”, Modo julio debería quedar ~USD 350–400 (≈ ARS 455–520k con FX 1300).
+
+Nota: usar “futuro” como baseline es válido para cierres retrospectivos; para real-time (mes corriente), el TCG seguirá usando solo pasado.
+
+2) Esta semana (mejor práctica de fondo)
+
+Crear metadatos de contrato y calidad de período para gobernar baseline:
+
+contract_terms (por projectKey): fee_usd_expected, currency_native, start_month, escalators.
+
+period_tags: partial, ramp_up, one_off.
+
+El TCG excluye partial/ramp_up del baseline y usa fee_usd_expected como ancla si no hay meses válidos.
+
+Así evitás que futuros arranques/meses parciales contaminen el baseline.
+
+En síntesis
+
+Conviene aplicar look-ahead + banda esperada hoy (rápido, limpio, sin tocar historia).
+
+Luego, formalizá contrato y period_tags para que el sistema “sepa” cuándo ignorar meses raros.
+
+Si querés, te paso el diff listo de TCG con nearest_valid, use_future_baseline y expected_usd_band.
