@@ -1,0 +1,105 @@
+Fuente de datos / ETL
+
+Ingresos (Income SoT): lee de DB sincronizada (tabla google_sheets_sales), con fix al parser decimal (ya no infla por “.”).
+
+Guarda USD y ARS cuando están disponibles (normalizador y storage actualizados).
+
+FX se toma de DB (exchange_rates), p/2025-08 usa 1345 (sin fallback).
+
+Filtrado por month_key.
+
+Costos (Costs SoT): lee de DB (direct_costs).
+
+Anti-×100 solo en costos por horas (si horas_reales_asana > 300).
+
+Descarta USD astronómicos (>100k) y usa ARS/FX.
+
+También filtra por month_key.
+
+Sync desde Excel: existe y funciona, pero incompleto en algunos meses (faltan filas y/o ARS en Ventas Tomi).
+
+Para agosto 2025 hay overrides temporales (reconciler) para: Warner, Kimberly, Modo y Coelsa, documentados y acotados a 2025-08.
+
+APIs / Backend
+
+Income:
+
+GET /api/income?period=YYYY-MM ✅
+
+GET /api/portfolio/income?period=YYYY-MM ✅
+
+Costs:
+
+GET /api/costs?period=YYYY-MM[&source=fresh] ✅ (acepta fresh)
+
+GET /api/portfolio/costs?period=YYYY-MM ✅
+
+GET /api/costs/debug?period=YYYY-MM ✅ (auditoría)
+
+Active Projects (/api/projects?timeFilter=YYYY-MM)
+
+Une ingresos+costos por projectKey (se corrigió el cruce “Fee mensual” Modo/Coelsa).
+
+Expone dual currency: revenueDisplay / costDisplay en moneda nativa + *USDNormalized.
+
+Respeta FX del mes y periodización por month_key.
+
+Frontend
+
+Active Projects muestra:
+
+Ingresos y costos en moneda nativa (USD p/Warner/Kimberly; ARS p/Modo/Coelsa).
+
+KPIs calculados con los normalizados USD.
+
+El selector de período usa el filtro backend (si el dato no cambió, revisar sync/cache).
+
+Logs/validaciones
+
+Validaciones activas:
+
+Anti-USD >100k, anti-×100-horas, uso de FX 1345 en 2025-08, filtrado estricto por month_key.
+
+Endpoint debug confirma filas aceptadas/rechazadas y muestra ledger.
+
+Gaps / pendientes
+
+Overrides activos solo en 2025-08 (quitar cuando la DB quede completa).
+
+Sync: hay meses donde faltan filas/ARS (p.ej., Ventas Tomi de Modo). Conviene:
+
+Asegurar que el normalizador siempre reciba y guarde ambos montos (ya soportado), y
+
+Programar sync periódico + botón manual que invalide caché (usar ?source=fresh).
+
+Tests: tenés tests/golden p/ingresos y algunos de costos; sumar casos multi-mes.
+
+Checklist express para constatar que todo sigue OK
+
+Periodo crítico (2025-08)
+
+/api/income?period=2025-08 → Warner 29,230 USD; Kimberly 8,450 USD.
+
+/api/costs?period=2025-08&source=fresh → Warner ~7,005 USD; Kimberly ~2,436 USD; Modo ARS 497,550; Coelsa ARS 553,002.
+
+/api/costs/debug?period=2025-08 → validationPassed: true y reglas aplicadas.
+
+Otro período (p.ej., 2025-07)
+
+Los endpoints responden sin overrides y la UI refleja moneda nativa correcta.
+
+Front
+
+/api/projects?timeFilter=YYYY-MM trae metrics.costDisplay/revenueDisplay correctos.
+
+En la UI, Modo/Coelsa se ven en ARS, Warner/Kimberly en USD.
+
+FX
+
+Logs muestran Using FX rate 1345 for 2025-08 (sin fallback).
+
+Cache
+
+Cambiás algo en Excel → corrés sync → llamás endpoints con &source=fresh → UI actualiza.
+
+Si querés, te dejo luego un plan corto para retirar los overrides y dejar 100% SoT con sync confiable.
