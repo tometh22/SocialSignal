@@ -24,6 +24,7 @@ import { getFx } from '../income/fx';
 // TCG (Temporal Consistency Guard) para detección de anomalías
 import { temporalGuard, getConfigForProject, AnomalyDecision } from './temporal-guard';
 import { getCostData } from './data-access';
+import { canonicalizeString } from './parser';
 
 // ==================== BUSINESS RULES CONFIG ====================
 
@@ -126,7 +127,7 @@ async function getProjectCostHistory(
 ): Promise<{ past: number[]; future: number[] }> {
   try {
     const allRecords = await getCostData();
-    const projectKey = `${clientName}|${projectName}`.toLowerCase();
+    const projectKey = `${canonicalizeString(clientName)}|${canonicalizeString(projectName)}`;
     
     const past: number[] = [];
     const future: number[] = [];
@@ -145,7 +146,8 @@ async function getProjectCostHistory(
       const lookbackPeriod = `${lookbackYear}-${String(lookbackMonth).padStart(2, '0')}` as PeriodKey;
       
       const periodRecords = allRecords.filter(r => {
-        const matchesProject = `${r.clientName}|${r.projectName}`.toLowerCase() === projectKey;
+        const rProjectKey = `${canonicalizeString(r.clientName)}|${canonicalizeString(r.projectName)}`;
+        const matchesProject = rProjectKey === projectKey;
         const matchesPeriod = r.period === lookbackPeriod;
         return matchesProject && matchesPeriod;
       });
@@ -174,7 +176,8 @@ async function getProjectCostHistory(
         const lookaheadPeriod = `${lookaheadYear}-${String(lookaheadMonth).padStart(2, '0')}` as PeriodKey;
         
         const periodRecords = allRecords.filter(r => {
-          const matchesProject = `${r.clientName}|${r.projectName}`.toLowerCase() === projectKey;
+          const rProjectKey = `${canonicalizeString(r.clientName)}|${canonicalizeString(r.projectName)}`;
+          const matchesProject = rProjectKey === projectKey;
           const matchesPeriod = r.period === lookaheadPeriod;
           return matchesProject && matchesPeriod;
         });
@@ -261,7 +264,7 @@ export async function aggregateCostsByProject(
   
   for (const group of groups.values()) {
     // 🛡️ TEMPORAL CONSISTENCY GUARD (TCG): Detectar y corregir anomalías temporales
-    const projectKey = `${group.clientName}|${group.projectName}`.toLowerCase();
+    const projectKey = `${canonicalizeString(group.clientName)}|${canonicalizeString(group.projectName)}`;
     const cfg = getConfigForProject(projectKey);
     const lookaheadMonths = cfg.lookahead_months ?? 0;
     

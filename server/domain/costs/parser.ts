@@ -10,6 +10,21 @@
 
 import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind } from './types';
 
+// ==================== CANONICALIZATION ====================
+
+/**
+ * Canonicaliza strings para matching consistente (config, projectKeys, etc)
+ * Normaliza Unicode, elimina diacríticos, lowercase, espacios únicos
+ */
+export function canonicalizeString(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 // ==================== COLUMN MAPPING ====================
 
 // 🎯 MAPEO CANÓNICO - Adaptado a la estructura real de la base de datos
@@ -294,7 +309,9 @@ export function parseCostRecord(
     // El indicador es las horas astronómicas, no la presencia de hourlyRate
     if (hoursReal && hoursReal > 300) {
       arsAmount = Math.round((arsAmountRaw / 100) * 100) / 100; // Redondeo a 2 decimales
-      console.log(`🔧 ANTI_×100_HOURS: {persona: "${persona}", cliente: "${clientName}", proyecto: "${projectName}", horas_raw: ${hoursReal}, horas_fix: ${(hoursReal! / 100).toFixed(2)}, costo_raw: ${arsAmountRaw}, costo_fix: ${arsAmount}}`);
+      const flags = ['ANTI_X100_HOURS'];
+      if (hoursReal > 3000) flags.push('HOURS_IMPOSSIBLE');
+      console.log(`🔧 ${flags.join(' + ')}: {persona: "${persona}", cliente: "${clientName}", proyecto: "${projectName}", horas_raw: ${hoursReal}, horas_fix: ${(hoursReal! / 100).toFixed(2)}, costo_raw: ${arsAmountRaw}, costo_fix: ${arsAmount}}`);
     } else {
       arsAmount = arsAmountRaw;
     }
@@ -313,14 +330,16 @@ export function parseCostRecord(
   
   // 🔍 COST KIND - FILTRO DIRECTO
   // 🎯 CHECKLIST: Sólo Directo: Tipo in {"Directo","Directos"}
+  // IMPORTANTE: Igualdad estricta para evitar que "indirecto" pase (contiene "directo")
   if (!kindRaw) {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - no tipo de gasto`);
     return null;
   }
   
   const kindLower = kindRaw.toLowerCase().trim();
-  if (!['directo', 'directos'].includes(kindLower)) {
-    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not directo: "${kindRaw}"`);
+  const isDirect = kindLower === 'directo' || kindLower === 'directos';
+  if (!isDirect) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not directo (got "${kindRaw}")`);
     return null;
   }
   

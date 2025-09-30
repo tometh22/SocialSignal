@@ -1,6 +1,7 @@
 import fs from 'fs';
 import yaml from 'js-yaml';
 import path from 'path';
+import { canonicalizeString } from './parser';
 
 export interface AnomalyConfig {
   lookback_months: number;
@@ -30,6 +31,9 @@ interface ConfigOverride {
   lower_clamp_ratio?: number;
   upper_clamp_ratio?: number;
   expected_usd_band?: { low: number; high: number };
+  lookahead_months?: number;
+  use_future_baseline?: boolean;
+  force_tcg?: boolean;
 }
 
 interface ConfigFile {
@@ -80,9 +84,15 @@ export function loadAnomalyConfig(): ConfigFile {
 
 export function getConfigForProject(projectKey: string): AnomalyConfig {
   const config = loadAnomalyConfig();
-  const override = config.overrides.find(o => 
-    projectKey.toLowerCase().includes(o.projectKey.toLowerCase())
-  );
+  const canonicalKey = projectKey; // Ya viene canonicalizado desde business-rules
+  const override = config.overrides.find(o => {
+    const overrideKeyParts = o.projectKey.split('|');
+    if (overrideKeyParts.length === 2) {
+      const canonicalOverrideKey = `${canonicalizeString(overrideKeyParts[0])}|${canonicalizeString(overrideKeyParts[1])}`;
+      return canonicalKey === canonicalOverrideKey;
+    }
+    return false;
+  });
 
   if (override) {
     return {
@@ -145,6 +155,23 @@ export function temporalGuard(input: {
 
   const minBaselineUSD = cfg.min_baseline_usd ?? 0;
   const baselineUSD = buildBaselineUSD(historyUSDNormalized, minBaselineUSD);
+  
+  // 🔧 FORCE_TCG: Si no hay baseline pero force_tcg=true, construir fixedUSD desde future o banda
+  const forceTcg = (cfg as any).force_tcg ?? false;
+  if (!baselineUSD && forceTcg) {
+    const nextValid = (cfg.use_future_baseline && historyFutureUSDNormalized.length > 0)
+      ? historyFutureUSDNormalized.find(x => Number.isFinite(x) && x >= minBaselineUSD) ?? null
+      : null;
+    
+    const fixedUSD = nextValid ?? (cfg.expected_usd_band ? (cfg.expected_usd_band.low + cfg.expected_usd_band.high) / 2 : null);
+    
+    if (fixedUSD) {
+      flags.push('ANOMALY_TEMPORAL', 'FORCE_TCG', nextValid ? 'AUTO_FROM_NEXT_VALID' : 'AUTO_FROM_EXPECTED_BAND');
+      console.log(`🔧 FORCE_TCG: ${projectKey} ${monthKey} - no baseline, fixed=${fixedUSD.toFixed(0)}, flags=${flags.join(', ')}`);
+      return { isAnomaly: true, fixedUSD, reason: flags.join(', '), flags };
+    }
+  }
+  
   if (!baselineUSD) {
     if (projectKey.toLowerCase().includes('modo') || projectKey.toLowerCase().includes('coelsa')) {
       console.log(`⚠️ TCG DEBUG: No baseline for ${projectKey} ${monthKey} - historial insuficiente`);

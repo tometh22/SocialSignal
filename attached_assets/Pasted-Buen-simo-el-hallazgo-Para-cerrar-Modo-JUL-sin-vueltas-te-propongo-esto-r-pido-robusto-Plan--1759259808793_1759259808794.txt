@@ -1,0 +1,111 @@
+Buenísimo el hallazgo. Para cerrar Modo JUL sin vueltas, te propongo esto (rápido + robusto):
+
+Plan en 2 capas
+A) Fix inmediato (que desbloquea hoy)
+
+No filtres por includes("directo")
+“indirecto” contiene “directo”. Forzá igualdad estricta:
+
+const t = (tipo_gasto || '').trim().toLowerCase();
+const isDirect = t === 'directo' || t === 'directos'; // NO includes()
+
+
+Esto puede estar dejando a Modo fuera del flujo o metiéndolo en una rama inesperada.
+
+Anti-×100-hours SIEMPRE con hoursReal > 300 (ya lo hiciste)
+Añadí también guard de horas imposibles:
+
+if (hoursReal > 300) flags.push('ANTI_X100_HOURS');
+if (hoursReal > 3000) flags.push('HOURS_IMPOSSIBLE'); // hard flag para debug
+
+
+Y aplica la corrección aunque hourlyRate=0 (listo).
+
+ProjectKey 100% canonicalizado (y usado en Config)
+
+const canon = (s:string) =>
+  s.normalize('NFD').replace(/\p{Diacritic}/gu,'')
+   .toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const projectKey = `${canon(clientName)}|${canon(projectName)}`;
+
+
+Asegurate de usar este mismo canon() para buscar overrides en anomaly.yaml. Evitás que “Play Digital S.A (Modo)” ≠ “play digital s.a (modo)”.
+
+Nunca descartar por hourlyRate=0 ni por monto_total_usd=null
+Fallback: si hay ARS y FX, siempre calculá usdNormalized = ARS/FX.
+
+Muchos pipelines “filtran” sin querer cuando falta un campo — acá no conviene.
+
+Forzar ejecución del TCG aunque falte baseline para Modo JUL
+En anomaly.yaml:
+
+overrides:
+  - projectKey: "play digital s a modo|fee mensual"
+    min_baseline_usd: 300
+    lookahead_months: 2
+    use_future_baseline: true
+    strategy: "nearest_valid"
+    expected_usd_band: {low: 300, high: 450}
+    force_tcg: true          # ← agrega esta llave y respétala en código
+    min_baseline_points: 0   # permite arrancar sin historia suficiente
+
+
+En TCG:
+
+if (cfg.force_tcg) { /* construir fixedUSD con next_valid o banda esperada */ }
+
+
+One-off cleanup seguro del registro (para no depender solo del TCG)
+Dado hours=2067 (×100):
+
+-- Solo JUL-2025 Modo (id=399)
+UPDATE direct_costs
+SET horas_reales_asana = horas_reales_asana/100.0
+WHERE id = 399 AND month_key='2025-07' AND horas_reales_asana > 1800;
+
+
+Esto baja el ARS a ~154,508; luego el TCG lo sube a la banda esperada (300–450 USD).
+
+FX de julio
+Confirmá que exchange_rates tenga 1300 (o el que uses consistentemente):
+
+SELECT * FROM exchange_rates WHERE year=2025 AND month=7;
+
+
+Si difiere, alinealo (tu debug mezcló 1300/1320).
+
+/debug con “razones de descarte”
+Exponé en /api/costs/debug dos arrays por proyecto:
+
+includedRecords[]
+
+excludedRecords[] con drop_reason ∈ { NOT_DIRECT, MISSING_PERIOD, BAD_CURRENCY, HOURLY_RATE_ZERO_BUT_ALLOWED, … }
+Y contadores por etapa: fetched → filtered_by_period → filtered_direct → sanitized → tcg_applied → aggregated.
+
+B) Hardening (para que no vuelva)
+
+Test unitario “Modo_JUL_2067h_hourly0” que verifica: entra al SoT, aplica anti-×100, corre TCG, sale en /projects.
+
+Contrato/period_tags: marcá Ene–May como partial para excluirlos del baseline.
+
+Clamp del TCG (ya sugerido): lower=0.6×prev_valid, upper=1.4×prev_valid; o banda fija (300–450) por override.
+
+Orden de ejecución sugerido (15–20 min de dev):
+
+Igualdad estricta en isDirect (no includes).
+
+Canon projectKey + matching de config con el mismo canon.
+
+No descartar por hourlyRate=0/usd=null; fallback ARS/FX.
+
+force_tcg + expected_usd_band para Modo.
+
+SQL one-off (id=399) dividir horas/100.
+
+GET /api/costs?period=2025-07&source=fresh → validar:
+
+Modo JUL ~USD 350–400 con flags: ANTI_X100_HOURS, ANOMALY_TEMPORAL, NEAREST_VALID, CLAMPED_TO_EXPECTED_BAND.
+
+/api/costs/debug muestre excludedRecords vacío para Modo.
+
+Si querés, te paso diffs listos para: parser.ts (isDirect + guards), business-rules.ts (canon+force_tcg), temporal-guard.ts (nearest_valid + expected_band), y expansión del /debug
