@@ -290,8 +290,9 @@ export function parseCostRecord(
   );
   
   if (arsAmountRaw && arsAmountRaw > 0) {
-    // 🎯 REGLA ANTI-×100: Solo para costos calculados por horas con horas > 300
-    if (isHourBasedCost && hoursReal! > 300) {
+    // 🎯 REGLA ANTI-×100: Si hoursReal > 300 (astronómico), dividir costo_total por 100
+    // El indicador es las horas astronómicas, no la presencia de hourlyRate
+    if (hoursReal && hoursReal > 300) {
       arsAmount = Math.round((arsAmountRaw / 100) * 100) / 100; // Redondeo a 2 decimales
       console.log(`🔧 ANTI_×100_HOURS: {persona: "${persona}", cliente: "${clientName}", proyecto: "${projectName}", horas_raw: ${hoursReal}, horas_fix: ${(hoursReal! / 100).toFixed(2)}, costo_raw: ${arsAmountRaw}, costo_fix: ${arsAmount}}`);
     } else {
