@@ -83,9 +83,36 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
   console.log('🔍 COSTS: Fetching from database...');
   
   try {
-    // For now, return empty array until cost staging table is set up
-    console.log('📝 COSTS: Database staging not yet implemented, returning empty array');
-    return [];
+    const dbCosts = await storage.db.select().from(storage.schema.directCosts);
+    
+    if (!dbCosts || dbCosts.length === 0) {
+      console.log('📝 COSTS: No records found in direct_costs table');
+      return [];
+    }
+    
+    console.log(`✅ COSTS: Retrieved ${dbCosts.length} rows from direct_costs table`);
+    
+    // Convert DB schema to RawCostRecord format
+    const rawRecords: RawCostRecord[] = dbCosts.map(row => ({
+      persona: row.persona || '',
+      mes: row.mes || '',
+      'año': row.año || 0,
+      'tipo_gasto': row.tipoGasto || 'Directo',
+      'especificacion': row.especificacion || '',
+      proyecto: row.proyecto || '',
+      'tipo_proyecto': row.tipoProyecto || '',
+      cliente: row.cliente || '',
+      'horas_reales_asana': row.horasRealesAsana?.toString() || '0',
+      'valor_hora_persona': row.valorHoraPersona?.toString() || '0',
+      'costo_total': row.costoTotal?.toString() || '0',
+      'monto_total_usd': row.montoTotalUsd?.toString() || '',
+      'tipo_cambio': row.tipoCambio?.toString() || '',
+      'cantidad_de_horas_asana': row.horasRealesAsana?.toString() || '0'
+    }));
+    
+    console.log(`🔄 COSTS: Converted ${rawRecords.length} DB rows to RawCostRecord format`);
+    
+    return rawRecords;
     
   } catch (error) {
     console.error('❌ COSTS: Error fetching from database:', error);
@@ -130,12 +157,32 @@ export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fres
       break;
       
     case 'auto':
-      // Try sheets first, fallback to database
-      rawRecords = await fetchCostsFromSheets();
-      if (rawRecords.length === 0) {
-        console.log('🔄 COSTS: Sheets empty, trying database...');
-        rawRecords = await fetchCostsFromDatabase();
+      // Merge sheets and database records
+      const sheetsRecords = await fetchCostsFromSheets();
+      const dbRecords = await fetchCostsFromDatabase();
+      
+      console.log(`🔀 COSTS: Merging ${sheetsRecords.length} sheets + ${dbRecords.length} DB records`);
+      
+      // Create unique key for deduplication
+      const seen = new Set<string>();
+      rawRecords = [];
+      
+      // Add sheets records first (priority)
+      for (const record of sheetsRecords) {
+        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
+        seen.add(key);
+        rawRecords.push(record);
       }
+      
+      // Add DB records that aren't already in sheets
+      for (const record of dbRecords) {
+        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
+        if (!seen.has(key)) {
+          rawRecords.push(record);
+        }
+      }
+      
+      console.log(`✅ COSTS: Merged result has ${rawRecords.length} total records (${rawRecords.length - sheetsRecords.length} unique from DB)`);
       break;
   }
   

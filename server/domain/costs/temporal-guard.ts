@@ -133,9 +133,22 @@ export function temporalGuard(input: {
     nativeCurrency === 'ARS' ? costNative / fx : costNative
   );
 
+  // 🐛 DEBUG: Log para Modo y Coelsa
+  if (projectKey.toLowerCase().includes('modo') || projectKey.toLowerCase().includes('coelsa')) {
+    console.log(`🔍 TCG DEBUG: ${projectKey} ${monthKey}`);
+    console.log(`  - currentUSD: ${currentUSD.toFixed(2)}`);
+    console.log(`  - historyUSDNormalized: [${historyUSDNormalized.map(x => x.toFixed(2)).join(', ')}]`);
+    console.log(`  - historyFutureUSDNormalized: [${historyFutureUSDNormalized.map(x => x.toFixed(2)).join(', ')}]`);
+    console.log(`  - min_baseline_usd: ${cfg.min_baseline_usd}`);
+    console.log(`  - strategy: ${cfg.strategy}`);
+  }
+
   const minBaselineUSD = cfg.min_baseline_usd ?? 0;
   const baselineUSD = buildBaselineUSD(historyUSDNormalized, minBaselineUSD);
   if (!baselineUSD) {
+    if (projectKey.toLowerCase().includes('modo') || projectKey.toLowerCase().includes('coelsa')) {
+      console.log(`⚠️ TCG DEBUG: No baseline for ${projectKey} ${monthKey} - historial insuficiente`);
+    }
     return { isAnomaly: false, flags };
   }
 

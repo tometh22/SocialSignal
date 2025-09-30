@@ -22,6 +22,7 @@ overrides:
     min_baseline_points: 1
     min_baseline_usd: 300
     low_ratio_threshold: 0.5
+    high_ratio_threshold: 1.5
     expected_usd_band:
       low: 300
       high: 450
@@ -31,3 +32,7 @@ overrides:
     min_baseline_points: 1
     min_baseline_usd: 300
     low_ratio_threshold: 0.5
+    high_ratio_threshold: 1.5
+    expected_usd_band:
+      low: 250
+      high: 350

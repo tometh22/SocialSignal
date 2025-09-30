@@ -261,7 +261,7 @@ export async function aggregateCostsByProject(
   
   for (const group of groups.values()) {
     // 🛡️ TEMPORAL CONSISTENCY GUARD (TCG): Detectar y corregir anomalías temporales
-    const projectKey = `${group.clientName}|${group.projectName}`;
+    const projectKey = `${group.clientName}|${group.projectName}`.toLowerCase();
     const cfg = getConfigForProject(projectKey);
     const lookaheadMonths = cfg.lookahead_months ?? 0;
     
