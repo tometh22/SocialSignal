@@ -1,0 +1,110 @@
+Solo un warning: el fix de Modo (11,885 → 45 USD) huele a sub-corrección. Probable causa: la mediana histórica incluye 0 o valores muy bajos, y tu TCG los tomó como baseline. Te dejo el ajuste fino para que la autocorrección quede “realista” (≈ USD 300–400 para Modo, dado AGO=ARS 497,550 ≈ USD 370).
+
+Ajustes recomendados (rápidos y seguros)
+1) Anomaly config (YAML)
+
+Forzá prev_valid y filtrá baseline “cero” para Modo/Coelsa.
+
+# config/anomaly.yaml
+version: 1.0
+defaults:
+  lookback_months: 6
+  low_ratio_threshold: 0.35
+  high_ratio_threshold: 2.5
+  min_baseline_points: 2
+  mode: "autocorrect"
+  strategy: "median"
+  max_gap_months: 6
+  usd_tolerance_pct: 25
+  # NUEVO:
+  min_baseline_usd: 50        # ignora baselines < USD 50
+  lower_clamp_ratio: 0.6      # clamp contra prev_valid
+  upper_clamp_ratio: 1.4
+
+overrides:
+  - projectKey: "play digital s.a (modo)|fee mensual"
+    strategy: "prev_valid"
+    min_baseline_points: 1
+    min_baseline_usd: 150     # Modo nunca debería caer < USD 150
+    low_ratio_threshold: 0.5
+  - projectKey: "coelsa|fee mensual"
+    strategy: "prev_valid"
+    min_baseline_points: 1
+    min_baseline_usd: 300
+
+2) Baseline robusto (ignorar 0/near-zero)
+
+En buildBaselineUSD(...):
+
+function buildBaselineUSD(history: number[], minUSD=0): number | null {
+  const values = history.filter(x => Number.isFinite(x) && x >= minUSD);
+  if (values.length < 1) return null;
+  values.sort((a,b)=>a-b);
+  const mid = Math.floor(values.length/2);
+  return values.length % 2 ? values[mid] : (values[mid-1] + values[mid]) / 2;
+}
+
+
+Y al llamar:
+
+const baselineUSD = buildBaselineUSD(historyUSDNormalized, cfg.min_baseline_usd ?? 0);
+
+3) Preferir prev_valid y clamp de autocorrección
+
+Dentro del bloque donde aplicás el fix:
+
+const prevValid = historyUSDNormalized.find(x => Number.isFinite(x) && x >= (cfg.min_baseline_usd ?? 0)) ?? null;
+
+if (decision.isAnomaly && decision.fixedUSD != null) {
+  // Clamp contra el mes válido anterior si existe
+  if (prevValid) {
+    const lo = prevValid * (cfg.lower_clamp_ratio ?? 0.6);
+    const hi = prevValid * (cfg.upper_clamp_ratio ?? 1.4);
+    decision.fixedUSD = Math.min(hi, Math.max(lo, decision.fixedUSD));
+    outFlags.push('CLAMPED_TO_PREV_RANGE');
+  }
+  usdNormalized = decision.fixedUSD;
+  displayNative = (nativeCurrency === 'ARS') ? Math.round(usdNormalized * fx) : usdNormalized;
+}
+
+4) Regla de anclaje para ARS-native
+
+Para proyectos ARS-native cuando hay ARS presente, usá como “candidato sano” ARS/FX y sólo reemplazá si cae en anomalía; pero si la corrección cae por debajo del 50% del prev_valid, clamp (ya queda cubierto por el punto 3).
+
+5) Re-verificación rápida (runbook)
+
+Actualizá YAML + código.
+
+UPDATE ya hecho para limpiar USD corruptos de JUL-2025.
+
+Reprocesá y bypasseá caché:
+
+GET /api/costs?period=2025-07&source=fresh
+GET /api/costs/debug?period=2025-07
+
+
+Esperado:
+
+Modo JUL ≈ USD 300–450 (flag: ANOMALY_TEMPORAL, AUTO_FROM_PREV_VALID, CLAMPED_TO_PREV_RANGE).
+
+Coelsa JUL ≈ rango cercano a prev_valid (no < 50% ni > 140%).
+
+Warner/Kimberly sin cambios.
+
+6) Tests de no-regresión
+
+Modo: historia [0, 380, 0, 360] + JUL=11,885 → corrige a 360±40% (clamp).
+
+Coelsa: historia [1,900, 2,200, 2,500] + JUL=63 → corrige a ~prev_valid y no < 50%.
+
+USD-native: si viene USD válido, no tocar (sin FX ni TCG).
+
+Zeros en baseline: no influyen (filtrados por min_baseline_usd).
+
+Por qué esto resuelve tu caso
+
+Evitás que ceros o near-zeros tiren la mediana a valores irreales (p. ej., USD 45).
+
+Anclás la corrección al último mes válido y limitás la deriva con clamp (0.6–1.4×).
+
+Mantenés autocorrección universal pero predecible para finanzas.
