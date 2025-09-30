@@ -17,6 +17,7 @@ import type {
 import { getCostData, getCostDataForProject } from './data-access';
 import { processCostsForPeriod } from './business-rules';
 import * as income from '../income';
+import { getFx } from '../income/fx';
 
 // ==================== PERIOD RECONCILER (TEMPORAL) ====================
 // 🎯 Overrides temporales para agosto 2025 mientras se completa la DB
@@ -154,7 +155,9 @@ export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult>
     const result = await processCostsForPeriod(allCostRecords, period, {}, projectCurrencyMap);
     
     // 5. 🎯 Apply period reconciler (temporal overrides for 2025-08)
-    const fxRate = 1345; // Hard-coded for 2025-08 per requirements
+    // 🚀 FIXED: Use dynamic FX based on period instead of hardcoded 1345
+    const fxRate = await getFx(period);
+    console.log(`💱 COSTS SoT: Using FX ${fxRate} for period ${period}`);
     result.projects = applyPeriodReconciler(result.projects, period, fxRate);
     
     // 6. Recalculate portfolio total after overrides

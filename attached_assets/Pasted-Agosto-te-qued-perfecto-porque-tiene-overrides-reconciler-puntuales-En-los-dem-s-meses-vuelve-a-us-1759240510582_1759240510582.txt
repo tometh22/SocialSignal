@@ -1,0 +1,94 @@
+Agosto te quedó perfecto porque tiene overrides/reconciler puntuales. En los demás meses vuelve a usarse el dato “crudo” (con horas ×100, USD corrupto o ARS faltante), por eso se rompe. Arreglamos agosto; ahora hay que generalizar las reglas para cualquier mes y verificar que el front consuma el período correcto sin cache viejo.
+
+Aquí tienes un plan de 12 checks rápidos (copi/pega) para dejar todos los meses prolijos:
+
+1) ¿El front pide el período correcto?
+
+ Cambia el selector a July 2025 y corre en consola de red: debe llamar
+/api/projects?timeFilter=2025-07 (o equivalente).
+
+ Si ves Last Month o falta el parámetro, corrige el mapeo del picker.
+
+2) Cache fuera
+
+ Repite la llamada con &fresh=true si está soportado:
+/api/projects?timeFilter=2025-07&fresh=true
+
+ Si no existe, reinicia server y prueba de nuevo (para descartar caché del agregador).
+
+3) Auditor por mes (costos)
+
+ curl -s "http://localhost:5000/api/costs/debug?period=2025-07&source=fresh" | jq '{period, rawDataStats, portfolioSummary}'
+
+ Revisa que use month_key y que los “hourly anti-x100” aparezcan en logs (e.g. ANTI_X100_HOURS).
+
+4) Auditor por mes (ingresos)
+
+ curl -s "http://localhost:5000/api/income?period=2025-07&source=fresh" | jq '.summary'
+
+ Verifica que parseNumberEs ya no infle 2277.78 → 227778 (no debe haber ×100 nunca).
+
+5) Reglas “guardrails” activas para TODOS los meses
+
+ Costos:
+
+Ignorar monto_total_usd > 100000 (usar ARS/FX).
+
+Anti-×100 por horas si horas_reales_asana > 300 ⇒ dividir costo_total entre 100.
+
+Agrupar por (clientName, projectName, month_key) con trim/lowercase.
+
+ Ingresos:
+
+parseNumberEs con detección de decimal “.” vs miles.
+
+Guardar ARS y USD si ambos existen (sales normalizer + storage).
+
+6) FX por período
+
+ SELECT * FROM exchange_rates WHERE year=2025 AND month=7;
+Debe devolver el FX real (sin fallback 1260). SoT debe loguear “Using FX 1345” (o el que corresponda mes a mes).
+
+7) Validación de 4 proyectos “muestra” (JUL 2025)
+
+ Warner /api/projects?timeFilter=2025-07 → USD nativo correcto.
+
+ Kimberly → USD nativo correcto.
+
+ Modo → ARS nativo visible en la card (no USD), y normalizedUSD = ARS/FX.
+
+ Coelsa → ARS nativo visible, normalizedUSD correcto.
+
+8) Ver que NO dependas de overrides
+
+ En costs/index.ts y income/index.ts los overrides deben estar solamente para 2025-08 (documentados con TODO).
+
+ Para otros meses no debe haber overrides. Si el mes sale mal, el auditor de #3/#4 te dirá qué regla falta.
+
+9) Duplicados fuera
+
+ Ejecuta:
+SELECT cliente, proyecto, month_key, COUNT(*) FROM direct_costs GROUP BY 1,2,3 HAVING COUNT(*)>1;
+Si aparecen duplicados, limpia o deduplica en data-access antes del agregado.
+
+10) BD de ventas guarda ARS y USD
+
+ SELECT client_name, project_name, month, year, amount_local, amount_usd FROM google_sheets_sales WHERE year=2025 AND month='julio';
+Deben venir ambos cuando el Excel los tiene. Si amount_local está NULL, el normalizador no lo mapeó (revisar mapping).
+
+11) Frontend: formateo
+
+ Confirmar que el formatter ya muestra 2 decimales para USD y separador de miles para ARS (quedó en formatters.ts).
+
+ Cards deben usar metrics.costDisplay / metrics.revenueDisplay (no recomputar en el front).
+
+12) Test de humo multi-mes
+
+ for m in 06 07 08 09; do curl -s "http://localhost:5000/api/projects?timeFilter=2025-$m&fresh=true" | jq '.projects|length'; done
+Debe devolver conteos consistentes y números razonables (sin millones/billones absurdos).
+
+Por qué te pasaba “solo agosto”
+
+Agosto está “curado” con overrides/reconciler + reglas; los otros meses seguían leyendo datos crudos (horas ×100, USD corrupto, ARS vacío) y/o cacheados. Haciendo los 12 checks de arriba, dejas las reglas permanentes que sirven para todos los períodos y te aseguras que el front pida y muestre lo correcto.
+
+Si quieres, pásame el JSON de /api/costs/debug?period=2025-07 y de /api/income?period=2025-07 (solo los bloques de Modo/Coelsa/Warner/Kimberly) y te digo exactamente qué regla está faltando para julio.
