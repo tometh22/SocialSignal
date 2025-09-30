@@ -1,0 +1,215 @@
+) Config (nuevo): config/anomaly.yaml
+
+Permite tunear por cliente/proyecto sin tocar código.
+
+# config/anomaly.yaml
+version: 1.0
+defaults:
+  lookback_months: 3
+  low_ratio_threshold: 0.35   # actual/baseline < 35% => sospechoso
+  high_ratio_threshold: 2.5   # actual/baseline > 250% => sospechoso
+  min_baseline_points: 2      # se necesita al menos 2 meses válidos
+  mode: "autocorrect"         # detect | autocorrect
+  strategy: "median"          # median | prev_valid
+  max_gap_months: 6           # hasta 6 meses hacia atrás para baseline
+  usd_tolerance_pct: 25       # usd*fx vs ars diferencia permitida
+  log_level: "info"
+
+overrides:
+  # Ejemplos de sintonía fina
+  - projectKey: "coelsa|fee mensual"
+    low_ratio_threshold: 0.5
+    strategy: "prev_valid"
+  - projectKey: "play digital s.a (modo)|fee mensual"
+    low_ratio_threshold: 0.5
+
+2) Guardas en ETL (evitar futuros USD corruptos)
+
+No tocamos datos históricos aún; esto previene que vuelva a pasar.
+
+// ETL (pseudocódigo/TS) al construir el payload a insertar en direct_costs
+function sanitizeUSD(input: { currency: 'ARS'|'USD', costoARS?: number, montoUSD?: number, fx?: number }) {
+  const usd = input.montoUSD ?? null;
+  const ars = input.costoARS ?? null;
+  const fx  = input.fx ?? null;
+
+  // 1) Prohibido que USD == ARS cuando la moneda nativa es ARS
+  if (input.currency === 'ARS' && usd != null && ars != null) {
+    const same = Math.abs(usd - ars) <= 0.01 * Math.max(1, ars);
+    if (same) return null;
+  }
+
+  // 2) Cortar astronómicos o notaciones científicas
+  if (usd != null && (usd > 1_000_000 || !Number.isFinite(usd))) return null;
+
+  // 3) Si hay ARS y FX, el USD de origen no debe diferir >X% del ARS/FX
+  if (usd != null && ars != null && fx != null) {
+    const implied = ars / fx;
+    const diffPct = Math.abs(usd - implied) / Math.max(1, implied) * 100;
+    if (diffPct > 200) return null; // 200% por si FX sufre saltos grandes
+  }
+
+  return usd ?? null;
+}
+
+
+Importante: en ETL nunca calcules USD si el origen es ARS. Guardá USD solo si viene explícito y pasa los checks.
+
+3) Guardas en SoT (Temporal Consistency Guard – TCG)
+
+Corre después de anti-USD-astronómico y anti-×100-horas.
+Si detecta desvío temporal, reemplaza el valor actual por un fallback (mediana o mes válido anterior) y flaggea.
+
+3.1 Helper para baseline
+// Query previa: trae últimos N meses válidos (sin flags graves) con costUSDNormalized
+// SELECT month_key, cost_usd_normalized FROM costs_sot WHERE projectKey=? AND is_valid=true ORDER BY month_key DESC LIMIT 6
+
+function buildBaselineUSD(history: number[]): number | null {
+  const values = history.filter(x => Number.isFinite(x));
+  if (values.length < 2) return null;
+  // mediana robusta
+  values.sort((a,b)=>a-b);
+  const mid = Math.floor(values.length/2);
+  return values.length % 2 ? values[mid] : (values[mid-1] + values[mid]) / 2;
+}
+
+3.2 Detector + corrección
+type AnomalyDecision = {
+  isAnomaly: boolean;
+  ratio?: number;
+  baselineUSD?: number|null;
+  fixedUSD?: number|null;
+  reason?: string;
+  flags: string[];
+};
+
+function temporalGuard({
+  projectKey,
+  monthKey,
+  nativeCurrency,         // 'ARS' | 'USD'
+  costNative,             // número “display” crudo tras saneamiento
+  fx,                     // FX del mes
+  montoUSDFromOrigin,     // USD limpio si vino de origen, sino null
+  historyUSDNormalized,   // array con últimos meses válidos
+  cfg                     // merge de defaults + override por projectKey
+}: {
+  projectKey: string; monthKey: string; nativeCurrency: 'ARS'|'USD';
+  costNative: number; fx: number; montoUSDFromOrigin: number|null;
+  historyUSDNormalized: number[]; cfg: AnomalyConfig;
+}): AnomalyDecision {
+
+  const flags: string[] = [];
+  // 1) Elegir USD “actual” candidato
+  const currentUSD = montoUSDFromOrigin ?? (nativeCurrency === 'ARS' ? costNative / fx : costNative);
+
+  // 2) Baseline
+  const baselineUSD = buildBaselineUSD(historyUSDNormalized);
+  if (!baselineUSD) return { isAnomaly:false, flags };
+
+  const ratio = currentUSD / baselineUSD;
+
+  // 3) Detección
+  const low = ratio < (cfg.low_ratio_threshold ?? 0.35);
+  const high = ratio > (cfg.high_ratio_threshold ?? 2.5);
+  if (!low && !high) return { isAnomaly:false, ratio, baselineUSD, flags };
+
+  flags.push('ANOMALY_TEMPORAL');
+  let fixedUSD: number|null = null;
+  let reason = '';
+
+  if (cfg.mode === 'autocorrect') {
+    if ((cfg.strategy ?? 'median') === 'prev_valid' && historyUSDNormalized.length) {
+      fixedUSD = historyUSDNormalized[0]; // último válido
+      reason = 'AUTO_FROM_PREV_VALID';
+    } else {
+      fixedUSD = baselineUSD;             // mediana robusta
+      reason = 'AUTO_FROM_MEDIAN';
+    }
+  }
+
+  return { isAnomaly:true, ratio, baselineUSD, fixedUSD, reason, flags };
+}
+
+3.3 Aplicación en el SoT de Costos
+// Dentro del builder del Costs SoT, por cada projectKey/monthKey
+const decision = temporalGuard({
+  projectKey, monthKey, nativeCurrency,
+  costNative, fx, montoUSDFromOrigin,
+  historyUSDNormalized, cfg
+});
+
+let usdNormalized = montoUSDFromOrigin ?? (nativeCurrency === 'ARS' ? costNative / fx : costNative);
+let displayNative = costNative;
+const outFlags = [...existingFlags, ...decision.flags];
+
+if (decision.isAnomaly && decision.fixedUSD != null) {
+  usdNormalized = decision.fixedUSD;
+  // reconstituir display en moneda nativa:
+  displayNative = (nativeCurrency === 'ARS') ? Math.round(usdNormalized * fx) : usdNormalized;
+  outFlags.push(decision.reason);
+  outFlags.push(`BASELINE_USD=${Math.round(decision.baselineUSD!*100)/100}`);
+  outFlags.push(`ANOMALY_RATIO=${Math.round(decision.ratio!*100)/100}`);
+}
+
+// Emitir ledger + flags a /api/costs/debug
+return { displayNative, usdNormalized, flags: outFlags, ...rest };
+
+4) Limpieza puntual de JULIO (una vez)
+
+Evita que esos USD corruptos “ensucien” futuros baselines.
+
+-- Quitar USD corrupto y USD=ARS en julio:
+UPDATE direct_costs
+SET monto_total_usd = NULL
+WHERE month_key = '2025-07'
+  AND (
+    monto_total_usd > 1000000
+    OR ABS(monto_total_usd - costo_total) <= 0.01 * GREATEST(1, costo_total)
+  );
+
+
+Runbook
+
+Aplicá el patch ETL + SoT.
+
+Ejecutá el UPDATE de arriba.
+
+Re-sync (o reprocess SoT) y forzá caché:
+
+GET /api/costs?period=2025-07&source=fresh
+GET /api/costs/debug?period=2025-07
+
+
+Verificá flags en /debug: ANOMALY_TEMPORAL, AUTO_FROM_MEDIAN o AUTO_FROM_PREV_VALID.
+
+Abrí “Active Projects” julio y validá display nativo + KPIs.
+
+5) Tests (golden)
+
+Coelsa 2025-07: con costo_total=82,160 ARS, fx=1300 y baseline ≈ 0.5–0.6M ARS → debe autocalibrar a ~baseline (flag ANOMALY_TEMPORAL).
+
+Modo 2025-07: si USD=ARS en DB → SoT ignora USD, calcula desde ARS/FX y no dispara anomalía si está en rango.
+
+Warner/Kimberly (USD-native): si viene USD válido, no aplicar FX ni anomalía salvo desvío > umbral.
+
+6) Observabilidad
+
+Extender /api/costs/debug con:
+
+baselineUSD, currentUSD, anomalyRatio, fixStrategy, autoFixed:boolean.
+
+Contador Prometheus: cost_anomalies_total{projectKey} y gauge cost_anomaly_ratio.
+
+7) Política de seguridad
+
+Default mode: detect en producción la primera semana; activá autocorrect per-project con overrides.
+
+Cualquier corrección queda trazada en ledger y visible en /debug.
+
+Qué ganás
+
+Universalizás la corrección (no dependés de overrides por mes).
+
+Blindás el pipeline ante datos “plausibles pero erróneos” (como 8 h * 10.270).
+
+Mantenés display nativo correcto y KPIs estables.
