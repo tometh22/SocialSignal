@@ -647,12 +647,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== CONSOLIDATED PROJECTS ENDPOINT ====================
   // Uses ONLY ActiveProjectsAggregator for consistency with dual-currency support
-  app.get('/api/projects', requireAuth, async (req, res) => {
-    console.log(`🔥🔥🔥 MY CONSOLIDATED ENDPOINT IS RUNNING 🔥🔥🔥 Query=${JSON.stringify(req.query)}`);
+  
+  // Shared handler for both /api/projects and /api/active-projects/v2
+  const handleProjectsRequest = async (req: any, res: any) => {
+    console.log(`🔥 CONSOLIDATED ENDPOINT CALLED: ${req.path} Query=${JSON.stringify(req.query)}`);
     
     try {
-      // Parse query parameters (match ActiveProjectsAggregator interface)
-      const timeFilter = req.query.timeFilter as string || 'this_month';
+      // Parse query parameters - support both "period" and "timeFilter"
+      const timeFilter = (req.query.period as string) || (req.query.timeFilter as string) || 'this_month';
       const activeOnly = req.query.onlyActiveInPeriod === 'true';
       
       console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}`);
@@ -684,7 +686,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         engine: 'consolidated_aggregator'
       });
     }
-  });
+  };
+
+  // Main endpoint
+  app.get('/api/projects', requireAuth, handleProjectsRequest);
+  
+  // V2 alias endpoint
+  app.get('/api/active-projects/v2', requireAuth, handleProjectsRequest);
 
   // Endpoint de prueba para deviation analysis (sin sanitización)
   app.get("/api/projects/:id/deviation-test", requireAuth, async (req, res) => {
@@ -4300,18 +4308,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allProjects = await storage.getActiveProjects();
       console.log(`🔍 Retrieved ${allProjects.length} projects from storage`);
 
+      // 🎯 CRÍTICO: Aplanar estructura para facilitar el trabajo con nombres
+      const projectsFlattened = allProjects.map(p => ({
+        ...p,
+        clientName: p.quotation?.client?.name || null,
+        name: p.quotation?.projectName || null
+      }));
+
       // Filtrar los proyectos según el parámetro
       let projects;
 
       if (!showSubprojects) {
         // Modo normal - mostrar solo proyectos padres y proyectos sin padre
-        projects = allProjects.filter(project => {
+        projects = projectsFlattened.filter(project => {
           const result = project.parentProjectId === null;
           return result;
         });
       } else {
         // Modo completo - mostrar todos los proyectos
-        projects = allProjects;
+        projects = projectsFlattened;
       }
 
       // Filtrar por período temporal si se especifica - basado en ACTIVIDAD no en fecha de inicio
