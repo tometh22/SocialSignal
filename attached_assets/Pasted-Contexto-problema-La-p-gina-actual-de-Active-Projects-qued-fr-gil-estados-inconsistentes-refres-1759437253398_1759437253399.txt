@@ -1,0 +1,127 @@
+Contexto / problema
+La página actual de Active Projects quedó frágil (estados inconsistentes, refresco incierto, mezcla de cálculos en front, logs confusos). Para estabilizar, necesitamos reconstruirla desde cero con contrato claro y sin lógica oculta.
+
+Objetivo
+Entregar una página nueva de Active Projects idempotente y determinística, que solo renderice lo que viene del backend y respete el SoT. Sin recálculos de FX ni heurísticas en el front.
+
+Alcance (done cuando pase todo)
+
+Stack: Next.js + React + Tailwind + React Query + framer-motion + lucide.
+
+Endpoint único: GET /api/projects?period=YYYY-MM[&source=fresh] (mismo origen).
+
+Estados: loading (skeleton), error (card roja), success.
+
+Controles:
+
+Selector de mes (<input type="month">) → actualiza period.
+
+Refresh → vuelve a llamar con source=fresh (bypass cache del backend).
+
+Search client/proyecto (case-insensitive).
+
+Toggle “Active only”.
+
+KPI header: Revenue USD, Profit USD, Hours, Active/Total, FX (muestra si viene).
+
+Cards por proyecto:
+
+Client, Project, badges (Active/Fee/One-Shot).
+
+Display nativo: revenueDisplay y costDisplay en moneda nativa (ARS o USD).
+
+Profit (display nativo = revenueDisplay − costDisplay).
+
+KPIs en USD: markup y margin (si no vienen, calcular con revenueUSDNormalized/costUSDNormalized).
+
+Si anomaly[] viene con flags → mostrar badge “Anomaly” y lista de flags en texto pequeño.
+
+Formato numérico: K/M con 0–2 decimales. No re-aplicar FX en el front.
+
+Sin lógica de negocio en front:
+
+No parsear ni corregir datos.
+
+No mover montos entre monedas.
+
+No derivar FX.
+El front solo muestra lo que entrega la API.
+
+Accesibilidad/UX: layout limpio, responsive, animaciones sutiles, estados claros.
+
+Contrato de API (obligatorio)
+
+La API debe devolver este shape (front tolera faltantes, pero estos campos son clave):
+
+{
+  "period": "2025-07",
+  "updatedAt": "2025-07-31T23:59:59Z",
+  "fx": 1300,
+  "summary": {
+    "periodRevenueUSD": 40750.0,
+    "periodProfitUSD": 38590.0,
+    "periodHours": 0,
+    "activeProjects": 5,
+    "totalProjects": 5
+  },
+  "projects": [
+    {
+      "clientName": "Play Digital S.A (Modo)",
+      "projectName": "Fee mensual",
+      "projectKey": "play digital s a modo|fee mensual",
+      "status": "Active",
+      "tags": ["Fee"],
+      "currencyNative": "ARS",
+      "metrics": {
+        "revenueDisplay": 3080000.0,
+        "costDisplay": 0.0,
+        "revenueUSDNormalized": 2370.0,
+        "costUSDNormalized": 0.0,
+        "markup": 0.0,
+        "margin": 1.0
+      },
+      "anomaly": ["ANOMALY_TEMPORAL","ANTI_X100_HOURS"]
+    }
+  ]
+}
+
+
+Notas:
+
+currencyNative define cómo formatear *Display. Si no viene, inferimos: Warner/Kimberly = USD; resto = ARS.
+
+Si markup/margin no vienen, el front los calcula solo con los normalizados en USD.
+
+Cualquier campo ausente se muestra como “—”.
+
+Definición de Hecho (DoD)
+
+La página compila, carga, y refresca con ?source=fresh.
+
+El front no cambia valores ni monedas (auditable comparando con payload).
+
+Search y “Active only” funcionan sin tocar datos.
+
+En errores de API se ve un card de error con el código.
+
+Lighthouse básico: sin errores de JS, layout estable.
+
+QA / Runbook (para cerrar)
+
+GET /api/projects?period=2025-07&source=fresh → verificar payload.
+
+Abrir página, setear 2025-07 → ver misma data renderizada (valores idénticos).
+
+Tocar Refresh → ver que hace nueva request con source=fresh.
+
+Buscar “Modo” → filtra solo sus cards.
+
+Apagar “Active only” → ver también inactivos (si los hay).
+
+Forzar 500 en API → ver card de error.
+
+Extras (si llegamos)
+
+Mostrar updatedAt y period en pie de página.
+
+Exponer un ?debug=true que renderice el JSON crudo (solo en dev).
