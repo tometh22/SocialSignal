@@ -131,8 +131,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/quotation/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/quotations/${params.id}`} />} />
                   
                   {/* Project Management */}
-                  <ProtectedRoute path="/active-projects" component={ActiveProjectsV2} />
-                  <ProtectedRoute path="/active-projects-next" component={ActiveProjectsNext} />
+                  <ProtectedRoute path="/active-projects" component={ActiveProjectsNext} />
+                  <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
                   <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
