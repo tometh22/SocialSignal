@@ -2050,7 +2050,15 @@ export const activeProjectItemSchema = z.object({
   periodCostUSD: z.number().nullable(),
   periodProfitUSD: z.number().nullable(),
   flags: projectFlagsSchema,
-  period: resolvedPeriodSchema
+  period: resolvedPeriodSchema,
+  // Optional metadata for intelligent visibility and project management
+  projectType: z.enum(['Fee', 'Puntual']).optional(),
+  startMonthKey: z.string().optional(),  // YYYY-MM
+  endMonthKey: z.string().optional(),    // YYYY-MM
+  lastActivity: z.string().optional(),   // YYYY-MM
+  isFinished: z.boolean().optional(),
+  supportsRollup: z.boolean().optional(),
+  allowFinish: z.boolean().optional()
 });
 
 export type ActiveProjectItem = z.infer<typeof activeProjectItemSchema>;

@@ -633,6 +633,36 @@ export class ActiveProjectsAggregator {
       const mappedType = this.mapProjectType(quotationType, projectName);
       console.log(`📋 Project "${projectName}": quotation=${!!projectData.quotation}, type mapped to="${mappedType}"`);
       
+      // Calculate optional metadata for intelligent visibility
+      const projectTypeLabel: 'Fee' | 'Puntual' | undefined = 
+        mappedType === 'fee' ? 'Fee' : 
+        mappedType === 'one-shot' ? 'Puntual' : 
+        undefined;
+
+      // Calculate last activity month from sales and costs
+      const activityMonths: string[] = [];
+      for (const sale of projectData.sales) {
+        const monthKey = `${sale.year}-${String(sale.month).padStart(2, '0')}`;
+        if (!activityMonths.includes(monthKey)) activityMonths.push(monthKey);
+      }
+      for (const cost of projectData.costs) {
+        const monthKey = `${cost.year}-${String(cost.month).padStart(2, '0')}`;
+        if (!activityMonths.includes(monthKey)) activityMonths.push(monthKey);
+      }
+      activityMonths.sort();
+      const lastActivity = activityMonths.length > 0 ? activityMonths[activityMonths.length - 1] : undefined;
+
+      // For puntual projects, calculate date range from quotation if available
+      const startMonthKey = projectData.quotation?.startDate 
+        ? projectData.quotation.startDate.substring(0, 7) 
+        : activityMonths[0];
+      const endMonthKey = projectData.quotation?.endDate 
+        ? projectData.quotation.endDate.substring(0, 7) 
+        : undefined;
+      
+      // Determine if finished (inactive status or explicitly marked)
+      const isFinished = projectData.quotation?.status === 'completed' || false;
+
       projectItems.push({
         projectId: projectData.projectId,
         clientId: projectData.clientId,
@@ -658,7 +688,15 @@ export class ActiveProjectsAggregator {
           ...period,
           displayCurrency,
           revenueDisplay
-        }
+        },
+        // Optional metadata for intelligent visibility
+        projectType: projectTypeLabel,
+        startMonthKey,
+        endMonthKey,
+        lastActivity,
+        isFinished,
+        supportsRollup: true,  // All projects support rollup queries
+        allowFinish: !isFinished  // Can mark as finished if not already finished
       });
       
       // 🔍 DEBUG: Verificar objeto period ANTES del return

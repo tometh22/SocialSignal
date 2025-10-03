@@ -314,7 +314,7 @@ function useActiveProjects(period: string, fresh: boolean) {
 
 // Hook for rollup data (optional endpoint - backward compatible)
 function useProjectRollup(projectKey?: string, period?: string, scope?: 'acum'|'total') {
-  const enabled = !!projectKey && !!period && !!scope && scope !== 'mes';
+  const enabled = !!projectKey && !!period && !!scope;
   return useQuery({
     queryKey: ['project-rollup', projectKey, period, scope],
     enabled,
