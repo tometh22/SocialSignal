@@ -17,13 +17,13 @@ export function setupUniversalRoutes(app: Express, requireAuth: any) {
   app.use('/api/projects', requireAuth);
   
   // Integrar todas las rutas universales
-  app.use('/api/projects', projectsRouter);          // GET /api/projects
+  // app.use('/api/projects', projectsRouter);          // COMENTADO: Conflicto con handleProjectsRequest en línea 692 de routes.ts
   app.get('/api/projects/:id/complete-data', completeDataHandler);  // ÚNICA RUTA COMPLETE-DATA (fix quirúrgico)
   app.use('/api/projects', deviationRouter);         // GET /api/projects/:id/deviation-analysis  
   app.use('/api/projects', rankingsRouter);          // GET /api/projects/:id/performance-rankings
 
   console.log('🚀 UNIVERSAL ROUTES CONFIGURED:');
-  console.log('   - GET /api/projects (listado con motor único)');
+  console.log('   - GET /api/projects (usa handleProjectsRequest de routes.ts línea 692)');
   console.log('   - GET /api/projects/:id/complete-data (proyecto completo con motor único)');
   console.log('   - GET /api/projects/:id/deviation-analysis (análisis equipo con motor único)');
   console.log('   - GET /api/projects/:id/performance-rankings (rankings equipo con motor único)');

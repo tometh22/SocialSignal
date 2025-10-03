@@ -40,7 +40,7 @@ function ProjectHeader() {
   const { data: projectInfo, isLoading: isLoadingProject } = useQuery({
     queryKey: ['/api/projects', 'projects'],
     enabled: !!projectId,
-    select: (data: any) => data?.find((p: any) => p.id === projectId)
+    select: (data: any) => data?.projects?.find((p: any) => p.projectId === projectId)
   });
 
   const { data: clientInfo } = useQuery({
@@ -78,8 +78,8 @@ function ProjectHeader() {
     );
   }
 
-  const projectName = projectInfo?.quotation?.projectName || 'Proyecto';
-  const clientName = clientInfo?.name || 'Cliente';
+  const projectName = projectInfo?.name || 'Proyecto';
+  const clientName = projectInfo?.client?.name || clientInfo?.name || 'Cliente';
 
   return (
     <div className="border-b bg-white p-6">
