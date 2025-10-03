@@ -5,6 +5,44 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 
+// ---------- Translations ----------
+const i18n = {
+  es: {
+    title: "Proyectos Activos",
+    subtitle: "Tablero unificado con datos de Excel/DB SoT",
+    refresh: "Actualizar",
+    searchPlaceholder: "Buscar proyectos o clientes…",
+    activeOnly: "Solo activos",
+    all: "Todos",
+    thisMonth: "Este mes",
+    lastMonth: "Mes anterior",
+    custom: "Personalizado…",
+    kpiRevenue: "Facturación del período (USD)",
+    kpiProfit: "Ganancia del período (USD)",
+    kpiHours: "Horas del período",
+    kpiActive: "Proyectos activos",
+    kpiFx: "Tipo de cambio (ref.)",
+    labelRevenue: "Facturación",
+    labelCost: "Costo",
+    labelProfit: "Ganancia",
+    labelMarkup: "Markup",
+    labelMargin: "Margen",
+    anomaly: "Anomalía",
+    flags: "Señales:",
+    noProjects: "No hay proyectos para este período.",
+    errorLoading: "Error al cargar datos:",
+    errorLoadingProjects: "Error al cargar proyectos",
+    period: "Período:",
+    updated: "Actualizado:",
+    statusActive: "Activo",
+    statusInactive: "Inactivo",
+    tagOneShot: "Puntual",
+    tagFee: "Fee",
+  }
+} as const;
+
+const t = (k: keyof typeof i18n["es"]) => i18n.es[k];
+
 // ---------- Types (tolerant to unknown backend fields) ----------
 export type Currency = "ARS" | "USD";
 
@@ -93,15 +131,12 @@ function periodToLabel(period: string): string {
   try {
     const [y, m] = period.split("-").map(Number);
     const d = new Date(y, m - 1, 1);
-    return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    return d.toLocaleDateString("es", { month: "short", year: "numeric" });
   } catch {
     return period;
   }
 }
 
-const API_BASE = ""; // same origin
-
-// Transform backend response to match our component contract
 function transformBackendResponse(backendData: any): ProjectsApi {
   // Extract period string from backend period object or construct it
   const periodStr = backendData.period?.start 

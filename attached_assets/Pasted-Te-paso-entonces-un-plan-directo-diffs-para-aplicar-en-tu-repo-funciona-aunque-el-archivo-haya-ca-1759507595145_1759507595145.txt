@@ -1,0 +1,164 @@
+Te paso entonces un plan directo + diffs para aplicar en tu repo (funciona aunque el archivo haya cambiado).
+
+1) Traducciones clave (find & replace rápido)
+
+Busca estos textos en el componente y cámbialos así:
+
+Active Projects → Proyectos Activos
+
+Unified dashboard powered by Excel/DB SoT → Tablero unificado con datos de Excel/DB SoT
+
+Refresh → Actualizar
+
+Search projects or clients… → Buscar proyectos o clientes…
+
+Active Only → Solo activos
+
+All → Todos
+
+This month → Este mes
+
+Last month → Mes anterior
+
+Custom… → Personalizado…
+
+Revenue (en las tarjetas) → Facturación
+
+Period Revenue (USD) → Facturación del período (USD)
+
+Period Profit (USD) → Ganancia del período (USD)
+
+Period Hours → Horas del período
+
+Active Projects (en KPI) → Proyectos activos
+
+FX (ref) → Tipo de cambio (ref.)
+
+Cost → Costo
+
+Profit → Ganancia
+
+Markup → Markup (lo dejamos igual, o si preferís: Multiplicador)
+
+Margin → Margen
+
+Anomaly → Anomalía
+
+Flags: → Señales:
+
+No projects for this period. → No hay proyectos para este período.
+
+Error loading data: → Error al cargar datos:
+
+API period: → Período API:
+
+Updated: → Actualizado:
+
+Nota: si “Revenue” aparece en otros lados (títulos, tooltips), cámbialo a “Facturación” también.
+
+2) Etiquetas de estado y tags
+
+En el componente de tarjeta de proyecto, mapea estado y tags a español:
+
+const statusLabel = p.status === "Inactive" ? "Inactivo" : "Activo";
+const tagLabel = (t: string) =>
+  ({ "Fee": "Fee", "One-Shot": "Puntual" } as any)[t] ?? t;
+
+
+Donde muestres el badge de estado y las tags, usa statusLabel y tagLabel(t).
+
+3) Mes en español
+
+Si tenés una función que convierte YYYY-MM a etiqueta, forzá locale es:
+
+function periodToLabel(period: string): string {
+  try {
+    const [y, m] = period.split("-").map(Number);
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleDateString("es", { month: "short", year: "numeric" });
+  } catch { return period; }
+}
+
+4) (Opcional) Centralizar traducciones con un mini i18n
+
+Si preferís no hacer muchos find/replace:
+
+const i18n = {
+  es: {
+    title: "Proyectos Activos",
+    subtitle: "Tablero unificado con datos de Excel/DB SoT",
+    refresh: "Actualizar",
+    searchPlaceholder: "Buscar proyectos o clientes…",
+    activeOnly: "Solo activos",
+    all: "Todos",
+    thisMonth: "Este mes",
+    lastMonth: "Mes anterior",
+    custom: "Personalizado…",
+    kpiRevenue: "Facturación del período (USD)",
+    kpiProfit: "Ganancia del período (USD)",
+    kpiHours: "Horas del período",
+    kpiActive: "Proyectos activos",
+    kpiFx: "Tipo de cambio (ref.)",
+    labelRevenue: "Facturación",
+    labelCost: "Costo",
+    labelProfit: "Ganancia",
+    labelMarkup: "Markup",
+    labelMargin: "Margen",
+    anomaly: "Anomalía",
+    flags: "Señales:",
+    noProjects: "No hay proyectos para este período.",
+    apiPeriod: "Período API:",
+    updated: "Actualizado:",
+    statusActive: "Activo",
+    statusInactive: "Inactivo",
+    tagOneShot: "Puntual",
+    tagFee: "Fee",
+  }
+} as const;
+
+const t = (k: keyof typeof i18n["es"]) => i18n.es[k];
+
+
+Y reemplazás literales por t("..."). Ejemplos:
+
+<h1>{t("title")}</h1>
+<button>{t("refresh")}</button>
+<input placeholder={t("searchPlaceholder")} />
+<Stat label={t("labelCost")} ... />
+
+5) ¿Querés separar “Facturación” (display nativo) de “Facturación (USD)”?
+
+Ya mostramos display nativo (ARS/USD) como “Facturación”.
+
+Si te sirve agregar un subtexto con el normalizado: poné debajo algo tipo:
+
+<div className="text-xs text-slate-500">
+  Normalizado: {formatUSD(p.metrics.revenueUSDNormalized)}
+</div>
+
+
+No cambia lógica, solo claridad para el equipo.
+
+6) ¿Formato numérico en español (coma decimal)?
+
+Por ahora dejé el toLocaleString() del front como está (usa el locale del navegador).
+Si querés forzar es-AR:
+
+const num = v.toLocaleString("es-AR", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
+
+
+(Hace “1,39 M” en lugar de “1.39M”). Si prefieren mantener el estilo anglo, no lo cambies.
+
+7) QA rápido (2 minutos)
+
+Cambiá el período con las flechas y el botón “Personalizado…” → etiqueta “Sep 2025”.
+
+Verificá KPI: “Facturación del período (USD) / Ganancia del período (USD) / Horas del período / Proyectos activos / Tipo de cambio (ref.)”.
+
+En tarjetas, el header derecho dice “Facturación” (no “Revenue”).
+
+Los stats dicen “Costo / Ganancia / Markup / Margen”.
+
+Badge “Anomalía” cuando haya flags.
+
+Mensaje vacío: “No hay proyectos para este período.”
