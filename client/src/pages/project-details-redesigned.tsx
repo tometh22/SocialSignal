@@ -1322,7 +1322,7 @@ const ProjectDetailsPage = () => {
       {
         label: "Presupuesto vs Objetivo",
         value: `$${actuals.totalWorkedCost.toLocaleString()}`,
-        subtitle: `Objetivo: $${quotation.baseCost.toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
+        subtitle: `Objetivo: $${(quotation.baseCost || 0).toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
         icon: DollarSign,
         color: budgetStyle.color,
         bgColor: budgetStyle.bgColor,
@@ -1331,7 +1331,7 @@ const ProjectDetailsPage = () => {
       {
         label: `Horas vs Objetivo`,
         value: `${actuals.totalWorkedHours.toFixed(1)}h`,
-        subtitle: `Objetivo: ${quotation.estimatedHours.toFixed(1)}h | ${efficiency <= 100 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(efficiency - 100).toFixed(1)}%`,
+        subtitle: `Objetivo: ${(quotation.estimatedHours || 0).toFixed(1)}h | ${efficiency <= 100 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(efficiency - 100).toFixed(1)}%`,
         icon: Clock,
         color: progressStyle.color,
         bgColor: progressStyle.bgColor,
@@ -1356,16 +1356,17 @@ const ProjectDetailsPage = () => {
         label: "Estado",
         value: (() => {
           // Usar métricas directas de unifiedData para la evaluación
+          const baseCost = quotation.baseCost || 1;
           console.log('🚨 ESTADO DEBUG:', { 
             budgetUtilization, 
             efficiency, 
             metricsFromUnified: unifiedData?.metrics?.budgetUtilization,
             actualCost: actuals.totalWorkedCost,
-            baseCost: quotation.baseCost,
-            calculatedBudget: (actuals.totalWorkedCost / quotation.baseCost) * 100
+            baseCost: baseCost,
+            calculatedBudget: (actuals.totalWorkedCost / baseCost) * 100
           });
           
-          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
           
           let resultado;
           if (actualBudgetUtil <= 85) resultado = "Excelente";
@@ -1377,21 +1378,24 @@ const ProjectDetailsPage = () => {
           return resultado;
         })(),
         subtitle: (() => {
-          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          const baseCost = quotation.baseCost || 1;
+          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
           if (actualBudgetUtil <= 85) return "🏆 Salud financiera excelente";
           if (actualBudgetUtil <= 100) return "✅ Salud financiera buena";
           if (actualBudgetUtil <= 110) return "🟡 Requiere atención";
           return "🔴 Estado crítico";
         })(),
         icon: (() => {
-          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          const baseCost = quotation.baseCost || 1;
+          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
           if (actualBudgetUtil <= 85) return Crown;
           if (actualBudgetUtil <= 100) return CheckCircle2;
           if (actualBudgetUtil <= 110) return AlertTriangle;
           return TrendingDown;
         })(),
         color: (() => {
-          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          const baseCost = quotation.baseCost || 1;
+          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
           if (actualBudgetUtil <= 85) return "text-emerald-700";
           if (actualBudgetUtil <= 100) return "text-green-700";
           if (actualBudgetUtil <= 110) return "text-yellow-700";
@@ -3292,6 +3296,17 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="performance-analysis" className="space-y-6">
 
+            {/* GRÁFICOS DE TENDENCIAS */}
+            <div className="grid grid-cols-1 gap-6">
+              <TrendCharts 
+                projectId={Number(projectId)}
+                timeFilter={timeFilterForHook}
+                dateFilter={{
+                  startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
+                  endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
+                }}
+              />
+            </div>
 
             {/* RANKINGS ECONÓMICOS - VISTA COMPLETA */}
             <div className="grid grid-cols-1 gap-6">

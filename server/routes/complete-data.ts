@@ -2,6 +2,9 @@
 import type { Request, Response } from 'express';
 import { resolveTimeFilter } from '../services/time';
 import { computeProjectPeriodMetrics } from '../domain/metrics';
+import { db } from '../db';
+import { activeProjects, quotations } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
 
 export async function completeDataHandler(req: Request, res: Response) {
   try {
@@ -14,6 +17,22 @@ export async function completeDataHandler(req: Request, res: Response) {
     }
 
     console.log(`🌟 COMPLETE-DATA FIX: Project ${projectId}, filter ${timeFilter}, basis ${basis}`);
+    
+    // Get project data
+    const projectData = await db.query.activeProjects.findFirst({
+      where: eq(activeProjects.id, parseInt(projectId))
+    });
+
+    if (!projectData) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    // Get quotation data separately
+    const quotationData = projectData.quotationId 
+      ? await db.query.quotations.findFirst({
+          where: eq(quotations.id, projectData.quotationId)
+        })
+      : null;
     
     const pm = await computeProjectPeriodMetrics(parseInt(projectId), timeFilter, basis);
 
@@ -71,6 +90,19 @@ export async function completeDataHandler(req: Request, res: Response) {
 
     const response = {
       // 🎯 FRONTEND COMPATIBILITY: Map to expected structure
+      project: {
+        id: projectData.id,
+        clientId: projectData.clientId,
+        status: projectData.status
+      },
+      quotation: quotationData ? {
+        id: quotationData.id,
+        projectName: quotationData.projectName,
+        baseCost: quotationData.baseCost,
+        estimatedHours: quotationData.estimatedHours,
+        totalAmount: quotationData.totalAmount,
+        markup: quotationData.markup
+      } : null,
       actuals: actualsData,
       metrics: {
         efficiency: summary.efficiencyPct,
@@ -91,6 +123,7 @@ export async function completeDataHandler(req: Request, res: Response) {
     };
     
     console.log(`🔍 FINAL RESPONSE MARKUP: ${response.metrics.markup}`);
+    console.log(`🔍 RESPONSE includes project: ${!!response.project}, quotation: ${!!response.quotation}`);
     return res.json(response);
   } catch (e: any) {
     console.error('❌ COMPLETE-DATA ERROR:', e.message);
