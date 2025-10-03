@@ -324,30 +324,6 @@ function useActiveProjects(period: string, fresh: boolean) {
   });
 }
 
-// Hook for rollup data (optional endpoint - backward compatible)
-function useProjectRollup(projectKey?: string, period?: string, scope?: 'acum'|'total') {
-  const enabled = !!projectKey && !!period && !!scope;
-  return useQuery({
-    queryKey: ['project-rollup', projectKey, period, scope],
-    enabled,
-    queryFn: async () => {
-      try {
-        const u = new URL(`/api/projects/${encodeURIComponent(projectKey!)}/rollup`, window.location.origin);
-        u.searchParams.set('scope', scope!);
-        u.searchParams.set('thru', period!);
-        const r = await fetch(u.toString());
-        if (!r.ok) return null; // Graceful degradation
-        return r.json();
-      } catch (e) {
-        console.warn('Rollup endpoint not available:', e);
-        return null;
-      }
-    },
-    staleTime: 60_000,
-    retry: false, // Don't retry if endpoint doesn't exist
-  });
-}
-
 // ---------- UI Components ----------
 function KPICard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
   return (
@@ -380,34 +356,15 @@ function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?
 }
 
 function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; period?: string }) {
-  const [view, setView] = useState<'mes'|'acum'|'total'>('mes');
   const queryClient = useQueryClient();
 
-  // Fetch rollup data if needed (backward compatible - fails gracefully)
-  const { data: rollup } = useProjectRollup(
-    p.projectKey, 
-    period, 
-    view === 'mes' ? undefined : view
-  );
-
-  // Use rollup data if available, otherwise use period metrics
-  const metrics = (view === 'mes' || !rollup) ? p.metrics : {
-    ...p.metrics,
-    revenueDisplay: rollup.revenueDisplay ?? p.metrics.revenueDisplay,
-    costDisplay: rollup.costDisplay ?? p.metrics.costDisplay,
-    revenueUSDNormalized: rollup.revenueUSDNormalized ?? p.metrics.revenueUSDNormalized,
-    costUSDNormalized: rollup.costUSDNormalized ?? p.metrics.costUSDNormalized,
-    markup: rollup.markup ?? p.metrics.markup,
-    margin: rollup.margin ?? p.metrics.margin,
-  };
-
   const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
-  const revenueDisplay = metrics.revenueDisplay ?? 0;
-  const costDisplay = metrics.costDisplay ?? 0;
-  const profitDisplay = (metrics.revenueDisplay ?? 0) - (metrics.costDisplay ?? 0);
+  const revenueDisplay = p.metrics.revenueDisplay ?? 0;
+  const costDisplay = p.metrics.costDisplay ?? 0;
+  const profitDisplay = (p.metrics.revenueDisplay ?? 0) - (p.metrics.costDisplay ?? 0);
 
-  const markup = metrics.markup ?? safeRatio(metrics.revenueUSDNormalized, metrics.costUSDNormalized);
-  const margin = metrics.margin ?? safeMargin(metrics.revenueUSDNormalized, metrics.costUSDNormalized);
+  const markup = p.metrics.markup ?? safeRatio(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
+  const margin = p.metrics.margin ?? safeMargin(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
 
   const hasAnomaly = (p.anomaly?.length || 0) > 0;
   
@@ -440,31 +397,6 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
             ))}
             {hasAnomaly && (
               <Badge tone="orange"><AlertTriangle className="h-3.5 w-3.5"/> {t("anomaly")}</Badge>
-            )}
-            
-            {/* View switcher - only show if rollup is supported or we always show it */}
-            {(p.supportsRollup !== false) && (
-              <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden ml-1">
-                {(['mes','acum','total'] as const).map(opt => (
-                  <button 
-                    key={opt} 
-                    onClick={() => setView(opt)}
-                    disabled={opt === 'total' && !p.isFinished}
-                    className={`px-2 py-1 text-xs transition-colors ${
-                      view === opt 
-                        ? 'bg-slate-900 dark:bg-slate-700 text-white' 
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-                    } ${opt === 'total' && !p.isFinished ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={
-                      opt === 'mes' ? t("monthData") : 
-                      opt === 'acum' ? t("accumulatedToDate") : 
-                      t("projectTotal")
-                    }
-                  >
-                    {opt === 'mes' ? t("viewMonth") : opt === 'acum' ? t("viewAccumulated") : t("viewTotal")}
-                  </button>
-                ))}
-              </div>
             )}
           </div>
         </div>
