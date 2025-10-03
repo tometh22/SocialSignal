@@ -303,12 +303,36 @@ async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsAp
   return transformBackendResponse(backendData);
 }
 
-// ---------- React Query Hook ----------
+// ---------- React Query Hooks ----------
 function useActiveProjects(period: string, fresh: boolean) {
   return useQuery({
     queryKey: ["projects", period, fresh ? "fresh" : "cached"],
     queryFn: () => fetchProjects(period, fresh),
     staleTime: 30_000,
+  });
+}
+
+// Hook for rollup data (optional endpoint - backward compatible)
+function useProjectRollup(projectKey?: string, period?: string, scope?: 'acum'|'total') {
+  const enabled = !!projectKey && !!period && !!scope && scope !== 'mes';
+  return useQuery({
+    queryKey: ['project-rollup', projectKey, period, scope],
+    enabled,
+    queryFn: async () => {
+      try {
+        const u = new URL(`/api/projects/${encodeURIComponent(projectKey!)}/rollup`, window.location.origin);
+        u.searchParams.set('scope', scope!);
+        u.searchParams.set('thru', period!);
+        const r = await fetch(u.toString());
+        if (!r.ok) return null; // Graceful degradation
+        return r.json();
+      } catch (e) {
+        console.warn('Rollup endpoint not available:', e);
+        return null;
+      }
+    },
+    staleTime: 60_000,
+    retry: false, // Don't retry if endpoint doesn't exist
   });
 }
 
@@ -343,14 +367,35 @@ function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?
   );
 }
 
-function ProjectCard({ p, dense }: { p: ProjectItem; dense?: boolean }) {
-  const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
-  const revenueDisplay = p.metrics.revenueDisplay ?? 0;
-  const costDisplay = p.metrics.costDisplay ?? 0;
-  const profitDisplay = (p.metrics.revenueDisplay ?? 0) - (p.metrics.costDisplay ?? 0);
+function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; period?: string }) {
+  const [view, setView] = useState<'mes'|'acum'|'total'>('mes');
+  const queryClient = useQueryClient();
 
-  const markup = p.metrics.markup ?? safeRatio(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
-  const margin = p.metrics.margin ?? safeMargin(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
+  // Fetch rollup data if needed (backward compatible - fails gracefully)
+  const { data: rollup } = useProjectRollup(
+    p.projectKey, 
+    period, 
+    view === 'mes' ? undefined : view
+  );
+
+  // Use rollup data if available, otherwise use period metrics
+  const metrics = (view === 'mes' || !rollup) ? p.metrics : {
+    ...p.metrics,
+    revenueDisplay: rollup.revenueDisplay ?? p.metrics.revenueDisplay,
+    costDisplay: rollup.costDisplay ?? p.metrics.costDisplay,
+    revenueUSDNormalized: rollup.revenueUSDNormalized ?? p.metrics.revenueUSDNormalized,
+    costUSDNormalized: rollup.costUSDNormalized ?? p.metrics.costUSDNormalized,
+    markup: rollup.markup ?? p.metrics.markup,
+    margin: rollup.margin ?? p.metrics.margin,
+  };
+
+  const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
+  const revenueDisplay = metrics.revenueDisplay ?? 0;
+  const costDisplay = metrics.costDisplay ?? 0;
+  const profitDisplay = (metrics.revenueDisplay ?? 0) - (metrics.costDisplay ?? 0);
+
+  const markup = metrics.markup ?? safeRatio(metrics.revenueUSDNormalized, metrics.costUSDNormalized);
+  const margin = metrics.margin ?? safeMargin(metrics.revenueUSDNormalized, metrics.costUSDNormalized);
 
   const hasAnomaly = (p.anomaly?.length || 0) > 0;
   
@@ -376,13 +421,38 @@ function ProjectCard({ p, dense }: { p: ProjectItem; dense?: boolean }) {
         <div>
           <div className="text-sm text-slate-500 dark:text-slate-400">{p.clientName}</div>
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{p.projectName}</div>
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge tone="green">{statusLabel}</Badge>
             {p.tags?.map((tag, i) => (
               <Badge key={i} tone="slate">{tagLabel(tag)}</Badge>
             ))}
             {hasAnomaly && (
               <Badge tone="orange"><AlertTriangle className="h-3.5 w-3.5"/> {t("anomaly")}</Badge>
+            )}
+            
+            {/* View switcher - only show if rollup is supported or we always show it */}
+            {(p.supportsRollup !== false) && (
+              <div className="inline-flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden ml-1">
+                {(['mes','acum','total'] as const).map(opt => (
+                  <button 
+                    key={opt} 
+                    onClick={() => setView(opt)}
+                    disabled={opt === 'total' && !p.isFinished}
+                    className={`px-2 py-1 text-xs transition-colors ${
+                      view === opt 
+                        ? 'bg-slate-900 dark:bg-slate-700 text-white' 
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                    } ${opt === 'total' && !p.isFinished ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    title={
+                      opt === 'mes' ? t("monthData") : 
+                      opt === 'acum' ? t("accumulatedToDate") : 
+                      t("projectTotal")
+                    }
+                  >
+                    {opt === 'mes' ? t("viewMonth") : opt === 'acum' ? t("viewAccumulated") : t("viewTotal")}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -407,6 +477,34 @@ function ProjectCard({ p, dense }: { p: ProjectItem; dense?: boolean }) {
       {hasAnomaly && (
         <div className="mt-3 text-xs text-orange-700 dark:text-orange-400">
           {t("flags")} {p.anomaly?.join(", ")}
+        </div>
+      )}
+
+      {/* Mark as finished button - only show if allowFinish is true */}
+      {p.projectKey && p.allowFinish && (
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={async () => {
+              if (!confirm(`¿Estás seguro de marcar "${p.projectName}" como terminado?`)) return;
+              try {
+                const res = await fetch(`/api/projects/${encodeURIComponent(p.projectKey!)}/status`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ status: 'Inactive', endMonthKey: period })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                // Invalidate cache to refresh data
+                queryClient.invalidateQueries({ queryKey: ['projects'] });
+                alert('Proyecto marcado como terminado exitosamente');
+              } catch (e) {
+                console.error('Error marking project as finished:', e);
+                alert('No se pudo cerrar el proyecto. El endpoint podría no estar disponible.');
+              }
+            }}
+            className="text-xs rounded-lg border border-rose-200 dark:border-rose-800 px-3 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 transition-colors"
+          >
+            {t("markAsFinished")}
+          </button>
         </div>
       )}
     </motion.div>
@@ -613,7 +711,7 @@ function safeMargin(rev?: number, cost?: number) {
   return (rev - cost) / rev;
 }
 
-function ProjectsList({ items, dense }:{ items: ProjectItem[]; dense?: boolean }){
+function ProjectsList({ items, dense, period }:{ items: ProjectItem[]; dense?: boolean; period?: string }){
   if (!items?.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
@@ -654,7 +752,7 @@ function ProjectsList({ items, dense }:{ items: ProjectItem[]; dense?: boolean }
             </div>
           )}
           {group.projects.map((p, idx) => (
-            <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} dense={dense} />
+            <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} dense={dense} period={period} />
           ))}
         </div>
       ))}
@@ -778,7 +876,7 @@ export default function ActiveProjectsNext(){
             {t("errorLoadingProjects")}
           </div>
         ) : (
-          <ProjectsList items={filtered} dense={dense} />
+          <ProjectsList items={filtered} dense={dense} period={period} />
         )}
       </div>
 
