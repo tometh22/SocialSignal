@@ -1,7 +1,7 @@
 "use client";
 
 import React, {useMemo, useState, useEffect} from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -81,104 +81,23 @@ function lastMonthKey(): string {
   return monthKeyOf(d);
 }
 
-// Helpers for navigation and pretty labels
+// helpers to navigate months and pretty labels
 function addMonths(period: string, delta: number): string {
-  const [y, m] = period.split("-").map(Number);
-  const d = new Date(y, m - 1, 1);
+  const [y,m] = period.split("-").map(Number);
+  const d = new Date(y, m-1, 1);
   d.setMonth(d.getMonth() + delta);
   return monthKeyOf(d);
 }
 
 function periodToLabel(period: string): string {
   try {
-    const [y, m] = period.split("-").map(Number);
-    const d = new Date(y, m - 1, 1);
+    const [y,m] = period.split("-").map(Number);
+    const d = new Date(y, m-1, 1);
     return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
-  } catch {
-    return period;
-  }
+  } catch { return period; }
 }
 
-const API_BASE = ""; // same origin
-
-// Transform backend response to match our component contract
-function transformBackendResponse(backendData: any): ProjectsApi {
-  // Extract period string from backend period object or construct it
-  const periodStr = backendData.period?.start 
-    ? backendData.period.start.substring(0, 7) // "2025-07-01" -> "2025-07"
-    : "";
-
-  // Extract FX rate if available
-  const fx = backendData.period?.fxRate || backendData.fx;
-
-  // Transform projects array
-  const projects: ProjectItem[] = (backendData.projects || []).map((p: any) => {
-    // Determine native currency based on client
-    const clientName = p.client?.name || p.clientName || "";
-    const isUSDClient = clientName.toLowerCase().includes("warner") || 
-                       clientName.toLowerCase().includes("kimberly");
-    const currencyNative: Currency = isUSDClient ? "USD" : "ARS";
-
-    // Determine status
-    const status = p.status === "active" || p.status === "Active" ? "Active" : "Inactive";
-
-    // Determine tags
-    const tags: string[] = [];
-    if (p.type === "fee" || p.type === "Fee") tags.push("Fee");
-    if (p.type === "one-shot" || p.type === "One-Shot") tags.push("One-Shot");
-
-    // Get display values (native currency)
-    const revenueDisplay = p.metrics?.revenueDisplay?.amount ?? p.metrics?.revenueUSD ?? 0;
-    const costDisplay = p.metrics?.costDisplay?.amount ?? p.metrics?.costUSD ?? 0;
-
-    // Get USD normalized values
-    const revenueUSDNormalized = p.metrics?.revenueUSDNormalized ?? p.metrics?.revenueUSD ?? 0;
-    const costUSDNormalized = p.metrics?.costUSDNormalized ?? p.metrics?.costUSD ?? 0;
-
-    // Get markup and margin
-    const markup = p.metrics?.markupRatio ?? p.metrics?.markup;
-    const margin = p.metrics?.marginFrac ?? p.metrics?.margin;
-
-    // Collect anomalies
-    const anomaly: string[] = [];
-    if (p.flags?.hasAnomaly) anomaly.push("ANOMALY");
-    if (p.anomaly && Array.isArray(p.anomaly)) {
-      anomaly.push(...p.anomaly);
-    }
-
-    return {
-      clientName,
-      projectName: p.name || p.projectName || "",
-      projectKey: `${clientName.toLowerCase()}|${(p.name || "").toLowerCase()}`,
-      status,
-      tags,
-      currencyNative,
-      metrics: {
-        revenueDisplay,
-        costDisplay,
-        revenueUSDNormalized,
-        costUSDNormalized,
-        markup,
-        margin,
-      },
-      anomaly: anomaly.length > 0 ? anomaly : undefined,
-    };
-  });
-
-  return {
-    period: periodStr,
-    updatedAt: backendData.updatedAt || new Date().toISOString(),
-    fx,
-    projects,
-    summary: {
-      periodRevenueUSD: backendData.summary?.periodRevenueUSD,
-      periodProfitUSD: backendData.summary?.periodProfitUSD,
-      periodHours: backendData.summary?.periodWorkedHours ?? backendData.summary?.periodHours,
-      activeProjects: backendData.summary?.activeProjects,
-      totalProjects: backendData.summary?.totalProjects,
-    },
-  };
-}
+const API_BASE = ""; // same origin; change if you proxy to a gateway = ""; // same origin; change if you proxy to a gateway
 
 async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsApi> {
   const url = new URL(`/api/projects`, window.location.origin + API_BASE);
@@ -187,9 +106,7 @@ async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsAp
 
   const res = await fetch(url.toString(), { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}`);
-  const backendData = await res.json();
-  
-  return transformBackendResponse(backendData);
+  return res.json();
 }
 
 // ---------- React Query Hook ----------
@@ -287,20 +204,19 @@ function Stat({label, value}:{label:string; value:string}){
 }
 
 function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly, setActiveOnly }:{
-  period:string; setPeriod:React.Dispatch<React.SetStateAction<string>>; onRefresh:()=>void;
+  period:string; setPeriod:(v:string)=>void; onRefresh:()=>void;
   search:string; setSearch:(v:string)=>void; activeOnly:boolean; setActiveOnly:(v:boolean)=>void;
 }){
   const [showNativePicker, setShowNativePicker] = useState(false);
-  const nativePickerRef = React.useRef<HTMLInputElement | null>(null);
+  const nativePickerRef = React.useRef<HTMLInputElement|null>(null);
 
-  // Keyboard navigation
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "ArrowLeft") setPeriod((p: string) => addMonths(p, -1));
-      if (e.key === "ArrowRight") setPeriod((p: string) => addMonths(p, 1));
+  useEffect(()=>{
+    function onKey(e: KeyboardEvent){
+      if (e.key === "ArrowLeft") setPeriod(p=>addMonths(p,-1));
+      if (e.key === "ArrowRight") setPeriod(p=>addMonths(p,1));
     }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return ()=> window.removeEventListener('keydown', onKey);
   }, [setPeriod]);
 
   return (
@@ -308,45 +224,39 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
       {/* Period navigator */}
       <div className="flex items-center gap-2">
         <button
-          onClick={() => setPeriod(addMonths(period, -1))}
+          onClick={()=> setPeriod(addMonths(period,-1))}
           className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
           aria-label="Previous month"
         >‹</button>
         <button
-          onClick={() => setShowNativePicker(true)}
+          onClick={()=> setShowNativePicker(true)}
           className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           aria-label="Pick month"
         >{periodToLabel(period)}</button>
         <button
-          onClick={() => setPeriod(addMonths(period, 1))}
+          onClick={()=> setPeriod(addMonths(period,1))}
           className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
           aria-label="Next month"
         >›</button>
 
         {/* Presets */}
         <div className="ml-2 hidden sm:flex items-center gap-2">
-          <button
-            onClick={() => setPeriod(monthKeyOf(new Date()))}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >This month</button>
-          <button
-            onClick={() => setPeriod(lastMonthKey())}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >Last month</button>
-          <button
-            onClick={() => setShowNativePicker(true)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >Custom…</button>
+          <button onClick={()=> setPeriod(monthKeyOf(new Date()))}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50">This month</button>
+          <button onClick={()=> setPeriod(lastMonthKey())}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50">Last month</button>
+          <button onClick={()=> setShowNativePicker(true)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50">Custom…</button>
         </div>
 
-        {/* Hidden native month input */}
+        {/* hidden native month input */}
         {showNativePicker && (
           <input
             ref={nativePickerRef}
             type="month"
             value={period}
-            onChange={(e) => { setPeriod(e.target.value); setShowNativePicker(false); }}
-            onBlur={() => setShowNativePicker(false)}
+            onChange={(e)=>{ setPeriod(e.target.value); setShowNativePicker(false);} }
+            onBlur={()=> setShowNativePicker(false)}
             className="absolute opacity-0 pointer-events-none"
             autoFocus
           />
@@ -364,22 +274,22 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
           <input
             placeholder="Search projects or clients…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e)=>setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <button
-          onClick={() => setActiveOnly(!activeOnly)}
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700"}`}
+          onClick={()=>setActiveOnly(v=>!v)}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly?"border-emerald-200 bg-emerald-50 text-emerald-700":"border-slate-200 bg-white text-slate-700"}`}
         >
-          <Filter className="h-4 w-4"/> {activeOnly ? "Active Only" : "All"}
+          <Filter className="h-4 w-4"/> {activeOnly?"Active Only":"All"}
         </button>
       </div>
     </div>
   );
 }
 
-function SummaryBar({ data }:{ data?: ProjectsApi }){
+function SummaryBar({ data }:{ data?: ProjectsApi }){({ data }:{ data?: ProjectsApi }){
   const active = data?.summary?.activeProjects ?? data?.projects?.filter(p=>p.status!=="Inactive").length ?? 0;
   const total = data?.summary?.totalProjects ?? data?.projects?.length ?? 0;
   return (
@@ -417,9 +327,8 @@ function ProjectsList({ items }:{ items: ProjectItem[] }){
   );
 }
 
-export default function ActiveProjectsNext(){
-  // Initialize period from localStorage
-  const initialPeriod = useMemo(() => {
+function ActiveProjectsInner(){
+  const initialPeriod = useMemo(()=>{
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('ap.period');
       if (saved) return saved;
@@ -433,14 +342,12 @@ export default function ActiveProjectsNext(){
   const [activeOnly, setActiveOnly] = useState(true);
   const queryClient = useQueryClient();
 
-  // Save period to localStorage when it changes
-  useEffect(() => {
+  useEffect(()=>{
     if (typeof window !== 'undefined') window.localStorage.setItem('ap.period', period);
   }, [period]);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useActiveProjects(period, freshToggle);
 
-  // Reset fresh flag after a fetch cycle
   useEffect(()=>{
     if (!isFetching && freshToggle) setFreshToggle(false);
   }, [isFetching, freshToggle]);
@@ -488,24 +395,25 @@ export default function ActiveProjectsNext(){
       <div className="mt-6">
         {isLoading ? (
           <div className="grid gap-4">
-            {[...Array(3)].map((_,i)=> (
-              <div key={i} className="h-48 animate-pulse rounded-2xl bg-slate-100"/>
-            ))}
-          </div>
-        ) : isError ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-            Error loading projects
+            {[...Array(4)].map((_,i)=> <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-100"/>) }
           </div>
         ) : (
           <ProjectsList items={filtered} />
         )}
       </div>
 
-      {data?.updatedAt && (
-        <div className="mt-6 text-center text-xs text-slate-400">
-          Last updated: {new Date(data.updatedAt).toLocaleString()} • Period: {data.period}
-        </div>
-      )}
+      <div className="mt-6 text-xs text-slate-400">
+        <div>API period: <span className="font-mono">{data?.period ?? period}</span> • Updated: {data?.updatedAt ? new Date(data.updatedAt).toLocaleString() : "—"}</div>
+      </div>
     </div>
+  );
+}
+
+export default function ActiveProjectsPage(){(){
+  const [client] = useState(()=> new QueryClient());
+  return (
+    <QueryClientProvider client={client}>
+      <ActiveProjectsInner />
+    </QueryClientProvider>
   );
 }
