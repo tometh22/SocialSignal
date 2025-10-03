@@ -2,8 +2,9 @@
 
 import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2 } from "lucide-react";
+import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link } from "wouter";
 
 // ---------- Translations ----------
 const i18n = {
@@ -53,6 +54,7 @@ const i18n = {
     viewTotal: "Total",
     markAsFinished: "Marcar como terminado",
     monthData: "Datos del mes",
+    viewProject: "Ver proyecto",
     accumulatedToDate: "Acumulado a la fecha",
     projectTotal: "Total del proyecto",
   }
@@ -386,6 +388,20 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
   return (
     <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${padding} shadow-sm transition-shadow hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600`}>
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-fuchsia-500" />
+      
+      {/* View project button - top right corner */}
+      {p.projectKey && (
+        <Link href={`/projects/${p.projectKey}`}>
+          <button 
+            className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors"
+            title={t("viewProject")}
+            data-testid={`button-view-project-${p.projectKey}`}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        </Link>
+      )}
+      
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-slate-500 dark:text-slate-400">{p.clientName}</div>
@@ -400,7 +416,7 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
             )}
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-right mr-12">
           <div className="text-sm text-slate-500 dark:text-slate-400">{t("labelRevenue")}</div>
           <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">{formatKM(revenueDisplay, nativeCurrency)}</div>
           {p.metrics.revenueUSDNormalized && p.metrics.revenueUSDNormalized !== revenueDisplay && (
