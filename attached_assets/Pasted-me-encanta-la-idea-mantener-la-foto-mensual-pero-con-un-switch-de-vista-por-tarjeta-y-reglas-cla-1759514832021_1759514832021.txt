@@ -1,0 +1,224 @@
+me encanta la idea: mantener la “foto mensual”, pero con un switch de vista por tarjeta y reglas claras para “Fee” vs “Puntual”, sin romper nada.
+
+Aquí va un plan 100% backward-compatible + snippets listos:
+
+Qué cambia de UX (sin romper API actual)
+
+Puntuales visibles solo cuando corresponde
+
+Si el proyecto es “Puntual” y tiene rango (inicio/fin), solo aparece en esos meses.
+
+Si el backend aún no manda rango: derivamos “activo” por actividad del mes (ingreso/costo ≠ 0).
+
+Botón en la card: “Mes / Acumulado / Total”
+
+Por defecto muestra Mes (lo que ya llega).
+
+Al tocar Acumulado, consulta un endpoint opcional (si existe) y pinta la tarjeta con esos números.
+
+Si el proyecto terminó y el backend lo indica, habilita Total (lifetime).
+
+Si el endpoint no existe, el botón se oculta (no rompemos nada).
+
+Marcar proyecto como terminado
+
+Link/acción en la card (“Marcar como terminado”) que hace PATCH /api/projects/:key/status si está expuesto.
+
+Si no existe el endpoint, mostramos un link a la vista detallada del proyecto para cerrarlo allí (sin romper).
+
+Cambios de front (seguros)
+A. Derivar “activo” cuando no venga status
+
+Pegá esto en tu archivo (usamos exactamente tus ProjectItem):
+
+function hasActivityThisPeriod(p: ProjectItem) {
+  const m = p.metrics || {};
+  return !!(
+    (m.revenueDisplay && m.revenueDisplay !== 0) ||
+    (m.costDisplay && m.costDisplay !== 0) ||
+    (m.revenueUSDNormalized && m.revenueUSDNormalized !== 0) ||
+    (m.costUSDNormalized && m.costUSDNormalized !== 0)
+  );
+}
+
+function isActiveForPeriod(p: ProjectItem, period: string) {
+  // 1) si viene status explícito, respetar
+  if (typeof p.status === 'string') return p.status !== 'Inactive';
+
+  // 2) si el backend empieza a mandar rango de vigencia (opcional)
+  // @ts-ignore tolerante: solo usamos si llega
+  const start = (p as any).startMonthKey as string | undefined;
+  // @ts-ignore
+  const end = (p as any).endMonthKey as string | undefined;
+  // @ts-ignore
+  const tags = (p.tags || []).map(t => t.toLowerCase());
+
+  const isPuntual = tags.includes('one-shot') || tags.includes('puntual');
+
+  if (isPuntual && (start || end)) {
+    const geStart = !start || period >= start;
+    const leEnd   = !end   || period <= end;
+    return geStart && leEnd;
+  }
+
+  // 3) fallback universal: activo si hubo movimiento en el mes
+  return hasActivityThisPeriod(p);
+}
+
+
+Cambiá una línea en tu filtro:
+
+- .filter(p => !activeOnly || p.status !== "Inactive")
++ .filter(p => !activeOnly || isActiveForPeriod(p, period))
+
+B. Vista “Mes / Acumulado / Total” (con fallback)
+
+Agregá un estado local en ProjectCard:
+
+function ProjectCard({ p }: { p: ProjectItem }) {
+  const [view, setView] = useState<'mes'|'acum'|'total'>('mes');
+  // ...
+
+
+Botonera compacta debajo del título:
+
+<div className="mt-2 flex items-center gap-2">
+  {/* ... tus badges ... */}
+  <div className="ml-2 inline-flex rounded-lg border border-slate-200 overflow-hidden">
+    {(['mes','acum','total'] as const).map(opt => (
+      <button
+        key={opt}
+        onClick={()=> setView(opt)}
+        className={`px-2 py-1 text-xs ${view===opt?'bg-slate-900 text-white':'bg-white text-slate-700 hover:bg-slate-50'}`}
+        disabled={opt==='total' && !(p as any).isFinished}
+        title={opt==='acum' ? 'Acumulado hasta el período' : opt==='total' ? 'Total del proyecto' : 'Datos del mes'}
+      >
+        {opt==='mes'?'Mes':opt==='acum'?'Acumulado':'Total'}
+      </button>
+    ))}
+  </div>
+</div>
+
+
+Datos para “Acumulado/Total”: no rompemos si el endpoint no existe → ocultamos el botón o mostramos tooltip.
+Hook simple (usa React Query; si 404/501, devolvemos null y mantenemos “Mes”):
+
+type RollupScope = 'acum'|'total';
+type RollupResp = {
+  revenueDisplay?: number;
+  costDisplay?: number;
+  revenueUSDNormalized?: number;
+  costUSDNormalized?: number;
+  markup?: number;
+  margin?: number;
+};
+
+function useProjectRollup(projectKey?: string, period?: string, scope?: RollupScope) {
+  const enabled = !!projectKey && !!period && !!scope;
+  return useQuery({
+    queryKey: ['project-rollup', projectKey, period, scope],
+    enabled,
+    queryFn: async () => {
+      const url = new URL(`/api/projects/${encodeURIComponent(projectKey!)}/rollup`, window.location.origin);
+      url.searchParams.set('scope', scope!); // 'acum' | 'total'
+      url.searchParams.set('thru', period!);
+      const r = await fetch(url.toString());
+      if (!r.ok) return null; // fallback silencioso si no existe
+      return (await r.json()) as RollupResp;
+    },
+    staleTime: 60_000
+  });
+}
+
+
+Usar los datos de la vista seleccionada:
+
+const { data: rollup } = useProjectRollup(p.projectKey, /* período actual */ (typeof window!=='undefined' ? window.localStorage.getItem('ap.period') || '' : ''), view==='mes' ? undefined : (view as RollupScope));
+
+const dataSource = view==='mes' || !rollup ? p.metrics : {
+  ...p.metrics,
+  ...rollup, // pisa con rollup si existe
+};
+const revenueDisplay = dataSource.revenueDisplay ?? 0;
+const costDisplay    = dataSource.costDisplay ?? 0;
+const profitDisplay  = (dataSource.revenueDisplay ?? 0) - (dataSource.costDisplay ?? 0);
+const markup = dataSource.markup ?? safeRatio(dataSource.revenueUSDNormalized, dataSource.costUSDNormalized);
+const margin = dataSource.margin ?? safeMargin(dataSource.revenueUSDNormalized, dataSource.costUSDNormalized);
+
+
+Si el backend aún no tiene /rollup, el botón Acumulado/Total puede quedar oculto:
+
+const supportsRollup = (p as any).supportsRollup === true;
+{/* … donde dibujás los botones … */}
+{supportsRollup && /* render del switch */}
+
+C. “Marcar como terminado”
+
+Acción opcional que solo aparece si tenemos projectKey:
+
+async function markFinished(projectKey: string, period: string) {
+  try {
+    const r = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/status`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ status: 'Inactive', endMonthKey: period })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    // ideal: invalidar cache
+  } catch(e) {
+    alert('No se pudo marcar como terminado. Ver detalle en consola.');
+    console.error(e);
+  }
+}
+
+
+Botón en la card (solo si querés mostrarlo en la lista, si no, dejalo para la vista de detalle):
+
+<button
+  onClick={()=> markFinished(p.projectKey!, (typeof window!=='undefined' ? window.localStorage.getItem('ap.period') || '' : ''))}
+  className="text-xs rounded-lg border px-2 py-1 hover:bg-rose-50 text-rose-700 border-rose-200"
+>
+  Marcar como terminado
+</button>
+
+
+Si la API no existe aún, el botón no se muestra y listo.
+
+Backend (mínimo para soportar lo nuevo)
+
+Nuevo endpoint opcional:
+GET /api/projects/:key/rollup?scope=acum|total&thru=YYYY-MM
+
+acum: suma ingresos/costos hasta thru (incl.).
+
+total: vida completa del proyecto (si ya terminó).
+
+Agregar metadatos (opcionales) en /api/projects
+
+startMonthKey, endMonthKey, isFinished, supportsRollup
+
+projectType: 'Fee' | 'Puntual'
+
+Nada es obligatorio: el front cae en gracia si no llegan.
+
+SQL orientativo para rollup acum:
+
+SELECT
+  SUM(revenue_usd_normalized)  AS revenueUSDNormalized,
+  SUM(cost_usd_normalized)     AS costUSDNormalized
+FROM project_ledger
+WHERE project_key = $1
+  AND month_key <= $2;
+
+
+Luego devolver display nativo usando tu FX/SoT (igual que hoy).
+
+DoD (cómo sabemos que quedó)
+
+“Puntual” no aparece fuera de su rango o sin actividad.
+
+Switch Mes / Acumulado / Total funciona; si no hay endpoint, no aparece.
+
+“Marcar como terminado” actualiza estado cuando el backend lo soporte.
+
+Nada de FX/KPIs se recalcula en el front: solo render.

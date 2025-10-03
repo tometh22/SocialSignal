@@ -48,6 +48,13 @@ const i18n = {
     comfortable: "Confort",
     compact: "Compacto",
     normalizedUSD: "Normalizado USD:",
+    viewMonth: "Mes",
+    viewAccumulated: "Acumulado",
+    viewTotal: "Total",
+    markAsFinished: "Marcar como terminado",
+    monthData: "Datos del mes",
+    accumulatedToDate: "Acumulado a la fecha",
+    projectTotal: "Total del proyecto",
   }
 } as const;
 
@@ -74,6 +81,14 @@ export type ProjectItem = {
     margin?: number; // e.g., 0.34 = 34%
   };
   anomaly?: string[]; // optional flags from /debug or SoT
+  // Optional metadata for intelligent visibility
+  projectType?: "Fee" | "Puntual";
+  startMonthKey?: string; // YYYY-MM
+  endMonthKey?: string;   // YYYY-MM
+  lastActivity?: string;  // YYYY-MM
+  isFinished?: boolean;
+  supportsRollup?: boolean;
+  allowFinish?: boolean;
 };
 
 export type ProjectsApi = {
@@ -89,6 +104,55 @@ export type ProjectsApi = {
     totalProjects?: number;
   };
 };
+
+// ---------- Visibility Helpers ----------
+
+function hasActivityThisPeriod(p: ProjectItem) {
+  const m = p.metrics || {};
+  return !!(
+    (m.revenueDisplay || 0) !== 0 || 
+    (m.costDisplay || 0) !== 0 ||
+    (m.revenueUSDNormalized || 0) !== 0 || 
+    (m.costUSDNormalized || 0) !== 0
+  );
+}
+
+function isActiveForPeriod(p: ProjectItem, period: string) {
+  // Respect status if it comes from backend
+  if (typeof p.status === 'string') {
+    return p.status !== 'Inactive';
+  }
+
+  // If ranges and type are available (optional), apply rules
+  const tags = (p.tags || []).map(t => t.toLowerCase());
+  const isPuntual = tags.includes('one-shot') || tags.includes('puntual') || p.projectType === 'Puntual';
+  const isFee = tags.includes('fee') || p.projectType === 'Fee';
+  const start = p.startMonthKey;
+  const end = p.endMonthKey;
+
+  // Puntual: only active within range or if there's activity
+  if (isPuntual && (start || end)) {
+    const okStart = !start || period >= start;
+    const okEnd = !end || period <= end;
+    return okStart && okEnd;
+  }
+
+  // Fee: active if there's activity or within grace period (1 month)
+  if (isFee && p.lastActivity) {
+    const [pYear, pMonth] = period.split('-').map(Number);
+    const [lYear, lMonth] = p.lastActivity.split('-').map(Number);
+    const periodDate = new Date(pYear, pMonth - 1);
+    const lastActDate = new Date(lYear, lMonth - 1);
+    const monthsDiff = (periodDate.getFullYear() - lastActDate.getFullYear()) * 12 + 
+                      (periodDate.getMonth() - lastActDate.getMonth());
+    
+    // Active if period <= lastActivity + 1 month (grace period)
+    if (monthsDiff <= 1) return true;
+  }
+
+  // Fallback universal: active if there's activity in the month
+  return hasActivityThisPeriod(p);
+}
 
 // ---------- Helpers ----------
 const currencySymbol = (c: Currency | undefined) => (c === "ARS" ? "ARS" : "$");
@@ -632,7 +696,7 @@ export default function ActiveProjectsNext(){
   const filtered = useMemo(()=>{
     const q = search.trim().toLowerCase();
     let result = (data?.projects ?? [])
-      .filter(p => !activeOnly || p.status !== "Inactive")
+      .filter(p => !activeOnly || isActiveForPeriod(p, period))
       .filter(p => !q || `${p.clientName} ${p.projectName}`.toLowerCase().includes(q));
     
     // Tag filtering

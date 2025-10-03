@@ -1,0 +1,225 @@
+Plan final de implementación
+1) Frontend (Next.js + React Query) – cambios mínimos y seguros
+
+1.1 Estado “activo” derivado si no llega status
+
+Añadimos helpers:
+
+function hasActivityThisPeriod(p: ProjectItem) {
+  const m = p.metrics || {};
+  return !!((m.revenueDisplay||0)!==0 || (m.costDisplay||0)!==0 ||
+            (m.revenueUSDNormalized||0)!==0 || (m.costUSDNormalized||0)!==0);
+}
+
+function isActiveForPeriod(p: ProjectItem, period: string) {
+  // Respetar status si viene del backend
+  if (typeof p.status === 'string') return p.status !== 'Inactive';
+
+  // Si llegan rangos y tipo (opcional), aplicar reglas
+  const tags = (p.tags || []).map(t => t.toLowerCase());
+  const isPuntual = tags.includes('one-shot') || tags.includes('puntual');
+  const start = (p as any).startMonthKey as string | undefined;
+  const end   = (p as any).endMonthKey as string | undefined;
+
+  if (isPuntual && (start || end)) {
+    const okStart = !start || period >= start;
+    const okEnd   = !end   || period <= end;
+    return okStart && okEnd;
+  }
+  // Fallback universal: activo si hay actividad en el mes
+  return hasActivityThisPeriod(p);
+}
+
+
+Reemplazo en el filtro:
+
+- .filter(p => !activeOnly || p.status !== "Inactive")
++ .filter(p => !activeOnly || isActiveForPeriod(p, period))
+
+
+1.2 Conmutador por tarjeta: “Mes / Acumulado / Total”
+
+Estado local en ProjectCard:
+
+const [view, setView] = useState<'mes'|'acum'|'total'>('mes');
+
+
+Botonera compacta junto a los badges:
+
+{((p as any).supportsRollup || true) && (
+  <div className="ml-2 inline-flex rounded-lg border border-slate-200 overflow-hidden">
+    {(['mes','acum','total'] as const).map(opt => (
+      <button key={opt} onClick={()=> setView(opt)}
+        className={`px-2 py-1 text-xs ${view===opt?'bg-slate-900 text-white':'bg-white text-slate-700 hover:bg-slate-50'}`}
+        disabled={opt==='total' && !(p as any).isFinished}
+        title={opt==='acum'?'Acumulado a la fecha':opt==='total'?'Total del proyecto':'Datos del mes'}>
+        {opt==='mes'?'Mes':opt==='acum'?'Acumulado':'Total'}
+      </button>
+    ))}
+  </div>
+)}
+
+
+Hook opcional para pedir rollups (si existe el endpoint; si no, oculta o falla en gracia):
+
+function useProjectRollup(projectKey?: string, period?: string, scope?: 'acum'|'total') {
+  const enabled = !!projectKey && !!period && !!scope && scope!=='mes';
+  return useQuery({
+    queryKey: ['project-rollup', projectKey, period, scope],
+    enabled,
+    queryFn: async () => {
+      const u = new URL(`/api/projects/${encodeURIComponent(projectKey!)}/rollup`, window.location.origin);
+      u.searchParams.set('scope', scope!);  // 'acum' | 'total'
+      u.searchParams.set('thru',  period!); // YYYY-MM
+      const r = await fetch(u.toString());
+      if (!r.ok) return null;
+      return r.json();
+    },
+    staleTime: 60_000
+  });
+}
+
+
+Al renderizar métricas:
+
+const { data: rollup } = useProjectRollup(p.projectKey, period, view==='mes'?undefined:view);
+const m = (view==='mes' || !rollup) ? p.metrics : { ...p.metrics, ...rollup };
+// usar m.revenueDisplay, m.costDisplay, m.revenueUSDNormalized, m.costUSDNormalized…
+
+
+1.3 Acción “Marcar como terminado” (opcional, solo si hay endpoint)
+
+{p.projectKey && (p as any).allowFinish && (
+  <button onClick={async ()=>{
+    try {
+      const r = await fetch(`/api/projects/${encodeURIComponent(p.projectKey!)}/status`, {
+        method: 'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ status:'Inactive', endMonthKey: period })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      // Ideal: invalidar cache
+    } catch(e){ console.error(e); alert('No se pudo cerrar el proyecto.'); }
+  }}
+  className="text-xs rounded-lg border px-2 py-1 hover:bg-rose-50 text-rose-700 border-rose-200">
+    Marcar como terminado
+  </button>
+)}
+
+
+Todo esto es no destructivo: si los endpoints/props aún no están, los controles se ocultan o degradan con gracia.
+
+2) Backend – SoT/Aggregator (período-aware y rollups)
+
+2.1 Agregar metadata (opcional, recomendado) a /api/projects
+
+Campos nuevos (opcionales):
+
+{
+  "projectKey": "cliente|proyecto",
+  "projectType": "Fee" | "Puntual",
+  "startMonthKey": "YYYY-MM",
+  "endMonthKey": "YYYY-MM",
+  "lastActivity": "YYYY-MM",
+  "isFinished": true/false,
+  "supportsRollup": true/false,
+  "status": "Active" | "Inactive"
+}
+
+
+Reglas de status:
+
+Puntual: Activo si start ≤ period ≤ end. Si no hay rango → activo solo si hay actividad en el mes.
+
+Fee: Activo si hay actividad en el período o period - lastActivity ≤ grace (p.ej. 1 mes).
+
+Si endMonthKey definido y period > end ⇒ Inactivo.
+
+2.2 Endpoint nuevo (opcional): rollups
+
+GET /api/projects/:key/rollup?scope=acum|total&thru=YYYY-MM
+
+acum: sumar normalizados hasta thru (incl.).
+
+total: vida completa del proyecto (si ya terminó, usa hasta end).
+
+Respuesta:
+
+{
+  "revenueUSDNormalized": 1234.56,
+  "costUSDNormalized": 789.00,
+  "revenueDisplay": 3080000,
+  "costDisplay": 553000,
+  "markup": 6.2,
+  "margin": 0.838
+}
+
+
+Nota: display en moneda nativa según tu lógica de SoT (no recalculamos FX en el front).
+
+2.3 (Opcional) Endpoint para estado
+
+PATCH /api/projects/:key/status { status:'Inactive', endMonthKey }
+
+Persiste el cierre y actualiza el Aggregator.
+
+2.4 SQL/CTE guía
+
+Última actividad:
+
+WITH activity AS (
+  SELECT project_key, month_key FROM income_sot WHERE revenue_usd_normalized > 0
+  UNION ALL
+  SELECT project_key, month_key FROM costs_sot  WHERE  cost_usd_normalized > 0
+), last_activity AS (
+  SELECT project_key, MAX(month_key) AS last_month FROM activity GROUP BY project_key
+)
+-- JOIN last_activity en el agregador para calcular status por período
+
+
+Rollup acumulado:
+
+SELECT
+  SUM(revenue_usd_normalized) AS revenueUSDNormalized,
+  SUM(cost_usd_normalized)    AS costUSDNormalized
+FROM project_ledger
+WHERE project_key = $1 AND month_key <= $2;
+
+3) Observabilidad y flags
+
+Loggear en /api/projects?period=:
+
+STATUS_RULE_APPLIED, GRACE_USED, RANGE_ENFORCED, DERIVED_ACTIVE_NO_STATUS.
+
+En /api/costs/debug (si lo usan): incluir statusComputed, lastActivity.
+
+Feature flags:
+
+supportsRollup: true → muestra el conmutador en la card.
+
+allowFinish: true → habilita el botón “Marcar como terminado”.
+
+4) QA / Runbook
+
+Puntual (3 meses): aparece solo en meses del rango; fuera del rango, no aparece con “Solo activos”.
+
+Fee sin actividad este mes: si hubo actividad el mes anterior (grace=1), sigue activo; si >1 mes, pasa a inactivo.
+
+Conmutador Mes/Acum/Total:
+
+“Mes” = igual a payload actual.
+
+“Acumulado” ≈ suma hasta thru.
+
+“Total” solo si isFinished=true.
+
+Cerrar proyecto: PATCH habilitado → vuelve inactivo y deja de verse en meses futuros.
+
+Compatibilidad: si no existen endpoints/props nuevos, la UI no rompe; solo ocultará el switch y el botón.
+
+5) Riesgos y mitigaciones
+
+Datos históricos incompletos → rollup devuelve solo lo disponible; el front lo muestra tal cual.
+
+Inconsistencias de moneda → display siempre viene del backend; el front no recalcula FX.
+
+Rendimiento → cachear rollup por projectKey|scope|thru y permitir ?source=fresh como hoy.
