@@ -1,0 +1,61 @@
+e dejé la página más linda y más clara sin tocar el contrato con el backend ni la data-flow. además arreglé dos cositas que podían romper la build.
+
+qué mejoré (sin romper nada)
+
+UI en español completa (“Proyectos Activos”, “Facturación”, “Ganancia”, “Margen”, etc.).
+
+Barra de filtros fija (sticky) con blur: queda pegada arriba al scrollear.
+
+Navegación temporal: flechas « / », presets (Este mes / Mes anterior / Personalizado…) y etiqueta “ago 2025”.
+
+Botón Actualizar (sigue llamando ?source=fresh).
+
+Tarjetas con hover suave (sombra + borde) y micro-animación.
+
+Fondo con gradiente sutil from-slate-50 → white (más limpio).
+
+Badges de estado en español (“Activo/Inactivo”) y “Anomalía”.
+
+Placeholders y mensajes vacíos también en español.
+
+No re-calculo de FX ni KPIs en el front: solo render.
+
+cambios técnicos puntuales (compatibles)
+
+Corregí API_BASE (tenía texto duplicado en la línea).
+
+Arreglé la firma de SummaryBar (estaba mal encerrada y podía romper el build).
+
+Traduje cadenas y mejoré clases Tailwind (no toqué types ni el fetch).
+
+Agregué clases sticky + backdrop-blur en Controls y hover en ProjectCard.
+
+Localicé el label del período (toLocaleDateString('es', …)).
+
+dónde está
+
+Canvas → Active Projects – Next (el archivo ya está actualizado ahí).
+
+cómo probar rápido
+
+Cambiá de mes con las flechas → el label cambia (“sep 2025”), la barra queda fija.
+
+Dale a Actualizar → el backend recibe ?source=fresh.
+
+Busca por cliente/proyecto → filtra sin tocar la data.
+
+Alterná Solo activos / Todos → no se recalculan KPIs, solo cambia el listado.
+
+Verificá que los números de Facturación/Costo/Ganancia coinciden con lo que responde la API (solo display).
+
+ideas “extra” que puedo sumar sin romper API
+
+Densidad (Confort / Compacto) como toggle de UI.
+
+Resaltado de anomalías: pequeño chip a la derecha del título con tooltip.
+
+Barrita de margen (progress fino) debajo de “Margen” para una lectura más visual.
+
+Modo oscuro respetando prefers-color-scheme.
+
+si querés, lo activo. por ahora lo dejé elegante, seguro y 100% compatible con tu backend.
