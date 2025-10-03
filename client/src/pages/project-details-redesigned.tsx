@@ -1222,6 +1222,22 @@ const ProjectDetailsPage = () => {
 
     const { quotation, actuals, metrics: unifiedMetrics } = unifiedData;
 
+    // Verificar que quotation existe
+    if (!quotation || !quotation.baseCost) {
+      console.warn('⚠️ Quotation data missing, returning default metrics');
+      return [
+        {
+          label: "Sin presupuesto",
+          value: "$0",
+          subtitle: "No hay datos de cotización",
+          icon: AlertTriangle,
+          color: "text-gray-600",
+          bgColor: "bg-gradient-to-br from-gray-50 to-gray-100",
+          change: 0
+        }
+      ];
+    }
+
     // SI NO HAY DATOS REALES EN EL PERÍODO
     if (!actuals.totalWorkedHours) {
       return [
@@ -1425,6 +1441,10 @@ const ProjectDetailsPage = () => {
   // SINGLE SOURCE OF TRUTH: usar unifiedData para todas las métricas
   const costSummary = useMemo(() => {
     if (!unifiedData) return null;
+    if (!unifiedData.quotation) {
+      console.warn('⚠️ No quotation data in costSummary');
+      return null;
+    }
 
     console.log('🔍 SINGLE SOURCE OF TRUTH - costSummary:', {
       estimatedHours: (unifiedData as any).quotation.estimatedHours,
@@ -1436,11 +1456,11 @@ const ProjectDetailsPage = () => {
     });
 
     // Usar datos directamente de unifiedData
-    const actualHours = (unifiedData as any).actuals.totalWorkedHours;
-    const actualCost = (unifiedData as any).actuals.totalWorkedCost;
-    const targetHours = (unifiedData as any).quotation.estimatedHours;
-    const targetBudget = (unifiedData as any).quotation.baseCost;
-    const targetClientPrice = (unifiedData as any).quotation.totalAmount;
+    const actualHours = (unifiedData as any).actuals.totalWorkedHours || 0;
+    const actualCost = (unifiedData as any).actuals.totalWorkedCost || 0;
+    const targetHours = (unifiedData as any).quotation.estimatedHours || 0;
+    const targetBudget = (unifiedData as any).quotation.baseCost || 0;
+    const targetClientPrice = (unifiedData as any).quotation.totalAmount || 0;
     
     // Usar métricas ya calculadas en el backend
     const budgetUtilization = (unifiedData as any).metrics.budgetUtilization;
