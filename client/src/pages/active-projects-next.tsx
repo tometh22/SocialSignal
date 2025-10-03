@@ -2,7 +2,7 @@
 
 import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter } from "lucide-react";
+import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 // ---------- Translations ----------
@@ -38,6 +38,16 @@ const i18n = {
     statusInactive: "Inactivo",
     tagOneShot: "Puntual",
     tagFee: "Fee",
+    // New translations
+    sortBy: "Ordenar por:",
+    sortRevenue: "Facturación",
+    sortProfit: "Ganancia",
+    sortMargin: "Margen",
+    sortMarkup: "Markup",
+    density: "Densidad:",
+    comfortable: "Confort",
+    compact: "Compacto",
+    normalizedUSD: "Normalizado USD:",
   }
 } as const;
 
@@ -269,7 +279,7 @@ function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?
   );
 }
 
-function ProjectCard({ p }: { p: ProjectItem }) {
+function ProjectCard({ p, dense }: { p: ProjectItem; dense?: boolean }) {
   const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
   const revenueDisplay = p.metrics.revenueDisplay ?? 0;
   const costDisplay = p.metrics.costDisplay ?? 0;
@@ -293,13 +303,15 @@ function ProjectCard({ p }: { p: ProjectItem }) {
   const markupTone: 'good'|'warn'|'bad'|undefined =
     Number.isFinite(markup) ? (markup! < 1 ? 'bad' : markup! < 2 ? 'warn' : 'good') : undefined;
 
+  const padding = dense ? "p-3" : "p-5";
+  
   return (
-    <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md hover:border-slate-300">
+    <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className={`relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 ${padding} shadow-sm transition-shadow hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600`}>
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-fuchsia-500" />
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-slate-500">{p.clientName}</div>
-          <div className="text-lg font-semibold text-slate-900">{p.projectName}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">{p.clientName}</div>
+          <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{p.projectName}</div>
           <div className="mt-2 flex items-center gap-2">
             <Badge tone="green">{statusLabel}</Badge>
             {p.tags?.map((tag, i) => (
@@ -311,20 +323,25 @@ function ProjectCard({ p }: { p: ProjectItem }) {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm text-slate-500">{t("labelRevenue")}</div>
-          <div className="text-xl font-semibold">{formatKM(revenueDisplay, nativeCurrency)}</div>
+          <div className="text-sm text-slate-500 dark:text-slate-400">{t("labelRevenue")}</div>
+          <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">{formatKM(revenueDisplay, nativeCurrency)}</div>
+          {p.metrics.revenueUSDNormalized && p.metrics.revenueUSDNormalized !== revenueDisplay && (
+            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+              {t("normalizedUSD")} {formatUSD(p.metrics.revenueUSDNormalized)}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className={`${dense ? 'mt-3' : 'mt-4'} grid grid-cols-2 gap-${dense ? '3' : '4'} sm:grid-cols-4`}>
         <Stat label={t("labelCost")} value={formatKM(costDisplay, nativeCurrency)} />
         <Stat label={t("labelProfit")} value={formatKM(profitDisplay, nativeCurrency)} />
         <Stat label={t("labelMarkup")} value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} tone={markupTone} />
-        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} tone={marginTone} />
+        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} tone={marginTone} progress={Number.isFinite(margin) ? margin : undefined} />
       </div>
 
       {hasAnomaly && (
-        <div className="mt-3 text-xs text-orange-700">
+        <div className="mt-3 text-xs text-orange-700 dark:text-orange-400">
           {t("flags")} {p.anomaly?.join(", ")}
         </div>
       )}
@@ -332,22 +349,34 @@ function ProjectCard({ p }: { p: ProjectItem }) {
   );
 }
 
-function Stat({label, value, tone}:{label:string; value:string; tone?: 'default'|'good'|'warn'|'bad'}) {
+function Stat({label, value, tone, progress}:{label:string; value:string; tone?: 'default'|'good'|'warn'|'bad'; progress?: number}) {
   const color = tone==='good' ? 'text-emerald-700'
               : tone==='warn' ? 'text-amber-700'
               : tone==='bad'  ? 'text-rose-700'
               : 'text-slate-900';
+  const progressColor = tone==='good' ? 'bg-emerald-500'
+                      : tone==='warn' ? 'bg-amber-500'
+                      : tone==='bad'  ? 'bg-rose-500'
+                      : 'bg-slate-400';
+  
   return (
-    <div className="rounded-xl bg-slate-50 p-3 text-center">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`text-sm font-semibold ${color}`}>{value}</div>
+    <div className="rounded-xl bg-slate-50 dark:bg-slate-800 p-3 text-center">
+      <div className="text-xs text-slate-500 dark:text-slate-400">{label}</div>
+      <div className={`text-sm font-semibold ${color} dark:brightness-125`}>{value}</div>
+      {progress !== undefined && (
+        <div className="mt-1.5 h-1 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div className={`h-full ${progressColor} transition-all`} style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }} />
+        </div>
+      )}
     </div>
   );
 }
 
-function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly, setActiveOnly }:{
+function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly, setActiveOnly, sortBy, setSortBy, tagFilters, setTagFilters, dense, setDense }:{
   period:string; setPeriod:React.Dispatch<React.SetStateAction<string>>; onRefresh:()=>void;
   search:string; setSearch:(v:string)=>void; activeOnly:boolean; setActiveOnly:(v:boolean)=>void;
+  sortBy:string; setSortBy:(v:string)=>void; tagFilters:string[]; setTagFilters:React.Dispatch<React.SetStateAction<string[]>>;
+  dense:boolean; setDense:(v:boolean)=>void;
 }){
   const [showNativePicker, setShowNativePicker] = useState(false);
   const nativePickerRef = React.useRef<HTMLInputElement | null>(null);
@@ -362,23 +391,28 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
     return () => window.removeEventListener('keydown', onKey);
   }, [setPeriod]);
 
+  const toggleTag = (tag: string) => {
+    setTagFilters((prev: string[]) => prev.includes(tag) ? prev.filter((t: string) => t !== tag) : [...prev, tag]);
+  };
+
   return (
-    <div className="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-white/60 bg-white/70 border-b border-slate-100 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="sticky top-0 z-10 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-slate-900/60 bg-white/70 dark:bg-slate-900/70 border-b border-slate-100 dark:border-slate-800 py-3">
       {/* Period navigator */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
       <div className="flex items-center gap-2">
         <button
           onClick={() => setPeriod(addMonths(period, -1))}
-          className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+          className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
           aria-label="Previous month"
         >‹</button>
         <button
           onClick={() => setShowNativePicker(true)}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
           aria-label="Pick month"
         >{periodToLabel(period)}</button>
         <button
           onClick={() => setPeriod(addMonths(period, 1))}
-          className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+          className="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700"
           aria-label="Next month"
         >›</button>
 
@@ -386,15 +420,15 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
         <div className="ml-2 hidden sm:flex items-center gap-2">
           <button
             onClick={() => setPeriod(monthKeyOf(new Date()))}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
           >{t("thisMonth")}</button>
           <button
             onClick={() => setPeriod(lastMonthKey())}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
           >{t("lastMonth")}</button>
           <button
             onClick={() => setShowNativePicker(true)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-3 py-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-700"
           >{t("custom")}</button>
         </div>
 
@@ -411,7 +445,7 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
           />
         )}
 
-        <button onClick={onRefresh} className="ml-2 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
+        <button onClick={onRefresh} className="ml-2 inline-flex items-center gap-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40">
           <RefreshCcw className="h-4 w-4"/> {t("refresh")}
         </button>
       </div>
@@ -419,20 +453,74 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
       {/* Search & Active only */}
       <div className="flex items-center gap-2">
         <div className="relative w-72">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500"/>
           <input
             placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 pl-8 pr-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500"
           />
         </div>
         <button
           onClick={() => setActiveOnly(!activeOnly)}
-          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700"}`}
+          className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly ? "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
         >
           <Filter className="h-4 w-4"/> {activeOnly ? t("activeOnly") : t("all")}
         </button>
+      </div>
+      </div>
+
+      {/* Second row: Sort, Tag Filters, Density */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500 dark:text-slate-400">{t("sortBy")}</span>
+          <select 
+            value={sortBy} 
+            onChange={(e) => setSortBy(e.target.value)}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="revenue">{t("sortRevenue")}</option>
+            <option value="profit">{t("sortProfit")}</option>
+            <option value="margin">{t("sortMargin")}</option>
+            <option value="markup">{t("sortMarkup")}</option>
+          </select>
+        </div>
+
+        {/* Tag Filters */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => toggleTag("Fee")}
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
+              tagFilters.includes("Fee") 
+                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-800" 
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            {t("tagFee")}
+          </button>
+          <button
+            onClick={() => toggleTag("One-Shot")}
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
+              tagFilters.includes("One-Shot") 
+                ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 ring-1 ring-indigo-200 dark:ring-indigo-800" 
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            {t("tagOneShot")}
+          </button>
+        </div>
+
+        {/* Density */}
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-slate-500 dark:text-slate-400">{t("density")}</span>
+          <button
+            onClick={() => setDense(!dense)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+          >
+            {dense ? <><Minimize2 className="h-3 w-3"/> {t("compact")}</> : <><Maximize2 className="h-3 w-3"/> {t("comfortable")}</>}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -461,17 +549,51 @@ function safeMargin(rev?: number, cost?: number) {
   return (rev - cost) / rev;
 }
 
-function ProjectsList({ items }:{ items: ProjectItem[] }){
+function ProjectsList({ items, dense }:{ items: ProjectItem[]; dense?: boolean }){
   if (!items?.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
+      <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
         {t("noProjects")}
       </div>
     );
   }
+
+  // Group by client for separators
+  const grouped: {client: string; projects: ProjectItem[]}[] = [];
+  let currentClient = "";
+  let currentGroup: ProjectItem[] = [];
+
+  items.forEach((p) => {
+    if (p.clientName !== currentClient) {
+      if (currentGroup.length > 0) {
+        grouped.push({client: currentClient, projects: currentGroup});
+      }
+      currentClient = p.clientName;
+      currentGroup = [p];
+    } else {
+      currentGroup.push(p);
+    }
+  });
+  if (currentGroup.length > 0) {
+    grouped.push({client: currentClient, projects: currentGroup});
+  }
+
   return (
-    <div className="grid gap-4">
-      {items.map((p, idx)=> <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} />)}
+    <div className={`grid gap-${dense ? '3' : '4'}`}>
+      {grouped.map((group, gIdx) => (
+        <div key={group.client}>
+          {gIdx > 0 && (
+            <div className="flex items-center gap-3 my-6">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
+              <div className="text-xs font-medium text-slate-400 dark:text-slate-500">{group.client}</div>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
+            </div>
+          )}
+          {group.projects.map((p, idx) => (
+            <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} dense={dense} />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -490,6 +612,9 @@ export default function ActiveProjectsNext(){
   const [freshToggle, setFreshToggle] = useState<boolean>(false);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
+  const [sortBy, setSortBy] = useState("revenue");
+  const [tagFilters, setTagFilters] = useState<string[]>([]);
+  const [dense, setDense] = useState(false);
   const queryClient = useQueryClient();
 
   // Save period to localStorage when it changes
@@ -506,17 +631,43 @@ export default function ActiveProjectsNext(){
 
   const filtered = useMemo(()=>{
     const q = search.trim().toLowerCase();
-    return (data?.projects ?? [])
+    let result = (data?.projects ?? [])
       .filter(p => !activeOnly || p.status !== "Inactive")
       .filter(p => !q || `${p.clientName} ${p.projectName}`.toLowerCase().includes(q));
-  }, [data?.projects, search, activeOnly]);
+    
+    // Tag filtering
+    if (tagFilters.length > 0) {
+      result = result.filter(p => p.tags?.some(tag => tagFilters.includes(tag)));
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let aVal = 0, bVal = 0;
+      if (sortBy === "revenue") {
+        aVal = a.metrics.revenueUSDNormalized ?? 0;
+        bVal = b.metrics.revenueUSDNormalized ?? 0;
+      } else if (sortBy === "profit") {
+        aVal = (a.metrics.revenueUSDNormalized ?? 0) - (a.metrics.costUSDNormalized ?? 0);
+        bVal = (b.metrics.revenueUSDNormalized ?? 0) - (b.metrics.costUSDNormalized ?? 0);
+      } else if (sortBy === "margin") {
+        aVal = a.metrics.margin ?? 0;
+        bVal = b.metrics.margin ?? 0;
+      } else if (sortBy === "markup") {
+        aVal = a.metrics.markup ?? 0;
+        bVal = b.metrics.markup ?? 0;
+      }
+      return bVal - aVal; // Descending order
+    });
+
+    return result;
+  }, [data?.projects, search, activeOnly, tagFilters, sortBy]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
       <div className="mx-auto max-w-6xl p-5 sm:p-8">
         <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
-        <p className="text-sm text-slate-500">{t("period")} <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • {t("subtitle")}</p>
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("title")}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{t("period")} <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • {t("subtitle")}</p>
       </div>
 
       <Controls
@@ -527,6 +678,12 @@ export default function ActiveProjectsNext(){
         setSearch={setSearch}
         activeOnly={activeOnly}
         setActiveOnly={setActiveOnly}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        tagFilters={tagFilters}
+        setTagFilters={setTagFilters}
+        dense={dense}
+        setDense={setDense}
       />
 
       <div className="mt-6">
@@ -537,7 +694,7 @@ export default function ActiveProjectsNext(){
             ))}
           </div>
         ) : isError ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
+          <div className="rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 p-4 text-rose-700 dark:text-rose-400">
             {t("errorLoading")} {(error as Error)?.message}
           </div>
         ) : (
@@ -553,16 +710,16 @@ export default function ActiveProjectsNext(){
             ))}
           </div>
         ) : isError ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
+          <div className="rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 p-4 text-rose-700 dark:text-rose-400">
             {t("errorLoadingProjects")}
           </div>
         ) : (
-          <ProjectsList items={filtered} />
+          <ProjectsList items={filtered} dense={dense} />
         )}
       </div>
 
       {data?.updatedAt && (
-        <div className="mt-6 text-center text-xs text-slate-400">
+        <div className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
           {t("updated")} {new Date(data.updatedAt).toLocaleString("es")} • {t("period")} {data.period}
         </div>
       )}
