@@ -68,6 +68,7 @@ const API_BASE = ""; // same origin
 export type Currency = "ARS" | "USD";
 
 export type ProjectItem = {
+  projectId?: number; // Database ID for navigation
   clientName: string;
   projectName: string;
   projectKey?: string;
@@ -272,6 +273,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
     }
 
     return {
+      projectId: p.projectId,
       clientName,
       projectName: p.name || p.projectName || "",
       projectKey: `${clientName.toLowerCase()}|${(p.name || "").toLowerCase()}`,
@@ -287,6 +289,14 @@ function transformBackendResponse(backendData: any): ProjectsApi {
         margin,
       },
       anomaly: anomaly.length > 0 ? anomaly : undefined,
+      // Include optional metadata from backend
+      projectType: p.projectType,
+      startMonthKey: p.startMonthKey,
+      endMonthKey: p.endMonthKey,
+      lastActivity: p.lastActivity,
+      isFinished: p.isFinished,
+      supportsRollup: p.supportsRollup,
+      allowFinish: p.allowFinish,
     };
   });
 
@@ -390,12 +400,12 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
       <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-fuchsia-500" />
       
       {/* View project button - top right corner */}
-      {p.projectKey && (
-        <Link href={`/projects/${p.projectKey}`}>
+      {p.projectId && (
+        <Link href={`/projects/${p.projectId}`}>
           <button 
             className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors"
             title={t("viewProject")}
-            data-testid={`button-view-project-${p.projectKey}`}
+            data-testid={`button-view-project-${p.projectId}`}
           >
             <Eye className="h-4 w-4" />
           </button>
@@ -441,13 +451,13 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
       )}
 
       {/* Mark as finished button - only show if allowFinish is true */}
-      {p.projectKey && p.allowFinish && (
+      {p.projectId && p.allowFinish && (
         <div className="mt-3 flex justify-end">
           <button
             onClick={async () => {
               if (!confirm(`¿Estás seguro de marcar "${p.projectName}" como terminado?`)) return;
               try {
-                const res = await fetch(`/api/projects/${encodeURIComponent(p.projectKey!)}/status`, {
+                const res = await fetch(`/api/projects/${p.projectId}/status`, {
                   method: 'PATCH',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ status: 'Inactive', endMonthKey: period })
