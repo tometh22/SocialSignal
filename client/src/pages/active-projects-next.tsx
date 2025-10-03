@@ -241,11 +241,15 @@ function useActiveProjects(period: string, fresh: boolean) {
 // ---------- UI Components ----------
 function KPICard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex items-center gap-3">
-      <div className="rounded-xl border bg-slate-50 p-2">{icon}</div>
-      <div>
-        <div className="text-xs text-slate-500">{title}</div>
-        <div className="text-xl font-semibold text-slate-900">{value}</div>
+    <div className="relative rounded-2xl p-[1px] bg-gradient-to-br from-indigo-200/70 via-violet-200/70 to-fuchsia-200/70">
+      <div className="rounded-2xl bg-white/90 backdrop-blur px-4 py-3 shadow-sm flex items-center gap-3">
+        <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white p-2 shadow-sm">
+          {icon}
+        </div>
+        <div>
+          <div className="text-xs text-slate-500">{title}</div>
+          <div className="text-xl font-semibold text-slate-900">{value}</div>
+        </div>
       </div>
     </div>
   );
@@ -283,8 +287,15 @@ function ProjectCard({ p }: { p: ProjectItem }) {
     return tag;
   };
 
+  const marginTone: 'good'|'warn'|'bad'|undefined =
+    Number.isFinite(margin) ? (margin! < 0 ? 'bad' : margin! < 0.5 ? 'warn' : 'good') : undefined;
+
+  const markupTone: 'good'|'warn'|'bad'|undefined =
+    Number.isFinite(markup) ? (markup! < 1 ? 'bad' : markup! < 2 ? 'warn' : 'good') : undefined;
+
   return (
-    <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md hover:border-slate-300">
+    <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md hover:border-slate-300">
+      <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 via-violet-500 to-fuchsia-500" />
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm text-slate-500">{p.clientName}</div>
@@ -308,8 +319,8 @@ function ProjectCard({ p }: { p: ProjectItem }) {
       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label={t("labelCost")} value={formatKM(costDisplay, nativeCurrency)} />
         <Stat label={t("labelProfit")} value={formatKM(profitDisplay, nativeCurrency)} />
-        <Stat label={t("labelMarkup")} value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} />
-        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} />
+        <Stat label={t("labelMarkup")} value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} tone={markupTone} />
+        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} tone={marginTone} />
       </div>
 
       {hasAnomaly && (
@@ -321,11 +332,15 @@ function ProjectCard({ p }: { p: ProjectItem }) {
   );
 }
 
-function Stat({label, value}:{label:string; value:string}){
+function Stat({label, value, tone}:{label:string; value:string; tone?: 'default'|'good'|'warn'|'bad'}) {
+  const color = tone==='good' ? 'text-emerald-700'
+              : tone==='warn' ? 'text-amber-700'
+              : tone==='bad'  ? 'text-rose-700'
+              : 'text-slate-900';
   return (
     <div className="rounded-xl bg-slate-50 p-3 text-center">
       <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-sm font-semibold text-slate-900">{value}</div>
+      <div className={`text-sm font-semibold ${color}`}>{value}</div>
     </div>
   );
 }
