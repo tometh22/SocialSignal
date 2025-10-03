@@ -44,6 +44,8 @@ const i18n = {
 const t = (k: keyof typeof i18n["es"]) => i18n.es[k];
 
 // ---------- Types (tolerant to unknown backend fields) ----------
+const API_BASE = ""; // same origin
+
 export type Currency = "ARS" | "USD";
 
 export type ProjectItem = {
@@ -273,6 +275,13 @@ function ProjectCard({ p }: { p: ProjectItem }) {
   const margin = p.metrics.margin ?? safeMargin(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
 
   const hasAnomaly = (p.anomaly?.length || 0) > 0;
+  
+  const statusLabel = p.status === "Inactive" ? t("statusInactive") : t("statusActive");
+  const tagLabel = (tag: string) => {
+    if (tag === "One-Shot") return t("tagOneShot");
+    if (tag === "Fee") return t("tagFee");
+    return tag;
+  };
 
   return (
     <motion.div layout initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -281,31 +290,31 @@ function ProjectCard({ p }: { p: ProjectItem }) {
           <div className="text-sm text-slate-500">{p.clientName}</div>
           <div className="text-lg font-semibold text-slate-900">{p.projectName}</div>
           <div className="mt-2 flex items-center gap-2">
-            <Badge tone="green">{p.status || "Active"}</Badge>
-            {p.tags?.map((t, i) => (
-              <Badge key={i} tone="slate">{t}</Badge>
+            <Badge tone="green">{statusLabel}</Badge>
+            {p.tags?.map((tag, i) => (
+              <Badge key={i} tone="slate">{tagLabel(tag)}</Badge>
             ))}
             {hasAnomaly && (
-              <Badge tone="orange"><AlertTriangle className="h-3.5 w-3.5"/> Anomaly</Badge>
+              <Badge tone="orange"><AlertTriangle className="h-3.5 w-3.5"/> {t("anomaly")}</Badge>
             )}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm text-slate-500">Revenue</div>
+          <div className="text-sm text-slate-500">{t("labelRevenue")}</div>
           <div className="text-xl font-semibold">{formatKM(revenueDisplay, nativeCurrency)}</div>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Cost" value={formatKM(costDisplay, nativeCurrency)} />
-        <Stat label="Profit" value={formatKM(profitDisplay, nativeCurrency)} />
-        <Stat label="Markup" value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} />
-        <Stat label="Margin" value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} />
+        <Stat label={t("labelCost")} value={formatKM(costDisplay, nativeCurrency)} />
+        <Stat label={t("labelProfit")} value={formatKM(profitDisplay, nativeCurrency)} />
+        <Stat label={t("labelMarkup")} value={Number.isFinite(markup) ? `${markup.toFixed(1)}x` : "—"} />
+        <Stat label={t("labelMargin")} value={Number.isFinite(margin) ? `${(margin*100).toFixed(1)}%` : "—"} />
       </div>
 
       {hasAnomaly && (
         <div className="mt-3 text-xs text-orange-700">
-          Flags: {p.anomaly?.join(", ")}
+          {t("flags")} {p.anomaly?.join(", ")}
         </div>
       )}
     </motion.div>
@@ -363,15 +372,15 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
           <button
             onClick={() => setPeriod(monthKeyOf(new Date()))}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >This month</button>
+          >{t("thisMonth")}</button>
           <button
             onClick={() => setPeriod(lastMonthKey())}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >Last month</button>
+          >{t("lastMonth")}</button>
           <button
             onClick={() => setShowNativePicker(true)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50"
-          >Custom…</button>
+          >{t("custom")}</button>
         </div>
 
         {/* Hidden native month input */}
@@ -388,7 +397,7 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
         )}
 
         <button onClick={onRefresh} className="ml-2 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100">
-          <RefreshCcw className="h-4 w-4"/> Refresh
+          <RefreshCcw className="h-4 w-4"/> {t("refresh")}
         </button>
       </div>
 
@@ -397,7 +406,7 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
         <div className="relative w-72">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400"/>
           <input
-            placeholder="Search projects or clients…"
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-sm shadow-sm focus:ring-2 focus:ring-indigo-500"
@@ -407,7 +416,7 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
           onClick={() => setActiveOnly(!activeOnly)}
           className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${activeOnly ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-700"}`}
         >
-          <Filter className="h-4 w-4"/> {activeOnly ? "Active Only" : "All"}
+          <Filter className="h-4 w-4"/> {activeOnly ? t("activeOnly") : t("all")}
         </button>
       </div>
     </div>
@@ -419,11 +428,11 @@ function SummaryBar({ data }:{ data?: ProjectsApi }){
   const total = data?.summary?.totalProjects ?? data?.projects?.length ?? 0;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-      <KPICard title="Period Revenue (USD)" value={formatUSD(data?.summary?.periodRevenueUSD)} icon={<DollarSign className="h-5 w-5"/>}/>
-      <KPICard title="Period Profit (USD)" value={formatUSD(data?.summary?.periodProfitUSD)} icon={<TrendingUp className="h-5 w-5"/>}/>
-      <KPICard title="Period Hours" value={`${data?.summary?.periodHours ?? 0}h`} icon={<Clock className="h-5 w-5"/>}/>
-      <KPICard title="Active Projects" value={`${active}/${total}`} icon={<BriefcaseBusiness className="h-5 w-5"/>}/>
-      <KPICard title="FX (ref)" value={data?.fx ? `${data.fx}` : "—"} icon={<DollarSign className="h-5 w-5"/>}/>
+      <KPICard title={t("kpiRevenue")} value={formatUSD(data?.summary?.periodRevenueUSD)} icon={<DollarSign className="h-5 w-5"/>}/>
+      <KPICard title={t("kpiProfit")} value={formatUSD(data?.summary?.periodProfitUSD)} icon={<TrendingUp className="h-5 w-5"/>}/>
+      <KPICard title={t("kpiHours")} value={`${data?.summary?.periodHours ?? 0}h`} icon={<Clock className="h-5 w-5"/>}/>
+      <KPICard title={t("kpiActive")} value={`${active}/${total}`} icon={<BriefcaseBusiness className="h-5 w-5"/>}/>
+      <KPICard title={t("kpiFx")} value={data?.fx ? `${data.fx}` : "—"} icon={<DollarSign className="h-5 w-5"/>}/>
     </div>
   );
 }
@@ -441,7 +450,7 @@ function ProjectsList({ items }:{ items: ProjectItem[] }){
   if (!items?.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-        No projects for this period.
+        {t("noProjects")}
       </div>
     );
   }
@@ -490,8 +499,8 @@ export default function ActiveProjectsNext(){
   return (
     <div className="mx-auto max-w-6xl p-5 sm:p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Active Projects</h1>
-        <p className="text-sm text-slate-500">Period: <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • Unified dashboard powered by Excel/DB SoT</p>
+        <h1 className="text-2xl font-semibold text-slate-900">{t("title")}</h1>
+        <p className="text-sm text-slate-500">{t("period")} <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • {t("subtitle")}</p>
       </div>
 
       <Controls
@@ -513,7 +522,7 @@ export default function ActiveProjectsNext(){
           </div>
         ) : isError ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-            Error loading data: {(error as Error)?.message}
+            {t("errorLoading")} {(error as Error)?.message}
           </div>
         ) : (
           <SummaryBar data={data} />
@@ -529,7 +538,7 @@ export default function ActiveProjectsNext(){
           </div>
         ) : isError ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-            Error loading projects
+            {t("errorLoadingProjects")}
           </div>
         ) : (
           <ProjectsList items={filtered} />
@@ -538,7 +547,7 @@ export default function ActiveProjectsNext(){
 
       {data?.updatedAt && (
         <div className="mt-6 text-center text-xs text-slate-400">
-          Last updated: {new Date(data.updatedAt).toLocaleString()} • Period: {data.period}
+          {t("updated")} {new Date(data.updatedAt).toLocaleString("es")} • {t("period")} {data.period}
         </div>
       )}
     </div>
