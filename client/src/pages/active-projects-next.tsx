@@ -118,6 +118,11 @@ function hasActivityThisPeriod(p: ProjectItem) {
 }
 
 function isActiveForPeriod(p: ProjectItem, period: string) {
+  // Respect explicit finished flag
+  if (p.isFinished === true) {
+    return false;
+  }
+
   // Respect status if it comes from backend
   if (typeof p.status === 'string') {
     return p.status !== 'Inactive';
@@ -138,16 +143,23 @@ function isActiveForPeriod(p: ProjectItem, period: string) {
   }
 
   // Fee: active if there's activity or within grace period (1 month)
-  if (isFee && p.lastActivity) {
-    const [pYear, pMonth] = period.split('-').map(Number);
-    const [lYear, lMonth] = p.lastActivity.split('-').map(Number);
-    const periodDate = new Date(pYear, pMonth - 1);
-    const lastActDate = new Date(lYear, lMonth - 1);
-    const monthsDiff = (periodDate.getFullYear() - lastActDate.getFullYear()) * 12 + 
-                      (periodDate.getMonth() - lastActDate.getMonth());
+  if (isFee) {
+    // Fee WITH lastActivity metadata: apply grace period logic
+    if (p.lastActivity) {
+      const [pYear, pMonth] = period.split('-').map(Number);
+      const [lYear, lMonth] = p.lastActivity.split('-').map(Number);
+      const periodDate = new Date(pYear, pMonth - 1);
+      const lastActDate = new Date(lYear, lMonth - 1);
+      const monthsDiff = (periodDate.getFullYear() - lastActDate.getFullYear()) * 12 + 
+                        (periodDate.getMonth() - lastActDate.getMonth());
+      
+      // Active if period <= lastActivity + 1 month (grace period)
+      return monthsDiff <= 1;
+    }
     
-    // Active if period <= lastActivity + 1 month (grace period)
-    if (monthsDiff <= 1) return true;
+    // Fee WITHOUT lastActivity metadata: assume active (backward compatibility)
+    // Only hide if explicitly marked inactive or finished
+    return true;
   }
 
   // Fallback universal: active if there's activity in the month
