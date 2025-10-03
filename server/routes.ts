@@ -694,6 +694,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // V2 alias endpoint
   app.get('/api/active-projects/v2', requireAuth, handleProjectsRequest);
 
+  // ==================== OPTIONAL ROLLUP ENDPOINT ====================
+  // GET /api/projects/:key/rollup?scope=acum|total&thru=YYYY-MM
+  // Returns aggregated metrics for a project (accumulated or total)
+  app.get('/api/projects/:key/rollup', requireAuth, async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { scope, thru } = req.query as { scope?: 'acum' | 'total'; thru?: string };
+
+      if (!scope || !thru) {
+        return res.status(400).json({
+          error: 'Missing required parameters',
+          message: 'Both scope (acum|total) and thru (YYYY-MM) are required'
+        });
+      }
+
+      if (scope !== 'acum' && scope !== 'total') {
+        return res.status(400).json({
+          error: 'Invalid scope',
+          message: 'scope must be either "acum" or "total"'
+        });
+      }
+
+      // Parse project key (format: "clientname|projectname")
+      const [clientName, projectName] = decodeURIComponent(key).split('|');
+      if (!clientName || !projectName) {
+        return res.status(400).json({
+          error: 'Invalid project key',
+          message: 'Project key must be in format "clientname|projectname"'
+        });
+      }
+
+      console.log(`📊 ROLLUP: ${clientName}|${projectName}, scope=${scope}, thru=${thru}`);
+
+      // TODO: Implement actual rollup calculation
+      // For now, return stub data
+      console.warn('⚠️ ROLLUP: Stub implementation - returning mock data');
+
+      return res.json({
+        revenueUSDNormalized: 0,
+        costUSDNormalized: 0,
+        revenueDisplay: 0,
+        costDisplay: 0,
+        markup: null,
+        margin: null
+      });
+
+    } catch (error) {
+      console.error('❌ Error in rollup endpoint:', error);
+      return res.status(500).json({
+        error: 'Failed to get rollup data',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // ==================== OPTIONAL STATUS UPDATE ENDPOINT ====================
+  // PATCH /api/projects/:key/status
+  // Marks a project as finished/inactive
+  app.patch('/api/projects/:key/status', requireAuth, async (req, res) => {
+    try {
+      const { key } = req.params;
+      const { status, endMonthKey } = req.body as { status?: string; endMonthKey?: string };
+
+      if (!status) {
+        return res.status(400).json({
+          error: 'Missing status',
+          message: 'status field is required'
+        });
+      }
+
+      // Parse project key
+      const [clientName, projectName] = decodeURIComponent(key).split('|');
+      if (!clientName || !projectName) {
+        return res.status(400).json({
+          error: 'Invalid project key',
+          message: 'Project key must be in format "clientname|projectname"'
+        });
+      }
+
+      console.log(`🔒 STATUS UPDATE: ${clientName}|${projectName}, status=${status}, end=${endMonthKey}`);
+
+      // TODO: Implement actual status update in database
+      console.warn('⚠️ STATUS UPDATE: Stub implementation - not persisting to database');
+
+      return res.json({
+        success: true,
+        message: `Project ${key} marked as ${status}`,
+        endMonthKey
+      });
+
+    } catch (error) {
+      console.error('❌ Error in status update endpoint:', error);
+      return res.status(500).json({
+        error: 'Failed to update project status',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // Endpoint de prueba para deviation analysis (sin sanitización)
   app.get("/api/projects/:id/deviation-test", requireAuth, async (req, res) => {
     console.log(`🚀 TEST DEVIATION ANALYSIS - Project ${req.params.id}`);
