@@ -780,9 +780,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'period=YYYY-MM is required' });
       }
       
-      // Get project data to extract projectKey
+      // Get project data with client and quotation relations
       const projectData = await db.query.activeProjects.findFirst({
-        where: eq(activeProjects.id, projectId)
+        where: eq(activeProjects.id, projectId),
+        with: {
+          quotation: true,
+          client: true
+        }
       });
       
       if (!projectData) {
@@ -792,9 +796,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getProjectsSummary, getProjectSummary } = await import('./domain/metrics/period_ledger');
       const { canonicalizeKey } = await import('./domain/shared/strings');
       
-      // Generate projectKey
-      const clientName = projectData.clientName || '';
-      const projectName = projectData.name || '';
+      // Generate projectKey from joined data
+      const clientName = projectData.client?.name || '';
+      const projectName = projectData.quotation?.projectName || '';
       const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
       
       console.log(`🔍 CONSISTENCY CHECK: Project ${projectId} (${projectKey}), period=${period}`);

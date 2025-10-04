@@ -1151,6 +1151,7 @@ export const projectComponentsRelations = relations(projectComponents, ({ one, m
 // Relaciones de proyectos activos
 export const activeProjectsRelations = relations(activeProjects, ({ one, many }) => ({
   quotation: one(quotations, { fields: [activeProjects.quotationId], references: [quotations.id] }),
+  client: one(clients, { fields: [activeProjects.clientId], references: [clients.id] }),
   components: many(projectComponents),
   timeEntries: many(timeEntries),
   progressReports: many(progressReports),
