@@ -721,8 +721,8 @@ function ProjectsList({ items, dense, period }:{ items: ProjectItem[]; dense?: b
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
             </div>
           )}
-          {group.projects.map((p, idx) => (
-            <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} dense={dense} period={period} />
+          {group.projects.map((p) => (
+            <ProjectCard key={p.projectId || p.projectKey || `${p.clientName}-${p.projectName}`} p={p} dense={dense} period={period} />
           ))}
         </div>
       ))}
