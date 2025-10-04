@@ -1,0 +1,176 @@
+Te dejo todo, bien ordenado, para que quede clarísimo qué datos toma cada pestaña de la vista única y cómo deben reaccionar a los filtros temporales (siempre con la misma SoT que “Proyectos Activos”).
+
+Principios globales (una sola SoT)
+
+Clave temporal única: period=YYYY-MM (month_key). Nada de strings tipo august_2025.
+
+Moneda base explícita: basis=usd|native. El front no recalcula FX.
+
+Módulo de verdad único: tanto la lista como la vista única leen KPIs desde el mismo módulo (p. ej. period_ledger.getProjectSummary(projectKey, period)).
+
+projectKey canonicalizado: cliente|proyecto en minúsculas para merges y lookups.
+
+Qué dato usa cada pestaña (endpoints y campos)
+1) Dashboard (header + KPIs)
+
+Endpoint: GET /api/projects/:id/complete-data?period=YYYY-MM&basis=usd
+
+SoT interno: getProjectSummary(projectKey, period)
+
+Campos que pinta:
+
+summary.revenue (USD), summary.cost (USD), summary.profit, summary.markup, summary.margin
+
+summary.revenueDisplay, summary.costDisplay (moneda nativa — display)
+
+project.{name, client.name, type, status} (status es período-aware)
+
+Regla: estos KPIs deben coincidir exacto con la card de la lista.
+
+2) Team Analysis (equipo / desviaciones)
+
+Endpoint: GET /api/projects/:id/deviation-analysis?period=YYYY-MM&basis=usd
+
+Campos: members[] con { memberId, name, role, hoursPlanned, hoursReal, cost, deviationPct, severity }
+
+SoT: costs/time por persona ya normalizados y con anti-×100 horas aplicado.
+
+No recalcula KPIs; solo muestra detalle por persona del período.
+
+3) Performance Analysis (rankings)
+
+Endpoint: GET /api/projects/:id/performance-rankings?period=YYYY-MM
+
+Campos: rankings[] con { rank, label, score, hours, efficiencyPct }
+
+SoT: métricas derivadas de time/cost del período (sin tocar KPIs de header).
+
+4) Time Management (entradas de tiempo)
+
+Endpoint: GET /api/projects/:id/time-tracking?period=YYYY-MM
+
+Campos: timesheets[] { memberId, name, date, hours, task }, totals.hours.
+
+Tip: si hay CRUD, que afecte solo este tab; los KPIs del header no se recalculan en el front (se re-fetch con el período activo).
+
+5) Income Details (ingresos)
+
+Endpoint: GET /api/projects/:id/income?period=YYYY-MM
+
+Campos: filas de ingresos del período y totales (display nativo + USD normalizado).
+
+SoT: Income SoT ya limpio (decimal fix, dual currency).
+
+6) Cost Details (costos)
+
+Endpoint: GET /api/projects/:id/costs?period=YYYY-MM
+
+Campos: filas de costos del período y totales (display nativo + USD normalizado), flags (e.g., ANTI_X100_HOURS, USD_CORRUPTED_IGNORED, FX_USED:1345).
+
+SoT: Costs SoT con anti-corrupción aplicado.
+
+7) Financial Analysis (P&L + histórico)
+
+Endpoint: GET /api/projects/:id/finance?period=YYYY-MM&basis=usd
+
+Campos:
+
+pl { revenue, cost, profit, margin, markup } del período
+
+monthly[] serie histórica [{ monthKey, revenue, cost, profit, margin }]
+
+Opcional (para “Mes/Acumulado/Total”):
+GET /api/projects/:id/rollup?scope=acum|total&thru=YYYY-MM
+
+8) Operational Analysis (operacional)
+
+Endpoint: puede salir de complete-data + time-tracking según tus cálculos.
+
+Campos: métricas operativas derivadas (no recalcular FX ni KPIs base en el front).
+
+Cómo reaccionan a los filtros temporales
+A) Cambio de mes (flechas / selector)
+
+Siempre re-consultar con period=YYYY-MM en todas las queries de la vista.
+
+React Query: queryKey debe incluir period (y basis si aplica).
+
+Guardar period en localStorage para persistencia de sesión.
+
+Prefetch suave (opcional): al moverte a YYYY-MM+1, prefetch ±1 mes para UX fluida.
+
+B) Basis (USD / Nativa)
+
+Dropdown basis=usd|native a nivel vista.
+
+Re-disparar queries que soporten basis.
+
+Display (nativa) viene del backend; no se recalcula FX en el front.
+
+C) Fee vs Puntual (vigencia)
+
+Puntual: visible solo si startMonthKey ≤ period ≤ endMonthKey (o si hubo actividad ese mes cuando no hay rango).
+
+Fee: activo si hay actividad en el período o si lastActivity ≥ period - 1 (gracia configurable).
+
+En la vista única, si el proyecto está fuera de vigencia para el período seleccionado, mostrar pill “Fuera de vigencia en MMM YYYY” + opción de ver Total (si existe /rollup?scope=total).
+
+D) “Mes / Acumulado / Total” (conmutador por proyecto)
+
+Mes (default): usa /complete-data?period=YYYY-MM&basis=usd (o /finance).
+
+Acumulado: GET /rollup?scope=acum&thru=YYYY-MM → suma hasta thru y devuelve mismo shape de KPIs (sin recalcular en front).
+
+Total: GET /rollup?scope=total&thru=YYYY-MM (si el proyecto terminó).
+
+Si /rollup no existe, ocultar el switch; la vista sigue operativa.
+
+E) Rango (quarter/year) — si lo necesitás
+
+Preferible backend agrega range=quarter|year y resuelve interno.
+
+Alternativa: la UI genera el conjunto de month_key y el backend agrega.
+
+Pero la vista siempre presenta el resultado como si fuera un “período lógico” sin recalcular en el front.
+
+Estados y caching recomendados
+
+staleTime: 30–60s por tab.
+
+keepPreviousData: true para transiciones suaves de período.
+
+Botón Actualizar → repetir consultas con ?source=fresh solo donde aplique (ej. costos SoT).
+
+Reglas de consistencia (para no volver a divergir)
+
+Todos los KPIs de header de la vista única salen de getProjectSummary(projectKey, period) (mismo módulo que la lista).
+
+Ningún tab recalcula Markup/Margen; solo pinta lo que devuelve su endpoint o lo que derive el backend.
+
+Flags de auditoría viajan con los detalles de costos y pueden reflejarse en UI (badge/tooltip).
+
+Mini-checklist de QA (por tab)
+
+Dashboard: KPIs = lista (mismos números a centavos).
+
+Team: horas/costos del período; si cambia el mes, cambian inmediatamente.
+
+Performance: rankings responden al período.
+
+Time: lista de entradas del mes; total horas concuerda con Team.
+
+Income/Costs: montos display y normalizados del mes; flags visibles.
+
+Finance: P&L del período y serie histórica consistente; basis respeta USD/Nativa.
+
+Operacional: métricas derivadas solo del período; sin recalcular FX.
+
+Puntual: fuera de rango no aparece en lista; en vista única, muestra “fuera de vigencia” + opción “Total”.
+
+Si querés, te armo un patch para la vista única con:
+
+PeriodContext (para compartir period/basis entre tabs),
+
+query keys unificadas,
+
+y el conmutador Mes/Acumulado/Total apagable por feature-flag.

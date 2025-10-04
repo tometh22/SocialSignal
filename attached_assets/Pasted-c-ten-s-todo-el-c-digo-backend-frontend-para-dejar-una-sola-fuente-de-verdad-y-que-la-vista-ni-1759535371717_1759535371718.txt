@@ -1,0 +1,475 @@
+cá tenés todo el código (backend + frontend) para dejar una sola fuente de verdad y que la vista única y la lista muestren los mismos números.
+
+Los paths son orientativos; ajustalos a tu árbol (server/…, client/src/…).
+Todo es TypeScript/Express + React Query y es back-compatible: no rompe la lista.
+
+🧱 BACKEND
+1) Módulo único de métricas de período (SoT)
+
+server/domain/metrics/period_ledger.ts
+
+// domain/metrics/period_ledger.ts
+import { getMonthlyFx } from "../shared/exchange";
+import { getIncomeRows, getCostRows } from "../shared/sot";
+import { canonicalizeKey } from "../shared/strings";
+
+export type Currency = "ARS" | "USD";
+
+export type LedgerRow = {
+  projectKey: string;              // cliente|proyecto (lowercase)
+  currencyNative: Currency;        // display currency
+  revenueDisplay: number;          // nativo (para UI)
+  costDisplay: number;             // nativo (para UI)
+  revenueUSD: number;              // normalizado USD (para KPIs)
+  costUSD: number;                 // normalizado USD (para KPIs)
+  flags: string[];                 // trazas (ANTI_X100_HOURS, USD_CORRUPTED_IGNORED, FX_USED:xxxx)
+};
+
+export async function getPeriodLedger(period: string, opts?: { fresh?: boolean }): Promise<LedgerRow[]> {
+  // 1) leer SoT (¡no hojas!)
+  const [income, costs] = await Promise.all([
+    getIncomeRows(period, opts), // [{projectKey, currency, revenueDisplay, revenueUSD}]
+    getCostRows(period, opts),   // [{projectKey, currency, costDisplay, costUSD, flags?}]
+  ]);
+
+  // 2) index
+  const map = new Map<string, LedgerRow>();
+
+  for (const r of income) {
+    const k = canonicalizeKey(r.projectKey);
+    const curr: Currency = r.currency ?? "ARS";
+    const row: LedgerRow = map.get(k) ?? {
+      projectKey: k, currencyNative: curr,
+      revenueDisplay: 0, costDisplay: 0, revenueUSD: 0, costUSD: 0, flags: []
+    };
+    row.currencyNative = curr;
+    row.revenueDisplay += r.revenueDisplay ?? 0;
+    row.revenueUSD     += r.revenueUSD ?? 0;
+    if (r.flags?.length) row.flags.push(...r.flags);
+    map.set(k, row);
+  }
+
+  for (const c of costs) {
+    const k = canonicalizeKey(c.projectKey);
+    const curr: Currency = c.currency ?? "ARS";
+    const row: LedgerRow = map.get(k) ?? {
+      projectKey: k, currencyNative: curr,
+      revenueDisplay: 0, costDisplay: 0, revenueUSD: 0, costUSD: 0, flags: []
+    };
+    row.currencyNative = curr;
+    row.costDisplay += c.costDisplay ?? 0;
+    row.costUSD     += c.costUSD ?? 0;
+    if (c.flags?.length) row.flags.push(...c.flags);
+    map.set(k, row);
+  }
+
+  // 3) FX (solo informativo; el SoT ya normaliza)
+  const fx = await getMonthlyFx(period).catch(()=>null);
+  const out = [...map.values()];
+  if (fx) out.forEach(r => r.flags.push(`FX_USED:${fx}`));
+  return out;
+}
+
+export function computeKpis(r: LedgerRow) {
+  const rev = r.revenueUSD || 0;
+  const cst = r.costUSD || 0;
+  return {
+    revenueUSD: rev,
+    costUSD: cst,
+    profitUSD: rev - cst,
+    markup: cst ? rev / cst : NaN,
+    margin: rev ? (rev - cst) / rev : NaN,
+    revenueDisplay: r.revenueDisplay,
+    costDisplay: r.costDisplay,
+    currencyNative: r.currencyNative,
+    flags: r.flags
+  };
+}
+
+export async function getProjectsSummary(period: string, opts?: { fresh?: boolean }) {
+  const L = await getPeriodLedger(period, opts);
+  return L.map(r => ({
+    projectKey: r.projectKey,
+    currencyNative: r.currencyNative,
+    metrics: {
+      revenueDisplay: r.revenueDisplay,
+      costDisplay: r.costDisplay,
+      revenueUSDNormalized: r.revenueUSD,
+      costUSDNormalized: r.costUSD,
+      ...kpiFrom(r)
+    },
+    anomaly: r.flags?.length ? r.flags : undefined
+  }));
+
+  function kpiFrom(x: LedgerRow) {
+    const rev = x.revenueUSD || 0, cst = x.costUSD || 0;
+    return {
+      markup: cst ? rev / cst : NaN,
+      margin: rev ? (rev - cst) / rev : NaN
+    };
+  }
+}
+
+export async function getProjectSummary(projectKey: string, period: string, opts?: { fresh?: boolean }) {
+  const L = await getPeriodLedger(period, opts);
+  const r = L.find(x => x.projectKey === canonicalizeKey(projectKey));
+  return r ? computeKpis(r) : null;
+}
+
+helpers que referencia este módulo
+
+server/domain/shared/strings.ts
+
+export function canonicalizeKey(x: string) {
+  return (x || "").trim().toLowerCase();
+}
+
+
+server/domain/shared/exchange.ts
+
+// Devuelve FX mensual desde DB
+import { db } from "../../infra/db";
+export async function getMonthlyFx(period: string): Promise<number> {
+  const [y, m] = period.split("-").map(Number);
+  const row = await db.oneOrNone(
+    "SELECT fx FROM exchange_rates WHERE year=$1 AND month=$2",
+    [y, m]
+  );
+  if (!row) throw new Error("FX not found");
+  return Number(row.fx);
+}
+
+
+server/domain/shared/sot.ts
+
+// Wrappers a tus SoT (Income/Costs). No recalculan nada.
+import { db } from "../../infra/db";
+
+export async function getIncomeRows(period: string, _opts?: any) {
+  const rows = await db.manyOrNone(`
+    SELECT project_key, currency_native AS currency,
+           revenue_display, revenue_usd AS revenue_usd,
+           flags
+    FROM income_sot
+    WHERE month_key = $1
+  `, [period]);
+  return rows.map(r => ({
+    projectKey: r.project_key,
+    currency: r.currency ?? "ARS",
+    revenueDisplay: Number(r.revenue_display ?? 0),
+    revenueUSD: Number(r.revenue_usd ?? 0),
+    flags: r.flags ?? []
+  }));
+}
+
+export async function getCostRows(period: string, _opts?: any) {
+  const rows = await db.manyOrNone(`
+    SELECT project_key, currency_native AS currency,
+           cost_display, cost_usd AS cost_usd,
+           flags
+    FROM costs_sot
+    WHERE month_key = $1
+  `, [period]);
+  return rows.map(r => ({
+    projectKey: r.project_key,
+    currency: r.currency ?? "ARS",
+    costDisplay: Number(r.cost_display ?? 0),
+    costUSD: Number(r.cost_usd ?? 0),
+    flags: r.flags ?? []
+  }));
+}
+
+2) Aggregator /api/projects (lista)
+
+server/routes/projects.list.ts
+
+import { Router } from "express";
+import { getProjectsSummary } from "../domain/metrics/period_ledger";
+
+export const projectsListRouter = Router();
+
+projectsListRouter.get("/api/projects", async (req, res) => {
+  try {
+    const period = String(req.query.period || "").trim();
+    if (!/^\d{4}-\d{2}$/.test(period)) return res.status(400).json({ error: "period=YYYY-MM" });
+    const fresh = req.query.source === "fresh";
+    const projects = await getProjectsSummary(period, { fresh });
+
+    res.json({
+      period,
+      fx: undefined, // opcional: incluir si querés
+      projects,
+      summary: {
+        periodRevenueUSD: sum(projects.map(p => p.metrics?.revenueUSDNormalized ?? 0)),
+        periodProfitUSD:  sum(projects.map(p => (p.metrics?.revenueUSDNormalized ?? 0) - (p.metrics?.costUSDNormalized ?? 0))),
+        periodHours: 0,
+        activeProjects: projects.filter(p => p.metrics?.revenueUSDNormalized || p.metrics?.costUSDNormalized).length,
+        totalProjects: projects.length
+      }
+    });
+  } catch (e:any) {
+    console.error(e);
+    res.status(500).json({ error: e?.message || "internal" });
+  }
+});
+
+function sum(a:number[]){ return a.reduce((x,y)=>x+y,0); }
+
+
+Importante: asegurate de no tener otro router registrado en /api/projects que lo sobrescriba.
+
+3) Vista única /api/projects/:id/complete-data usando el mismo módulo
+
+server/routes/projects.single.ts
+
+import { Router } from "express";
+import { getProjectSummary } from "../domain/metrics/period_ledger";
+import { getProjectById } from "../domain/projects/registry"; // tu tabla de proyectos
+import { parseTimeLegacyOrNew } from "../utils/period";
+
+export const projectSingleRouter = Router();
+
+projectSingleRouter.get("/api/projects/:id/complete-data", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { period } = parseTimeLegacyOrNew(req.query);
+    const basis = (String(req.query.basis || "usd").toLowerCase() === "native") ? "native" : "usd";
+
+    const project = await getProjectById(id);
+    if (!project) return res.status(404).json({ error: "project not found" });
+
+    // KPIs del mismo SoT que la lista
+    const summary = await getProjectSummary(project.projectKey, period);
+    // el resto del payload (quotation/actuals/metrics…) lo puedes completar como hoy
+    res.json({
+      period, basis,
+      project: {
+        id, projectKey: project.projectKey,
+        name: project.name, client: { id: project.clientId, name: project.clientName },
+        type: project.type, status: project.status ?? "Active"
+      },
+      summary: summary ? {
+        revenue: summary.revenueUSD,
+        cost: summary.costUSD,
+        profit: summary.profitUSD,
+        markup: summary.markup,
+        margin: summary.margin,
+        revenueDisplay: summary.revenueDisplay,
+        costDisplay: summary.costDisplay
+      } : { revenue:0, cost:0, profit:0, markup:NaN, margin:NaN },
+      kpis: { teamSize: 0, criticalDeviations: 0, overBudgetMembers: 0, underBudgetMembers: 0 },
+      // mantiene campos legacy si tu UI los usa todavía
+      quotation: null, actuals: null, metrics: null, rankings: null, timeEntries: [], googleSheetsSales: []
+    });
+  } catch (e:any) {
+    console.error(e);
+    res.status(500).json({ error: e?.message || "internal" });
+  }
+});
+
+
+server/utils/period.ts
+
+export function parseTimeLegacyOrNew(q: any): { period: string, range: "month"|"quarter"|"year" } {
+  const tf = String(q.timeFilter || "");
+  if (/^\d{4}-\d{2}$/.test(String(q.period || ""))) {
+    return { period: String(q.period), range: (q.range as any) || "month" };
+  }
+  if (tf === "current_month") {
+    const d = new Date(); const m = String(d.getMonth()+1).padStart(2,"0"); const y = d.getFullYear();
+    return { period: `${y}-${m}`, range: "month" };
+  }
+  if (/^[a-z]+_\d{4}$/i.test(tf)) {
+    const [name, year] = tf.split("_");
+    const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+    const idx = months.indexOf(name.slice(0,3).toLowerCase());
+    if (idx>=0) return { period: `${year}-${String(idx+1).padStart(2,"0")}`, range:"month" };
+  }
+  return { period: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,"0")}`, range: "month" };
+}
+
+
+server/domain/projects/registry.ts (ejemplo mínimo)
+
+import { db } from "../../infra/db";
+export async function getProjectById(id: number) {
+  return db.oneOrNone(`
+    SELECT id, client_id AS "clientId", client_name AS "clientName",
+           name, project_key AS "projectKey",
+           type, status
+    FROM projects_registry
+    WHERE id = $1
+  `, [id]);
+}
+
+4) QA de paridad
+
+server/routes/consistency.ts
+
+import { Router } from "express";
+import { getProjectsSummary, getProjectSummary } from "../domain/metrics/period_ledger";
+import { getProjectById } from "../domain/projects/registry";
+
+export const consistencyRouter = Router();
+
+consistencyRouter.get("/api/consistency-check/projects/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const period = String(req.query.period || "");
+  if (!/^\d{4}-\d{2}$/.test(period)) return res.status(400).json({ error: "period=YYYY-MM" });
+
+  const p = await getProjectById(id);
+  if (!p) return res.status(404).json({ error: "project not found" });
+
+  const [list, single] = await Promise.all([
+    getProjectsSummary(period),
+    getProjectSummary(p.projectKey, period)
+  ]);
+  const fromList = list.find(x => x.projectKey === p.projectKey);
+
+  const a = {
+    revenue: fromList?.metrics?.revenueUSDNormalized ?? 0,
+    cost:    fromList?.metrics?.costUSDNormalized ?? 0,
+    profit:  (fromList?.metrics?.revenueUSDNormalized ?? 0) - (fromList?.metrics?.costUSDNormalized ?? 0),
+    markup:  fromList?.metrics?.markup ?? NaN,
+    margin:  fromList?.metrics?.margin ?? NaN
+  };
+  const b = {
+    revenue: single?.revenueUSD ?? 0,
+    cost:    single?.costUSD ?? 0,
+    profit:  single ? single.revenueUSD - single.costUSD : 0,
+    markup:  single?.markup ?? NaN,
+    margin:  single?.margin ?? NaN
+  };
+
+  res.json({ ok: almostEq(a, b), list:a, single:b, diff: diff(a,b) });
+});
+
+function almostEq(a:any,b:any){ return Object.keys(a).every(k => Math.abs((a as any)[k] - (b as any)[k]) < 0.01); }
+function diff(a:any,b:any){ const d:any={}; for(const k of Object.keys(a)) d[k] = (a as any)[k] - (b as any)[k]; return d; }
+
+
+Registro de routers: montá projectsListRouter, projectSingleRouter y consistencyRouter en tu app.
+
+🧩 FRONTEND
+1) Hook de paridad inmediata (usa single → fallback lista)
+
+client/src/hooks/useProjectSummary.ts
+
+import { useQuery } from "@tanstack/react-query";
+
+type Summary = {
+  revenueUSD: number; costUSD: number; profitUSD: number;
+  markup: number; margin: number;
+  revenueDisplay?: number; costDisplay?: number;
+  currencyNative?: "ARS"|"USD";
+};
+
+export function useProjectSummary(projectId: number, projectKey: string, period: string) {
+  // 1) intento vista única (nuevo contrato o shim)
+  const qSingle = useQuery({
+    queryKey: ["proj-summary", projectId, period, "usd"],
+    queryFn: async (): Promise<Summary | null> => {
+      const r = await fetch(`/api/projects/${projectId}/complete-data?period=${period}&basis=usd`);
+      if (!r.ok) return null;
+      const j = await r.json();
+      const s = j?.summary;
+      return s ? {
+        revenueUSD: s.revenue ?? 0,
+        costUSD:    s.cost ?? 0,
+        profitUSD:  s.profit ?? ((s.revenue ?? 0) - (s.cost ?? 0)),
+        markup:     s.markup ?? NaN,
+        margin:     s.margin ?? NaN,
+        revenueDisplay: s.revenueDisplay,
+        costDisplay: s.costDisplay,
+        currencyNative: j?.project?.currencyNative
+      } : null;
+    },
+    staleTime: 30_000
+  });
+
+  // 2) fallback 100% igual a "Active Projects"
+  const qList = useQuery({
+    queryKey: ["projects", period],
+    enabled: !qSingle.data,
+    queryFn: async () => {
+      const r = await fetch(`/api/projects?period=${period}`);
+      if (!r.ok) throw new Error("projects list fail");
+      return r.json() as Promise<{projects:any[]}>;
+    },
+    select: (data): Summary | null => {
+      const p = data.projects.find(x => (x.projectKey || `${x.clientName}|${x.projectName}`.toLowerCase()) === projectKey);
+      if (!p) return null;
+      const rev = p.metrics?.revenueUSDNormalized ?? 0;
+      const cst = p.metrics?.costUSDNormalized ?? 0;
+      return {
+        revenueUSD: rev,
+        costUSD: cst,
+        profitUSD: rev - cst,
+        markup: p.metrics?.markup ?? (cst ? rev / cst : NaN),
+        margin: p.metrics?.margin ?? (rev ? (rev - cst) / rev : NaN),
+        revenueDisplay: p.metrics?.revenueDisplay,
+        costDisplay: p.metrics?.costDisplay,
+        currencyNative: p.currencyNative
+      };
+    },
+    staleTime: 30_000
+  });
+
+  return qSingle.data ?? qList.data ?? null;
+}
+
+2) Uso en ProjectDetailsRedesigned (header)
+import { useProjectSummary } from "@/hooks/useProjectSummary";
+
+export default function ProjectDetailsRedesigned() {
+  const { projectId, projectKey, period } = useProjectRouteState(); // lo que ya tengas
+  const summary = useProjectSummary(projectId, projectKey, period);
+
+  return (
+    <div>
+      {/* Header KPI cards */}
+      <KPICard title="Facturación (USD)" value={fmt(summary?.revenueUSD)} />
+      <KPICard title="Costo (USD)"        value={fmt(summary?.costUSD)} />
+      <KPICard title="Ganancia (USD)"     value={fmt(summary?.profitUSD)} />
+      <KPICard title="Markup"             value={isFinite(summary?.markup ?? NaN) ? `${(summary!.markup).toFixed(1)}x` : "—"} />
+      <KPICard title="Margen"             value={isFinite(summary?.margin ?? NaN) ? `${(summary!.margin*100).toFixed(1)}%` : "—"} />
+      {/* …resto de pestañas sin tocar */}
+    </div>
+  );
+}
+
+function fmt(n?: number){ if(n==null) return "—"; const x=Math.abs(n); const s=n<0?"-":""; const [v,suf]=x>=1e6?[x/1e6,"M"]:x>=1e3?[x/1e3,"K"]:[x,""]; return `${s}$ ${v.toFixed(2)}${suf}`; }
+
+
+Con este hook, los números del header de la vista única quedan idénticos a los de la lista, hoy mismo.
+
+🚦 Registro de routers (Express)
+
+En tu server/app.ts o similar:
+
+import express from "express";
+import { projectsListRouter } from "./routes/projects.list";
+import { projectSingleRouter } from "./routes/projects.single";
+import { consistencyRouter } from "./routes/consistency";
+
+const app = express();
+
+// ⚠️ Asegurate de NO registrar otro router en "/api/projects" que lo sobrescriba.
+app.use(projectsListRouter);
+app.use(projectSingleRouter);
+app.use(consistencyRouter);
+
+export default app;
+
+🧪 Quick QA (curls)
+# lista
+curl -s "http://localhost:5000/api/projects?period=2025-08" | jq '.projects[0].metrics'
+
+# single usando misma SoT
+curl -s "http://localhost:5000/api/projects/34/complete-data?period=2025-08&basis=usd" | jq '.summary'
+
+# paridad
+curl -s "http://localhost:5000/api/consistency-check/projects/34?period=2025-08" | jq
+
+
+si querés, después te paso el patch para que la lista aplique el filtro activo por período y el switch Mes/Acum/Total en cada card, pero con esto quedás unificado y consistente ya.

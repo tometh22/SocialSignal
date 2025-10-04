@@ -1,0 +1,111 @@
+🧭 Contexto & objetivo
+
+Queremos una sola Fuente de Verdad (SoT) para toda la app.
+Los KPIs (Facturación, Costo, Ganancia, Markup, Margen) de Vista Única de Proyecto deben ser idénticos a los de Proyectos Activos.
+Nada de recalcular en el front. Todo por month_key (period=YYYY-MM) y basis=usd|native.
+
+🎯 Alcance
+
+Hotfix front: la vista única toma los KPIs del mismo endpoint que usa la lista (aggregator /api/projects?period=YYYY-MM) como fallback, hasta que unifiquemos backend.
+
+Backend: crear un módulo único de métricas de período y hacer que /api/projects y /api/projects/:id/complete-data llamen a las mismas funciones.
+
+QA de paridad: validar que ambos endpoints devuelven los mismos números por proyecto/mes.
+
+🛠️ Tareas (en orden)
+1) Resolver conflictos de rutas
+
+Asegurar que NADA sobrescriba GET /api/projects.
+
+Mantener /api/projects como aggregator por período (lo usa “Active Projects – Next”).
+
+Si hay routers duplicados, dejar solo el que responde:
+
+{ "period": "YYYY-MM", "projects": [ { "projectKey": "...", "metrics": { "revenueDisplay", "costDisplay", "revenueUSDNormalized", "costUSDNormalized", "markup", "margin" } } ], "summary": {...}, "fx": 1345 }
+
+2) Backend – módulo SoT único
+
+Crear services/domain/metrics/period_ledger.ts (o path equivalente) con:
+
+getPeriodLedger(period: string) → merge Income SoT + Costs SoT:
+
+Reglas: anti-USD astronómico, anti-×100 horas, FX de DB, overrides 2025-08.
+
+Output por projectKey: revenueDisplay, costDisplay, revenueUSD, costUSD, currencyNative, flags.
+
+getProjectsSummary(period) → usa getPeriodLedger.
+
+getProjectSummary(projectKey, period) → usa getPeriodLedger.
+
+Importante: Tanto /api/projects como GET /api/projects/:id/complete-data deben usar estas funciones. Nada de lógica duplicada.
+
+3) Shim de compatibilidad en complete-data
+
+Aceptar ambos formatos:
+
+timeFilter=august_2025|current_month|q3_2025 (legacy)
+
+period=YYYY-MM[&range=month|quarter|year] (nuevo)
+
+Aceptar basis=usd|native (default: usd).
+
+Armar el payload legacy esperado por ProjectDetailsRedesigned, pero los KPIs del header deben provenir de getProjectSummary(projectKey, period).
+
+4) Front – hotfix de paridad inmediata
+
+En ProjectDetailsRedesigned agregar un hook useProjectSummary(projectId, projectKey, period) que:
+
+Intente GET /api/projects/:id/complete-data?period=YYYY-MM&basis=usd.
+
+Si no hay summary válido, haga fallback a GET /api/projects?period=YYYY-MM, encuentre el projectKey y use sus métricas (idénticas a la lista).
+Con eso, hoy mismo los números del header de proyecto = números de la lista.
+
+5) Pestañas (sin bloquear)
+
+Cada pestaña mantiene su endpoint específico (/deviation-analysis, /performance-rankings, /time-tracking, /finance) pero no recalcula KPIs de resumen.
+Cuando el backend esté listo, iremos migrando pestaña por pestaña.
+
+6) Endpoint de consistencia (QA)
+
+Agregar:
+
+GET /api/consistency-check/projects/:id?period=YYYY-MM
+
+
+Compara summary de complete-data vs entry de /api/projects para ese projectKey.
+Devuelve { ok: true } o { ok:false, diff:{...} } (tolerancia de redondeo).
+
+7) Logs & flags
+
+Loggear en backend para trazabilidad:
+
+FX_USED:<valor>, ANTI_X100_HOURS, USD_CORRUPTED_IGNORED, OVERRIDES_APPLIED, STATUS_RULE_APPLIED.
+
+✅ Criterios de aceptación
+
+Para 3 proyectos (ej. Warner Fee Marketing, Modo, Coelsa) y períodos 2025-08 / 2025-07:
+
+GET /api/projects?period=YYYY-MM y
+GET /api/projects/:id/complete-data?period=YYYY-MM&basis=usd
+deben dar los mismos revenueUSD, costUSD, profitUSD, markup, margin.
+
+“Active Projects – Next” no cambia.
+
+La Vista Única muestra exactamente los mismos números en el header (gracias al hotfix).
+
+?source=fresh sigue forzando bypass de caché en costos.
+
+Filtrado por month_key siempre (period=YYYY-MM). El front no recalcula FX.
+
+🧪 Quick checks (curl)
+curl -s "/api/projects?period=2025-08" | jq '.projects[] | {key:.projectKey, rev:.metrics.revenueUSDNormalized, cost:.metrics.costUSDNormalized}'
+curl -s "/api/projects/34/complete-data?period=2025-08&basis=usd" | jq '.summary'
+curl -s "/api/consistency-check/projects/34?period=2025-08"
+
+Notas
+
+No tocar el contrato actual de “Active Projects – Next”.
+
+projectKey canonicalizado (cliente|proyecto en minúsculas) para merges.
+
+Display vs Normalized: display en moneda nativa; KPIs en USD normalizado (SoT).

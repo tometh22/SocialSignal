@@ -1,0 +1,109 @@
+o te dejo dos ajustes mínimos y seguros para que la lista enlace a tu vista existente y ambas sigan leyendo la misma SoT (sin superponer nada).
+
+1) Enlazar cada card a tu vista única (sin romper nada)
+
+A. Tipado (opcional si ya lo tenés)
+
+// Agregá el id si tu /api/projects ya lo devuelve
+export type ProjectItem = {
+  // …
+  projectId?: number;   // NEW (opcional)
+  projectKey?: string;  // ya lo traés
+  // …
+}
+
+
+B. Pasar el período a las cards (1 línea + firma)
+
+- function ProjectsList({ items }:{ items: ProjectItem[] }){
++ function ProjectsList({ items, period }:{ items: ProjectItem[], period: string }){
+  // …
+}
+
+- <ProjectsList items={filtered} />
++ <ProjectsList items={filtered} period={period} />
+
+
+C. Link en la card (usa id si existe; si no, usa projectKey)
+
+import Link from "next/link";
+
+function ProjectCard({ p, period }: { p: ProjectItem; period: string }) {
+  const href =
+    p.projectId != null
+      ? `/active-projects/${p.projectId}?period=${period}`
+      : `/active-projects/by-key/${encodeURIComponent(p.projectKey ?? "")}?period=${period}`;
+
+  return (
+    <Link href={href} className="block group focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-2xl">
+      {/* …tu contenido actual de la card sin cambios de datos… */}
+    </Link>
+  );
+}
+
+
+D. Pasar period desde ProjectsList → ProjectCard
+
+- {items.map((p, idx)=> <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} />)}
++ {items.map((p, idx)=> (
++   <ProjectCard key={`${p.projectKey ?? p.clientName+"|"+p.projectName}-${idx}`} p={p} period={period} />
++ ))}
+
+
+Con esto, al hacer click en una card saltás a tu vista única (/active-projects/:id) con el period actual, sin tocar lógica ni KPIs.
+
+2) (Opcional) Hacer que la lista devuelva projectId para navegar por ID
+
+Si tu /api/projects hoy no trae projectId, agregalo desde el backend con un join a tu registro:
+
+SELECT
+  s.project_key,
+  pr.id          AS project_id,
+  pr.name        AS project_name,
+  pr.client_name AS client_name,
+  -- métricas ya calculadas por tu SoT…
+FROM sot_summary s
+LEFT JOIN projects_registry pr ON pr.project_key = s.project_key
+WHERE s.month_key = $1;
+
+
+Y en el JSON:
+
+{
+  "projects": [
+    {
+      "projectId": 34,
+      "projectKey": "warner|fee marketing",
+      "clientName": "Warner",
+      "projectName": "Fee Marketing",
+      "metrics": { … }
+    }
+  ]
+}
+
+
+Si preferís no tocar el backend hoy, el fallback por projectKey (ruta /by-key/…) te deja navegar igual.
+
+3) Heads-up: hay un bugcito de sintaxis en tu archivo
+
+En el código que pegaste, periodToLabel quedó con llaves duplicadas y te va a romper el build. Reemplazalo por este:
+
+function periodToLabel(period: string): string {
+  try {
+    const [y, m] = period.split("-").map(Number);
+    const d = new Date(y, m - 1, 1);
+    return d.toLocaleDateString("es", { month: "short", year: "numeric" });
+  } catch {
+    return period;
+  }
+}
+
+4) QA rápido
+
+En la lista, hacé click en un proyecto → abre /active-projects/:id?period=YYYY-MM.
+
+El período en la vista única coincide con el de la lista.
+
+Los números del header de la vista única = los de la card (misma SoT).
+
+Si un proyecto no tiene projectId, la ruta de fallback /by-key/<projectKey> funciona.
