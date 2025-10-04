@@ -764,6 +764,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== CONSISTENCY CHECK ENDPOINT ====================
+  // GET /api/consistency-check/projects/:id?period=YYYY-MM
+  // QA endpoint to validate parity between list and detail view KPIs
+  app.get('/api/consistency-check/projects/:id', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const period = String(req.query.period || '');
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ error: 'Invalid project ID' });
+      }
+      
+      if (!period || !/^\d{4}-\d{2}$/.test(period)) {
+        return res.status(400).json({ error: 'period=YYYY-MM is required' });
+      }
+      
+      // Get project data to extract projectKey
+      const projectData = await db.query.activeProjects.findFirst({
+        where: eq(activeProjects.id, projectId)
+      });
+      
+      if (!projectData) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      const { getProjectsSummary, getProjectSummary } = await import('./domain/metrics/period_ledger');
+      const { canonicalizeKey } = await import('./domain/shared/strings');
+      
+      // Generate projectKey
+      const clientName = projectData.clientName || '';
+      const projectName = projectData.name || '';
+      const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
+      
+      console.log(`🔍 CONSISTENCY CHECK: Project ${projectId} (${projectKey}), period=${period}`);
+      
+      // Get from list endpoint
+      const listProjects = await getProjectsSummary(period);
+      const fromList = listProjects.find(p => p.projectKey === projectKey);
+      
+      // Get from single endpoint
+      const fromSingle = await getProjectSummary(projectKey, period);
+      
+      const listKPIs = {
+        revenue: fromList?.metrics?.revenueUSDNormalized ?? 0,
+        cost: fromList?.metrics?.costUSDNormalized ?? 0,
+        profit: (fromList?.metrics?.revenueUSDNormalized ?? 0) - (fromList?.metrics?.costUSDNormalized ?? 0),
+        markup: fromList?.metrics?.markup ?? NaN,
+        margin: fromList?.metrics?.margin ?? NaN
+      };
+      
+      const singleKPIs = {
+        revenue: fromSingle?.revenueUSD ?? 0,
+        cost: fromSingle?.costUSD ?? 0,
+        profit: fromSingle?.profitUSD ?? 0,
+        markup: fromSingle?.markup ?? NaN,
+        margin: fromSingle?.margin ?? NaN
+      };
+      
+      // Calculate differences
+      const diff: any = {};
+      for (const key of Object.keys(listKPIs)) {
+        const a = (listKPIs as any)[key];
+        const b = (singleKPIs as any)[key];
+        diff[key] = Math.abs(a - b);
+      }
+      
+      // Check if all differences are within tolerance (0.01)
+      const tolerance = 0.01;
+      const ok = Object.values(diff).every((d: any) => d < tolerance || isNaN(d));
+      
+      console.log(`✅ CONSISTENCY ${ok ? 'PASS' : 'FAIL'}: ${projectKey}`);
+      
+      return res.json({
+        ok,
+        projectId,
+        projectKey,
+        period,
+        list: listKPIs,
+        single: singleKPIs,
+        diff,
+        tolerance
+      });
+      
+    } catch (error) {
+      console.error('❌ Error in consistency check:', error);
+      return res.status(500).json({
+        error: 'Failed to check consistency',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // ==================== OPTIONAL STATUS UPDATE ENDPOINT ====================
   // PATCH /api/projects/:key/status
   // Marks a project as finished/inactive
