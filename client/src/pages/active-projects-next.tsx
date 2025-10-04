@@ -401,7 +401,7 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
       
       {/* View project button - top right corner */}
       {p.projectId && (
-        <Link href={`/active-projects/${p.projectId}`}>
+        <Link href={`/active-projects/${p.projectId}${period ? `?period=${period}` : ''}`}>
           <button 
             className="absolute top-3 right-3 p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors"
             title={t("viewProject")}

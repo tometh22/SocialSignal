@@ -174,12 +174,19 @@ interface CompleteProjectData {
   }>;
 }
 
-export const useCompleteProjectData = (projectId: number, timeFilter: string = 'all') => {
+export const useCompleteProjectData = (
+  projectId: number, 
+  timeFilter: string = 'all',
+  period?: string // 🎯 NEW: Support period=YYYY-MM for SoT integration
+) => {
   return useQuery<CompleteProjectData>({
-    queryKey: ['projects', projectId, 'complete-data', timeFilter],
+    queryKey: ['projects', projectId, 'complete-data', period || timeFilter],
     queryFn: async () => {
-      const url = `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
-      console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, url });
+      // 🎯 Prefer period over timeFilter for SoT integration
+      const url = period && /^\d{4}-\d{2}$/.test(period)
+        ? `/api/projects/${projectId}/complete-data?period=${period}&basis=usd`
+        : `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
+      console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, period, url });
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {

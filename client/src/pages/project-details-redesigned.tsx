@@ -872,9 +872,10 @@ const ProjectDetailsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Verificar si hay parámetro de tab en la URL
+  // Verificar si hay parámetros en la URL
   const urlParams = new URLSearchParams(window.location.search);
   const tabFromUrl = urlParams.get('tab');
+  const periodFromUrl = urlParams.get('period'); // 🎯 NEW: Support period=YYYY-MM from URL
   
   const [activeTab, setActiveTab] = useState(tabFromUrl || "dashboard");
   const [showQuickRegister, setShowQuickRegister] = useState(false);
@@ -1010,7 +1011,8 @@ const ProjectDetailsPage = () => {
   });
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
-    timeFilterForHook
+    timeFilterForHook,
+    periodFromUrl || undefined // 🎯 NEW: Pass period from URL to enable SoT integration
   );
 
   // Cliente del proyecto
