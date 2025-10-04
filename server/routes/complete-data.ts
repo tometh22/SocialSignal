@@ -7,7 +7,68 @@ import { getProjectSummary } from '../domain/metrics/period_ledger';
 import { canonicalizeKey } from '../domain/shared/strings';
 import { db } from '../db';
 import { activeProjects, quotations, clients } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+
+/**
+ * Helper: Resolve projectKey to activeProject ID
+ * ProjectKey format: "clientname|projectname" (canonicalized)
+ */
+async function resolveProjectKey(projectKey: string): Promise<number | null> {
+  // Parse projectKey
+  const parts = projectKey.split('|');
+  if (parts.length < 2) return null;
+  
+  const [clientPart, ...projectParts] = parts;
+  const projectPart = projectParts.join('|'); // In case project name contains '|'
+  
+  // Canonicalize for matching
+  const clientCanon = canonicalizeKey(clientPart);
+  const projectCanon = canonicalizeKey(projectPart);
+  
+  console.log(`🔍 RESOLVE KEY: "${projectKey}" → client:"${clientCanon}" project:"${projectCanon}"`);
+  
+  // Find client by canonicalized name
+  const allClients = await db.query.clients.findMany();
+  const matchingClient = allClients.find(c => 
+    canonicalizeKey(c.name || '') === clientCanon
+  );
+  
+  if (!matchingClient) {
+    console.log(`❌ RESOLVE KEY: No client found for "${clientCanon}"`);
+    return null;
+  }
+  
+  console.log(`✅ RESOLVE KEY: Found client #${matchingClient.id} "${matchingClient.name}"`);
+  
+  // Find quotation by clientId and canonicalized projectName
+  const allQuotations = await db.query.quotations.findMany({
+    where: eq(quotations.clientId, matchingClient.id)
+  });
+  
+  const matchingQuotation = allQuotations.find(q => 
+    canonicalizeKey(q.projectName || '') === projectCanon
+  );
+  
+  if (!matchingQuotation) {
+    console.log(`❌ RESOLVE KEY: No quotation found for client #${matchingClient.id} project "${projectCanon}"`);
+    return null;
+  }
+  
+  console.log(`✅ RESOLVE KEY: Found quotation #${matchingQuotation.id} "${matchingQuotation.projectName}"`);
+  
+  // Find activeProject by quotationId
+  const activeProject = await db.query.activeProjects.findFirst({
+    where: eq(activeProjects.quotationId, matchingQuotation.id)
+  });
+  
+  if (!activeProject) {
+    console.log(`❌ RESOLVE KEY: No active project found for quotation #${matchingQuotation.id}`);
+    return null;
+  }
+  
+  console.log(`✅ RESOLVE KEY: Resolved "${projectKey}" → activeProject #${activeProject.id}`);
+  return activeProject.id;
+}
 
 export async function completeDataHandler(req: Request, res: Response) {
   try {
@@ -46,18 +107,32 @@ export async function completeDataHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
     }
     
-    // Get project data - numeric ID only (activeProjects doesn't have projectKey column)
+    // Get project data - support both numeric ID and projectKey
+    let resolvedProjectId: number;
     const numericId = parseInt(projectId);
     
-    if (isNaN(numericId)) {
-      return res.status(400).json({ 
-        error: 'Invalid project ID - complete-data endpoint only supports numeric IDs',
-        hint: 'Use /api/projects?period=YYYY-MM for projects-list view which supports projectKeys'
-      });
+    if (!isNaN(numericId)) {
+      // Numeric ID provided - use directly
+      resolvedProjectId = numericId;
+      console.log(`🔢 COMPLETE-DATA: Using numeric ID ${resolvedProjectId}`);
+    } else {
+      // ProjectKey provided - resolve to numeric ID
+      console.log(`🔑 COMPLETE-DATA: Resolving projectKey "${projectId}"`);
+      const resolved = await resolveProjectKey(projectId);
+      
+      if (!resolved) {
+        return res.status(404).json({ 
+          error: 'Project not found',
+          message: `Could not resolve projectKey "${projectId}" to an active project`,
+          hint: 'ProjectKey format should be "clientname|projectname" (case-insensitive)'
+        });
+      }
+      
+      resolvedProjectId = resolved;
     }
     
     const projectData = await db.query.activeProjects.findFirst({
-      where: eq(activeProjects.id, numericId)
+      where: eq(activeProjects.id, resolvedProjectId)
     });
 
     if (!projectData) {
@@ -173,9 +248,9 @@ export async function completeDataHandler(req: Request, res: Response) {
         id: quotationData.id,
         projectName: quotationData.projectName,
         baseCost: quotationData.baseCost,
-        estimatedHours: quotationData.estimatedHours,
         totalAmount: quotationData.totalAmount,
-        markup: quotationData.markup
+        markupAmount: quotationData.markupAmount,
+        marginFactor: quotationData.marginFactor
       } : null,
       actuals: actualsData,
       metrics: {
