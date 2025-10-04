@@ -713,7 +713,7 @@ function ProjectsList({ items, dense, period }:{ items: ProjectItem[]; dense?: b
   return (
     <div className={`grid gap-${dense ? '3' : '4'}`}>
       {grouped.map((group, gIdx) => (
-        <div key={group.client}>
+        <div key={`${group.client}-${gIdx}`}>
           {gIdx > 0 && (
             <div className="flex items-center gap-3 my-6">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-200 dark:via-slate-700 to-transparent" />
