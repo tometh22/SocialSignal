@@ -653,11 +653,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`🔥 CONSOLIDATED ENDPOINT CALLED: ${req.path} Query=${JSON.stringify(req.query)}`);
     
     try {
-      // Parse query parameters - support both "period" and "timeFilter"
-      const timeFilter = (req.query.period as string) || (req.query.timeFilter as string) || 'this_month';
-      const activeOnly = req.query.onlyActiveInPeriod === 'true';
+      // 🚀 SoT INTEGRATION: Support both period=YYYY-MM (new) and timeFilter (legacy)
+      const periodQuery = req.query.period as string;
+      const timeFilterQuery = req.query.timeFilter as string;
+      const sourceQuery = req.query.source as string;
       
-      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}`);
+      let timeFilter: string;
+      
+      // If period=YYYY-MM is provided, use it directly
+      if (periodQuery && /^\d{4}-\d{2}$/.test(periodQuery)) {
+        timeFilter = periodQuery;
+        console.log(`🎯 SoT MODE: Using period=${periodQuery} (YYYY-MM format)`);
+      } else {
+        // Fall back to legacy timeFilter
+        timeFilter = timeFilterQuery || 'this_month';
+        console.log(`📅 LEGACY MODE: Using timeFilter=${timeFilter}`);
+      }
+      
+      const activeOnly = req.query.onlyActiveInPeriod === 'true';
+      const fresh = sourceQuery === 'fresh';
+      
+      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, fresh=${fresh}`);
 
       // Create aggregator instance  
       const aggregator = new ActiveProjectsAggregator(storage);
@@ -666,7 +682,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
       
       console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
-      console.log(`🔍 DEBUG AGGREGATOR RESPONSE STRUCTURE:`, JSON.stringify(aggregatorResponse, null, 2));
       
       // Safe access to summary with debugging
       if (aggregatorResponse?.summary?.periodRevenueUSD) {
