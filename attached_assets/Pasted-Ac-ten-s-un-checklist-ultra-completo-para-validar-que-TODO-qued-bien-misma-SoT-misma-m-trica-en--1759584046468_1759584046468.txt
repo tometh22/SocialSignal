@@ -1,0 +1,277 @@
+Acá tenés un checklist ultra-completo para validar que TODO quedó bien (misma SoT, misma métrica en todas las vistas, filtros temporales correctos y UI sólida). Está ordenado por capas, con pasos, cómo probar y criterio de aceptación.
+
+0) Pre-flight (build & sanity)
+
+Compila sin errores
+
+npm run build en client y server.
+
+Criterio: 0 errores. (Tip: corregí el helper periodToLabel—tenés llaves/) de más; y revisá comillas escapadas className=\"...\" que rompen TSX).
+
+Lint básico
+
+npm run lint o ESLint/TS.
+
+Criterio: 0 errores críticos.
+
+1) SoT única (backend)
+
+Un solo router en /api/projects
+
+Inspeccionar registro de rutas.
+
+Criterio: no hay otro app.use('/api/projects', ...) que lo sobrescriba.
+
+Aggregator usa el mismo módulo SoT
+
+Confirmar que /api/projects y /api/projects/:id/complete-data llaman a tu módulo único (e.g., getPeriodLedger/getProjectSummary).
+
+Criterio: no hay lógica duplicada de FX / anti-×100 / overrides.
+
+Filtro temporal
+
+Ambos endpoints aceptan ?period=YYYY-MM.
+
+Criterio: no se usan strings tipo august_2025.
+
+Pruebas rápidas (curl)
+
+curl -s "/api/projects?period=2025-08" | jq '.period, .projects[0].metrics'
+curl -s "/api/projects/34/complete-data?period=2025-08&basis=usd" | jq '.summary'
+
+2) Paridad numérica (lista vs vista única)
+
+Warner / Modo / Coelsa – Agosto 2025
+
+Comparar revenueUSD, costUSD, profitUSD, markup, margin.
+
+Criterio: iguales a 2 decimales.
+
+Julio 2025 (mes problemático)
+
+Mismas comparaciones.
+
+Criterio: iguales a 2 decimales.
+
+Endpoint de consistencia (si lo tenés)
+
+GET /api/consistency-check/projects/:id?period=YYYY-MM.
+
+Criterio: { ok: true }.
+
+3) Reglas de moneda y FX
+
+Dual currency
+
+revenueDisplay/costDisplay en moneda nativa (ARS para Modo/Coelsa; $ para Warner/Kimberly).
+
+KPIs en USD normalizado.
+
+Criterio: UI muestra nativo en cards; KPIs USD en barra de resumen.
+
+FX mensual de DB
+
+/api/costs/debug?period=2025-08 debe mostrar FX_USED: 1345.
+
+Criterio: no hay FX hardcodeado.
+
+4) Reglas anti-corrupción (Costos SoT)
+
+Anti-USD astronómico
+
+Casos de julio con monto_total_usd enorme deben ignorarse y normalizar vía ARS/FX.
+
+Criterio: flags incluyen USD_CORRUPTED_IGNORED.
+
+Anti-×100 horas
+
+Horas > 300 → divide costo ×100 (aunque valor_hora sea 0).
+
+Criterio: flags ANTI_X100_HOURS en /api/costs/debug.
+
+5) Filtro temporal (front)
+
+Flechas ← / →
+
+Cambian period y persisten en localStorage (ap.period).
+
+Criterio: recarga conserva el período.
+
+Botón “Actualizar”
+
+Hace fetch con ?source=fresh.
+
+Criterio: en Network se ve source=fresh y luego el estado vuelve a “cached”.
+
+Picker nativo (type="month")
+
+Al elegir mes, se cierra y actualiza period.
+
+Criterio: periodToLabel se actualiza correcto (ej. “ago 2025”).
+
+6) Filtro “Solo activos” (front)
+
+Derivación si no hay status (si aplicaste el helper)
+
+Activo = tuvo actividad en el mes (ingreso/costo/normalized ≠ 0).
+
+Criterio: al tildar “Solo activos” desaparecen cards con todo 0 en ese mes.
+
+Puntuales
+
+Solo aparecen en meses de vigencia (start/endMonthKey) o si hay actividad.
+
+Criterio: fuera de rango no se listan.
+
+7) Búsqueda
+
+Buscador “cliente / proyecto”
+
+Debe filtrar sin tocar números.
+
+Criterio: cambia el set visible, no los totales de cada card.
+
+8) Cards de proyecto (UI/UX)
+
+Nativo y KPIs
+
+Título: Cliente + Proyecto.
+
+Derecha: “Facturación” en moneda nativa con formato K/M (2 decimales).
+
+Abajo: Costo / Ganancia / Markup / Margen.
+
+Criterio: “—” si no hay dato; Markup/Margen no usan $.
+
+Badges
+
+“Activo/Inactivo” + tags (“Fee”/“Puntual”) + “Anomalía” si hay flags.
+
+Criterio: AlertTriangle visible solo si anomaly?.length>0.
+
+9) Barra de resumen (KPI globales)
+
+Facturación/Ganancia del período (USD), Horas, Activos/Total, FX (ref.).
+
+Criterio: números consistentes con /api/projects .summary.
+
+10) Navegación a vista única
+
+Click en card
+
+Debe llevar a /active-projects/:id?period=YYYY-MM (o fallback /by-key/...).
+
+Criterio: el header de la vista única muestra mismos KPIs que la card.
+
+11) Pestañas de la vista única (datos y filtros)
+
+Dashboard: complete-data?period&basis=usd (solo pinta; no recalcula).
+
+Equipo: deviation-analysis?period&basis=usd.
+
+Performance: performance-rankings?period.
+
+Tiempo: time-tracking?period.
+
+Ingresos: projects/:id/income?period.
+
+Costos: projects/:id/costs?period.
+
+Financiero: finance?period&basis=usd (+ serie histórica).
+
+Criterio: todos re-fetch al cambiar period; basis solo en tabs que lo soportan.
+
+12) Overrides 2025-08 (si siguen vigentes)
+
+Warner/Kimberly USD; Modo 497,550 ARS; Coelsa 553,002 ARS
+
+Criterio: valores reflejados en /api/costs?period=2025-08&source=fresh y en la UI.
+
+13) Rendimiento
+
+React Query
+
+staleTime ~30s; keepPreviousData: true.
+
+Criterio: cambios de mes sin “saltos” visibles.
+
+Payloads
+
+/api/projects no trae data pesada de tabs.
+
+Criterio: < 300ms en local dev.
+
+14) Accesibilidad
+
+Teclado
+
+Flechas cambian mes; focus visible en botones.
+
+Iconos decorativos
+
+aria-hidden="true" si corresponde.
+
+Contraste
+
+Texto principal ≥ 4.5:1.
+
+Criterio: navegación sin mouse posible.
+
+15) Logs & auditoría
+
+Logs backend
+
+FX_USED, ANTI_X100_HOURS, USD_CORRUPTED_IGNORED, OVERRIDES_APPLIED, STATUS_RULE_APPLIED.
+
+Criterio: aparecen en /debug o logs al llamar endpoints de costos.
+
+16) Seguridad y errores
+
+Errores API
+
+En front: banner rojo con mensaje si fetch falla.
+
+Criterio: la UI no crashea; ofrece reintentar.
+
+Inputs
+
+Validar period ^\d{4}-\d{2}$ en backend.
+
+Criterio: 400 si invalido; no ejecuta queries.
+
+17) Regresión (casos bordes)
+
+Mes sin datos
+
+Criterio: mensaje “No hay proyectos para este período.”
+
+Proyecto con costUSD=0
+
+Criterio: Markup = “—” (no Infinity); Margen correcto.
+
+Proyecto con rev=0 y cost>0
+
+Criterio: Margen negativo visible.
+
+18) Deploy / persistencia
+
+LocalStorage
+
+ap.period persiste; limpiar entre pruebas si hace falta.
+
+Cache bust
+
+/api/*?source=fresh funciona y luego vuelve a cache normal.
+
+Macro-criterio de “OK FINAL”
+
+Misma SoT y mismas cifras en:
+(a) lista (Active Projects), (b) vista única (header), (c) pestañas financieras.
+
+Filtros por period=YYYY-MM en TODOS los endpoints.
+
+UI en español, formatos K/M correctos, moneda nativa en display, KPIs en USD.
+
+Reglas anti-corrupción activas y visibles en debug.
+
+Si querés, te armo un script de verificación (con curl+jq) que corre todos estos checks y devuelve un OK/FAIL con diffs
