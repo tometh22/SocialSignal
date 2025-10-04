@@ -6,7 +6,7 @@ import { parseTimeLegacyOrNew } from '../utils/period';
 import { getProjectSummary } from '../domain/metrics/period_ledger';
 import { canonicalizeKey } from '../domain/shared/strings';
 import { db } from '../db';
-import { activeProjects, quotations } from '../../shared/schema';
+import { activeProjects, quotations, clients } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
 export async function completeDataHandler(req: Request, res: Response) {
@@ -64,15 +64,20 @@ export async function completeDataHandler(req: Request, res: Response) {
     
     // 🚀 SoT INTEGRATION: Get metrics from SoT if using period format
     let sotSummary = null;
-    if (usingSoT && projectData.name) {
+    if (usingSoT && quotationData?.projectName) {
       try {
-        // Generate projectKey from client and project name
-        const clientName = projectData.clientName || '';
-        const projectName = projectData.name || '';
+        // Get client data to generate projectKey
+        const clientData = await db.query.clients.findFirst({
+          where: eq(clients.id, projectData.clientId)
+        });
+        
+        const clientName = clientData?.name || '';
+        const projectName = quotationData.projectName || '';
         const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
         
+        console.log(`🎯 SoT FETCH: Calling getProjectSummary('${projectKey}', '${period}')`);
         sotSummary = await getProjectSummary(projectKey, period);
-        console.log(`🎯 SoT SUMMARY for ${projectKey}:`, sotSummary);
+        console.log(`🎯 SoT SUMMARY for ${projectKey}:`, JSON.stringify(sotSummary, null, 2));
       } catch (error) {
         console.warn(`⚠️ SoT fallback: Could not get SoT summary, using legacy:`, error);
       }
