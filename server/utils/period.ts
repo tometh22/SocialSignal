@@ -135,3 +135,42 @@ export function getMonthKeysInPeriod(period: Period): string[] {
   
   return monthKeys;
 }
+
+/**
+ * 🔄 Parse timeFilter legacy or new period format
+ */
+export function parseTimeLegacyOrNew(q: any): { period: string; range: "month" | "quarter" | "year" } {
+  const tf = String(q.timeFilter || "");
+  
+  if (/^\d{4}-\d{2}$/.test(String(q.period || ""))) {
+    return { period: String(q.period), range: (q.range as any) || "month" };
+  }
+  
+  if (tf === "current_month") {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const y = d.getFullYear();
+    return { period: `${y}-${m}`, range: "month" };
+  }
+  
+  if (/^[a-z]+_\d{4}$/i.test(tf)) {
+    const [name, year] = tf.split("_");
+    const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const monthsEs = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    
+    let idx = months.indexOf(name.slice(0, 3).toLowerCase());
+    if (idx < 0) {
+      idx = monthsEs.indexOf(name.toLowerCase());
+    }
+    
+    if (idx >= 0) {
+      return { period: `${year}-${String(idx + 1).padStart(2, "0")}`, range: "month" };
+    }
+  }
+  
+  const d = new Date();
+  return {
+    period: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+    range: "month"
+  };
+}

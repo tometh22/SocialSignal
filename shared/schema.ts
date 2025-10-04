@@ -2088,6 +2088,36 @@ export type ActiveProjectsQuery = z.infer<typeof activeProjectsQuerySchema>;
 
 // ==================== ETL NORMALIZED TABLES ====================
 
+// Tabla SoT de ingresos (Income Source of Truth)
+export const incomeSot = pgTable("income_sot", {
+  id: serial("id").primaryKey(),
+  projectKey: varchar("project_key", { length: 100 }).notNull(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
+  currencyNative: varchar("currency_native", { length: 3 }).notNull().default('ARS'), // ARS or USD
+  revenueDisplay: numeric("revenue_display", { precision: 12, scale: 2 }).notNull(), // en moneda nativa
+  revenueUsd: numeric("revenue_usd", { precision: 12, scale: 2 }).notNull(), // normalizado en USD
+  flags: json("flags").$type<string[]>().default([]), // ['FX_USED:1345', etc.]
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectMonthIdx: unique().on(table.projectKey, table.monthKey)
+}));
+
+// Tabla SoT de costos (Costs Source of Truth)
+export const costsSot = pgTable("costs_sot", {
+  id: serial("id").primaryKey(),
+  projectKey: varchar("project_key", { length: 100 }).notNull(),
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
+  currencyNative: varchar("currency_native", { length: 3 }).notNull().default('ARS'), // ARS or USD
+  costDisplay: numeric("cost_display", { precision: 12, scale: 2 }).notNull(), // en moneda nativa
+  costUsd: numeric("cost_usd", { precision: 12, scale: 2 }).notNull(), // normalizado en USD
+  flags: json("flags").$type<string[]>().default([]), // ['ANTI_X100_HOURS', 'USD_CORRUPTED_IGNORED', etc.]
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  projectMonthIdx: unique().on(table.projectKey, table.monthKey)
+}));
+
 // Tabla normalizada de ventas
 export const salesNorm = pgTable("sales_norm", {
   id: serial("id").primaryKey(),
