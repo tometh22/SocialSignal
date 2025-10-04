@@ -46,9 +46,18 @@ export async function completeDataHandler(req: Request, res: Response) {
       return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
     }
     
-    // Get project data
+    // Get project data - numeric ID only (activeProjects doesn't have projectKey column)
+    const numericId = parseInt(projectId);
+    
+    if (isNaN(numericId)) {
+      return res.status(400).json({ 
+        error: 'Invalid project ID - complete-data endpoint only supports numeric IDs',
+        hint: 'Use /api/projects?period=YYYY-MM for projects-list view which supports projectKeys'
+      });
+    }
+    
     const projectData = await db.query.activeProjects.findFirst({
-      where: eq(activeProjects.id, parseInt(projectId))
+      where: eq(activeProjects.id, numericId)
     });
 
     if (!projectData) {
@@ -83,7 +92,8 @@ export async function completeDataHandler(req: Request, res: Response) {
       }
     }
     
-    const pm = await computeProjectPeriodMetrics(parseInt(projectId), timeFilterQuery || period, basis === 'EXEC' ? 'EXEC' : 'ECON');
+    // Use numeric ID for legacy computeProjectPeriodMetrics
+    const pm = await computeProjectPeriodMetrics(projectData.id, timeFilterQuery || period, basis === 'EXEC' ? 'EXEC' : 'ECON');
 
     console.log(`🔍 COMPLETE-DATA METRICS: summary exists: ${!!pm.summary}, teamCostUSD: ${pm.summary?.teamCostUSD}`);
 
