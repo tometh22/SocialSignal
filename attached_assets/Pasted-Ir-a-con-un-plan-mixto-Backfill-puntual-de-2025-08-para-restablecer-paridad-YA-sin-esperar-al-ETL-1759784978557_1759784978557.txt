@@ -1,0 +1,147 @@
+Iría con un plan mixto:
+
+Backfill puntual de 2025-08 para restablecer paridad YA (sin esperar al ETL).
+
+Fix del ETL para septiembre en adelante, con sanitización y validaciones para que no vuelva a romper.
+
+Te dejo todo listo (SQL + endpoints + pruebas). No toca tu “vista única” ni la lista, solo alimenta la misma SoT.
+
+1) Backfill express de 2025-08 (solo ese mes)
+1.1. Rellenar income_sot y costs_sot desde el aggregator (los mismos números que usa /api/projects)
+
+Si ya tenés un servicio que calcula el ledger del período (el que usa /api/projects), exponé un endpoint temporal solo local:
+
+// GET /internal/rebuild-sot?period=2025-08
+app.get('/internal/rebuild-sot', async (req, res) => {
+  const period = String(req.query.period);
+  const ledger = await getPeriodLedger(period, { fresh: true }); // mismo módulo de la lista
+  // volcar a SOT
+  await db.tx(async t => {
+    await t.none('DELETE FROM income_sot WHERE month_key=$1', [period]);
+    await t.none('DELETE FROM costs_sot  WHERE month_key=$1', [period]);
+    for (const r of ledger) {
+      await t.none(`
+        INSERT INTO income_sot (project_key, month_key, currency_native, revenue_display, revenue_usd, flags)
+        VALUES ($1,$2,$3,$4,$5,$6)
+      `, [r.projectKey, period, r.currencyNative, r.revenueDisplay, r.revenueUSD, r.flags]);
+      await t.none(`
+        INSERT INTO costs_sot (project_key, month_key, currency_native, cost_display, cost_usd, flags)
+        VALUES ($1,$2,$3,$4,$5,$6)
+      `, [r.projectKey, period, r.currencyNative, r.costDisplay, r.costUSD, r.flags]);
+    }
+  });
+  res.json({ ok: true, period, rows: ledger.length });
+});
+
+
+Comando rápido:
+
+curl -s "http://localhost:5000/internal/rebuild-sot?period=2025-08" | jq
+
+1.2. Verificación
+# SoT poblada
+psql "$DATABASE_URL" -c "SELECT month_key, COUNT(*) c, SUM(revenue_usd) rev, SUM(cost_usd) cost FROM income_sot JOIN costs_sot USING (project_key, month_key) WHERE month_key='2025-08' GROUP BY 1;"
+
+# Paridad lista vs vista única
+curl -s "/api/projects?period=2025-08" | jq '.projects | length'
+curl -s "/api/projects/34/complete-data?period=2025-08&basis=usd" | jq '.summary'
+
+
+Esto te devuelve exactamente los mismos números que la lista porque la fuente es el mismo módulo (getPeriodLedger). Queda todo consistente mientras arreglamos el ETL.
+
+2) Fix robusto del ETL (septiembre en adelante)
+2.1. Sanitización dura en ingestión
+
+Anti-USD astronómico: si monto_total_usd > 100000 ⇒ ignorar USD y convertir desde ARS/FX.
+
+Anti-×100 horas: si horas_reales_asana > 300 ⇒ dividir costo_total por 100 aunque valor_hora_persona sea 0.
+
+Decimal parser unificado: parseNumberEs que respete 2277.78 y 2.277,78.
+
+Ejemplo (pseudo-TS en tu ETL):
+const FX = await getMonthlyFx(period);
+
+function sanitizeCostRow(r){
+  const flags:string[] = [];
+
+  let ars = r.costo_total_ars ?? 0;
+  let usd = r.monto_total_usd ?? null;
+
+  if (usd != null && usd > 100000) { // USD astronómico
+    flags.push('USD_CORRUPTED_IGNORED');
+    usd = null;
+  }
+
+  if (r.horas_reales_asana > 300) {
+    flags.push('ANTI_X100_HOURS');
+    ars = ars / 100;
+  }
+
+  if (usd == null) {
+    usd = ars > 0 ? ars / FX : 0;
+  }
+
+  return { ars, usd, flags };
+}
+
+2.2. Validación previa a insertar
+
+Regla de ratio temporal (TCG light): si usd cae fuera de [prev*0.35, prev*1.65] y no hay explicación (cambio de alcance), loggear y marcar flag TEMPORAL_OUTLIER (pero no bloquear).
+
+Bloqueo solo por overflow (no por outlier leve).
+
+2.3. Pruebas del ETL
+# Repoblar 2025-09 en staging (no prod)
+curl -s "/etl/run?period=2025-09&mode=dry-run" | jq '.summary, .anomalies[0:5]'
+
+# Luego commit real
+curl -s "/etl/run?period=2025-09&mode=commit" | jq '.ok'
+
+3) Endpoint complete-data con fallback sano
+
+Ya que tus tablas estaban vacías, complete-data debe siempre poder responder con KPIs gracias al mismo aggregator de /api/projects.
+
+// dentro de GET /api/projects/:id/complete-data
+const sum = await getProjectSummary(project.projectKey, period); // del mismo módulo del aggregator
+const summary = sum ? {
+  revenue: sum.revenueUSD, cost: sum.costUSD, profit: sum.profitUSD,
+  markup: sum.markup, margin: sum.margin,
+  revenueDisplay: sum.revenueDisplay, costDisplay: sum.costDisplay
+} : { revenue:0, cost:0, profit:0, markup:NaN, margin:NaN };
+
+
+No dependas de que SoT esté poblada para responder; responde desde el módulo común (que ya sabe leer Income/Costs y aplicar reglas). Cuando el ETL termine, SoT y aggregator quedarán alineados.
+
+4) Qué ejecutar ahora (paso a paso)
+
+Backfill agosto:
+
+curl -s "http://localhost:5000/internal/rebuild-sot?period=2025-08" | jq
+
+
+Smoke test:
+
+curl -s "/api/projects?period=2025-08" | jq '.projects[0].metrics'
+curl -s "/api/projects/34/complete-data?period=2025-08&basis=usd" | jq '.summary'
+
+
+Arreglar ETL (aplicar sanitización/TCG).
+
+Cargar septiembre (dry-run → commit):
+
+curl -s "/etl/run?period=2025-09&mode=dry-run" | jq '.summary'
+curl -s "/etl/run?period=2025-09&mode=commit" | jq
+
+
+Verificar paridad con consistencia:
+
+curl -s "/api/consistency-check/projects/34?period=2025-08" | jq
+curl -s "/api/consistency-check/projects/34?period=2025-09" | jq
+
+Recomendación concreta
+
+Ahora mismo: hacé el backfill de agosto con el endpoint interno (2 minutos) para que todo “viva” con números correctos.
+
+Luego: mergeá el fix del ETL y repoblá septiembre con dry-run → commit.
+
+Si querés, te paso el archivo listo del endpoint /internal/rebuild-sot para pegar y subirlo como hotfix (lo mantendríamos solo en dev/stage y lo apagamos en prod).

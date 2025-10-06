@@ -75,7 +75,9 @@ import {
   googleSheetsProjects,
   googleSheetsProjectBilling,
   googleSheetsSales,
-  directCosts
+  directCosts,
+  incomeSot,
+  costsSot
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -11799,6 +11801,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Debug Anomalies Error:', error);
       res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // ==================== INTERNAL BACKFILL ENDPOINT ====================
+  // Temporary endpoint to backfill SoT tables from aggregator data
+  app.get('/internal/rebuild-sot', async (_req: Request, _res: Response) => {
+    try {
+      const period = String(_req.query.period || '');
+      
+      console.log(`🔄 REBUILD SOT: Starting backfill for period=${period}`);
+      
+      // Validate period format (YYYY-MM)
+      if (!period.match(/^\d{4}-\d{2}$/)) {
+        console.log(`❌ REBUILD SOT: Invalid period format: ${period}`);
+        return _res.status(400).json({ 
+          error: 'Invalid period format. Use YYYY-MM' 
+        });
+      }
+      
+      // Use same aggregator as /api/projects
+      const aggregator = new ActiveProjectsAggregator(storage);
+      const response = await aggregator.getActiveProjectsUnified(period, false);
+      
+      if (!response || !response.projects) {
+        console.log(`❌ REBUILD SOT: Failed to get aggregator data`);
+        return _res.status(500).json({ 
+          error: 'Failed to get aggregator data' 
+        });
+      }
+      
+      console.log(`📊 REBUILD SOT: Got ${response.projects.length} projects from aggregator`);
+      
+      // Delete existing SoT data for this period
+      await db.delete(incomeSot).where(eq(incomeSot.monthKey, period));
+      await db.delete(costsSot).where(eq(costsSot.monthKey, period));
+      
+      console.log(`🗑️ REBUILD SOT: Cleared existing data for ${period}`);
+      
+      // Insert new data for each project
+      let insertedCount = 0;
+      for (const project of response.projects) {
+        if (!project.projectKey) continue;
+        
+        const projectKey = project.projectKey;
+        const currencyNative = project.metrics?.displayCurrency || 'USD';
+        const revenueUSD = project.metrics?.revenueUSD || 0;
+        const costUSD = project.metrics?.costUSD || 0;
+        const revenueDisplay = project.metrics?.revenueDisplay || revenueUSD;
+        const costDisplay = project.metrics?.costDisplay || costUSD;
+        
+        // Insert income
+        await db.insert(incomeSot).values({
+          projectKey,
+          monthKey: period,
+          currencyNative,
+          revenueDisplay: String(revenueDisplay),
+          revenueUsd: String(revenueUSD),
+          flags: JSON.stringify([])
+        }).onConflictDoUpdate({
+          target: [incomeSot.projectKey, incomeSot.monthKey],
+          set: {
+            currencyNative,
+            revenueDisplay: String(revenueDisplay),
+            revenueUsd: String(revenueUSD),
+            updatedAt: new Date()
+          }
+        });
+        
+        // Insert cost
+        await db.insert(costsSot).values({
+          projectKey,
+          monthKey: period,
+          currencyNative,
+          costDisplay: String(costDisplay),
+          costUsd: String(costUSD),
+          flags: JSON.stringify([])
+        }).onConflictDoUpdate({
+          target: [costsSot.projectKey, costsSot.monthKey],
+          set: {
+            currencyNative,
+            costDisplay: String(costDisplay),
+            costUsd: String(costUSD),
+            updatedAt: new Date()
+          }
+        });
+        
+        insertedCount++;
+      }
+      
+      console.log(`✅ REBUILD SOT: Inserted ${insertedCount} projects into SoT tables`);
+      
+      // Verify the data
+      const incomeCount = await db.select({ count: sql<number>`count(*)` })
+        .from(incomeSot)
+        .where(eq(incomeSot.monthKey, period));
+      
+      const costsCount = await db.select({ count: sql<number>`count(*)` })
+        .from(costsSot)
+        .where(eq(costsSot.monthKey, period));
+      
+      const result = {
+        ok: true,
+        period,
+        projectsProcessed: insertedCount,
+        verification: {
+          income_sot: Number(incomeCount[0]?.count || 0),
+          costs_sot: Number(costsCount[0]?.count || 0)
+        },
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log(`📤 REBUILD SOT: Sending response:`, JSON.stringify(result));
+      return _res.json(result);
+      
+    } catch (error) {
+      console.error('❌ REBUILD SOT Error:', error);
+      return _res.status(500).json({ 
         error: error instanceof Error ? error.message : String(error) 
       });
     }
