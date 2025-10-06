@@ -8,6 +8,8 @@ import { canonicalizeKey } from '../domain/shared/strings';
 import { db } from '../db';
 import { activeProjects, quotations, clients } from '../../shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { ActiveProjectsAggregator } from '../domain/projectsActive';
+import { storage } from '../storage';
 
 /**
  * Helper: Resolve projectKey to activeProject ID
@@ -162,8 +164,38 @@ export async function completeDataHandler(req: Request, res: Response) {
         console.log(`🎯 SoT FETCH: Calling getProjectSummary('${projectKey}', '${period}')`);
         sotSummary = await getProjectSummary(projectKey, period);
         console.log(`🎯 SoT SUMMARY for ${projectKey}:`, JSON.stringify(sotSummary, null, 2));
+        
+        // 🛡️ AGGREGATOR FALLBACK: If SoT tables are empty, use Excel directly
+        if (!sotSummary) {
+          console.warn(`⚠️ SoT FALLBACK: Tables empty for ${projectKey} ${period}, using ActiveProjectsAggregator`);
+          const aggregator = new ActiveProjectsAggregator(storage);
+          
+          // Convert period to timeFilter format (YYYY-MM → monthname_yyyy)
+          const [year, month] = period.split('-');
+          const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+          const timeFilter = `${monthNames[parseInt(month) - 1]}_${year}`;
+          
+          const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, false);
+          const project = aggregatorResponse?.projects?.find((p: any) => p.id === resolvedProjectId);
+          
+          if (project?.metrics) {
+            const displayCurrency = project.metrics.revenueDisplay?.currency || project.metrics.costDisplay?.currency || 'USD';
+            sotSummary = {
+              revenueUSD: project.metrics.revenueUSD || 0,
+              costUSD: project.metrics.costUSD || 0,
+              profitUSD: project.metrics.profitUSD || 0,
+              markup: project.metrics.markupRatio || null,
+              margin: project.metrics.marginFrac || 0,
+              revenueDisplay: project.metrics.revenueDisplay?.amount || 0,
+              costDisplay: project.metrics.costDisplay?.amount || 0,
+              currencyNative: displayCurrency,
+              flags: ['FALLBACK_AGGREGATOR']
+            };
+            console.log(`✅ SoT FALLBACK SUCCESS: Got metrics from aggregator`, sotSummary);
+          }
+        }
       } catch (error) {
-        console.warn(`⚠️ SoT fallback: Could not get SoT summary, using legacy:`, error);
+        console.warn(`⚠️ SoT error: Could not get SoT summary:`, error);
       }
     }
     
