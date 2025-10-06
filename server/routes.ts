@@ -661,9 +661,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sourceQuery = req.query.source as string;
       
       let timeFilter: string;
+      const usingSoT = periodQuery && /^\d{4}-\d{2}$/.test(periodQuery);
       
       // If period=YYYY-MM is provided, use it directly
-      if (periodQuery && /^\d{4}-\d{2}$/.test(periodQuery)) {
+      if (usingSoT) {
         timeFilter = periodQuery;
         console.log(`🎯 SoT MODE: Using period=${periodQuery} (YYYY-MM format)`);
       } else {
@@ -675,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeOnly = req.query.onlyActiveInPeriod === 'true';
       const fresh = sourceQuery === 'fresh';
       
-      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, fresh=${fresh}`);
+      console.log(`📊 Processing: timeFilter=${timeFilter}, activeOnly=${activeOnly}, fresh=${fresh}, usingSoT=${usingSoT}`);
 
       // Create aggregator instance  
       const aggregator = new ActiveProjectsAggregator(storage);
@@ -684,6 +685,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const aggregatorResponse = await aggregator.getActiveProjectsUnified(timeFilter, activeOnly);
       
       console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
+      
+      // 🚀 SoT OVERRIDE: If using period=YYYY-MM, override display values with SoT data
+      if (usingSoT && aggregatorResponse?.projects) {
+        const { getProjectsSummary } = await import('./domain/metrics/period_ledger');
+        const { canonicalizeKey } = await import('./domain/shared/strings');
+        
+        console.log(`🔍 SoT OVERRIDE: Fetching SoT data for ${aggregatorResponse.projects.length} projects`);
+        
+        // Get all projects from database with relations
+        const allProjectsData = await db.query.activeProjects.findMany({
+          with: {
+            client: true,
+            quotation: true
+          }
+        });
+        
+        // Get SoT summaries for period
+        const sotSummaries = await getProjectsSummary(periodQuery);
+        console.log(`📊 SoT: Found ${sotSummaries.length} project summaries in SoT tables`);
+        
+        // Create lookup map: projectId -> SoT data
+        const sotByProjectId = new Map();
+        for (const projectData of allProjectsData) {
+          if (projectData.client && projectData.quotation?.projectName) {
+            const clientName = projectData.client.name;
+            const projectName = projectData.quotation.projectName;
+            const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
+            
+            const sotData = sotSummaries.find(s => s.projectKey === projectKey);
+            if (sotData) {
+              sotByProjectId.set(projectData.id, sotData);
+              console.log(`✅ SoT MATCH: Project ${projectData.id} (${projectKey}) → ${sotData.currencyNative} ${sotData.metrics.revenueDisplay}`);
+            }
+          }
+        }
+        
+        // Override display values with SoT data
+        for (const project of aggregatorResponse.projects) {
+          const sotData = sotByProjectId.get(project.projectId);
+          if (sotData && project.metrics) {
+            console.log(`🔄 SoT OVERRIDE: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${sotData.currencyNative} ${sotData.metrics.revenueDisplay}`);
+            
+            project.metrics.revenueDisplay = {
+              amount: sotData.metrics.revenueDisplay,
+              currency: sotData.currencyNative as "ARS" | "USD"
+            };
+            project.metrics.costDisplay = {
+              amount: sotData.metrics.costDisplay,
+              currency: sotData.currencyNative as "ARS" | "USD"
+            };
+            
+            // Also update USD values
+            project.metrics.revenueUSD = sotData.metrics.revenueUSDNormalized;
+            project.metrics.costUSD = sotData.metrics.costUSDNormalized;
+            project.metrics.profitUSD = sotData.metrics.revenueUSDNormalized - sotData.metrics.costUSDNormalized;
+            project.metrics.markupRatio = sotData.metrics.markup;
+            project.metrics.marginFrac = sotData.metrics.margin;
+          }
+        }
+        
+        console.log(`✅ SoT OVERRIDE: Updated ${sotByProjectId.size} projects with SoT data`);
+      }
       
       // Safe access to summary with debugging
       if (aggregatorResponse?.summary?.periodRevenueUSD) {
