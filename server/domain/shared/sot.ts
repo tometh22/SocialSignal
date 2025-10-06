@@ -10,8 +10,8 @@ export async function getIncomeRows(period: string, _opts?: { fresh?: boolean })
   return rows.map(r => ({
     projectKey: r.projectKey,
     currency: (r.currencyNative as "ARS" | "USD") ?? "ARS",
-    revenueDisplay: Number(r.revenueDisplay ?? 0) / 100, // Fix ×100 bug
-    revenueUSD: Number(r.revenueUsd ?? 0) / 100, // Fix ×100 bug
+    revenueDisplay: Number(r.revenueDisplay ?? 0),
+    revenueUSD: Number(r.revenueUsd ?? 0),
     flags: r.flags ?? []
   }));
 }
@@ -24,8 +24,8 @@ export async function getCostRows(period: string, _opts?: { fresh?: boolean }) {
   return rows.map(r => ({
     projectKey: r.projectKey,
     currency: (r.currencyNative as "ARS" | "USD") ?? "ARS",
-    costDisplay: Number(r.costDisplay ?? 0) / 100, // Fix ×100 bug
-    costUSD: Number(r.costUsd ?? 0) / 100, // Fix ×100 bug
+    costDisplay: Number(r.costDisplay ?? 0),
+    costUSD: Number(r.costUsd ?? 0),
     flags: r.flags ?? []
   }));
 }

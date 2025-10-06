@@ -10,15 +10,18 @@ export function parseMoneyUnified(raw: unknown): number {
   // Quitar espacios y símbolos, dejar sólo dígitos, coma, punto y signo
   s = s.replace(/[^\d.,\-]/g, '');
   
-  // Quitar separadores de miles (.) y dejar , como decimal
-  // Detectar si hay coma como decimal al final
-  const hasCommaDecimal = /,\d{1,2}$/.test(s);
+  // Detectar formato: europeo (coma decimal) vs USA/inglés (punto decimal)
+  const hasCommaDecimal = /,\d{1,2}$/.test(s);  // Formato europeo: 1.234,56
+  const hasDotDecimal = /\.\d{1,2}$/.test(s);   // Formato USA: 1,234.56
   
   if (hasCommaDecimal) {
-    // Quitar puntos (separadores de miles) y convertir coma a punto decimal
+    // Formato europeo: punto=miles, coma=decimal
     s = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasDotDecimal) {
+    // Formato USA/inglés: coma=miles, punto=decimal
+    s = s.replace(/,/g, '');  // Solo quitar comas (separadores de miles)
   } else {
-    // Si no hay coma decimal, quitar todos los separadores
+    // Sin decimal claro: asumir formato entero (quitar todo)
     s = s.replace(/[.,]/g, '');
   }
 
