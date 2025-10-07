@@ -11988,6 +11988,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== INTERNAL IMPORT INCOMES ENDPOINT ====================
+  // Endpoint para importar ingresos desde "Proyectos confirmados y estimados"
+  app.post('/internal/import-incomes', upload.single('file'), async (req: Request, res: Response) => {
+    try {
+      console.log('📥 IMPORT INCOMES: Starting import from CSV/JSON');
+      
+      if (!req.file && !req.body.rows) {
+        return res.status(400).json({ error: 'No file or rows provided' });
+      }
+
+      let rows: any[] = [];
+      
+      // If JSON body with rows
+      if (req.body.rows) {
+        rows = req.body.rows;
+        console.log(`📥 IMPORT INCOMES: Got ${rows.length} rows from JSON body`);
+      }
+      // If CSV file uploaded
+      else if (req.file) {
+        const { parse } = await import('csv-parse/sync');
+        const csvContent = req.file.buffer.toString('utf-8');
+        rows = parse(csvContent, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true
+        });
+        console.log(`📥 IMPORT INCOMES: Parsed ${rows.length} rows from CSV file`);
+      }
+
+      // Import using ETL
+      const { importIncomesFromConfirmed } = await import('./etl/import-incomes-confirmed');
+      const result = await importIncomesFromConfirmed(rows);
+
+      return res.json({
+        ok: true,
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ IMPORT INCOMES Error:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {

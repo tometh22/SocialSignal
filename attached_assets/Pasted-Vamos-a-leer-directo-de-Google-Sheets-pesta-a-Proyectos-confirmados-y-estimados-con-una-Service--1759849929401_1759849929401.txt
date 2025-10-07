@@ -1,0 +1,218 @@
+Vamos a leer directo de Google Sheets (pestaña “Proyectos confirmados y estimados”) con una Service Account y a poblar income_sot. Acá está el kit completo, listo para pegar en el repo (Node/TS). No rompe nada del front.
+
+0) Variables de entorno (.env)
+# Google Service Account (sin comillas, con \n reales o escapados)
+GOOGLE_SA_EMAIL=tu-service-account@tu-proyecto.iam.gserviceaccount.com
+GOOGLE_SA_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIE...==\n-----END PRIVATE KEY-----\n
+
+# Hoja
+SHEETS_SPREADSHEET_ID=1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc
+SHEETS_TAB_NAME=Proyectos confirmados y estimados  # EXACTO, como aparece en la hoja
+SHEETS_HEADER_ROW=1                                 # fila de encabezados
+
+
+Si el PRIVATE_KEY lo guardás con saltos reales, no uses \n. Si lo guardás “escapado”, mantené \n.
+
+1) Dependencias
+npm i googleapis
+# (ya tenés zod / pg / etc. en el proyecto)
+
+2) Cliente Google Sheets
+
+server/services/gsheets/client.ts
+
+import { google } from "googleapis";
+
+export function getSheetsClient() {
+  const email = process.env.GOOGLE_SA_EMAIL!;
+  let key = process.env.GOOGLE_SA_PRIVATE_KEY!;
+  // Si viene escapado, convertimos \n a saltos reales
+  key = key.replace(/\\n/g, "\n");
+
+  const auth = new google.auth.JWT({
+    email,
+    key,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
+  });
+
+  const sheets = google.sheets({ version: "v4", auth });
+  return sheets;
+}
+
+3) Utilidad: leer la pestaña y devolver objetos por encabezado
+
+server/services/gsheets/readSheetAsObjects.ts
+
+import { getSheetsClient } from "./client";
+
+export async function readSheetAsObjects(opts: {
+  spreadsheetId: string;
+  tabName: string;
+  headerRow?: number;   // default 1
+}) {
+  const { spreadsheetId, tabName, headerRow = 1 } = opts;
+  const sheets = getSheetsClient();
+
+  const range = `'${tabName}'`;
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range,
+    valueRenderOption: "UNFORMATTED_VALUE", // nos da números/fechas crudos cuando puede
+    dateTimeRenderOption: "FORMATTED_STRING",
+  });
+
+  const rows = res.data.values ?? [];
+  if (!rows.length) return [];
+
+  const header = rows[headerRow - 1].map((h: any) => String(h).trim());
+  const data = rows.slice(headerRow);
+
+  // to objects by header name
+  const objects = data
+    .filter((r) => r && r.length)
+    .map((r) => {
+      const obj: Record<string, any> = {};
+      header.forEach((k, i) => (obj[k] = r[i]));
+      return obj;
+    });
+
+  return objects;
+}
+
+4) Importador desde la pestaña (usa el mapeo nuevo)
+
+server/services/etl/import_incomes_from_sheets.ts
+
+import { readSheetAsObjects } from "../gsheets/readSheetAsObjects";
+import { importIncomesFromConfirmed } from "./import_incomes_from_confirmed";
+
+export async function syncIncomeFromSheets() {
+  const spreadsheetId = process.env.SHEETS_SPREADSHEET_ID!;
+  const tabName = process.env.SHEETS_TAB_NAME!;
+  const headerRow = Number(process.env.SHEETS_HEADER_ROW ?? 1);
+
+  const rows = await readSheetAsObjects({ spreadsheetId, tabName, headerRow });
+  // rows tienen que tener columnas EXACTAS como la hoja:
+  // "Mes Facturación", "Año Facturación", "Cliente", "Detalle", "Tipo de proyecto",
+  // "Confirmado", "Pasado/Futuro", "Cotización", "Moneda Original ARS",
+  // "Moneda Original USD", "Monto Total USD", "Monto Total ARS CON IVA",
+  // "Monto Total USD CON IVA", "Facturado/No Facturado"
+
+  const result = await importIncomesFromConfirmed(rows);
+  return { ...result, spreadsheetId, tabName, rows: rows.length };
+}
+
+
+import_incomes_from_confirmed.ts es el importador que ya te pasé (mapea y hace UPSERT sobre income_sot).
+
+5) Endpoint interno para ejecutar el sync
+
+server/routes/internal-sync.ts
+
+import express from "express";
+import { syncIncomeFromSheets } from "../services/etl/import_incomes_from_sheets";
+
+export const internalSync = express.Router();
+
+/**
+ * Ejecuta la importación desde Google Sheets → income_sot
+ * GET /internal/sync/income
+ */
+internalSync.get("/sync/income", async (req, res) => {
+  try {
+    const out = await syncIncomeFromSheets();
+    res.json({ ok: true, ...out });
+  } catch (err: any) {
+    console.error("SYNC INCOME ERROR:", err);
+    res.status(500).json({ ok: false, error: err?.message || "unknown_error" });
+  }
+});
+
+
+Y registrá este router (una sola vez) en tu init de rutas:
+
+// server/routes/index.ts
+import { internalSync } from "./internal-sync";
+app.use("/internal", internalSync);
+
+6) Integración con el agregador (ya unificado)
+
+No toques el front. En el backend, asegurate de que /api/projects y /api/projects/:id/complete-data llamen al mismo agregador (getProjectsByPeriod(period)), el cual:
+
+Lee ingresos desde income_sot (esta nueva SoT)
+
+Lee costos desde tu costs_sot actual (con reglas anti-×100/astronómico y overrides de agosto)
+
+Calcula:
+
+revenueDisplay = revenue_usd
+
+costDisplay = cost_usd
+
+revenueUSDNormalized = revenue_usd
+
+costUSDNormalized = cost_usd
+
+markup = revenue_usd / cost_usd (si cost>0)
+
+margin = (revenue_usd - cost_usd) / revenue_usd (si revenue>0)
+
+Con eso, Active Projects – Next (tu canvas) y la vista única van a ver los mismos números.
+
+7) Smoke tests (Agosto 2025)
+
+Ejecutar el sync:
+
+curl -s "http://localhost:5000/internal/sync/income" | jq
+
+
+Ver lista de proyectos:
+
+curl -s "http://localhost:5000/api/projects?period=2025-08" \
+ | jq '.projects[] | {cliente:.clientName, proyecto:.projectName, rev:.metrics.revenueUSDNormalized, cost:.metrics.costUSDNormalized, markup:.metrics.markup, margen:.metrics.margin}'
+
+
+Ver proyecto único (probá un ID mapeado a client+project):
+
+curl -s "http://localhost:5000/api/projects/:id/complete-data?period=2025-08" | jq '.summary'
+
+
+Esperado: aparecen Warner, Kimberly Clark, Play Digital S.A (Modo), Coelsa, Tortugas OM, PeYa, Animal Studio, Detroit, Uber, etc. con Facturación USD correcta (igual a Monto Total USD de la hoja), costos de tu SoT y KPIs alineados.
+
+8) Scheduler (opcional)
+
+Podés correr esto cada X min con un cron simple:
+
+server/jobs/scheduler.ts
+
+import cron from "node-cron";
+import { syncIncomeFromSheets } from "../services/etl/import_incomes_from_sheets";
+
+export function startJobs() {
+  // cada 15 minutos
+  cron.schedule("*/15 * * * *", async () => {
+    try {
+      const out = await syncIncomeFromSheets();
+      console.log("Income sync OK:", out);
+    } catch (e) {
+      console.error("Income sync FAIL:", e);
+    }
+  });
+}
+
+
+Y llamarlo en tu bootstrap:
+
+// server/index.ts
+import { startJobs } from "./jobs/scheduler";
+startJobs();
+
+Notas de calidad
+
+Validación: el import usa Zod; si cambian encabezados, te lo va a decir con error claro.
+
+Idempotencia: el UPSERT es por (client_name, project_name, month_key).
+
+IVA: para KPIs seguimos usando Monto Total USD (sin IVA). Los campos CON IVA quedan solo para auditoría.
+
+Display: si necesitás mostrar moneda nativa, podés usar amount_local_ars / amount_local_usd como “display”, pero a efectos de KPIs nos quedamos con USD (coherente con tu tablero).
