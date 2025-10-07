@@ -12035,6 +12035,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SYNC INCOMES FROM GOOGLE SHEETS ====================
+  // Sincronizar ingresos automáticamente desde "Proyectos confirmados y estimados"
+  app.get('/internal/sync/income', async (req: Request, res: Response) => {
+    try {
+      console.log('🔄 SYNC INCOME: Starting automatic sync from Google Sheets');
+      
+      // Get data from Google Sheets
+      const proyectos = await googleSheetsWorkingService.getProyectosConfirmados();
+      console.log(`📊 SYNC INCOME: Retrieved ${proyectos.length} projects from Google Sheets`);
+      
+      // Convert to ETL format
+      const rows = proyectos.map(p => ({
+        "Mes Facturación": p.mesFacturacion,
+        "Año Facturación": p.añoFacturacion,
+        "Cliente": p.cliente,
+        "Detalle": p.detalle || p.proyecto,
+        "Tipo de proyecto": p.proyecto.toLowerCase().includes('fee') ? 'Fee' : 'Puntual',
+        "Confirmado": p.confirmado ? "Sí" : "No",
+        "Pasado/Futuro": p.pasadoFuturo || "", // Campo directo del Google Sheet
+        "Cotización": "", // Se calculará si es necesario
+        "Moneda Original ARS": p.monedaARS ? String(p.monedaARS) : "",
+        "Moneda Original USD": p.monedaUSD ? String(p.monedaUSD) : "",
+        "Monto Total USD": String(p.monedaUSD || (p.monedaARS / 1345)) // Fallback FX
+      }));
+      
+      console.log(`🔄 SYNC INCOME: Converted ${rows.length} rows to ETL format`);
+      
+      // Import using ETL
+      const { importIncomesFromConfirmed } = await import('./etl/import-incomes-confirmed');
+      const result = await importIncomesFromConfirmed(rows);
+      
+      console.log(`✅ SYNC INCOME: Completed - ${result.inserted} inserted, ${result.updated} updated`);
+      
+      return res.json({
+        ok: true,
+        rows: rows.length,
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ SYNC INCOME Error:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {

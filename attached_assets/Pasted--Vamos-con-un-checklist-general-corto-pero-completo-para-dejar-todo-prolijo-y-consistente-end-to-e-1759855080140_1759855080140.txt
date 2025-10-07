@@ -1,0 +1,113 @@
+¡Vamos con un checklist general (corto pero completo) para dejar todo prolijo y consistente end-to-end!
+
+Preparación
+
+ .env con credenciales de Google SA (GOOGLE_SA_EMAIL, GOOGLE_SA_PRIVATE_KEY) y hoja (SHEETS_SPREADSHEET_ID, SHEETS_TAB_NAME="Proyectos confirmados y estimados", SHEETS_HEADER_ROW=1).
+
+ Migración DB creada/aplicada: income_sot + índice único (client_name, project_name, month_key).
+
+ costs_sot OK (reglas anti-astronómico / anti×100 / FX por mes / overrides agosto).
+
+ETL / Sync (Ingresos desde Sheets)
+
+ readSheetAsObjects() funcionando (Google APIs).
+
+ importIncomesFromConfirmed() mapea columnas y hace UPSERT en income_sot.
+
+ Ruta interna: GET /internal/sync/income devuelve { ok:true, rows, inserted }.
+
+ SQL spot-check:
+
+SELECT * FROM income_sot WHERE month_key='2025-08' ORDER BY client_name, project_name;
+
+Fuente de Costos
+
+ costs_sot poblada por el pipeline existente (direct_costs + reglas + overrides 2025-08).
+
+ GET /api/costs/debug?period=2025-08 ⇒ validationPassed:true y flags esperados.
+
+Agregador único (para toda la app)
+
+ Implementado getProjectsByPeriod(period) que solo lee:
+
+Ingresos ← income_sot
+
+Costos ← costs_sot
+
+ /api/projects?period=YYYY-MM y /api/projects/:id/complete-data?period=YYYY-MM usan el mismo agregador.
+
+ Paridad de métricas:
+
+revenueDisplay = revenue_usd
+
+costDisplay = cost_usd
+
+revenueUSDNormalized = revenue_usd
+
+costUSDNormalized = cost_usd
+
+markup = revenue / cost (si cost>0)
+
+margin = (revenue - cost) / revenue (si revenue>0)
+
+Front – Lista (Active Projects – Next)
+
+ El código de canvas usa /api/projects (periodo YYYY-MM, ?source=fresh para refrescar).
+
+ Search y “Solo activos” filtran solo en UI (no rompen los datos).
+
+ Cards muestran: Facturación/Costo/Ganancia en display y Markup/Margen desde USDNormalized.
+
+ SummaryBar: Facturación y Ganancia del período = sumatorias del backend.
+
+Front – Vista única (Project Single)
+
+ Al hacer click en una card, el header del proyecto muestra los mismos números que la lista (mismo agregador).
+
+ Pestañas cargan sin error; filtros temporales sincronizados.
+
+Validación con Agosto 2025
+
+ Aparece todo lo de la hoja (Warner, Kimberly, Modo, Coelsa, Tortugas OM, PeYa, Animal Studio, Detroit, Uber, Arcos, etc.).
+
+ Números clave (ejemplos):
+
+Warner: 29,230 rev USD / 7,005.20 cost USD / ~76% margen / ~4.17× markup
+
+Kimberly: 8,450 / 2,436.09 / ~71% / ~3.47×
+
+Modo: ~2,286.25 / ~369.93 / ~84% / ~6.18×
+
+Coelsa: ~3,241.5 / ~411.15 / ~87% / ~7.88×
+
+ Totales agosto: summary.periodRevenueUSD = suma de “Monto Total USD” confirmados/Real de la pestaña.
+
+Observabilidad / Debug
+
+ Logs del sync (filas leídas, upserts por periodo).
+
+ /api/projects?period=2025-08&source=fresh invalida caché.
+
+ Endpoint /api/costs/debug accesible para auditoría (FX usado, flags).
+
+Edge cases
+
+ Duplicados client|project|month se consolidan (UPSERT suma ingresos/costos).
+
+ “One Shot” aparece solo en su month_key.
+
+ Si no hay costo para un proyecto/mes, cost=0 (margen alto) hasta que entre el dato.
+
+Seguridad / Deploy
+
+ Ocultar GOOGLE_SA_PRIVATE_KEY en logs; rutas /internal/* protegidas.
+
+ Backups para income_sot y costs_sot.
+
+ Flag de rollback: INCOME_SOURCE=sheets|legacy si necesitás volver.
+
+Smoke tests rápidos
+curl -s "/internal/sync/income" | jq
+curl -s "/api/projects?period=2025-08" | jq '.projects | length'
+curl -s "/api/projects?period=2025-08" | jq '.projects[] | {c:.clientName,p:.projectName,rev:.metrics.revenueUSDNormalized,cost:.metrics.costUSDNormalized,mu:.metrics.markup,mg:.metrics.margin}' | head -30
+curl -s "/api/projects/<ID>/complete-data?period=2025-08" | jq '.summary'

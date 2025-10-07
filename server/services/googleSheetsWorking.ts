@@ -26,6 +26,7 @@ interface ProyectoConfirmado {
   detalle: string;
   proyecto: string;
   confirmado: boolean;
+  pasadoFuturo?: string; // "Real", "Estimado", "Futuro"
   propuestasEnviadas: number;
   condicionPago: string;
   ajuste: number;
@@ -476,6 +477,7 @@ class GoogleSheetsWorkingService {
       detalle: headers.findIndex(h => h && h.toLowerCase().includes('detalle')),
       proyecto: headers.findIndex(h => h && h.toLowerCase().includes('proyecto')),
       confirmado: headers.findIndex(h => h && h.toLowerCase().includes('confirmado')),
+      pasadoFuturo: headers.findIndex(h => h && h.toLowerCase().includes('pasado') && h.toLowerCase().includes('futuro')),
       propuestasEnviadas: headers.findIndex(h => h && h.toLowerCase().includes('propuesta')),
       condicionPago: headers.findIndex(h => h && h.toLowerCase().includes('condic') && h.toLowerCase().includes('pago')),
       ajuste: headers.findIndex(h => h && h.toLowerCase().includes('ajuste')),
@@ -527,6 +529,7 @@ class GoogleSheetsWorkingService {
           detalle: this.getCellValue(row, columnMap.detalle) || '',
           proyecto: proyecto,
           confirmado: esConfirmado,
+          pasadoFuturo: this.getCellValue(row, columnMap.pasadoFuturo) || '',
           propuestasEnviadas: parseDec(this.getCellValue(row, columnMap.propuestasEnviadas)) || 0,
           condicionPago: this.getCellValue(row, columnMap.condicionPago) || '',
           ajuste: parseDec(this.getCellValue(row, columnMap.ajuste)) || 0,

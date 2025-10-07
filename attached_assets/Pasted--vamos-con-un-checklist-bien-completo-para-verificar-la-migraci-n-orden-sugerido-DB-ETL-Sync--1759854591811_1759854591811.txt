@@ -1,0 +1,201 @@
+¡vamos con un checklist bien completo para verificar la migración!
+(orden sugerido: DB → ETL/Sync → API → Front → Paridad de datos → Confiabilidad)
+
+Checklist de validación
+A. Base de datos (SoT nueva de ingresos)
+
+ Ejecutada la migración y tabla creada:
+
+income_sot(client_name, project_name, project_type, month_key, year, amount_local_ars, amount_local_usd, revenue_usd, …)
+
+Índice único por (client_name, project_name, month_key).
+
+ costs_sot intacta (sin cambios).
+
+ Variables .env para Google SA configuradas:
+
+GOOGLE_SA_EMAIL, GOOGLE_SA_PRIVATE_KEY (con \n reales o escapados),
+SHEETS_SPREADSHEET_ID, SHEETS_TAB_NAME="Proyectos confirmados y estimados".
+
+B. ETL / Sync desde Google Sheets
+
+ Habilitada ruta interna: GET /internal/sync/income.
+
+ Correr sync y confirmar respuesta:
+
+curl -s "http://localhost:5000/internal/sync/income" | jq
+
+
+Debe devolver { ok:true, rows: N, inserted: M } sin errores.
+
+ Chequear filas en DB:
+
+SELECT month_key, COUNT(*)
+FROM income_sot
+GROUP BY 1 ORDER BY 1;
+
+
+ Muestra de agosto 2025:
+
+SELECT client_name, project_name, revenue_usd, amount_local_usd, amount_local_ars
+FROM income_sot WHERE month_key='2025-08'
+ORDER BY client_name, project_name;
+
+C. API (un solo agregador para ambas vistas)
+
+ /api/projects usa sólo income_sot + costs_sot; no hay rutas duplicadas ni conflictos.
+
+ /api/projects/:id/complete-data reutiliza el mismo agregador (paridad 1:1 con la lista).
+
+ Smoke tests:
+
+curl -s "http://localhost:5000/api/projects?period=2025-08" | jq '.projects | length'
+
+curl -s "http://localhost:5000/api/projects?period=2025-08" \
+  | jq '.projects[] | {c:.clientName, p:.projectName, rev:.metrics.revenueUSDNormalized, cost:.metrics.costUSDNormalized, mu:.metrics.markup, mg:.metrics.margin}' | head -30
+
+# Elegí un proyecto (id o key) y validá el resumen:
+curl -s "http://localhost:5000/api/projects/<ID>/complete-data?period=2025-08" | jq '.summary'
+
+
+ Resumen del período coherente:
+
+summary.periodRevenueUSD = sum(revenueUSDNormalized de todos)
+
+summary.periodProfitUSD = sum(revenueUSDNormalized - costUSDNormalized)
+
+D. Front – Active Projects (tu canvas “Active Projects – Next”)
+
+ Al abrir, el período por defecto es el guardado en localStorage o “mes anterior”.
+
+ Cambiar período (← → y selector) actualiza tarjetas y cards.
+
+ “Actualizar” llama ?source=fresh (ver logs server).
+
+ Búsqueda filtra por cliente + proyecto.
+
+ “Solo activos” oculta los status: Inactive (si existieran).
+
+ En cada card:
+
+Facturación = metrics.revenueDisplay (USD en esta hoja).
+
+Costo = metrics.costDisplay.
+
+Ganancia = facturación – costo.
+
+Markup = revenueUSDNormalized / costUSDNormalized.
+
+Margen = (rev - cost) / rev.
+
+ Barra de KPIs muestra:
+
+“Facturación del período (USD)” = summary.periodRevenueUSD
+
+“Ganancia del período (USD)” = summary.periodProfitUSD
+
+“Proyectos activos” = summary.activeProjects/totalProjects
+
+E. Front – Vista única de Proyecto
+
+ Navegar desde una card → header carga mismos números que la lista.
+
+ Todas las pestañas cargan sin error; la principal (Dashboard/Financiero) usa el summary del agregador.
+
+ Filtro temporal arriba cambia todo en sincronía (igual que la lista).
+
+F. Paridad con tu hoja (agosto 2025)
+
+Validar clientes clave (según “Proyectos confirmados y estimados”):
+
+ Warner
+
+Facturación ≈ 29,230 USD
+
+Costos (override agosto) ≈ 7,005.20 USD
+
+Margen ≈ 76.03% • Markup ≈ 4.17x
+
+ Kimberly Clark
+
+Facturación ≈ 8,450 • Costos ≈ 2,436.09
+
+Margen ≈ 71.17% • Markup ≈ 3.47x
+
+ Play Digital S.A (Modo)
+
+Facturación ≈ 2,286.25 • Costos ≈ 369.93
+
+Margen ≈ 83.8% • Markup ≈ 6.18x
+
+ Coelsa
+
+Facturación ≈ 3,241.53 • Costos ≈ 411.15
+
+Margen ≈ 87.3% • Markup ≈ 7.88x
+
+ Tortugas Open Mall / PeYa / Animal Studio / Detroit / Uber / Arcos Dorados
+
+Facturación = Monto Total USD de la hoja; si no hay costo en costs_sot, margen = 100% (temporal) → verificar que existan costos o aceptar margen alto hasta completar costs.
+
+Bonus: Total agosto = suma de “Monto Total USD” (confirmados + Real) debe coincidir con summary.periodRevenueUSD.
+
+G. Reglas & bordes
+
+ Sólo Confirmado = Sí y Pasado/Futuro = Real entran en income.
+
+ One Shot aparece sólo en su month_key.
+
+ No se duplica un mismo cliente|proyecto|month_key (ver índice único).
+
+ Si hay varias filas para el mismo proyecto/mes, el UPSERT las consolida (suma ingresos/costos).
+
+H. Observabilidad
+
+ Logs del sync: cantidad de filas leídas y upserts por período.
+
+ /api/*/debug (si existe) muestra validationPassed, fx_ref, y totales.
+
+ Manejo de errores de Google SA claro (credenciales inválidas, permisos).
+
+I. Performance y caché
+
+ ?source=fresh invalida cache del agregador y fuerza lectura SoT.
+
+ Tiempo de respuesta de /api/projects?period=YYYY-MM < 500 ms con N proyectos.
+
+ staleTime de React Query razonable (30s) y revalidación on-focus.
+
+J. Seguridad / despliegue
+
+ GOOGLE_SA_PRIVATE_KEY no aparece en logs.
+
+ Rutas /internal/* detrás de auth o sólo en entornos seguros.
+
+ Backups/exports activados para income_sot y costs_sot.
+
+K. Rollback (por si acaso)
+
+ Guardado el script para revertir a “Ventas Tomi” si hiciera falta.
+
+ Feature flag simple para elegir fuente de ingresos (env INCOME_SOURCE=sheets|legacy).
+
+Tip rápido de verificación manual
+
+En consola del navegador en la página de proyectos:
+
+fetch('/api/projects?period=2025-08').then(r=>r.json()).then(d=>console.table(
+  d.projects.map(p => ({
+    cliente: p.clientName,
+    proyecto: p.projectName,
+    factUSD: p.metrics.revenueUSDNormalized,
+    costUSD: p.metrics.costUSDNormalized,
+    markup: p.metrics.markup?.toFixed(2),
+    margen: ((p.metrics.margin??0)*100).toFixed(1)+'%'
+  }))
+))
+
+
+Debería coincidir con tu hoja y con el gráfico “Rendimiento de Cliente”.
+
+¿Querés que te deje también un mini script SQL para chequear diferencias entre income_sot y una export CSV de la hoja por período? Te lo armo si te sirve.
