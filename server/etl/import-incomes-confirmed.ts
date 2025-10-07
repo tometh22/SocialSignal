@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "../db";
 import { incomeSot } from "../../shared/schema";
 import { sql } from "drizzle-orm";
+import { fixAntiX100 } from "../utils/normalize";
 
 // Schema de validación para filas de "Proyectos confirmados y estimados"
 const ConfirmedProjectRow = z.object({
@@ -127,12 +128,31 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
     for (const row of filtered) {
       try {
         const monthKey = monthKeyFromEs(row["Mes Facturación"], row["Año Facturación"]);
-        const amountLocalArs = parseMoneyUnified(row["Moneda Original ARS"] ?? "");
+        
+        // Parsear valores
+        let amountLocalArs = parseMoneyUnified(row["Moneda Original ARS"] ?? "");
         const amountLocalUsd = parseMoneyUnified(row["Moneda Original USD"] ?? "");
         const revenueUsd = parseMoneyUnified(row["Monto Total USD"]) ?? 0;
         const revenueUsdVat = parseMoneyUnified(row["Monto Total USD CON IVA"] ?? "");
-        const revenueArsVat = parseMoneyUnified(row["Monto Total ARS CON IVA"] ?? "");
+        let revenueArsVat = parseMoneyUnified(row["Monto Total ARS CON IVA"] ?? "");
         const fxRef = parseMoneyUnified(row["Cotización"] ?? "");
+        
+        // Aplicar corrección anti-×100/×1000/×10000 a valores ARS
+        if (amountLocalArs && amountLocalArs > 0) {
+          const corrected = fixAntiX100(amountLocalArs);
+          if (corrected.anomaly) {
+            console.warn(`⚠️ ${row["Cliente"]} - ${row["Detalle"]} (${monthKey}): ${corrected.anomaly}`);
+            amountLocalArs = corrected.corrected;
+          }
+        }
+        
+        if (revenueArsVat && revenueArsVat > 0) {
+          const corrected = fixAntiX100(revenueArsVat);
+          if (corrected.anomaly) {
+            console.warn(`⚠️ ${row["Cliente"]} - ${row["Detalle"]} (${monthKey}) ARS con IVA: ${corrected.anomaly}`);
+            revenueArsVat = corrected.corrected;
+          }
+        }
 
         const record = {
           monthKey,

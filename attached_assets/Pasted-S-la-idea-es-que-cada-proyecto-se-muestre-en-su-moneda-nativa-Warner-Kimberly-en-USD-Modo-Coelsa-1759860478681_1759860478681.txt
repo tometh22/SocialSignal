@@ -1,0 +1,57 @@
+Sí: la idea es que cada proyecto se muestre en su moneda nativa —Warner/Kimberly en USD, Modo/Coelsa (y resto locales) en ARS— y que los KPIs (Markup/Margen) sigan calculados con USD normalizado.
+
+Cómo verificar en 1 minuto
+
+API (ver moneda nativa y montos de display)
+
+# Cambiá el período si querés
+PERIOD=2025-08
+
+curl -s "http://localhost:5000/api/projects?period=$PERIOD&source=fresh" \
+| jq '.projects[] | {c:.clientName, p:.projectName, cur:.currencyNative,
+                     rev_disp:.metrics.revenueDisplay, cost_disp:.metrics.costDisplay,
+                     rev_usd:.metrics.revenueUSDNormalized, cost_usd:.metrics.costUSDNormalized}' \
+| head -20
+
+
+Esperado (ejemplos):
+
+Warner → cur:"USD", rev_disp≈29230, cost_disp≈7005.20
+
+Kimberly → cur:"USD", rev_disp≈8450, cost_disp≈2436.09
+
+Play Digital S.A (Modo) → cur:"ARS", rev_disp≈3720750, cost_disp≈497550
+
+Coelsa → cur:"ARS", rev_disp≈5275427, cost_disp≈553002
+
+UI (Active Projects – Next)
+
+En la card:
+
+“Facturación / Costo / Ganancia” deben renderizar con ARS para Modo/Coelsa y con $ para Warner/Kimberly (el canvas ya usa p.currencyNative si viene del backend).
+
+“Markup / Margen” deben coincidir con el tablero (USD normalizado).
+
+Si algo se ve mal (p.ej. ARS enormes o signo equivocado)
+
+Revisar que el backend devuelva:
+
+currencyNative: "ARS" | "USD"
+
+metrics.revenueDisplay y metrics.costDisplay en la moneda nativa
+
+metrics.revenueUSDNormalized y metrics.costUSDNormalized en USD
+
+El canvas ya respeta esos campos (ver tu último código en la canvas).
+
+Mini checklist
+
+ /api/projects trae currencyNative correcto (USD para Warner/Kimberly; ARS para Modo/Coelsa).
+
+ revenueDisplay/costDisplay están en la moneda nativa, sin IVA duplicado ni FX extra.
+
+ KPIs (markup/margen) salen de *_USDNormalized y matchean el dashboard.
+
+ En UI, cards muestran símbolos correctos (ARS vs $) y valores razonables (no “ARS 43,xxxM”).
+
+¿Querés que ejecute un diff rápido entre lo que retorna /api/projects y los valores de “Proyectos confirmados y estimados” para agosto y te dejo el resultado armado?
