@@ -102,9 +102,19 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
     // Filtrar: Confirmado = "Sí" y Pasado/Futuro = "Real"
     const filtered = parsed
       .filter(r => {
-        const confirmado = (r["Confirmado"] || "").toLowerCase().startsWith("si");
-        const pasadoFuturo = (r["Pasado/Futuro"] || "Real").toLowerCase();
-        return confirmado && (pasadoFuturo === "real" || !r["Pasado/Futuro"]);
+        const confirmadoNormalized = (r["Confirmado"] || "")
+          .toLowerCase()
+          .normalize("NFD") // Descomponer caracteres acentuados
+          .replace(/[\u0300-\u036f]/g, ""); // Eliminar marcas de acento
+        const confirmado = confirmadoNormalized.startsWith("si");
+        
+        const pasadoFuturoNormalized = (r["Pasado/Futuro"] || "Real")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        const pasadoFuturo = pasadoFuturoNormalized === "real" || !r["Pasado/Futuro"];
+        
+        return confirmado && pasadoFuturo;
       });
 
     console.log(`🔍 Filtradas (Confirmado=Sí, Pasado/Futuro=Real): ${filtered.length}`);
