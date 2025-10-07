@@ -2089,19 +2089,26 @@ export type ActiveProjectsQuery = z.infer<typeof activeProjectsQuerySchema>;
 
 // ==================== ETL NORMALIZED TABLES ====================
 
-// Tabla SoT de ingresos (Income Source of Truth)
+// Tabla SoT de ingresos (Income Source of Truth) - leer de "Proyectos confirmados y estimados"
 export const incomeSot = pgTable("income_sot", {
   id: serial("id").primaryKey(),
-  projectKey: varchar("project_key", { length: 100 }).notNull(),
-  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM format
-  currencyNative: varchar("currency_native", { length: 3 }).notNull().default('ARS'), // ARS or USD
-  revenueDisplay: numeric("revenue_display", { precision: 12, scale: 2 }).notNull(), // en moneda nativa
-  revenueUsd: numeric("revenue_usd", { precision: 12, scale: 2 }).notNull(), // normalizado en USD
-  flags: json("flags").$type<string[]>().default([]), // ['FX_USED:1345', etc.]
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM (Mes Facturación + Año Facturación)
+  year: integer("year").notNull(), // Año Facturación
+  clientName: text("client_name").notNull(), // Cliente
+  projectName: text("project_name").notNull(), // Detalle
+  projectType: text("project_type"), // Tipo de proyecto: 'Fee' | 'One Shot'
+  confirmed: boolean("confirmed").notNull().default(true), // Confirmado = Sí
+  statusHint: text("status_hint"), // Facturado/No requiere factura/etc (opcional)
+  fxRef: numeric("fx_ref", { precision: 12, scale: 6 }), // Cotización (guardado para auditoría)
+  amountLocalArs: numeric("amount_local_ars", { precision: 16, scale: 2 }), // Moneda Original ARS
+  amountLocalUsd: numeric("amount_local_usd", { precision: 16, scale: 2 }), // Moneda Original USD
+  revenueUsd: numeric("revenue_usd", { precision: 16, scale: 2 }).notNull(), // Monto Total USD (sin IVA) - CANÓNICO
+  revenueUsdWithVat: numeric("revenue_usd_with_vat", { precision: 16, scale: 2 }), // Monto Total USD CON IVA (auditoría)
+  revenueArsWithVat: numeric("revenue_ars_with_vat", { precision: 16, scale: 2 }), // Monto Total ARS CON IVA (auditoría)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => ({
-  projectMonthIdx: unique().on(table.projectKey, table.monthKey)
+  uniqueClientProjectMonth: unique().on(table.clientName, table.projectName, table.monthKey)
 }));
 
 // Tabla SoT de costos (Costs Source of Truth)
@@ -2172,6 +2179,18 @@ export const targetsNorm = pgTable("targets_norm", {
 }));
 
 // Insert schemas
+export const insertIncomeSotSchema = createInsertSchema(incomeSot).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCostsSotSchema = createInsertSchema(costsSot).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertSalesNormSchema = createInsertSchema(salesNorm).omit({
   id: true,
   createdAt: true,
@@ -2191,6 +2210,10 @@ export const insertTargetsNormSchema = createInsertSchema(targetsNorm).omit({
 });
 
 // Types
+export type IncomeSot = typeof incomeSot.$inferSelect;
+export type InsertIncomeSot = z.infer<typeof insertIncomeSotSchema>;
+export type CostsSot = typeof costsSot.$inferSelect;
+export type InsertCostsSot = z.infer<typeof insertCostsSotSchema>;
 export type SalesNorm = typeof salesNorm.$inferSelect;
 export type InsertSalesNorm = z.infer<typeof insertSalesNormSchema>;
 export type CostsNorm = typeof costsNorm.$inferSelect;
