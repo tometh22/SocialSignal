@@ -108,11 +108,15 @@ export async function importIncomesFromConfirmed(rows: any[]): Promise<ImportInc
           .replace(/[\u0300-\u036f]/g, ""); // Eliminar marcas de acento
         const confirmado = confirmadoNormalized.startsWith("si");
         
-        const pasadoFuturoNormalized = (r["Pasado/Futuro"] || "Real")
+        const pasadoFuturoRaw = r["Pasado/Futuro"] || "";
+        const pasadoFuturoNormalized = pasadoFuturoRaw
           .toLowerCase()
+          .trim()
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "");
-        const pasadoFuturo = pasadoFuturoNormalized === "real" || !r["Pasado/Futuro"];
+        
+        // Solo aceptar si explícitamente dice "Real"
+        const pasadoFuturo = pasadoFuturoNormalized === "real";
         
         return confirmado && pasadoFuturo;
       });

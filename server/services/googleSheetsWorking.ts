@@ -508,9 +508,11 @@ class GoogleSheetsWorkingService {
             proyecto: proyecto,
             detalle: this.getCellValue(row, columnMap.detalle),
             confirmado: this.getCellValue(row, columnMap.confirmado),
+            pasadoFuturo: this.getCellValue(row, columnMap.pasadoFuturo), // DEBUG
             valorBase: this.getCellValue(row, columnMap.valorBase),
             monedaUSD: this.getCellValue(row, columnMap.monedaUSD),
-            rawRow: row.slice(0, 15) // Mostrar primeras 15 columnas raw
+            rawRowLength: row.length, // DEBUG
+            col21Value: row[21] // DEBUG: valor directo de columna 21
           });
         }
         
@@ -1381,6 +1383,13 @@ class GoogleSheetsWorkingService {
             montoUSD: costo.montoTotalUSD,
             fx: costo.tipoCambio
           });
+          
+          // 🛡️ PREVENIR OVERFLOW: Limitar costoTotal a valores razonables
+          const MAX_COST = 100_000_000; // 100M máximo razonable para un costo mensual
+          if (!Number.isFinite(costoTotal) || costoTotal > MAX_COST) {
+            console.log(`🛡️ GUARD OVERFLOW: Costo astronómico detectado (${costoTotal}), saltando registro`);
+            continue; // Saltar este registro
+          }
           
           const directCostData = {
             monthKey: monthKey, // NUEVO: Clave temporal única

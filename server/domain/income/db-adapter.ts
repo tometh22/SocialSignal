@@ -4,14 +4,21 @@
  */
 
 import { storage } from '../../storage';
+import { db as drizzleDb } from '../../db';
+import { incomeSot } from '../../../shared/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * Interfaz db.sales que mapea a métodos existentes
  */
 const sales = {
   async getRowsForPeriod(period: string): Promise<any[]> {
-    // Usar método existente de GoogleSheetsSales
-    return await storage.getGoogleSheetsSales();
+    // Leer desde income_sot (Single Source of Truth)
+    const rows = await drizzleDb.query.incomeSot.findMany({
+      where: eq(incomeSot.monthKey, period)
+    });
+    console.log(`📊 INCOME SoT: Retrieved ${rows.length} rows for period ${period}`);
+    return rows;
   }
 };
 
