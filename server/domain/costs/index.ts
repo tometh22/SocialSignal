@@ -144,9 +144,12 @@ export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult>
     const incomeResult = await income.getIncomeByPeriod(period);
     
     // 3. Create project currency map: clientName|projectName → revenueDisplay.currency
+    // Use canonicalized keys to match business-rules.ts
     const projectCurrencyMap = new Map<string, 'USD' | 'ARS'>();
     for (const project of incomeResult.projects) {
-      const key = `${project.clientName}|${project.projectName}`;
+      const clientCanon = project.clientName.toLowerCase().trim();
+      const projectCanon = project.projectName.toLowerCase().trim();
+      const key = `${clientCanon}|${projectCanon}`;
       projectCurrencyMap.set(key, project.revenueDisplay.currency as 'USD' | 'ARS');
       console.log(`📊 CURRENCY MAP: ${key} → ${project.revenueDisplay.currency}`);
     }

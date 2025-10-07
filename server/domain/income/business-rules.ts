@@ -78,20 +78,28 @@ export async function buildIncomeResult(
     const [clientName, projectName] = k.split('|||');
 
     // 5) REGLA DE MONEDA NATIVA (DISPLAY)
-    // Preservar moneda original: usar ARS si hay ARS significativo, sino USD
-    // ARS significativo = ARS > USD * 10 (detectar que es la moneda principal)
+    // Warner/Kimberly = USD nativo, resto = ARS nativo
+    const isUSDNative = /warner|kimberly/i.test(clientName);
+    const nativeCurrency: 'ARS' | 'USD' = isUSDNative ? 'USD' : 'ARS';
+    
     const sumUSD = list.reduce((a, r) => a + (r.amountUSD || 0), 0);
     const sumARS = list.reduce((a, r) => a + (r.amountARS || 0), 0);
 
     console.log(`🔍 CURRENCY LOGIC for ${clientName}/${projectName}:`);
+    console.log(`   Native Currency: ${nativeCurrency} (isUSDNative: ${isUSDNative})`);
     console.log(`   ARS: ${sumARS.toLocaleString()} | USD: ${sumUSD.toLocaleString()}`);
-    console.log(`   ARS > USD*10? ${sumARS} > ${sumUSD * 10} = ${sumARS > sumUSD * 10}`);
 
-    const revenueDisplay =
-      sumARS > sumUSD * 10 ? { amount: sumARS, currency: 'ARS' as const } :
-      sumUSD > 0 ? { amount: sumUSD, currency: 'USD' as const } :
-      sumARS > 0 ? { amount: sumARS, currency: 'ARS' as const } :
-      { amount: 0, currency: 'USD' as const };
+    // Calcular display según moneda nativa
+    let displayAmount: number;
+    if (nativeCurrency === 'ARS') {
+      // Preferir ARS directo, si no hay convertir USD a ARS
+      displayAmount = sumARS > 0 ? sumARS : (sumUSD * fx);
+    } else {
+      // Preferir USD directo, si no hay convertir ARS a USD
+      displayAmount = sumUSD > 0 ? sumUSD : (sumARS / fx);
+    }
+
+    const revenueDisplay = { amount: displayAmount, currency: nativeCurrency };
 
     console.log(`   → Display: ${revenueDisplay.currency} ${revenueDisplay.amount.toLocaleString()}`);
 
