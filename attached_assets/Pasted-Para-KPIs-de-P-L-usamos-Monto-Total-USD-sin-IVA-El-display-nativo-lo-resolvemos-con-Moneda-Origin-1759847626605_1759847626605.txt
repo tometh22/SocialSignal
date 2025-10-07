@@ -1,0 +1,205 @@
+Para KPIs de P&L usamos Monto Total USD (sin IVA). El display nativo lo resolvemos con Moneda Original ARS/ USD (si hay ARS mostramos ARS en la card; si hay USD, USD).
+
+Cambios en el modelo (Income SoT)
+
+Objetivo: dejar de leer “Ventas Tomi” y leer 100% de “Proyectos confirmados y estimados”.
+
+SQL (idempotente)
+-- Nueva fuente cruda de ingresos (reemplaza Ventas Tomi)
+CREATE TABLE IF NOT EXISTS income_sot (
+  id BIGSERIAL PRIMARY KEY,
+  month_key CHAR(7) NOT NULL,      -- 'YYYY-MM'
+  year INT NOT NULL,
+  client_name TEXT NOT NULL,
+  project_name TEXT NOT NULL,
+  project_type TEXT,               -- 'Fee' | 'One Shot'
+  confirmed BOOLEAN NOT NULL DEFAULT TRUE,
+  status_hint TEXT,                -- 'Facturado'/'No requiere factura'/etc (opcional)
+  fx_ref NUMERIC(12,6),            -- Cotización (si viene)
+  amount_local_ars NUMERIC(16,2),
+  amount_local_usd NUMERIC(16,2),
+  revenue_usd NUMERIC(16,2) NOT NULL,  -- Monto Total USD (sin IVA)  ******* CANÓNICO
+  revenue_usd_with_vat NUMERIC(16,2),  -- Monto Total USD CON IVA (auditoría)
+  revenue_ars_with_vat NUMERIC(16,2),  -- Monto Total ARS CON IVA (auditoría)
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_income_sot_key
+  ON income_sot (client_name, project_name, month_key);
+
+Reglas (Income SoT)
+
+Filtro: Confirmado = "Sí" y (opcional) Pasado/Futuro="Real".
+
+month_key = (Mes Facturación, Año Facturación).
+
+revenue_usd = Monto Total USD (sin IVA).
+
+display nativo:
+
+si Moneda Original ARS > 0 → revenueDisplay = amount_local_ars y currencyNative="ARS".
+
+si Moneda Original USD > 0 → revenueDisplay = amount_local_usd y currencyNative="USD".
+
+USD normalizado para KPIs = revenue_usd.
+
+Guardar fx_ref = Cotización (auditoría/diagnóstico).
+
+ETL (reemplazo de “Ventas Tomi”)
+// services/etl/import_incomes_from_confirmed.ts
+import { z } from "zod";
+import { db } from "../db";
+import { parseMoneyUnified } from "../utils/money";
+
+const Row = z.object({
+  "Mes Facturación": z.string(),
+  "Año Facturación": z.coerce.number(),
+  "Cliente": z.string(),
+  "Detalle": z.string(),               // nombre del proyecto
+  "Tipo de proyecto": z.string(),      // Fee | One Shot
+  "Confirmado": z.string(),
+  "Pasado/Futuro": z.string().optional(),
+  "Cotización": z.string().optional(),
+  "Moneda Original ARS": z.string().optional(),
+  "Moneda Original USD": z.string().optional(),
+  "Monto Total USD": z.string(),
+  "Monto Total ARS CON IVA": z.string().optional(),
+  "Monto Total USD CON IVA": z.string().optional(),
+  "Facturado/No Facturado": z.string().optional(),
+});
+
+const monthKeyFromEs = (mes: string, year: number) => {
+  const m = mes.toLowerCase();
+  const map: Record<string,string>={ene:"01",feb:"02",mar:"03",abr:"04",may:"05",jun:"06",jul:"07",ago:"08",sep:"09",oct:"10",nov:"11",dic:"12"};
+  const token = Object.keys(map).find(k => m.includes(k)) ?? "01";
+  return `${year}-${map[token]}`;
+};
+
+export async function importIncomesFromConfirmed(rows: any[]) {
+  const parsed = rows.map(r => Row.parse(r));
+
+  const records = parsed
+    .filter(r => (r["Confirmado"] || "").toLowerCase().startsWith("si"))
+    .filter(r => (r["Pasado/Futuro"] || "Real").toLowerCase() === "real")
+    .map(r => {
+      const month_key = monthKeyFromEs(r["Mes Facturación"], r["Año Facturación"]);
+      const amount_local_ars = parseMoneyUnified(r["Moneda Original ARS"] ?? "");
+      const amount_local_usd = parseMoneyUnified(r["Moneda Original USD"] ?? "");
+      const revenue_usd       = parseMoneyUnified(r["Monto Total USD"]) ?? 0;
+      const revenue_usd_vat   = parseMoneyUnified(r["Monto Total USD CON IVA"] ?? "");
+      const revenue_ars_vat   = parseMoneyUnified(r["Monto Total ARS CON IVA"] ?? "");
+      const fx_ref            = parseMoneyUnified(r["Cotización"] ?? "");
+      return {
+        month_key,
+        year: r["Año Facturación"],
+        client_name: r["Cliente"].trim(),
+        project_name: r["Detalle"].trim(),
+        project_type: r["Tipo de proyecto"].trim(),
+        confirmed: true,
+        status_hint: (r["Facturado/No Facturado"] ?? "").trim(),
+        fx_ref,
+        amount_local_ars,
+        amount_local_usd,
+        revenue_usd,
+        revenue_usd_with_vat: revenue_usd_vat ?? null,
+        revenue_ars_with_vat: revenue_ars_vat ?? null,
+      };
+    });
+
+  // upsert
+  await db.tx(async t => {
+    for (const v of records) {
+      await t.none(`
+        INSERT INTO income_sot
+        (month_key, year, client_name, project_name, project_type, confirmed, status_hint, fx_ref,
+         amount_local_ars, amount_local_usd, revenue_usd, revenue_usd_with_vat, revenue_ars_with_vat)
+        VALUES ($<month_key>, $<year>, $<client_name>, $<project_name>, $<project_type>, true, $<status_hint>, $<fx_ref>,
+                $<amount_local_ars>, $<amount_local_usd>, $<revenue_usd>, $<revenue_usd_with_vat>, $<revenue_ars_with_vat>)
+        ON CONFLICT (client_name, project_name, month_key)
+        DO UPDATE SET
+          project_type = EXCLUDED.project_type,
+          fx_ref = COALESCE(EXCLUDED.fx_ref, income_sot.fx_ref),
+          amount_local_ars = COALESCE(EXCLUDED.amount_local_ars, income_sot.amount_local_ars),
+          amount_local_usd = COALESCE(EXCLUDED.amount_local_usd, income_sot.amount_local_usd),
+          revenue_usd = EXCLUDED.revenue_usd,
+          revenue_usd_with_vat = COALESCE(EXCLUDED.revenue_usd_with_vat, income_sot.revenue_usd_with_vat),
+          revenue_ars_with_vat = COALESCE(EXCLUDED.revenue_ars_with_vat, income_sot.revenue_ars_with_vat);
+      `, v);
+    }
+  });
+
+  return { inserted: records.length };
+}
+
+Reemplazo en el Aggregator/API
+
+/api/income?period=YYYY-MM
+
+Cambiar query a leer solo income_sot:
+
+SELECT client_name, project_name, project_type, month_key,
+       amount_local_ars, amount_local_usd, revenue_usd, fx_ref
+FROM income_sot
+WHERE month_key = $1;
+
+
+Payload:
+
+{
+  "period":"2025-08",
+  "fx": <median fx_ref del período si aplica>,
+  "items":[
+    {
+      "clientName": "...",
+      "projectName": "...",
+      "currencyNative": "ARS"|"USD",
+      "revenueDisplay": <amount_local_ars OR amount_local_usd>,
+      "revenueUSDNormalized": <revenue_usd>,
+      "tags": ["Fee"|"One-Shot"]
+    }
+  ]
+}
+
+
+Active Projects & Project Single
+
+Reusar lo mismo: cuando el backend arma cada ProjectItem, para ingresos toma:
+
+revenueDisplay y currencyNative desde income_sot (como arriba).
+
+revenueUSDNormalized = revenue_usd.
+
+/api/projects?period=YYYY-MM
+
+El join de Active Projects ahora hace:
+
+Ingresos ← income_sot
+
+Costos ← costs_sot (tu SoT actual, con reglas anti-×100/astronómico + overrides de agosto)
+
+KPIs (markup, margen) con USD normalizado.
+
+Checklist de migración (paso a paso, seguro)
+
+Crear/actualizar tabla income_sot (SQL arriba).
+
+Agregar importador importIncomesFromConfirmed y un endpoint interno POST /internal/import-incomes para cargar desde CSV/Sheet.
+
+Cambiar /api/income, /api/projects, /api/projects/:id/complete-data para leer ingresos desde income_sot.
+
+Mantener costos como están (SoT de costos + overrides agosto).
+
+Smoke test agosto 2025:
+
+GET /api/projects?period=2025-08 → deben aparecer Warner, Kimberly, Modo, Coelsa, Tortugas OM, PeYa, Animal Studio, etc. con Facturación correcta.
+
+GET /api/projects/ID/complete-data?period=2025-08 → mismos números en el header.
+
+Log de auditoría:
+
+validationPassed: true
+
+rawIncomeRows: N
+
+fx_ref: [lista única]
+
+diferenciar USD vs ARS en display.

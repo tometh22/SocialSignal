@@ -1,0 +1,271 @@
+Te dejo un paquete “copy-paste” para que el agente de Replit haga el cambio completo: tanto Active Projects como Project Single leen ingresos desde la pestaña “Proyectos confirmados y estimados” (y costos desde tu SoT/overrides como hasta ahora). Es 100% retro-compatible con tu UI actual.
+
+1) Tabla SoT de Ingresos (reemplaza “Ventas Tomi”)
+-- db/migrations/20251001_income_sot.sql
+CREATE TABLE IF NOT EXISTS income_sot (
+  id BIGSERIAL PRIMARY KEY,
+  month_key CHAR(7) NOT NULL,      -- 'YYYY-MM' (Mes Facturación + Año Facturación)
+  year INT NOT NULL,
+  client_name TEXT NOT NULL,
+  project_name TEXT NOT NULL,      -- "Detalle" en la hoja
+  project_type TEXT,               -- 'Fee'|'One Shot'
+  confirmed BOOLEAN NOT NULL DEFAULT TRUE,
+  status_hint TEXT,                -- 'Facturado'/'No requiere factura'/etc (opcional)
+  fx_ref NUMERIC(12,6),            -- 'Cotización' (auditoría)
+  amount_local_ars NUMERIC(16,2),
+  amount_local_usd NUMERIC(16,2),
+  revenue_usd NUMERIC(16,2) NOT NULL,      -- **Monto Total USD (sin IVA)**
+  revenue_usd_with_vat NUMERIC(16,2),      -- Monto Total USD CON IVA (auditoría)
+  revenue_ars_with_vat NUMERIC(16,2),      -- Monto Total ARS CON IVA (auditoría)
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_income_sot_key
+  ON income_sot (client_name, project_name, month_key);
+
+2) ETL desde “Proyectos confirmados y estimados”
+
+Mapeo de columnas (de tu captura):
+
+Mes Facturación + Año Facturación → month_key
+
+Cliente → client_name
+
+Detalle → project_name
+
+Tipo de proyecto → project_type
+
+Confirmado → filtrar Sí
+
+Pasado/Futuro → (opcional) filtrar Real
+
+Cotización → fx_ref
+
+Moneda Original ARS / USD → amount_local_ars / amount_local_usd
+
+Monto Total USD (sin IVA) → revenue_usd (canónico)
+
+(Con IVA) → solo auditoría
+
+// services/etl/import_incomes_from_confirmed.ts
+import { z } from "zod";
+import { db } from "../db";
+import { parseMoneyUnified } from "../utils/money";
+
+const Row = z.object({
+  "Mes Facturación": z.string(),
+  "Año Facturación": z.coerce.number(),
+  "Cliente": z.string(),
+  "Detalle": z.string(),
+  "Tipo de proyecto": z.string(),
+  "Confirmado": z.string(),
+  "Pasado/Futuro": z.string().optional(),
+  "Cotización": z.string().optional(),
+  "Moneda Original ARS": z.string().optional(),
+  "Moneda Original USD": z.string().optional(),
+  "Monto Total USD": z.string(),
+  "Monto Total ARS CON IVA": z.string().optional(),
+  "Monto Total USD CON IVA": z.string().optional(),
+  "Facturado/No Facturado": z.string().optional(),
+});
+
+const monthKeyFromEs = (mes: string, year: number) => {
+  const m = mes.toLowerCase();
+  const map: Record<string,string>={ene:"01",feb:"02",mar:"03",abr:"04",may:"05",jun:"06",jul:"07",ago:"08",sep:"09",oct:"10",nov:"11",dic:"12"};
+  const token = Object.keys(map).find(k => m.includes(k)) ?? "01";
+  return `${year}-${map[token]}`;
+};
+
+export async function importIncomesFromConfirmed(rows: any[]) {
+  const parsed = rows.map(r => Row.parse(r));
+
+  const records = parsed
+    .filter(r => (r["Confirmado"] || "").toLowerCase().startsWith("si"))
+    .filter(r => (r["Pasado/Futuro"] || "Real").toLowerCase() === "real")
+    .map(r => {
+      const month_key = monthKeyFromEs(r["Mes Facturación"], r["Año Facturación"]);
+      const amount_local_ars = parseMoneyUnified(r["Moneda Original ARS"] ?? "");
+      const amount_local_usd = parseMoneyUnified(r["Moneda Original USD"] ?? "");
+      const revenue_usd       = parseMoneyUnified(r["Monto Total USD"]) ?? 0;
+      const revenue_usd_vat   = parseMoneyUnified(r["Monto Total USD CON IVA"] ?? "");
+      const revenue_ars_vat   = parseMoneyUnified(r["Monto Total ARS CON IVA"] ?? "");
+      const fx_ref            = parseMoneyUnified(r["Cotización"] ?? "");
+      return {
+        month_key,
+        year: r["Año Facturación"],
+        client_name: r["Cliente"].trim(),
+        project_name: r["Detalle"].trim(),
+        project_type: r["Tipo de proyecto"].trim(),
+        confirmed: true,
+        status_hint: (r["Facturado/No Facturado"] ?? "").trim(),
+        fx_ref,
+        amount_local_ars,
+        amount_local_usd,
+        revenue_usd,
+        revenue_usd_with_vat: revenue_usd_vat ?? null,
+        revenue_ars_with_vat: revenue_ars_vat ?? null,
+      };
+    });
+
+  await db.tx(async t => {
+    for (const v of records) {
+      await t.none(`
+        INSERT INTO income_sot
+        (month_key, year, client_name, project_name, project_type, confirmed, status_hint, fx_ref,
+         amount_local_ars, amount_local_usd, revenue_usd, revenue_usd_with_vat, revenue_ars_with_vat)
+        VALUES ($<month_key>, $<year>, $<client_name>, $<project_name>, $<project_type>, true, $<status_hint>, $<fx_ref>,
+                $<amount_local_ars>, $<amount_local_usd>, $<revenue_usd>, $<revenue_usd_with_vat>, $<revenue_ars_with_vat>)
+        ON CONFLICT (client_name, project_name, month_key)
+        DO UPDATE SET
+          project_type = EXCLUDED.project_type,
+          fx_ref = COALESCE(EXCLUDED.fx_ref, income_sot.fx_ref),
+          amount_local_ars = COALESCE(EXCLUDED.amount_local_ars, income_sot.amount_local_ars),
+          amount_local_usd = COALESCE(EXCLUDED.amount_local_usd, income_sot.amount_local_usd),
+          revenue_usd = EXCLUDED.revenue_usd,
+          revenue_usd_with_vat = COALESCE(EXCLUDED.revenue_usd_with_vat, income_sot.revenue_usd_with_vat),
+          revenue_ars_with_vat = COALESCE(EXCLUDED.revenue_ars_with_vat, income_sot.revenue_ars_with_vat);
+      `, v);
+    }
+  });
+
+  return { inserted: records.length };
+}
+
+
+Ruta interna para importar CSV/Sheet (simple):
+
+// server/routes/internal-import.ts
+import express from "express";
+import { importIncomesFromConfirmed } from "../services/etl/import_incomes_from_confirmed";
+import { readCsvToJson } from "../utils/csv"; // tu helper común
+
+export const internalImport = express.Router();
+
+internalImport.post("/import-incomes", async (req, res) => {
+  // admite multipart file ó ya-parsed rows
+  const rows = await readCsvToJson(req); // infiere headers idénticos a la hoja
+  const result = await importIncomesFromConfirmed(rows);
+  res.json({ ok: true, ...result });
+});
+
+3) Un solo agregador para ambas vistas
+// services/aggregators/projects.ts
+import { db } from "../db";
+
+export type ProjectAgg = {
+  clientName: string;
+  projectName: string;
+  project_type: string | null;
+  revenue_usd: number;
+  cost_usd: number;
+};
+
+export async function getProjectsByPeriod(period: string): Promise<ProjectAgg[]> {
+  // ingresos (income_sot)
+  const income = await db.manyOrNone(`
+    SELECT client_name AS "clientName",
+           project_name AS "projectName",
+           project_type,
+           revenue_usd
+    FROM income_sot
+    WHERE month_key = $1
+  `, [period]);
+
+  // costos (costs_sot, tu SoT ya existente)
+  const costs = await db.manyOrNone(`
+    SELECT client_name AS "clientName",
+           project_name AS "projectName",
+           cost_usd_normalized AS cost_usd
+    FROM costs_sot
+    WHERE month_key = $1
+  `, [period]);
+
+  // join por client+project
+  const key = (x:{clientName:string,projectName:string}) => (x.clientName.trim().toLowerCase()+"|"+x.projectName.trim().toLowerCase());
+  const costMap = new Map(costs.map(c => [key(c), c.cost_usd || 0]));
+  return income.map(i => ({
+    clientName: i.clientName,
+    projectName: i.projectName,
+    project_type: i.project_type ?? null,
+    revenue_usd: i.revenue_usd || 0,
+    cost_usd: costMap.get(key(i)) ?? 0,
+  }));
+}
+
+
+/api/projects (lista) y /api/projects/:id/complete-data (detalle) usan el mismo getProjectsByPeriod(period):
+
+// server/routes/projects.ts (lista)
+app.get("/api/projects", async (req, res) => {
+  const period = String(req.query.period ?? "").slice(0,7);
+  const rows = await getProjectsByPeriod(period);
+
+  const projects = rows.map(r => {
+    const markup = r.cost_usd > 0 ? r.revenue_usd / r.cost_usd : null;
+    const margin = r.revenue_usd > 0 ? (r.revenue_usd - r.cost_usd) / r.revenue_usd : null;
+    return {
+      clientName: r.clientName,
+      projectName: r.projectName,
+      tags: r.project_type ? [r.project_type] : [],
+      currencyNative: (/* display nativo: si en income_sot había ARS > 0, ARS */ "USD"),
+      metrics: {
+        revenueDisplay: r.revenue_usd,          // display = USD (esta hoja ya está en USD)
+        costDisplay: r.cost_usd,                // idem
+        revenueUSDNormalized: r.revenue_usd,    // USD
+        costUSDNormalized: r.cost_usd,          // USD
+        markup, margin
+      }
+    };
+  });
+
+  const summary = {
+    periodRevenueUSD: projects.reduce((a,p)=>a+(p.metrics.revenueUSDNormalized||0),0),
+    periodProfitUSD:  projects.reduce((a,p)=>a+((p.metrics.revenueUSDNormalized||0)-(p.metrics.costUSDNormalized||0)),0),
+    activeProjects:   projects.length,
+    totalProjects:    projects.length,
+  };
+
+  res.json({ period, updatedAt: new Date().toISOString(), projects, summary });
+});
+
+// server/routes/complete-data.ts (detalle)
+app.get("/api/projects/:id/complete-data", async (req, res) => {
+  const period = String(req.query.period ?? "").slice(0,7);
+  const id = req.params.id; // si el id no es natural, resolvelo a client+project
+  const rows = await getProjectsByPeriod(period);
+  const p = rows.find(/* tu selector por id → client+project */);
+
+  if (!p) return res.status(404).json({error:"Not found"});
+
+  const markup = p.cost_usd>0 ? p.revenue_usd/p.cost_usd : null;
+  const margin = p.revenue_usd>0 ? (p.revenue_usd-p.cost_usd)/p.revenue_usd : null;
+
+  res.json({
+    period,
+    project: { name: p.projectName, client: p.clientName, tags: [p.project_type].filter(Boolean) },
+    summary: {
+      revenueUSD: p.revenue_usd,
+      teamCostUSD: p.cost_usd,
+      profitUSD: (p.revenue_usd - p.cost_usd),
+    },
+    metrics: { markup, margin }
+    // (el resto de pestañas pueden hacer sus queries específicas si aplica)
+  });
+});
+
+4) Smoke tests (agosto 2025)
+# Importar CSV exportado de "Proyectos confirmados y estimados"
+curl -X POST http://localhost:5000/internal/import-incomes -F file=@ProyectosConfirmadosYEstimados.csv
+
+# Ver lista
+curl -s "http://localhost:5000/api/projects?period=2025-08" | jq '.projects | length'
+curl -s "http://localhost:5000/api/projects?period=2025-08" | jq '.projects[] | {c:.clientName, p:.projectName, rev:.metrics.revenueUSDNormalized, cost:.metrics.costUSDNormalized, mu:.metrics.markup, mg:.metrics.margin}'
+
+
+Criterios de aceptación
+
+En agosto aparecen Warner, Kimberly, Modo, Coelsa, Tortugas OM, PeYa, Animal Studio, Detroit, Uber, etc. con Facturación (USD), Costos (USD), Markup y Margen coherentes con tu hoja.
+
+La vista única muestra los mismos números del header que la lista.
+
+Con esto, Active Projects (tu canvas actual) no se rompe y Project Single queda alineado
