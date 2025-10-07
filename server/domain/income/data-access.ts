@@ -37,14 +37,10 @@ export async function fetchSalesRawForPeriod(period: string): Promise<IncomeRow[
     // If we have monthKey (income_sot format), extract month and year from it
     const monthKey = r.monthKey ?? r.month_key;
     if (monthKey) {
-      console.log(`📊 DATA ACCESS DEBUG: monthKey found = "${monthKey}"`);
       const [yearStr, monthStr] = monthKey.split('-');
       year = parseInt(yearStr);
       const monthNum = parseInt(monthStr);
       monthEs = monthNumberToSpanish(monthNum);
-      console.log(`📊 DATA ACCESS DEBUG: Converted to monthEs="${monthEs}", year=${year}`);
-    } else {
-      console.log(`📊 DATA ACCESS DEBUG: No monthKey found, monthEs="${monthEs}", year=${year}`);
     }
     
     return {
