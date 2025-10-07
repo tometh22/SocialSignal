@@ -1,0 +1,156 @@
+oy el front ya infiere “ARS” para todos salvo Warner/Kimberly, pero el problema es que el backend está mandando revenueDisplay/costDisplay en USD para esos clientes; entonces la card los rotula como ARS y queda cualquier cosa.
+
+Te paso el fix concreto y mínimo para que todo quede consistente (display nativo en ARS para Modo/Coelsa y USD para Warner/Kimberly) sin romper KPIs (que siguen en USD normalizado).
+
+Qué hay que cambiar (backend)
+
+En el aggregator que arma /api/projects?period=YYYY-MM y el detalle /api/projects/:id/complete-data, definí el display nativo así:
+
+Detección de moneda nativa (simple y auditable)
+
+const isUSDNative = (client: string) => /warner|kimberly/i.test(client);
+const nativeCurrency: "ARS"|"USD" = isUSDNative(clientName) ? "USD" : "ARS";
+
+
+Ingreso (income_sot): ya tenés amount_local_ars y amount_local_usd además de revenue_usd (canónico).
+
+Costo (costs_sot): la SoT expone dual currency; si no tenés el nativo explícito, convertís con FX del mes.
+
+Patch del aggregator (esqueleto)
+// services/aggregators/projects.ts
+import { db } from "../db";
+
+export async function getProjectsByPeriod(period: string) {
+  const fxRow = await db.oneOrNone(
+    `SELECT fx FROM exchange_rates WHERE (year||'-'||LPAD(month::text,2,'0'))=$1`,
+    [period]
+  );
+  const fx = fxRow?.fx ?? null;
+
+  const income = await db.manyOrNone(`
+    SELECT client_name, project_name, project_type,
+           amount_local_ars, amount_local_usd, revenue_usd
+    FROM income_sot
+    WHERE month_key=$1
+  `, [period]);
+
+  const costs = await db.manyOrNone(`
+    SELECT client_name, project_name,
+           -- si tu SoT tiene ambas, usalas:
+           cost_native_amount, cost_native_currency,
+           cost_usd_normalized
+    FROM costs_sot
+    WHERE month_key=$1
+  `, [period]);
+
+  const key = (x:any)=> (x.client_name.trim().toLowerCase()+"|"+x.project_name.trim().toLowerCase());
+  const costMap = new Map(costs.map(c => [key(c), c]));
+
+  return income.map(i => {
+    const k = key(i);
+    const c = costMap.get(k);
+
+    const clientName  = i.client_name;
+    const projectName = i.project_name;
+    const native      = /warner|kimberly/i.test(clientName) ? "USD" : "ARS";
+
+    // -------- ingresos (display nativo) ----------
+    let revenueDisplay: number;
+    if (native === "ARS") {
+      revenueDisplay = i.amount_local_ars ?? (fx ? (i.revenue_usd ?? 0) * fx : 0);
+    } else {
+      revenueDisplay = i.amount_local_usd ?? (i.revenue_usd ?? 0);
+    }
+
+    // -------- costos (display nativo) -------------
+    const costUSD = c?.cost_usd_normalized ?? 0;
+    let costDisplay: number;
+    if (native === "ARS") {
+      // Si tu SoT guarda el nativo explícito, preferilo:
+      if (c?.cost_native_currency === "ARS" && c?.cost_native_amount != null) {
+        costDisplay = c.cost_native_amount;
+      } else {
+        costDisplay = fx ? costUSD * fx : 0;
+      }
+    } else {
+      if (c?.cost_native_currency === "USD" && c?.cost_native_amount != null) {
+        costDisplay = c.cost_native_amount;
+      } else {
+        costDisplay = costUSD;
+      }
+    }
+
+    // -------- KPIs (siempre en USD normalizado) ---
+    const revenueUSD = i.revenue_usd ?? 0;
+    const costUSDNorm = costUSD;
+    const markup = costUSDNorm > 0 ? (revenueUSD / costUSDNorm) : null;
+    const margin = revenueUSD > 0 ? (revenueUSD - costUSDNorm) / revenueUSD : null;
+
+    return {
+      clientName, projectName,
+      tags: [i.project_type].filter(Boolean),
+      currencyNative: native,                                // ← ARS para Modo/Coelsa
+      metrics: {
+        // display nativo
+        revenueDisplay,                                      // ← ARS para Modo/Coelsa
+        costDisplay,                                         // ← ARS para Modo/Coelsa
+        // USD normalizado (KPIs)
+        revenueUSDNormalized: revenueUSD,
+        costUSDNormalized: costUSDNorm,
+        markup, margin,
+      }
+    };
+  });
+}
+
+
+Con esto, Modo/Coelsa se verán en ARS (display), mientras que Warner/Kimberly en USD. Los KPIs (markup/margen) se calculan con USD normalizado —que es lo que ya funciona y debe mantenerse.
+
+Qué NO tocar (front)
+
+Tu Active Projects – Next ya hace:
+
+const nativeCurrency = p.currencyNative ?? (warner/kimberly ? "USD" : "ARS");
+const revenueDisplay = p.metrics.revenueDisplay ?? 0;
+const costDisplay = p.metrics.costDisplay ?? 0;
+
+
+O sea, si el backend envía currencyNative y los *Display nativos correctos, la card queda bien automáticamente. No cambies formateadores (ARS vs $).
+
+El error de agosto que viste (“ARS 43,xxxM”) venía de que el backend devolvía USD en revenueDisplay/costDisplay pero el front lo rotulaba como ARS por ser Modo/Coelsa. Con este patch desaparece.
+
+Runbook de verificación (agosto 2025)
+
+/api/projects?period=2025-08&source=fresh
+
+Modo:
+
+Facturación (display) ≈ ARS 3.720.750
+
+Costo (display) ≈ ARS 497.550 (override agosto)
+
+Markup ≈ 6.18×, Margen ≈ 83.8% (en KPIs)
+
+Coelsa:
+
+Facturación (display) ≈ ARS 5.275.427
+
+Costo (display) ≈ ARS 553.002 (override agosto)
+
+Markup ≈ 7.88×, Margen ≈ 87.3%
+
+Warner: display en USD (29,230 / 7,005.20)
+
+Kimberly: display en USD (8,450 / 2,436.09)
+
+En la UI, las cards deben verse:
+
+Modo/Coelsa ARS en Facturación/Costo/Ganancia;
+
+Warner/Kimberly USD;
+
+Markup/Margen coherentes con los números del dashboard “Rendimiento de Cliente”.
+
+/api/costs/debug?period=2025-08
+
+Ver FX=1345, flags, y overrides aplicados para Modo/Coelsa.
