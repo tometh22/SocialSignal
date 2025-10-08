@@ -12083,6 +12083,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SYNC FINANCIAL SOT FROM RENDIMIENTO CLIENTE ====================
+  // Sincronizar financial_sot desde "Rendimiento Cliente"
+  app.get('/internal/sync/financial', async (req: Request, res: Response) => {
+    try {
+      console.log('🔄 SYNC FINANCIAL: Starting sync from "Rendimiento Cliente"');
+      
+      const { importRendimientoCliente } = await import('./etl/rendimiento-cliente');
+      const result = await importRendimientoCliente();
+      
+      console.log(`✅ SYNC FINANCIAL: Completed - ${result.inserted} inserted/updated`);
+      
+      return res.json({
+        ok: true,
+        rows: result.inserted,
+        upserts: result.inserted,
+        errors: result.errors,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ SYNC FINANCIAL Error:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {
