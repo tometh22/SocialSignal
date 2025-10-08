@@ -81,6 +81,27 @@ interface CompleteProjectData {
     hoursDeviation: number;
     costDeviation: number;
   };
+  summary?: {
+    teamCostUSD: number;
+    revenueUSD: number;
+    markupUSD: number;
+    costDisplay?: number;
+    revenueDisplay?: number;
+    currencyNative?: string;
+    markup?: number;
+    margin?: number;
+    flags?: string[];
+    emptyStates?: {
+      costos: boolean;
+      ingresos: boolean;
+      horas: boolean;
+      objetivos: boolean;
+    };
+    hasData?: {
+      costos: boolean;
+      ingresos: boolean;
+    };
+  };
   rankings: {
     economicMetrics: Array<{
       personnelId: number;

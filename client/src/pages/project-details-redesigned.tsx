@@ -1323,7 +1323,12 @@ const ProjectDetailsPage = () => {
     return [
       {
         label: "Presupuesto vs Objetivo",
-        value: `$${actuals.totalWorkedCost.toLocaleString()}`,
+        value: (() => {
+          const costDisplay = (unifiedData as any).summary?.costDisplay ?? actuals.totalWorkedCost;
+          const currency = (unifiedData as any).summary?.currencyNative ?? 'USD';
+          const symbol = currency === 'ARS' ? 'ARS' : '$';
+          return `${symbol} ${costDisplay.toLocaleString()}`;
+        })(),
         subtitle: `Objetivo: $${(quotation.baseCost || 0).toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
         icon: DollarSign,
         color: budgetStyle.color,
@@ -1461,17 +1466,23 @@ const ProjectDetailsPage = () => {
       metrics: (unifiedData as any).metrics
     });
 
-    // Usar datos directamente de unifiedData
+    // 🎯 Usar datos del SoT si están disponibles, sino fallback a actuals
     const actualHours = (unifiedData as any).actuals.totalWorkedHours || 0;
-    const actualCost = (unifiedData as any).actuals.totalWorkedCost || 0;
+    const actualCost = (unifiedData as any).summary?.costDisplay ?? (unifiedData as any).actuals.totalWorkedCost ?? 0;
     const targetHours = (unifiedData as any).quotation.estimatedHours || 0;
     const targetBudget = (unifiedData as any).quotation.baseCost || 0;
     const targetClientPrice = (unifiedData as any).quotation.totalAmount || 0;
     
-    // Usar métricas ya calculadas en el backend
+    // Usar métricas ya calculadas en el backend (del SoT si están disponibles)
     const budgetUtilization = (unifiedData as any).metrics.budgetUtilization;
-    const markup = (unifiedData as any).metrics.markup;
+    const markup = (unifiedData as any).summary?.markup ?? (unifiedData as any).metrics.markup;
     const hoursProgress = (unifiedData as any).metrics.efficiency;
+
+    console.log('🚨 CARD MORADA DEBUG:', {
+      actualCost,
+      baseCost: targetBudget,
+      budgetUtil: actualCost && targetBudget ? (actualCost / targetBudget) * 100 : 0
+    });
 
     return {
       totalCost: actualCost,
