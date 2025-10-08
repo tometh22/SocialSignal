@@ -3,11 +3,10 @@
  * Fuente unificada de ingresos y costos por proyecto
  */
 
-import { google } from 'googleapis';
-import fs from 'fs';
 import { db } from '../db';
 import { financialSot } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
+import { googleSheetsWorkingService } from '../services/googleSheetsWorking';
 
 interface RendimientoClienteRow {
   Cliente?: string;
@@ -73,77 +72,51 @@ function monthKeyFromEs(mes: string, year: number): string {
 }
 
 /**
- * Crear cliente Google Sheets
- */
-async function createSheetsClient() {
-  const jsonFiles = [
-    'attached_assets/focal-utility-318020-e2defb839c83_1754064776295.json',
-    'focal-utility-318020-e2defb839c83.json'
-  ];
-
-  let credentialsPath = '';
-  for (const filePath of jsonFiles) {
-    if (fs.existsSync(filePath)) {
-      credentialsPath = filePath;
-      break;
-    }
-  }
-
-  if (!credentialsPath) {
-    throw new Error('No se encontró el archivo de credenciales JSON');
-  }
-
-  console.log(`🔑 Using credentials file: ${credentialsPath}`);
-  
-  const credentialsJson = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
-  
-  const auth = new google.auth.GoogleAuth({
-    credentials: credentialsJson,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
-  });
-
-  return google.sheets({ version: 'v4', auth });
-}
-
-/**
- * Leer pestaña "Rendimiento Cliente" del Excel MAESTRO
+ * Leer pestaña "Rendimiento Cliente" usando el servicio singleton
  */
 async function readRendimientoCliente(): Promise<any[]> {
-  const sheets = await createSheetsClient();
-  const spreadsheetId = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
   const sheetName = 'Rendimiento Cliente';
-  const range = `${sheetName}!A:Z`;
-
+  
   console.log(`📥 Leyendo "${sheetName}" desde Excel MAESTRO...`);
 
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range,
-  });
+  try {
+    // Usar el método genérico del servicio
+    const sheets = (googleSheetsWorkingService as any).createSheetsClientFromJSON();
+    const spreadsheetId = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
+    const range = `${sheetName}!A:Z`;
 
-  const rows = response.data.values;
-  if (!rows || rows.length === 0) {
-    console.log('⚠️ No hay datos en la pestaña');
-    return [];
-  }
-
-  // Primera fila es headers
-  const headers = rows[0] as string[];
-  console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
-
-  // Convertir a objetos
-  const data = [];
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const obj: any = {};
-    headers.forEach((header, index) => {
-      obj[header] = row[index] || '';
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range,
     });
-    data.push(obj);
-  }
 
-  console.log(`✅ Leídas ${data.length} filas de "${sheetName}"`);
-  return data;
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+      console.log('⚠️ No hay datos en la pestaña');
+      return [];
+    }
+
+    // Primera fila es headers
+    const headers = rows[0] as string[];
+    console.log(`📋 Headers encontrados: ${headers.join(', ')}`);
+
+    // Convertir a objetos
+    const data = [];
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const obj: any = {};
+      headers.forEach((header, index) => {
+        obj[header] = row[index] || '';
+      });
+      data.push(obj);
+    }
+
+    console.log(`✅ Leídas ${data.length} filas de "${sheetName}"`);
+    return data;
+  } catch (error) {
+    console.error(`❌ Error leyendo "${sheetName}":`, error);
+    throw error;
+  }
 }
 
 /**
@@ -151,14 +124,14 @@ async function readRendimientoCliente(): Promise<any[]> {
  */
 async function getFXForMonth(year: number, monthNum: number): Promise<number> {
   const result = await db.execute(sql`
-    SELECT exchange_rate 
+    SELECT rate 
     FROM exchange_rates 
     WHERE year = ${year} AND month = ${monthNum}
     LIMIT 1
   `);
   
   if (result.rows && result.rows.length > 0) {
-    return Number(result.rows[0].exchange_rate);
+    return Number(result.rows[0].rate);
   }
   
   // Fallback: usar 1345 (promedio histórico)
@@ -187,29 +160,44 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
     }
 
     let skippedNotReal = 0;
+    const statusValues = new Set<string>();
 
     // Procesar cada fila
     for (const row of rows as RendimientoClienteRow[]) {
       try {
         // Validar campos requeridos
         if (!row.Cliente || !row.Proyecto || !row.Mes || !row.Año) {
+          console.log('⏭️ Saltando fila por campos faltantes:', { cliente: row.Cliente, proyecto: row.Proyecto, mes: row.Mes, año: row.Año });
           continue; // Skip rows sin datos básicos
         }
 
         // ⚠️ FILTRO CRÍTICO: Solo importar proyectos confirmados
-        const statusFlag = row["Pasado/Futuro"]?.trim().toLowerCase() || '';
-        if (statusFlag !== 'real') {
-          skippedNotReal++;
-          continue; // Skip rows que no son "Real" (futuro/pasado proyectado)
+        // Si la columna "Pasado/Futuro" existe, solo aceptar "Real"
+        // Si no existe, asumir que todos son confirmados
+        const hasPasadoFuturo = row["Pasado/Futuro"] !== undefined && row["Pasado/Futuro"] !== null;
+        
+        if (hasPasadoFuturo) {
+          const statusFlag = row["Pasado/Futuro"].trim().toLowerCase();
+          statusValues.add(statusFlag);
+          
+          if (statusFlag !== 'real') {
+            skippedNotReal++;
+            console.log(`⏭️ Saltando fila por status "${statusFlag}": ${row.Cliente} - ${row.Proyecto}`);
+            continue; // Skip rows que no son "Real" (futuro/pasado proyectado)
+          }
+        } else {
+          // Pestaña sin columna "Pasado/Futuro" - asumir todos confirmados
+          statusValues.add('(sin filtro - todos confirmados)');
+          console.log(`✅ Procesando fila (sin filtro): ${row.Cliente} - ${row.Proyecto}`);
         }
 
         const year = typeof row.Año === 'string' ? parseInt(row.Año) : Number(row.Año);
         const monthKey = monthKeyFromEs(row.Mes, year);
         const monthNum = parseInt(monthKey.split('-')[1]);
 
-        // Parsear valores
-        const revenueUsd = parseMoneyRobust(row["Facturación (USD)"]) ?? 0;
-        const costUsd = parseMoneyRobust(row["Costos (USD)"]) ?? 0;
+        // Parsear valores (los headers usan [USD], no (USD))
+        const revenueUsd = parseMoneyRobust(row["Facturación [USD]"]) ?? 0;
+        const costUsd = parseMoneyRobust(row["Costos [USD]"]) ?? 0;
         const fxSheet = parseMoneyRobust(row["Cotización"]);
         
         // Obtener FX del mes (preferir exchange_rates, fallback a Cotización)
@@ -251,6 +239,7 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
 
     console.log(`✅ Importación completada: ${result.inserted} registros insertados/actualizados`);
     console.log(`🔍 Filas filtradas (no "Real"): ${skippedNotReal}`);
+    console.log(`📋 Valores únicos encontrados en "Pasado/Futuro": ${Array.from(statusValues).join(', ')}`);
     
     if (result.errors.length > 0) {
       console.warn(`⚠️ Errores encontrados: ${result.errors.length}`);
