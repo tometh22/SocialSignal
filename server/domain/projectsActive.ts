@@ -31,8 +31,7 @@ import { db } from "../db";
 import { eq, and } from "drizzle-orm";
 import { CoverageCalculator } from "./coverage";
 import { aggregateIncome, type DualNormalizedIncome } from "../services/sales";
-import * as income from "./income";
-import * as costs from "./costs";
+import { aggregateFinancialProjects } from "./financial-aggregator";
 
 // ==================== TIME FILTER RESOLVER ====================
 // Unified resolver according to blueprint specification
@@ -173,31 +172,28 @@ export class ActiveProjectsAggregator {
   }
 
   /**
-   * 🚀 NUEVO SISTEMA DUAL: Get sales data usando nuevo normalizador dual
-   * Respeta moneda original + calcula USD normalizado para KPIs
+   * 🚀 FINANCIAL SOT: Get sales data from financial_sot (Rendimiento Cliente)
+   * Single Source of Truth - Only shows data loaded in "Rendimiento Cliente" Google Sheets tab
    */
   private async getSalesInPeriod(period: ResolvedPeriod): Promise<SalesRecord[]> {
-    console.log(`🚀 INCOME SOT: Using Income SoT for period ${period.start} → ${period.end}`);
+    console.log(`🚀 FINANCIAL SOT: Using financial_sot for period ${period.start} → ${period.end}`);
     
     try {
-      // 🎯 USAR INCOME SOT - Sistema completo con reglas anti-escala
+      // Convert period to monthKey format (YYYY-MM)
+      const monthKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+      console.log(`🎯 FINANCIAL SOT: Requesting data for period "${monthKey}"`);
       
-      // Convert period to Income SoT format (YYYY-MM)
-      const periodKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
-      console.log(`🎯 INCOME SOT: Requesting data for period "${periodKey}"`);
+      // Get financial data from financial_sot (Rendimiento Cliente)
+      const financialProjects = await aggregateFinancialProjects(monthKey);
+      console.log(`🎯 FINANCIAL SOT: Retrieved ${financialProjects.length} projects`);
       
-      // Get income data using Income SoT (includes anti-scale rules)
-      const incomeData = await income.getIncomeByPeriod(periodKey as any);
-      console.log(`🎯 INCOME SOT: Retrieved ${incomeData.projects.length} projects`);
-      
-      // Convert Income SoT projects to SalesRecord format for compatibility
+      // Convert to SalesRecord format for compatibility
       const filteredSales: SalesRecord[] = [];
       
-      for (const project of incomeData.projects) {
+      for (const project of financialProjects) {
         // Generate canonical fields for ETL consistency
         const canonicalFields = generateCanonicalFields(project.clientName, project.projectName);
         
-        // 🚀 INCOME SOT INTEGRATION: Usar datos con reglas anti-escala aplicadas
         const salesRecord: SalesRecord & {
           displayCurrency?: "ARS" | "USD";
           revenueDisplay?: number;
@@ -209,91 +205,84 @@ export class ActiveProjectsAggregator {
           projectName: project.projectName,
           clientId: 0, // Will be resolved later in merge
           clientName: project.clientName,
-          revenueUSD: project.revenueUSDNormalized, // Valor correcto con reglas anti-escala
-          month: periodKey.substring(5, 7),   // Extract month from period
-          year: parseInt(periodKey.substring(0, 4)), // Extract year from period
-          confirmedOnly: true, // Todos los records del Income SoT ya están confirmados
+          revenueUSD: project.metrics.revenueUSDNormalized,
+          month: monthKey.substring(5, 7),   // Extract month from period
+          year: parseInt(monthKey.substring(0, 4)), // Extract year from period
+          confirmedOnly: true, // All records from financial_sot are confirmed
           
-          // 🚀 DUAL CURRENCY: Valores correctos del Income SoT
-          displayCurrency: project.revenueDisplay.currency as "ARS" | "USD",
-          revenueDisplay: project.revenueDisplay.amount,
-          revenueUSDNormalized: project.revenueUSDNormalized
+          // 🚀 DUAL CURRENCY: Native currency display + USD normalized
+          displayCurrency: project.currencyNative,
+          revenueDisplay: project.metrics.revenueDisplay,
+          revenueUSDNormalized: project.metrics.revenueUSDNormalized
         };
         
         filteredSales.push(salesRecord);
         
-        console.log(`💰 INCOME SOT RECORD: ${project.clientName}|${project.projectName} → Display: ${project.revenueDisplay.currency} ${project.revenueDisplay.amount}, USD: ${project.revenueUSDNormalized}`);
+        console.log(`💰 FINANCIAL SOT RECORD: ${project.clientName}|${project.projectName} → Display: ${project.currencyNative} ${project.metrics.revenueDisplay}, USD: ${project.metrics.revenueUSDNormalized}`);
       }
 
-      console.log(`💰 INCOME SOT: ${filteredSales.length} records with anti-scale rules applied`);
+      console.log(`💰 FINANCIAL SOT: ${filteredSales.length} records from Rendimiento Cliente`);
       return filteredSales;
       
     } catch (error) {
-      console.error(`❌ INCOME SOT ERROR in getSalesInPeriod:`, error);
-      console.error(`❌ INCOME SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      console.error(`❌ FINANCIAL SOT ERROR in getSalesInPeriod:`, error);
+      console.error(`❌ FINANCIAL SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
       return []; // Return empty array on error
     }
   }
 
   /**
-   * 🚀 COSTS SoT: Get costs/hours data using new Source of Truth system
-   * Replaces legacy Excel MAESTRO approach with unified cost system
+   * 🚀 FINANCIAL SOT: Get costs data from financial_sot (Rendimiento Cliente)
+   * Single Source of Truth - Uses same data source as sales
    */
   private async getCostsInPeriod(period: ResolvedPeriod): Promise<CostRecord[]> {
+    console.log(`🚀 FINANCIAL SOT COSTS: Using financial_sot for period ${period.start} → ${period.end}`);
+    
     try {
-      // Extract period key from ResolvedPeriod
-      const periodKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+      // Convert period to monthKey format (YYYY-MM)
+      const monthKey = period.start.substring(0, 7); // "2025-08-01" → "2025-08"
+      console.log(`🎯 FINANCIAL SOT COSTS: Requesting data for period "${monthKey}"`);
       
-      console.log(`🚀 COSTS SOT: Getting costs for period ${periodKey}`);
+      // Get financial data from financial_sot (Rendimiento Cliente) - same source as sales
+      const financialProjects = await aggregateFinancialProjects(monthKey);
+      console.log(`🎯 FINANCIAL SOT COSTS: Retrieved ${financialProjects.length} projects`);
       
-      // Get costs data using Costs SoT (includes anti-scale rules)
-      const costsData = await costs.getCostsForPeriod(periodKey as any);
-      console.log(`🎯 COSTS SOT: Retrieved ${costsData.projects.length} projects`);
-
+      // Convert to CostRecord format for compatibility
       const filteredCosts: CostRecord[] = [];
-
-      // Transform costs SoT data to legacy CostRecord format
-      for (const project of costsData.projects) {
-        // Only include direct costs (exclude indirect/overhead)
-        if (project.kind !== 'Directo') {
-          console.log(`🔧 COSTS SOT: Skipping indirect cost for ${project.clientName}|${project.projectName}`);
-          continue;
-        }
-
-        // Generate canonical fields for consistency with rest of system
+      
+      for (const project of financialProjects) {
+        // Generate canonical fields for ETL consistency
         const canonicalFields = generateCanonicalFields(project.clientName, project.projectName);
         
-        // Create CostRecord compatible with existing aggregator
         const costRecord: CostRecord = {
           clientCanon: canonicalFields.clientCanon,
           projectCanon: canonicalFields.projectCanon,
           projectKey: canonicalFields.projectKey,
           projectName: project.projectName,
-          costUSD: project.costUSDNormalized, // Uses normalized USD amount with anti-scale
-          hoursReal: 0, // TODO: Hours integration when available in costs SoT
-          hoursTarget: 0, // TODO: Hours integration when available in costs SoT
-          month: period.start.substring(5, 7), // Extract month from period
-          year: parseInt(period.start.substring(0, 4)), // Extract year from period
-          // 🚀 DUAL CURRENCY FIELDS from Costs SoT
-          displayCurrency: project.costDisplay.currency,
-          costDisplay: project.costDisplay.amount,
-          costUSDNormalized: project.costUSDNormalized
+          costUSD: project.metrics.costUSDNormalized,
+          hoursReal: 0, // Hours not tracked in financial_sot
+          hoursTarget: 0, // Hours not tracked in financial_sot
+          month: monthKey.substring(5, 7),   // Extract month from period
+          year: parseInt(monthKey.substring(0, 4)), // Extract year from period
+          
+          // 🚀 DUAL CURRENCY: Native currency display + USD normalized
+          displayCurrency: project.currencyNative,
+          costDisplay: project.metrics.costDisplay,
+          costUSDNormalized: project.metrics.costUSDNormalized
         };
         
         filteredCosts.push(costRecord);
         
-        console.log(`💰 COSTS SOT RECORD: ${project.clientName}|${project.projectName} → Display: ${project.costDisplay.currency} ${project.costDisplay.amount}, USD: ${project.costUSDNormalized}`);
+        console.log(`💰 FINANCIAL SOT COST RECORD: ${project.clientName}|${project.projectName} → Display: ${project.currencyNative} ${project.metrics.costDisplay}, USD: ${project.metrics.costUSDNormalized}`);
       }
 
-      console.log(`💰 COSTS SOT: ${filteredCosts.length} records with anti-scale rules applied`);
+      console.log(`💰 FINANCIAL SOT COSTS: ${filteredCosts.length} records from Rendimiento Cliente`);
       return filteredCosts;
       
     } catch (error) {
-      console.error(`❌ COSTS SOT ERROR in getCostsInPeriod:`, error);
-      console.error(`❌ COSTS SOT ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Fallback to empty array on error
-      return [];
+      console.error(`❌ FINANCIAL SOT COSTS ERROR in getCostsInPeriod:`, error);
+      console.error(`❌ FINANCIAL SOT COSTS ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      return []; // Return empty array on error
     }
   }
 
