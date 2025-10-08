@@ -1463,7 +1463,10 @@ const ProjectDetailsPage = () => {
       totalWorkedCost: (unifiedData as any).actuals.totalWorkedCost,
       baseCost: (unifiedData as any).quotation.baseCost,
       totalAmount: (unifiedData as any).quotation.totalAmount,
-      metrics: (unifiedData as any).metrics
+      metrics: (unifiedData as any).metrics,
+      summary: (unifiedData as any).summary,
+      summaryExists: !!(unifiedData as any).summary,
+      costDisplay: (unifiedData as any).summary?.costDisplay
     });
 
     // 🎯 Usar datos del SoT si están disponibles, sino fallback a actuals
