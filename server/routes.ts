@@ -686,12 +686,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
       
-      // 🚀 SoT OVERRIDE: If using period=YYYY-MM, override display values with SoT data
+      // 🚀 FINANCIAL SoT: If using period=YYYY-MM, override display values with financial_sot data
       if (usingSoT && aggregatorResponse?.projects) {
-        const { getProjectsSummary } = await import('./domain/metrics/period_ledger');
+        const { aggregateFinancialProjects } = await import('./domain/financial-aggregator');
         const { canonicalizeKey } = await import('./domain/shared/strings');
         
-        console.log(`🔍 SoT OVERRIDE: Fetching SoT data for ${aggregatorResponse.projects.length} projects`);
+        console.log(`🔍 FINANCIAL SoT: Fetching from financial_sot for ${aggregatorResponse.projects.length} projects`);
         
         // Get all projects from database with relations
         const allProjectsData = await db.query.activeProjects.findMany({
@@ -701,51 +701,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         
-        // Get SoT summaries for period
-        const sotSummaries = await getProjectsSummary(periodQuery);
-        console.log(`📊 SoT: Found ${sotSummaries.length} project summaries in SoT tables`);
+        // Get financial data from financial_sot for the period
+        const financialData = await aggregateFinancialProjects(periodQuery);
+        console.log(`📊 FINANCIAL SoT: Found ${financialData.length} projects in financial_sot`);
         
-        // Create lookup map: projectId -> SoT data
-        const sotByProjectId = new Map();
+        // Create lookup map: projectId -> financial data
+        const financialByProjectId = new Map();
         for (const projectData of allProjectsData) {
           if (projectData.client && projectData.quotation?.projectName) {
             const clientName = projectData.client.name;
             const projectName = projectData.quotation.projectName;
             const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
             
-            const sotData = sotSummaries.find(s => s.projectKey === projectKey);
-            if (sotData) {
-              sotByProjectId.set(projectData.id, sotData);
-              console.log(`✅ SoT MATCH: Project ${projectData.id} (${projectKey}) → ${sotData.currencyNative} ${sotData.metrics.revenueDisplay}`);
+            const finData = financialData.find(f => f.projectKey === projectKey);
+            if (finData) {
+              financialByProjectId.set(projectData.id, finData);
+              console.log(`✅ FINANCIAL MATCH: Project ${projectData.id} (${projectKey}) → ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
             }
           }
         }
         
-        // Override display values with SoT data
+        // Override display values with financial_sot data
         for (const project of aggregatorResponse.projects) {
-          const sotData = sotByProjectId.get(project.projectId);
-          if (sotData && project.metrics) {
-            console.log(`🔄 SoT OVERRIDE: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${sotData.currencyNative} ${sotData.metrics.revenueDisplay}`);
+          const finData = financialByProjectId.get(project.projectId);
+          if (finData && project.metrics) {
+            console.log(`🔄 FINANCIAL SoT: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
             
             project.metrics.revenueDisplay = {
-              amount: sotData.metrics.revenueDisplay,
-              currency: sotData.currencyNative as "ARS" | "USD"
+              amount: finData.metrics.revenueDisplay,
+              currency: finData.currencyNative as "ARS" | "USD"
             };
             project.metrics.costDisplay = {
-              amount: sotData.metrics.costDisplay,
-              currency: sotData.currencyNative as "ARS" | "USD"
+              amount: finData.metrics.costDisplay,
+              currency: finData.currencyNative as "ARS" | "USD"
             };
             
             // Also update USD values
-            project.metrics.revenueUSD = sotData.metrics.revenueUSDNormalized;
-            project.metrics.costUSD = sotData.metrics.costUSDNormalized;
-            project.metrics.profitUSD = sotData.metrics.revenueUSDNormalized - sotData.metrics.costUSDNormalized;
-            project.metrics.markupRatio = sotData.metrics.markup;
-            project.metrics.marginFrac = sotData.metrics.margin;
+            project.metrics.revenueUSD = finData.metrics.revenueUSDNormalized;
+            project.metrics.costUSD = finData.metrics.costUSDNormalized;
+            project.metrics.profitUSD = finData.metrics.profitUSD;
+            project.metrics.markupRatio = finData.metrics.markup;
+            project.metrics.marginFrac = finData.metrics.margin;
           }
         }
         
-        console.log(`✅ SoT OVERRIDE: Updated ${sotByProjectId.size} projects with SoT data`);
+        console.log(`✅ FINANCIAL SoT: Updated ${financialByProjectId.size} projects with financial_sot data`);
+        
+        // 🔢 Recalcular summary desde financial_sot
+        if (financialData.length > 0) {
+          const totalRevenueUSD = financialData.reduce((sum, p) => sum + p.metrics.revenueUSDNormalized, 0);
+          const totalCostUSD = financialData.reduce((sum, p) => sum + p.metrics.costUSDNormalized, 0);
+          const totalProfitUSD = totalRevenueUSD - totalCostUSD;
+          
+          const margins = financialData
+            .map(p => p.metrics.margin)
+            .filter((m): m is number => m !== null && !isNaN(m));
+          const avgMargin = margins.length > 0 ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
+          
+          aggregatorResponse.summary = {
+            periodRevenueUSD: totalRevenueUSD,
+            periodCostUSD: totalCostUSD,
+            periodProfitUSD: totalProfitUSD,
+            periodAvgMarginPercent: avgMargin * 100,
+            projectCount: financialData.length,
+            monthCount: 1
+          };
+          
+          console.log(`📊 FINANCIAL SoT SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Projects=${financialData.length}`);
+        }
       }
       
       // Safe access to summary with debugging

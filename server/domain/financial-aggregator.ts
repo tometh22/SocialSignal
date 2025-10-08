@@ -6,8 +6,10 @@
 import { db } from '../db';
 import { financialSot } from '../../shared/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
+import { canonicalizeKey } from './shared/strings';
 
 export interface FinancialProjectMetrics {
+  projectKey: string;
   clientName: string;
   projectName: string;
   projectType: string | null;
@@ -91,7 +93,11 @@ export async function aggregateFinancialProjects(
       const margin = revenueUSD > 0 ? (profitUSD / revenueUSD) : null;
       const markup = costUSD > 0 ? (revenueUSD / costUSD) : null;
 
+      // Crear projectKey canónico
+      const projectKey = canonicalizeKey(`${row.clientName}|${row.projectName}`);
+
       return {
+        projectKey,
         clientName: row.clientName,
         projectName: row.projectName,
         projectType: row.projectType,

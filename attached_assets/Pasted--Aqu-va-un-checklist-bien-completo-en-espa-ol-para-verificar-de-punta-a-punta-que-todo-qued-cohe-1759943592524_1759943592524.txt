@@ -1,0 +1,151 @@
+¡Aquí va un checklist bien completo (en español) para verificar de punta a punta que todo quedó coherente, nativo (ARS/USD) y consistente entre lista y vista única!
+
+1) Datos / ETL (Rendimiento Cliente)
+
+ La app lee solo de la pestaña Rendimiento Cliente (no de otras).
+
+ Mapeo por fila:
+
+ Cliente → client_name
+
+ Proyecto → project_name
+
+ Tipo de proyecto → project_type (Fee / One Shot)
+
+ Mes + Año → month_key (YYYY-MM)
+
+ Facturación (USD) → revenue_usd (neto, sin IVA)
+
+ Costos (USD) → cost_usd (neto, sin IVA)
+
+ fx del mes desde exchange_rates(year,month) (fallback: Cotización del sheet)
+
+ UPSERT por clave única (client_name, project_name, month_key) (evita duplicados).
+
+ Conversión robusta de números (puntos y comas) — sin ×100, sin miles mal parseados.
+
+ Log del import: filas leídas, upserts, errores por fila (si los hay).
+
+2) Moneda nativa (reglas)
+
+ USD nativo: Warner, Kimberly → display en USD.
+
+ ARS nativo: Play Digital S.A (Modo), Coelsa y resto → display en ARS.
+
+ currencyNative se emite explícita en el backend para cada proyecto.
+
+ KPIs (Markup/Margen) siempre calculados en USD (revenue_usd / cost_usd).
+
+3) Agregador (API única para toda la app)
+
+ /api/projects?period=YYYY-MM:
+
+ metrics.revenueDisplay y metrics.costDisplay en moneda nativa.
+
+ metrics.revenueUSDNormalized y metrics.costUSDNormalized en USD.
+
+ metrics.markup = revenueUSDNormalized / costUSDNormalized (si cost>0).
+
+ metrics.margin = (rev_usd - cost_usd)/rev_usd (si rev>0).
+
+ summary.periodRevenueUSD y summary.periodProfitUSD = sumas en USD.
+
+ /api/projects/:id/complete-data?period=YYYY-MM usa el mismo agregador para header/KPIs.
+
+ ?source=fresh invalida caché y responde fresco.
+
+4) UI – Lista (tu canvas “Active Projects – Next”)
+
+ El componente no infiere moneda si viene currencyNative; usa lo que envía el backend.
+
+ Cards:
+
+ “Facturación/Costo/Ganancia” → usan revenueDisplay/costDisplay + símbolo por currencyNative.
+
+ “Markup/Margen” → de *_USDNormalized (quedan iguales entre páginas).
+
+ Barra de KPIs arriba:
+
+ “Facturación del período (USD)” = summary.periodRevenueUSD.
+
+ “Ganancia del período (USD)” = summary.periodProfitUSD.
+
+ Filtro “Solo activos” solo oculta en UI (no altera datos).
+
+ Periodo se guarda en localStorage y teclas ← → navegan meses.
+
+5) UI – Vista única
+
+ El header del proyecto muestra exactamente los mismos números que su card (mismo agregador).
+
+ Pestañas (Equipo/Performance/Tiempo/Ingresos/Costos/Financiero/Operacional) no recalculan distinto: si requieren datos extras, no duplican KPI base.
+
+ Selector temporal sincronizado (mes YYYY-MM).
+
+6) Verificación rápida con Agosto 2025 (expected sanity)
+
+Ejecutá:
+
+PERIOD=2025-08
+curl -s "/api/projects?period=$PERIOD&source=fresh" | jq \
+'.projects[] | {c:.clientName,p:.projectName,cur:.currencyNative,
+ rev_disp:.metrics.revenueDisplay, cost_disp:.metrics.costDisplay,
+ rev_usd:.metrics.revenueUSDNormalized, cost_usd:.metrics.costUSDNormalized,
+ mu:.metrics.markup, mg:.metrics.margin}' | head -30
+
+
+Comprobar ejemplos:
+
+ Warner (USD): rev≈ 29,230 / cost≈ 7,005.20 / margen ~0.76 / markup ~4.17×
+
+ Kimberly (USD): rev≈ 8,450 / cost≈ 2,436.09 / margen ~0.71 / markup ~3.47×
+
+ Modo (ARS): rev_disp≈ ARS ~3.72M ; cost_disp≈ ARS ~497,550 ; KPIs ~6.18× / 0.84
+
+ Coelsa (ARS): rev_disp≈ ARS ~5.28M ; cost_disp≈ ARS ~553,002 ; KPIs ~7.88× / 0.87
+
+7) Comparación con el Excel (consistencia)
+
+ Totales por cliente en USD:
+
+Ejecutá diff SQL/consulta que compare revenue_usd y cost_usd vs sheet para 2025-08.
+
+ Si algo no cierra:
+
+ Revisión de parser (coma/punto).
+
+ Duplicados client|project|month_key (sumar).
+
+ FX correcto del mes (no usar FX de otro período).
+
+ IVA: no mezclar columnas “con IVA”.
+
+8) Debug / Auditoría
+
+ Logs del ETL con filas rechazadas y motivo.
+
+ /api/costs/debug?period=2025-08 accesible (para ver FX, flags).
+
+ Flag de rollback (FINANCIAL_SOURCE=sheet|legacy) por si hay que volver temporalmente.
+
+9) Edge cases
+
+ Proyectos One Shot solo aparecen en los meses en los que tienen fila.
+
+ Si falta costo en un mes, cost=0 (markup infinito → mostrar “—” y margen ≈100%).
+
+ Si revenue=0, margen “—”.
+
+ Nombres normalizados (projectKey lower-case) para evitar cruces (Modo/Coelsa).
+
+10) Aceptación (done criteria)
+
+ Lista y vista única muestran idénticos KPIs para el mismo proyecto/mes.
+
+ Modo/Coelsa siempre en ARS; Warner/Kimberly en USD.
+
+ Totales del período (USD) coinciden con “Rendimiento Cliente”.
+
+ No hay números “astronómicos” ni signos incorrectos.
+
+ Navegación temporal y “Actualizar” funcionan sin inconsistencias
