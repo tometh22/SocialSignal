@@ -93,13 +93,14 @@ async function createSheetsClient() {
     throw new Error('No se encontró el archivo de credenciales JSON');
   }
 
-  const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
-  const auth = new google.auth.JWT(
-    credentials.client_email,
-    undefined,
-    credentials.private_key,
-    ['https://www.googleapis.com/auth/spreadsheets.readonly']
-  );
+  console.log(`🔑 Using credentials file: ${credentialsPath}`);
+  
+  const credentialsJson = JSON.parse(fs.readFileSync(credentialsPath, 'utf-8'));
+  
+  const auth = new google.auth.GoogleAuth({
+    credentials: credentialsJson,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+  });
 
   return google.sheets({ version: 'v4', auth });
 }
