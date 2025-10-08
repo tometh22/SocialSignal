@@ -18,6 +18,7 @@ interface RendimientoClienteRow {
   Cotización?: string | number;
   "Facturación (USD)"?: string | number;
   "Costos (USD)"?: string | number;
+  "Pasado/Futuro"?: string;
 }
 
 export interface ImportRendimientoClienteResult {
@@ -184,12 +185,21 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
       return result;
     }
 
+    let skippedNotReal = 0;
+
     // Procesar cada fila
     for (const row of rows as RendimientoClienteRow[]) {
       try {
         // Validar campos requeridos
         if (!row.Cliente || !row.Proyecto || !row.Mes || !row.Año) {
           continue; // Skip rows sin datos básicos
+        }
+
+        // ⚠️ FILTRO CRÍTICO: Solo importar proyectos confirmados
+        const statusFlag = row["Pasado/Futuro"]?.trim().toLowerCase() || '';
+        if (statusFlag !== 'real') {
+          skippedNotReal++;
+          continue; // Skip rows que no son "Real" (futuro/pasado proyectado)
         }
 
         const year = typeof row.Año === 'string' ? parseInt(row.Año) : Number(row.Año);
@@ -239,6 +249,7 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
     }
 
     console.log(`✅ Importación completada: ${result.inserted} registros insertados/actualizados`);
+    console.log(`🔍 Filas filtradas (no "Real"): ${skippedNotReal}`);
     
     if (result.errors.length > 0) {
       console.warn(`⚠️ Errores encontrados: ${result.errors.length}`);
