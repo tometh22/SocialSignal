@@ -1,0 +1,111 @@
+Qué trae la hoja (columnas clave)
+
+Cliente → nombre del cliente (p. ej. Warner, Play Digital S.A (Modo), Coelsa).
+
+Tipo de proyecto → Fee (mensual) o One Shot (puntual).
+
+Proyecto → nombre del proyecto dentro del cliente (p. ej. Fee mensual, Fee Huggies, Vacaciones Invierno).
+
+Mes / Año → período de facturación (no de cobro). De acá armamos month_key = YYYY-MM.
+
+Cotización → tipo de cambio de referencia (puede existir, pero para KPIs usamos el FX mensual de la tabla exchange_rates; la cotización del sheet queda como respaldo).
+
+Facturación (USD) → ingreso del período ya expresado en USD neto (sin IVA).
+
+Costos (USD) → costo del período ya en USD neto (sin IVA).
+
+En esta pestaña, ingresos y costos ya están en USD. Por eso la tratamos como nuestra SoT financiera (canónica) en USD.
+
+Reglas/criterios de uso
+
+Moneda nativa para display (solo UI):
+
+Clientes USD nativo: Warner, Kimberly Clark → mostramos display en USD.
+
+Clientes ARS nativo: Modo, Coelsa y el resto locales → mostramos display en ARS (conversión: USD × FX del mes).
+
+KPIs (Markup/Margen) siempre se calculan con los USD de la hoja (consistencia global).
+
+Fee vs One Shot:
+
+Fee: cada fila es un mes independiente; el proyecto aparece solo en esos meses.
+
+One Shot: aparece en los meses que existan filas (si dura 3 meses, vendrán 3 filas; si es 1 mes, 1 fila).
+
+Filtrado temporal: se hace por month_key (ej. 2025-08).
+
+FX: para convertir a ARS (solo para display de clientes ARS) usamos exchange_rates(year, month). Si faltara, se puede usar Cotización como fallback.
+
+Agregación: sumamos por client|project|month_key (si hay varias filas del mismo, se consolidan).
+
+Cómo mapeo a la base
+
+Para cada fila válida:
+
+client_name ← Cliente
+
+project_name ← Proyecto
+
+project_type ← Tipo de proyecto
+
+month_key ← Mes/Año → YYYY-MM
+
+revenue_usd ← Facturación (USD)
+
+cost_usd ← Costos (USD)
+
+fx ← exchange_rates (del mes), cotización queda de respaldo
+
+Guardamos en una SoT unificada (p. ej. financial_sot), con PK (client, project, month_key).
+
+Qué se calcula
+
+Por proyecto y período:
+
+Display nativo:
+
+revenueDisplay =
+
+USD-nativo → revenue_usd
+
+ARS-nativo → revenue_usd × fx
+
+costDisplay =
+
+USD-nativo → cost_usd
+
+ARS-nativo → cost_usd × fx
+
+KPIs (siempre en USD):
+
+revenueUSDNormalized = revenue_usd
+
+costUSDNormalized = cost_usd
+
+markup = revenue_usd / cost_usd (si cost_usd>0)
+
+margin = (revenue_usd - cost_usd) / revenue_usd (si revenue_usd>0)
+
+Totales del período (summary): sumas de USD (revenue y profit).
+
+Pitfalls que tengo en cuenta
+
+Separadores (puntos/comas) en números → parse robusto.
+
+IVA: trabajamos con columnas (USD) netas (sin IVA), por lo que no usamos columnas “con IVA”.
+
+Duplicados: si hay múltiples filas para el mismo client|project|month_key, las sumamos (y la PK evita duplicados al final).
+
+Moneda visual: si el backend envía currencyNative y *Display correctos, el front no “derrapa” (nada de USD rotulado como ARS).
+
+One Shot fuera del período: no se muestra si no tiene fila ese mes.
+
+Ejemplos de agosto (esperados)
+
+Warner (USD): Facturación ~ $29,230; Costo ~ $7,005.20 → margen ~76%, markup ~4.17×.
+
+Kimberly (USD): $8,450 / $2,436.09 → ~71%, ~3.47×.
+
+Modo (ARS): Facturación USD~2,286.25 → ARS ≈ 2,286.25×FX (y costo idem); en tu dataset vimos montos ARS de referencia (p. ej., 3.72M y 497.55K) coherentes con ese FX.
+
+Coelsa (ARS): Facturación USD~3,241.53 → ARS ≈ 5.27M; Costo ARS ~553,002; KPIs sobre USD

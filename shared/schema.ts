@@ -2126,6 +2126,23 @@ export const costsSot = pgTable("costs_sot", {
   projectMonthIdx: unique().on(table.projectKey, table.monthKey)
 }));
 
+// Tabla SoT financiera unificada (Financial Source of Truth) - leer de "Rendimiento Cliente"
+export const financialSot = pgTable("financial_sot", {
+  id: serial("id").primaryKey(),
+  clientName: text("client_name").notNull(), // Cliente
+  projectName: text("project_name").notNull(), // Proyecto
+  projectType: text("project_type"), // Tipo de proyecto: 'Fee' | 'One Shot'
+  monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM (Mes + Año)
+  year: integer("year").notNull(), // Año
+  revenueUsd: numeric("revenue_usd", { precision: 16, scale: 2 }).notNull(), // Facturación (USD)
+  costUsd: numeric("cost_usd", { precision: 16, scale: 2 }).notNull(), // Costos (USD)
+  fx: numeric("fx", { precision: 12, scale: 6 }).notNull(), // FX del mes para conversión a ARS
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueClientProjectMonth: unique().on(table.clientName, table.projectName, table.monthKey)
+}));
+
 // Tabla normalizada de ventas
 export const salesNorm = pgTable("sales_norm", {
   id: serial("id").primaryKey(),
@@ -2191,6 +2208,12 @@ export const insertCostsSotSchema = createInsertSchema(costsSot).omit({
   updatedAt: true,
 });
 
+export const insertFinancialSotSchema = createInsertSchema(financialSot).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertSalesNormSchema = createInsertSchema(salesNorm).omit({
   id: true,
   createdAt: true,
@@ -2214,6 +2237,8 @@ export type IncomeSot = typeof incomeSot.$inferSelect;
 export type InsertIncomeSot = z.infer<typeof insertIncomeSotSchema>;
 export type CostsSot = typeof costsSot.$inferSelect;
 export type InsertCostsSot = z.infer<typeof insertCostsSotSchema>;
+export type FinancialSot = typeof financialSot.$inferSelect;
+export type InsertFinancialSot = z.infer<typeof insertFinancialSotSchema>;
 export type SalesNorm = typeof salesNorm.$inferSelect;
 export type InsertSalesNorm = z.infer<typeof insertSalesNormSchema>;
 export type CostsNorm = typeof costsNorm.$inferSelect;

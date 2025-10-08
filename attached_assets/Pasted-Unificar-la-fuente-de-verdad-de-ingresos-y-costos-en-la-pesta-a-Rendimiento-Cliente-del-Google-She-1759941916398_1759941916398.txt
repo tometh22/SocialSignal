@@ -1,0 +1,153 @@
+Unificar la fuente de verdad de ingresos y costos en la pestaña “Rendimiento Cliente” del Google Sheet Seguimiento Financiero/Economico Para Tablero. La lista de proyectos y la vista única deben usar el mismo agregador y mostrar display en moneda nativa (USD: Warner/Kimberly; ARS: resto) y KPIs en USD normalizado.
+
+1) ETL nuevo desde “Rendimiento Cliente”
+
+Crear server/services/etl/rendimiento-cliente.ts con lector de Google Sheets y mapeo:
+
+Sheet: Rendimiento Cliente
+Columnas (mínimas):
+
+Cliente → client_name
+
+Proyecto → project_name
+
+Tipo de proyecto → project_type (Fee | One Shot)
+
+Mes → month_es (ej. “08 ago”)
+
+Año → year
+
+Cotización → fx_sheet (string con separadores → número)
+
+Facturación (USD) → revenue_usd (número)
+
+Costos (USD) → cost_usd (número)
+
+Normalizaciones:
+
+month_key = YYYY-MM (mapear “ene…dic”).
+
+Parsear números robusto: replace(/[^\d,.-]/g,''), luego . miles → remove, , decimal → .
+
+fx final = exchange_rates por month_key (si falta, usar fx_sheet).
+
+Persistencia (nueva SoT unificada): crear tabla financial_sot:
+
+financial_sot(
+  client_name text,
+  project_name text,
+  project_type text,
+  month_key text,  -- YYYY-MM
+  year int,
+  revenue_usd numeric,   -- Facturación (USD)
+  cost_usd numeric,      -- Costos (USD)
+  fx numeric,            -- FX del mes usado
+  PRIMARY KEY (client_name, project_name, month_key)
+);
+
+
+(Opcional) Si preferís no crear nueva tabla: poblar income_sot(revenue_usd) y costs_sot(cost_usd) desde esta pestaña con la misma PK (client,project,month_key).
+
+Endpoint interno de sync:
+
+GET /internal/sync/financial
+→ { ok:true, rows:<N>, upserts:<M>, periodStats:{...} }
+
+2) Agregador único para API
+
+Modificar/crear server/aggregators/projects.ts para leer solo de financial_sot:
+
+// currency native
+const isUSD = (client:string)=> /warner|kimberly/i.test(client);
+const toARS = (usd:number, fx:number)=> (usd ?? 0) * (fx ?? 0);
+
+// para cada fila financial_sot:
+const revenueUSD = row.revenue_usd ?? 0;
+const costUSD    = row.cost_usd ?? 0;
+const fx         = row.fx ?? fxTable[period];
+
+const currencyNative = isUSD(row.client_name) ? "USD" : "ARS";
+const revenueDisplay = currencyNative === "USD" ? revenueUSD : toARS(revenueUSD, fx);
+const costDisplay    = currencyNative === "USD" ? costUSD    : toARS(costUSD, fx);
+
+const markup = costUSD > 0 ? revenueUSD / costUSD : null;
+const margin = revenueUSD > 0 ? (revenueUSD - costUSD) / revenueUSD : null;
+
+return {
+  clientName: row.client_name,
+  projectName: row.project_name,
+  tags: [row.project_type].filter(Boolean),
+  currencyNative,
+  metrics: {
+    revenueDisplay, costDisplay,                // nativo (ARS o USD)
+    revenueUSDNormalized: revenueUSD,          // KPIs en USD
+    costUSDNormalized: costUSD,
+    markup, margin
+  }
+};
+
+
+Resumen del período = sumas en USD (revenue_usd, revenue_usd - cost_usd).
+
+3) Endpoints
+
+GET /api/projects?period=YYYY-MM[&source=fresh] → usa agregador anterior.
+
+GET /api/projects/:id/complete-data?period=YYYY-MM → usar el mismo agregador para el header y KPIs (evitar divergencias).
+
+Mantener /api/costs/debug opcionalmente como auditoría histórica, pero la UI toma costos de financial_sot.
+
+4) Front (ya está casi listo)
+
+El canvas Active Projects – Next ya espera:
+
+currencyNative → render “ARS” o “$”.
+
+metrics.revenueDisplay/costDisplay → en moneda nativa.
+
+metrics.*USDNormalized → KPIs.
+
+No tocar el canvas salvo que falte currencyNative.
+
+5) Pruebas rápidas (Agosto 2025)
+# 1) Sync
+curl -s /internal/sync/financial | jq
+
+# 2) Ver API
+curl -s "/api/projects?period=2025-08&source=fresh" | jq \
+'.projects[] | {c:.clientName,p:.projectName,cur:.currencyNative,
+ rev_disp:.metrics.revenueDisplay,cost_disp:.metrics.costDisplay,
+ rev_usd:.metrics.revenueUSDNormalized,cost_usd:.metrics.costUSDNormalized}' | head -30
+
+
+Esperado (ejemplos):
+
+Warner → cur=USD, rev_disp≈29230, cost_disp≈7005.20
+
+Kimberly → cur=USD, rev_disp≈8450, cost_disp≈2436.09
+
+Play Digital S.A (Modo) → cur=ARS, rev_disp≈3.720.750, cost_disp≈497.550
+
+Coelsa → cur=ARS, rev_disp≈5.275.427, cost_disp≈553.002
+
+Markup/Margen deben coincidir con el dashboard “Rendimiento de Cliente”.
+
+6) Rollback & Flags
+
+.env → FINANCIAL_SOURCE=sheet|legacy.
+
+Mantener scripts para re-poblar income_sot/costs_sot si hiciera falta volver.
+
+✅ Checklist de cierre
+
+ financial_sot poblada para 2025-08 con FX correcto.
+
+ /api/projects y /api/projects/:id/complete-data dan los mismos números.
+
+ Cards: Modo/Coelsa ARS, Warner/Kimberly USD.
+
+ SummaryBar: totales USD coherentes.
+
+ Sin valores “astronómicos” ni conversiones duplicadas.
+
+Con esto, quedamos 1:1 con la pestaña Rendimiento Cliente y resolvemos la disputa de monedas y de fuentes divergentes.
