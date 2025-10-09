@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
+import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
 import {
   ArrowLeft,
   Calendar,
@@ -1419,6 +1420,17 @@ const ProjectDetailsPage = () => {
     ];
   }, [unifiedData, project]);
 
+  // 🛡️ WATCHDOG: Detectar cuando summary desaparece (solo DEV)
+  useEffect(() => {
+    if (import.meta.env.MODE !== 'production' && unifiedData) {
+      const prevData = (window as any).__prevUnifiedData;
+      if (prevData) {
+        watchSummaryDropped(prevData, unifiedData, 'unifiedData update');
+      }
+      (window as any).__prevUnifiedData = unifiedData;
+    }
+  }, [unifiedData]);
+
   // CRITICAL FIX: Use filtered team data from actuals instead of quotation team
   // This ensures temporal filtering is respected across ALL tabs
   const teamStats = useMemo(() => {
@@ -1450,6 +1462,7 @@ const ProjectDetailsPage = () => {
   }, [unifiedData?.actuals?.teamBreakdown]);
 
   // SINGLE SOURCE OF TRUTH: usar unifiedData para todas las métricas
+  // 🛡️ FIX: Dependencias específicas en lugar del objeto completo
   const costSummary = useMemo(() => {
     if (!unifiedData) return null;
     if (!unifiedData.quotation) {
@@ -1499,7 +1512,19 @@ const ProjectDetailsPage = () => {
       targetClientPrice: targetClientPrice,
       hoursProgress: hoursProgress
     };
-  }, [unifiedData]);
+  }, [
+    // 🛡️ DEPENDENCIAS ESPECÍFICAS: Solo recalcular cuando cambien estos valores
+    unifiedData?.summary?.costDisplay,
+    unifiedData?.actuals?.totalWorkedCost,
+    unifiedData?.actuals?.totalWorkedHours,
+    unifiedData?.quotation?.estimatedHours,
+    unifiedData?.quotation?.baseCost,
+    unifiedData?.quotation?.totalAmount,
+    unifiedData?.metrics?.budgetUtilization,
+    unifiedData?.metrics?.efficiency,
+    unifiedData?.summary?.markup,
+    unifiedData?.metrics?.markup
+  ]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({

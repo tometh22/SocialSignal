@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useRef, useEffect } from 'react';
 
 interface CompleteProjectData {
   // Root level properties (for direct access)
@@ -200,16 +201,27 @@ export const useCompleteProjectData = (
   timeFilter: string = 'all',
   period?: string // 🎯 NEW: Support period=YYYY-MM for SoT integration
 ) => {
-  return useQuery<CompleteProjectData>({
+  // 🛡️ RACE CONDITION FIX: Cache último summary válido
+  const lastGoodSummaryRef = useRef<CompleteProjectData['summary'] | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const query = useQuery<CompleteProjectData>({
     queryKey: ['projects', projectId, 'complete-data', period || timeFilter],
     queryFn: async () => {
+      // 🛡️ Abortar fetch anterior si existe
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      
       // 🎯 Prefer period over timeFilter for SoT integration
       const url = period && /^\d{4}-\d{2}$/.test(period)
         ? `/api/projects/${projectId}/complete-data?period=${period}&basis=usd`
         : `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
       console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, period, url });
       
-      const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         console.log('🔍 HOOK: Request timeout after 20 seconds');
         controller.abort();
@@ -242,15 +254,26 @@ export const useCompleteProjectData = (
         }
         
         const data = await response.json();
+        
+        // 🛡️ MERGE FUNCIONAL: Preservar summary si el nuevo fetch no lo trae
+        const mergedData = {
+          ...data,
+          summary: data.summary || lastGoodSummaryRef.current || undefined
+        };
+        
         console.log('🔍 HOOK: Success data received:', {
           projectId,
           timeFilter,
           estimatedHours: data.quotation?.estimatedHours,
           workedHours: data.actuals?.totalWorkedHours,
           totalCost: data.actuals?.totalWorkedCost,
-          markup: data.metrics?.markup
+          markup: data.metrics?.markup,
+          hasSummary: !!data.summary,
+          costDisplay: data.summary?.costDisplay,
+          usedCachedSummary: !data.summary && !!lastGoodSummaryRef.current
         });
-        return data;
+        
+        return mergedData;
       } catch (error: any) {
         clearTimeout(timeoutId);
         if (error.name === 'AbortError') {
@@ -274,4 +297,26 @@ export const useCompleteProjectData = (
     refetchOnWindowFocus: false, // Disable refetch on window focus
     refetchInterval: false, // Disable automatic polling
   });
+
+  // 🛡️ Actualizar cache cuando llegue un summary válido
+  useEffect(() => {
+    if (query.data?.summary?.costDisplay != null) {
+      lastGoodSummaryRef.current = query.data.summary;
+      console.log('🛡️ CACHE: Updated lastGoodSummary:', {
+        costDisplay: query.data.summary.costDisplay,
+        currencyNative: query.data.summary.currencyNative
+      });
+    }
+  }, [query.data?.summary?.costDisplay]);
+
+  // 🛡️ Cleanup al desmontar
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  return query;
 };
