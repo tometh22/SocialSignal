@@ -1220,6 +1220,40 @@ const ProjectDetailsPage = () => {
     console.log('🚀 Data should change when filter changes above');
   }
 
+  // 🎯 SELECTOR ÚNICO: ViewModel consolidado (no reconvertir)
+  const projectVM = useMemo(() => {
+    if (!unifiedData) return null;
+    
+    const vm = toProjectVM({
+      summary: unifiedData.summary,
+      actuals: unifiedData.actuals,
+      quotation: unifiedData.quotation,
+      metrics: unifiedData.metrics
+    });
+
+    console.log('🎯 PROJECT VM:', {
+      costDisplay: vm.costDisplay,
+      currencyNative: vm.currencyNative,
+      revenueDisplay: vm.revenueDisplay,
+      markup: vm.markup,
+      flags: vm.flags
+    });
+
+    return vm;
+  }, [
+    unifiedData?.summary?.costDisplay,
+    unifiedData?.summary?.currencyNative,
+    unifiedData?.summary?.revenueDisplay,
+    unifiedData?.summary?.markup,
+    unifiedData?.actuals?.totalWorkedCost,
+    unifiedData?.actuals?.totalWorkedHours,
+    unifiedData?.quotation?.baseCost,
+    unifiedData?.quotation?.totalAmount,
+    unifiedData?.quotation?.estimatedHours,
+    unifiedData?.metrics?.budgetUtilization,
+    unifiedData?.metrics?.efficiency
+  ]);
+
   // MÉTRICAS SIMPLIFICADAS - TODAS DESDE SINGLE SOURCE OF TRUTH
   const metrics = useMemo(() => {
     if (!unifiedData) return [];
@@ -1460,40 +1494,6 @@ const ProjectDetailsPage = () => {
       isFromExcel: data.isFromExcel || false
     }));
   }, [unifiedData?.actuals?.teamBreakdown]);
-
-  // 🎯 SELECTOR ÚNICO: ViewModel consolidado (no reconvertir)
-  const projectVM = useMemo(() => {
-    if (!unifiedData) return null;
-    
-    const vm = toProjectVM({
-      summary: unifiedData.summary,
-      actuals: unifiedData.actuals,
-      quotation: unifiedData.quotation,
-      metrics: unifiedData.metrics
-    });
-
-    console.log('🎯 PROJECT VM:', {
-      costDisplay: vm.costDisplay,
-      currencyNative: vm.currencyNative,
-      revenueDisplay: vm.revenueDisplay,
-      markup: vm.markup,
-      flags: vm.flags
-    });
-
-    return vm;
-  }, [
-    unifiedData?.summary?.costDisplay,
-    unifiedData?.summary?.currencyNative,
-    unifiedData?.summary?.revenueDisplay,
-    unifiedData?.summary?.markup,
-    unifiedData?.actuals?.totalWorkedCost,
-    unifiedData?.actuals?.totalWorkedHours,
-    unifiedData?.quotation?.baseCost,
-    unifiedData?.quotation?.totalAmount,
-    unifiedData?.quotation?.estimatedHours,
-    unifiedData?.metrics?.budgetUtilization,
-    unifiedData?.metrics?.efficiency
-  ]);
 
   // 🛡️ GUARD: Detectar reconversiones incorrectas (solo DEV)
   useEffect(() => {
