@@ -1497,24 +1497,26 @@ const ProjectDetailsPage = () => {
 
   // 🛡️ GUARD: Detectar reconversiones incorrectas (solo DEV)
   useEffect(() => {
-    if (import.meta.env.MODE === 'production' || !unifiedData) return;
+    if (import.meta.env.MODE === 'production' || !unifiedData || !projectVM) return;
     
     const s = unifiedData.summary?.costDisplay;
     const a = unifiedData.actuals?.totalWorkedCost;
+    const shown = projectVM.costDisplay;
     
-    if (s && a) {
+    if (s && a && shown) {
       const ratio = s / a;
-      // Si ratio parece un tipo de cambio, alguien está mostrando USD en vez de summary
-      if (ratio > 300 && ratio < 5000) {
+      // Solo advertir si se está MOSTRANDO el valor USD en lugar del nativo
+      if (ratio > 300 && ratio < 5000 && Math.abs(shown - a) < 0.01) {
         console.error('🚨 [CONSISTENCY] Detalle usando USD en UI. Esperado summary.costDisplay en moneda nativa.', {
           summaryCostDisplay: s,
           actualsUSD: a,
+          shownValue: shown,
           ratio,
           currency: unifiedData.summary?.currencyNative
         });
       }
     }
-  }, [unifiedData?.summary?.costDisplay, unifiedData?.actuals?.totalWorkedCost, unifiedData?.summary?.currencyNative]);
+  }, [unifiedData?.summary?.costDisplay, unifiedData?.actuals?.totalWorkedCost, unifiedData?.summary?.currencyNative, projectVM?.costDisplay]);
 
   // 🔍 RASTREO: Detectar de dónde viene el valor mostrado (solo DEV)
   useEffect(() => {
