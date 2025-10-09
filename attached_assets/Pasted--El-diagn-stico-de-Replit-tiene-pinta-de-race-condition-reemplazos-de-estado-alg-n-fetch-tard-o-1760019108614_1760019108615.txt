@@ -1,0 +1,135 @@
+. El diagnóstico de Replit tiene pinta de race condition + reemplazos de estado: algún fetch “tardío” está sobrescribiendo unifiedData sin summary, y tu useMemo([unifiedData]) recalcula con un objeto incompleto. Te dejo un plan en 3 capas: hotfix inmediato, arreglo estructural en frontend, y endurecimiento de contrato con backend.
+Hotfix inmediato (10–15 min)
+Dejá de depender de unifiedData entero
+Cambiá los useMemo para depender solo de los slices que usan:
+const costDisplay = useMemo(() => {
+  return summary?.costDisplay
+    ?? lastGoodSummaryRef.current?.costDisplay
+    ?? actuals?.totalWorkedCost  // fallback consciente
+    ?? 0;
+}, [summary?.costDisplay, actuals?.totalWorkedCost]);
+Cacheá el último summary válido
+Evita el “parpadeo” cuando llega un patch sin summary.
+const lastGoodSummaryRef = useRef<ProjectSummary | null>(null);
+useEffect(() => {
+  if (summary?.costDisplay != null) {
+    lastGoodSummaryRef.current = summary;
+  }
+}, [summary?.costDisplay]);
+No reemplaces estado completo con parches parciales
+Si en algún fetch hacés setUnifiedData(patch), cambiá a merge funcional:
+setUnifiedData(prev => deepMerge(prev, patch)); // usa un merge propio y seguro
+Arreglo estructural (recomendado)
+A) Normalizá el estado en “slices” (evitá unifiedData monolítico)
+type ProjectState = {
+  summary?: Summary;
+  quotation?: Quotation;
+  actuals?: Actuals;
+  metrics?: Metrics;
+  timeEntries?: TimeEntry[];
+  currencyNative?: 'ARS'|'USD';
+  // opcional: version por slice
+  _v: { summary: number; quotation: number; actuals: number; metrics: number; timeEntries: number; };
+};
+Beneficio: cada fetch actualiza solo su slice y no borra el resto.
+B) Usa useReducer con acciones por slice + versionado anti-carrera
+type Action =
+  | { type: 'SUMMARY_OK'; payload: Summary; reqId: number }
+  | { type: 'ACTUALS_OK'; payload: Actuals; reqId: number }
+  // ...
+
+function reducer(state: ProjectState, action: Action): ProjectState {
+  switch (action.type) {
+    case 'SUMMARY_OK':
+      if (action.reqId < state._v.summary) return state; // descarta respuesta vieja
+      return {
+        ...state,
+        summary: action.payload,
+        _v: { ...state._v, summary: action.reqId }
+      };
+    // ...
+  }
+}
+Generá un reqId incremental por llamada o timestamp; descartá respuestas atrasadas.
+C) AbortController por fetch
+Si el usuario cambia de proyecto o se re-renderiza, abortá requests anteriores para que no sobreescriban:
+const ac = new AbortController();
+fetch(url, { signal: ac.signal }).then(...);
+return () => ac.abort();
+D) Selectores con fallback “inteligente”
+Centralizá la lógica de presentación:
+const selectors = {
+  costDisplay(state: ProjectState) {
+    return state.summary?.costDisplay
+        ?? state.actuals?.totalWorkedCost
+        ?? 0;
+  },
+  currency(state: ProjectState) {
+    return state.summary?.currencyNative ?? state.currencyNative ?? 'ARS';
+  },
+};
+En el JSX, usá selectors.costDisplay(state) y no el objeto crudo.
+E) useMemo sólo sobre claves estables
+No dependas del objeto; dependé de propiedades:
+const perf = useMemo(() => {
+  const used = selectors.budgetUtilization(state);
+  const eff  = selectors.efficiency(state);
+  return { used, eff };
+}, [state.metrics?.budgetUtilization, state.metrics?.efficiency]);
+Endurecimiento del contrato (backend + frontend)
+Contrato de payload por pestaña (lo que ya listaste) con Zod en frontend: si llega un patch sin summary, no invalida el summary previo.
+const SummarySchema = z.object({
+  costDisplay: z.number(),
+  revenueDisplay: z.number(),
+  currencyNative: z.enum(['ARS','USD']),
+  markup: z.number(),
+  margin: z.number(),
+  flags: z.array(z.string())
+});
+Valida cada respuesta; si falla, no la apliques (log + Sentry).
+API por slices
+/projects/:id/summary
+/projects/:id/quotation
+/projects/:id/actuals
+/projects/:id/metrics
+/projects/:id/time-entries
+Evita endpoints que devuelvan todo y luego “mezclen” en el FE.
+Inmutabilidad en el agregador
+Asegurate de que el backend nunca envíe summary null en parches donde no tenga novedades. Mejor: omite la clave.
+Moneda nativa
+Definí currencyNative y *_Display solo en backend. Front no recalcula moneda. Esto sella la consistencia entre “vista única” y “lista”.
+Checklist accionable
+ Reemplazar todos los setUnifiedData(patch) por setState(prev => deepMerge(prev, patch)).
+ Implementar useReducer con acciones por slice y versionado (_v + reqId).
+ Agregar AbortController a cada fetch.
+ Introducir lastGoodSummaryRef y selectores centralizados de view-model.
+ Cambiar dependencias de useMemo a propiedades (no objetos).
+ Validar con Zod cada slice; descartar parches inválidos.
+ Asegurar que el backend no mande summary: null en respuestas parciales.
+ Mantener currencyNative/*Display en backend; prohibir recálculo en FE.
+ Test de carreras: simular dos fetches con delays cruzados y verificar que no se pierde summary.
+Snippet de reducer + merge seguro
+import { merge } from 'ts-deepmerge'; // o implementa uno propio sin mutar arrays si no querés
+
+function deepMerge<T>(a: T, b: Partial<T>): T {
+  return merge.withOptions({ mergeArrays: false }, a, b);
+}
+
+const initial: ProjectState = { _v: { summary:0, quotation:0, actuals:0, metrics:0, timeEntries:0 } };
+
+function useProjectState(projectId: string) {
+  const [state, dispatch] = useReducer(reducer, initial);
+
+  useEffect(() => {
+    let req = Date.now();
+    const ac = new AbortController();
+    fetch(`/api/projects/${projectId}/summary`, { signal: ac.signal })
+      .then(r => r.json())
+      .then(data => SummarySchema.parse(data))
+      .then(summary => dispatch({ type:'SUMMARY_OK', payload: summary, reqId: req }))
+      .catch(()=>{ /* handle/ignore abort */ });
+    return () => ac.abort();
+  }, [projectId]);
+
+  return state;
+}

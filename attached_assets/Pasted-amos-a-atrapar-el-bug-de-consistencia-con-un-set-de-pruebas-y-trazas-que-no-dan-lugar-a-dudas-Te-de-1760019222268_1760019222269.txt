@@ -1,0 +1,161 @@
+amos a atrapar el bug de consistencia con un set de pruebas y trazas que no dan lugar a dudas. Te dejo un plan operativo y snippets plug-and-play.
+1) Reproducir el problema (forzado)
+Throttle de red (Slow 3G) para forzar carreras.
+Simular respuestas cruzadas con MSW o un ?delay= en el backend:
+/projects/:id/summary?delay=800
+/projects/:id/actuals?delay=200
+Abrí vista lista → click a vista única → volvés a lista. Repetí 3–4 veces.
+2) Watchdog de consistencia (frontend, DEV only)
+Compara la misma fuente de verdad (selectores) entre lista y detalle para el mismo projectId. Si difieren, loggea un diff claro.
+// consistencyWatchdog.ts
+type VM = {
+  costDisplay?: number;
+  revenueDisplay?: number;
+  currencyNative?: 'ARS'|'USD';
+  budgetUtilization?: number;
+  efficiency?: number;
+  _v?: Record<string, number>;  // versionado por slice
+};
+
+export function assertConsistency({
+  source, // 'list' | 'detail'
+  projectId,
+  listVM,
+  detailVM
+}: {
+  source: 'list' | 'detail';
+  projectId: string | number;
+  listVM?: VM;
+  detailVM?: VM;
+}) {
+  if (!listVM || !detailVM) return;
+  const keys: (keyof VM)[] = [
+    'costDisplay','revenueDisplay','currencyNative','budgetUtilization','efficiency'
+  ];
+  const diffs: Record<string,{list:any;detail:any}> = {};
+  for (const k of keys) {
+    if (listVM[k] !== detailVM[k]) {
+      diffs[k as string] = { list: listVM[k], detail: detailVM[k] };
+    }
+  }
+  if (Object.keys(diffs).length) {
+    // ⚠️ Señal clara y accionable
+    // eslint-disable-next-line no-console
+    console.groupCollapsed(`[CONSISTENCY] project ${projectId} mismatch (${source})`);
+    console.table(diffs);
+    console.log('list._v', listVM._v, 'detail._v', detailVM._v);
+    console.groupEnd();
+  }
+}
+Úsalo donde montás ambas vistas (solo en dev):
+if (process.env.NODE_ENV !== 'production') {
+  assertConsistency({
+    source: 'detail',
+    projectId,
+    listVM: selectors.vmFromList(listState, projectId),
+    detailVM: selectors.vmFromDetail(detailState)
+  });
+}
+Tip: Los selectors.vmFromList / vmFromDetail deben construir el mismo ViewModel desde estados distintos; si acá se rompe, ya tenés el lugar exacto.
+3) Timeline de estado + checksum (detecta “parches que borran”)
+Loggea cada aplicación de patch con un hash barato por slice. Si summary desaparece entre ticks, se reporta.
+// stateTimeline.ts
+const hash = (o:any) => {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(o))).slice(0,48)); }
+  catch { return 'NA'; }
+};
+
+export function logPatch(prev:any, next:any, tag:string){
+  const fields = ['summary','quotation','actuals','metrics'];
+  const row:any = { tag, ts: new Date().toISOString() };
+  for (const f of fields) {
+    row[`${f}_prev`] = prev?.[f] ? hash(prev[f]) : '-';
+    row[`${f}_next`] = next?.[f] ? hash(next[f]) : '-';
+  }
+  // eslint-disable-next-line no-console
+  console.table(row);
+
+  // Invariante fuerte: nunca “bajar” summary a undefined por un patch parcial
+  if (prev?.summary && !next?.summary) {
+    // eslint-disable-next-line no-console
+    console.error('[INVARIANT] summary dropped by patch:', tag);
+  }
+}
+Luego, en tu setState:
+setState(prev => {
+  const merged = deepMerge(prev, patch);  // tu merge funcional
+  logPatch(prev, merged, patch.__tag ?? 'unknown');
+  return merged;
+});
+4) Invariantes en tiempo de render (fail-fast visual)
+Si el detalle muestra actuals.totalWorkedCost como fallback cuando ya hubo un summary.costDisplay válido → alerta.
+const costDisplay =
+  summary?.costDisplay ?? actuals?.totalWorkedCost ?? 0;
+
+if (process.env.NODE_ENV !== 'production') {
+  if (lastGoodSummaryRef.current?.costDisplay != null && summary?.costDisplay == null) {
+    console.warn('[CONSISTENCY] Missing summary.costDisplay after it existed. Using fallback.');
+  }
+}
+5) Trazas de backend (agregador) — “de dónde salió la moneda”
+Log estructurado siempre que calcules *_Display y currencyNative:
+currency_rule_applied: 'explicit_rule' | 'auto_detect' | 'project_override'
+currency_source: 'IncomeSoT' | 'CostsSoT' | 'StaticRule'
+project_id, req_id, slice (summary|actuals|...)
+Con esto, si la lista usa una regla y el detalle otra, lo ves en 1 minuto.
+Ejemplo (pseudocódigo):
+log.info("currency_decision",
+  project_id=pid,
+  slice="summary",
+  currency_native=currency,
+  currency_rule_applied="explicit_rule",
+  currency_source="IncomeSoT",
+  req_id=req_id
+)
+6) Contratos espejo (API) — test que compara LIST vs DETAIL
+Objetivo: que la transformación a ViewModel sea idéntica para /projects y /projects/:id.
+Backend test (o contract test en FE con MSW):
+GET /projects → tomar el item p del projectId.
+GET /projects/:id → d.
+Pasá ambos por el mismo mapper toProjectVM(payload) y compará deepEqual en:
+costDisplay, revenueDisplay, currencyNative, budgetUtilization, efficiency.
+Jest (frontend) con MSW:
+test('list vs detail produce el mismo VM', async () => {
+  const listPayload = await fetch('/api/projects').then(r=>r.json());
+  const detailPayload = await fetch('/api/projects/123').then(r=>r.json());
+
+  const listVM = toProjectVM(listPayload.items.find((x:any)=>x.id===123));
+  const detailVM = toProjectVM(detailPayload);
+
+  expect(listVM.costDisplay).toBe(detailVM.costDisplay);
+  expect(listVM.currencyNative).toBe(detailVM.currencyNative);
+  // ... resto de claves críticas
+});
+7) Guardas anti-carrera: reqId + AbortController
+Cada fetch lleva reqId incremental/timestamp.
+Reducer ignora respuestas con reqId menor al último aplicado por slice.
+Abortar fetches viejos al cambiar projectId.
+if (action.type === 'SUMMARY_OK') {
+  if (action.reqId < state._v.summary) return state; // vieja → descartar
+  return { ...state, summary: action.payload, _v:{...state._v, summary: action.reqId} };
+}
+8) Reporte express para vos (consola)
+Cuando haya mismatch, querés ver números ya:
+function printProjectVM(tag:string, vm:VM) {
+  console.groupCollapsed(`[VM] ${tag}`);
+  console.table({
+    costDisplay: vm.costDisplay,
+    revenueDisplay: vm.revenueDisplay,
+    currencyNative: vm.currencyNative,
+    budgetUtilization: vm.budgetUtilization,
+    efficiency: vm.efficiency,
+  });
+  console.groupEnd();
+}
+Úsalo en ambas vistas y compará.
+Qué te va a decir EXACTAMENTE dónde está el bug
+Watchdog te muestra qué campo difiere y en qué dirección (lista vs detalle).
+Timeline te muestra cuándo se perdió summary y qué patch lo borró.
+Trazas de backend te dicen con qué regla se calculó currencyNative/*Display en cada endpoint.
+Contract test te garantiza que ambos endpoints + mapper producen el mismo VM.
+Con estos 4, el bug no tiene dónde esconderse. Si querés, te armo los selectors y el toProjectVM estándar para que ambas vistas consuman EXACTAMENTE el mismo mapeo y sellamos la consistencia de una vez.
