@@ -2312,14 +2312,14 @@ const ProjectDetailsPage = () => {
                 <div className="p-4 space-y-3">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-blue-900">
-                      ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                      {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
                     </div>
-                    <div className="text-xs text-gray-500">de ${(unifiedData?.estimatedCost || 0).toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">de {projectVM ? formatCurrency(unifiedData?.quotation?.baseCost || 0, projectVM.currencyNative) : '$0'}</div>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-blue-500 h-2 rounded-full" 
-                      style={{ width: `${Math.min(100, ((unifiedData?.actuals?.totalWorkedCost || 0) / (unifiedData?.estimatedCost || 1)) * 100)}%` }}
+                      style={{ width: `${Math.min(100, projectVM && unifiedData?.quotation?.baseCost ? ((projectVM.costDisplay / unifiedData.quotation.baseCost) * 100) : 0)}%` }}
                     ></div>
                   </div>
                 </div>
