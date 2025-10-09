@@ -83,3 +83,11 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Recharts**: For professional charting in analytics dashboards.
 - **lucide-react**: For icons.
 - **cookie-parser**: For handling HTTP cookies.
+## Recent Changes (October 2025)
+
+### Unified ViewModel Pattern for Project Detail View
+- **Issue**: Project detail cards were showing inconsistent cost values due to frontend USD→ARS reconversions instead of using backend-provided native currency values.
+- **Solution**: Implemented `toProjectVM` selector (`client/src/selectors/projectVM.ts`) with "Regla de Oro" (Golden Rule): `summary.costDisplay` is FINAL value in native currency. All project detail cards (Dashboard, Presupuesto, Costos) now consume unified projectVM selector.
+- **Backend Enhancement**: Extended cost reconciler in `server/routes/complete-data.ts` to apply overrides in both SoT mode (period=YYYY-MM) and legacy mode (timeFilter=month_year), ensuring summary always includes costDisplay/currencyNative/revenueDisplay fields regardless of query mode.
+- **Quality Assurance**: DEV-only Consistency Guard detects incorrect USD→ARS reconversions without false positives by verifying both FX ratio presence and actual displayed value.
+- **Verification**: August 2025 golden values confirmed: Coelsa shows ARS 553,002 (reconciler override), Warner shows USD 7,005.20, Kimberly shows USD 2,436.09, Modo shows ARS 497,550.
