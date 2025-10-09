@@ -1,0 +1,70 @@
+Acá va el mapeo exacto (por fila = Cliente + Proyecto + Mes + Año):
+Mapeo columna → ViewModel (moneda nativa)
+Cliente → vm.client
+Proyecto → vm.projectName
+Tipo de proyecto (“Fee mensual” / “One Shot”) → vm.projectType
+Mes → vm.month
+Año → vm.year
+Cotización → vm.quotation.totalAmount (en moneda nativa)
+Si el cliente es USD-nativo (Warner/Kimberly) → es USD y se muestra USD.
+Si el cliente es ARS-nativo (Coelsa/Modo/etc.) → es ARS y se muestra ARS.
+Costos (USD) → vm.actuals.totalWorkedCost (USD base)
+Display: vm.summary.costDisplay =
+si cliente USD-nativo → Costos (USD)
+si cliente ARS-nativo → Costos (USD) * fx.usd_ars
+Facturación (USD) → vm.summary.revenueDisplay (display en nativa)
+USD-nativo → Facturación (USD)
+ARS-nativo → Facturación (USD) * fx.usd_ars
+Regla de oro: todo *Display sale de esta pestaña (convertido a la moneda nativa según regla de cliente). Nunca reconvertir en el FE.
+Derivados que usa el UI
+vm.summary.currencyNative :=
+USD si Cliente ∈ {Warner, Kimberly} (o lista blanca que definas)
+ARS en el resto (Coelsa, Modo, etc.)
+vm.metrics.budgetUtilization := vm.summary.costDisplay / vm.quotation.totalAmount
+vm.summary.markup := vm.quotation.totalAmount / vm.summary.costDisplay
+vm.summary.margin := (vm.quotation.totalAmount - vm.summary.costDisplay) / vm.quotation.totalAmount
+Dónde debe leerse en tu UI (para arreglar lo “mal” que ves)
+Rendimiento Financiero (barra superior)
+“Ingresos generados” → vm.summary.revenueDisplay + vm.summary.currencyNative
+“Costo” (línea gris) → vm.summary.costDisplay + moneda nativa
+“% Presupuesto usado” → vm.metrics.budgetUtilization
+❌ No usar actuals.totalWorkedCost directo ni $ hardcodeado.
+Card Presupuesto
+Monto → vm.summary.costDisplay
+Denominador (si lo mostrás) → vm.quotation.totalAmount
+Pestaña Costos
+Total → vm.summary.costDisplay (no USD)
+Si mostrás el “base USD”, ahí sí vm.actuals.totalWorkedCost como dato técnico.
+Lista de Proyectos
+Columna Costo → vm.summary.costDisplay
+Columna Ingreso → vm.summary.revenueDisplay
+Moneda por fila → vm.summary.currencyNative
+Guardas de consistencia (rápidas)
+Si vm.summary.costDisplay existe, prohíbe en FE usar actuals.totalWorkedCost para pintar.
+Log DEV: si summary.costDisplay / actuals.totalWorkedCost ∈ [300, 5000] y la card muestra el valor chico → estás mostrando USD por error.
+Pseudocódigo del agregador (backend)
+const USD_NATIVE = new Set(['Warner', 'Kimberly Clark']);
+const cur = USD_NATIVE.has(cliente) ? 'USD' : 'ARS';
+
+const costUSD = row['Costos (USD)'] ?? 0;
+const billUSD = row['Facturación (USD)'] ?? 0;
+const quote   = row['Cotización'] ?? 0; // ya en nativa (convención hoja)
+
+const fx = rates.usd_ars; // del día/mes
+
+const costDisplay = cur === 'USD' ? costUSD : Math.round(costUSD * fx);
+const revenueDisplay = cur === 'USD' ? billUSD : Math.round(billUSD * fx);
+
+return {
+  summary: { costDisplay, revenueDisplay, currencyNative: cur, markup: quote && costDisplay ? quote/costDisplay : null,
+             margin: quote ? (quote - costDisplay)/quote : null },
+  quotation: { totalAmount: quote },
+  actuals: { totalWorkedCost: costUSD } // USD base
+};
+Checklist (lo mínimo para que “se vea bien” ya)
+ En Rendimiento Financiero, cambiar costo/ingreso a vm.*Display + currencyNative.
+ Alinear Presupuesto y Costos a vm.summary.costDisplay.
+ Quitar $ hardcodeado y toLocaleString() sin currency.
+ Verificar que el % usado use nativa/nativa.
+ Grep de actuals.totalWorkedCost en JSX y removerlo de la UI (solo data técnica).
+Con esto, la vista única y la vista de todos van a leer del mismo VM, y los números van a calzar con “Rendimiento Cliente” (553.002 ARS para Coelsa agosto 2025, ingresos lo que marque “Facturación (USD)” convertido a ARS). Si querés, te paso el CurrencyText y el toProjectVM listos para pegar.

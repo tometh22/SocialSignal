@@ -1397,18 +1397,19 @@ const ProjectDetailsPage = () => {
       {
         label: "Estado",
         value: (() => {
-          // Usar métricas directas de unifiedData para la evaluación
-          const baseCost = quotation.baseCost || 1;
+          // 🎯 USAR PROJECT VM: Calcular budgetUtil con moneda nativa
+          if (!projectVM) return "Sin datos";
+          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+          
           console.log('🚨 ESTADO DEBUG:', { 
             budgetUtilization, 
             efficiency, 
-            metricsFromUnified: unifiedData?.metrics?.budgetUtilization,
-            actualCost: actuals.totalWorkedCost,
-            baseCost: baseCost,
-            calculatedBudget: (actuals.totalWorkedCost / baseCost) * 100
+            costDisplay: projectVM.costDisplay,
+            quotationTotal,
+            calculatedBudget: actualBudgetUtil,
+            currency: projectVM.currencyNative
           });
-          
-          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
           
           let resultado;
           if (actualBudgetUtil <= 85) resultado = "Excelente";
@@ -1420,31 +1421,36 @@ const ProjectDetailsPage = () => {
           return resultado;
         })(),
         subtitle: (() => {
-          const baseCost = quotation.baseCost || 1;
-          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
+          if (!projectVM) return "Sin datos";
+          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "🏆 Salud financiera excelente";
           if (actualBudgetUtil <= 100) return "✅ Salud financiera buena";
           if (actualBudgetUtil <= 110) return "🟡 Requiere atención";
           return "🔴 Estado crítico";
         })(),
         icon: (() => {
-          const baseCost = quotation.baseCost || 1;
-          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
+          if (!projectVM) return AlertTriangle;
+          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return Crown;
           if (actualBudgetUtil <= 100) return CheckCircle2;
           if (actualBudgetUtil <= 110) return AlertTriangle;
           return TrendingDown;
         })(),
         color: (() => {
-          const baseCost = quotation.baseCost || 1;
-          const actualBudgetUtil = (actuals.totalWorkedCost / baseCost) * 100;
+          if (!projectVM) return "text-gray-700";
+          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "text-emerald-700";
           if (actualBudgetUtil <= 100) return "text-green-700";
           if (actualBudgetUtil <= 110) return "text-yellow-700";
           return "text-red-700";
         })(),
         bgColor: (() => {
-          const actualBudgetUtil = (actuals.totalWorkedCost / quotation.baseCost) * 100;
+          if (!projectVM) return "bg-gray-50";
+          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "bg-emerald-50";
           if (actualBudgetUtil <= 100) return "bg-green-50";
           if (actualBudgetUtil <= 110) return "bg-yellow-50";
@@ -1997,8 +2003,13 @@ const ProjectDetailsPage = () => {
                             const currency = analysis.currency === 'ARS' ? 'AR$' : '$';
                             return `Costo: ${currency} ${analysis.totals.costs.toLocaleString()} • Margen: ${((analysis.totals.margin / analysis.totals.revenue) * 100).toFixed(1)}%`;
                           }
-                          // Fallback: valores originales
-                          return `Costo: $${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()} • Margen: ${((1 - 1/(unifiedData?.metrics?.markup || 1)) * 100).toFixed(1)}%`;
+                          // 🎯 USAR PROJECT VM: Fallback con moneda nativa
+                          if (projectVM) {
+                            const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
+                            const margin = projectVM.markup && projectVM.markup > 0 ? ((1 - 1/projectVM.markup) * 100).toFixed(1) : '0.0';
+                            return `Costo: ${costStr} • Margen: ${margin}%`;
+                          }
+                          return 'Costo: $0 • Margen: 0%';
                         })()}
                       </div>
                     </div>
@@ -2618,15 +2629,14 @@ const ProjectDetailsPage = () => {
 
               {/* Costo Real Trabajado */}
               <Card className={`border-l-4 ${(() => {
-                if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                  const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                  if (percentage <= 90) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white'; // Bajo presupuesto
-                  if (percentage <= 100) return 'border-l-gray-600 bg-gradient-to-br from-gray-50 via-gray-25 to-white'; // Dentro del presupuesto
-                  if (percentage <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white'; // Alerta temprana
-                  if (percentage <= 120) return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white'; // Crítico
-                  return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white'; // Crisis
-                }
-                return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white';
+                if (!projectVM) return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white';
+                const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                if (percentage <= 90) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
+                if (percentage <= 100) return 'border-l-gray-600 bg-gradient-to-br from-gray-50 via-gray-25 to-white';
+                if (percentage <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white';
+                if (percentage <= 120) return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white';
+                return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white';
               })()} shadow-sm hover:shadow-md transition-shadow`}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -2634,26 +2644,24 @@ const ProjectDetailsPage = () => {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className={`p-2 rounded-lg cursor-help ${(() => {
-                            if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                              const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                              if (percentage <= 90) return 'bg-green-100';
-                              if (percentage <= 100) return 'bg-gray-100';
-                              if (percentage <= 110) return 'bg-yellow-100';
-                              if (percentage <= 120) return 'bg-orange-100';
-                              return 'bg-red-100';
-                            }
-                            return 'bg-orange-100';
+                            if (!projectVM) return 'bg-orange-100';
+                            const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                            const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                            if (percentage <= 90) return 'bg-green-100';
+                            if (percentage <= 100) return 'bg-gray-100';
+                            if (percentage <= 110) return 'bg-yellow-100';
+                            if (percentage <= 120) return 'bg-orange-100';
+                            return 'bg-red-100';
                           })()}`}>
                             <DollarSign className={`h-4 w-4 ${(() => {
-                          if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                            const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                            if (percentage <= 90) return 'text-green-600';
-                            if (percentage <= 100) return 'text-gray-600';
-                            if (percentage <= 110) return 'text-yellow-600';
-                            if (percentage <= 120) return 'text-orange-600';
-                            return 'text-red-600';
-                          }
-                          return 'text-orange-600';
+                          if (!projectVM) return 'text-orange-600';
+                          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                          const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                          if (percentage <= 90) return 'text-green-600';
+                          if (percentage <= 100) return 'text-gray-600';
+                          if (percentage <= 110) return 'text-yellow-600';
+                          if (percentage <= 120) return 'text-orange-600';
+                          return 'text-red-600';
                         })()}`} />
                           </div>
                         </TooltipTrigger>
@@ -2672,67 +2680,55 @@ const ProjectDetailsPage = () => {
                         </TooltipContent>
                       </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          if (percentage <= 90) return 'text-green-700';
-                          if (percentage <= 100) return 'text-gray-700';
-                          if (percentage <= 110) return 'text-yellow-700';
-                          if (percentage <= 120) return 'text-orange-700';
-                          return 'text-red-700';
-                        }
-                        return 'text-orange-700';
+                        if (!projectVM) return 'text-orange-700';
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                        if (percentage <= 90) return 'text-green-700';
+                        if (percentage <= 100) return 'text-gray-700';
+                        if (percentage <= 110) return 'text-yellow-700';
+                        if (percentage <= 120) return 'text-orange-700';
+                        return 'text-red-700';
                       })()}`}>Costo Real</span>
                     </div>
                     <Badge variant={(() => {
-                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                        const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                        if (percentage <= 90) return 'default'; // Verde: Bajo presupuesto
-                        if (percentage <= 100) return 'secondary'; // Gris: Dentro del presupuesto
-                        if (percentage <= 110) return 'outline'; // Amarillo: Alerta temprana
-                        if (percentage <= 120) return 'destructive'; // Naranja: Crítico
-                        return 'destructive'; // Rojo: Crisis
-                      }
-                      return 'outline';
+                      if (!projectVM) return 'outline';
+                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                      if (percentage <= 90) return 'default';
+                      if (percentage <= 100) return 'secondary';
+                      if (percentage <= 110) return 'outline';
+                      if (percentage <= 120) return 'destructive';
+                      return 'destructive';
                     })()} className={`text-xs px-2 py-0.5 ${(() => {
-                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                        const percentage = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                        if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
-                        if (percentage <= 100) return 'bg-gray-100 text-gray-800 border-gray-300';
-                        if (percentage <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-                        if (percentage <= 120) return 'bg-orange-100 text-orange-800 border-orange-300';
-                        return 'bg-red-100 text-red-800 border-red-300';
-                      }
-                      return '';
+                      if (!projectVM) return '';
+                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                      if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
+                      if (percentage <= 100) return 'bg-gray-100 text-gray-800 border-gray-300';
+                      if (percentage <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                      if (percentage <= 120) return 'bg-orange-100 text-orange-800 border-orange-300';
+                      return 'bg-red-100 text-red-800 border-red-300';
                     })()}`}>
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const realCost = (unifiedData as any).actuals.totalWorkedCost;
-                          const estimatedCost = (unifiedData as any).quotation.baseCost;
-                          const percentage = (realCost / estimatedCost) * 100;
-                          
-                          if (percentage <= 90) return `${percentage.toFixed(0)}%`;
-                          if (percentage <= 100) return `${percentage.toFixed(0)}%`;
-                          if (percentage <= 110) return `${percentage.toFixed(0)}%`;
-                          if (percentage <= 120) return `${percentage.toFixed(0)}%`;
-                          return `${percentage.toFixed(0)}%`;
-                        }
-                        return '0%';
+                        if (!projectVM) return '0%';
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const percentage = (projectVM.costDisplay / quotationTotal) * 100;
+                        return `${percentage.toFixed(0)}%`;
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-2">
                     <p className="text-lg font-bold text-gray-900">
-                      ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                      {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
                     </p>
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>de ${(unifiedData?.quotation?.baseCost || 0).toLocaleString()} estimado</span>
+                      <span>de {projectVM ? formatCurrency(quotation.totalAmount || quotation.baseCost || 0, projectVM.currencyNative) : '$0'} estimado</span>
                     </div>
                     <Progress 
                       value={(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          return ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                        }
-                        return 0;
+                        if (!projectVM) return 0;
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        return (projectVM.costDisplay / quotationTotal) * 100;
                       })()} 
                       className="h-2"
                     />
@@ -2821,14 +2817,13 @@ const ProjectDetailsPage = () => {
 
               {/* Estado General */}
               <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${(() => {
-                if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                  const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                  if (budgetUtil <= 85) return 'border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white';
-                  if (budgetUtil <= 100) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
-                  if (budgetUtil <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white';
-                  return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white';
-                }
-                return 'border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white';
+                if (!projectVM) return 'border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white';
+                const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                if (budgetUtil <= 85) return 'border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white';
+                if (budgetUtil <= 100) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
+                if (budgetUtil <= 110) return 'border-l-yellow-600 bg-gradient-to-br from-yellow-50 via-yellow-25 to-white';
+                return 'border-l-red-600 bg-gradient-to-br from-red-50 via-red-25 to-white';
               })()}`}>
                 <CardContent className="p-5">
                   <div className="flex items-center justify-between mb-3">
@@ -2836,24 +2831,22 @@ const ProjectDetailsPage = () => {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className={`p-2 rounded-lg cursor-help ${(() => {
-                            if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                              const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                              if (budgetUtil <= 85) return 'bg-emerald-100';
-                              if (budgetUtil <= 100) return 'bg-green-100';
-                              if (budgetUtil <= 110) return 'bg-yellow-100';
-                              return 'bg-red-100';
-                            }
-                            return 'bg-purple-100';
+                            if (!projectVM) return 'bg-purple-100';
+                            const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                            const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                            if (budgetUtil <= 85) return 'bg-emerald-100';
+                            if (budgetUtil <= 100) return 'bg-green-100';
+                            if (budgetUtil <= 110) return 'bg-yellow-100';
+                            return 'bg-red-100';
                           })()}`}>
                             {(() => {
-                          if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                            const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                            if (budgetUtil <= 85) return <Crown className="h-4 w-4 text-emerald-600" />;
-                            if (budgetUtil <= 100) return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-                            if (budgetUtil <= 110) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-                            return <TrendingDown className="h-4 w-4 text-red-600" />;
-                          }
-                          return <Gauge className="h-4 w-4 text-purple-600" />;
+                          if (!projectVM) return <Gauge className="h-4 w-4 text-purple-600" />;
+                          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                          const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                          if (budgetUtil <= 85) return <Crown className="h-4 w-4 text-emerald-600" />;
+                          if (budgetUtil <= 100) return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+                          if (budgetUtil <= 110) return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+                          return <TrendingDown className="h-4 w-4 text-red-600" />;
                         })()}
                           </div>
                         </TooltipTrigger>
@@ -2871,51 +2864,47 @@ const ProjectDetailsPage = () => {
                         </TooltipContent>
                       </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          if (budgetUtil <= 85) return 'text-emerald-700';
-                          if (budgetUtil <= 100) return 'text-green-700';
-                          if (budgetUtil <= 110) return 'text-yellow-700';
-                          return 'text-red-700';
-                        }
-                        return 'text-purple-700';
+                        if (!projectVM) return 'text-purple-700';
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                        if (budgetUtil <= 85) return 'text-emerald-700';
+                        if (budgetUtil <= 100) return 'text-green-700';
+                        if (budgetUtil <= 110) return 'text-yellow-700';
+                        return 'text-red-700';
                       })()}`}>Estado</span>
                     </div>
                     <Badge className={`text-xs px-2 py-0.5 ${(() => {
-                      if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                        const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                        if (budgetUtil <= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-                        if (budgetUtil <= 100) return 'bg-green-100 text-green-800 border-green-300';
-                        if (budgetUtil <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-                        return 'bg-red-100 text-red-800 border-red-300';
-                      }
-                      return 'bg-purple-100 text-purple-800 border-purple-300';
+                      if (!projectVM) return 'bg-purple-100 text-purple-800 border-purple-300';
+                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                      if (budgetUtil <= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                      if (budgetUtil <= 100) return 'bg-green-100 text-green-800 border-green-300';
+                      if (budgetUtil <= 110) return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+                      return 'bg-red-100 text-red-800 border-red-300';
                     })()}`}>
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          console.log('🚨 CARD MORADA DEBUG:', { 
-                            actualCost: (unifiedData as any).actuals.totalWorkedCost,
-                            baseCost: (unifiedData as any).quotation.baseCost,
-                            budgetUtil 
-                          });
-                          if (budgetUtil <= 85) return 'Excelente';
-                          if (budgetUtil <= 100) return 'Bueno';
-                          if (budgetUtil <= 110) return 'Regular';
-                          return 'Crítico';
-                        }
-                        return 'Sin datos';
+                        if (!projectVM) return 'Sin datos';
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                        console.log('🚨 CARD MORADA DEBUG:', { 
+                          actualCost: projectVM.costDisplay,
+                          baseCost: quotationTotal,
+                          budgetUtil 
+                        });
+                        if (budgetUtil <= 85) return 'Excelente';
+                        if (budgetUtil <= 100) return 'Bueno';
+                        if (budgetUtil <= 110) return 'Regular';
+                        return 'Crítico';
                       })()}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
-                        if (unifiedData?.actuals?.totalWorkedCost && unifiedData?.quotation?.baseCost) {
-                          const budgetUtil = ((unifiedData as any).actuals.totalWorkedCost / (unifiedData as any).quotation.baseCost) * 100;
-                          return `${budgetUtil.toFixed(0)}%`;
-                        }
-                        return '0%';
+                        if (!projectVM) return '0%';
+                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
+                        return `${budgetUtil.toFixed(0)}%`;
                       })()}
                     </p>
                     <p className="text-xs text-gray-500">Uso del presupuesto</p>
