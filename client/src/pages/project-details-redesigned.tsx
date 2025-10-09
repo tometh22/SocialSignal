@@ -1364,7 +1364,7 @@ const ProjectDetailsPage = () => {
           // 🎯 USAR PROJECT VM: No reconvertir
           return formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
         })(),
-        subtitle: `Objetivo: $${(quotation.baseCost || 0).toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
+        subtitle: `Objetivo: $${(unifiedData?.quotation?.baseCost || 0).toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
         icon: DollarSign,
         color: budgetStyle.color,
         bgColor: budgetStyle.bgColor,
@@ -1373,7 +1373,7 @@ const ProjectDetailsPage = () => {
       {
         label: `Horas vs Objetivo`,
         value: `${actuals.totalWorkedHours.toFixed(1)}h`,
-        subtitle: `Objetivo: ${(quotation.estimatedHours || 0).toFixed(1)}h | ${efficiency <= 100 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(efficiency - 100).toFixed(1)}%`,
+        subtitle: `Objetivo: ${(unifiedData?.quotation?.estimatedHours || 0).toFixed(1)}h | ${efficiency <= 100 ? 'Bajo objetivo' : 'Exceso'}: ${Math.abs(efficiency - 100).toFixed(1)}%`,
         icon: Clock,
         color: progressStyle.color,
         bgColor: progressStyle.bgColor,
@@ -1399,7 +1399,7 @@ const ProjectDetailsPage = () => {
         value: (() => {
           // 🎯 USAR PROJECT VM: Calcular budgetUtil con moneda nativa
           if (!projectVM) return "Sin datos";
-          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
           const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           
           console.log('🚨 ESTADO DEBUG:', { 
@@ -1422,7 +1422,7 @@ const ProjectDetailsPage = () => {
         })(),
         subtitle: (() => {
           if (!projectVM) return "Sin datos";
-          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
           const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "🏆 Salud financiera excelente";
           if (actualBudgetUtil <= 100) return "✅ Salud financiera buena";
@@ -1431,7 +1431,7 @@ const ProjectDetailsPage = () => {
         })(),
         icon: (() => {
           if (!projectVM) return AlertTriangle;
-          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
           const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return Crown;
           if (actualBudgetUtil <= 100) return CheckCircle2;
@@ -1440,7 +1440,7 @@ const ProjectDetailsPage = () => {
         })(),
         color: (() => {
           if (!projectVM) return "text-gray-700";
-          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
           const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "text-emerald-700";
           if (actualBudgetUtil <= 100) return "text-green-700";
@@ -1449,7 +1449,7 @@ const ProjectDetailsPage = () => {
         })(),
         bgColor: (() => {
           if (!projectVM) return "bg-gray-50";
-          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
           const actualBudgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
           if (actualBudgetUtil <= 85) return "bg-emerald-50";
           if (actualBudgetUtil <= 100) return "bg-green-50";
@@ -2630,7 +2630,7 @@ const ProjectDetailsPage = () => {
               {/* Costo Real Trabajado */}
               <Card className={`border-l-4 ${(() => {
                 if (!projectVM) return 'border-l-orange-600 bg-gradient-to-br from-orange-50 via-orange-25 to-white';
-                const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                 const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                 if (percentage <= 90) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
                 if (percentage <= 100) return 'border-l-gray-600 bg-gradient-to-br from-gray-50 via-gray-25 to-white';
@@ -2645,7 +2645,7 @@ const ProjectDetailsPage = () => {
                         <TooltipTrigger asChild>
                           <div className={`p-2 rounded-lg cursor-help ${(() => {
                             if (!projectVM) return 'bg-orange-100';
-                            const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                            const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                             const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                             if (percentage <= 90) return 'bg-green-100';
                             if (percentage <= 100) return 'bg-gray-100';
@@ -2655,7 +2655,7 @@ const ProjectDetailsPage = () => {
                           })()}`}>
                             <DollarSign className={`h-4 w-4 ${(() => {
                           if (!projectVM) return 'text-orange-600';
-                          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                           const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                           if (percentage <= 90) return 'text-green-600';
                           if (percentage <= 100) return 'text-gray-600';
@@ -2681,7 +2681,7 @@ const ProjectDetailsPage = () => {
                       </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
                         if (!projectVM) return 'text-orange-700';
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                         if (percentage <= 90) return 'text-green-700';
                         if (percentage <= 100) return 'text-gray-700';
@@ -2692,7 +2692,7 @@ const ProjectDetailsPage = () => {
                     </div>
                     <Badge variant={(() => {
                       if (!projectVM) return 'outline';
-                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                       const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                       if (percentage <= 90) return 'default';
                       if (percentage <= 100) return 'secondary';
@@ -2701,7 +2701,7 @@ const ProjectDetailsPage = () => {
                       return 'destructive';
                     })()} className={`text-xs px-2 py-0.5 ${(() => {
                       if (!projectVM) return '';
-                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                       const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                       if (percentage <= 90) return 'bg-green-100 text-green-800 border-green-300';
                       if (percentage <= 100) return 'bg-gray-100 text-gray-800 border-gray-300';
@@ -2711,7 +2711,7 @@ const ProjectDetailsPage = () => {
                     })()}`}>
                       {(() => {
                         if (!projectVM) return '0%';
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         const percentage = (projectVM.costDisplay / quotationTotal) * 100;
                         return `${percentage.toFixed(0)}%`;
                       })()}
@@ -2722,12 +2722,12 @@ const ProjectDetailsPage = () => {
                       {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
                     </p>
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>de {projectVM ? formatCurrency(quotation.totalAmount || quotation.baseCost || 0, projectVM.currencyNative) : '$0'} estimado</span>
+                      <span>de {projectVM ? formatCurrency(unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 0, projectVM.currencyNative) : '$0'} estimado</span>
                     </div>
                     <Progress 
                       value={(() => {
                         if (!projectVM) return 0;
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         return (projectVM.costDisplay / quotationTotal) * 100;
                       })()} 
                       className="h-2"
@@ -2818,7 +2818,7 @@ const ProjectDetailsPage = () => {
               {/* Estado General */}
               <Card className={`border-l-4 shadow-sm hover:shadow-md transition-shadow ${(() => {
                 if (!projectVM) return 'border-l-purple-600 bg-gradient-to-br from-purple-50 via-purple-25 to-white';
-                const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                 const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                 if (budgetUtil <= 85) return 'border-l-emerald-600 bg-gradient-to-br from-emerald-50 via-emerald-25 to-white';
                 if (budgetUtil <= 100) return 'border-l-green-600 bg-gradient-to-br from-green-50 via-green-25 to-white';
@@ -2832,7 +2832,7 @@ const ProjectDetailsPage = () => {
                         <TooltipTrigger asChild>
                           <div className={`p-2 rounded-lg cursor-help ${(() => {
                             if (!projectVM) return 'bg-purple-100';
-                            const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                            const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                             const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                             if (budgetUtil <= 85) return 'bg-emerald-100';
                             if (budgetUtil <= 100) return 'bg-green-100';
@@ -2841,7 +2841,7 @@ const ProjectDetailsPage = () => {
                           })()}`}>
                             {(() => {
                           if (!projectVM) return <Gauge className="h-4 w-4 text-purple-600" />;
-                          const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                          const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                           const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                           if (budgetUtil <= 85) return <Crown className="h-4 w-4 text-emerald-600" />;
                           if (budgetUtil <= 100) return <CheckCircle2 className="h-4 w-4 text-green-600" />;
@@ -2865,7 +2865,7 @@ const ProjectDetailsPage = () => {
                       </Tooltip>
                       <span className={`text-sm font-medium ${(() => {
                         if (!projectVM) return 'text-purple-700';
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                         if (budgetUtil <= 85) return 'text-emerald-700';
                         if (budgetUtil <= 100) return 'text-green-700';
@@ -2875,7 +2875,7 @@ const ProjectDetailsPage = () => {
                     </div>
                     <Badge className={`text-xs px-2 py-0.5 ${(() => {
                       if (!projectVM) return 'bg-purple-100 text-purple-800 border-purple-300';
-                      const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                      const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                       const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                       if (budgetUtil <= 85) return 'bg-emerald-100 text-emerald-800 border-emerald-300';
                       if (budgetUtil <= 100) return 'bg-green-100 text-green-800 border-green-300';
@@ -2884,7 +2884,7 @@ const ProjectDetailsPage = () => {
                     })()}`}>
                       {(() => {
                         if (!projectVM) return 'Sin datos';
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                         console.log('🚨 CARD MORADA DEBUG:', { 
                           actualCost: projectVM.costDisplay,
@@ -2902,7 +2902,7 @@ const ProjectDetailsPage = () => {
                     <p className="text-lg font-bold text-gray-900">
                       {(() => {
                         if (!projectVM) return '0%';
-                        const quotationTotal = quotation.totalAmount || quotation.baseCost || 1;
+                        const quotationTotal = unifiedData?.quotation?.totalAmount || unifiedData?.quotation?.baseCost || 1;
                         const budgetUtil = (projectVM.costDisplay / quotationTotal) * 100;
                         return `${budgetUtil.toFixed(0)}%`;
                       })()}
