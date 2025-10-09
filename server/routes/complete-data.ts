@@ -264,7 +264,7 @@ export async function completeDataHandler(req: Request, res: Response) {
     const teamCostUSD = sotSummary?.costUSD ?? pm.summary?.teamCostUSD ?? 0;
     const markupUSD = revenueUSD - teamCostUSD;
     
-    const summary = {
+    let summary = {
       period: period,        // 'YYYY-MM'
       basis,
       activeMembers: (pm.teamBreakdown ?? []).filter(p => (p.actualHours ?? 0) > 0).length,
@@ -285,6 +285,41 @@ export async function completeDataHandler(req: Request, res: Response) {
         flags: sotSummary.flags
       })
     };
+    
+    // 🔧 LEGACY RECONCILER: Apply cost overrides even for legacy timeFilter mode
+    if (!sotSummary && quotationData?.projectName) {
+      const clientData = await db.query.clients.findFirst({
+        where: eq(clients.id, projectData.clientId)
+      });
+      const clientName = clientData?.name || '';
+      const projectName = quotationData.projectName || '';
+      const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
+      
+      // Apply reconciler with the base summary (using teamCostUSD as costUSD)
+      const baseSummary = {
+        costUSD: summary.teamCostUSD,
+        revenueUSD: summary.revenueUSD,
+        profitUSD: summary.markupUSD,
+        markup: summary.teamCostUSD > 0 ? summary.revenueUSD / summary.teamCostUSD : null,
+        margin: summary.revenueUSD > 0 ? (summary.revenueUSD - summary.teamCostUSD) / summary.revenueUSD : 0
+      };
+      
+      const reconciledSummary = applyCostReconciler(baseSummary, projectKey, period, clientName, projectName);
+      
+      if (reconciledSummary && reconciledSummary.costDisplay !== undefined) {
+        console.log(`🔧 LEGACY RECONCILER APPLIED: ${clientName} | ${projectName} → ${reconciledSummary.currencyNative} ${reconciledSummary.costDisplay}`);
+        summary = {
+          ...summary,
+          costDisplay: reconciledSummary.costDisplay,
+          currencyNative: reconciledSummary.currencyNative,
+          revenueDisplay: reconciledSummary.currencyNative === 'ARS' ? reconciledSummary.revenueUSD * 1345 : reconciledSummary.revenueUSD,
+          markup: reconciledSummary.markup,
+          margin: reconciledSummary.margin,
+          teamCostUSD: reconciledSummary.costUSD,
+          flags: reconciledSummary.flags || []
+        };
+      }
+    }
 
     const teamBreakdown = (pm.teamBreakdown ?? []).map(p => ({
       personnelId: p.personnelId ?? p.name,
