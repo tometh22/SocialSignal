@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
+import { toProjectVM, formatCurrency, useWhichCost } from "@/selectors/projectVM";
 import {
   ArrowLeft,
   Calendar,
@@ -1325,10 +1326,9 @@ const ProjectDetailsPage = () => {
       {
         label: "Presupuesto vs Objetivo",
         value: (() => {
-          const costDisplay = (unifiedData as any).summary?.costDisplay ?? actuals.totalWorkedCost;
-          const currency = (unifiedData as any).summary?.currencyNative ?? 'USD';
-          const symbol = currency === 'ARS' ? 'ARS' : '$';
-          return `${symbol} ${costDisplay.toLocaleString()}`;
+          if (!projectVM) return '$0';
+          // 🎯 USAR PROJECT VM: No reconvertir
+          return formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
         })(),
         subtitle: `Objetivo: $${(quotation.baseCost || 0).toLocaleString()} | ${budgetUtilization <= 100 ? 'Ahorro' : 'Sobrecosto'}: ${Math.abs(budgetUtilization - 100).toFixed(1)}%`,
         icon: DollarSign,
@@ -1418,7 +1418,7 @@ const ProjectDetailsPage = () => {
         })(),
       }
     ];
-  }, [unifiedData, project]);
+  }, [unifiedData, project, projectVM]);
 
   // 🛡️ WATCHDOG: Detectar cuando summary desaparece (solo DEV)
   useEffect(() => {
@@ -1461,70 +1461,79 @@ const ProjectDetailsPage = () => {
     }));
   }, [unifiedData?.actuals?.teamBreakdown]);
 
-  // SINGLE SOURCE OF TRUTH: usar unifiedData para todas las métricas
-  // 🛡️ FIX: Dependencias específicas en lugar del objeto completo
-  const costSummary = useMemo(() => {
+  // 🎯 SELECTOR ÚNICO: ViewModel consolidado (no reconvertir)
+  const projectVM = useMemo(() => {
     if (!unifiedData) return null;
-    if (!unifiedData.quotation) {
-      console.warn('⚠️ No quotation data in costSummary');
-      return null;
-    }
-
-    console.log('🔍 SINGLE SOURCE OF TRUTH - costSummary:', {
-      estimatedHours: (unifiedData as any).quotation.estimatedHours,
-      totalWorkedHours: (unifiedData as any).actuals.totalWorkedHours,
-      totalWorkedCost: (unifiedData as any).actuals.totalWorkedCost,
-      baseCost: (unifiedData as any).quotation.baseCost,
-      totalAmount: (unifiedData as any).quotation.totalAmount,
-      metrics: (unifiedData as any).metrics,
-      summary: (unifiedData as any).summary,
-      summaryExists: !!(unifiedData as any).summary,
-      costDisplay: (unifiedData as any).summary?.costDisplay
-    });
-
-    // 🎯 Usar datos del SoT si están disponibles, sino fallback a actuals
-    const actualHours = (unifiedData as any).actuals.totalWorkedHours || 0;
-    const actualCost = (unifiedData as any).summary?.costDisplay ?? (unifiedData as any).actuals.totalWorkedCost ?? 0;
-    const targetHours = (unifiedData as any).quotation.estimatedHours || 0;
-    const targetBudget = (unifiedData as any).quotation.baseCost || 0;
-    const targetClientPrice = (unifiedData as any).quotation.totalAmount || 0;
     
-    // Usar métricas ya calculadas en el backend (del SoT si están disponibles)
-    const budgetUtilization = (unifiedData as any).metrics.budgetUtilization;
-    const markup = (unifiedData as any).summary?.markup ?? (unifiedData as any).metrics.markup;
-    const hoursProgress = (unifiedData as any).metrics.efficiency;
-
-    console.log('🚨 CARD MORADA DEBUG:', {
-      actualCost,
-      baseCost: targetBudget,
-      budgetUtil: actualCost && targetBudget ? (actualCost / targetBudget) * 100 : 0
+    const vm = toProjectVM({
+      summary: unifiedData.summary,
+      actuals: unifiedData.actuals,
+      quotation: unifiedData.quotation,
+      metrics: unifiedData.metrics
     });
 
-    return {
-      totalCost: actualCost,
-      budget: targetBudget,
-      budgetUtilization,
-      savings: targetBudget - actualCost,
-      filteredHours: actualHours,
-      targetHours,
-      targetMultiplier: 1, // Simplificado para single source
-      markup: markup,
-      targetClientPrice: targetClientPrice,
-      hoursProgress: hoursProgress
-    };
+    console.log('🎯 PROJECT VM:', {
+      costDisplay: vm.costDisplay,
+      currencyNative: vm.currencyNative,
+      revenueDisplay: vm.revenueDisplay,
+      markup: vm.markup,
+      flags: vm.flags
+    });
+
+    return vm;
   }, [
-    // 🛡️ DEPENDENCIAS ESPECÍFICAS: Solo recalcular cuando cambien estos valores
     unifiedData?.summary?.costDisplay,
+    unifiedData?.summary?.currencyNative,
+    unifiedData?.summary?.revenueDisplay,
+    unifiedData?.summary?.markup,
     unifiedData?.actuals?.totalWorkedCost,
     unifiedData?.actuals?.totalWorkedHours,
-    unifiedData?.quotation?.estimatedHours,
     unifiedData?.quotation?.baseCost,
     unifiedData?.quotation?.totalAmount,
+    unifiedData?.quotation?.estimatedHours,
     unifiedData?.metrics?.budgetUtilization,
-    unifiedData?.metrics?.efficiency,
-    unifiedData?.summary?.markup,
-    unifiedData?.metrics?.markup
+    unifiedData?.metrics?.efficiency
   ]);
+
+  // 🛡️ GUARD: Detectar reconversiones incorrectas (solo DEV)
+  useEffect(() => {
+    if (import.meta.env.MODE === 'production' || !unifiedData) return;
+    
+    const s = unifiedData.summary?.costDisplay;
+    const a = unifiedData.actuals?.totalWorkedCost;
+    
+    if (s && a) {
+      const ratio = s / a;
+      // Si ratio parece un tipo de cambio, alguien está mostrando USD en vez de summary
+      if (ratio > 300 && ratio < 5000) {
+        console.error('🚨 [CONSISTENCY] Detalle usando USD en UI. Esperado summary.costDisplay en moneda nativa.', {
+          summaryCostDisplay: s,
+          actualsUSD: a,
+          ratio,
+          currency: unifiedData.summary?.currencyNative
+        });
+      }
+    }
+  }, [unifiedData?.summary?.costDisplay, unifiedData?.actuals?.totalWorkedCost, unifiedData?.summary?.currencyNative]);
+
+  // 🔍 RASTREO: Detectar de dónde viene el valor mostrado (solo DEV)
+  useEffect(() => {
+    if (import.meta.env.MODE === 'production' || !projectVM || !unifiedData) return;
+    
+    const valueShown = projectVM.costDisplay;
+    const s = unifiedData.summary?.costDisplay;
+    const a = unifiedData.actuals?.totalWorkedCost;
+    const cur = projectVM.currencyNative;
+    
+    if (s != null && Math.abs(valueShown - s) < 0.01) {
+      console.log(`✅ [COST OK][PresupuestoCard] summary.costDisplay (${cur}) =`, valueShown);
+    } else if (a != null && Math.abs(valueShown - a) < 0.01) {
+      console.warn(`⚠️ [COST MISMATCH][PresupuestoCard] mostrando actuals.totalWorkedCost (USD) =`, valueShown, 
+        `| Expected summary.costDisplay =`, s);
+    } else {
+      console.log(`🔍 [COST][PresupuestoCard] valor derivado =`, valueShown, { cur, s, a });
+    }
+  }, [projectVM?.costDisplay, unifiedData?.summary?.costDisplay, unifiedData?.actuals?.totalWorkedCost, projectVM?.currencyNative]);
 
   // Mutación para eliminar entrada de tiempo
   const deleteTimeEntryMutation = useMutation({
@@ -3267,17 +3276,17 @@ const ProjectDetailsPage = () => {
                           }
 
                           // Agregar resumen financiero
-                          if (costSummary) {
+                          if (projectVM) {
                             reportData.push({
                               seccion: "Resumen Financiero",
                               nombre: "Markup",
-                              valor: costSummary.markup ? `${costSummary.markup.toFixed(2)}x` : '0.00x',
+                              valor: projectVM.markup ? `${projectVM.markup.toFixed(2)}x` : '0.00x',
                               fecha: dateFilter.label
                             });
                             reportData.push({
                               seccion: "Resumen Financiero", 
                               nombre: "Costo Total",
-                              valor: `$${costSummary.totalCost?.toLocaleString() || '0'}`,
+                              valor: formatCurrency(projectVM.costDisplay, projectVM.currencyNative),
                               fecha: dateFilter.label
                             });
                           }

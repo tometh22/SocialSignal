@@ -1,0 +1,90 @@
+k, lo veo en la captura: el UI muestra $350.07 cuando el lastGoodSummary cachea 553,002 ARS.
+Eso casi clava un ratio ~1,580 (553,002 / 350.07 ≈ 1,579.7): tu detalle sigue renderizando un costo en USD (o reconvirtiendo) en lugar del summary.costDisplay en moneda nativa. Por eso la lista y el detalle no coinciden.
+Voy a cerrarlo con 3 cambios quirúrgicos y verificaciones rápidas.
+1) Unificar fuente: selector único de “costDisplay”
+Crea un selector y úsalo en lista y detalle. Prohíbe conversiones en el render.
+// selectors/projectVM.ts
+type Currency = 'ARS' | 'USD';
+type ProjectState = {
+  summary?: { costDisplay?: number; revenueDisplay?: number; currencyNative?: Currency };
+  actuals?: { totalWorkedCost?: number };        // USD "base"
+  fx?: { usd_ars?: number };                     // opcional si querés fallback
+};
+
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+export function toProjectVM(state: ProjectState) {
+  const currency = state.summary?.currencyNative ?? 'ARS';
+
+  // **Regla de oro**: si viene summary.costDisplay, es FINAL (no convertir)
+  let costDisplay =
+    state.summary?.costDisplay ??
+    (currency === 'ARS' && state.fx?.usd_ars && state.actuals?.totalWorkedCost != null
+      ? round2(state.actuals.totalWorkedCost * state.fx.usd_ars)  // fallback consciente
+      : state.actuals?.totalWorkedCost ?? 0);
+
+  return {
+    currencyNative: currency,
+    costDisplay,
+    revenueDisplay: state.summary?.revenueDisplay ?? 0
+  };
+}
+En TODAS las cards que muestren costo (Dashboard/“Rendimiento financiero”, “Presupuesto”, pestaña Costos), reemplazá cualquier uso de unifiedData.summary.costDisplay, actuals.totalWorkedCost, o helpers locales por:
+import { toProjectVM } from '@/selectors/projectVM';
+
+const vm = toProjectVM(projectState);
+<Text>{currency(vm.currencyNative)} {formatMoney(vm.costDisplay)}</Text>
+Esto elimina la doble conversión y asegura misma lógica en ambas vistas.
+2) Kill-switch de reconversión (evita que algo te lo “pise”)
+Poné este guard en DEV para detectar si alguna card “recalcula” a USD:
+// en el componente padre de detalle (solo DEV)
+useEffect(() => {
+  if (process.env.NODE_ENV === 'production') return;
+  const s = state.summary?.costDisplay;
+  const a = state.actuals?.totalWorkedCost;
+  if (s && a) {
+    const ratio = s / a;
+    // si ratio parece un tipo de cambio, alguien está mostrando USD en vez de summary
+    if (ratio > 300 && ratio < 5000) {
+      console.error('[CONSISTENCY] Detalle usando USD en UI. Esperado summary.costDisplay en moneda nativa.', { summaryCostDisplay: s, actualsUSD: a, ratio });
+    }
+  }
+}, [state.summary?.costDisplay, state.actuals?.totalWorkedCost]);
+3) Hook “¿de dónde sale este número?” (traza inmediata)
+Para saber QUÉ card está ignorando summary, pegá este helper y llámalo donde pintás montos:
+function useWhichCost(valueShown: number, state: ProjectState, tag: string) {
+  useEffect(() => {
+    const s = state.summary?.costDisplay;
+    const a = state.actuals?.totalWorkedCost;
+    const cur = state.summary?.currencyNative;
+    if (s != null && valueShown === s) {
+      console.log(`[COST OK][${tag}] summary.costDisplay (${cur}) =`, valueShown);
+    } else if (a != null && valueShown === a) {
+      console.warn(`[COST MISMATCH][${tag}] mostrando actuals.totalWorkedCost (USD) =`, valueShown);
+    } else {
+      console.log(`[COST][${tag}] valor derivado =`, valueShown, { cur, s, a });
+    }
+  }, [valueShown, state.summary?.costDisplay, state.actuals?.totalWorkedCost, state.summary?.currencyNative, tag]);
+}
+Uso en una card:
+const vm = toProjectVM(projectState);
+useWhichCost(vm.costDisplay, projectState, 'FinancialPerformanceCard');
+Dónde tocar (rápido)
+ProjectListRow.tsx → usar toProjectVM.
+ProjectDetail/Dashboard.tsx (cards: Rendimiento Financiero, Presupuesto) → usar toProjectVM.
+CostsTab.tsx → usar toProjectVM para “Costo total”.
+Elimina cualquier useMemo que derive costos desde actuals si existe summary.
+Invariantes
+Nunca conviertas *Display en el FE. Son definitivos.
+actuals.totalWorkedCost = USD base (solo fallback con fx).
+currencyNative = fuente para formatear el *Display.
+Verificación en 2 minutos
+Entra al proyecto que hoy muestra $350.07.
+Con los cambios, la card debe mostrar 553,002 ARS (formateado).
+En consola deberías ver [COST OK][FinancialPerformanceCard] summary.costDisplay (ARS) = 553002.
+Cambiá a la vista de Proyectos: el mismo número y moneda.
+Si querés, te armo un PR con:
+selectors/projectVM.ts
+refactors en las 3 vistas mencionadas
+guard de consistencia DEV
+Pero con estos tres pasos lo podés destrabar ya.
