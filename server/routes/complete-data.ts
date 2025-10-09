@@ -358,6 +358,28 @@ export async function completeDataHandler(req: Request, res: Response) {
     const correctMarginRatio = sotSummary?.margin ?? (summary.revenueUSD > 0 ? ((summary.revenueUSD - summary.teamCostUSD) / summary.revenueUSD) : 0);
     console.log(`🔍 MARKUP CALCULATION: ${summary.revenueUSD} / ${summary.teamCostUSD} = ${correctMarkupRatio}${sotSummary ? ' (from SoT)' : ''}`);
 
+    // 🔒 Calculate totalAmountNative for quotation based on currencyNative
+    const currencyNative = summary.currencyNative || 'ARS';
+    const fxRate = 1345; // TODO: Get from exchange_rates table for the period
+    
+    let totalAmountNative = quotationData?.totalAmount || 0;
+    if (quotationData) {
+      // If quotation has its own currency setting, respect it
+      if (quotationData.quotationCurrency === 'USD' && currencyNative === 'ARS') {
+        totalAmountNative = quotationData.totalAmount * fxRate;
+      } else if (quotationData.quotationCurrency === 'ARS' && currencyNative === 'USD') {
+        totalAmountNative = quotationData.totalAmount / fxRate;
+      } else {
+        // Same currency or quotationCurrency matches currencyNative
+        totalAmountNative = quotationData.totalAmount;
+      }
+    }
+    
+    // Calculate budgetUtilization using native currency values
+    const budgetUtilization = totalAmountNative > 0 && summary.costDisplay 
+      ? summary.costDisplay / totalAmountNative 
+      : 0;
+
     const response = {
       // 🎯 FRONTEND COMPATIBILITY: Map to expected structure
       project: {
@@ -370,6 +392,8 @@ export async function completeDataHandler(req: Request, res: Response) {
         projectName: quotationData.projectName,
         baseCost: quotationData.baseCost,
         totalAmount: quotationData.totalAmount,
+        totalAmountNative, // 🔒 Native currency amount for consistent calculations
+        estimatedHours: legacy.estimatedHours || -1, // From team breakdown
         markupAmount: quotationData.markupAmount,
         marginFactor: quotationData.marginFactor
       } : null,
@@ -378,7 +402,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         efficiency: summary.efficiencyPct,
         markup: correctMarkupRatio,
         margin: correctMarginRatio,
-        budgetUtilization: 0,
+        budgetUtilization,
         hoursDeviation: 0,
         costDeviation: 0
       },

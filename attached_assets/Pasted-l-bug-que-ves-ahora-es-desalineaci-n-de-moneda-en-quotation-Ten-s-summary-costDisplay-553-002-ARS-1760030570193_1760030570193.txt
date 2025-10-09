@@ -1,0 +1,144 @@
+l bug que ves ahora es desalineación de moneda en quotation. Tenés summary.costDisplay = 553.002 ARS, pero el detalle calcula con quotation.totalAmount = 1,000 USD (nativo ≠ nativa). Eso rompe multiplier, budgetUtilization, markup, etc.
+Te dejo patch inmediato (FE) + arreglo definitivo (BE) y el contrato que sella la consistencia.
+1) Hotfix inmediato (Frontend)
+Mientras corregimos el BE, blindá la vista para no mezclar monedas.
+// currency helpers
+type Cur = 'ARS'|'USD';
+const fx = { usd_ars: /* tu rate mensual */ };
+
+function toNative(amountUSD: number, native: Cur) {
+  return native === 'USD' ? amountUSD : Math.round(amountUSD * fx.usd_ars);
+}
+
+// Normalizador de quotation
+function normalizeQuotation(q: any, native: Cur) {
+  const totalAmount = Number(q?.totalAmount ?? 0);        // USD (legacy)
+  const totalAmountNative =
+    q?.totalAmountNative != null
+      ? Number(q.totalAmountNative)
+      : toNative(totalAmount, native); // 🔒 fallback consistente
+
+  const estimatedHours = Number(q?.estimatedHours ?? -1);
+
+  return { ...q, totalAmount, totalAmountNative, estimatedHours };
+}
+Usalo antes de calcular métricas:
+const native = summary?.currencyNative ?? 'ARS';
+const quotationN = normalizeQuotation(quotation, native);
+
+// display SIEMPRE en nativa
+const revenueDisplay = summary?.revenueDisplay ?? 0;   // ya nativa
+const costDisplay    = summary?.costDisplay ?? 0;      // ya nativa
+const denomNative    = quotationN.totalAmountNative ?? 0;
+
+// métricas
+const budgetUtilization = denomNative > 0 ? costDisplay / denomNative : null;
+const markup            = costDisplay > 0 ? (denomNative / costDisplay) : null;
+const margin            = denomNative > 0 ? (denomNative - costDisplay) / denomNative : null;
+Y para el UI:
+En Rendimiento financiero y Presupuesto mostrar SIEMPRE currencyNative con costDisplay/revenueDisplay.
+Para denominadores y % usar quotationN.totalAmountNative (no USD).
+Además, agregá un guard visual:
+if (process.env.NODE_ENV !== 'production') {
+  const suspicious = summary?.costDisplay && quotation?.totalAmount && !quotation?.totalAmountNative;
+  if (suspicious) console.warn('[CONSISTENCY] quotation.totalAmountNative missing. Falling back via fx.');
+}
+2) Arreglo definitivo (Backend – agregador)
+Fuente: pestaña Rendimiento Cliente (SoT). Reglas:
+currencyNative: USD ↔ clientes lista-blanca (p. ej., Warner, Kimberly); ARS para el resto.
+summary.costDisplay =
+USD-nativo: Costos (USD)
+ARS-nativo: Costos (USD) * usd_ars
+summary.revenueDisplay =
+USD-nativo: Facturación (USD)
+ARS-nativo: Facturación (USD) * usd_ars
+quotation.totalAmountNative = la columna Cotización (ya nativa en tu sheet). Si solo tuvieras USD, convertir.
+Derivadas:
+summary.markup = totalAmountNative / costDisplay
+summary.margin = (totalAmountNative - costDisplay) / totalAmountNative
+metrics.budgetUtilization = costDisplay / totalAmountNative
+Patch (TypeScript / Node, pseudo)
+const USD_NATIVE = new Set(['Warner', 'Kimberly Clark']);
+function nativeFor(client: string): 'USD'|'ARS' {
+  return USD_NATIVE.has(client) ? 'USD' : 'ARS';
+}
+
+function buildProjectPayload(row: SheetRow, rates: {usd_ars:number}) {
+  const cur = nativeFor(row.Cliente);
+  const usd_ars = rates.usd_ars;
+
+  const costUSD  = num(row['Costos (USD)']);
+  const billUSD  = num(row['Facturación (USD)']);
+  const quoteNat = num(row['Cotización']); // nativa en la hoja
+
+  const costDisplay     = cur === 'USD' ? costUSD : Math.round(costUSD * usd_ars);
+  const revenueDisplay  = cur === 'USD' ? billUSD : Math.round(billUSD * usd_ars);
+  const totalAmount     = cur === 'USD' ? quoteNat : Math.round(quoteNat / usd_ars);   // opcional, legado
+  const totalAmountNat  = quoteNat;                                                    // 🔒 SIEMPRE
+
+  const markup = (costDisplay > 0 && totalAmountNat > 0) ? totalAmountNat / costDisplay : null;
+  const margin = (totalAmountNat > 0) ? (totalAmountNat - costDisplay) / totalAmountNat : null;
+  const budgetUtilization = (totalAmountNat > 0) ? costDisplay / totalAmountNat : null;
+
+  return {
+    summary: {
+      costDisplay, revenueDisplay, currencyNative: cur, markup, margin
+    },
+    quotation: {
+      totalAmount,                // para compatibilidad
+      totalAmountNative: totalAmountNat,
+      estimatedHours: row['Horas Estimadas'] ?? -1,
+    },
+    actuals: { totalWorkedCost: costUSD },
+    metrics: { budgetUtilization }
+  };
+}
+Claves:
+Mandar quotation.totalAmountNative SIEMPRE.
+No enviar summary: null en parches; si no cambia, omití la clave.
+Lista y detalle deben usar el mismo mapper a VM.
+3) Contrato de respuesta (Zod – FE)
+const SummarySchema = z.object({
+  costDisplay: z.number(),
+  revenueDisplay: z.number(),
+  currencyNative: z.enum(['ARS','USD']),
+  markup: z.number().nullable(),
+  margin: z.number().nullable(),
+});
+
+const QuotationSchema = z.object({
+  totalAmount: z.number().nonnegative().default(0),           // legacy USD
+  totalAmountNative: z.number().nonnegative(),                // 🔒 requerido
+  estimatedHours: z.number().int()
+});
+
+const PayloadSchema = z.object({
+  summary: SummarySchema,
+  quotation: QuotationSchema,
+  actuals: z.object({ totalWorkedCost: z.number() }),
+  metrics: z.object({ budgetUtilization: z.number().nullable() })
+});
+Si totalAmountNative falta → no apliques el patch y log de error.
+4) Test de consistencia (una sola función para LIST y DETAIL)
+function toVM(p:any){
+  const cur = p.summary.currencyNative;
+  return {
+    currencyNative: cur,
+    costDisplay:    p.summary.costDisplay,
+    revenueDisplay: p.summary.revenueDisplay,
+    denomNative:    p.quotation.totalAmountNative,
+    budgetUtilization: p.metrics.budgetUtilization,
+    markup: p.summary.markup
+  };
+}
+
+test('list vs detail VM equal', async () => {
+  const listP = await api.list();
+  const detP  = await api.detail(id);
+  expect(toVM(listP.find(x=>x.id===id))).toEqual(toVM(detP));
+});
+Qué vas a ver después del fix
+Rendimiento financiero: “Costo” y “Ingresos” en ARS (para Coelsa), % Presupuesto usado ≈ 553.002 / (Cotización en ARS); nada en USD.
+Presupuesto y Costos: mismos valores que la lista.
+Multiplier/ROI deja de explotar porque el denominador es nativo.
+¿Querés que te pase un diff listo para pegar del agregador (BE) y del normalizador (FE)? Te lo preparo apuntando a tu ruta /projects/:id/complete-data y a las 2–3 cards que hoy muestran el valor errado.
