@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -2245,3 +2245,89 @@ export type CostsNorm = typeof costsNorm.$inferSelect;
 export type InsertCostsNorm = z.infer<typeof insertCostsNormSchema>;
 export type TargetsNorm = typeof targetsNorm.$inferSelect;
 export type InsertTargetsNorm = z.infer<typeof insertTargetsNormSchema>;
+
+// ==================== SISTEMA DE 3 VISTAS (MULTIMONEDA) ====================
+// Enum para tipos de vista (debe ir antes de las tablas)
+export const viewTypeEnum = pgEnum('view_type', ['original', 'operativa', 'usd']);
+
+// Tabla de períodos de proyecto (base para agregaciones)
+export const projectPeriods = pgTable("project_periods", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id),
+  periodKey: varchar("period_key", { length: 7 }).notNull(), // YYYY-MM
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  fx: numeric("fx", { precision: 10, scale: 4 }).notNull(), // Tipo de cambio del período
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueProjectPeriod: unique().on(table.projectId, table.periodKey)
+}));
+
+// Tabla de agregaciones por vista
+export const projectAggregates = pgTable("project_aggregates", {
+  id: serial("id").primaryKey(),
+  projectPeriodId: integer("project_period_id").notNull().references(() => projectPeriods.id, { onDelete: 'cascade' }),
+  viewType: viewTypeEnum("view_type").notNull(), // 'original' | 'operativa' | 'usd'
+  currencyNative: varchar("currency_native", { length: 3 }).notNull(), // ARS | USD
+  // Datos base (JSONB para flexibilidad)
+  baseData: jsonb("base_data").notNull(), // { fact_ars, fact_usd, cost_ars, cost_usd, cotizacion_nat, cotizacion_usd }
+  // Datos de la vista calculados
+  viewData: jsonb("view_data").notNull(), // { revenue, cost, currency, cotizacion, markup, margin, budgetUtilization }
+  // Datos de cotización
+  quotationData: jsonb("quotation_data"), // { totalAmountNative, totalAmountUSD, estimatedHours }
+  // Datos de actuals
+  actualsData: jsonb("actuals_data"), // { totalWorkedHours, totalWorkedCost, teamBreakdown }
+  // Flags de validación
+  flags: text("flags").array().default([]),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueProjectPeriodView: unique().on(table.projectPeriodId, table.viewType)
+}));
+
+// Tabla de desglose de equipo por período
+export const teamBreakdown = pgTable("team_breakdown", {
+  id: serial("id").primaryKey(),
+  projectPeriodId: integer("project_period_id").notNull().references(() => projectPeriods.id, { onDelete: 'cascade' }),
+  personName: varchar("person_name", { length: 255 }).notNull(),
+  roleName: varchar("role_name", { length: 255 }).notNull(),
+  targetHours: numeric("target_hours", { precision: 8, scale: 2 }), // Horas objetivo (J)
+  hoursReal: numeric("hours_real", { precision: 8, scale: 2 }), // Horas reales trabajadas
+  hourlyRateARS: numeric("hourly_rate_ars", { precision: 10, scale: 2 }), // Valor hora ARS (N)
+  costARS: numeric("cost_ars", { precision: 12, scale: 2 }), // Costo ARS (O)
+  costUSD: numeric("cost_usd", { precision: 12, scale: 2 }), // Costo USD (R)
+  isFromExcel: boolean("is_from_excel").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePersonPeriod: unique().on(table.projectPeriodId, table.personName, table.roleName)
+}));
+
+// Insert schemas
+export const insertProjectPeriodSchema = createInsertSchema(projectPeriods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectAggregateSchema = createInsertSchema(projectAggregates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTeamBreakdownSchema = createInsertSchema(teamBreakdown).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type ProjectPeriod = typeof projectPeriods.$inferSelect;
+export type InsertProjectPeriod = z.infer<typeof insertProjectPeriodSchema>;
+export type ProjectAggregate = typeof projectAggregates.$inferSelect;
+export type InsertProjectAggregate = z.infer<typeof insertProjectAggregateSchema>;
+export type TeamBreakdown = typeof teamBreakdown.$inferSelect;
+export type InsertTeamBreakdown = z.infer<typeof insertTeamBreakdownSchema>;
+export type ViewType = 'original' | 'operativa' | 'usd';

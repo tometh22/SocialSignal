@@ -1,0 +1,87 @@
+Tenés 3 inconsistencias visibles en la captura y su causa inmediata:
+Ingresos generados = $1,000 (USD)
+— Está pintando el legacy quotation.totalAmount (USD) o un placeholder, en vez de summary.revenueDisplay (nativa).
+Impacto: barra de “Rendimiento Financiero” muestra la moneda equivocada.
+% Presupuesto usado = 70%
+— Se está calculando con denominador en USD o con un campo distinto al esperado.
+Con tus datos correctos: 553.002 / 1.345.000 = 41%, no 70%.
+Horas = 0h (Velocidad, Total trabajado)
+— No se está consumiendo la fuente pactada (Costos directos e indirectos → Directo), o no se está mapeando la columna de horas efectiva (facturación/asignadas) a actuals.totalWorkedHours.
+Fix ahora (quirúrgico, 1 sola fuente de verdad en FE)
+En los componentes de vista única (Dashboard + FinancialPerformance + Presupuesto + métricas), reemplazá cualquier cálculo local por estas asignaciones exactas:
+// VM (mismo para lista y detalle)
+const vm = {
+  currency: payload.summary.currencyNative,                   // 'ARS' | 'USD'
+  costDisplay: payload.summary.costDisplay,                   // nativa
+  revenueDisplay: payload.summary.revenueDisplay,             // nativa
+  denomNative: payload.quotation.totalAmountNative,           // nativa
+  totalWorkedHours: payload.actuals.totalWorkedHours,         // horas trabajadas
+  estimatedHours: payload.quotation.estimatedHours ?? -1,
+  budgetUtilization: payload.metrics.budgetUtilization,       // pre-calculada en BE
+  markup: payload.summary.markup,
+  margin: payload.summary.margin,
+};
+
+// Pintado (sin reconversiones)
+<CurrencyText amount={vm.revenueDisplay} currency={vm.currency} />   // Ingresos generados
+<Text muted> Costo: <CurrencyText amount={vm.costDisplay} currency={vm.currency} /> · Margen: {(vm.margin*100).toFixed(1)}% </Text>
+
+// % Presupuesto usado
+const usedPct = vm.denomNative > 0 ? vm.costDisplay / vm.denomNative : null;
+// para Coelsa ago-2025: usedPct ≈ 0.411 → 41%
+
+// Presupuesto (card)
+<Progress value={usedPct*100}/>
+<CurrencyText amount={vm.costDisplay} currency={vm.currency} /> de <CurrencyText amount={vm.denomNative} currency={vm.currency} />
+
+// Horas
+<Text>{vm.totalWorkedHours?.toFixed(2)}h</Text>
+Prohibido en FE (eliminá si existe):
+Usar quotation.totalAmount (USD) para mostrar ingresos o presupuesto.
+Usar actuals.totalWorkedCost para mostrar costo total.
+Cualquier $ hardcodeado o toLocaleString() sin currency.
+Qué debe mandar el Backend (y ya cerrar):
+Para el mismo período (Año+Mes) con matching exacto Cliente/Proyecto (normalizado):
+Rendimiento Cliente
+quotation.totalAmountNative ← Cotización (nativa)
+summary.revenueDisplay ← Facturación (USD) → a nativa
+summary.costDisplay ← Costos (USD) → a nativa
+summary.currencyNative ← regla de cliente (USD: Warner/Kimberly; resto ARS)
+summary.markup = totalAmountNative / costDisplay
+summary.margin = (totalAmountNative - costDisplay) / totalAmountNative
+metrics.budgetUtilization = costDisplay / totalAmountNative
+Costos directos e indirectos (filtrando “Directo”)
+actuals.totalWorkedHours ← sumar “Cantidad de horas para facturación”; si no existe, “Cantidad de horas asignadas”; si ninguna, 0
+actuals.teamBreakdown[] ← persona/rol + hours, targetHours (J), hourlyRateARS (N), costARS (O), costUSD (R)
+Si “Rendimiento Cliente” trae costo/ingreso, esa es la fuente titular para displays. “Costos…” queda como base técnica + equipo.
+Validaciones que te blindan (DEV, fallan fuerte si algo se mezcla)
+// 1) Moneda consistente
+invariant(payload.summary.costDisplay > 0, 'Missing summary.costDisplay');
+invariant(payload.quotation.totalAmountNative > 0, 'Missing quotation.totalAmountNative');
+
+// 2) Presupuesto en nativa
+const ratio = payload.summary.costDisplay / payload.quotation.totalAmountNative;
+if (ratio > 1.2) console.error('BudgetUtilization > 120%. Verificar mezcla USD/ARS.');
+
+// 3) Ingresos correctos
+invariant(typeof payload.summary.revenueDisplay === 'number', 'Missing revenueDisplay');
+
+// 4) Horas
+invariant(typeof payload.actuals.totalWorkedHours === 'number', 'Missing totalWorkedHours');
+Y un grep para evitar regresiones:
+rg -n "quotation\.totalAmount[^N]" client/src   # no debe usarse fuera de BE/mapper
+rg -n "actuals\.totalWorkedCost" client/src     # no debe pintar UI
+rg -n "\$[^A-Z]" client/src                     # $ hardcodeado
+Qué debería verse con esto (Coelsa, ago-2025)
+Ingresos generados: ARS (no USD).
+Costo: ARS 553.002 (línea de apoyo), margen ≈ 58.9% si denom=1.345.000 y costo=553.002.
+Presupuesto usado: 41% (no 70%).
+Horas trabajadas: el total que surja de Costos directos e indirectos → Directo (no 0).
+Markup (Multiplicador): 1.345.000 / 553.002 ≈ 2.43x (si hoy te muestra 7.9x, está usando otra pareja de campos).
+Mini-checklist de cierre
+ Reemplazar en Rendimiento Financiero: Ingresos = revenueDisplay, Costo = costDisplay, Moneda = currencyNative.
+ Recalcular Presupuesto usado con totalAmountNative (nativa).
+ Conectar totalWorkedHours desde Costos directos e indirectos (no 0).
+ Asegurar lista y detalle consumen el mismo toProjectVM.
+ Agregar invariantes/grep anteriores.
+Si querés, te dejo el toProjectVM y el CurrencyText listos para pegar en tu repo y un test Jest “list vs detail produce el mismo VM” para que esto no vuelva a romper.

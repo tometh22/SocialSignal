@@ -1,0 +1,173 @@
+tenés el brief completo para que Replit refactorice todo (end-to-end) con multimoneda y 3 vistas (“Original”, “Operativa”, “USD consolidada”), integrando Rendimiento Cliente + Costos directos e indirectos (Directo) con horas objetivo/horas reales/valor hora.
+0) Principios (no negociables)
+Una sola fuente de verdad (SoT) por hoja y columna.
+Nada se reconvierte en el frontend. El BE entrega los números ya listos para mostrar según la vista.
+Lista y Detalle consumen el mismo ViewModel (selectors/toProjectVM).
+1) Ingesta & Normalización (Sheets → tablas intermedias)
+1.1 Claves canónicas
+project_key = hash(normalize(cliente) + '::' + normalize(proyecto))
+period_key = YYYY-MM (derivado de Año + Mes).
+normalize: trim, lower, quitar acentos, colapsar espacios, quitar -_/()..
+1.2 Rendimiento Cliente → rc_monthly
+Tomar por Cliente + Proyecto + Mes + Año:
+fact_ars ← Facturación [ARS]
+fact_usd ← Facturación (USD)
+cost_ars ← Costos [ARS]
+cost_usd_sheet ← Costos (USD) (si existe; si no, se calculará)
+cotizacion_nat ← Cotización (⚠️ en moneda nativa del cliente)
+fx_month ← Tipo de cotización del período (o tabla FX mensual)
+Nota: para clientes USD, la cotización en USD deberá emitirse como cotizacion_usd = cotizacion_nat / fx_month.
+1.3 Costos directos e indirectos (filtrar Directo) → labor_rows
+Por fila (persona/rol):
+Persona (Detalle), Rol, Proyecto, Cliente, Mes, Año
+J: targetHours ← Cantidad de horas objetivo
+N: hourlyRateARS ← Valor hora ARS
+O: costARS_row ← Monto total ARS (= N * J si ya está)
+Q: fx_row ← Tipo de cotización (ARS→USD por fila)
+R: costUSD_row ← Monto total USD (si no existe, O / Q)
+Horas reales (por preferencia):
+Cantidad de horas para facturación
+Cantidad de horas asignadas
+→ hours_real_row (si nada existe, null)
+Aggregate → labor_monthly por project_key+period_key:
+totalWorkedHours = Σ hours_real_row (o null)
+estimatedHours = Σ J
+totalWorkedCostUSD = Σ R (o Σ(O/Q))
+sumCostARS = Σ O
+teamBreakdown[] por Persona+Rol:
+{ name, roleName, targetHours, hours, hourlyRateARS, costARS, costUSD, isFromExcel: true }
+2) Reglas de moneda & Vistas (precalcular en BE)
+2.1 Determinar moneda nativa de facturación
+isUSD = cliente ∈ {Warner, Kimberly Clark}
+currency_native = isUSD ? 'USD' : 'ARS'
+2.2 Construir 3 vistas por proyecto-mes
+Base (directo de tablas):
+ingreso_ars = rc.fact_ars
+ingreso_usd = rc.fact_usd
+costo_ars   = rc.cost_ars
+costo_usd   = rc.cost_usd_sheet || (rc.cost_ars / fx_month)
+
+cotizacion_nat = rc.cotizacion_nat
+cotizacion_usd = cotizacion_nat ? (cotizacion_nat / fx_month) : null
+(A) Vista Original
+original.revenue = ingreso_usd ?? ingreso_ars
+original.revenue_currency = ingreso_usd ? 'USD' : 'ARS'
+original.cost = costo_ars
+original.cost_currency = 'ARS'
+No calcular KPIs que mezclen monedas (mostrar badge “no comparable”).
+(B) Vista Operativa (para análisis del proyecto)
+Si isUSD:
+operativa.revenue = ingreso_usd
+operativa.cost = costo_usd // convertir costos a USD
+operativa.currency = 'USD'
+operativa.cotizacion = cotizacion_usd
+Si !isUSD:
+operativa.revenue = ingreso_ars
+operativa.cost = costo_ars
+operativa.currency = 'ARS'
+operativa.cotizacion = cotizacion_nat
+KPIs operativa (si operativa.cotizacion existe):
+operativa.markup = operativa.revenue / operativa.cost (x)
+operativa.margin = (operativa.revenue - operativa.cost) / operativa.revenue
+operativa.budgetUtilization = operativa.cost / operativa.cotizacion
+(C) Vista USD consolidada (para empresa)
+usd.revenue = ingreso_usd ?? (ingreso_ars / fx_month)
+usd.cost = costo_usd
+usd.currency = 'USD'
+usd.cotizacion = cotizacion_usd
+KPIs = mismas fórmulas sobre campos usd.*
+3) Payload final (por proyecto-mes)
+{
+  "project_key": "hash",
+  "period_key": "2025-08",
+  "client": "Coelsa",
+  "project": "Fee mensual",
+  "fx": 1345,
+  "currency_native": "ARS",
+  "base": {
+    "fact_ars": 0,
+    "fact_usd": 2100,
+    "cost_ars": 553002,
+    "cost_usd": 411.15,
+    "cotizacion_nat": 1345000,
+    "cotizacion_usd": 1000
+  },
+  "views": {
+    "original":  { "revenue": 2100, "revenue_currency": "USD", "cost": 553002, "cost_currency": "ARS" },
+    "operativa": { "revenue": 2100, "cost": 411.15, "currency": "USD", "cotizacion": 1000, "markup": 5.11, "margin": 0.80, "budgetUtilization": 0.411 },
+    "usd":       { "revenue": 2100, "cost": 411.15, "currency": "USD", "cotizacion": 1000 }
+  },
+  "quotation": {
+    "totalAmountNative": 1345000,
+    "totalAmountUSD": 1000,
+    "estimatedHours":  Σ(J)   // desde Costos D/I
+  },
+  "actuals": {
+    "totalWorkedHours":  Σ(horas reales),
+    "totalWorkedCost":   Σ(R),   // USD técnico
+    "teamBreakdown": [ { "name": "...", "roleName": "...", "targetHours":  J, "hours": h, "hourlyRateARS": N, "costARS": O, "costUSD": R, "isFromExcel": true } ]
+  },
+  "flags": []
+}
+Nota: si “Rendimiento Cliente” ya tiene “Costos (USD)”, usarlo (consistencia con tu hoja).
+4) Persistencia (PostgreSQL / Drizzle)
+project_periods(project_id, period_key, year, month, fx)
+project_aggregates(project_period_id, currency_native, base_jsonb, views_jsonb, quotation_jsonb, actuals_jsonb, flags text[])
+team_breakdown(project_period_id, person_name, role_name, hours, target_hours, hourly_rate_ars, cost_ars, cost_usd)
+5) API (misma fuente para lista y detalle)
+GET /api/projects?view=operativa|usd|original&period=YYYY-MM
+→ devuelve lista con summary mapeado desde views[view]
+GET /api/projects/:id?view=operativa|usd|original&period=YYYY-MM
+→ devuelve el mismo shape para detalle
+Mapper a ViewModel (único):
+function toProjectVM(p:any, view:'operativa'|'usd'|'original') {
+  const v = p.views[view];
+  return {
+    currencyNative: v.currency ?? v.revenue_currency ?? p.currency_native,
+    revenueDisplay: v.revenue,
+    costDisplay: v.cost,
+    denom: v.cotizacion ?? null,           // para % presupuesto
+    markup: v.markup ?? null,
+    margin: v.margin ?? null,
+    budgetUtilization: v.budgetUtilization ?? (v.cotizacion ? v.cost / v.cotizacion : null),
+    totalWorkedHours: p.actuals.totalWorkedHours,
+    teamBreakdown: p.actuals.teamBreakdown
+  };
+}
+6) Frontend
+Toggle global: view = 'operativa' | 'usd' | 'original' (default: operativa en Detalle; usd en Empresa).
+TODAS las cards (Dashboard, Financiero, Presupuesto, Costos, Ingresos) consumen toProjectVM(data, view).
+Prohibido usar actuals.totalWorkedCost o quotation.totalAmount (legacy USD) para pintar.
+CurrencyText único para formateo.
+7) Validaciones (fail-fast en BE)
+Debe existir Cotización (cotizacion_nat) y fx para calcular vistas.
+views.operativa debe tener revenue y cost en misma moneda.
+Si Σ(team.costUSD) != base.cost_usd ± tol, flag: labor_vs_rc_cost_mismatch.
+Si quotation.estimatedHours != Σ(J), flag: estimated_hours_mismatch.
+8) Tests (mínimos)
+List vs Detail con mismo view → mismo VM.
+Operativa: budgetUtilization = cost / cotizacion (moneda consistente).
+USD consolidada: revenue_usd = fact_usd || (fact_ars/fx).
+Horas: estimatedHours = Σ(J) y totalWorkedHours = Σ(horas reales).
+9) Resumen de dónde sale cada campo (para que no haya dudas)
+Rendimiento Cliente
+Ingresos ARS → Facturación [ARS]
+Ingresos USD → Facturación (USD)
+Costos ARS → Costos [ARS]
+Costos USD → Costos (USD) (o Costos[ARS]/fx)
+Cotización nativa → Cotización
+FX → Tipo de cotización (del mes)
+Costos directos e indirectos (Directo)
+J → horas objetivo (por persona y total)
+N → valor hora ARS
+O → costo ARS (fila y total)
+Q → tipo cotización (fila)
+R → costo USD (fila y total, si falta usar O/Q)
+Horas reales → “Cantidad de horas para facturación” › “Cantidad de horas asignadas” (fallback)
+Entregables para Replit
+ETL: etl/monthly_aggregate.ts con parseRC, parseLabor, mergeToViews.
+DB: migraciones de tablas (periods, aggregates, team_breakdown).
+API: endpoints con view + period y mapper toProjectVM.
+FE: toggle de vista, toProjectVM, CurrencyText, refactor de cards a vm.*.
+Tests: 4 casos listados arriba.
+Con esto, te queda operación clara (vista Operativa), consolidado empresa en USD, y auditoría en Original — sin volver a mezclar USD/ARS ni horas.
