@@ -470,6 +470,51 @@ function TimeRangeFilter({
   );
 }
 
+// Component for ViewToggle (3 vistas: Original, Operativa, USD)
+function ViewToggle({ 
+  selectedView, 
+  onViewChange, 
+  className 
+}: { 
+  selectedView: 'original' | 'operativa' | 'usd';
+  onViewChange: (view: 'original' | 'operativa' | 'usd') => void;
+  className?: string;
+}) {
+  const viewOptions = [
+    { value: 'operativa', label: 'Vista Operativa', description: 'Moneda nativa por cliente' },
+    { value: 'usd', label: 'USD Consolidada', description: 'Todo en USD' },
+    { value: 'original', label: 'Vista Original', description: 'Datos sin procesar' }
+  ];
+
+  return (
+    <div className={className}>
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium">Vista:</Label>
+        <Select value={selectedView} onValueChange={onViewChange}>
+          <SelectTrigger className="w-48">
+            <SelectValue>
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                {viewOptions.find(v => v.value === selectedView)?.label}
+              </div>
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {viewOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                <div className="flex flex-col">
+                  <span className="font-medium">{option.label}</span>
+                  <span className="text-xs text-gray-500">{option.description}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 // Component for ProjectTeamSection with enhanced functionality
 function ProjectTeamSection({ projectId, unifiedData, timeFilter }: { 
   projectId: string; 
@@ -885,6 +930,7 @@ const ProjectDetailsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<number | null>(null);
   const [deleteEntryId, setDeleteEntryId] = useState<number | null>(null);
+  const [selectedView, setSelectedView] = useState<'original' | 'operativa' | 'usd'>('operativa');
 
   // Estado del filtro temporal - configurado por defecto para mostrar agosto 2025 donde están los datos reales
   const [dateFilter, setDateFilter] = useState<DateFilter>(() => {
@@ -1015,7 +1061,8 @@ const ProjectDetailsPage = () => {
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
     timeFilterForHook,
-    periodFromUrl || undefined // 🎯 NEW: Pass period from URL to enable SoT integration
+    periodFromUrl || undefined, // 🎯 Pass period from URL to enable SoT integration
+    selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)
   );
 
   // Cliente del proyecto
@@ -1696,12 +1743,19 @@ const ProjectDetailsPage = () => {
                 {projectName}
               </h1>
 
-              {/* Filtro temporal */}
-              <TimeRangeFilter 
-                selectedFilter={dateFilter}
-                onFilterChange={setDateFilter}
-                className="flex-shrink-0"
-              />
+              {/* Filtros: Vista y Período */}
+              <div className="flex items-center gap-3">
+                <ViewToggle 
+                  selectedView={selectedView}
+                  onViewChange={setSelectedView}
+                  className="flex-shrink-0"
+                />
+                <TimeRangeFilter 
+                  selectedFilter={dateFilter}
+                  onFilterChange={setDateFilter}
+                  className="flex-shrink-0"
+                />
+              </div>
             </div>
           </div>
 

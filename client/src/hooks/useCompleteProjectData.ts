@@ -199,14 +199,15 @@ interface CompleteProjectData {
 export const useCompleteProjectData = (
   projectId: number, 
   timeFilter: string = 'all',
-  period?: string // 🎯 NEW: Support period=YYYY-MM for SoT integration
+  period?: string, // 🎯 Support period=YYYY-MM for SoT integration
+  view?: 'original' | 'operativa' | 'usd' // 🎯 NEW: Support 3-view system
 ) => {
   // 🛡️ RACE CONDITION FIX: Cache último summary válido
   const lastGoodSummaryRef = useRef<CompleteProjectData['summary'] | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const query = useQuery<CompleteProjectData>({
-    queryKey: ['projects', projectId, 'complete-data', period || timeFilter],
+    queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa'],
     queryFn: async () => {
       // 🛡️ Abortar fetch anterior si existe
       if (abortControllerRef.current) {
@@ -216,11 +217,13 @@ export const useCompleteProjectData = (
       const controller = new AbortController();
       abortControllerRef.current = controller;
       
-      // 🎯 Prefer period over timeFilter for SoT integration
-      const url = period && /^\d{4}-\d{2}$/.test(period)
+      // 🎯 Build URL with view parameter
+      const baseUrl = period && /^\d{4}-\d{2}$/.test(period)
         ? `/api/projects/${projectId}/complete-data?period=${period}&basis=usd`
         : `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
-      console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, period, url });
+      
+      const url = view ? `${baseUrl}&view=${view}` : baseUrl;
+      console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, period, view, url });
       
       const timeoutId = setTimeout(() => {
         console.log('🔍 HOOK: Request timeout after 20 seconds');
