@@ -12133,6 +12133,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== SYNC MONTHLY AGGREGATES (ETL 3 VISTAS) ====================
+  // Sincroniza un período específico y genera las 3 vistas (Original, Operativa, USD)
+  app.post('/internal/sync/monthly-aggregates', async (req: Request, res: Response) => {
+    try {
+      const { periodKey } = req.body; // YYYY-MM format
+      
+      if (!periodKey || !/^\d{4}-\d{2}$/.test(periodKey)) {
+        return res.status(400).json({
+          error: 'Invalid periodKey format. Expected YYYY-MM (e.g., 2025-08)'
+        });
+      }
+      
+      console.log(`🔄 SYNC MONTHLY AGGREGATES: Processing ${periodKey}...`);
+      
+      const { syncMonthlyAggregates } = await import('./etl/monthly-aggregates');
+      const result = await syncMonthlyAggregates(periodKey);
+      
+      console.log(`✅ SYNC MONTHLY AGGREGATES: Completed ${periodKey}`);
+      
+      return res.json({
+        ok: true,
+        period: periodKey,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ SYNC MONTHLY AGGREGATES Error:', error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 🚀 INTEGRAR ENDPOINTS UNIVERSALES DEL MOTOR ÚNICO
   // Importar y configurar todos los routers universales
   try {
