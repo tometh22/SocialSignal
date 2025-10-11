@@ -91,3 +91,30 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Backend Enhancement**: Extended cost reconciler in `server/routes/complete-data.ts` to apply overrides in both SoT mode (period=YYYY-MM) and legacy mode (timeFilter=month_year), ensuring summary always includes costDisplay/currencyNative/revenueDisplay fields regardless of query mode.
 - **Quality Assurance**: DEV-only Consistency Guard detects incorrect USD→ARS reconversions without false positives by verifying both FX ratio presence and actual displayed value.
 - **Verification**: August 2025 golden values confirmed: Coelsa shows ARS 553,002 (reconciler override), Warner shows USD 7,005.20, Kimberly shows USD 2,436.09, Modo shows ARS 497,550.
+
+### Multi-Currency 3-View System Architecture
+- **Objective**: Provide three distinct analytical perspectives on project data: (1) Original - raw imported data, (2) Operativa - native currency per client for operational analysis, (3) USD Consolidada - all values in USD for company-wide analysis.
+- **Database Schema**: 
+  - `project_periods`: Links projects to specific time periods (YYYY-MM format)
+  - `project_aggregates`: Pre-computed views with JSON fields for base_data, view_data, quotation_data, actuals_data, and flags. Supports `ViewType` enum (original | operativa | usd)
+  - `team_breakdown`: Team-level metrics with JSON storage for labor details from directCosts table
+- **ETL Pipeline** (`server/etl/monthly-aggregates.ts`):
+  - Consolidates data from `financial_sot` (revenue/costs from "Rendimiento Cliente") and `direct_costs` (labor hours/costs from "Costos directos e indirectos - Directo")
+  - Generates 3 pre-computed views per project-period with proper currency normalization
+  - Resolves projects via `quotations.projectName` → `active_projects.quotationId` mapping
+  - Sync endpoint: `POST /internal/sync/monthly-aggregates` with `periodKey` parameter (YYYY-MM)
+- **Backend Integration** (`server/routes/complete-data.ts`):
+  - ALL views (including default operativa) now route through `view-aggregator` for consistency
+  - Accepts `view` query parameter: `?view=original|operativa|usd`
+  - Returns unified response with `view`, `costDisplay`, `revenueDisplay`, `currencyNative`, and `flags` fields
+  - Adds `LEGACY_FALLBACK` flag when project_aggregates data unavailable
+- **Frontend Integration**:
+  - `ViewToggle` component in project details page header for switching between 3 views
+  - `useCompleteProjectData` hook passes view parameter to backend
+  - `projectVM.ts` selector consumes view-aware data without frontend currency reconversion
+  - Backward compatible: defaults to operativa view when no view specified
+- **Currency Logic**:
+  - **Original**: Shows raw data as imported (may mix currencies)
+  - **Operativa**: Warner/Kimberly in USD, all others in ARS (native currency per client)
+  - **USD**: Everything normalized to USD for company-wide KPI analysis
+- **Testing**: Verified with August 2025 data for projects 34 (Warner), 39 (Kimberly), 40 (Uber), 46, 48. All 3 views return correct currency values and flags.
