@@ -259,18 +259,27 @@ export async function processProjectPeriod(periodKey: string) {
  * Procesa un proyecto individual y genera las 3 vistas
  */
 async function processProject(data: RawPeriodData) {
-  // 1. Buscar proyecto en active_projects por nombre
-  const project = await db.select()
-    .from(activeProjects)
-    .where(eq(activeProjects.subprojectName, data.projectName))
-    .limit(1);
+  // 1. Buscar proyecto por quotation.projectName y luego vincular con active_projects
+  const quotation = await db.query.quotations.findFirst({
+    where: (quotations, { eq }) => eq(quotations.projectName, data.projectName)
+  });
   
-  if (project.length === 0) {
-    console.log(`  ⚠️ Proyecto "${data.projectName}" no encontrado en active_projects, omitiendo...`);
+  if (!quotation) {
+    console.log(`  ⚠️ Quotation para proyecto "${data.projectName}" no encontrada, omitiendo...`);
     return;
   }
   
-  const projectId = project[0].id;
+  // 2. Buscar active_project por quotation_id
+  const project = await db.query.activeProjects.findFirst({
+    where: (activeProjects, { eq }) => eq(activeProjects.quotationId, quotation.id)
+  });
+  
+  if (!project) {
+    console.log(`  ⚠️ Active project para quotation #${quotation.id} "${data.projectName}" no encontrado, omitiendo...`);
+    return;
+  }
+  
+  const projectId = project.id;
   
   // 2. Crear o actualizar project_period
   const existingPeriod = await db.select()
