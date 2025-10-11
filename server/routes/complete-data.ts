@@ -128,6 +128,12 @@ export async function completeDataHandler(req: Request, res: Response) {
     const timeFilterQuery = String(req.query.timeFilter ?? '');
     const periodQuery = String(req.query.period ?? '');
     
+    // 🎯 NEW: 3-View System Support (original | operativa | usd)
+    const viewQuery = String(req.query.view ?? '').toLowerCase() as 'original' | 'operativa' | 'usd' | '';
+    const view: 'original' | 'operativa' | 'usd' = viewQuery && ['original', 'operativa', 'usd'].includes(viewQuery) 
+      ? viewQuery as any
+      : 'operativa'; // Default to operativa view
+    
     // 🎯 RESTORE LEGACY BASIS CONTRACT: Accept ECON/EXEC (and lowercase aliases)
     const basisQuery = String(req.query.basis ?? 'ECON').toUpperCase();
     let basis: 'ECON' | 'EXEC' | 'usd' | 'native';
@@ -149,12 +155,12 @@ export async function completeDataHandler(req: Request, res: Response) {
       // NEW FORMAT: period=YYYY-MM
       period = periodQuery;
       usingSoT = true;
-      console.log(`🎯 COMPLETE-DATA SoT MODE: Project ${projectId}, period=${period}, basis=${basis} (${basisNormalized})`);
+      console.log(`🎯 COMPLETE-DATA SoT MODE: Project ${projectId}, period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
     } else if (timeFilterQuery) {
       // LEGACY FORMAT: timeFilter=august_2025
       const parsed = parseTimeLegacyOrNew({ timeFilter: timeFilterQuery });
       period = parsed.period;
-      console.log(`📅 COMPLETE-DATA LEGACY MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, basis=${basis} (${basisNormalized})`);
+      console.log(`📅 COMPLETE-DATA LEGACY MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
     } else {
       return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
     }
@@ -197,6 +203,69 @@ export async function completeDataHandler(req: Request, res: Response) {
           where: eq(quotations.id, projectData.quotationId)
         })
       : null;
+    
+    // 🎯 NEW: 3-VIEW SYSTEM - ALWAYS try to use view-aggregator for ALL views (including operativa)
+    try {
+      const { getProjectPeriodView } = await import('../domain/view-aggregator');
+      const viewData = await getProjectPeriodView(resolvedProjectId, period, view);
+      
+      if (viewData) {
+        console.log(`🎨 VIEW-AGGREGATOR: Using ${view} view for project ${resolvedProjectId}, period ${period}`);
+        
+        // Return view-based response with consistent structure
+        return res.json({
+          view: view, // CRITICAL: Include view field for frontend
+          project: {
+            id: projectData.id,
+            clientId: projectData.clientId,
+            status: projectData.status
+          },
+          quotation: quotationData ? {
+            id: quotationData.id,
+            projectName: quotationData.projectName,
+            baseCost: quotationData.baseCost,
+            totalAmount: viewData.cotizacion || quotationData.totalAmount,
+            totalAmountNative: viewData.cotizacion || quotationData.totalAmount,
+            estimatedHours: viewData.estimatedHours || -1
+          } : null,
+          actuals: {
+            totalWorkedHours: viewData.totalWorkedHours,
+            totalWorkedCost: viewData.costDisplay, // Display value
+            totalEntries: 0,
+            teamBreakdown: viewData.teamBreakdown
+          },
+          metrics: {
+            efficiency: 0,
+            markup: viewData.markup || 0,
+            margin: viewData.margin || 0,
+            budgetUtilization: viewData.budgetUtilization || 0,
+            hoursDeviation: 0,
+            costDeviation: 0
+          },
+          summary: {
+            teamCostUSD: viewData.costDisplay, // TODO: normalize to USD if needed
+            revenueUSD: viewData.revenueDisplay,
+            markupUSD: viewData.markup || 0,
+            costDisplay: viewData.costDisplay, // CRITICAL: Include for frontend
+            revenueDisplay: viewData.revenueDisplay, // CRITICAL: Include for frontend
+            currencyNative: viewData.currencyNative, // CRITICAL: Include for frontend
+            markup: viewData.markup,
+            margin: viewData.margin,
+            flags: [...viewData.flags, `VIEW_${view.toUpperCase()}`]
+          },
+          estimatedHours: viewData.estimatedHours,
+          workedHours: viewData.totalWorkedHours,
+          totalCost: viewData.costDisplay,
+          totalRealRevenue: viewData.revenueDisplay
+        });
+      } else {
+        console.warn(`⚠️ VIEW-AGGREGATOR: No data in project_aggregates for ${view} view (project ${resolvedProjectId}, period ${period}), falling back to legacy mode`);
+        // Flag will be added to response below to indicate fallback mode
+      }
+    } catch (err: any) {
+      console.error(`❌ VIEW-AGGREGATOR ERROR: ${err.message}, falling back to legacy mode`);
+      // Continue with legacy mode
+    }
     
     // 🚀 SoT INTEGRATION: Get metrics from SoT if using period format
     let sotSummary = null;
@@ -380,7 +449,12 @@ export async function completeDataHandler(req: Request, res: Response) {
       ? summary.costDisplay / totalAmountNative 
       : 0;
 
+    // 🚨 Add LEGACY_FALLBACK flag if view-aggregator was not used
+    const legacyFlags = [...(summary.flags || []), 'LEGACY_FALLBACK'];
+    
     const response = {
+      // 🎯 3-VIEW SYSTEM: Include view field for frontend
+      view: view, // CRITICAL: Frontend needs to know which view is being used
       // 🎯 FRONTEND COMPATIBILITY: Map to expected structure
       project: {
         id: projectData.id,
@@ -406,7 +480,10 @@ export async function completeDataHandler(req: Request, res: Response) {
         hoursDeviation: 0,
         costDeviation: 0
       },
-      summary,
+      summary: {
+        ...summary,
+        flags: legacyFlags // Add LEGACY_FALLBACK flag
+      },
       teamBreakdown,
       ingresos: pm.ingresos ?? [],
       costos: pm.costos ?? [],
