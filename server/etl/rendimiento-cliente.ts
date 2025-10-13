@@ -15,9 +15,9 @@ interface RendimientoClienteRow {
   Mes?: string;
   Año?: string | number;
   Cotización?: string | number;
-  "Facturación (USD)"?: string | number; // Columna G
+  "Facturación [USD]"?: string | number; // Columna G (los headers usan corchetes)
   "Facturación [ARS]"?: string | number; // Columna I
-  "Costos (USD)"?: string | number; // Columna H
+  "Costos [USD]"?: string | number; // Columna H (los headers usan corchetes)
   "Costos [ARS]"?: string | number; // Columna K
   "Pasado/Futuro"?: string;
 }
@@ -197,10 +197,10 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
         const monthKey = monthKeyFromEs(row.Mes, year);
         const monthNum = parseInt(monthKey.split('-')[1]);
 
-        // Parsear valores - usar nombres exactos de las columnas de la hoja
-        const revenueUsd = parseMoneyRobust(row["Facturación (USD)"]); // Columna G
+        // Parsear valores - usar nombres exactos de las columnas de la hoja (con corchetes)
+        const revenueUsd = parseMoneyRobust(row["Facturación [USD]"]); // Columna G
         const revenueArs = parseMoneyRobust(row["Facturación [ARS]"]); // Columna I
-        const costUsd = parseMoneyRobust(row["Costos (USD)"]); // Columna H
+        const costUsd = parseMoneyRobust(row["Costos [USD]"]); // Columna H
         const costArs = parseMoneyRobust(row["Costos [ARS]"]); // Columna K
         const quotation = parseMoneyRobust(row["Cotización"]); // Columna F
         
