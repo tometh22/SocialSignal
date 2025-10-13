@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
 import { toProjectVM, formatCurrency, useWhichCost } from "@/selectors/projectVM";
-import { normalizeQuotation, calculateNativeMetrics } from "@/utils/quotation-normalizer";
 import {
   ArrowLeft,
   Calendar,
@@ -1109,12 +1108,8 @@ const ProjectDetailsPage = () => {
   const project = (unifiedData as any)?.project;
   const isLoading = dataLoading;
   
-  // 🔒 NORMALIZE QUOTATION: Ensure totalAmountNative is in correct currency
-  const currencyNative = (unifiedData as any)?.summary?.currencyNative || 'ARS';
-  const quotationData = normalizeQuotation(
-    (unifiedData as any)?.quotation, 
-    currencyNative as 'USD' | 'ARS'
-  );
+  // ✅ Use quotation data directly from backend (already normalized)
+  const quotationData = (unifiedData as any)?.quotation;
   
   // Crear filteredTimeEntries vacío por compatibilidad (todos los datos vienen del endpoint unificado)
   const filteredTimeEntries: any[] = [];
