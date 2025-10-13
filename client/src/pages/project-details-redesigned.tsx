@@ -1050,9 +1050,28 @@ const ProjectDetailsPage = () => {
 
   // SINGLE SOURCE OF TRUTH: obtener todos los datos del proyecto con filtros temporales
   const timeFilterForHook = getTimeFilterForHook(dateFilter);
+  
+  // 🎯 Calculate period (YYYY-MM) from dateFilter for SoT integration
+  const periodFromFilter = dateFilter.startDate && dateFilter.endDate 
+    ? (() => {
+        const start = dateFilter.startDate;
+        const end = dateFilter.endDate;
+        const monthDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        
+        // Si el rango es exactamente un mes, usar ese mes
+        if (monthDiff === 0 || (monthDiff === 1 && end.getDate() === 1 && start.getDate() === 1)) {
+          const year = start.getFullYear();
+          const month = String(start.getMonth() + 1).padStart(2, '0');
+          return `${year}-${month}`;
+        }
+        return undefined;
+      })()
+    : undefined;
+  
   console.log('🔍 FILTER DEBUG:', { 
     dateFilterLabel: dateFilter.label, 
     mappedTimeFilter: timeFilterForHook,
+    calculatedPeriod: periodFromFilter,
     dateFilterDates: {
       start: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
       end: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
@@ -1061,7 +1080,7 @@ const ProjectDetailsPage = () => {
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
     timeFilterForHook,
-    periodFromUrl || undefined, // 🎯 Pass period from URL to enable SoT integration
+    periodFromUrl || periodFromFilter, // 🎯 Use URL period or calculated period from filter
     selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)
   );
 
@@ -2030,22 +2049,12 @@ const ProjectDetailsPage = () => {
                         <span className="text-slate-300">Ingresos Generados</span>
                         <span className="text-2xl font-bold text-green-400">
                           {(() => {
-                            // 🪙 ANÁLISIS MULTI-MONEDA: Usar análisis unificado si está disponible
-                            const analysis = (unifiedData as any)?.analysis;
-                            if (analysis && analysis.totals) {
-                              const currency = analysis.currency === 'ARS' ? 'AR$' : '$';
-                              return `${currency} ${analysis.totals.revenue.toLocaleString()}`;
+                            // 🎯 USAR SUMMARY: Fuente única de verdad desde view-aggregator
+                            if (projectVM) {
+                              return formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative);
                             }
-                            
-                            // Fallback: usar datos reales del Excel MAESTRO
-                            const realSales = (unifiedData as any)?.googleSheetsSales || [];
-                            if (realSales.length > 0) {
-                              return `$${(realSales
-                                .reduce((sum: number, sale: any) => sum + parseFloat(sale.amountUsd || 0), 0) || 0).toLocaleString()}`;
-                            } else {
-                              // Último fallback: cotización
-                              return `$${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}`;
-                            }
+                            // Fallback legacy
+                            return `$${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}`;
                           })()}
                         </span>
                       </div>
@@ -2057,17 +2066,11 @@ const ProjectDetailsPage = () => {
                       </div>
                       <div className="text-xs text-slate-400">
                         {(() => {
-                          // 🪙 ANÁLISIS MULTI-MONEDA: Usar costos del análisis unificado
-                          const analysis = (unifiedData as any)?.analysis;
-                          if (analysis && analysis.totals) {
-                            const currency = analysis.currency === 'ARS' ? 'AR$' : '$';
-                            return `Costo: ${currency} ${analysis.totals.costs.toLocaleString()} • Margen: ${((analysis.totals.margin / analysis.totals.revenue) * 100).toFixed(1)}%`;
-                          }
-                          // 🎯 USAR PROJECT VM: Fallback con moneda nativa
+                          // 🎯 USAR PROJECT VM: Fuente única de verdad
                           if (projectVM) {
                             const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
-                            const margin = projectVM.markup && projectVM.markup > 0 ? ((1 - 1/projectVM.markup) * 100).toFixed(1) : '0.0';
-                            return `Costo: ${costStr} • Margen: ${margin}%`;
+                            const marginPercent = projectVM.margin != null ? projectVM.margin.toFixed(1) : '0.0';
+                            return `Costo: ${costStr} • Margen: ${marginPercent}%`;
                           }
                           return 'Costo: $0 • Margen: 0%';
                         })()}
