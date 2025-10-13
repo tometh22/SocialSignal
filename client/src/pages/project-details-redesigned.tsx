@@ -3474,15 +3474,14 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Markup</p>
                       <p className="text-2xl font-bold">
-                        {(() => {
-                          const revenue = unifiedData?.quotation?.totalAmount || 0;
-                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const markup = cost > 0 ? (revenue / cost) : 0;
-                          return markup.toFixed(2);
-                        })()}X
+                        {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
                       </p>
                       <p className="text-xs text-violet-200">
-                        ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()} sobre costo
+                        {(() => {
+                          if (!projectVM) return '$0 sobre costo';
+                          const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                          return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
+                        })()}
                       </p>
                     </div>
                     <DollarSign className="h-6 w-6 text-violet-200" />
@@ -3495,15 +3494,14 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Margen Operativo</p>
                       <p className="text-2xl font-bold">
-                        {(() => {
-                          const revenue = unifiedData?.quotation?.totalAmount || 0;
-                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const margin = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
-                          return margin.toFixed(1);
-                        })()}%
+                        {projectVM?.margin != null ? `${projectVM.margin.toFixed(1)}%` : 'N/A'}
                       </p>
                       <p className="text-xs text-violet-200">
-                        ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()} beneficio
+                        {(() => {
+                          if (!projectVM) return '$0 beneficio';
+                          const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                          return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
+                        })()}
                       </p>
                     </div>
                     <TrendingUp className="h-6 w-6 text-violet-200" />
@@ -3516,13 +3514,14 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Burn Rate</p>
                       <p className="text-2xl font-bold">
-                        ${(() => {
-                          const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                        {(() => {
+                          if (!projectVM) return '$0';
+                          const totalCost = projectVM.costDisplay;
                           const workedHours = unifiedData?.workedHours || 1;
                           const estimatedHours = unifiedData?.estimatedHours || 1;
                           const projectProgress = workedHours / estimatedHours;
                           const monthlyBurn = projectProgress > 0 ? totalCost / Math.max(projectProgress * 12, 1) : 0;
-                          return Math.round(monthlyBurn).toLocaleString();
+                          return formatCurrency(Math.round(monthlyBurn), projectVM.currencyNative);
                         })()}
                       </p>
                       <p className="text-xs text-violet-200">por mes estimado</p>
@@ -3538,17 +3537,15 @@ const ProjectDetailsPage = () => {
                       <p className="text-violet-100 text-sm">ROI del Proyecto</p>
                       <p className="text-2xl font-bold">
                         {(() => {
-                          const revenue = unifiedData?.quotation?.totalAmount || 0;
-                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const roi = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
+                          if (!projectVM || !projectVM.markup) return '0%';
+                          const roi = (projectVM.markup - 1) * 100;
                           return roi.toFixed(0);
                         })()}%
                       </p>
                       <p className="text-xs text-violet-200">
                         {(() => {
-                          const revenue = unifiedData?.quotation?.totalAmount || 0;
-                          const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                          const roi = cost > 0 ? ((revenue - cost) / cost * 100) : 0;
+                          if (!projectVM || !projectVM.markup) return 'N/A';
+                          const roi = (projectVM.markup - 1) * 100;
                           return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
                         })()} retorno
                       </p>
@@ -3572,21 +3569,17 @@ const ProjectDetailsPage = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Ingresos Proyectados vs Reales */}
+                {/* Ingresos Facturados */}
                 <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">Ingresos Proyectados</span>
+                    <span className="text-sm font-medium text-green-700">Ingresos Facturados</span>
                   </div>
                   <div className="text-2xl font-bold text-green-800">
-                    ${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}
+                    {projectVM ? formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative) : '$0'}
                   </div>
                   <div className="text-xs text-green-600">
-                    vs ${(() => {
-                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
-                      const realizedRevenue = (unifiedData?.quotation?.totalAmount || 0) * progress;
-                      return Math.round(realizedRevenue).toLocaleString();
-                    })()} realizado ({((unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1) * 100).toFixed(0)}%)
+                    del período seleccionado
                   </div>
                 </div>
 
@@ -3594,24 +3587,19 @@ const ProjectDetailsPage = () => {
                 <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
                   <div className="flex items-center gap-2 mb-2">
                     <Target className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">Punto de Equilibrio</span>
+                    <span className="text-sm font-medium text-blue-700">Estado Financiero</span>
                   </div>
                   <div className="text-2xl font-bold text-blue-800">
                     {(() => {
-                      const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const currentRevenue = unifiedData?.quotation?.totalAmount || 0;
-                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
-                      const realizedRevenue = currentRevenue * progress;
-                      return realizedRevenue >= totalCost ? 'Alcanzado' : Math.round(((totalCost / currentRevenue) * 100)).toString() + '%';
+                      if (!projectVM) return 'N/A';
+                      return projectVM.revenueDisplay >= projectVM.costDisplay ? 'Rentable' : 'En Déficit';
                     })()} 
                   </div>
                   <div className="text-xs text-blue-600">
                     {(() => {
-                      const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const currentRevenue = unifiedData?.quotation?.totalAmount || 0;
-                      const progress = (unifiedData?.workedHours || 0) / Math.max(unifiedData?.estimatedHours || 1, 1);
-                      const realizedRevenue = currentRevenue * progress;
-                      return realizedRevenue >= totalCost ? 'Proyecto rentable' : 'Progreso requerido';
+                      if (!projectVM) return 'Sin datos';
+                      const diff = projectVM.revenueDisplay - projectVM.costDisplay;
+                      return diff >= 0 ? `+${formatCurrency(diff, projectVM.currencyNative)}` : formatCurrency(diff, projectVM.currencyNative);
                     })()} 
                   </div>
                 </div>
@@ -3620,15 +3608,20 @@ const ProjectDetailsPage = () => {
                 <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-purple-700">Cash Flow Neto</span>
+                    <span className="text-sm font-medium text-purple-700">Beneficio Neto</span>
                   </div>
                   <div className="text-2xl font-bold text-purple-800">
-                    ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()}
+                    {(() => {
+                      if (!projectVM) return '$0';
+                      const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                      return formatCurrency(profit, projectVM.currencyNative);
+                    })()}
                   </div>
                   <div className="text-xs text-purple-600">
                     {(() => {
-                      const cashFlow = (unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0);
-                      return cashFlow > 0 ? 'Flujo positivo' : cashFlow < 0 ? 'Flujo negativo' : 'Equilibrado';
+                      if (!projectVM) return 'Sin datos';
+                      const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                      return profit > 0 ? 'Flujo positivo' : profit < 0 ? 'Flujo negativo' : 'Equilibrado';
                     })()} 
                   </div>
                 </div>
@@ -3637,22 +3630,18 @@ const ProjectDetailsPage = () => {
                 <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg p-4 border border-yellow-200">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-700">Rentabilidad</span>
+                    <span className="text-sm font-medium text-yellow-700">Margen (%)</span>
                   </div>
                   <div className="text-2xl font-bold text-yellow-800">
                     {(() => {
-                      const revenue = unifiedData?.quotation?.totalAmount || 0;
-                      const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const profitability = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
-                      return profitability > 0 ? '+' + profitability.toFixed(1) + '%' : profitability.toFixed(1) + '%';
+                      if (!projectVM || projectVM.margin == null) return '0%';
+                      return projectVM.margin > 0 ? `+${projectVM.margin.toFixed(1)}%` : `${projectVM.margin.toFixed(1)}%`;
                     })()} 
                   </div>
                   <div className="text-xs text-yellow-600">
                     {(() => {
-                      const revenue = unifiedData?.quotation?.totalAmount || 0;
-                      const cost = unifiedData?.actuals?.totalWorkedCost || 0;
-                      const profitability = revenue > 0 ? ((revenue - cost) / revenue * 100) : 0;
-                      return profitability > 30 ? 'Muy rentable' : profitability > 15 ? 'Rentable' : profitability > 0 ? 'Mínimo' : 'Pérdida';
+                      if (!projectVM || projectVM.margin == null) return 'Sin datos';
+                      return projectVM.margin > 30 ? 'Muy rentable' : projectVM.margin > 15 ? 'Rentable' : projectVM.margin > 0 ? 'Mínimo' : 'Pérdida';
                     })()} 
                   </div>
                 </div>
