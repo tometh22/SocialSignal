@@ -1,0 +1,67 @@
+Aquí tienes un checklist de consistencia (corto pero completo) para validar que lista y vista única muestren lo mismo y que todas las pestañas usen datos coherentes con la vista activa (Operativa/USD/Original).
+1) Claves & Período
+ project_key = normalización (cliente+proyecto) idéntica en BE y FE.
+ period_key = YYYY-MM y TODAS las consultas filtran ese período.
+ No hay mezclas de meses (horas/costos/ingresos vienen del mismo período).
+2) Vistas (BE precalculadas)
+Para el período seleccionado:
+ views.operativa = { revenue, cost, currency, cotizacion, markup, margin, budgetUtilization }
+ views.usd = { ... } (ambos en USD).
+ views.original = { revenue, revenue_currency, cost, cost_currency:'ARS' } (sin KPIs).
+ Ingreso, Costo, Cotización están en la misma moneda en operativa y usd.
+3) Mapas de origen (SoT)
+ Ingresos: “Rendimiento Cliente” →
+• USD-nativo: Facturación (USD).
+• ARS-nativo: Facturación [ARS].
+(Consolidado USD: fact_usd || fact_ars/fx).
+ Costos (display):
+• ARS-nativo: Costos [ARS].
+• USD-nativo: Costos (USD) (o Costos[ARS]/fx).
+ Cotización (denominador): “Cotización” (nativa) y cotizacion_usd = cotización/fx.
+ Horas/Equipo: “Costos directos e indirectos” → solo Directo:
+totalWorkedHours (horas facturación/asignadas), estimatedHours = Σ J, teamBreakdown{name, roleName, hours, targetHours(J), hourlyRateARS(N), costARS(O), costUSD(R)}.
+4) Invariantes duros (BE/FE)
+ Si view !== 'original': currency(view.cost) == currency(view.revenue) == currency(view.cotizacion).
+ budgetUtilization = cost / cotizacion (mismas unidades).
+ markup = revenue / cost, margin = (revenue - cost)/revenue.
+ teamBreakdown[].roleName existe (no role).
+ totalWorkedHours y Σ teamBreakdown.hours ~≈ (tolerancia ≤2%).
+5) Lista vs Detalle (misma función)
+ Ambos usan el mismo mapper toProjectVM(data, activeView).
+ Comparación puntual (mismo período/vista):
+costDisplay, revenueDisplay, currency, budgetUtilization, markup, margin → idénticos.
+6) Pestaña por pestaña (qué debe leer)
+ Dashboard/Financiero/Presupuesto → solo views[view].{revenue,cost,currency,cotizacion,markup,margin,budgetUtilization}.
+⛔ No usar quotation.totalAmount (legacy USD), ni summary.*Display sueltos.
+ Costos → teamBreakdown + total según vista (ARS para ARS-nativo, USD para USD-nativo).
+⛔ No pintar actuals.totalWorkedCost si hay views.
+ Ingresos → views[view].revenue (agregado); si hay ítems, el total == agregado (± tolerancia).
+ Equipo → teamBreakdown (Directo, período exacto).
+ Tiempo → registros del mismo período; Σ horas ≈ actuals.totalWorkedHours.
+ Performance/Operacional → métricas derivadas de views[view] + actuals.
+7) Auditoría rápida en código (grep)
+ rg -n "quotation\.totalAmount[^N]" client/src → 0 resultados en renders.
+ rg -n "actuals\.totalWorkedCost" client/src → no usado para UI (solo debug/cálculo técnico).
+ rg -n "\\$[^A-Z]" client/src → sin $ hardcodeado (usar CurrencyText).
+ rg -n "summary\.(costDisplay|revenueDisplay)" client/src → solo dentro de toProjectVM/selector.
+8) Asserts/Logs útiles (copiar y pegar)
+FE – anti-mezcla en la vista:
+const v = data.views[activeView];
+console.assert(!v.cotizacion || v.currency === (activeView==='original' ? v.revenue_currency : v.currency),
+  'Moneda inconsistente en vista', v);
+
+if (activeView!=='original' && v.cotizacion) {
+  const bu = v.budgetUtilization ?? (v.cost / v.cotizacion);
+  console.assert(Math.abs(bu - v.cost / v.cotizacion) < 1e-6, 'BU mal calculado', v);
+}
+BE – trazas por período:
+[RC] period=YYYY-MM client=X project=Y | F_USD=<G> F_ARS=<I> C_ARS=<K> C_USD=<H|K/fx> FX=<fx> COT_NAT=<F> COT_USD=<F/fx>
+[LABOR] hrs_total=<Σ horas directas> hrs_obj=<Σ J> costUSD=<Σ R> costARS=<Σ O>
+[VIEW operativa] rev=<...> cost=<...> cur=<...> cotiz=<...> bu=<cost/cotiz>
+9) Pruebas unitarias mínimas
+ Ingresos operativa USD = Facturación (USD).
+ Ingresos operativa ARS = Facturación [ARS].
+ USD consolidado convierte fact_ars/fx.
+ Presupuesto usado = cost/cotizacion (vista).
+ Horas: estimatedHours = Σ J y totalWorkedHours = Σ horas directas del período.
+ List vs Detail con misma vista/período → toProjectVM(listItem) == toProjectVM(detail).
