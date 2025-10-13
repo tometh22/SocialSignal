@@ -1,0 +1,108 @@
+¡Vamos a dejarlo blindado y sin ambigüedades!
+Esto es exactamente qué traer para cada pestaña, de dónde (fuente y vista), cómo formatearlo y qué está prohibido para que la vista única y la lista den siempre lo mismo.
+0) Vistas y contrato base (común a todas las pestañas)
+Backend entrega por proyecto-mes:
+views.operativa: { revenue, cost, currency, cotizacion, markup, margin, budgetUtilization }
+• ARS-nativo → ambos en ARS. • USD-nativo → ambos en USD (cost = cost_ars/fx).
+views.usd: ambos en USD (para consolidado empresa).
+views.original: ingresos en su moneda original (USD o ARS) y costos en ARS (solo auditoría, no KPIs).
+quotation: { totalAmountNative, totalAmountUSD, estimatedHours } (estimatedHours = Σ J “Horas objetivo”)
+actuals: { totalWorkedHours, totalWorkedCost, teamBreakdown[] }
+• teamBreakdown[] desde Costos directos e indirectos (Directo): { name, roleName, hours, targetHours(J), hourlyRateARS(N), costARS(O), costUSD(R) }
+Frontend SIEMPRE consume toProjectVM(payload, view) y NO recalcula moneda.
+1) Dashboard (Resumen Ejecutivo)
+Fuente: views[activeView] (default: operativa) + actuals + quotation.
+Campos:
+Ingresos generados → views[v].revenue + views[v].currency
+Costo (línea de apoyo) → views[v].cost + views[v].currency
+% Presupuesto usado → views[v].budgetUtilization (o views[v].cost / views[v].cotizacion)
+Multiplicador (markup) → views[v].markup
+Margen % → views[v].margin
+Horas trabajadas → actuals.totalWorkedHours
+Velocidad equipo (h/sem) → actuals.totalWorkedHours / semanasDelMes
+Presupuesto (card) → views[v].cost / views[v].cotizacion con ambas en la MISMA moneda de la vista
+Prohibido: usar quotation.totalAmount (legacy USD), usar summary.*Display sueltos, reconvertir moneda en FE.
+2) Equipo (Team)
+Fuente: actuals.teamBreakdown[] (solo Directo del período).
+Campos:
+name, roleName (obligatorio, no “role”), hours, targetHours, hourlyRateARS, costARS, costUSD
+Totales:
+• totalWorkedHours = Σ hours
+• estimatedHours = quotation.estimatedHours
+Prohibido: mezclar Indirectos, sumar fuera del período.
+3) Performance
+Fuente: KPIs precalculados del BE o derivados de views[activeView] + actuals.
+efficiency → si hay estimadas: estimatedHours / totalWorkedHours
+budgetUtilization → views[v].budgetUtilization
+marginPerHour → (views[v].revenue - views[v].cost) / totalWorkedHours
+Prohibido: computar métricas con monedas distintas.
+4) Tiempo (Time)
+Fuente: servicio de time-entries (o la columna “horas para facturación/asignadas” si mantenés el proxy).
+Mostrar registros y agregados del mismo período.
+Sincronizar totalWorkedHours con actuals.totalWorkedHours (alarma si difiere >2%).
+5) Ingresos (Income Details)
+Fuente titular: Rendimiento Cliente (por mes):
+ARS-nativo → Facturación [ARS]
+USD-nativo → Facturación (USD)
+En UI según vista:
+operativa → views.operativa.revenue (+ moneda de la vista)
+usd → views.usd.revenue
+original → views.original.revenue + views.original.revenue_currency
+(Si listás ítems de ventas, cada fila trae amountNative y su equivalente en la vista activa; el total debe igualar el agregado del mes.)
+Prohibido: usar “Cotización” como ingresos.
+6) Costos (Cost Details)
+Fuente: Costos directos e indirectos (Directo) + vista activa:
+Tabla por persona: costARS(O), costUSD(R), hours, targetHours, roleName
+Total mostrado:
+operativa ARS-nativo → Σ costARS
+operativa USD-nativo → Σ costUSD
+usd → Σ costUSD
+original → cost_ars (no KPIs aquí)
+Prohibido: mostrar actuals.totalWorkedCost como display si existe vista.
+7) Financiero (Financial)
+Fuente: views[activeView] + quotation.
+Ingresos, Costos → views[v].revenue, views[v].cost
+Cotización (denominador) → views[v].cotizacion
+ROI / Markup / Margen → precalculados en vista
+Burn-rate mensual → views[v].cost / semanasDelMes (moneda de la vista)
+Series temporales → mismas reglas por período y vista
+Prohibido: series que mezclen monedas entre meses; si cambias view, recalcular con la misma vista histórica.
+8) Operacional
+Fuente: actuals.teamBreakdown + actuals.totalWorkedHours + workflow.
+Cuellos de botella, carga por rol, desviaciones horas (hours - targetHours).
+9) Reglas de consistencia (invariantes)
+En operativa y usd, Ingreso, Costo y Cotización están en la misma moneda.
+quotation.totalAmountNative se usa solo para ARS-nativo; para USD-nativo usar cotizacion_usd precalculada.
+totalWorkedHours y teamBreakdown solo Directo del período; si faltan horas reales, usar targetHours como fallback marcando flag.
+10) Mapper único en FE (plantilla)
+type View = 'operativa'|'usd'|'original';
+export function toProjectVM(p:any, view:View){
+  const v = p.views[view];
+  const currency = v.currency ?? v.revenue_currency;
+  return {
+    currency,
+    revenueDisplay: v.revenue,
+    costDisplay: v.cost,
+    denom: v.cotizacion ?? null,
+    budgetUtilization: v.budgetUtilization ?? (v.cotizacion ? v.cost / v.cotizacion : null),
+    markup: v.markup ?? null,
+    margin: v.margin ?? null,
+    totalWorkedHours: p.actuals.totalWorkedHours,
+    teamBreakdown: p.actuals.teamBreakdown,
+    estimatedHours: p.quotation.estimatedHours
+  };
+}
+11) Do/Dont checklist por pestaña (resumen)
+Dashboard/Financiero/Presupuesto
+✅ views[v].{revenue,cost,currency,cotizacion}
+❌ quotation.totalAmount / summary.*Display sueltos / conversiones en FE
+Ingresos
+✅ views[v].revenue (agregado) + ítems conciliados
+❌ usar “Cotización” como ingreso
+Costos
+✅ teamBreakdown + total según vista
+❌ actuals.totalWorkedCost como display
+Equipo/Performance/Operacional
+✅ horas y costos de Directo del período
+❌ incluir Indirectos o sumar varios meses
+Con esto, cada pestaña trae los mismos campos coherentes con la vista activa, y queda eliminada la mezcla USD/ARS y los descuadres entre lista y detalle. Si querés, te paso diffs listos para pegar en BE (constructor de views) y FE (uso de toProjectVM).
