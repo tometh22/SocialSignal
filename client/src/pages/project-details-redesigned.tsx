@@ -514,101 +514,56 @@ function ViewToggle({
   );
 }
 
-// Component for ProjectTeamSection with enhanced functionality
-function ProjectTeamSection({ projectId, unifiedData, timeFilter }: { 
+// Component for ProjectTeamSection with enhanced functionality - REFACTORED to use projectVM
+function ProjectTeamSection({ 
+  projectId, 
+  projectVM, 
+  quotationTeam = []
+}: { 
   projectId: string; 
-  unifiedData: any;
-  timeFilter: string;
+  projectVM: ReturnType<typeof toProjectVM> | null;
+  quotationTeam?: any[];
 }) {
   const { toast } = useToast();
 
-  // FUNCIÓN PARA CALCULAR MULTIPLICADOR TEMPORAL
-  const getQuotationMultiplier = (filter: string): number => {
-    switch (filter) {
-      case 'current_month':
-      case 'last_month':
-      case 'may_2025':
-      case 'june_2025':
-      case 'july_2025':
-      case 'january_2025':
-      case 'february_2025':
-      case 'march_2025':
-      case 'april_2025':
-      case 'august_2025':
-      case 'september_2025':
-      case 'october_2025':
-      case 'november_2025':
-      case 'december_2025':
-        return 1;
-      case 'current_quarter':
-      case 'last_quarter':
-      case 'q1_2025':
-      case 'q2_2025':
-      case 'q3_2025':
-      case 'q4_2025':
-        return 3;
-      case 'current_semester':
-      case 'last_semester':
-      case 'semester1_2025':
-      case 'semester2_2025':
-        return 6;
-      case 'current_year':
-      case 'last_year':
-      case 'year_2025':
-        return 12;
-      default:
-        return 1;
-    }
+  // FUNCIÓN PARA CALCULAR MULTIPLICADOR TEMPORAL (mantener para escalado de cotización)
+  const getQuotationMultiplier = (hours: number): number => {
+    // Si las horas de cotización son muy bajas, probablemente son mensuales
+    // Si son normales (>40h), probablemente son totales del proyecto
+    return hours > 0 && hours < 20 ? 1 : 1;
   };
 
-  // USAR DIRECTAMENTE LOS DATOS YA PREPARADOS POR EL BACKEND
-  const quotationTeam = unifiedData?.quotation?.team || [];
-  const teamBreakdownArray = unifiedData?.actuals?.teamBreakdown || [];
+  // ✅ USAR PROJECTVM COMO SINGLE SOURCE OF TRUTH
+  const teamBreakdownArray = projectVM?.teamBreakdown || [];
   
-  // Debug: Ver qué datos llegan del backend
-  console.log('🔍 DEBUG - Datos del backend (FIXED):', {
-    quotationTeam: quotationTeam.slice(0, 2),
-    teamBreakdownArray: teamBreakdownArray.slice(0, 2),
-    totalTeamMembers: quotationTeam.length,
-    totalActualMembers: teamBreakdownArray.length,
-    unifiedDataKeys: Object.keys(unifiedData || {}),
-    actualsKeys: Object.keys(unifiedData?.actuals || {}),
-    expectationsKeys: Object.keys(unifiedData?.expectations || {}),
-    fullUnifiedData: unifiedData,
-    fullTeamBreakdown: teamBreakdownArray,
-    timeFilter: timeFilter
-  });
-  
-  // SIMPLIFICADO: Usar directamente el teamBreakdown del backend que ya tiene toda la lógica
+  // Enriquecer con datos de cotización si están disponibles
   const completeTeam = teamBreakdownArray.map((member: any) => {
-    // Buscar datos de cotización para mostrar estimaciones
     const quotationMember = quotationTeam.find((q: any) => q.personnelId === member.personnelId);
     
-    // APLICAR ESCALAMIENTO TEMPORAL a las horas estimadas
-    const baseEstimatedHours = quotationMember?.hours || 0;
-    const multiplier = getQuotationMultiplier(timeFilter);
-    const scaledEstimatedHours = baseEstimatedHours * multiplier;
-    
     return {
-      ...member,
-      // Datos reales (ya vienen del backend correctos)
+      personnelId: member.personnelId,
+      name: member.name || member.roleName || 'Sin Nombre',
+      roleName: member.roleName || 'Sin Rol',
+      hours: member.hours || 0,
+      cost: member.cost || 0,
+      rate: member.rate || (member.cost && member.hours ? member.cost / member.hours : 0),
+      // Datos de cotización (si existen)
+      quotedHours: quotationMember?.hours || 0,
+      quotedRate: quotationMember?.rate || 0,
+      // Para compatibilidad con el template
       actualHours: member.hours || 0,
       actualName: member.name || 'Sin Nombre',
       actualRoleName: member.roleName || 'Sin Rol',
-      actualRate: member.rate || member.hourlyRate || 0,
-      // Datos de estimación (escalados según período temporal)
-      estimatedHours: scaledEstimatedHours,
-      baseEstimatedHours: baseEstimatedHours, // Para debugging
-      timeMultiplier: multiplier, // Para debugging
-      // NUEVO: Horas objetivo del Excel MAESTRO (ya vienen filtradas del backend)
-      targetHours: member.targetHours || 0,
-      // Flags de estado (ya vienen del backend)
-      isQuoted: member.isQuoted || false,
-      isUnquoted: member.isUnquoted || false
+      actualRate: member.rate || (member.cost && member.hours ? member.cost / member.hours : 0),
+      actualCost: member.cost || 0,
+      estimatedHours: quotationMember?.hours || 0,
+      targetHours: quotationMember?.hours || 0,
+      isQuoted: !!quotationMember,
+      isUnquoted: !quotationMember && member.hours > 0
     };
   });
   
-  const teamLoading = !unifiedData;
+  const teamLoading = !projectVM;
 
   const copyTeamMutation = useMutation({
     mutationFn: async () => {
@@ -891,10 +846,10 @@ function ProjectTeamSection({ projectId, unifiedData, timeFilter }: {
                 {/* Costo más discreto */}
                 <div className="text-right min-w-[70px]">
                   <div className={`text-sm font-semibold ${cardStyle.nameColor}`}>
-                    ${(member.actualCost || (workedHours * (member.actualRate || 0))).toFixed(0)}
+                    {formatCurrency(member.actualCost || (workedHours * (member.actualRate || 0)), projectVM?.currencyNative || 'USD')}
                   </div>
                   <div className="text-xs text-gray-500">
-                    ${member.actualCost && workedHours > 0 ? (member.actualCost / workedHours).toFixed(0) : member.actualRate || 0}/h
+                    {formatCurrency(member.actualCost && workedHours > 0 ? (member.actualCost / workedHours) : member.actualRate || 0, projectVM?.currencyNative || 'USD')}/h
                   </div>
                 </div>
               </div>
@@ -3399,6 +3354,28 @@ const ProjectDetailsPage = () => {
                       startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
                       endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                     }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* 🎯 VISUAL TEAM CARDS - Using projectVM for consistent data */}
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-purple-50 to-indigo-50">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Users className="h-6 w-6 text-purple-600" />
+                    </div>
+                    Vista de Equipo - Tarjetas Visuales
+                  </CardTitle>
+                  <CardDescription className="text-base">
+                    Desglose detallado por miembro del equipo con progreso y costos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ProjectTeamSection 
+                    projectId={projectId!}
+                    projectVM={projectVM}
+                    quotationTeam={(unifiedData as any)?.quotation?.team || []}
                   />
                 </CardContent>
               </Card>
