@@ -1,0 +1,62 @@
+aquí tienes el checklist definitivo para la pestaña Dashboard de proyecto único, con qué dato debe recibir cada componente, de qué vista/fuente y cómo calcularlo. Está pensado para que nada mezcle monedas ni períodos.
+Reglas base (se aplican a todo el Dashboard)
+Entrada única al FE: vm = toProjectVM(payload, activeView)
+donde activeView ∈ {'operativa','usd','original'}.
+Campos que expone vm:
+vm.currency · vm.revenueDisplay · vm.costDisplay · vm.denom ·
+vm.markup · vm.margin · vm.budgetUtilization ·
+vm.totalWorkedHours · vm.teamBreakdown[] · vm.estimatedHours
+Prohibido en Dashboard: usar quotation.totalAmount (legacy USD), actuals.totalWorkedCost para UI, o cualquier $ hardcodeado.
+Checklist por componente
+1) Header “Rendimiento Financiero”
+Ingresos generados: vm.revenueDisplay + vm.currency
+Línea de apoyo (“Costo … · Margen …”):
+Costo → vm.costDisplay + vm.currency
+Margen → vm.margin (formatear %)
+Multiplicador (debajo de la barra): vm.markup (formato X.x x)
+Total trabajado (horas): vm.totalWorkedHours (con “h”)
+% Presupuesto usado (derecha): vm.budgetUtilization * 100
+Si vm.budgetUtilization es null, no mostrar barra/porcentaje.
+2) Panel “Resumen Ejecutivo” (4 tarjetas)
+Markup del Proyecto: vm.markup
+ROI Performance: derivado de markup → roi = (vm.markup - 1) * 100 (si vm.markup existe)
+Velocidad del Equipo: vm.totalWorkedHours / semanasDelMes → xh/sem
+Estado Presupuesto: a partir de vm.budgetUtilization
+≤60% → “Saludable”; 60–85% → “Atención”; >85% → “Crítico”
+3) “Rendimiento del Equipo”
+Mejor rendimiento (nombre y horas): max(vm.teamBreakdown, by=hours)
+Velocidad Equipo (promedio semanal): vm.totalWorkedHours / semanasDelMes
+Cargas por miembro (tooltip/listado): vm.teamBreakdown[]
+Mostrar: name, roleName, hours, targetHours
+4) Tarjeta “Performance”
+Eficiencia:
+Si vm.estimatedHours > 0 → eff = vm.estimatedHours / vm.totalWorkedHours (formato %)
+Si no → “N/A”
+Horas restantes (si aplica): max(vm.estimatedHours - vm.totalWorkedHours, 0)
+5) Tarjeta “Presupuesto”
+Numerador: vm.costDisplay + vm.currency
+Denominador: vm.denom + vm.currency (misma moneda de la vista)
+Barra: vm.budgetUtilization * 100
+6) “Timeline del Proyecto”
+Fecha inicio: payload.project.startDate (si existe)
+Hitos (opcional): del mismo período period_key seleccionado
+Progreso/Restante: usar vm.budgetUtilization (no recalcular)
+7) “Puntuación de Calidad”
+Score: payload.quality.score (0–100) o cálculo propio (pero sin usar monedas)
+8) “Actividad Reciente”
+Registros: payload.timeEntries del mismo período
+(si no hay, mostrar “0 registros”)
+Guardas rápidas (ponelas en DEV)
+console.assert(!vm.denom || Math.abs((vm.costDisplay/vm.denom) - (vm.budgetUtilization ?? 0)) < 1e-6, 'BU inconsistente');
+console.assert(vm.currency, 'currency faltante');
+console.assert((vm.teamBreakdown ?? []).every(p => !!p.roleName), 'roleName faltante en teamBreakdown');
+console.assert(vm.totalWorkedHours <= 400, 'Horas sospechosamente altas para un mes');
+Mini “Do / Don’t” del Dashboard
+Do
+Usar solo campos de vm para ingresos, costos, moneda, % usado, markup, margen.
+Para horas/Equipo, solo Directo del período.
+Don’t
+No leer summary.*Display ni quotation.totalAmount.
+No pintar actuals.totalWorkedCost como costo total.
+No mezclar períodos ni monedas en una misma tarjeta.
+Con este checklist, tu Dashboard queda moneda-consistente, período-consistente y alineado con la vista activa.

@@ -1380,6 +1380,42 @@ const ProjectDetailsPage = () => {
       });
     }
 
+    // 🔒 GUARDAS ADICIONALES (Checklist punto 8)
+    
+    // ASSERT 4: Verificar que cotizacion y budgetUtilization son coherentes
+    const cotizacion = quotationData?.totalAmountNative || null;
+    if (cotizacion && cotizacion > 0 && vm.budgetUtilization != null && vm.costDisplay > 0) {
+      const expectedBU = vm.costDisplay / cotizacion;
+      const buDiff = Math.abs(vm.budgetUtilization - expectedBU);
+      console.assert(buDiff < 1e-6, 
+        '🚨 [GUARDA FAILED] BU inconsistente', { 
+          costDisplay: vm.costDisplay,
+          costDisplayType: typeof vm.costDisplay,
+          cotizacion,
+          cotizacionType: typeof cotizacion,
+          expectedBU,
+          actualBU: vm.budgetUtilization,
+          diff: buDiff
+        });
+    }
+    
+    // ASSERT 5: Currency nativa debe estar presente
+    console.assert(vm.currencyNative, 
+      '🚨 [GUARDA FAILED] currency faltante', { vm });
+    
+    // ASSERT 6: TeamBreakdown debe tener roleName en cada miembro
+    console.assert((vm.teamBreakdown ?? []).every(p => !!p.roleName), 
+      '🚨 [GUARDA FAILED] roleName faltante en teamBreakdown', { 
+        teamBreakdown: vm.teamBreakdown 
+      });
+    
+    // ASSERT 7: Horas sospechosamente altas para un mes
+    console.assert((vm.totalHours || 0) <= 400, 
+      '🚨 [GUARDA FAILED] Horas sospechosamente altas para un mes', { 
+        totalHours: vm.totalHours,
+        period: periodFromUrl || periodFromFilter
+      });
+
     return vm;
   }, [
     unifiedData?.summary?.costDisplay,
@@ -2054,11 +2090,11 @@ const ProjectDetailsPage = () => {
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                       <div className="text-sm text-slate-300 mb-1">Markup del Proyecto</div>
                       <div className={`text-2xl font-bold ${(() => {
-                        const markup = unifiedData?.metrics?.markup || 0;
+                        const markup = projectVM?.markup || 0;
                         return markup >= 3 ? "text-green-400" : markup >= 2.5 ? "text-blue-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
                       })()}`}>
                         {(() => {
-                          const markup = unifiedData?.metrics?.markup || 0;
+                          const markup = projectVM?.markup || 0;
                           return markup > 0 ? `${markup.toFixed(1)}x` : "N/A";
                         })()}
                       </div>
@@ -2070,8 +2106,9 @@ const ProjectDetailsPage = () => {
                       <div className="text-sm text-slate-300 mb-1">ROI Performance</div>
                       <div className="text-2xl font-bold text-blue-400">
                         {(() => {
-                          const markup = unifiedData?.metrics?.markup || 0;
-                          return markup > 2 ? "+185%" : markup > 1.5 ? "+145%" : "+89%";
+                          const markup = projectVM?.markup || 0;
+                          const roi = markup > 0 ? ((markup - 1) * 100).toFixed(0) : '0';
+                          return markup > 0 ? `+${roi}%` : "N/A";
                         })()}
                       </div>
                       <div className="text-xs text-slate-400">vs proyección inicial</div>
@@ -2081,7 +2118,7 @@ const ProjectDetailsPage = () => {
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                       <div className="text-sm text-slate-300 mb-1">Velocidad del Equipo</div>
                       <div className="text-2xl font-bold text-purple-400">
-                        {Math.round(unifiedData?.workedHours || 0 / 7)} h/sem
+                        {Math.round((projectVM?.totalHours || 0) / 4)} h/sem
                       </div>
                       <div className="text-xs text-slate-400">Período actual</div>
                     </div>
@@ -2090,17 +2127,16 @@ const ProjectDetailsPage = () => {
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                       <div className="text-sm text-slate-300 mb-1">Estado Presupuesto</div>
                       <div className={`text-2xl font-bold ${(() => {
-                        const efficiency = unifiedData?.metrics?.efficiency || 0;
-                        return efficiency > 80 ? "text-red-400" : efficiency > 60 ? "text-yellow-400" : "text-green-400";
+                        const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
+                        return budgetUtil > 85 ? "text-red-400" : budgetUtil > 60 ? "text-yellow-400" : "text-green-400";
                       })()}`}>
                         {(() => {
-                          const efficiency = unifiedData?.metrics?.efficiency || 0;
-                          const remaining = Math.max(0, 100 - efficiency);
-                          return remaining > 40 ? "Saludable" : remaining > 20 ? "Atención" : "Crítico";
+                          const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
+                          return budgetUtil <= 60 ? "Saludable" : budgetUtil <= 85 ? "Atención" : "Crítico";
                         })()}
                       </div>
                       <div className="text-xs text-slate-400">
-                        {Math.max(0, 100 - (unifiedData?.metrics?.efficiency || 0)).toFixed(0)}% restante
+                        {Math.max(0, 100 - ((projectVM?.budgetUtilization || 0) * 100)).toFixed(0)}% restante
                       </div>
                     </div>
                   </div>
@@ -2132,7 +2168,7 @@ const ProjectDetailsPage = () => {
                       <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
                         <div 
                           className="bg-green-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (unifiedData?.metrics?.efficiency || 0))}%` }}
+                          style={{ width: `${Math.min(100, (projectVM?.budgetUtilization || 0) * 100)}%` }}
                         ></div>
                       </div>
                       <div className="text-xs text-slate-400">
@@ -2152,19 +2188,19 @@ const ProjectDetailsPage = () => {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="text-center">
                         <div className="text-lg font-bold text-blue-400">
-                          {(unifiedData?.metrics?.markup || 0).toFixed(1)}x
+                          {(projectVM?.markup || 0).toFixed(1)}x
                         </div>
                         <div className="text-xs text-slate-400">Multiplicador</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-purple-400">
-                          {(unifiedData?.workedHours || 0)}h
+                          {(projectVM?.totalHours || 0)}h
                         </div>
                         <div className="text-xs text-slate-400">Total Trabajado</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-cyan-400">
-                          {(unifiedData?.metrics?.efficiency || 0).toFixed(0)}%
+                          {((projectVM?.budgetUtilization || 0) * 100).toFixed(0)}%
                         </div>
                         <div className="text-xs text-slate-400">Presupuesto Usado</div>
                       </div>
@@ -2186,7 +2222,7 @@ const ProjectDetailsPage = () => {
                       Rendimiento del Equipo
                     </h3>
                     <Badge variant="outline" className="text-xs">
-                      {Object.values(unifiedData?.actuals?.teamBreakdown || {}).length} miembros
+                      {(projectVM?.teamBreakdown || []).length} miembros
                     </Badge>
                   </div>
                 </div>
@@ -2199,18 +2235,18 @@ const ProjectDetailsPage = () => {
                         <div className="text-sm text-green-700 mb-1">Mejor Rendimiento</div>
                         <div className="font-bold text-green-900">
                           {(() => {
-                            const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                            const team = projectVM?.teamBreakdown || [];
                             const topPerformer = team.reduce((max: any, member: any) => 
                               (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
-                            return topPerformer.name || 'N/A';
+                            return topPerformer?.name || 'N/A';
                           })()}
                         </div>
                         <div className="text-xs text-green-600">
                           {(() => {
-                            const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                            const team = projectVM?.teamBreakdown || [];
                             const topPerformer = team.reduce((max: any, member: any) => 
                               (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
-                            return `${topPerformer.hours || 0}h trabajadas`;
+                            return `${topPerformer?.hours || 0}h trabajadas`;
                           })()}
                         </div>
                       </div>
@@ -2218,7 +2254,7 @@ const ProjectDetailsPage = () => {
                       <div className="bg-blue-50 rounded-lg p-4">
                         <div className="text-sm text-blue-700 mb-1">Velocidad Equipo</div>
                         <div className="font-bold text-blue-900">
-                          {Math.round((unifiedData?.workedHours || 0) / 4)}h
+                          {Math.round((projectVM?.totalHours || 0) / 4)}h
                         </div>
                         <div className="text-xs text-blue-600">promedio semanal</div>
                       </div>
@@ -2229,7 +2265,7 @@ const ProjectDetailsPage = () => {
                       <div className="text-sm font-medium text-gray-700">Carga de trabajo por miembro</div>
                       <div className="text-xs text-gray-500 mb-2">Pasa el mouse sobre cada inicial para ver detalles</div>
                       <div className="grid grid-cols-6 gap-1">
-                        {Object.values(unifiedData?.actuals?.teamBreakdown || {}).slice(0, 6).map((member: any, index) => (
+                        {(projectVM?.teamBreakdown || []).slice(0, 6).map((member: any, index) => (
                           <div 
                             key={index}
                             className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help relative group ${
@@ -2288,41 +2324,41 @@ const ProjectDetailsPage = () => {
                 <div className="p-6">
                   <div className="space-y-4">
                     {(() => {
-                      const efficiency = unifiedData?.metrics?.efficiency || 0;
-                      const markup = unifiedData?.metrics?.markup || 0;
+                      const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
+                      const markup = projectVM?.markup || 0;
                       const recommendations = [];
 
-                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
-                      const totalBudget = unifiedData?.estimatedCost || 1;
-                      const actualCost = unifiedData?.actuals?.totalWorkedCost || 0;
+                      const team = projectVM?.teamBreakdown || [];
+                      const totalBudget = quotationData?.totalAmountNative || 1;
+                      const actualCost = projectVM?.costDisplay || 0;
                       const remainingBudget = totalBudget - actualCost;
                       
-                      // Recomendación específica basada en eficiencia con datos reales
-                      if (efficiency > 85) {
+                      // Recomendación específica basada en budget utilization con datos reales
+                      if (budgetUsed > 85) {
                         const overspend = actualCost - totalBudget;
                         recommendations.push({
                           type: 'warning',
                           icon: '🚨',
-                          title: 'Presupuesto Excedido en $' + overspend.toLocaleString(),
-                          description: `Ya gastaste $${actualCost.toLocaleString()} de $${totalBudget.toLocaleString()}. Renegocia con el cliente o reduce scope.`,
+                          title: 'Presupuesto Excedido en ' + formatCurrency(Math.abs(overspend), projectVM?.currencyNative || 'USD'),
+                          description: `Ya gastaste ${formatCurrency(actualCost, projectVM?.currencyNative || 'USD')} de ${formatCurrency(totalBudget, projectVM?.currencyNative || 'USD')}. Renegocia con el cliente o reduce scope.`,
                           color: 'text-red-700',
                           bg: 'bg-red-50'
                         });
-                      } else if (efficiency > 75) {
+                      } else if (budgetUsed > 75) {
                         recommendations.push({
                           type: 'warning',
                           icon: '⚠️',
-                          title: 'Quedan Solo $' + remainingBudget.toLocaleString() + ' de Presupuesto',
-                          description: `Con ${efficiency.toFixed(0)}% usado, prioriza tareas críticas. Estima ${Math.ceil(remainingBudget / 100)} horas máximas restantes.`,
+                          title: 'Quedan Solo ' + formatCurrency(remainingBudget, projectVM?.currencyNative || 'USD') + ' de Presupuesto',
+                          description: `Con ${budgetUsed.toFixed(0)}% usado, prioriza tareas críticas. Estima ${Math.ceil(remainingBudget / 100)} horas máximas restantes.`,
                           color: 'text-orange-700',
                           bg: 'bg-orange-50'
                         });
-                      } else if (efficiency < 30) {
+                      } else if (budgetUsed < 30) {
                         const monthsElapsed = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
                         recommendations.push({
                           type: 'opportunity',
                           icon: '📈',
-                          title: `Solo ${efficiency.toFixed(0)}% Usado en ${monthsElapsed} Mes(es)`,
+                          title: `Solo ${budgetUsed.toFixed(0)}% Usado en ${monthsElapsed} Mes(es)`,
                           description: `Puedes acelerar ${Math.floor(remainingBudget / 150)} días adicionales de trabajo. Considera ampliar scope.`,
                           color: 'text-blue-700',
                           bg: 'bg-blue-50'
@@ -2386,7 +2422,7 @@ const ProjectDetailsPage = () => {
                           type: 'general',
                           icon: '📋',
                           title: `Proyecto Activo ${daysActive} Días - Revisar Hitos`,
-                          description: `Con ${efficiency.toFixed(0)}% progreso, programa check-in semanal y revisa deliverables pendientes.`,
+                          description: `Con ${budgetUsed.toFixed(0)}% progreso, programa check-in semanal y revisa deliverables pendientes.`,
                           color: 'text-blue-700',
                           bg: 'bg-blue-50'
                         });
@@ -2427,21 +2463,29 @@ const ProjectDetailsPage = () => {
                 <div className="p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Eficiencia</span>
-                    <span className={`text-sm font-bold ${
-                      (unifiedData?.metrics?.efficiency || 0) > 80 ? 'text-red-600' : 
-                      (unifiedData?.metrics?.efficiency || 0) > 60 ? 'text-yellow-600' : 'text-green-600'
-                    }`}>
-                      {(unifiedData?.metrics?.efficiency || 0).toFixed(1)}%
+                    <span className={`text-sm font-bold ${(() => {
+                      if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 'text-gray-600';
+                      const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                      return eff > 80 ? 'text-red-600' : eff > 60 ? 'text-yellow-600' : 'text-green-600';
+                    })()}`}>
+                      {(() => {
+                        if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 'N/A';
+                        const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                        return `${eff.toFixed(1)}%`;
+                      })()}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" 
-                      style={{ width: `${Math.min(100, unifiedData?.metrics?.efficiency || 0)}%` }}
+                      style={{ width: `${(() => {
+                        if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 0;
+                        return Math.min(100, (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100);
+                      })()}%` }}
                     ></div>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {(unifiedData?.estimatedHours || 0) - (unifiedData?.workedHours || 0)}h restantes
+                    {Math.max(0, (projectVM?.estimatedHours || 0) - (projectVM?.totalHours || 0))}h restantes
                   </div>
                 </div>
               </div>
@@ -2483,7 +2527,7 @@ const ProjectDetailsPage = () => {
                     {(() => {
                       const projectStart = new Date(unifiedData?.project?.startDate || Date.now());
                       const monthsActive = Math.ceil((Date.now() - projectStart.getTime()) / (1000 * 60 * 60 * 24 * 30));
-                      const efficiency = unifiedData?.metrics?.efficiency || 0;
+                      const budgetUsed = ((projectVM?.budgetUtilization || 0) * 100);
                       
                       return [
                         {
@@ -2493,12 +2537,12 @@ const ProjectDetailsPage = () => {
                         },
                         {
                           date: 'Ago 25',
-                          event: `${efficiency.toFixed(0)}% presupuesto usado`,
-                          status: efficiency > 80 ? 'warning' : 'active'
+                          event: `${budgetUsed.toFixed(0)}% presupuesto usado`,
+                          status: budgetUsed > 80 ? 'warning' : 'active'
                         },
                         {
                           date: 'Sep 25',
-                          event: `${Math.max(0, 100 - efficiency).toFixed(0)}% restante estimado`,
+                          event: `${Math.max(0, 100 - budgetUsed).toFixed(0)}% restante estimado`,
                           status: 'pending'
                         }
                       ].map((item, index) => (
@@ -2545,16 +2589,16 @@ const ProjectDetailsPage = () => {
                   <div className="text-center">
                     <div className="text-2xl font-bold text-yellow-900">
                       {(() => {
-                        const efficiency = unifiedData?.metrics?.efficiency || 0;
-                        const markup = unifiedData?.metrics?.markup || 0;
-                        const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                        const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
+                        const markup = projectVM?.markup || 0;
+                        const team = projectVM?.teamBreakdown || [];
                         
                         // Factor de distribución del equipo (penaliza sobrecarga)
                         const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
                         const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
                         
                         // Fórmula mejorada y documentada
-                        const budgetScore = (100 - efficiency) * 0.4; // Mejor si usa menos presupuesto
+                        const budgetScore = (100 - budgetUsed) * 0.4; // Mejor si usa menos presupuesto
                         const profitabilityScore = Math.min(100, (markup - 1) * 35); // Mejor markup = mejor score
                         const teamScore = teamFactor * 0.25; // Penaliza equipo sobrecargado
                         
@@ -2567,12 +2611,12 @@ const ProjectDetailsPage = () => {
                   <div className="flex justify-center">
                     <div className="flex gap-1">
                       {[1,2,3,4,5].map(star => {
-                        const efficiency = unifiedData?.metrics?.efficiency || 0;
-                        const markup = unifiedData?.metrics?.markup || 0;
-                        const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                        const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
+                        const markup = projectVM?.markup || 0;
+                        const team = projectVM?.teamBreakdown || [];
                         const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
                         const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
-                        const budgetScore = (100 - efficiency) * 0.4;
+                        const budgetScore = (100 - budgetUsed) * 0.4;
                         const profitabilityScore = Math.min(100, (markup - 1) * 35);
                         const teamScore = teamFactor * 0.25;
                         const totalScore = budgetScore + profitabilityScore + teamScore;
@@ -2593,12 +2637,12 @@ const ProjectDetailsPage = () => {
                   </div>
                   <div className="text-xs text-center text-gray-500">
                     {(() => {
-                      const efficiency = unifiedData?.metrics?.efficiency || 0;
-                      const markup = unifiedData?.metrics?.markup || 0;
-                      const team = Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                      const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
+                      const markup = projectVM?.markup || 0;
+                      const team = projectVM?.teamBreakdown || [];
                       const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
                       const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
-                      const budgetScore = (100 - efficiency) * 0.4;
+                      const budgetScore = (100 - budgetUsed) * 0.4;
                       const profitabilityScore = Math.min(100, (markup - 1) * 35);
                       const teamScore = teamFactor * 0.25;
                       const totalScore = budgetScore + profitabilityScore + teamScore;
@@ -3587,8 +3631,8 @@ const ProjectDetailsPage = () => {
                         {(() => {
                           if (!projectVM) return '$0';
                           const totalCost = projectVM.costDisplay;
-                          const workedHours = unifiedData?.workedHours || 1;
-                          const estimatedHours = unifiedData?.estimatedHours || 1;
+                          const workedHours = projectVM.totalHours || 1;
+                          const estimatedHours = projectVM.estimatedHours || 1;
                           const projectProgress = workedHours / estimatedHours;
                           const monthlyBurn = projectProgress > 0 ? totalCost / Math.max(projectProgress * 12, 1) : 0;
                           return formatCurrency(Math.round(monthlyBurn), projectVM.currencyNative);
@@ -4038,8 +4082,8 @@ const ProjectDetailsPage = () => {
                         stroke="#10b981"
                         strokeWidth="2"
                         strokeDasharray={`${(() => {
-                          const workedHours = unifiedData?.actuals?.totalWorkedHours || unifiedData?.workedHours || 0;
-                          const estimatedHours = unifiedData?.estimatedHours || 1;
+                          const workedHours = projectVM?.totalHours || 0;
+                          const estimatedHours = projectVM?.estimatedHours || 1;
                           return estimatedHours > 0 ? Math.min((workedHours / estimatedHours) * 100, 100) : 0;
                         })()}, 100`}
                       />
@@ -4047,8 +4091,8 @@ const ProjectDetailsPage = () => {
                     <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-2xl font-bold text-gray-900">
                         {(() => {
-                          const workedHours = unifiedData?.actuals?.totalWorkedHours || unifiedData?.workedHours || 0;
-                          const estimatedHours = unifiedData?.estimatedHours || 1;
+                          const workedHours = projectVM?.totalHours || 0;
+                          const estimatedHours = projectVM?.estimatedHours || 1;
                           const resourceEfficiency = estimatedHours > 0 ? Math.min((workedHours / estimatedHours) * 100, 100) : 0;
                           return resourceEfficiency.toFixed(1);
                         })()}%
@@ -4236,9 +4280,9 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-green-600 text-sm font-medium">Riesgo Operacional</p>
                       <p className="text-2xl font-bold text-green-900">
-                        {unifiedData?.metrics?.efficiency ? (() => {
-                          const risk = unifiedData.metrics.efficiency < 50 ? 'Alto' : 
-                                     unifiedData.metrics.efficiency < 80 ? 'Medio' : 'Bajo';
+                        {projectVM?.budgetUtilization ? (() => {
+                          const budgetUsed = (projectVM.budgetUtilization || 0) * 100;
+                          const risk = budgetUsed < 50 ? 'Bajo' : budgetUsed < 80 ? 'Medio' : 'Alto';
                           return risk;
                         })() : 'N/A'}
                       </p>
