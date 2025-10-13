@@ -30,10 +30,12 @@ interface RawPeriodData {
   periodKey: string; // YYYY-MM
   year: number;
   month: number;
-  // De financialSot
-  revenueUSD: number;
-  costUSD: number;
-  quotationUSD: number | null;
+  // De financialSot (de columnas de la hoja "Rendimiento Cliente")
+  revenueUSD: number; // Facturación (USD) - columna G
+  revenueARS: number; // Facturación [ARS] - columna I
+  costUSD: number; // Costos (USD) - columna H
+  costARS: number; // Costos [ARS] - columna K
+  quotation: number | null; // Cotización - columna F (para % presupuesto)
   fxMonth: number;
   // De directCosts
   laborRows: Array<{
@@ -80,21 +82,23 @@ function isUSDClient(clientName: string): boolean {
 }
 
 /**
- * Calcula la vista Original (datos raw, puede mezclar monedas)
+ * Calcula la vista Original (datos raw tal cual de la hoja)
  */
 function computeOriginalView(data: RawPeriodData): ViewData {
-  // Revenue siempre viene en USD de financialSot
-  // Cost puede venir en USD o calcularse desde labor rows en ARS
+  // Mostrar revenue y cost tal cual vienen de la hoja (puede mezclar monedas)
+  const revenue = data.revenueUSD || data.revenueARS;
+  const revenueCurrency = data.revenueUSD ? 'USD' : 'ARS';
   
-  const laborCostARS = data.laborRows.reduce((sum, r) => sum + r.costTotal, 0);
+  const cost = data.costARS || data.costUSD;
+  const costCurrency = data.costARS ? 'ARS' : 'USD';
   
   return {
-    revenue: data.revenueUSD,
-    revenueCurrency: 'USD',
-    cost: laborCostARS || data.costUSD, // Preferir labor rows si existe
-    costCurrency: laborCostARS > 0 ? 'ARS' : 'USD',
+    revenue,
+    revenueCurrency,
+    cost,
+    costCurrency,
     currency: 'MIXED',
-    cotizacion: null, // No calculable si mezcla monedas
+    cotizacion: data.quotation, // Usar cotización de la hoja
   };
 }
 
@@ -110,18 +114,17 @@ function computeOperativaView(data: RawPeriodData): ViewData {
   let cotizacion: number | null;
   
   if (isUSD) {
-    // Cliente USD: usar directamente revenue y cost USD
+    // Cliente USD: usar Facturación (USD) - columna G
     revenue = data.revenueUSD;
     cost = data.costUSD;
     currency = 'USD';
-    cotizacion = data.quotationUSD;
+    cotizacion = data.quotation; // Cotización en USD
   } else {
-    // Cliente ARS: convertir revenue a ARS, cost ya está en ARS (labor rows)
-    revenue = data.revenueUSD * data.fxMonth;
-    const laborCostARS = data.laborRows.reduce((sum, r) => sum + r.costTotal, 0);
-    cost = laborCostARS || (data.costUSD * data.fxMonth);
+    // Cliente ARS: usar Facturación [ARS] - columna I
+    revenue = data.revenueARS;
+    cost = data.costARS;
     currency = 'ARS';
-    cotizacion = data.quotationUSD ? (data.quotationUSD * data.fxMonth) : null;
+    cotizacion = data.quotation; // Cotización en ARS
   }
   
   // Calcular KPIs solo si hay cotización
@@ -140,9 +143,10 @@ function computeOperativaView(data: RawPeriodData): ViewData {
  * Calcula la vista USD (todo en USD para análisis empresa)
  */
 function computeUSDView(data: RawPeriodData): ViewData {
-  const revenue = data.revenueUSD;
-  const cost = data.costUSD;
-  const cotizacion = data.quotationUSD;
+  // Convertir todo a USD
+  const revenue = data.revenueUSD || (data.revenueARS / data.fxMonth);
+  const cost = data.costUSD || (data.costARS / data.fxMonth);
+  const cotizacion = data.quotation ? (isUSDClient(data.clientName) ? data.quotation : data.quotation / data.fxMonth) : null;
   
   const view: ViewData = { 
     revenue, 
@@ -201,9 +205,11 @@ export async function processProjectPeriod(periodKey: string) {
       periodKey,
       year,
       month,
-      revenueUSD: parseFloat(row.revenueUsd || '0'),
-      costUSD: parseFloat(row.costUsd || '0'),
-      quotationUSD: null, // Se podría obtener de otra tabla
+      revenueUSD: parseFloat(row.revenueUsd || '0'), // Facturación (USD) - columna G
+      revenueARS: parseFloat(row.revenueArs || '0'), // Facturación [ARS] - columna I
+      costUSD: parseFloat(row.costUsd || '0'), // Costos (USD) - columna H
+      costARS: parseFloat(row.costArs || '0'), // Costos [ARS] - columna K
+      quotation: parseFloat(row.quotation || '0') || null, // Cotización - columna F
       fxMonth: parseFloat(row.fx || '1345'),
       laborRows: []
     });
@@ -224,8 +230,10 @@ export async function processProjectPeriod(periodKey: string) {
         year,
         month,
         revenueUSD: 0,
+        revenueARS: 0,
         costUSD: 0,
-        quotationUSD: null,
+        costARS: 0,
+        quotation: null,
         fxMonth: fx,
         laborRows: []
       });
@@ -312,11 +320,11 @@ async function processProject(data: RawPeriodData) {
   
   const baseData = {
     revenue_usd: data.revenueUSD,
-    revenue_ars: data.revenueUSD * data.fxMonth,
+    revenue_ars: data.revenueARS,
     cost_usd: data.costUSD,
-    cost_ars: laborCostARS,
-    quotation_usd: data.quotationUSD,
-    quotation_ars: data.quotationUSD ? (data.quotationUSD * data.fxMonth) : null,
+    cost_ars: laborCostARS || data.costARS,
+    quotation_usd: data.quotation,
+    quotation_ars: data.quotation ? (isUSDClient(data.clientName) ? data.quotation : data.quotation) : null,
     fx: data.fxMonth
   };
   
@@ -325,8 +333,8 @@ async function processProject(data: RawPeriodData) {
   const totalRealHours = data.laborRows.reduce((sum, r) => sum + r.hoursReal, 0);
   
   const quotationData = {
-    totalAmountNative: isUSDClient(data.clientName) ? data.quotationUSD : (data.quotationUSD ? data.quotationUSD * data.fxMonth : null),
-    totalAmountUSD: data.quotationUSD,
+    totalAmountNative: data.quotation,
+    totalAmountUSD: isUSDClient(data.clientName) ? data.quotation : (data.quotation ? data.quotation / data.fxMonth : null),
     estimatedHours: totalTargetHours
   };
   
@@ -356,7 +364,7 @@ async function processProject(data: RawPeriodData) {
   // 6. Validaciones y flags
   const flags: string[] = [];
   
-  if (!data.quotationUSD) {
+  if (!data.quotation) {
     flags.push('NO_QUOTATION');
   }
   

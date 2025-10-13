@@ -15,8 +15,10 @@ interface RendimientoClienteRow {
   Mes?: string;
   Año?: string | number;
   Cotización?: string | number;
-  "Facturación (USD)"?: string | number;
-  "Costos (USD)"?: string | number;
+  "Facturación (USD)"?: string | number; // Columna G
+  "Facturación [ARS]"?: string | number; // Columna I
+  "Costos (USD)"?: string | number; // Columna H
+  "Costos [ARS]"?: string | number; // Columna K
   "Pasado/Futuro"?: string;
 }
 
