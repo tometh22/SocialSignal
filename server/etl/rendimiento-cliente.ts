@@ -195,13 +195,15 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
         const monthKey = monthKeyFromEs(row.Mes, year);
         const monthNum = parseInt(monthKey.split('-')[1]);
 
-        // Parsear valores (los headers usan [USD], no (USD))
-        const revenueUsd = parseMoneyRobust(row["Facturación [USD]"]) ?? 0;
-        const costUsd = parseMoneyRobust(row["Costos [USD]"]) ?? 0;
-        const fxSheet = parseMoneyRobust(row["Cotización"]);
+        // Parsear valores - usar nombres exactos de las columnas de la hoja
+        const revenueUsd = parseMoneyRobust(row["Facturación (USD)"]); // Columna G
+        const revenueArs = parseMoneyRobust(row["Facturación [ARS]"]); // Columna I
+        const costUsd = parseMoneyRobust(row["Costos (USD)"]); // Columna H
+        const costArs = parseMoneyRobust(row["Costos [ARS]"]); // Columna K
+        const quotation = parseMoneyRobust(row["Cotización"]); // Columna F
         
-        // Obtener FX del mes (preferir exchange_rates, fallback a Cotización)
-        const fx = await getFXForMonth(year, monthNum) || fxSheet || 1345;
+        // Obtener FX del mes desde exchange_rates
+        const fx = await getFXForMonth(year, monthNum);
 
         const record = {
           clientName: row.Cliente.trim(),
@@ -209,8 +211,11 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
           projectType: row["Tipo de proyecto"]?.trim() || null,
           monthKey,
           year,
-          revenueUsd: String(revenueUsd),
-          costUsd: String(costUsd),
+          revenueUsd: revenueUsd ? String(revenueUsd) : null,
+          revenueArs: revenueArs ? String(revenueArs) : null,
+          costUsd: costUsd ? String(costUsd) : null,
+          costArs: costArs ? String(costArs) : null,
+          quotation: quotation ? String(quotation) : null,
           fx: String(fx),
         };
 
@@ -223,7 +228,10 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
             set: {
               projectType: sql`EXCLUDED.project_type`,
               revenueUsd: sql`EXCLUDED.revenue_usd`,
+              revenueArs: sql`EXCLUDED.revenue_ars`,
               costUsd: sql`EXCLUDED.cost_usd`,
+              costArs: sql`EXCLUDED.cost_ars`,
+              quotation: sql`EXCLUDED.quotation`,
               fx: sql`EXCLUDED.fx`,
               updatedAt: sql`NOW()`,
             },
