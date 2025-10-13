@@ -3254,7 +3254,7 @@ const ProjectDetailsPage = () => {
                         <DollarSign className="h-6 w-6 text-red-600" />
                       </div>
                       <div className="text-3xl font-bold text-red-600 mb-1">
-                        ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}
+                        {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
                       </div>
                       <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
                       <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
