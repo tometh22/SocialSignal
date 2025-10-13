@@ -1,0 +1,108 @@
+Vamos a dejar Equipo impecable y consistente!
+Objetivo
+Una sola fuente de verdad para horas, costos y personas.
+La misma data alimente: Dashboard (resumen), pestaña Equipo y cualquier tabla/analítica de personas.
+Nada de consultas paralelas: TeamDeviationAnalysis y demás leen el mismo VM.
+1) Fuente de verdad (SoT)
+Hoja: Costos directos e indirectos → filtrar Tipo de Costo = "Directo"
+Periodo: Año+Mes (= period_key)
+Campos → payload:
+Persona → name
+Rol → roleName (obligatorio)
+J – Horas objetivo → targetHours
+Horas reales → preferencia:
+“Cant. horas para facturación”
+“Cant. horas asignadas”
+→ hours
+N – Valor hora ARS → hourlyRateARS
+O – Monto total ARS → costARS
+Q – FX (ARS→USD) → fx_row (fallback)
+R – Monto total USD → costUSD (si falta: costARS / fx_row)
+Agregados:
+actuals.totalWorkedHours = Σ hours
+quotation.estimatedHours = Σ targetHours (suma J)
+actuals.totalWorkedCost = Σ costUSD (técnico)
+actuals.teamBreakdown[] con los campos arriba.
+2) Backend – qué corregir
+2.1 ETL (monthly-aggregates)
+Asegurar join por client, project, period_key y filtro Directo.
+Rellenar hours desde la columna real (facturación/asignadas).
+Si no hay, usar targetHours y setear flag ['hours_fallback_to_target'].
+Calcular costUSD por fila si R está vacío (O / Q).
+Construir teamBreakdown[] siempre (aunque haya 0 horas).
+Guardar en project_aggregates.actuals.teamBreakdown.
+Pseudocódigo clave:
+const direct = rows.filter(r => r.TipoDeCosto === 'Directo' && samePeriod(r));
+const hoursCol = pick(['Cant horas para facturación','Cant horas asignadas'], direct);
+const groups = groupBy(direct, r => `${r.Persona}||${r.Rol||''}`);
+
+const teamBreakdown = Object.values(groups).map(list => {
+  const a0 = list[0];
+  const targetHours = sum(list.map(r => num(r.J)));               // Horas objetivo
+  const hours       = hoursCol ? sum(list.map(r => num(r[hoursCol]))) : targetHours;
+  const costARS     = sum(list.map(r => num(r.O)));
+  let costUSD       = sum(list.map(r => num(r.R)));
+  if (!costUSD) { const fx = num(a0.Q)||0; costUSD = fx ? costARS/fx : 0; }
+  return {
+    name: a0.Persona, roleName: a0.Rol || 'N/A',
+    targetHours, hours,
+    hourlyRateARS: num(a0.N),
+    costARS, costUSD,
+    isFromExcel: true
+  };
+});
+
+const totalWorkedHours = sum(teamBreakdown.map(t => t.hours));
+const totalWorkedCost  = sum(teamBreakdown.map(t => t.costUSD));
+
+persist({ actuals: { totalWorkedHours, totalWorkedCost, teamBreakdown } });
+2.2 API
+GET /projects/:id?view=operativa&period=YYYY-MM debe incluir:
+actuals.totalWorkedHours
+actuals.teamBreakdown[]
+quotation.estimatedHours
+No emitir summary:null en parches; si no cambia, omitir clave.
+3) Frontend – qué cambiar
+3.1 Selector único
+toProjectVM(payload, view) debe exponer:
+vm.teamBreakdown = payload.actuals.teamBreakdown
+vm.totalWorkedHours = payload.actuals.totalWorkedHours
+vm.estimatedHours = payload.quotation.estimatedHours
+3.2 Pestaña Equipo
+Eliminar consultas internas (como las de TeamDeviationAnalysis) y recibir vm.teamBreakdown por props.
+Tarjeta “Resumen Operativo”:
+Miembros = vm.teamBreakdown.length
+Horas trabajadas = vm.totalWorkedHours
+Horas objetivo = vm.estimatedHours
+Eficiencia = vm.estimatedHours>0 ? vm.estimatedHours / vm.totalWorkedHours : null
+Tabla:
+Columnas: name, roleName, hours, targetHours, hourlyRateARS, costARS, costUSD
+Progreso = hours / targetHours (si targetHours>0)
+Ranking/Desviaciones:
+Desviación horas = hours - targetHours
+Costo por hora = (costARS || costUSD*fx_view) / hours (si hours>0)
+4) Fallbacks (marcados con flags)
+Sin horas reales → usar targetHours para hours y flag: hours_fallback_to_target.
+Sin R y sin Q → costUSD=0 y flag: missing_fx_for_usd_cost.
+Sin roleName → 'N/A' y flag: missing_role_name.
+5) Validaciones/Asserts
+teamBreakdown.length > 0 para proyectos con filas Directo en el período.
+Σ teamBreakdown.hours === actuals.totalWorkedHours (± 1e-6).
+Σ teamBreakdown.targetHours === quotation.estimatedHours.
+Si vista = operativa/usd, no mostrar totales de equipo en moneda distinta a la vista (si mostrás dinero, derivar desde costARS o costUSD según vista).
+6) QA rápido (pasos)
+Elegí un proyecto/mes que tenga filas “Directo”.
+Verificá en hoja:
+Σ J (objetivo), Σ horas reales, Σ O (ARS), Σ R (USD).
+En la app (pestaña Equipo):
+Miembros = cantidad de personas distintas (por rol).
+Horas totales = Σ horas reales; Objetivo = Σ J.
+Fila por persona: horas, objetivo, costos visibles.
+En Dashboard:
+Velocidad equipo y Total trabajado = mismos números de Equipo.
+7) Criterios de aceptación (listo para cerrar)
+La pestaña Equipo muestra las mismas horas y mismo desglose que el Dashboard (no más “0.0h”).
+No hay más fetches paralelos: TeamDeviationAnalysis recibe teamBreakdown por props.
+Cambiar de período cambia los datos de Equipo y Dashboard de forma consistente.
+Flags aparecen cuando hubo fallbacks (auditable).
+Si querés, te paso un mini diff para el componente TeamDeviationAnalysis (props → teamBreakdown, totalWorkedHours, estimatedHours) y el selector toProjectVM.
