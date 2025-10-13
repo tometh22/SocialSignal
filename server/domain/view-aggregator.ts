@@ -71,7 +71,7 @@ export async function getProjectPeriodView(
   const actualsData = agg.actualsData as any;
   
   // 3. Mapear a ViewModel unificado
-  return {
+  const result = {
     currencyNative: viewData.currency || agg.currencyNative,
     revenueDisplay: viewData.revenue || 0,
     costDisplay: viewData.cost || 0,
@@ -84,6 +84,32 @@ export async function getProjectPeriodView(
     teamBreakdown: actualsData?.teamBreakdown || [],
     flags: agg.flags || []
   };
+  
+  // 🔒 TRAZAS DE VALIDACIÓN (Punto 8 del checklist)
+  console.log(`📊 [VIEW ${view.toUpperCase()}] period=${periodKey} project=${projectId} | ` +
+    `rev=${result.revenueDisplay} cost=${result.costDisplay} cur=${result.currencyNative} ` +
+    `cotiz=${result.cotizacion} bu=${result.budgetUtilization?.toFixed(2) || 'N/A'}`);
+  
+  // Validación de consistencia de moneda
+  if (view !== 'original' && result.cotizacion) {
+    const expectedBU = result.costDisplay / result.cotizacion;
+    const actualBU = result.budgetUtilization ?? expectedBU;
+    const diff = Math.abs(actualBU - expectedBU);
+    if (diff > 1e-6) {
+      console.warn(`⚠️ [BE VALIDATION] Budget Utilization inconsistente: expected=${expectedBU.toFixed(4)}, actual=${actualBU.toFixed(4)}, diff=${diff}`);
+    }
+  }
+  
+  // Validación de markup
+  if (result.markup && result.revenueDisplay && result.costDisplay) {
+    const expectedMarkup = result.revenueDisplay / result.costDisplay;
+    const diff = Math.abs(result.markup - expectedMarkup);
+    if (diff > 0.01) {
+      console.warn(`⚠️ [BE VALIDATION] Markup inconsistente: expected=${expectedMarkup.toFixed(4)}, actual=${result.markup.toFixed(4)}, diff=${diff}`);
+    }
+  }
+  
+  return result;
 }
 
 /**

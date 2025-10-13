@@ -103,6 +103,33 @@ interface CompleteProjectData {
       ingresos: boolean;
     };
   };
+  views?: {
+    original?: {
+      revenue: number;
+      revenue_currency: string;
+      cost: number;
+      cost_currency: string;
+      cotizacion?: number | null;
+    };
+    operativa?: {
+      revenue: number;
+      cost: number;
+      currency: string;
+      cotizacion?: number | null;
+      markup?: number | null;
+      margin?: number | null;
+      budgetUtilization?: number | null;
+    };
+    usd?: {
+      revenue: number;
+      cost: number;
+      currency: string;
+      cotizacion?: number | null;
+      markup?: number | null;
+      margin?: number | null;
+      budgetUtilization?: number | null;
+    };
+  };
   rankings: {
     economicMetrics: Array<{
       personnelId: number;

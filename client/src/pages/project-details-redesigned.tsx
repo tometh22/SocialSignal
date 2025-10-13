@@ -1293,7 +1293,7 @@ const ProjectDetailsPage = () => {
     if (!unifiedData) return null;
     
     const vm = toProjectVM({
-      summary: unifiedData.summary,
+      summary: unifiedData.summary as any,
       actuals: unifiedData.actuals,
       quotation: unifiedData.quotation,
       metrics: unifiedData.metrics
@@ -1307,6 +1307,79 @@ const ProjectDetailsPage = () => {
       flags: vm.flags
     });
 
+    // 🔒 ASSERTS DE CONSISTENCIA (Punto 8 del checklist)
+    const views = (unifiedData as any).views;
+    if (views && views[selectedView]) {
+      const v = views[selectedView];
+      
+      // ASSERT 1: Anti-mezcla de moneda en vista
+      if (selectedView !== 'original') {
+        const currencyConsistent = v.currency === vm.currencyNative;
+        console.assert(currencyConsistent, 
+          '🚨 [ASSERT FAILED] Moneda inconsistente en vista', { 
+            view: selectedView, 
+            viewCurrency: v.currency, 
+            vmCurrency: vm.currencyNative,
+            viewData: v 
+          });
+      }
+      
+      // ASSERT 2: Budget Utilization correctamente calculado
+      if (selectedView !== 'original' && v.cotizacion && v.cotizacion > 0) {
+        const expectedBU = v.cost / v.cotizacion;
+        const actualBU = v.budgetUtilization ?? expectedBU;
+        const buDiff = Math.abs(actualBU - expectedBU);
+        console.assert(buDiff < 1e-6, 
+          '🚨 [ASSERT FAILED] Budget Utilization mal calculado', { 
+            view: selectedView,
+            expected: expectedBU,
+            actual: actualBU,
+            diff: buDiff,
+            cost: v.cost,
+            cotizacion: v.cotizacion
+          });
+      }
+      
+      // ASSERT 3: Markup y Margin coherentes
+      if (v.revenue && v.cost && v.cost > 0) {
+        const expectedMarkup = v.revenue / v.cost;
+        const expectedMargin = ((v.revenue - v.cost) / v.revenue) * 100;
+        
+        if (v.markup != null) {
+          const markupDiff = Math.abs(v.markup - expectedMarkup);
+          console.assert(markupDiff < 0.01, 
+            '🚨 [ASSERT FAILED] Markup mal calculado', { 
+              view: selectedView,
+              expected: expectedMarkup,
+              actual: v.markup,
+              diff: markupDiff
+            });
+        }
+        
+        if (v.margin != null) {
+          const marginDiff = Math.abs(v.margin - expectedMargin);
+          console.assert(marginDiff < 0.1, 
+            '🚨 [ASSERT FAILED] Margin mal calculado', { 
+              view: selectedView,
+              expected: expectedMargin,
+              actual: v.margin,
+              diff: marginDiff
+            });
+        }
+      }
+      
+      // LOG de trazabilidad por período
+      console.log(`📊 [VIEW ${selectedView.toUpperCase()}] period=${periodFromUrl || periodFromFilter}`, {
+        revenue: v.revenue,
+        cost: v.cost,
+        currency: v.currency,
+        cotizacion: v.cotizacion,
+        budgetUtilization: v.budgetUtilization,
+        markup: v.markup,
+        margin: v.margin
+      });
+    }
+
     return vm;
   }, [
     unifiedData?.summary?.costDisplay,
@@ -1318,7 +1391,10 @@ const ProjectDetailsPage = () => {
     quotationData?.totalAmountNative,
     quotationData?.estimatedHours,
     unifiedData?.metrics?.budgetUtilization,
-    unifiedData?.metrics?.efficiency
+    unifiedData?.metrics?.efficiency,
+    selectedView,
+    periodFromUrl,
+    periodFromFilter
   ]);
 
   // MÉTRICAS SIMPLIFICADAS - TODAS DESDE SINGLE SOURCE OF TRUTH
@@ -3399,7 +3475,6 @@ const ProjectDetailsPage = () => {
             <div className="grid grid-cols-1 gap-6">
               <TrendCharts 
                 projectId={Number(projectId)}
-                timeFilter={timeFilterForHook}
                 dateFilter={{
                   startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
                   endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
@@ -4144,7 +4219,7 @@ const ProjectDetailsPage = () => {
                       <p className="text-purple-600 text-sm font-medium">Dependencias</p>
                       <p className="text-2xl font-bold text-purple-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.role || 'Sin Rol'));
+                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.roleName || 'Sin Rol'));
                           return uniqueRoles.size;
                         })() : 0}
                       </p>
@@ -4292,9 +4367,9 @@ const ProjectDetailsPage = () => {
                       
                       return activeMembers.map((member, index) => {
                         const workIntensity = member.hours / Math.max(...activeMembers.map(m => m.hours));
-                        const collaborationType = member.role === 'Analista Senior' ? 'Ejecutor Principal' :
-                                                 member.role === 'Operations Lead' ? 'Coordinador' :
-                                                 member.role === 'Project Manager' ? 'Supervisor' : 'Especialista';
+                        const collaborationType = member.roleName === 'Analista Senior' ? 'Ejecutor Principal' :
+                                                 member.roleName === 'Operations Lead' ? 'Coordinador' :
+                                                 member.roleName === 'Project Manager' ? 'Supervisor' : 'Especialista';
                         
                         return (
                           <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
