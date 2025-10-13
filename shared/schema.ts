@@ -2134,8 +2134,11 @@ export const financialSot = pgTable("financial_sot", {
   projectType: text("project_type"), // Tipo de proyecto: 'Fee' | 'One Shot'
   monthKey: varchar("month_key", { length: 7 }).notNull(), // YYYY-MM (Mes + Año)
   year: integer("year").notNull(), // Año
-  revenueUsd: numeric("revenue_usd", { precision: 16, scale: 2 }).notNull(), // Facturación (USD)
-  costUsd: numeric("cost_usd", { precision: 16, scale: 2 }).notNull(), // Costos (USD)
+  revenueUsd: numeric("revenue_usd", { precision: 16, scale: 2 }), // Facturación (USD) - columna G
+  revenueArs: numeric("revenue_ars", { precision: 16, scale: 2 }), // Facturación [ARS] - columna I
+  costUsd: numeric("cost_usd", { precision: 16, scale: 2 }), // Costos (USD) - columna H
+  costArs: numeric("cost_ars", { precision: 16, scale: 2 }), // Costos [ARS] - columna K
+  quotation: numeric("quotation", { precision: 16, scale: 2 }), // Cotización - columna F (para % presupuesto)
   fx: numeric("fx", { precision: 12, scale: 6 }).notNull(), // FX del mes para conversión a ARS
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -1,0 +1,104 @@
+Tienes razón: los ingresos están mal mapeados. Ahora mismo la UI está mostrando (o mezclando) la Cotización como si fueran Ingresos. En tu hoja Rendimiento Cliente la fuente correcta de ingresos no es “Cotización”: son las columnas Facturación (USD) y Facturación [ARS]. Aquí va el cierre, corto y quirúrgico, para que Replit lo arregle sin dudas.
+Origen exacto (SoT) de INGRESOS por proyecto-mes
+De la pestaña Rendimiento Cliente:
+Si el proyecto factura en USD (clientes USD):
+Ingreso base = columna G: “Facturación (USD)”.
+Si el proyecto factura en ARS (clientes ARS):
+Ingreso base = columna I: “Facturación [ARS]”.
+Nunca usar “Cotización” como ingresos. “Cotización” es el precio pactado (denominador del presupuesto), no la facturación del mes.
+Cómo exponerlo en el payload (3 vistas)
+Usa el mismo ingreso base y conviértelo sólo si la vista lo exige.
+Vista Operativa (moneda del proyecto):
+USD-nativo → views.operativa.revenue = Facturación (USD); currency='USD'
+ARS-nativo → views.operativa.revenue = Facturación [ARS]; currency='ARS'
+Vista USD consolidada:
+views.usd.revenue = Facturación (USD) || (Facturación [ARS] / fx)
+Vista Original:
+views.original.revenue = Facturación (USD) || Facturación [ARS]
+views.original.revenue_currency = 'USD' | 'ARS'
+fx = tipo de cambio del período (columna Q o tabla de FX mensual).
+Costos (para que no se crucen)
+Costos [ARS] (columna K) = base local.
+Costos (USD) (columna H o K/fx) = sólo si el proyecto es USD-nativo o si la vista es USD.
+Cotización (denominador de Presupuesto)
+Cotización (nativa) = columna F.
+cotizacion_usd = F / fx (si el proyecto es USD-nativo o si la vista es USD).
+% Presupuesto usado = costo de la vista / cotización de la vista (misma moneda).
+Patch backend (pseudocódigo)
+const isUSD = USD_CLIENTS.has(cliente);
+const fx = fxByMonth[period];
+
+const factUSD = num(rc['Facturación (USD)']);     // G
+const factARS = num(rc['Facturación [ARS]']);     // I
+const cotNat  = num(rc['Cotización']);            // F
+
+const costARS = num(rc['Costos [ARS]']);          // K
+const costUSD = num(rc['Costos (USD)']) || (fx ? costARS / fx : 0); // H o K/fx
+
+// --- Vistas ---
+const views = {
+  operativa: isUSD
+    ? { revenue: factUSD, cost: costUSD, currency: 'USD', cotizacion: cotNat / fx }
+    : { revenue: factARS, cost: costARS, currency: 'ARS', cotizacion: cotNat },
+
+  usd: { revenue: factUSD || (factARS / fx), cost: costUSD, currency: 'USD', cotizacion: cotNat / fx },
+
+  original: {
+    revenue: factUSD || factARS,
+    revenue_currency: factUSD ? 'USD' : 'ARS',
+    cost: costARS,
+    cost_currency: 'ARS'
+  }
+};
+En el frontend (en todas las cards)
+Usar SIEMPRE el VM de la vista activa. Prohibido leer quotation.totalAmount o summary.revenueDisplay sueltos.
+const v = data.views[activeView];   // 'operativa' | 'usd' | 'original'
+const currency = v.currency ?? v.revenue_currency;
+
+<CurrencyText amount={v.revenue} currency={currency} />   // Ingresos generados
+<Text muted>
+  Costo: <CurrencyText amount={v.cost} currency={currency} />
+</Text>
+
+const usedPct = v.cotizacion ? v.cost / v.cotizacion : null;
+Checks que deben pasar (rápidos)
+Warner (USD, 2025-08)
+Ingresos mostrados (Operativa): = G: Facturación (USD).
+Presupuesto usado: costUSD / (Cotización/ fx).
+Coelsa (ARS, 2025-08)
+Ingresos mostrados (Operativa): = I: Facturación [ARS].
+Presupuesto usado: costARS / Cotización.
+Grep en FE:
+rg -n "quotation\.totalAmount[^N]" client/src → 0 resultados en renders.
+rg -n "revenueDisplay" client/src → sólo vía views[view].revenue.
+rg -n "\\$[^A-Z]" client/src → sin $ hardcodeados.
+Tests (mínimo)
+test('Ingresos operativa USD salen de Facturación (USD)', () => {
+  const p = fixture({ rc:{ fact_usd:13450, fact_ars:0, cost_ars:21922.35, cot_nat:13450 }, fx:1 });
+  const v = toViews(p).operativa;
+  expect(v.revenue).toBe(13450);
+  expect(v.currency).toBe('USD');
+});
+
+test('Ingresos operativa ARS salen de Facturación [ARS]', () => {
+  const p = fixture({ rc:{ fact_usd:0, fact_ars:3_820_000, cost_ars:553_002, cot_nat:1_345_000 }, fx:1345 });
+  const v = toViews(p).operativa;
+  expect(v.revenue).toBe(3_820_000);
+  expect(v.currency).toBe('ARS');
+});
+
+test('Ingresos USD consolidada convierte ARS con fx', () => {
+  const p = fixture({ rc:{ fact_usd:0, fact_ars:3_820_000 }, fx:1345 });
+  const v = toViews(p).usd;
+  expect(v.revenue).toBeCloseTo(3_820_000/1345, 2);
+});
+Diagnóstico inmediato (qué imprimir ahora)
+Para el proyecto/período que ves mal, logueá en BE:
+[RC] cliente=..., proyecto=..., period=2025-08
+F(USD)=<G>  F(ARS)=<I>   Cotiz=<F>  Cost(ARS)=<K>  Cost(USD)=<H|K/fx>  fx=<Q>
+[VIEW operativa] revenue=<...> cost=<...> currency=<...> cotizacion=<...>
+Si “Ingresos generados” no coincide con G (o I en ARS-nativo) para Operativa, ya sabés dónde tocar.
+Con esto, ingresos quedan alineados al 100% con tu hoja:
+Operativa usa G o I según el cliente,
+USD consolidada convierte,
+Original refleja tal cual la planilla.
