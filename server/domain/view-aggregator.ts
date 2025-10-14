@@ -138,14 +138,29 @@ export async function getProjectPeriodView(
   console.log(`🎯 3-HOURS DEBUG: teamCount=${teamBreakdown.length}, totalAsanaHours=${totalAsanaHours}, totalBillingHours=${totalBillingHours}`);
   
   // 3. Mapear a ViewModel unificado
+  // 🎯 FIX: Para clientes USD en vista operativa, usar revenue del mes como cotizacion
+  const isUSDClient = viewData.currency === 'USD' || agg.currencyNative === 'USD';
+  let cotizacion = viewData.cotizacion || quotationData?.totalAmountNative || null;
+  
+  if (view === 'operativa' && isUSDClient && viewData.revenue) {
+    // Use monthly revenue as budget baseline for USD clients (not static quotation or FX)
+    cotizacion = viewData.revenue;
+    console.log(`💰 VIEW-AGGREGATOR FIX: USD operativa using revenue ${cotizacion} as cotizacion (was ${viewData.cotizacion})`);
+  }
+  
+  // Recalculate budgetUtilization with corrected cotizacion
+  const budgetUtilization = cotizacion > 0 && viewData.cost 
+    ? viewData.cost / cotizacion 
+    : (viewData.budgetUtilization || null);
+  
   const result = {
     currencyNative: viewData.currency || agg.currencyNative,
     revenueDisplay: viewData.revenue || 0,
     costDisplay: viewData.cost || 0,
-    cotizacion: viewData.cotizacion || quotationData?.totalAmountNative || null,
+    cotizacion,
     markup: viewData.markup || null,
     margin: viewData.margin || null,
-    budgetUtilization: viewData.budgetUtilization || null,
+    budgetUtilization,
     totalWorkedHours: actualsData?.totalWorkedHours || totalAsanaHours || 0,
     totalAsanaHours,  // 🎯 NEW
     totalBillingHours,  // 🎯 NEW

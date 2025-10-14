@@ -642,11 +642,12 @@ function ProjectTeamSection({
     <TooltipProvider>
       <div className="space-y-3">
         {completeTeam.map((member: any, index: number) => {
-          const workedHours = member.actualHours || 0;
-          const estimatedHours = member.estimatedHours || 0;
-          const progressPercent = getProgressPercentage(workedHours, estimatedHours, member.targetHours);
+          // 🎯 3-HOURS ARCHITECTURE: Use normalized fields from backend
+          const workedHours = member.hoursAsana || member.actualHours || 0;  // Prefer hoursAsana (normalized)
+          const targetHours = member.targetHours || member.estimatedHours || 0;
+          const progressPercent = getProgressPercentage(workedHours, targetHours, member.targetHours);
           // Usar horas objetivo para calcular presupuesto restante y estado de exceso
-          const referenceHours = (member.targetHours && member.targetHours > 0) ? member.targetHours : estimatedHours;
+          const referenceHours = (member.targetHours && member.targetHours > 0) ? member.targetHours : targetHours;
           const remainingHours = Math.max(0, referenceHours - workedHours);
           
           // Umbral más realista para "excedido": 15% de tolerancia corporativa
@@ -763,14 +764,14 @@ function ProjectTeamSection({
                     {member.targetHours > 0 ? (
                       <>
                         de {member.targetHours}h objetivo {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}
-                        {estimatedHours > 0 && (
+                        {targetHours > 0 && (
                           <span className="text-gray-400 ml-1">
-                            | {estimatedHours}h cotización
+                            | {targetHours}h cotización
                           </span>
                         )}
                       </>
-                    ) : estimatedHours > 0 ? (
-                      <>de {estimatedHours.toFixed(0)}h estimadas {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}</>
+                    ) : targetHours > 0 ? (
+                      <>de {targetHours.toFixed(0)}h estimadas {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}</>
                     ) : (
                       <span className="text-orange-500">Sin horas asignadas</span>
                     )}
@@ -800,9 +801,9 @@ function ProjectTeamSection({
                           <div className="text-blue-600 font-medium">
                             Objetivo estimado: {member.targetHours}h
                           </div>
-                          {estimatedHours > 0 && (
+                          {targetHours > 0 && (
                             <div className="text-gray-500">
-                              Estimadas (cotización): {estimatedHours}h
+                              Estimadas (cotización): {targetHours}h
                             </div>
                           )}
                           <div>Progreso vs objetivo: {progressPercent}%</div>
@@ -810,9 +811,9 @@ function ProjectTeamSection({
                             Eficiencia: {((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0)}%
                           </div>
                         </>
-                      ) : estimatedHours > 0 ? (
+                      ) : targetHours > 0 ? (
                         <>
-                          <div>Estimadas (cotización): {estimatedHours}h</div>
+                          <div>Estimadas (cotización): {targetHours}h</div>
                           <div>Progreso: {progressPercent}%</div>
                         </>
                       ) : (

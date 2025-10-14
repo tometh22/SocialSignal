@@ -212,13 +212,32 @@ export async function completeDataHandler(req: Request, res: Response) {
       if (viewData) {
         console.log(`🎨 VIEW-AGGREGATOR: Using ${view} view for project ${resolvedProjectId}, period ${period}`);
         
+        // 🎯 Calculate labor vs RC cost mismatch flag (same as legacy mode)
+        const detailedLaborCost = viewData.teamBreakdown.reduce((sum: number, m: any) => sum + ((m.costUSD || m.costARS || 0)), 0);
+        const rcCost = viewData.costDisplay || 0;
+        const laborMismatchPct = rcCost > 0 ? Math.abs(detailedLaborCost - rcCost) / rcCost : 0;
+        const hasMismatch = laborMismatchPct > 0.10;
+        const aggregatorFlags = [...viewData.flags, `VIEW_${view.toUpperCase()}`];
+        
+        if (hasMismatch) {
+          aggregatorFlags.push('labor_vs_rc_cost_mismatch');
+          console.log(`⚠️ COST MISMATCH (aggregator): Detail labor=${detailedLaborCost.toFixed(2)}, RC=${rcCost.toFixed(2)}, diff=${(laborMismatchPct*100).toFixed(1)}%`);
+        }
+        
         // Return view-based response with consistent structure
         return res.json({
           view: view, // CRITICAL: Include view field for frontend
           project: {
             id: projectData.id,
             clientId: projectData.clientId,
-            status: projectData.status
+            status: projectData.status,
+            // 🎯 BUG FIX: Add missing fields for frontend compatibility
+            revenueDisplay: viewData.revenueDisplay,
+            costDisplay: viewData.costDisplay,
+            cotizacion: viewData.cotizacion, // Already corrected in view-aggregator for USD operativa
+            currencyNative: viewData.currencyNative,
+            budgetUtilization: viewData.budgetUtilization, // Already corrected in view-aggregator
+            name: quotationData?.projectName || null
           },
           quotation: quotationData ? {
             id: quotationData.id,
@@ -233,14 +252,14 @@ export async function completeDataHandler(req: Request, res: Response) {
             totalAsanaHours: viewData.totalAsanaHours,  // 🎯 3-hours architecture
             totalBillingHours: viewData.totalBillingHours,  // 🎯 3-hours architecture
             totalWorkedCost: viewData.costDisplay, // Display value
-            totalEntries: 0,
+            totalEntries: viewData.teamBreakdown.length,
             teamBreakdown: viewData.teamBreakdown
           },
           metrics: {
             efficiency: 0,
             markup: viewData.markup || 0,
             margin: viewData.margin || 0,
-            budgetUtilization: viewData.budgetUtilization || 0,
+            budgetUtilization: viewData.budgetUtilization || 0, // Already corrected value
             hoursDeviation: 0,
             costDeviation: 0
           },
@@ -253,7 +272,7 @@ export async function completeDataHandler(req: Request, res: Response) {
             currencyNative: viewData.currencyNative, // CRITICAL: Include for frontend
             markup: viewData.markup,
             margin: viewData.margin,
-            flags: [...viewData.flags, `VIEW_${view.toUpperCase()}`]
+            flags: aggregatorFlags
           },
           estimatedHours: viewData.estimatedHours,
           workedHours: viewData.totalWorkedHours,
@@ -498,26 +517,49 @@ export async function completeDataHandler(req: Request, res: Response) {
     const currencyNative = summary.currencyNative || 'ARS';
     const fxRate = 1345; // TODO: Get from exchange_rates table for the period
     
+    // 🎯 FIX: Para vista operativa con clientes USD, usar revenueDisplay del mes como denominador
+    // (no el totalAmount fijo de la cotización)
     let totalAmountNative = quotationData?.totalAmount || 0;
-    if (quotationData) {
-      // If quotation has its own currency setting, respect it
+    let cotizacion = totalAmountNative; // Track the budget denominator separately
+    
+    if (view === 'operativa' && (quotationData?.quotationCurrency === 'USD' || currencyNative === 'USD')) {
+      // For USD customers in operativa view, use monthly revenue as budget baseline
+      cotizacion = summary.revenueDisplay || summary.revenueUSD || totalAmountNative;
+      totalAmountNative = cotizacion;
+      console.log(`💰 OPERATIVA USD: Using monthly revenue ${cotizacion} as budget baseline (not static quotation ${quotationData?.totalAmount})`);
+    } else if (quotationData) {
+      // Legacy logic for other views/currencies
       if (quotationData.quotationCurrency === 'USD' && currencyNative === 'ARS') {
         totalAmountNative = quotationData.totalAmount * fxRate;
+        cotizacion = totalAmountNative;
       } else if (quotationData.quotationCurrency === 'ARS' && currencyNative === 'USD') {
         totalAmountNative = quotationData.totalAmount / fxRate;
+        cotizacion = totalAmountNative;
       } else {
         // Same currency or quotationCurrency matches currencyNative
         totalAmountNative = quotationData.totalAmount;
+        cotizacion = totalAmountNative;
       }
     }
     
     // Calculate budgetUtilization using native currency values
-    const budgetUtilization = totalAmountNative > 0 && summary.costDisplay 
-      ? summary.costDisplay / totalAmountNative 
+    const budgetUtilization = cotizacion > 0 && summary.costDisplay 
+      ? summary.costDisplay / cotizacion 
       : 0;
 
     // 🚨 Add LEGACY_FALLBACK flag if view-aggregator was not used
     const legacyFlags = [...(summary.flags || []), 'LEGACY_FALLBACK'];
+    
+    // 🎯 Calculate labor vs RC cost mismatch flag
+    const detailedLaborCost = teamBreakdown.reduce((sum, m) => sum + ((m.costUSD || m.costARS || 0)), 0);
+    const rcCost = summary.costDisplay || summary.teamCostUSD || 0;
+    const laborMismatchPct = rcCost > 0 ? Math.abs(detailedLaborCost - rcCost) / rcCost : 0;
+    const hasMismatch = laborMismatchPct > 0.10;
+    
+    if (hasMismatch) {
+      legacyFlags.push('labor_vs_rc_cost_mismatch');
+      console.log(`⚠️ COST MISMATCH: Detail labor=${detailedLaborCost.toFixed(2)}, RC=${rcCost.toFixed(2)}, diff=${(laborMismatchPct*100).toFixed(1)}%`);
+    }
     
     const response = {
       // 🎯 3-VIEW SYSTEM: Include view field for frontend
@@ -526,7 +568,14 @@ export async function completeDataHandler(req: Request, res: Response) {
       project: {
         id: projectData.id,
         clientId: projectData.clientId,
-        status: projectData.status
+        status: projectData.status,
+        // 🎯 BUG FIX: Add missing fields for frontend compatibility
+        revenueDisplay: summary.revenueDisplay || summary.revenueUSD,
+        costDisplay: summary.costDisplay || summary.teamCostUSD,
+        cotizacion: cotizacion, // Budget denominator (monthly revenue for USD operativa)
+        currencyNative: currencyNative,
+        budgetUtilization: budgetUtilization,
+        name: quotationData?.projectName || null
       },
       quotation: quotationData ? {
         id: quotationData.id,
