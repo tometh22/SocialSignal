@@ -108,6 +108,41 @@ function useTeamData({
         ? (hourDeviation / budgetedHours) * 100 
         : 0;
 
+      // 🏢 CALCULAR CRITERIOS CORPORATIVOS (misma lógica que backend)
+      const absDeviation = Math.abs(deviationPercentage);
+      const minHoursThreshold = budgetedHours * 0.3;
+      const hasSignificantActivity = actualHours > minHoursThreshold;
+
+      let severity: 'critical' | 'high' | 'medium' | 'low' | undefined;
+      let alertType: string | undefined;
+      let deviationType: string | undefined;
+
+      if (deviationPercentage > 50 && hasSignificantActivity) {
+        severity = 'critical';
+        alertType = 'budget_overrun';
+        deviationType = 'sobrecosto';
+      } else if (deviationPercentage < -50 && hasSignificantActivity) {
+        severity = 'critical';
+        alertType = 'estimation_issue';
+        deviationType = 'subutilizacion_critica';
+      } else if (deviationPercentage > 25) {
+        severity = 'high';
+        alertType = 'within_tolerance';
+        deviationType = 'sobrecosto_tolerado';
+      } else if (deviationPercentage < -25) {
+        severity = 'medium';
+        alertType = 'efficiency_review';
+        deviationType = 'eficiencia_alta';
+      } else if (absDeviation <= 15) {
+        severity = 'low';
+        alertType = 'on_target';
+        deviationType = 'ejecucion_optima';
+      } else if (deviationPercentage < 0) {
+        severity = 'low';
+        alertType = 'healthy_savings';
+        deviationType = 'subcosto_saludable';
+      }
+
       return {
         personnelId: index + 1,
         personnelName: member.name,
@@ -118,6 +153,9 @@ function useTeamData({
         hourDeviation,
         costDeviation,
         deviationPercentage,
+        severity,
+        alertType,
+        deviationType,
       };
     });
 
