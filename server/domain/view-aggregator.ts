@@ -17,6 +17,8 @@ interface ViewModelOutput {
   margin: number | null;
   budgetUtilization: number | null;
   totalWorkedHours: number;
+  totalAsanaHours?: number;  // 🎯 3-hours architecture
+  totalBillingHours?: number;  // 🎯 3-hours architecture
   estimatedHours: number;
   teamBreakdown: any[];
   flags: string[];
@@ -70,6 +72,59 @@ export async function getProjectPeriodView(
   const quotationData = agg.quotationData as any;
   const actualsData = agg.actualsData as any;
   
+  // 🔧 HOTFIX: Hydrate team breakdown with on-the-fly normalization
+  const normHours = (x?: number): number => {
+    if (!Number.isFinite(x as number)) return 0;
+    const val = x as number;
+    return val > 500 ? val / 100 : val;
+  };
+  
+  const fxMes = viewData.currency === 'ARS' && viewData.revenue && (viewData.revenueUsd || viewData.revenueUSD)
+    ? viewData.revenue / (viewData.revenueUsd || viewData.revenueUSD)
+    : 1345;
+  
+  const hydrateMember = (m: any) => {
+    const targetHours = Number(m.targetHours ?? m.estimatedHours ?? 0);
+    const hoursRaw = Number(m.hours ?? m.actualHours ?? 0);
+    
+    const hoursAsana = Number.isFinite(m.hoursAsana) && m.hoursAsana !== null
+      ? Number(m.hoursAsana)
+      : normHours(hoursRaw);
+    
+    const billingRaw = Number(m.hoursBilling ?? m.hoursParaFacturacion ?? 0);
+    const hoursBilling = billingRaw > 0
+      ? normHours(billingRaw)
+      : hoursAsana > 0
+        ? hoursAsana
+        : targetHours;
+    
+    const rateARS = Number(m.hourlyRateARS ?? m.rateARS ?? m.rate ?? 0);
+    const costARS = Number(m.costARS ?? (hoursBilling * rateARS || 0));
+    const costUSD = Number(m.costUSD ?? (fxMes ? costARS / fxMes : 0));
+    
+    return {
+      ...m,
+      targetHours,
+      hoursAsana,
+      hoursBilling,
+      hours: hoursAsana,
+      costARS,
+      costUSD,
+      hourlyRateARS: rateARS,
+      estimatedHours: targetHours,
+      actualHours: hoursAsana,
+      actualCost: costUSD
+    };
+  };
+  
+  const rawTeamBreakdown = actualsData?.teamBreakdown || [];
+  const teamBreakdown = rawTeamBreakdown.map(hydrateMember);
+  
+  const totalAsanaHours = teamBreakdown.reduce((sum: number, m: any) => sum + (m.hoursAsana || 0), 0);
+  const totalBillingHours = teamBreakdown.reduce((sum: number, m: any) => sum + (m.hoursBilling || 0), 0);
+  
+  console.log(`🎯 3-HOURS DEBUG: teamCount=${teamBreakdown.length}, totalAsanaHours=${totalAsanaHours}, totalBillingHours=${totalBillingHours}`);
+  
   // 3. Mapear a ViewModel unificado
   const result = {
     currencyNative: viewData.currency || agg.currencyNative,
@@ -79,9 +134,11 @@ export async function getProjectPeriodView(
     markup: viewData.markup || null,
     margin: viewData.margin || null,
     budgetUtilization: viewData.budgetUtilization || null,
-    totalWorkedHours: actualsData?.totalWorkedHours || 0,
+    totalWorkedHours: actualsData?.totalWorkedHours || totalAsanaHours || 0,
+    totalAsanaHours,  // 🎯 NEW
+    totalBillingHours,  // 🎯 NEW
     estimatedHours: quotationData?.estimatedHours || 0,
-    teamBreakdown: actualsData?.teamBreakdown || [],
+    teamBreakdown,  // 🎯 Now hydrated with normalized hours
     flags: agg.flags || []
   };
   

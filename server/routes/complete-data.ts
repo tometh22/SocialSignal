@@ -230,6 +230,8 @@ export async function completeDataHandler(req: Request, res: Response) {
           } : null,
           actuals: {
             totalWorkedHours: viewData.totalWorkedHours,
+            totalAsanaHours: viewData.totalAsanaHours,  // 🎯 3-hours architecture
+            totalBillingHours: viewData.totalBillingHours,  // 🎯 3-hours architecture
             totalWorkedCost: viewData.costDisplay, // Display value
             totalEntries: 0,
             teamBreakdown: viewData.teamBreakdown
@@ -420,7 +422,7 @@ export async function completeDataHandler(req: Request, res: Response) {
       
       // 🎯 Cost calculation
       const rateARS = Number(m.hourlyRateARS ?? m.rateARS ?? m.rate ?? 0);
-      const costARS = Number(m.costARS ?? (hoursBilling * rateARS) || 0);
+      const costARS = Number(m.costARS ?? (hoursBilling * rateARS || 0));
       const costUSD = Number(m.costUSD ?? (fxMes ? costARS / fxMes : 0));
       
       return {
