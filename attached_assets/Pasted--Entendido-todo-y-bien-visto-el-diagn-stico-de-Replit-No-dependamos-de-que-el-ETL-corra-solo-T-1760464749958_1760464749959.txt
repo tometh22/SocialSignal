@@ -1,0 +1,112 @@
+¡Entendido todo — y bien visto el diagnóstico de Replit!
+No dependamos de “que el ETL corra solo”. Te dejo cómo cerrarlo ahora mismo con pasos ejecutables y salvaguardas para que la UI ya quede bien aunque la DB tenga datos viejos.
+Plan de cierre inmediato (sin esperar nada)
+A) Hotfix en API (compatibilidad hacia atrás)
+Objetivo: si el período aún no tiene hoursAsana/hoursBilling, derivarlos on-the-fly para que Equipo/Dashboard muestren bien ya.
+// complete-data.ts (al mapear actuals.teamBreakdown)
+function normHours(x?: number) {
+  if (!Number.isFinite(x as number)) return 0;
+  return (x as number) > 500 ? (x as number) / 100 : (x as number);
+}
+
+function hydrateMember(m:any, fxMes:number) {
+  const targetHours   = Number(m.targetHours ?? m.estimatedHours ?? 0); // vienen bien
+  const hoursRaw      = Number(m.hours ?? m.actualHours ?? 0);          // legacy “inflado”
+  const asanaFixed    = Number.isFinite(m.hoursAsana) ? m.hoursAsana : normHours(hoursRaw);
+
+  const billingRaw    = Number(m.hoursBilling ?? m.hoursParaFacturacion ?? 0);
+  const hoursBilling  = billingRaw ? normHours(billingRaw)
+                        : asanaFixed ? asanaFixed
+                        : targetHours;
+
+  const rateARS       = Number(m.hourlyRateARS ?? m.rateARS ?? 0);
+  const costARS       = Number(m.costARS ?? (hoursBilling * rateARS) || 0);
+  const costUSD       = Number(m.costUSD ?? (fxMes ? costARS / fxMes : 0));
+
+  return {
+    name: m.name, roleName: m.roleName ?? 'N/A',
+    targetHours,
+    hoursAsana: asanaFixed,
+    hoursBilling,
+    hourlyRateARS: rateARS,
+    costARS,
+    costUSD,
+    // compat
+    hours: asanaFixed,
+  };
+}
+
+const fxMes = payload.fx || rc.fx_mes; // según tu contrato
+const tb    = (dbTeamBreakdown || []).map(m => hydrateMember(m, fxMes));
+
+const totalAsanaHours   = tb.reduce((a,b)=>a+(b.hoursAsana||0),0);
+const totalBillingHours = tb.reduce((a,b)=>a+(b.hoursBilling||0),0);
+Con esto, aunque la tabla tenga hours=10133, la API devolverá hoursAsana=101.33, hoursBilling=101.33, y la UI ya pinta bien.
+B) Reproceso manual del ETL (reliquidar un período puntual)
+Objetivo: persistir correctamente hoursAsana/hoursBilling en project_aggregates sin esperar.
+Borrar agregados del período (solo ese proyecto/mes):
+-- variables: :project_id, :period_key ('2025-08')
+WITH target AS (
+  SELECT pa.id
+  FROM project_aggregates pa
+  JOIN project_periods pp ON pp.id = pa.project_period_id
+  WHERE pp.project_id = :project_id AND pp.period_key = :period_key
+)
+DELETE FROM project_aggregates WHERE id IN (SELECT id FROM target);
+Correr tarea de re-ingesta local (script o job que ya tenés):
+python services/nlp-pipeline/dags/monthly_aggregates.py --project :project_id --period 2025-08
+Si no existe comando, crea un endpoint interno /admin/etl/monthly-aggregates?project=..&period=.. que ejecute el pipeline para ese scope.
+C) Check de consistencia (post-fix)
+Ejecuta estas verificaciones:
+Horas:
+Σ targetHours = 320.00
+Σ hoursAsana = 288.28
+Σ hoursBilling = 288.28 (según tu hoja ejemplo)
+Costos (detalle):
+Σ costARS = 3,276,539
+Σ costUSD = 2,436.09 (con fx=1,345)
+Vista Operativa (USD-nativo):
+Ingresos = 13,450 (RC col. G)
+Costos = 7,655.65 (RC col. H) ➜ BU ≈ 56.9% si cotización=13,450
+Equipo (UI):
+Progreso persona = hoursAsana / targetHours
+(Aylu 31.07/70=44%, Sol 101.33/100=101%, Trini 107.5/100=108%, Vanu 40/40=100%, Vicky 8.38/10=84%)
+$/h (vista USD) = costUSD / hoursBilling
+(p.ej. Sol ≈ 773.74 / 101.33 ≈ 7.64 USD/h)
+Flag de reconciliación (opcional pero recomendado):
+|Σ costUSD (detalle) - RC.cost_usd| / RC.cost_usd > 0.10 → labor_vs_rc_cost_mismatch (aquí ~68%)
+D) UI: uso correcto por bloque (ya con los nuevos campos)
+Dashboard
+“Total Trabajado (h)” → actuals.totalAsanaHours
+“Presupuesto usado” → views[view].budgetUtilization (no recalcular)
+“Costo” → views[view].cost (Proviene de facturación, no de Asana)
+Equipo
+Resumen: miembros, totalAsanaHours, estimatedHours, eff=estimatedHours/totalAsanaHours
+Tabla: hoursAsana, targetHours, hoursBilling, costARS/USD, $/h = cost / hoursBilling
+Si conservás TeamDeviationAnalysis con fetch propio, pásale props y deja fetch como fallback.
+E) Tests mínimos (pegables)
+Normalización
+normHours(10133) === 101.33
+normHours(288.28) === 288.28
+Fallback billing
+si hoursBilling_raw null → usa hoursAsana; si no hay Asana → targetHours.
+Aggregates
+Σ tb.hoursAsana === totalAsanaHours
+Σ tb.hoursBilling === totalBillingHours
+Σ tb.targetHours === estimatedHours
+Vista
+Operativa (USD): ingresos=G, costos=H, BU=H/cotización.
+F) Qué debería ver ahora (para tu caso ejemplar)
+Dashboard (Operativa)
+Ingresos: USD 13,450
+Costo: USD 7,655.65
+Presupuesto usado: 56.9%
+Total trabajado: 288.28 h
+Equipo
+5 miembros; objetivo 320.0 h; trabajadas 288.28 h; eficiencia ~111% (objetivo/trabajadas invertido según tu definición; si preferís real/objetivo invierte fórmula).
+Cada fila con progreso y $/h correcto; sin $0/h.
+En síntesis
+API hotfix te deja la UI correcta inmediatamente (hidrata hoursAsana/hoursBilling desde legacy).
+Reproceso ETL persiste los campos nuevos para ese período.
+Checks y tests garantizan que no vuelva a colarse ×100.
+Si querés, te paso el diff del hotfix listo para pegar (archivo y funciones exactas) según tu estructura.

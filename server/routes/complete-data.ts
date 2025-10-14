@@ -390,28 +390,64 @@ export async function completeDataHandler(req: Request, res: Response) {
       }
     }
 
-    const teamBreakdown = (pm.teamBreakdown ?? []).map(p => ({
-      personnelId: p.personnelId ?? p.name,
-      name: p.name,
-      role: p.role,
-      roleName: p.roleName ?? p.role,
-      // 3 tipos de horas según nueva arquitectura
-      targetHours: p.targetHours ?? 0,
-      hoursAsana: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,  // ✓ FIXED: usar p.hoursAsana primero
-      hoursBilling: p.hoursBilling ?? p.hoursAsana ?? p.hours ?? 0,  // fallback chain
-      hours: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,       // Legacy = hoursAsana
-      // Costos
-      costARS: p.costARS ?? 0,
-      costUSD: p.costUSD ?? (p.actualCost ?? 0),
-      hourlyRateARS: p.hourlyRateARS ?? 0,
-      // Legacy fields
-      estimatedHours: p.targetHours ?? 0,
-      actualHours: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,
-      actualCost: p.costUSD ?? (p.actualCost ?? 0),
-      budgetedCost: p.budgetCost ?? 0,
-      rate: p.hourlyRateARS ?? null,
-      efficiency: p.efficiency ?? 70
-    }));
+    // 🔧 HOTFIX: Hydrate member with on-the-fly normalization for legacy data
+    const normHours = (x?: number): number => {
+      if (!Number.isFinite(x as number)) return 0;
+      const val = x as number;
+      return val > 500 ? val / 100 : val;
+    };
+    
+    const fxMes = sotSummary?.currencyNative === 'ARS' && sotSummary?.revenueUSD && sotSummary?.revenueDisplay
+      ? sotSummary.revenueDisplay / sotSummary.revenueUSD
+      : 1345; // Default fallback
+    
+    const hydrateMember = (m: any) => {
+      const targetHours = Number(m.targetHours ?? m.estimatedHours ?? 0); // budgeted hours (NOT normalized)
+      const hoursRaw = Number(m.hours ?? m.actualHours ?? 0); // legacy field (may be ×100)
+      
+      // 🎯 If hoursAsana exists in DB, use it; otherwise normalize hoursRaw
+      const hoursAsana = Number.isFinite(m.hoursAsana) && m.hoursAsana !== null
+        ? Number(m.hoursAsana)
+        : normHours(hoursRaw);
+      
+      // 🎯 hoursBilling fallback chain with normalization
+      const billingRaw = Number(m.hoursBilling ?? m.hoursParaFacturacion ?? 0);
+      const hoursBilling = billingRaw > 0
+        ? normHours(billingRaw)
+        : hoursAsana > 0
+          ? hoursAsana
+          : targetHours;
+      
+      // 🎯 Cost calculation
+      const rateARS = Number(m.hourlyRateARS ?? m.rateARS ?? m.rate ?? 0);
+      const costARS = Number(m.costARS ?? (hoursBilling * rateARS) || 0);
+      const costUSD = Number(m.costUSD ?? (fxMes ? costARS / fxMes : 0));
+      
+      return {
+        personnelId: m.personnelId ?? m.name,
+        name: m.name,
+        role: m.role,
+        roleName: m.roleName ?? m.role ?? 'N/A',
+        // 3-hours architecture
+        targetHours,
+        hoursAsana,
+        hoursBilling,
+        hours: hoursAsana, // Legacy compatibility
+        // Costs
+        costARS,
+        costUSD,
+        hourlyRateARS: rateARS,
+        // Legacy fields
+        estimatedHours: targetHours,
+        actualHours: hoursAsana,
+        actualCost: costUSD,
+        budgetedCost: m.budgetCost ?? 0,
+        rate: rateARS > 0 ? rateARS : null,
+        efficiency: m.efficiency ?? 70
+      };
+    };
+    
+    const teamBreakdown = (pm.teamBreakdown ?? []).map(hydrateMember);
 
     // Compat opcional (si el front viejo lo pide)
     const legacy = {
@@ -421,13 +457,21 @@ export async function completeDataHandler(req: Request, res: Response) {
       markup: pm.summary?.markupUSD ?? null
     };
 
+    // 🎯 Calculate aggregates from hydrated team breakdown
+    const totalAsanaHours = teamBreakdown.reduce((sum, m) => sum + (m.hoursAsana || 0), 0);
+    const totalBillingHours = teamBreakdown.reduce((sum, m) => sum + (m.hoursBilling || 0), 0);
+    const totalTargetHours = teamBreakdown.reduce((sum, m) => sum + (m.targetHours || 0), 0);
+    
     console.log(`✅ COMPLETE-DATA RESPONSE: summary.teamCostUSD=${summary.teamCostUSD}, teamBreakdown.length=${teamBreakdown.length}`);
+    console.log(`🎯 3-HOURS AGGREGATES: targetHours=${totalTargetHours}, asanaHours=${totalAsanaHours}, billingHours=${totalBillingHours}`);
     console.log(`🔍 DEBUG MAPPING: summary=${JSON.stringify(summary, null, 2)}`);
 
     const actualsData = {
       totalWorkedCost: summary.teamCostUSD,
       totalWorkedRevenue: summary.revenueUSD, 
       totalWorkedHours: summary.totalHours,
+      totalAsanaHours,  // 🎯 NEW: Normalized Asana hours
+      totalBillingHours,  // 🎯 NEW: Billing hours with fallback
       totalEntries: teamBreakdown.length,
       teamBreakdown
     };
