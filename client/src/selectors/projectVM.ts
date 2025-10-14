@@ -34,6 +34,7 @@ type ProjectStateLegacy = {
   actuals?: {
     totalWorkedCost?: number;    // USD base (solo fallback)
     totalWorkedHours?: number;
+    teamBreakdown?: any[];
   };
   quotation?: {
     baseCost?: number;
@@ -128,7 +129,7 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
     totalHours: legacyState.actuals?.totalWorkedHours ?? 0,
     estimatedHours: legacyState.quotation?.estimatedHours ?? 0,
     baseCost: legacyState.quotation?.baseCost ?? 0,
-    teamBreakdown: [],
+    teamBreakdown: legacyState.actuals?.teamBreakdown ?? [],
     flags: legacyState.summary?.flags ?? []
   };
 }
