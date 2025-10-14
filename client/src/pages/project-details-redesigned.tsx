@@ -3281,14 +3281,14 @@ const ProjectDetailsPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                     {/* Miembros Activos */}
                     <div className="text-center p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
                         <Users className="h-6 w-6 text-blue-600" />
                       </div>
                       <div className="text-3xl font-bold text-blue-600 mb-1">
-                        {teamStats?.length || 0}
+                        {projectVM?.teamBreakdown?.length || 0}
                       </div>
                       <div className="text-sm font-medium text-gray-600">Miembros Activos</div>
                       <div className="text-xs text-gray-500 mt-1">con actividad registrada</div>
@@ -3300,22 +3300,40 @@ const ProjectDetailsPage = () => {
                         <Clock className="h-6 w-6 text-green-600" />
                       </div>
                       <div className="text-3xl font-bold text-green-600 mb-1">
-                        {(unifiedData?.actuals?.totalWorkedHours || 0).toFixed(1)}h
+                        {(projectVM?.totalHours || 0).toFixed(1)}h
                       </div>
                       <div className="text-sm font-medium text-gray-600">Horas Trabajadas</div>
                       <div className="text-xs text-gray-500 mt-1">total del período</div>
                     </div>
 
+                    {/* Horas Objetivo */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-amber-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-100 rounded-full mb-3">
+                        <Target className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-amber-600 mb-1">
+                        {(projectVM?.estimatedHours || 0).toFixed(1)}h
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Horas Objetivo</div>
+                      <div className="text-xs text-gray-500 mt-1">presupuestadas</div>
+                    </div>
+
                     {/* Eficiencia del Equipo vs Objetivo */}
                     <div className="text-center p-4 bg-white rounded-xl border border-purple-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
-                        <Target className="h-6 w-6 text-purple-600" />
+                        <BarChart3 className="h-6 w-6 text-purple-600" />
                       </div>
                       <div className="text-3xl font-bold text-purple-600 mb-1" data-testid="text-efficiency-header">
-                        {efficiencyFromDeviationAPI !== undefined ? `${efficiencyFromDeviationAPI.toFixed(1)}%` : 'N/A'}
+                        {(() => {
+                          const workedHours = projectVM?.totalHours || 0;
+                          const targetHours = projectVM?.estimatedHours || 0;
+                          if (targetHours === 0) return 'N/A';
+                          const efficiency = (workedHours / targetHours) * 100;
+                          return `${efficiency.toFixed(1)}%`;
+                        })()}
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Eficiencia vs Objetivo</div>
-                      <div className="text-xs text-gray-500 mt-1">horas reales vs objetivo estimado</div>
+                      <div className="text-sm font-medium text-gray-600">Eficiencia</div>
+                      <div className="text-xs text-gray-500 mt-1">horas reales vs objetivo</div>
                     </div>
 
                     {/* Costo Real del Equipo */}
