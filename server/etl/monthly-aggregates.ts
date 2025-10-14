@@ -40,11 +40,13 @@ interface RawPeriodData {
   // De directCosts
   laborRows: Array<{
     personName: string;
+    roleName: string;
     targetHours: number;
     hoursReal: number;
     hourlyRateARS: number;
     costTotal: number; // En ARS generalmente
     costUSD: number;
+    hasRealHours: boolean;
   }>;
 }
 
@@ -215,7 +217,9 @@ export async function processProjectPeriod(periodKey: string) {
     });
   }
   
-  // Procesar directCosts
+  // Procesar directCosts - AGRUPAR POR PERSONA+ROL
+  const laborMap = new Map<string, Map<string, any>>(); // projectKey -> Map<personRoleKey, laborData>
+  
   for (const row of costRows) {
     const key = `${row.cliente}::${row.proyecto}`;
     
@@ -239,20 +243,70 @@ export async function processProjectPeriod(periodKey: string) {
       });
     }
     
-    const data = projectMap.get(key)!;
+    // Inicializar mapa de labor para este proyecto si no existe
+    if (!laborMap.has(key)) {
+      laborMap.set(key, new Map());
+    }
     
-    // Agregar fila de labor
-    data.laborRows.push({
-      personName: row.persona,
-      targetHours: row.horasObjetivo || 0,
-      hoursReal: row.horasParaFacturacion || row.horasRealesAsana,
-      hourlyRateARS: parseFloat(row.valorHoraLocalCurrency || '0'),
-      costTotal: row.costoTotal,
-      costUSD: parseFloat(row.montoTotalUSD || '0')
-    });
+    const projectLaborMap = laborMap.get(key)!;
+    const personRoleKey = `${row.persona}||${row.rol || 'N/A'}`;
     
-    // Actualizar costUSD total
-    data.costUSD += parseFloat(row.montoTotalUSD || '0');
+    // Agrupar por persona+rol
+    if (!projectLaborMap.has(personRoleKey)) {
+      projectLaborMap.set(personRoleKey, {
+        personName: row.persona,
+        roleName: row.rol || 'N/A',
+        targetHours: 0,
+        hoursReal: 0,
+        hourlyRateARS: parseFloat(row.valorHoraLocalCurrency || '0'),
+        costTotal: 0,
+        costUSD: 0,
+        fx: parseFloat(row.tipoCambio || row.fxCost || '1345'),
+        hasRealHours: false
+      });
+    }
+    
+    const laborData = projectLaborMap.get(personRoleKey)!;
+    
+    // Acumular horas y costos
+    laborData.targetHours += row.horasObjetivo || 0;
+    
+    // Preferencia: horasParaFacturacion > horasRealesAsana
+    const realHours = row.horasParaFacturacion || row.horasRealesAsana || 0;
+    if (realHours > 0) {
+      laborData.hasRealHours = true;
+      laborData.hoursReal += realHours;
+    }
+    
+    laborData.costTotal += row.costoTotal;
+    laborData.costUSD += parseFloat(row.montoTotalUSD || '0');
+  }
+  
+  // Convertir mapas agrupados a laborRows
+  for (const [projectKey, projectLaborMap] of laborMap) {
+    const data = projectMap.get(projectKey)!;
+    
+    for (const [personRoleKey, laborData] of projectLaborMap) {
+      // Si no hay horas reales, usar targetHours como fallback
+      if (!laborData.hasRealHours && laborData.targetHours > 0) {
+        laborData.hoursReal = laborData.targetHours;
+        // Flag se agregará después
+      }
+      
+      data.laborRows.push({
+        personName: laborData.personName,
+        roleName: laborData.roleName,
+        targetHours: laborData.targetHours,
+        hoursReal: laborData.hoursReal,
+        hourlyRateARS: laborData.hourlyRateARS,
+        costTotal: laborData.costTotal,
+        costUSD: laborData.costUSD,
+        hasRealHours: laborData.hasRealHours
+      });
+      
+      // Actualizar costUSD total
+      data.costUSD += laborData.costUSD;
+    }
   }
   
   // 4. Procesar cada proyecto
@@ -338,20 +392,24 @@ async function processProject(data: RawPeriodData) {
     estimatedHours: totalTargetHours
   };
   
+  // Construir teamBreakdown con validación de horas
+  const teamBreakdownData = data.laborRows.map(r => ({
+    personnelId: r.personName,
+    name: r.personName,
+    roleName: r.roleName,
+    targetHours: r.targetHours,
+    hours: r.hoursReal, // actualHours → hours (según spec)
+    hourlyRateARS: r.hourlyRateARS,
+    costARS: r.costTotal,
+    costUSD: r.costUSD,
+    isFromExcel: true,
+    usedTargetHoursFallback: !r.hasRealHours && r.targetHours > 0 // Flag para fallback
+  }));
+  
   const actualsData = {
     totalWorkedHours: totalRealHours,
     totalWorkedCost: data.costUSD,
-    teamBreakdown: data.laborRows.map(r => ({
-      personnelId: r.personName,
-      name: r.personName,
-      roleName: 'From Excel MAESTRO', // No tenemos rol en directCosts
-      targetHours: r.targetHours,
-      actualHours: r.hoursReal,
-      actualCost: r.costUSD,
-      hourlyRateARS: r.hourlyRateARS,
-      costARS: r.costTotal,
-      isFromExcel: true
-    }))
+    teamBreakdown: teamBreakdownData
   };
   
   // 5. Calcular 3 vistas
@@ -366,6 +424,24 @@ async function processProject(data: RawPeriodData) {
   
   if (!data.quotation) {
     flags.push('NO_QUOTATION');
+  }
+  
+  // Flag si se usó targetHours como fallback para horas reales
+  const hasHoursFallback = teamBreakdownData.some(t => t.usedTargetHoursFallback);
+  if (hasHoursFallback) {
+    flags.push('HOURS_FALLBACK_TO_TARGET');
+  }
+  
+  // Validaciones de consistencia
+  const sumHours = teamBreakdownData.reduce((sum, t) => sum + t.hours, 0);
+  const sumTargetHours = teamBreakdownData.reduce((sum, t) => sum + t.targetHours, 0);
+  
+  if (Math.abs(sumHours - totalRealHours) > 1e-6) {
+    console.warn(`  ⚠️ Inconsistencia en horas: Σ teamBreakdown.hours (${sumHours}) !== totalWorkedHours (${totalRealHours})`);
+  }
+  
+  if (Math.abs(sumTargetHours - totalTargetHours) > 1e-6) {
+    console.warn(`  ⚠️ Inconsistencia en horas objetivo: Σ teamBreakdown.targetHours (${sumTargetHours}) !== estimatedHours (${totalTargetHours})`);
   }
   
   // 7. Guardar las 3 vistas
@@ -411,14 +487,16 @@ async function processProject(data: RawPeriodData) {
     }
   }
   
-  // 8. Guardar team_breakdown
+  // 8. Guardar team_breakdown (legacy table - mantener para compatibilidad)
+  console.log(`  🔧 Limpiando team_breakdown para period ${periodId}...`);
   await db.delete(teamBreakdown).where(eq(teamBreakdown.projectPeriodId, periodId));
+  console.log(`  ✅ Team_breakdown limpiado`);
   
   for (const labor of data.laborRows) {
     await db.insert(teamBreakdown).values({
       projectPeriodId: periodId,
       personName: labor.personName,
-      roleName: 'From Excel MAESTRO',
+      roleName: labor.roleName, // 🆕 Usar roleName real desde Excel
       targetHours: labor.targetHours.toString(),
       hoursReal: labor.hoursReal.toString(),
       hourlyRateARS: labor.hourlyRateARS.toString(),

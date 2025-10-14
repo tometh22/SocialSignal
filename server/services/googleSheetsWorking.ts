@@ -59,6 +59,7 @@ interface VentaTomi {
 
 interface CostoDirectoExcel {
   persona: string;
+  rol?: string; // 🆕 Rol de la persona
   mes: string;
   año: number;
   tipoGasto: string;
@@ -369,6 +370,8 @@ class GoogleSheetsWorkingService {
       // Mapeo EXACTO basado en las columnas reales del Excel MAESTRO
       if (header === 'Detalle') {
         map.persona = index; // A: Nombre de la persona
+      } else if (header === 'Rol') {
+        map.rol = index; // Rol de la persona
       } else if (header === 'Mes') {
         map.mes = index; // C: Mes
       } else if (header === 'Año') {
@@ -1394,6 +1397,7 @@ class GoogleSheetsWorkingService {
           const directCostData = {
             monthKey: monthKey, // NUEVO: Clave temporal única
             persona: costo.persona,
+            rol: costo.rol || null, // 🆕 Rol de la persona
             mes: costo.mes,
             año: costo.año,
             tipoGasto: costo.tipoGasto,
@@ -1405,6 +1409,7 @@ class GoogleSheetsWorkingService {
             horasRealesAsana: costo.horasRealesAsana,
             horasParaFacturacion: costo.horasParaFacturacion || 0, // NUEVO: Columna M
             valorHoraPersona: valorHora || 0,
+            valorHoraLocalCurrency: valorHora ? valorHora.toString() : '0', // 🆕 Valor hora en moneda local (ARS)
             costoTotal: costoTotal,
             tipoCambio: costo.tipoCambio,
             montoTotalUSD: sanitizedUSD, // 🛡️ USD sanitizado
@@ -1472,6 +1477,7 @@ class GoogleSheetsWorkingService {
     // CORRECCIÓN COMPLETA: Mapeo según la estructura real del Excel
     const columnMap = {
       persona: 0, // Columna A - Detalle (nombre persona)
+      rol: 1, // Columna B - Rol 🆕
       mes: 2, // Columna C - Mes  
       año: 3, // Columna D - Año
       tipoGasto: 4, // Columna E - Tipo de Costo (DIRECTO/INDIRECTO)
@@ -1557,6 +1563,7 @@ class GoogleSheetsWorkingService {
 
         const costoData: CostoDirectoExcel = {
           persona: persona,
+          rol: this.getCellValue(row, columnMap.rol) || undefined, // 🆕 Rol de la persona
           mes: this.getCellValue(row, columnMap.mes) || '',
           año: parseDec(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
           tipoGasto: tipoGasto,

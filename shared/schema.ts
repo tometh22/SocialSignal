@@ -1716,6 +1716,7 @@ export const directCosts = pgTable("direct_costs", {
   
   // Datos desde Excel "Costos directos e indirectos"
   persona: text("persona").notNull(),
+  rol: text("rol"), // Rol de la persona en el proyecto
   mes: text("mes").notNull(),
   año: integer("año").notNull(),
   tipoGasto: text("tipo_gasto"), // "Directo", "Indirecto"
