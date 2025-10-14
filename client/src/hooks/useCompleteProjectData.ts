@@ -60,19 +60,31 @@ interface CompleteProjectData {
   };
   actuals: {
     totalWorkedHours: number;
+    totalAsanaHours?: number;
+    totalBillingHours?: number;
     totalWorkedCost: number;
     totalEntries: number;
     teamBreakdown: Array<{
-      personnelId: number;
+      personnelId: number | string;
       name: string;
-      hours: number;
-      cost: number;
-      entries: number;
-      lastActivity: string | null;
-      estimatedHours: number;
-      rate: number;
-      isQuoted: boolean;
-      roleName: string;
+      // 3 tipos de horas
+      targetHours?: number;
+      hoursAsana?: number;
+      hoursBilling?: number;
+      hours: number;              // Legacy
+      // Costos
+      costARS?: number;
+      costUSD?: number;
+      hourlyRateARS?: number;
+      // Legacy fields
+      cost?: number;
+      entries?: number;
+      lastActivity?: string | null;
+      estimatedHours?: number;
+      rate?: number | null;
+      isQuoted?: boolean;
+      roleName?: string;
+      role?: string;
     }>;
   };
   metrics: {

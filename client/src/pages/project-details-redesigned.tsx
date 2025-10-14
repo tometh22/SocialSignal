@@ -1024,7 +1024,7 @@ const ProjectDetailsPage = () => {
   
   // 🎯 PRIORITY FIX: Use periodFromFilter (calculated from dateFilter) first, fallback to URL
   // This ensures the visual date filter always takes precedence over stale URL params
-  const finalPeriod = periodFromFilter || periodFromUrl;
+  const finalPeriod = periodFromFilter || periodFromUrl || undefined;
   
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
@@ -2204,7 +2204,7 @@ const ProjectDetailsPage = () => {
                       <div className="bg-blue-50 rounded-lg p-4">
                         <div className="text-sm text-blue-700 mb-1">Velocidad Equipo</div>
                         <div className="font-bold text-blue-900">
-                          {Math.round((projectVM?.totalHours || 0) / 4)}h
+                          {Math.round((projectVM?.totalAsanaHours || projectVM?.totalHours || 0) / 4)}h
                         </div>
                         <div className="text-xs text-blue-600">promedio semanal</div>
                       </div>
@@ -2219,14 +2219,14 @@ const ProjectDetailsPage = () => {
                           <div 
                             key={index}
                             className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help relative group ${
-                              (member.hours || 0) > 80 ? 'bg-red-500' : 
-                              (member.hours || 0) > 50 ? 'bg-yellow-500' : 
-                              (member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
+                              (member.hoursAsana || member.hours || 0) > 80 ? 'bg-red-500' : 
+                              (member.hoursAsana || member.hours || 0) > 50 ? 'bg-yellow-500' : 
+                              (member.hoursAsana || member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
                             }`}
-                            title={`${member.name}: ${member.hours || 0}h trabajadas - $${(member.cost || 0).toLocaleString()} - Estado: ${
-                              (member.hours || 0) > 80 ? 'Sobrecarga' : 
-                              (member.hours || 0) > 50 ? 'Intenso' : 
-                              (member.hours || 0) > 20 ? 'Normal' : 'Bajo'
+                            title={`${member.name}: ${member.hoursAsana || member.hours || 0}h trabajadas - $${(member.costUSD || member.cost || 0).toLocaleString()} - Estado: ${
+                              (member.hoursAsana || member.hours || 0) > 80 ? 'Sobrecarga' : 
+                              (member.hoursAsana || member.hours || 0) > 50 ? 'Intenso' : 
+                              (member.hoursAsana || member.hours || 0) > 20 ? 'Normal' : 'Bajo'
                             }`}
                           >
                             {(member.name || '?').charAt(0)}
@@ -2235,13 +2235,13 @@ const ProjectDetailsPage = () => {
                             <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 min-w-max">
                               <div className="space-y-1">
                                 <p className="font-semibold">{member.name}</p>
-                                <p className="text-xs">🕐 {member.hours || 0} horas trabajadas</p>
-                                <p className="text-xs">💰 ${(member.cost || 0).toLocaleString()} costo total</p>
+                                <p className="text-xs">🕐 {member.hoursAsana || member.hours || 0} horas trabajadas (Asana)</p>
+                                <p className="text-xs">💰 ${(member.costUSD || member.cost || 0).toLocaleString()} costo total</p>
                                 <p className="text-xs">
                                   📊 Estado: {
-                                    (member.hours || 0) > 80 ? 'Sobrecarga' : 
-                                    (member.hours || 0) > 50 ? 'Intenso' : 
-                                    (member.hours || 0) > 20 ? 'Normal' : 'Bajo'
+                                    (member.hoursAsana || member.hours || 0) > 80 ? 'Sobrecarga' : 
+                                    (member.hoursAsana || member.hours || 0) > 50 ? 'Intenso' : 
+                                    (member.hoursAsana || member.hours || 0) > 20 ? 'Normal' : 'Bajo'
                                   }
                                 </p>
                               </div>
@@ -2415,12 +2415,12 @@ const ProjectDetailsPage = () => {
                     <span className="text-sm text-gray-600">Eficiencia</span>
                     <span className={`text-sm font-bold ${(() => {
                       if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 'text-gray-600';
-                      const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                      const eff = (projectVM.estimatedHours / Math.max(projectVM.totalAsanaHours || projectVM.totalHours, 0.1)) * 100;
                       return eff > 80 ? 'text-red-600' : eff > 60 ? 'text-yellow-600' : 'text-green-600';
                     })()}`}>
                       {(() => {
                         if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 'N/A';
-                        const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                        const eff = (projectVM.estimatedHours / Math.max(projectVM.totalAsanaHours || projectVM.totalHours, 0.1)) * 100;
                         return `${eff.toFixed(1)}%`;
                       })()}
                     </span>
@@ -2430,12 +2430,12 @@ const ProjectDetailsPage = () => {
                       className="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" 
                       style={{ width: `${(() => {
                         if (!projectVM || !projectVM.estimatedHours || projectVM.estimatedHours === 0) return 0;
-                        return Math.min(100, (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100);
+                        return Math.min(100, (projectVM.estimatedHours / Math.max(projectVM.totalAsanaHours || projectVM.totalHours, 0.1)) * 100);
                       })()}%` }}
                     ></div>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {Math.max(0, (projectVM?.estimatedHours || 0) - (projectVM?.totalHours || 0))}h restantes
+                    {Math.max(0, (projectVM?.estimatedHours || 0) - (projectVM?.totalAsanaHours || projectVM?.totalHours || 0))}h restantes
                   </div>
                 </div>
               </div>
@@ -3295,10 +3295,10 @@ const ProjectDetailsPage = () => {
                         <Clock className="h-6 w-6 text-green-600" />
                       </div>
                       <div className="text-3xl font-bold text-green-600 mb-1">
-                        {(projectVM?.totalHours || 0).toFixed(1)}h
+                        {(projectVM?.totalAsanaHours || projectVM?.totalHours || 0).toFixed(1)}h
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Horas Trabajadas</div>
-                      <div className="text-xs text-gray-500 mt-1">total del período</div>
+                      <div className="text-sm font-medium text-gray-600">Horas Trabajadas (Asana)</div>
+                      <div className="text-xs text-gray-500 mt-1">horas reales rastreadas</div>
                     </div>
 
                     {/* Horas Objetivo */}
@@ -3624,7 +3624,7 @@ const ProjectDetailsPage = () => {
                         {(() => {
                           if (!projectVM) return '$0';
                           const totalCost = projectVM.costDisplay;
-                          const workedHours = projectVM.totalHours || 1;
+                          const workedHours = projectVM.totalAsanaHours || projectVM.totalHours || 1;
                           const estimatedHours = projectVM.estimatedHours || 1;
                           const projectProgress = workedHours / estimatedHours;
                           const monthlyBurn = projectProgress > 0 ? totalCost / Math.max(projectProgress * 12, 1) : 0;

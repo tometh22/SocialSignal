@@ -394,11 +394,22 @@ export async function completeDataHandler(req: Request, res: Response) {
       personnelId: p.personnelId ?? p.name,
       name: p.name,
       role: p.role,
+      roleName: p.roleName ?? p.role,
+      // 3 tipos de horas según nueva arquitectura
+      targetHours: p.targetHours ?? 0,
+      hoursAsana: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,  // ✓ FIXED: usar p.hoursAsana primero
+      hoursBilling: p.hoursBilling ?? p.hoursAsana ?? p.hours ?? 0,  // fallback chain
+      hours: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,       // Legacy = hoursAsana
+      // Costos
+      costARS: p.costARS ?? 0,
+      costUSD: p.costUSD ?? (p.actualCost ?? 0),
+      hourlyRateARS: p.hourlyRateARS ?? 0,
+      // Legacy fields
       estimatedHours: p.targetHours ?? 0,
-      actualHours: p.actualHours ?? 0,
-      actualCost: p.actualCost ?? 0,
+      actualHours: p.hoursAsana ?? p.hours ?? p.actualHours ?? 0,
+      actualCost: p.costUSD ?? (p.actualCost ?? 0),
       budgetedCost: p.budgetCost ?? 0,
-      rate: null,
+      rate: p.hourlyRateARS ?? null,
       efficiency: p.efficiency ?? 70
     }));
 
