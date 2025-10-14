@@ -1319,6 +1319,32 @@ const ProjectDetailsPage = () => {
         }
       }
       
+      // 🎯 ASSERTS ESPECÍFICOS PERFORMANCE (3-hours architecture)
+      console.assert(Number.isFinite(vm.totalAsanaHours), 
+        '🚨 [ASSERT FAILED] totalAsanaHours faltante o no finito', vm.totalAsanaHours);
+      console.assert(vm.estimatedHours >= 0, 
+        '🚨 [ASSERT FAILED] estimatedHours faltante o negativo', vm.estimatedHours);
+      
+      const tb = vm.teamBreakdown ?? [];
+      console.assert(tb.every(p => p.roleName || p.role), 
+        '🚨 [ASSERT FAILED] roleName faltante en teamBreakdown', tb.filter(p => !p.roleName && !p.role));
+      
+      const sumAsana = tb.reduce((a, p) => a + (p.hoursAsana || 0), 0);
+      console.assert(Math.abs(sumAsana - vm.totalAsanaHours) < 1e-6, 
+        '🚨 [ASSERT FAILED] Σ hoursAsana != totalAsanaHours', { 
+          sumAsana, 
+          totalAsanaHours: vm.totalAsanaHours, 
+          diff: Math.abs(sumAsana - vm.totalAsanaHours) 
+        });
+      
+      const sumTarget = tb.reduce((a, p) => a + (p.targetHours || 0), 0);
+      console.assert(Math.abs(sumTarget - vm.estimatedHours) < 1e-6, 
+        '🚨 [ASSERT FAILED] Σ targetHours != estimatedHours', { 
+          sumTarget, 
+          estimatedHours: vm.estimatedHours, 
+          diff: Math.abs(sumTarget - vm.estimatedHours) 
+        });
+      
       // LOG de trazabilidad por período
       console.log(`📊 [VIEW ${selectedView.toUpperCase()}] period=${periodFromUrl || periodFromFilter}`, {
         revenue: v.revenue,
@@ -3314,14 +3340,14 @@ const ProjectDetailsPage = () => {
                       <div className="text-xs text-gray-500 mt-1">presupuestadas</div>
                     </div>
 
-                    {/* Eficiencia del Equipo vs Objetivo */}
+                    {/* Eficiencia del Equipo vs Objetivo - usa totalAsanaHours */}
                     <div className="text-center p-4 bg-white rounded-xl border border-purple-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-3">
                         <BarChart3 className="h-6 w-6 text-purple-600" />
                       </div>
                       <div className="text-3xl font-bold text-purple-600 mb-1" data-testid="text-efficiency-header">
                         {(() => {
-                          const workedHours = projectVM?.totalHours || 0;
+                          const workedHours = projectVM?.totalAsanaHours || projectVM?.totalHours || 0;
                           const targetHours = projectVM?.estimatedHours || 0;
                           if (targetHours === 0) return 'N/A';
                           const efficiency = (workedHours / targetHours) * 100;
@@ -3329,7 +3355,7 @@ const ProjectDetailsPage = () => {
                         })()}
                       </div>
                       <div className="text-sm font-medium text-gray-600">Eficiencia</div>
-                      <div className="text-xs text-gray-500 mt-1">horas reales vs objetivo</div>
+                      <div className="text-xs text-gray-500 mt-1">horas Asana vs objetivo</div>
                     </div>
 
                     {/* Costo Real del Equipo */}
@@ -3616,7 +3642,7 @@ const ProjectDetailsPage = () => {
                   </div>
                 </div>
 
-                {/* Burn Rate */}
+                {/* Burn Rate - Simplificado y auditable */}
                 <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                   <div className="flex items-center justify-between">
                     <div>
@@ -3624,15 +3650,13 @@ const ProjectDetailsPage = () => {
                       <p className="text-2xl font-bold">
                         {(() => {
                           if (!projectVM) return '$0';
-                          const totalCost = projectVM.costDisplay;
-                          const workedHours = projectVM.totalAsanaHours || projectVM.totalHours || 1;
-                          const estimatedHours = projectVM.estimatedHours || 1;
-                          const projectProgress = workedHours / estimatedHours;
-                          const monthlyBurn = projectProgress > 0 ? totalCost / Math.max(projectProgress * 12, 1) : 0;
-                          return formatCurrency(Math.round(monthlyBurn), projectVM.currencyNative);
+                          const burnPerHour = projectVM.totalAsanaHours > 0 
+                            ? projectVM.costDisplay / projectVM.totalAsanaHours 
+                            : 0;
+                          return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
                         })()}
                       </p>
-                      <p className="text-xs text-violet-200">por mes estimado</p>
+                      <p className="text-xs text-violet-200">costo por hora trabajada</p>
                     </div>
                     <Flame className="h-6 w-6 text-violet-200" />
                   </div>

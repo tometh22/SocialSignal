@@ -1,0 +1,43 @@
+La pestaña Performance ya está conceptualmente alineada. Te dejo un veredicto + micro-ajustes para que quede redonda y consistente con la arquitectura de “3 tipos de horas”.
+Veredicto (lo clave)
+Horas: usar totalAsanaHours (no totalHours legacy) ✅
+Objetivo: estimatedHours (Σ targetHours) ✅
+Eficiencia: totalAsanaHours / estimatedHours → 90.1% para 288.28/320 ✅
+Cost/Revenue/Markup/Margin: desde views[activeView] (operativa) ✅
+ROI: (markup - 1) * 100 → 106% ✅
+3 ajustes finos
+Presupuesto usado en Dashboard (no en Performance)
+Asegúrate de no recalcularlo aquí. El Dashboard ya debe traer budgetUtilization precalculado con:
+cost / denom, donde denom = precio del mes (p. ej., 8,450 USD), no el FX 1,345.
+→ Esperado Kimberly AGO: 48.5%.
+Burn rate (si lo mantenés)
+La fórmula que pusiste es confusa. Te propongo una versión estable y auditable:
+Burn mensual actual: burn = views.cost (lo gastado este mes).
+Burn vs presupuesto: burn_ratio = views.cost / denom (igual al presupuesto usado).
+Si querés un burn por hora: burn_per_hour = views.cost / totalAsanaHours.
+Rankings
+Eficiencia individual = member.hoursAsana / member.targetHours.
+Impacto: ponderá por economía real del miembro:
+impact = (member.cost (vista) / views.cost) * efficiency_individual.
+Unificado: promedio ponderado (p. ej., 50% eficiencia, 50% impacto).
+Fuente por miembro:
+operación → hoursAsana, targetHours
+economía → hoursBilling, costUSD|costARS (según vista)
+Datos mínimos que Performance debe leer (projectVM)
+estimatedHours
+totalAsanaHours
+views.cost, views.revenue, views.markup, views.margin, views.currency
+teamBreakdown[] con: name, roleName, hoursAsana, targetHours, hoursBilling, costUSD, costARS
+Guardas rápidas (ponelas en DEV)
+console.assert(Number.isFinite(vm.totalAsanaHours), 'totalAsanaHours faltante');
+console.assert(vm.estimatedHours >= 0, 'estimatedHours faltante');
+console.assert(vm.views?.cost >= 0 && vm.views?.revenue >= 0, 'views financieros incompletos');
+
+const tb = vm.teamBreakdown ?? [];
+console.assert(tb.every(p => p.roleName), 'roleName faltante');
+console.assert(Math.abs(tb.reduce((a,p)=>a+(p.hoursAsana||0),0) - vm.totalAsanaHours) < 1e-6, 'Σ Asana != total');
+console.assert(Math.abs(tb.reduce((a,p)=>a+(p.targetHours||0),0) - vm.estimatedHours) < 1e-6, 'Σ objetivo != estimated');
+Qué quedaría por ajustar en tu UI actual (según screenshot)
+Dashboard → Presupuesto: reemplazar denominador por 8,450 (precio mes) y usar vm.budgetUtilization.
+Tarjetas de Equipo: mostrar objetivo (targetHours), trabajadas (hoursAsana), $/h = cost / hoursBilling y costo ≠ $0.
+¿Querés que te pase el diff del componente de Performance para cambiar a vm.totalAsanaHours, y el de la card Presupuesto para tomar vm.denom
