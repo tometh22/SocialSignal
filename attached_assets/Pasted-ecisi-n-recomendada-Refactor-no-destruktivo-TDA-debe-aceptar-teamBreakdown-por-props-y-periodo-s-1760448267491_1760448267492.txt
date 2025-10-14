@@ -1,0 +1,91 @@
+ecisión recomendada
+Refactor “no-destruktivo”: TDA debe aceptar teamBreakdown por props y periodo; si no se le pasa, hace su fetch (comportamiento actual). Así mantenemos la analítica corporativa y logramos una sola fuente de verdad cuando viene desde projectVM.
+Plan de cambio (mínimo riesgo)
+1) Firma del componente
+type TeamMember = {
+  name: string;
+  roleName: string;
+  hours: number;
+  targetHours: number;
+  hourlyRateARS?: number;
+  costARS?: number;
+  costUSD?: number;
+};
+
+type Props = {
+  projectId: string;
+  periodKey: string;                  // 'YYYY-MM'
+  teamBreakdown?: TeamMember[];       // <- inyectado desde vm (opcional)
+  totalHours?: number;                // <- de vm (opcional)
+  estimatedHours?: number;            // <- de vm (opcional)
+};
+
+export function TeamDeviationAnalysis(props: Props) { /* ... */ }
+2) Data Provider interno (fallback)
+function useTeamData({ projectId, periodKey, injected }: {
+  projectId: string; periodKey: string;
+  injected?: { teamBreakdown?: TeamMember[]; totalHours?: number; estimatedHours?: number; }
+}) {
+  const shouldFetch = !injected?.teamBreakdown?.length;
+  const { data, isLoading, error } = useQuery(
+    ['tda', projectId, periodKey],
+    () => api.get(`/projects/${projectId}/team-deviation?period=${periodKey}`),
+    { enabled: shouldFetch }
+  );
+
+  const tb = injected?.teamBreakdown ?? data?.teamBreakdown ?? [];
+  const total = injected?.totalHours ?? data?.totalHours ?? tb.reduce((a,b)=>a+(b.hours||0),0);
+  const est   = injected?.estimatedHours ?? data?.estimatedHours ?? tb.reduce((a,b)=>a+(b.targetHours||0),0);
+
+  return { teamBreakdown: tb, totalHours: total, estimatedHours: est, isLoading: shouldFetch && isLoading, error };
+}
+3) Uso en el componente
+export function TeamDeviationAnalysis({ projectId, periodKey, teamBreakdown, totalHours, estimatedHours }: Props) {
+  const { teamBreakdown: tb, totalHours: th, estimatedHours: eh, isLoading, error } =
+    useTeamData({ projectId, periodKey, injected: { teamBreakdown, totalHours, estimatedHours } });
+
+  // === Analítica corporativa (se mantiene) ===
+  // scoring, tolerancias, clusters, etc. sobre tb/th/eh
+  const deviation = tb.map(p => ({
+    ...p,
+    hoursDelta: (p.hours ?? 0) - (p.targetHours ?? 0),
+    progress: p.targetHours ? (p.hours / p.targetHours) : null
+  }));
+
+  // render...
+}
+4) Integración desde la pestaña Equipo
+const vm = toProjectVM(payload, view);
+<TeamDeviationAnalysis
+  projectId={projectId}
+  periodKey={selectedPeriod}
+  teamBreakdown={vm.teamBreakdown}
+  totalHours={vm.totalWorkedHours}
+  estimatedHours={vm.estimatedHours}
+/>
+Salvaguardas (consistencia)
+Periodo: TDA siempre recibe/usa periodKey; el fetch y los datos inyectados deben coincidir.
+Solo Directo: endpoint /team-deviation filtra Tipo de Costo = Directo.
+Invariantes:
+Σtb.hours === totalHours (±1e-6)
+Σtb.targetHours === estimatedHours
+tb.every(x => !!x.roleName)
+Logs DEV:
+console.assert(Math.abs(tb.reduce((a,b)=>a+(b.hours||0),0) - th) < 1e-6, '[TDA] totalHours mismatch');
+console.assert(Math.abs(tb.reduce((a,b)=>a+(b.targetHours||0),0) - eh) < 1e-6, '[TDA] estimatedHours mismatch');
+API (si mantenés el fetch)
+GET /projects/:id/team-deviation?period=YYYY-MM
+{
+  "period_key": "2025-08",
+  "teamBreakdown": [{ "name":"...", "roleName":"...", "hours": 12, "targetHours": 16, "costARS": 12345, "costUSD": 9.17 }],
+  "totalHours": 3040.42,
+  "estimatedHours": 989,
+  "flags": []
+}
+(Ideal: el backend reutiliza el mismo agregado de project_aggregates.actuals para evitar divergencias.)
+Criterios de aceptación (para cerrar el 100%)
+Equipo (Resumen) = Dashboard en horas y miembros.
+TDA usa datos inyectados cuando están; si no, fetch.
+Cambiar período actualiza Equipo y TDA en bloque.
+Asserts de suma de horas y target pasan.
+roleName presente en todas las filas (o 'N/A' + flag).
