@@ -393,10 +393,14 @@ export async function completeDataHandler(req: Request, res: Response) {
     }
 
     // 🔧 HOTFIX: Hydrate member with on-the-fly normalization for legacy data
-    const normHours = (x?: number): number => {
+    const normHours = (x?: number, context?: string): number => {
       if (!Number.isFinite(x as number)) return 0;
       const val = x as number;
-      return val > 500 ? val / 100 : val;
+      if (val > 500) {
+        console.warn(`⚠️ ANTI_×100 APPLIED [${context}]: ${val} → ${val/100} (threshold: 500h)`);
+        return val / 100;
+      }
+      return val;
     };
     
     const fxMes = sotSummary?.currencyNative === 'ARS' && sotSummary?.revenueUSD && sotSummary?.revenueDisplay
@@ -404,21 +408,27 @@ export async function completeDataHandler(req: Request, res: Response) {
       : 1345; // Default fallback
     
     const hydrateMember = (m: any) => {
-      const targetHours = Number(m.targetHours ?? m.estimatedHours ?? 0); // budgeted hours (NOT normalized)
-      const hoursRaw = Number(m.hours ?? m.actualHours ?? 0); // legacy field (may be ×100)
+      // Helper: parsea a número válido o retorna null si inválido
+      const safeNum = (val: any): number | null => {
+        const n = Number(val);
+        return Number.isFinite(n) ? n : null;
+      };
       
-      // 🎯 If hoursAsana exists in DB, use it; otherwise normalize hoursRaw
-      const hoursAsana = Number.isFinite(m.hoursAsana) && m.hoursAsana !== null
-        ? Number(m.hoursAsana)
-        : normHours(hoursRaw);
+      const memberName = m.name || m.personnelId || 'Unknown';
+      const targetHours = safeNum(m.targetHours ?? m.estimatedHours) ?? 0;
       
-      // 🎯 hoursBilling fallback chain with normalization
-      const billingRaw = Number(m.hoursBilling ?? m.hoursParaFacturacion ?? 0);
-      const hoursBilling = billingRaw > 0
-        ? normHours(billingRaw)
-        : hoursAsana > 0
-          ? hoursAsana
-          : targetHours;
+      // hoursAsana con fallbacks múltiples, SIEMPRE normalizar
+      // Usar hoursBilling como proxy si no hay hoursAsana directo (los aggregates no guardan hoursAsana separado)
+      const hoursAsanaRaw = safeNum(m.hoursAsana) ?? safeNum(m.horasRealesAsana) ?? safeNum(m.hours ?? m.actualHours) ?? safeNum(m.hoursBilling) ?? 0;
+      const hoursAsana = normHours(hoursAsanaRaw, `${memberName}.hoursAsana`);
+      
+      // hoursBilling: horasParaFacturacion → hoursAsana → targetHours
+      const billingRaw = safeNum(m.hoursBilling ?? m.horasParaFacturacion);
+      const hoursBilling = (() => {
+        if (billingRaw && billingRaw > 0) return normHours(billingRaw, `${memberName}.hoursBilling`);
+        if (hoursAsana > 0) return hoursAsana; // Ya normalizado arriba
+        return targetHours; // Último fallback
+      })();
       
       // 🎯 Cost calculation
       const rateARS = Number(m.hourlyRateARS ?? m.rateARS ?? m.rate ?? 0);

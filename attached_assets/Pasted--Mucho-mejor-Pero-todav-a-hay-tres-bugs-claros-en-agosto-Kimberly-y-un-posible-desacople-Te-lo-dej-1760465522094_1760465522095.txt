@@ -1,0 +1,47 @@
+¡Mucho mejor! Pero todavía hay tres bugs claros en agosto/Kimberly y un posible desacople. Te lo dejo quirúrgico:
+Qué está OK
+Ingresos: USD 8,450 (RC) ✔️
+Total trabajado: 288.28h (Asana normalizado) ✔️
+Eficiencia en “Performance”: ~111% (objetivo 320h vs Asana 288.28h) ✔️
+Miembros: 5 ✔️
+Qué está mal (y cómo arreglarlo)
+Presupuesto usado 305% y card “Presupuesto” = $4,098.44 de $1,345
+Causa: el denominador está tomando el FX (1,345) en lugar del precio del mes (8,450).
+Fix backend (único lugar):
+// views.operativa para clientes USD
+cotizacion = price_usd_mes;           // p.ej., 8450 (NO el FX)
+budgetUtilization = cost / cotizacion; // se envía precalculado
+Fix frontend:
+La card “Presupuesto” debe usar vm.denom y vm.budgetUtilization (nunca calcular con FX).
+Resultado esperado:
+4,098.44 / 8,450 ≈ 48.5% (no 305%).
+También desaparece el banner de “Presupuesto Excedido”.
+Tarjetas visuales de Equipo: “Sin horas asignadas”, $0 y $/h = 0
+Causa: no están mapeados los campos nuevos del teamBreakdown.
+Fix frontend (Team cards): usar SIEMPRE:
+Objetivo → member.targetHours
+Horas trabajadas (barra) → member.hoursAsana
+Horas para costo → member.hoursBilling
+Costo mostrado → view=="operativa(USD)" ? member.costUSD : member.costARS
+$/h → cost / hoursBilling (si hoursBilling>0)
+Prop drilling: pasa vm.teamBreakdown, vm.estimatedHours, vm.totalAsanaHours. Si TeamDeviationAnalysis mantiene fetch, que use props si existen y fetch como fallback.
+Línea “Costo: $4,098.44 · Margen 0.5%”
+Revisa la política que elegimos:
+KPIs (Dashboard/Financiero) → costos de RC (agregado mensual).
+Equipo/Costos → Σ detalle (billing × rate).
+Si aquí estás mostrando Σ detalle (4,098.44) y en RC el Costo (USD) fuera distinto, agrega flag:
+if (abs(sum(detail.costUSD) - rc.cost_usd) / rc.cost_usd > 0.10)
+  flags.push('labor_vs_rc_cost_mismatch');
+Si tu decisión final es usar detalle en Dashboard, ok; pero entonces cotización debe seguir siendo precio del mes (8,450) para que el % usado sea correcto.
+Checks rápidos para cerrar
+ vm.denom === 8450 y NO 1345.
+ vm.budgetUtilization ≈ 0.485 y la card “Presupuesto” muestra 48.5%.
+ En “Vista de Equipo – Tarjetas”: cada fila muestra objetivo (W), horas Asana (X), $/h y coste ≠ $0.
+ Si TDA sigue con fetch, acepta teamBreakdown por props y sólo hace fetch cuando faltan props.
+ (Opcional) Flag de reconciliación si Σ detalle y RC.H difieren >10%.
+Recordatorio de mapeo (para que no se vuelva a mover)
+Objetivo → Cantidad de horas asignadas (W) → targetHours
+Operación → Cantidad de horas reales Asana (X) → hoursAsana
+Costo → Horas para facturación (preferencia) → hoursBilling → cost = hoursBilling × rate
+(si ya viene Z/AA, usarlo como titular)
+¿Querés que te pase el diff exacto del componente de tarjetas de equipo (prop names y render) y del aggregator para fijar cotizacion=8450?
