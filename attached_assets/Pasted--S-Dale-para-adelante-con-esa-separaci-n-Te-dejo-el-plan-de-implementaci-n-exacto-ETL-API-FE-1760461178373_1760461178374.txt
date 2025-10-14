@@ -1,0 +1,124 @@
+¡Sí! Dale para adelante con esa separación. Te dejo el plan de implementación exacto (ETL + API + FE + tests) para que lo apliquen sin ambigüedad.
+1) ETL – construir teamBreakdown con 3 tipos de horas
+1.1. Normalización de horas (ANTI×100)
+function normHours(x: number): number {
+  if (x == null || Number.isNaN(x)) return 0;
+  // Heurística: si viene 10133 debe ser 101.33 (escala ×100)
+  return x > 500 ? x / 100 : x;
+}
+1.2. Mapeo de columnas (Costos directos e indirectos, solo “Directo”, período exacto)
+targetHours ← “Cantidad de horas objetivo” (J)
+hoursAsana_raw ← “Cantidad de horas reales Asana” (si existe)
+hoursBilling_raw ← “Cantidad de horas para facturación”
+rateARS ← “Valor Hora” (Y)
+costARS_sheet ← “Total ARS” (Z) (si viene listo, úsalo)
+costUSD_sheet ← “Total USD” (AA) (si viene listo, úsalo)
+fx_row ← “Tipo de cambio” (Q) (fallback para USD)
+Aplicar normalización:
+const hoursAsana  = normHours(hoursAsana_raw);
+const hoursBillIn = normHours(hoursBilling_raw);
+1.3. Reglas de horas
+const hoursBilling = (
+  Number.isFinite(hoursBillIn) && hoursBillIn > 0 ? hoursBillIn :
+  Number.isFinite(hoursAsana)  && hoursAsana  > 0 ? hoursAsana  :
+  Number.isFinite(targetHours) && targetHours > 0 ? targetHours : 0
+);
+const hoursFlags = [];
+if ((!hoursBillIn || hoursBillIn===0) && hoursAsana>0) hoursFlags.push('billing_from_asana');
+if ((!hoursBillIn && !hoursAsana) && targetHours>0)   hoursFlags.push('billing_from_target');
+1.4. Costos (si hay totales en la hoja, son la fuente titular)
+const costARS = costARS_sheet ?? +(hoursBilling * rateARS);
+let costUSD = costUSD_sheet;
+if (costUSD == null) {
+  const fx = fx_row || fxMes;               // fx del mes si hay tabla
+  costUSD = fx ? +(costARS / fx) : 0;
+}
+1.5. Estructura por persona
+teamBreakdown.push({
+  name, roleName,
+  targetHours: +targetHours,
+  hoursAsana: +hoursAsana,
+  hoursBilling: +hoursBilling,
+  hourlyRateARS: +rateARS,
+  costARS: +costARS,
+  costUSD: +costUSD,
+  flags: hoursFlags,
+  isFromExcel: true,
+});
+1.6. Agregados del proyecto
+actuals.totalAsanaHours      = sum(tb.map(t => t.hoursAsana));
+actuals.totalBillingHours    = sum(tb.map(t => t.hoursBilling));
+actuals.totalWorkedCostARS   = sum(tb.map(t => t.costARS));
+actuals.totalWorkedCostUSD   = sum(tb.map(t => t.costUSD));
+quotation.estimatedHours     = sum(tb.map(t => t.targetHours));
+1.7. Reconciliación con Rendimiento Cliente (RC)
+views.operativa.cost = RC.Costos (USD/ARS) según moneda del cliente.
+Flag si difiere del detalle:
+const rcCost = rc.cost_usd_or_ars_in_view;
+const tbCost = viewCurrency==='USD' ? actuals.totalWorkedCostUSD : actuals.totalWorkedCostARS;
+if (rcCost > 0 && Math.abs(tbCost - rcCost) / rcCost > 0.10)
+  flags.push('labor_vs_rc_cost_mismatch');
+2) API – contrato (compat y evolución)
+2.1. Nuevo shape (añadimos campos; mantenemos hours por compat)
+{
+  "quotation": { "estimatedHours": 320 },
+  "actuals": {
+    "totalAsanaHours": 288.28,
+    "totalBillingHours": 288.28,
+    "totalWorkedCostARS": 3276539,
+    "totalWorkedCostUSD": 2436.09,
+    "teamBreakdown": [{
+      "name":"Sol Ayala","roleName":"Dev",
+      "targetHours":100,
+      "hoursAsana":101.33,
+      "hoursBilling":101.33,
+      "hourlyRateARS":10270.25,
+      "costARS":1040684,
+      "costUSD":773.74,
+      "flags":["billing_from_asana"]
+    }]
+  }
+}
+Compat: expón hours = hoursAsana temporalmente para no romper consumidores legacy.
+3) FE – uso correcto por pestaña
+Dashboard
+Total trabajado (h) → actuals.totalAsanaHours
+Presupuesto usado / costos → desde views[view] (costo de facturación).
+Equipo
+Resumen:
+miembros = teamBreakdown.length
+horas trabajadas = totalAsanaHours
+horas objetivo = estimatedHours
+eficiencia = estimatedHours / totalAsanaHours
+Tabla (por persona):
+Operación: hoursAsana / targetHours
+Rentabilidad: hoursBilling, costARS|USD, $/h = cost / hoursBilling (si >0)
+Mostrar badge si hoursAsana > targetHours.
+Financiero/Costos
+Totales = Σ cost (vista). Nunca desde horas Asana.
+4) Invariantes (fail-fast)
+assertClose(sum(tb.map(t=>t.targetHours)), quotation.estimatedHours, 'Σtarget != estimated');
+assertClose(sum(tb.map(t=>t.hoursAsana)),  actuals.totalAsanaHours,  'Σasana  != totalAsana');
+assertClose(sum(tb.map(t=>t.hoursBilling)),actuals.totalBillingHours,'Σbill   != totalBilling');
+const viewCost = view==='USD' ? actuals.totalWorkedCostUSD : actuals.totalWorkedCostARS;
+console.assert(viewCost >= 0, 'viewCost negativo?');
+5) Tests (mínimos)
+ANTI×100: 10133 → 101.33; 288.28 → 288.28.
+Fallbacks: billing ← facturación → asana → target (con flags).
+Costo: si hay Z/AA se respeta; si no, hoursBilling*rate y/o Z/fx.
+Aggregates: Σ iguales a totales.
+Reconciliación RC: flag si diferencia >10%.
+6) Migración (orden recomendado)
+ETL: generar nuevos campos (hoursAsana, hoursBilling, totales).
+API: exponer nuevos campos (mantener hours = hoursAsana por ahora).
+FE:
+Dashboard → actuals.totalAsanaHours.
+Equipo → usar hoursAsana vs targetHours; costos con hoursBilling.
+Activar asserts/flags en DEV.
+Retirar hours legacy cuando TDA quede adaptado.
+7) Ejemplo cerrado (Kimberly/Warner AGO-2025)
+FX 1,345 · Σ target 320.00h · Σ Asana 288.28h
+Σ costUSD detalle 2,436.09; RC.Costos(USD) 7,655.65 → flag de mismatch (68%).
+Dashboard Operativa:
+Ingresos = 13,450 · Costos = 7,655.65 · BU ≈ 56.9% · Trabajadas = 288.28h.
+Equipo: filas con hoursAsana/targetHours correctos; $/h ≈ costUSD/hoursBilling.

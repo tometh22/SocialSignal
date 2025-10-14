@@ -1,0 +1,90 @@
+1) Campos por persona (teamBreakdown[])
+Traemos las tres horas y dejamos claro para qué se usa cada una:
+targetHours ← Cantidad de horas objetivo (lo que seteamos)
+→ tope operativo / objetivo de capacidad.
+hoursAsana ← Cantidad de horas reales Asana (lo registrado realmente)
+→ operación: compara objetivo vs. realidad.
+hoursBilling ← Cantidad de horas para facturación (tu cálculo interno)
+→ rentabilidad/costo: estas horas × hourlyRateARS = costo real a pagar.
+hourlyRateARS ← Valor Hora
+costARS = hoursBilling * hourlyRateARS (si viene precalculado desde hoja “Total ARS”, lo usamos tal cual)
+costUSD = costARS / fx_mes (si viene “Total USD”, usamos ese)
+roleName, name, isFromExcel
+Nota: si en la hoja ya tenés Total ARS/Total USD por persona, los usamos como fuente titular y derivamos las horas solo para análisis (no para recalcular esos totales).
+2) Agregados del proyecto (actuals/quotation)
+quotation.estimatedHours = Σ targetHours
+actuals.totalAsanaHours = Σ hoursAsana
+actuals.totalBillingHours = Σ hoursBilling
+actuals.totalWorkedCostARS = Σ costARS
+actuals.totalWorkedCostUSD = Σ costUSD
+3) Qué usa cada pestaña (regla de oro)
+Operación (equipo, eficiencia, desvíos): Asana vs. Objetivo
+→ compara hoursAsana vs targetHours (por persona y total).
+Rentabilidad (costo del proyecto/persona): Facturación interna
+→ hoursBilling * rate → costARS/USD (agregado = costo real).
+→ Debe cuadrar con Rendimiento Cliente.Costos (USD/ARS) del mes (con tolerancia).
+4) Vista única – qué mostrar dónde
+Dashboard
+Total trabajado (h): actuals.totalAsanaHours
+Presupuesto % usado: desde views[view] (costo de facturación / cotización del mes).
+Costo mostrado: views[view].cost (proviene de Σ cost por persona, no de horas Asana).
+Equipo
+Cards:
+Miembros = teamBreakdown.length
+Horas trabajadas (operación): totalAsanaHours
+Horas objetivo: estimatedHours
+Eficiencia: estimatedHours / totalAsanaHours
+Tabla: por persona
+Operación: hoursAsana / targetHours (progreso, desvío)
+Rentabilidad: hoursBilling, costARS/USD, $/h = cost / hoursBilling (si hoursBilling>0)
+Badge si hoursAsana > targetHours (sobreconsumo) o hoursAsana << targetHours (subutilización).
+Financiero/Costos
+Totales y series salen de Σ cost por persona del mes (facturación), moneda según vista.
+Mostrar reconciliación contra “Rendimiento Cliente.Costos”:
+diff = |Σcost_vista - RC.cost_vista| / RC.cost_vista → flag si > 10%.
+5) API (payload mínimo)
+{
+  "quotation": {
+    "estimatedHours": 320
+  },
+  "actuals": {
+    "totalAsanaHours": 288.28,
+    "totalBillingHours": 288.28,
+    "totalWorkedCostARS": 3276539,
+    "totalWorkedCostUSD": 2436.09,
+    "teamBreakdown": [
+      {
+        "name": "Sol Ayala",
+        "roleName": "Dev",
+        "targetHours": 100,
+        "hoursAsana": 101.33,
+        "hoursBilling": 101.33,
+        "hourlyRateARS": 10270.25,
+        "costARS": 1040684,
+        "costUSD": 773.74
+      }
+      // ...
+    ]
+  },
+  "views": {
+    "operativa": { "revenue": 13450, "cost": 7655.65, "currency": "USD", "cotizacion": 13450, "budgetUtilization": 0.569, "markup": 1.757, "margin": 0.431 }
+  },
+  "fx": 1345
+}
+6) Invariantes (para que nunca se mezclen)
+Σ teamBreakdown.targetHours === quotation.estimatedHours
+Σ teamBreakdown.hoursAsana === actuals.totalAsanaHours
+Σ teamBreakdown.hoursBilling === actuals.totalBillingHours
+Costo del proyecto usado en KPIs = Σ cost desde hoursBilling, no desde hoursAsana.
+En operativa/usd, revenue, cost y cotizacion están en la misma moneda.
+7) Flags útiles
+hours_fallback_to_target → si no hubo Asana ni facturación.
+labor_vs_rc_cost_mismatch → si |Σcost - RC.cost|/RC.cost > 10%.
+missing_hourly_rate → si falta rate y el costo fue forzado a 0.
+outlier_hours → persona con hoursAsana > 200 o hoursBilling > 200 en un mes.
+Resumen corto:
+Operación = Asana vs. Objetivo.
+Rentabilidad = Facturación interna (hoursBilling × rate).
+KPIs financieros siempre con costos de facturación (no Asana).
+Todo cuadra contra Rendimiento Cliente del mismo mes.
+Si querés, te mando el diff para agregar hoursAsana/hoursBilling al teamBreakdown, recalcular agregados y ajustar la pestaña Equipo sin romper nada.
