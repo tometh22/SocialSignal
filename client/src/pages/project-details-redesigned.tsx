@@ -3372,6 +3372,9 @@ const ProjectDetailsPage = () => {
                       startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
                       endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                     }}
+                    teamBreakdown={projectVM?.teamBreakdown}
+                    totalHours={projectVM?.totalHours}
+                    estimatedHours={projectVM?.estimatedHours}
                   />
                 </CardContent>
               </Card>
