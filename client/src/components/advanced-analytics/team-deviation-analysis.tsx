@@ -7,6 +7,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
+// 🎯 TeamMember desde projectVM (inyectable)
+interface TeamMember {
+  name: string;
+  roleName: string;
+  hours: number;
+  targetHours: number;
+  hourlyRateARS?: number;
+  costARS?: number;
+  costUSD?: number;
+}
+
 interface TeamDeviationAnalysisProps {
   projectId: number;
   dateFilter?: {
@@ -14,6 +25,10 @@ interface TeamDeviationAnalysisProps {
     endDate: string;
   };
   timeFilter?: string;
+  // 🔥 PROPS INYECTABLES desde projectVM (opcional)
+  teamBreakdown?: TeamMember[];
+  totalHours?: number;
+  estimatedHours?: number;
 }
 
 interface Deviation {
@@ -46,26 +61,153 @@ interface DeviationAnalysisData {
 type SortField = 'deviation' | 'cost' | 'hours';
 type SortDirection = 'asc' | 'desc';
 
-export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter }: TeamDeviationAnalysisProps) {
-  const [sortField, setSortField] = useState<SortField>('deviation');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+// 🔥 HOOK DE DATA PROVIDER con fallback
+function useTeamData({ 
+  projectId, 
+  dateFilter,
+  timeFilter,
+  injected 
+}: {
+  projectId: number;
+  dateFilter?: { startDate: string; endDate: string };
+  timeFilter?: string;
+  injected?: { teamBreakdown?: TeamMember[]; totalHours?: number; estimatedHours?: number; }
+}) {
+  const shouldFetch = !injected?.teamBreakdown || injected.teamBreakdown.length === 0;
   
-  // Preferir timeFilter sobre dateFilter para consistencia con el sistema
+  // Query params para fetch
   const queryParams = timeFilter 
     ? `?timeFilter=${timeFilter}&basis=ECON`
     : dateFilter 
     ? `?startDate=${dateFilter.startDate}&endDate=${dateFilter.endDate}&basis=ECON`
     : '?basis=ECON';
 
-  const { data: deviationData, isLoading, error } = useQuery<DeviationAnalysisData>({
+  const { data, isLoading, error } = useQuery<DeviationAnalysisData>({
     queryKey: [`/api/projects/${projectId}/deviation-analysis`, timeFilter || dateFilter, 'ECON'],
     queryFn: async () => {
       const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
       const data = await response.json();
       return data;
     },
-    enabled: !!projectId,
+    enabled: !!projectId && shouldFetch,
   });
+
+  // 🎯 CONVERTIR teamBreakdown a Deviation[] si está inyectado
+  if (injected?.teamBreakdown && injected.teamBreakdown.length > 0) {
+    const deviations: Deviation[] = injected.teamBreakdown.map((member, index) => {
+      const actualHours = member.hours || 0;
+      const budgetedHours = member.targetHours || 0;
+      const actualCost = member.costUSD || 0;
+      const budgetedCost = budgetedHours > 0 && actualHours > 0 
+        ? (actualCost / actualHours) * budgetedHours 
+        : actualCost;
+      
+      const hourDeviation = actualHours - budgetedHours;
+      const costDeviation = actualCost - budgetedCost;
+      const deviationPercentage = budgetedHours > 0 
+        ? (hourDeviation / budgetedHours) * 100 
+        : 0;
+
+      return {
+        personnelId: index + 1,
+        personnelName: member.name,
+        budgetedHours,
+        actualHours,
+        budgetedCost,
+        actualCost,
+        hourDeviation,
+        costDeviation,
+        deviationPercentage,
+      };
+    });
+
+    const totalHours = injected.totalHours ?? deviations.reduce((a, b) => a + (b.actualHours || 0), 0);
+    const estimatedHours = injected.estimatedHours ?? deviations.reduce((a, b) => a + (b.budgetedHours || 0), 0);
+    const teamCost = deviations.reduce((a, b) => a + (b.actualCost || 0), 0);
+    const efficiencyPct = estimatedHours > 0 ? (totalHours / estimatedHours) * 100 : 0;
+
+    // 🔍 VALIDACIONES en DEV
+    if (import.meta.env.DEV) {
+      const sumHours = deviations.reduce((a, b) => a + (b.actualHours || 0), 0);
+      const sumTarget = deviations.reduce((a, b) => a + (b.budgetedHours || 0), 0);
+      
+      console.assert(
+        Math.abs(sumHours - totalHours) < 1e-6, 
+        '[TDA] totalHours mismatch', 
+        { sumHours, totalHours, diff: sumHours - totalHours }
+      );
+      console.assert(
+        Math.abs(sumTarget - estimatedHours) < 1e-6, 
+        '[TDA] estimatedHours mismatch', 
+        { sumTarget, estimatedHours, diff: sumTarget - estimatedHours }
+      );
+      console.assert(
+        deviations.every(d => d.personnelName), 
+        '[TDA] Missing personnelName in some deviations'
+      );
+    }
+
+    return {
+      teamBreakdown: deviations,
+      totalHours,
+      estimatedHours,
+      teamCost,
+      efficiencyPct,
+      isLoading: false,
+      error: null,
+    };
+  }
+
+  // Usar datos del fetch
+  const teamBreakdown = data?.deviations ?? [];
+  const totalHours = data?.summary?.totalHours ?? teamBreakdown.reduce((a, b) => a + (b.actualHours || 0), 0);
+  const estimatedHours = teamBreakdown.reduce((a, b) => a + (b.budgetedHours || 0), 0);
+  const teamCost = data?.summary?.teamCost ?? 0;
+  const efficiencyPct = data?.summary?.efficiencyPct ?? 0;
+
+  return { 
+    teamBreakdown, 
+    totalHours, 
+    estimatedHours, 
+    teamCost,
+    efficiencyPct,
+    isLoading: shouldFetch && isLoading, 
+    error 
+  };
+}
+
+export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter, teamBreakdown, totalHours, estimatedHours }: TeamDeviationAnalysisProps) {
+  const [sortField, setSortField] = useState<SortField>('deviation');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  
+  // 🔥 USAR HOOK CON FALLBACK: datos inyectados o fetch
+  const { 
+    teamBreakdown: deviations, 
+    totalHours: th, 
+    estimatedHours: eh, 
+    teamCost,
+    efficiencyPct,
+    isLoading, 
+    error 
+  } = useTeamData({ 
+    projectId, 
+    dateFilter,
+    timeFilter,
+    injected: { teamBreakdown, totalHours, estimatedHours } 
+  });
+
+  // Crear deviationData compatible con el resto del componente
+  const deviationData: DeviationAnalysisData = {
+    summary: {
+      activeMembers: deviations.length,
+      totalHours: th,
+      efficiencyPct: efficiencyPct,
+      teamCost: teamCost,
+      basis: 'ECON',
+      period: timeFilter,
+    },
+    deviations: deviations,
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
