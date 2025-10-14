@@ -41,12 +41,13 @@ interface RawPeriodData {
   laborRows: Array<{
     personName: string;
     roleName: string;
-    targetHours: number;
-    hoursReal: number;
+    targetHours: number;          // Cantidad de horas objetivo
+    hoursAsana: number;            // Cantidad de horas reales Asana (corregidas)
+    hoursBilling: number;          // Cantidad de horas para facturación (con fallbacks)
     hourlyRateARS: number;
-    costTotal: number; // En ARS generalmente
-    costUSD: number;
-    hasRealHours: boolean;
+    costARS: number;               // Total ARS
+    costUSD: number;               // Total USD
+    flags: string[];               // Flags de rastreabilidad
   }>;
 }
 
@@ -81,6 +82,24 @@ function normalize(str: string): string {
 function isUSDClient(clientName: string): boolean {
   const normalized = normalize(clientName);
   return /warner|kimberly/.test(normalized);
+}
+
+/**
+ * Normaliza horas aplicando heurística ANTI×100
+ * Si viene 10133 → 101.33 (detecta multiplicación por 100)
+ */
+function normHours(x: number | null | undefined): number {
+  if (x == null || Number.isNaN(x)) return 0;
+  const num = Number(x);
+  
+  // Heurística: si > 500 horas en un mes, probablemente está multiplicado por 100
+  if (num > 500) {
+    const corrected = num / 100;
+    console.log(`🔧 ANTI_×100_HOURS: ${num} → ${corrected}`);
+    return corrected;
+  }
+  
+  return num;
 }
 
 /**
@@ -257,27 +276,32 @@ export async function processProjectPeriod(periodKey: string) {
         personName: row.persona,
         roleName: row.rol || 'N/A',
         targetHours: 0,
-        hoursReal: 0,
+        hoursAsana: 0,
+        hoursBilling: 0,
         hourlyRateARS: parseFloat(row.valorHoraLocalCurrency || '0'),
         costTotal: 0,
         costUSD: 0,
         fx: parseFloat(row.tipoCambio || row.fxCost || '1345'),
-        hasRealHours: false
+        flags: []
       });
     }
     
     const laborData = projectLaborMap.get(personRoleKey)!;
     
-    // Acumular horas y costos
+    // Acumular horas objetivo (NO normalizar - vienen correctas del Excel)
     laborData.targetHours += row.horasObjetivo || 0;
     
-    // Preferencia: horasParaFacturacion > horasRealesAsana
-    const realHours = row.horasParaFacturacion || row.horasRealesAsana || 0;
-    if (realHours > 0) {
-      laborData.hasRealHours = true;
-      laborData.hoursReal += realHours;
-    }
+    // Normalizar horas Asana (aplicar ANTI×100)
+    const hoursAsanaRaw = row.horasRealesAsana || 0;
+    const hoursAsanaNorm = normHours(hoursAsanaRaw);
+    laborData.hoursAsana += hoursAsanaNorm;
     
+    // Normalizar horas de facturación (aplicar ANTI×100)
+    const hoursBillingRaw = row.horasParaFacturacion || 0;
+    const hoursBillingNorm = normHours(hoursBillingRaw);
+    laborData.hoursBilling += hoursBillingNorm;
+    
+    // Acumular costos
     laborData.costTotal += row.costoTotal;
     laborData.costUSD += parseFloat(row.montoTotalUSD || '0');
   }
@@ -287,21 +311,31 @@ export async function processProjectPeriod(periodKey: string) {
     const data = projectMap.get(projectKey)!;
     
     for (const [personRoleKey, laborData] of projectLaborMap) {
-      // Si no hay horas reales, usar targetHours como fallback
-      if (!laborData.hasRealHours && laborData.targetHours > 0) {
-        laborData.hoursReal = laborData.targetHours;
-        // Flag se agregará después
+      const flags: string[] = [];
+      
+      // Aplicar fallbacks para hoursBilling: horasParaFacturacion → horasRealesAsana → targetHours
+      let finalHoursBilling = laborData.hoursBilling;
+      
+      if (!finalHoursBilling || finalHoursBilling === 0) {
+        if (laborData.hoursAsana > 0) {
+          finalHoursBilling = laborData.hoursAsana;
+          flags.push('billing_from_asana');
+        } else if (laborData.targetHours > 0) {
+          finalHoursBilling = laborData.targetHours;
+          flags.push('billing_from_target');
+        }
       }
       
       data.laborRows.push({
         personName: laborData.personName,
         roleName: laborData.roleName,
         targetHours: laborData.targetHours,
-        hoursReal: laborData.hoursReal,
+        hoursAsana: laborData.hoursAsana,
+        hoursBilling: finalHoursBilling,
         hourlyRateARS: laborData.hourlyRateARS,
-        costTotal: laborData.costTotal,
+        costARS: laborData.costTotal,
         costUSD: laborData.costUSD,
-        hasRealHours: laborData.hasRealHours
+        flags
       });
       
       // Actualizar costUSD total
@@ -370,7 +404,7 @@ async function processProject(data: RawPeriodData) {
   }
   
   // 3. Calcular datos base
-  const laborCostARS = data.laborRows.reduce((sum, r) => sum + r.costTotal, 0);
+  const laborCostARS = data.laborRows.reduce((sum, r) => sum + r.costARS, 0);
   
   const baseData = {
     revenue_usd: data.revenueUSD,
@@ -382,9 +416,12 @@ async function processProject(data: RawPeriodData) {
     fx: data.fxMonth
   };
   
-  // 4. Calcular quotation y actuals
+  // 4. Calcular agregados con 3 tipos de horas
   const totalTargetHours = data.laborRows.reduce((sum, r) => sum + r.targetHours, 0);
-  const totalRealHours = data.laborRows.reduce((sum, r) => sum + r.hoursReal, 0);
+  const totalAsanaHours = data.laborRows.reduce((sum, r) => sum + r.hoursAsana, 0);
+  const totalBillingHours = data.laborRows.reduce((sum, r) => sum + r.hoursBilling, 0);
+  const totalWorkedCostARS = data.laborRows.reduce((sum, r) => sum + r.costARS, 0);
+  const totalWorkedCostUSD = data.laborRows.reduce((sum, r) => sum + r.costUSD, 0);
   
   const quotationData = {
     totalAmountNative: data.quotation,
@@ -392,23 +429,29 @@ async function processProject(data: RawPeriodData) {
     estimatedHours: totalTargetHours
   };
   
-  // Construir teamBreakdown con validación de horas
+  // Construir teamBreakdown con 3 tipos de horas
   const teamBreakdownData = data.laborRows.map(r => ({
     personnelId: r.personName,
     name: r.personName,
     roleName: r.roleName,
     targetHours: r.targetHours,
-    hours: r.hoursReal, // actualHours → hours (según spec)
+    hoursAsana: r.hoursAsana,
+    hoursBilling: r.hoursBilling,
+    hours: r.hoursAsana, // Mantener por compatibilidad (= hoursAsana)
     hourlyRateARS: r.hourlyRateARS,
-    costARS: r.costTotal,
+    costARS: r.costARS,
     costUSD: r.costUSD,
-    isFromExcel: true,
-    usedTargetHoursFallback: !r.hasRealHours && r.targetHours > 0 // Flag para fallback
+    flags: r.flags,
+    isFromExcel: true
   }));
   
   const actualsData = {
-    totalWorkedHours: totalRealHours,
-    totalWorkedCost: data.costUSD,
+    totalWorkedHours: totalAsanaHours, // Legacy: usar hoursAsana
+    totalAsanaHours: totalAsanaHours,
+    totalBillingHours: totalBillingHours,
+    totalWorkedCostARS: totalWorkedCostARS,
+    totalWorkedCostUSD: totalWorkedCostUSD,
+    totalWorkedCost: totalWorkedCostUSD, // Legacy: mantener
     teamBreakdown: teamBreakdownData
   };
   
@@ -426,22 +469,33 @@ async function processProject(data: RawPeriodData) {
     flags.push('NO_QUOTATION');
   }
   
-  // Flag si se usó targetHours como fallback para horas reales
-  const hasHoursFallback = teamBreakdownData.some(t => t.usedTargetHoursFallback);
+  // Flag si se usó fallback de horas
+  const hasHoursFallback = teamBreakdownData.some(t => t.flags?.includes('billing_from_target'));
   if (hasHoursFallback) {
     flags.push('HOURS_FALLBACK_TO_TARGET');
   }
   
-  // Validaciones de consistencia
-  const sumHours = teamBreakdownData.reduce((sum, t) => sum + t.hours, 0);
+  // Invariantes matemáticos (fail-fast en DEV)
   const sumTargetHours = teamBreakdownData.reduce((sum, t) => sum + t.targetHours, 0);
-  
-  if (Math.abs(sumHours - totalRealHours) > 1e-6) {
-    console.warn(`  ⚠️ Inconsistencia en horas: Σ teamBreakdown.hours (${sumHours}) !== totalWorkedHours (${totalRealHours})`);
-  }
+  const sumAsanaHours = teamBreakdownData.reduce((sum, t) => sum + t.hoursAsana, 0);
+  const sumBillingHours = teamBreakdownData.reduce((sum, t) => sum + t.hoursBilling, 0);
+  const sumCostARS = teamBreakdownData.reduce((sum, t) => sum + t.costARS, 0);
+  const sumCostUSD = teamBreakdownData.reduce((sum, t) => sum + t.costUSD, 0);
   
   if (Math.abs(sumTargetHours - totalTargetHours) > 1e-6) {
-    console.warn(`  ⚠️ Inconsistencia en horas objetivo: Σ teamBreakdown.targetHours (${sumTargetHours}) !== estimatedHours (${totalTargetHours})`);
+    console.warn(`  ⚠️ INVARIANT: Σ targetHours (${sumTargetHours}) !== estimatedHours (${totalTargetHours})`);
+  }
+  
+  if (Math.abs(sumAsanaHours - totalAsanaHours) > 1e-6) {
+    console.warn(`  ⚠️ INVARIANT: Σ hoursAsana (${sumAsanaHours}) !== totalAsanaHours (${totalAsanaHours})`);
+  }
+  
+  if (Math.abs(sumBillingHours - totalBillingHours) > 1e-6) {
+    console.warn(`  ⚠️ INVARIANT: Σ hoursBilling (${sumBillingHours}) !== totalBillingHours (${totalBillingHours})`);
+  }
+  
+  if (Math.abs(sumCostUSD - totalWorkedCostUSD) > 0.01) {
+    console.warn(`  ⚠️ INVARIANT: Σ costUSD (${sumCostUSD}) !== totalWorkedCostUSD (${totalWorkedCostUSD})`);
   }
   
   // 7. Guardar las 3 vistas
@@ -496,11 +550,11 @@ async function processProject(data: RawPeriodData) {
     await db.insert(teamBreakdown).values({
       projectPeriodId: periodId,
       personName: labor.personName,
-      roleName: labor.roleName, // 🆕 Usar roleName real desde Excel
+      roleName: labor.roleName,
       targetHours: labor.targetHours.toString(),
-      hoursReal: labor.hoursReal.toString(),
+      hoursReal: labor.hoursAsana.toString(), // Usar hoursAsana para legacy
       hourlyRateARS: labor.hourlyRateARS.toString(),
-      costARS: labor.costTotal.toString(),
+      costARS: labor.costARS.toString(),
       costUSD: labor.costUSD.toString(),
       isFromExcel: true
     });

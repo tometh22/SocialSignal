@@ -2,6 +2,8 @@
 // Regla de oro: Los datos de vista vienen pre-calculados del backend (NO reconvertir)
 // Soporta 3 vistas: original, operativa, usd
 
+import type { TeamBreakdownMember } from "@shared/schema";
+
 type Currency = 'ARS' | 'USD' | 'MIXED';
 type ViewType = 'original' | 'operativa' | 'usd';
 
@@ -16,8 +18,10 @@ type ProjectViewState = {
   margin?: number | null;
   budgetUtilization?: number | null;
   totalWorkedHours?: number;
+  totalAsanaHours?: number;
+  totalBillingHours?: number;
   estimatedHours?: number;
-  teamBreakdown?: any[];
+  teamBreakdown?: TeamBreakdownMember[];
   flags?: string[];
 };
 
@@ -34,7 +38,9 @@ type ProjectStateLegacy = {
   actuals?: {
     totalWorkedCost?: number;    // USD base (solo fallback)
     totalWorkedHours?: number;
-    teamBreakdown?: any[];
+    totalAsanaHours?: number;
+    totalBillingHours?: number;
+    teamBreakdown?: TeamBreakdownMember[];
   };
   quotation?: {
     baseCost?: number;
@@ -89,7 +95,9 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
       budgetUtilization: state.budgetUtilization || 0,
       cotizacion: state.cotizacion || null,
       efficiency: 0, // TODO: Calcular desde teamBreakdown
-      totalHours: state.totalWorkedHours || 0,
+      totalHours: state.totalAsanaHours || state.totalWorkedHours || 0,
+      totalAsanaHours: state.totalAsanaHours || state.totalWorkedHours || 0,
+      totalBillingHours: state.totalBillingHours || state.totalAsanaHours || 0,
       estimatedHours: state.estimatedHours || 0,
       baseCost: state.costDisplay || 0, // En vista unificada, baseCost = costDisplay
       teamBreakdown: state.teamBreakdown || [],
@@ -117,6 +125,9 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
   const markup = legacyState.summary?.markup ?? legacyState.metrics?.markup ?? 0;
   const margin = legacyState.summary?.margin ?? legacyState.metrics?.margin ?? 0;
 
+  const totalAsanaHours = legacyState.actuals?.totalAsanaHours ?? legacyState.actuals?.totalWorkedHours ?? 0;
+  const totalBillingHours = legacyState.actuals?.totalBillingHours ?? totalAsanaHours;
+
   return {
     view: viewOverride || 'operativa',
     currencyNative: currency,
@@ -126,7 +137,9 @@ export function toProjectVM(state: ProjectState, viewOverride?: ViewType) {
     margin,
     budgetUtilization: legacyState.metrics?.budgetUtilization ?? 0,
     efficiency: legacyState.metrics?.efficiency ?? 0,
-    totalHours: legacyState.actuals?.totalWorkedHours ?? 0,
+    totalHours: totalAsanaHours,
+    totalAsanaHours,
+    totalBillingHours,
     estimatedHours: legacyState.quotation?.estimatedHours ?? 0,
     baseCost: legacyState.quotation?.baseCost ?? 0,
     teamBreakdown: legacyState.actuals?.teamBreakdown ?? [],

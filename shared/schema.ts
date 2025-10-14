@@ -2335,3 +2335,48 @@ export type InsertProjectAggregate = z.infer<typeof insertProjectAggregateSchema
 export type TeamBreakdown = typeof teamBreakdown.$inferSelect;
 export type InsertTeamBreakdown = z.infer<typeof insertTeamBreakdownSchema>;
 export type ViewType = 'original' | 'operativa' | 'usd';
+
+// ==================== TEAM BREAKDOWN JSON CONTRACTS ====================
+// Contrato para teamBreakdown dentro de actualsData (JSONB)
+// Este es el formato que el ETL genera y el frontend consume
+
+export interface TeamBreakdownMember {
+  personnelId: string;        // ID o nombre de la persona
+  name: string;               // Nombre completo
+  roleName: string;           // Rol en el proyecto
+  
+  // 3 tipos de horas (arquitectura de separación)
+  targetHours: number;        // Horas objetivo/asignadas (capacidad)
+  hoursAsana: number;         // Horas reales de Asana (operación)
+  hoursBilling: number;       // Horas para facturación (rentabilidad)
+  hours?: number;             // Legacy: mantener por compatibilidad (= hoursAsana)
+  
+  // Costos y rates
+  hourlyRateARS: number;      // Valor hora en ARS
+  costARS: number;            // Costo total ARS (hoursBilling × rate generalmente)
+  costUSD: number;            // Costo total USD
+  
+  // Metadata
+  flags?: string[];           // Ej: ['billing_from_asana', 'billing_from_target']
+  isFromExcel?: boolean;      // Si viene del Excel MAESTRO
+  usedTargetHoursFallback?: boolean; // Legacy flag
+}
+
+export interface ActualsData {
+  // Agregados globales
+  totalWorkedHours?: number;       // Legacy: usa hoursAsana
+  totalAsanaHours?: number;        // Suma de hoursAsana
+  totalBillingHours?: number;      // Suma de hoursBilling
+  totalWorkedCostARS?: number;     // Suma de costARS
+  totalWorkedCostUSD?: number;     // Suma de costUSD
+  totalWorkedCost?: number;        // Legacy: mantener (= totalWorkedCostUSD)
+  
+  // Desglose por miembro
+  teamBreakdown?: TeamBreakdownMember[];
+}
+
+export interface QuotationData {
+  totalAmountNative?: number | null;
+  totalAmountUSD?: number | null;
+  estimatedHours?: number;  // Suma de targetHours
+}
