@@ -1012,54 +1012,19 @@ const ProjectDetailsPage = () => {
         const end = dateFilter.endDate;
         const monthDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
         
-        console.log('🔍 PERIOD CALC:', {
-          start: start.toISOString(),
-          end: end.toISOString(),
-          startMonth: start.getMonth(),
-          endMonth: end.getMonth(),
-          startDate: start.getDate(),
-          endDate: end.getDate(),
-          monthDiff,
-          condition: monthDiff === 0 || (monthDiff === 1 && end.getDate() === 1 && start.getDate() === 1)
-        });
-        
         // Si el rango es exactamente un mes, usar ese mes
         if (monthDiff === 0 || (monthDiff === 1 && end.getDate() === 1 && start.getDate() === 1)) {
           const year = start.getFullYear();
           const month = String(start.getMonth() + 1).padStart(2, '0');
-          const result = `${year}-${month}`;
-          console.log('🔍 PERIOD RESULT:', { year, month, result });
-          return result;
+          return `${year}-${month}`;
         }
-        console.log('🔍 PERIOD: No match, returning undefined');
         return undefined;
       })()
     : undefined;
   
-  console.log('🔍 FILTER DEBUG:', { 
-    dateFilterLabel: dateFilter.label, 
-    mappedTimeFilter: timeFilterForHook,
-    calculatedPeriod: periodFromFilter,
-    dateFilterDates: {
-      start: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
-      end: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
-    }
-  });
-  
   // 🎯 PRIORITY FIX: Use periodFromFilter (calculated from dateFilter) first, fallback to URL
   // This ensures the visual date filter always takes precedence over stale URL params
   const finalPeriod = periodFromFilter || periodFromUrl;
-  console.log('🐛 PERIOD DEBUG:', {
-    periodFromUrl,
-    periodFromFilter,
-    finalPeriod,
-    dateFilter: {
-      start: dateFilter.startDate,
-      end: dateFilter.endDate,
-      startMonth: dateFilter.startDate?.getMonth(),
-      endMonth: dateFilter.endDate?.getMonth()
-    }
-  });
   
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
