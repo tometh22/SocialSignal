@@ -1466,6 +1466,7 @@ class GoogleSheetsWorkingService {
    * Procesar datos de costos directos del Excel
    */
   private processDirectCostsData(rows: any[][]): CostoDirectoExcel[] {
+    console.log('🔥🔥🔥 PROCESS_DIRECT_COSTS_DATA CALLED - ANTI×100 FIX ACTIVE 🔥🔥🔥');
     const result: CostoDirectoExcel[] = [];
     
     if (rows.length === 0) return result;
@@ -1503,9 +1504,21 @@ class GoogleSheetsWorkingService {
       try {
         const persona = this.getCellValue(row, columnMap.persona);
         const tipoGasto = this.getCellValue(row, columnMap.tipoGasto);
-        const horasObjetivo = parseDec(this.getCellValue(row, columnMap.horasObjetivo));
-        const horasRealesAsana = parseDec(this.getCellValue(row, columnMap.horasRealesAsana));
-        const horasParaFacturacion = parseDec(this.getCellValue(row, columnMap.horasParaFacturacion));
+        
+        // 🔧 ANTI×100: Aplicar normalización a todas las horas
+        const horasObjetivoRaw = parseDec(this.getCellValue(row, columnMap.horasObjetivo));
+        const horasRealesAsanaRaw = parseDec(this.getCellValue(row, columnMap.horasRealesAsana));
+        const horasParaFacturacionRaw = parseDec(this.getCellValue(row, columnMap.horasParaFacturacion));
+        
+        // Normalizar horas (dividir por 100 si > 500)
+        const horasObjetivo = horasObjetivoRaw > 500 ? horasObjetivoRaw / 100 : horasObjetivoRaw;
+        const horasRealesAsana = horasRealesAsanaRaw > 500 ? horasRealesAsanaRaw / 100 : horasRealesAsanaRaw;
+        const horasParaFacturacion = horasParaFacturacionRaw > 500 ? horasParaFacturacionRaw / 100 : horasParaFacturacionRaw;
+        
+        if (horasRealesAsanaRaw > 500 || horasParaFacturacionRaw > 500) {
+          console.log(`🔧 ANTI×100_HOURS: ${persona} - Asana: ${horasRealesAsanaRaw} → ${horasRealesAsana}, Billing: ${horasParaFacturacionRaw} → ${horasParaFacturacion}`);
+        }
+        
         const cliente = this.getCellValue(row, columnMap.cliente);
         const proyecto = this.getCellValue(row, columnMap.proyecto);
         const montoTotalUSDRaw = this.getCellValue(row, columnMap.montoTotalUSD) || '';
@@ -1559,7 +1572,13 @@ class GoogleSheetsWorkingService {
         const tipoCambioRaw = this.getCellValue(row, columnMap.tipoCambio) || '';
         const montoOriginalARSRaw = this.getCellValue(row, columnMap.montoOriginalARS) || '';
 
-
+        // 🔧 ANTI×100 para costos: Normalizar montos si son astronómicos
+        const montoUSDRaw = montoUSDValue;
+        const montoUSD = montoUSDRaw > 1000000 ? montoUSDRaw / 100 : montoUSDRaw;
+        
+        if (montoUSDRaw > 1000000) {
+          console.log(`🔧 ANTI×100_COST: ${persona} - USD: ${montoUSDRaw} → ${montoUSD}`);
+        }
 
         const costoData: CostoDirectoExcel = {
           persona: persona,
@@ -1575,7 +1594,7 @@ class GoogleSheetsWorkingService {
           horasRealesAsana: horasRealesAsana, // Columna L: Horas reales
           horasParaFacturacion: horasParaFacturacion, // Columna M: Horas para facturación - NUEVO
           tipoCambio: tipoCambioRaw ? this.parseMoneyValue(tipoCambioRaw) : undefined,
-          montoTotalUSD: montoTotalUSDRaw ? this.parseMoneyValue(montoTotalUSDRaw) : undefined
+          montoTotalUSD: montoUSD || undefined
         };
 
         result.push(costoData);
