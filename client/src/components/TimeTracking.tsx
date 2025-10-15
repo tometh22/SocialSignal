@@ -110,7 +110,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
   const summary = timeData?.summary ?? {
     totalAsanaHours: 0,
     estimatedHours: 0,
-    progressPercent: 0,
+    progressPct: 0,
     membersActive: 0,
     avgDailyHoursPerMember: 0
   };
