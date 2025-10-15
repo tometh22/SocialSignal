@@ -35,63 +35,52 @@ interface TimeTrackingProps {
 
 interface TimeTrackingData {
   projectId: number;
-  timeFilter: string;
-  cards: {
-    totalRegistrado: {
-      horasRegistradas: number;
-      horasObjetivo: number;
-      porcentajeRegistrado: number;
-    };
-    miembrosActivos: {
-      activos: number;
-      asignados: number;
-    };
-    promedioDiario: {
-      promedio: number;
-      modo: string;
-    };
-    horasTrabajadas: {
-      horas: number;
-      estimadas: number;
-    };
-    costoReal: {
-      real: number;
-      estimado: number;
-    };
+  period: string;
+  summary: {
+    membersActive: number;
+    totalAsanaHours: number;
+    estimatedHours: number;
+    progressPct: number;
+    avgDailyHoursPerMember: number;
   };
-  miembros: Array<{
-    persona: string;
-    rol: string;
-    hrs_real: number;
-    hrs_obj: number;
-    porcentaje_progreso: number;
-    estado: 'completo' | 'parcial' | 'sin_registro';
-    costo_usd: number;
-    rate_usd: number;
-    brecha_objetivo: number;
+  members: Array<{
+    personId: string | number;
+    name: string;
+    roleName: string;
+    targetHours: number;
+    hoursAsana: number;
+    hoursBilling: number;
+    status: 'exceso' | 'cumplido' | 'pendiente';
+    badges: string[];
   }>;
-  configuracion: {
-    modoPromedio: string;
-    umbralCompleto: number;
-    diasHabilesMes: number;
-    diasTranscurridos: number;
-    mostrarRate: boolean;
+}
+
+// Convertir timeFilter a period (e.g. "august_2025" → "2025-08")
+function convertTimeFilterToPeriod(timeFilter: string): string {
+  const monthMap: Record<string, string> = {
+    january: '01', february: '02', march: '03', april: '04',
+    may: '05', june: '06', july: '07', august: '08',
+    september: '09', october: '10', november: '11', december: '12'
   };
-  validaciones: {
-    noDataForPeriod: boolean;
-    conciliacionCosto: boolean;
-    conciliacionHoras: boolean;
-  };
-  generatedAt: string;
+  
+  const match = timeFilter.match(/^(\w+)_(\d+)$/);
+  if (match) {
+    const [, month, year] = match;
+    return `${year}-${monthMap[month.toLowerCase()] || '01'}`;
+  }
+  return timeFilter;
 }
 
 export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProps) {
-  const [showConfig, setShowConfig] = useState(false);
   const [sortMode, setSortMode] = useState<'brecha' | 'porcentaje'>('brecha');
 
+  // Convertir timeFilter a period
+  const period = convertTimeFilterToPeriod(timeFilter);
+
   const { data: timeData, isLoading, error } = useQuery<TimeTrackingData>({
-    queryKey: [`/api/projects/${projectId}/time-tracking?timeFilter=${timeFilter}`, timeFilter],
-    enabled: !!projectId
+    queryKey: [`/api/projects/${projectId}/time-tracking`, period],
+    queryFn: () => fetch(`/api/projects/${projectId}/time-tracking?period=${period}`).then(res => res.json()),
+    enabled: !!projectId && !!period
   });
 
   if (isLoading) {
@@ -117,23 +106,26 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
     );
   }
 
-  const { cards, miembros, configuracion, validaciones } = timeData;
+  const { summary, members } = timeData;
 
-  // Función para obtener estado del miembro
-  const getMemberStatus = (porcentaje: number) => {
-    if (porcentaje > 100) return { status: 'exceso', color: 'red', icon: AlertTriangle };
-    if (porcentaje === 100) return { status: 'perfecto', color: 'emerald', icon: CheckCircle };
-    if (porcentaje >= 85) return { status: 'riesgo', color: 'amber', icon: Clock };
-    if (porcentaje >= 70) return { status: 'bien', color: 'emerald', icon: CheckCircle };
-    return { status: 'bajo', color: 'blue', icon: Info };
+  // Función para obtener color según status
+  const getStatusColor = (status: string) => {
+    if (status === 'exceso') return { color: 'red', icon: AlertTriangle };
+    if (status === 'cumplido') return { color: 'emerald', icon: CheckCircle };
+    return { color: 'blue', icon: Clock };
   };
 
   // Ordenar miembros
-  const miembrosOrdenados = [...miembros].sort((a, b) => {
+  const miembrosOrdenados = [...members].sort((a, b) => {
+    const brechaA = a.hoursAsana - a.targetHours;
+    const brechaB = b.hoursAsana - b.targetHours;
+    
     if (sortMode === 'brecha') {
-      return b.brecha_objetivo - a.brecha_objetivo;
+      return brechaB - brechaA;
     } else {
-      return b.porcentaje_progreso - a.porcentaje_progreso;
+      const pctA = a.targetHours > 0 ? (a.hoursAsana / a.targetHours) * 100 : 0;
+      const pctB = b.targetHours > 0 ? (b.hoursAsana / b.targetHours) * 100 : 0;
+      return pctB - pctA;
     }
   });
 
@@ -150,53 +142,22 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
               Análisis de Tiempo
             </h2>
             <p className="text-gray-500 mt-1 text-sm">
-              Período: <span className="font-medium">{timeFilter.replace('_', ' ').toUpperCase()}</span> • 
-              Solo datos de tiempo (sin información financiera)
+              Período: <span className="font-medium">{period}</span> • 
+              Datos del Excel MAESTRO
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowConfig(!showConfig)}
-              className="flex items-center gap-2"
-            >
-              <Settings className="w-4 h-4" />
-              {showConfig ? 'Ocultar Config' : 'Configurar'}
-            </Button>
-          </div>
         </div>
-
-        {/* Panel de configuración */}
-        {showConfig && (
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <Label className="text-sm font-medium text-gray-700">Modo Promedio Diario</Label>
-                <p className="text-sm text-gray-500 mt-1">{configuracion.modoPromedio}</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-700">Umbral "Completo"</Label>
-                <p className="text-sm text-gray-500 mt-1">{configuracion.umbralCompleto}% del objetivo</p>
-              </div>
-              <div>
-                <Label className="text-sm font-medium text-gray-700">Período Analizado</Label>
-                <p className="text-sm text-gray-500 mt-1">{configuracion.diasTranscurridos} días hábiles</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Alertas */}
-      {validaciones.noDataForPeriod && (
+      {/* Alerta si no hay datos */}
+      {summary.totalAsanaHours === 0 && members.length === 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
             <div>
               <h4 className="font-medium text-red-900">Sin datos para el período</h4>
               <p className="text-sm text-red-700 mt-1">
-                No se encontraron registros de tiempo para {timeFilter}. Verifica los datos del Excel MAESTRO.
+                No se encontraron registros de tiempo para {period}. Verifica los datos del Excel MAESTRO.
               </p>
             </div>
           </div>
@@ -221,13 +182,13 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             </div>
             <div className="space-y-2">
               <div className="text-2xl font-bold text-blue-600">
-                {cards.totalRegistrado.porcentajeRegistrado}%
+                {(summary.progressPct * 100).toFixed(1)}%
               </div>
               <div className="text-xs text-gray-700">
-                {cards.totalRegistrado.horasRegistradas}h de {cards.totalRegistrado.horasObjetivo}h
+                {summary.totalAsanaHours}h de {summary.estimatedHours}h
               </div>
               <Progress 
-                value={Math.min(cards.totalRegistrado.porcentajeRegistrado, 100)} 
+                value={Math.min(summary.progressPct * 100, 100)} 
                 className="h-1.5 bg-gray-200"
               />
             </div>
@@ -250,13 +211,13 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             </div>
             <div className="space-y-2">
               <div className="text-2xl font-bold text-emerald-600">
-                {cards.miembrosActivos.activos}
+                {summary.membersActive}
               </div>
               <div className="text-xs text-gray-700">
-                de {cards.miembrosActivos.asignados} asignados
+                de {members.length} asignados
               </div>
               <Progress 
-                value={(cards.miembrosActivos.activos / cards.miembrosActivos.asignados) * 100} 
+                value={(summary.membersActive / Math.max(members.length, 1)) * 100} 
                 className="h-1.5 bg-gray-200 [&>div]:bg-emerald-500"
               />
             </div>
@@ -279,10 +240,10 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             </div>
             <div className="space-y-2">
               <div className="text-2xl font-bold text-orange-600">
-                {cards.horasTrabajadas.horas}h
+                {summary.totalAsanaHours}h
               </div>
               <div className="text-xs text-gray-700">
-                de {cards.horasTrabajadas.estimadas}h estimadas
+                de {summary.estimatedHours}h estimadas
               </div>
             </div>
           </CardContent>
@@ -304,10 +265,10 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             </div>
             <div className="space-y-2">
               <div className="text-2xl font-bold text-purple-600">
-                {cards.promedioDiario.promedio}h
+                {summary.avgDailyHoursPerMember}h
               </div>
               <div className="text-xs text-gray-700">
-                en {configuracion.diasTranscurridos} días hábiles
+                promedio del período
               </div>
             </div>
           </CardContent>
@@ -320,7 +281,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg text-gray-900">Detalle por Miembro</CardTitle>
-              <p className="text-sm text-gray-500 mt-1">{miembros.length} miembros en el equipo</p>
+              <p className="text-sm text-gray-500 mt-1">{members.length} miembros en el equipo</p>
             </div>
             <div className="flex items-center gap-3">
               <Label className="text-sm font-medium text-gray-700">Ordenar por:</Label>
@@ -337,79 +298,68 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
         </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-4">
-            {miembrosOrdenados.map((miembro, index) => {
-              const memberStatus = getMemberStatus(miembro.porcentaje_progreso);
-              const StatusIcon = memberStatus.icon;
+            {miembrosOrdenados.map((m, index) => {
+              const statusInfo = getStatusColor(m.status);
+              const StatusIcon = statusInfo.icon;
+              const porcentaje = m.targetHours > 0 ? (m.hoursAsana / m.targetHours) * 100 : 0;
+              const brecha = m.hoursAsana - m.targetHours;
               
               return (
                 <div
-                  key={`${miembro.persona}-${index}`}
+                  key={`${m.personId}-${index}`}
                   className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-center justify-between">
-                    {/* Información del miembro */}
                     <div className="flex items-center gap-3 flex-1">
-                      <div className={`p-2 rounded-full bg-${memberStatus.color}-100`}>
-                        <StatusIcon className={`w-4 h-4 text-${memberStatus.color}-600`} />
+                      <div className={`p-2 rounded-full bg-${statusInfo.color}-100`}>
+                        <StatusIcon className={`w-4 h-4 text-${statusInfo.color}-600`} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <h4 className="font-semibold text-gray-900 text-base">{miembro.persona}</h4>
-                            {miembro.rol && (
-                              <p className="text-sm text-gray-600">{miembro.rol}</p>
+                            <h4 className="font-semibold text-gray-900 text-base">{m.name}</h4>
+                            {m.roleName && m.roleName !== 'N/A' && (
+                              <p className="text-sm text-gray-600">{m.roleName}</p>
                             )}
                           </div>
                           <div className="text-right">
-                            <div className="text-xl font-bold text-gray-900">{miembro.hrs_real}h</div>
+                            <div className="text-xl font-bold text-gray-900">{m.hoursAsana}h</div>
                             <div className="text-xs text-gray-500">trabajadas</div>
                           </div>
                         </div>
                         
-                        {/* Barra de progreso */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-gray-600">
-                              {miembro.hrs_real}h de {miembro.hrs_obj}h objetivo
+                              {m.hoursAsana}h de {m.targetHours}h objetivo
                             </span>
-                            <span className={`font-bold text-${memberStatus.color}-600`}>
-                              {miembro.porcentaje_progreso}%
+                            <span className={`font-bold text-${statusInfo.color}-600`}>
+                              {porcentaje.toFixed(1)}%
                             </span>
                           </div>
                           <Progress 
-                            value={Math.min(miembro.porcentaje_progreso, 100)}
-                            className={`h-2 bg-gray-200 [&>div]:bg-${memberStatus.color}-500`}
+                            value={Math.min(porcentaje, 100)}
+                            className={`h-2 bg-gray-200 [&>div]:bg-${statusInfo.color}-500`}
                           />
                           
-                          {/* Indicadores adicionales */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge 
-                                className={`bg-${memberStatus.color}-100 text-${memberStatus.color}-800 border-${memberStatus.color}-300`}
-                              >
-                                {miembro.estado === 'completo' && '✅ Completo'}
-                                {miembro.estado === 'parcial' && '⏳ Parcial'}
-                                {miembro.estado === 'sin_registro' && '❌ Sin registro'}
-                              </Badge>
-                              {miembro.porcentaje_progreso > 100 && (
-                                <Badge className="bg-red-500 text-white">
-                                  🚨 Exceso tiempo
+                              {m.badges.map((badge, i) => (
+                                <Badge 
+                                  key={i}
+                                  className={`bg-${statusInfo.color}-100 text-${statusInfo.color}-800`}
+                                >
+                                  {badge}
                                 </Badge>
-                              )}
-                              {miembro.porcentaje_progreso === 100 && (
-                                <Badge className="bg-emerald-500 text-white">
-                                  ✅ Objetivo cumplido
-                                </Badge>
-                              )}
+                              ))}
                             </div>
                             
-                            {/* Brecha */}
-                            {miembro.brecha_objetivo !== 0 && (
+                            {brecha !== 0 && (
                               <div className={`text-sm font-medium ${
-                                miembro.brecha_objetivo > 0 ? 'text-red-600' : 'text-emerald-600'
+                                brecha > 0 ? 'text-red-600' : 'text-emerald-600'
                               }`}>
-                                {miembro.brecha_objetivo > 0 ? '↗️' : '↙️'} 
-                                Brecha: {miembro.brecha_objetivo > 0 ? '+' : ''}{miembro.brecha_objetivo}h
+                                {brecha > 0 ? '↗️' : '↙️'} 
+                                Brecha: {brecha > 0 ? '+' : ''}{brecha.toFixed(2)}h
                               </div>
                             )}
                           </div>
@@ -422,7 +372,7 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
             })}
           </div>
 
-          {miembros.length === 0 && (
+          {members.length === 0 && (
             <div className="text-center py-8">
               <Users className="h-8 w-8 text-gray-400 mx-auto mb-3" />
               <h3 className="text-base font-medium text-gray-900 mb-2">Sin registros de tiempo</h3>
@@ -435,11 +385,11 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
       {/* Footer */}
       <div className="text-center text-xs text-gray-500 py-3">
         <div className="flex items-center justify-center gap-3">
-          <span>Generado: {new Date(timeData.generatedAt).toLocaleString()}</span>
+          <span>Período: {period}</span>
           <span>•</span>
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Análisis exclusivo de tiempo
+            Datos del Excel MAESTRO
           </span>
         </div>
       </div>

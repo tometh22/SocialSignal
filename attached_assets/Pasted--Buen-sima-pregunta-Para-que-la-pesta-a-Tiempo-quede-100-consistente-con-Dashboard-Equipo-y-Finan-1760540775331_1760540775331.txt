@@ -1,0 +1,127 @@
+¡Buenísima pregunta! Para que la pestaña Tiempo quede 100% consistente con Dashboard, Equipo y Financiero, hay que hacer que lea exactamente la misma verdad (las 3 horas) y el mismo período/llaves que usa el resto.
+Te dejo el plan ya masticado —contrato de API, reglas de cálculo y checks— para que lo implementen tal cual.
+1) Una única fuente (3 tipos de horas)
+Todas las vistas (incluida Tiempo) deben leer del mismo agregado:
+targetHours ← Cantidad de horas objetivo (col. J / W)
+hoursAsana ← Cantidad de horas reales Asana (normalizada ANTI×100)
+hoursBilling ← Cantidad de horas para facturación (con fallback: facturación → asana → objetivo)
+Estas tres viven en actuals.teamBreakdown[] y sus totales en:
+actuals.totalAsanaHours, quotation.estimatedHours, actuals.totalBillingHours.
+2) Backend: endpoint consistente
+Ruta
+GET /api/projects/:id/time-tracking?period=YYYY-MM
+(Evitar timeFilter=august_2025; usar siempre period=2025-08 como en las demás rutas).
+Contrato (JSON)
+{
+  "projectId": 39,
+  "period": "2025-08",
+  "summary": {
+    "membersActive": 5,
+    "totalAsanaHours": 288.28,
+    "estimatedHours": 320,
+    "progressPct": 0.9009,              // totalAsanaHours / estimatedHours
+    "avgDailyHoursPerMember": 19.22     // ver cálculo abajo
+  },
+  "members": [
+    {
+      "personId": 5,
+      "name": "Trini Petreigne",
+      "roleName": "Dev",
+      "targetHours": 100,
+      "hoursAsana": 107.5,
+      "hoursBilling": 107.5,
+      "status": "exceso",                // exceso|cumplido|pendiente
+      "badges": ["Completo","Exceso tiempo"]
+    },
+    {
+      "personId": 2,
+      "name": "Sol Ayala",
+      "roleName": "Dev",
+      "targetHours": 100,
+      "hoursAsana": 101.33,
+      "hoursBilling": 101.33,
+      "status": "exceso",
+      "badges": ["Completo","Exceso tiempo"]
+    }
+    // ...
+  ]
+}
+Reglas del endpoint
+Periodo: usa period_key (exacto) como en /complete-data.
+Fuente: NO releer Excel directo; toma de project_aggregates.actuals_data (la misma que usa Dashboard/Equipo).
+Normalización: ya viene hecha. Si llegan legacy (hours=10133), aplicar ANTI×100 en la hidratación.
+Miembros activos: count(members where hoursAsana>0 or hoursBilling>0).
+Promedio diario:
+avgDailyHoursPerMember = totalAsanaHours / (diasHabiles(period) * max(membersActive,1)).
+(O mantener tu fórmula actual, pero que siempre use totalAsanaHours.)
+Status por persona:
+exceso si hoursAsana > targetHours
+cumplido si hoursAsana === targetHours (± tolerancia)
+pendiente si hoursAsana < targetHours
+3) Frontend: uso correcto en la pestaña Tiempo
+Query: useQuery(['time-tracking', projectId, period], () => GET /time-tracking?period=YYYY-MM)
+Cards superiores:
+Progreso total: summary.progressPct y 288.28h de 320h
+Equipo activo: summary.membersActive / teamAssigned (si lo tenés)
+Horas trabajadas: summary.totalAsanaHours
+Promedio diario: summary.avgDailyHoursPerMember
+Detalle por miembro:
+Texto: hoursAsana de targetHours
+Barra: progreso = hoursAsana / targetHours
+Badges: según status (Exceso / Cumplido / Pendiente)
+Ordenar por: brechaObjetivo = hoursAsana - targetHours (desc/asc)
+Importante: Tiempo nunca muestra plata. Evita mezclar hoursBilling aquí (se usa en Costos/Financiero), pero sí podés mostrarla en un tooltip como “horas imputadas a costo”.
+4) Invariantes y checks (fail-fast)
+Poné estas aserciones en DEV:
+// Resumen
+console.assert(Math.abs(
+  members.reduce((a,m)=>a+(m.hoursAsana||0),0) - summary.totalAsanaHours
+) < 1e-6, '[Tiempo] Σ horasAsana != totalAsanaHours');
+
+console.assert(Math.abs(
+  members.reduce((a,m)=>a+(m.targetHours||0),0) - summary.estimatedHours
+) < 1e-6, '[Tiempo] Σ targetHours != estimatedHours');
+
+// Consistencia cross-tab
+console.assert(summary.totalAsanaHours === vm.totalAsanaHours, '[Tiempo] totalAsanaHours != Dashboard');
+console.assert(summary.estimatedHours === vm.estimatedHours,   '[Tiempo] estimatedHours != Dashboard');
+5) Qué se corrige del screenshot
+El endpoint ahora existe y consume el mismo agregado que Equipo/Dashboard.
+“Horas trabajadas” = 288.28h (ya está OK).
+“Progreso total 90.09%” = 288.28 / 320 (OK).
+Las filas muestran “N horas de M objetivo” con badges correctos (no más “N/A”, no más “Sin horas asignadas”).
+6) Mini-diff (back y front) — guía rápida
+Back (routes.ts o controller)
+router.get('/api/projects/:id/time-tracking', async (req, res) => {
+  const { id } = req.params;
+  const period = req.query.period as string; // '2025-08'
+  const agg = await loadProjectAggregate(id, period); // mismo que complete-data
+
+  const tb = (agg.actuals_data.teamBreakdown ?? []).map(hydrateLegacyHours(fxMes));
+  const summary = {
+    membersActive: tb.filter(m => (m.hoursAsana||0) > 0 || (m.hoursBilling||0) > 0).length,
+    totalAsanaHours: sum(tb.map(m=>m.hoursAsana||0)),
+    estimatedHours: sum(tb.map(m=>m.targetHours||0)),
+  };
+  const dias = businessDays(period);
+  const avgDaily = summary.totalAsanaHours / (dias * Math.max(summary.membersActive,1));
+
+  res.json({
+    projectId: +id, period,
+    summary: { ...summary, progressPct: safeDiv(summary.totalAsanaHours, summary.estimatedHours), avgDailyHoursPerMember: +avgDaily.toFixed(2) },
+    members: tb.map(m => ({
+      personId: m.personId, name: m.name, roleName: m.roleName,
+      targetHours: m.targetHours, hoursAsana: m.hoursAsana, hoursBilling: m.hoursBilling,
+      status: m.hoursAsana > m.targetHours ? 'exceso' : (m.hoursAsana === m.targetHours ? 'cumplido' : 'pendiente'),
+      badges: m.hoursAsana > m.targetHours ? ['Completo','Exceso tiempo'] : (m.hoursAsana === m.targetHours ? ['Completo','Objetivo cumplido'] : [])
+    }))
+  });
+});
+Front (TimeTracking.tsx)
+Reemplazar queryKey a ['time-tracking', projectId, period].
+Usar data.summary.* y data.members[] según contrato de arriba.
+Con esto:
+Tiempo muestra exactamente lo que Equipo/Dashboard usan (misma suma, mismo período, misma lógica).
+Desaparecen “N/A”, “Sin horas asignadas” y cualquier número “×100”.
+Podés auditar 1:1 con tus hojas: 288.28/320 y miembros 5 en Agosto-2025.
+¿Querés que te pase un snippet de businessDays(period) (sin lib externa) o el pequeño hook de React Query para el front?
