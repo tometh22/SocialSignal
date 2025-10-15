@@ -11447,6 +11447,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔄 RECOMPUTE AGGREGATES - Recalculate all agg_project_month
+  app.post("/api/etl/sot/recompute-aggregates", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Recomputing all aggregates from fact tables...');
+      
+      const { computeAggProjectMonth } = await import('./etl/sot-etl');
+      const { factLaborMonth } = await import('../shared/schema');
+      
+      // Get all distinct project_id + period_key combinations
+      const combinations = await db.selectDistinct({
+        projectId: factLaborMonth.projectId,
+        periodKey: factLaborMonth.periodKey
+      })
+      .from(factLaborMonth);
+      
+      console.log(`📊 Found ${combinations.length} project/period combinations to recompute`);
+      
+      let recomputed = 0;
+      for (const { projectId, periodKey } of combinations) {
+        if (projectId && periodKey) {
+          await computeAggProjectMonth(projectId, periodKey);
+          recomputed++;
+        }
+      }
+      
+      res.json({
+        success: true,
+        recomputed,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Recompute Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  
