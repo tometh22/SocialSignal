@@ -2380,3 +2380,137 @@ export interface QuotationData {
   totalAmountUSD?: number | null;
   estimatedHours?: number;  // Suma de targetHours
 }
+
+// ==================== SINGLE SOURCE OF TRUTH (SoT) - STAR SCHEMA ====================
+
+// Dimensión: Períodos
+export const dimPeriod = pgTable("dim_period", {
+  periodKey: varchar("period_key", { length: 7 }).primaryKey(), // 'YYYY-MM'
+  year: integer("year").notNull(),
+  month: integer("month").notNull(),
+  firstDay: timestamp("first_day").notNull(),
+  businessDays: integer("business_days"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDimPeriodSchema = createInsertSchema(dimPeriod).omit({ createdAt: true });
+export type DimPeriod = typeof dimPeriod.$inferSelect;
+export type InsertDimPeriod = z.infer<typeof insertDimPeriodSchema>;
+
+// Hechos: Rendimiento Cliente (RC) por proyecto/mes
+export const factRCMonth = pgTable("fact_rc_month", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
+  
+  // Ingresos/costos en USD
+  revenueUSD: numeric("revenue_usd", { precision: 12, scale: 2 }),
+  costUSD: numeric("cost_usd", { precision: 12, scale: 2 }),
+  
+  // Ingresos/costos en ARS
+  revenueARS: numeric("revenue_ars", { precision: 14, scale: 2 }),
+  costARS: numeric("cost_ars", { precision: 14, scale: 2 }),
+  
+  // Precio del mes (denominador presupuesto)
+  priceNative: numeric("price_native", { precision: 12, scale: 2 }),
+  
+  // Tipo de cambio
+  fx: numeric("fx", { precision: 10, scale: 4 }),
+  
+  // Metadata
+  sourceRowId: text("source_row_id"),
+  loadedAt: timestamp("loaded_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueProjectPeriod: unique().on(table.projectId, table.periodKey)
+}));
+
+export const insertFactRCMonthSchema = createInsertSchema(factRCMonth).omit({ 
+  id: true, 
+  loadedAt: true 
+});
+export type FactRCMonth = typeof factRCMonth.$inferSelect;
+export type InsertFactRCMonth = z.infer<typeof insertFactRCMonthSchema>;
+
+// Hechos: Labor/Costos directos por proyecto/persona/mes
+export const factLaborMonth = pgTable("fact_labor_month", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  personId: integer("person_id").references(() => personnel.id),
+  periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
+  
+  // Claves normalizadas para matching
+  clientKey: varchar("client_key", { length: 255 }),
+  projectKey: varchar("project_key", { length: 255 }),
+  personKey: varchar("person_key", { length: 255 }),
+  
+  // 3 tipos de horas
+  targetHours: numeric("target_hours", { precision: 10, scale: 2 }).default('0'),
+  asanaHours: numeric("asana_hours", { precision: 10, scale: 2 }).default('0'),
+  billingHours: numeric("billing_hours", { precision: 10, scale: 2 }).default('0'),
+  
+  // Valores y costos
+  hourlyRateARS: numeric("hourly_rate_ars", { precision: 10, scale: 2 }),
+  costARS: numeric("cost_ars", { precision: 12, scale: 2 }),
+  costUSD: numeric("cost_usd", { precision: 12, scale: 2 }),
+  fx: numeric("fx", { precision: 10, scale: 4 }),
+  
+  // Rol
+  roleName: varchar("role_name", { length: 100 }),
+  
+  // Flags y metadata
+  flags: jsonb("flags").default([]),
+  sourceRowId: text("source_row_id"),
+  loadedAt: timestamp("loaded_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueProjectPersonPeriod: unique().on(table.projectId, table.personKey, table.periodKey)
+}));
+
+export const insertFactLaborMonthSchema = createInsertSchema(factLaborMonth).omit({ 
+  id: true, 
+  loadedAt: true 
+});
+export type FactLaborMonth = typeof factLaborMonth.$inferSelect;
+export type InsertFactLaborMonth = z.infer<typeof insertFactLaborMonthSchema>;
+
+// Agregado: Proyecto/Mes precalculado (SSOT para dashboards)
+export const aggProjectMonth = pgTable("agg_project_month", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
+  
+  // Horas agregadas
+  estHours: numeric("est_hours", { precision: 10, scale: 2 }),
+  totalAsanaHours: numeric("total_asana_hours", { precision: 10, scale: 2 }),
+  totalBillingHours: numeric("total_billing_hours", { precision: 10, scale: 2 }),
+  
+  // Costos agregados
+  totalCostARS: numeric("total_cost_ars", { precision: 14, scale: 2 }),
+  totalCostUSD: numeric("total_cost_usd", { precision: 12, scale: 2 }),
+  
+  // Vista Operativa (precalculada según moneda nativa)
+  viewOperativaRevenue: numeric("view_operativa_revenue", { precision: 12, scale: 2 }),
+  viewOperativaCost: numeric("view_operativa_cost", { precision: 12, scale: 2 }),
+  viewOperativaDenom: numeric("view_operativa_denom", { precision: 12, scale: 2 }), // Presupuesto/precio
+  viewOperativaMarkup: numeric("view_operativa_markup", { precision: 10, scale: 4 }),
+  viewOperativaMargin: numeric("view_operativa_margin", { precision: 10, scale: 4 }),
+  viewOperativaBudgetUtil: numeric("view_operativa_budget_util", { precision: 10, scale: 4 }),
+  
+  // Datos de RC (auditoría)
+  rcRevenueNative: numeric("rc_revenue_native", { precision: 12, scale: 2 }),
+  rcCostNative: numeric("rc_cost_native", { precision: 12, scale: 2 }),
+  rcPriceNative: numeric("rc_price_native", { precision: 12, scale: 2 }),
+  fx: numeric("fx", { precision: 10, scale: 4 }),
+  
+  // Flags y metadata
+  flags: jsonb("flags").default([]),
+  computedAt: timestamp("computed_at").notNull().defaultNow(),
+}, (table) => ({
+  uniqueProjectPeriod: unique().on(table.projectId, table.periodKey)
+}));
+
+export const insertAggProjectMonthSchema = createInsertSchema(aggProjectMonth).omit({ 
+  id: true, 
+  computedAt: true 
+});
+export type AggProjectMonth = typeof aggProjectMonth.$inferSelect;
+export type InsertAggProjectMonth = z.infer<typeof insertAggProjectMonthSchema>;

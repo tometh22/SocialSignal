@@ -1,0 +1,104 @@
+Lo correcto es tener una única fuente de verdad por período que contenga agregados (ingresos/costos del proyecto) y línea por persona (horas + costos normalizados). Luego cada pestaña lee lo que necesita desde ahí. Te dejo un diseño compacto y accionable.
+Arquitectura de datos propuesta (SoT única)
+Tablas (star schema)
+Dimensiones
+dim_client(id, name_norm, name_raw)
+dim_project(id, client_id, name_norm, name_raw, currency_native)
+dim_person(id, name_norm, name_raw, role_name)
+dim_period(period_key, year, month, first_day, business_days)
+Hechos
+fact_rc_month(project_id, period_key, revenue_native, cost_native, price_native, fx, revenue_usd, cost_usd, source_row_id, loaded_at)
+“Rendimiento Cliente” por proyecto/mes (precio del mes = denom)
+fact_labor_month(project_id, person_id, period_key, target_hours, asana_hours, billing_hours, hourly_rate_ars, cost_ars, cost_usd, fx, flags_json, source_row_id, loaded_at)
+Línea por persona y mes con las 3 horas y costos normalizados.
+Agregado/materializado
+agg_project_month(project_id, period_key, est_hours, total_asana_hours, total_billing_hours, total_cost_ars, total_cost_usd, // vistas precalculadas: view_operativa_revenue, view_operativa_cost, view_operativa_denom, view_operativa_markup, view_operativa_margin, view_operativa_budget_util, // auditoría rc_revenue_native, rc_cost_native, rc_price_native, fx, flags_json, computed_at)
+Precálculo para Dashboard/Financiero (write once, read many).
+Claves e índices
+PK fact_labor_month: (project_id, person_id, period_key)
+PK fact_rc_month: (project_id, period_key)
+PK agg_project_month: (project_id, period_key)
+Índices por period_key y project_id para todas.
+Ingesta/Normalización (ETL)
+Reglas clave
+period_key = YYYY-MM (zero-padded) a partir de Mes/Año.
+ANTI×100: si una hora > 500 → dividir por 100.
+billing_hours = prefer(billing_raw, asana_hours, target_hours)
+cost_ars = prefer(sheet_total_ars, billing_hours * hourly_rate_ars)
+cost_usd = prefer(sheet_total_usd, cost_ars / fx)
+Normalizar strings: lower, trim, quitar tildes; “Directo” exacto.
+Invariantes al cerrar el período
+Σ target_hours = est_hours
+Σ asana_hours = total_asana_hours
+Σ billing_hours = total_billing_hours
+Σ cost_{ars,usd} = total_cost_{ars,usd}
+APIs (solo desde la SoT)
+GET /projects/:id/complete-data?period=YYYY-MM&view=operativa
+Lee agg_project_month y adjunta teamBreakdown desde fact_labor_month.
+GET /projects/:id/time-tracking?period=YYYY-MM
+Suma y lista horas Asana/objetivo desde fact_labor_month.
+GET /projects/:id/costs?period=YYYY-MM
+Devuelve líneas por persona (para Costos/Equipo).
+GET /projects/:id/periods
+Periodos disponibles con members_count, has_rc.
+La UI no toca planillas ni calcula FX. Todo sale de estas tablas.
+DDL de referencia (resumido)
+CREATE TABLE dim_period(
+  period_key char(7) PRIMARY KEY, -- '2025-07'
+  year int, month int, first_day date, business_days int
+);
+
+CREATE TABLE fact_rc_month(
+  project_id int, period_key char(7),
+  revenue_native numeric, cost_native numeric, price_native numeric,
+  fx numeric, revenue_usd numeric, cost_usd numeric,
+  source_row_id text, loaded_at timestamptz default now(),
+  PRIMARY KEY(project_id, period_key),
+  FOREIGN KEY(period_key) REFERENCES dim_period(period_key)
+);
+
+CREATE TABLE fact_labor_month(
+  project_id int, person_id int, period_key char(7),
+  target_hours numeric, asana_hours numeric, billing_hours numeric,
+  hourly_rate_ars numeric, cost_ars numeric, cost_usd numeric, fx numeric,
+  flags_json jsonb default '[]',
+  source_row_id text, loaded_at timestamptz default now(),
+  PRIMARY KEY(project_id, person_id, period_key),
+  FOREIGN KEY(period_key) REFERENCES dim_period(period_key)
+);
+
+CREATE TABLE agg_project_month(
+  project_id int, period_key char(7),
+  est_hours numeric, total_asana_hours numeric, total_billing_hours numeric,
+  total_cost_ars numeric, total_cost_usd numeric,
+  view_operativa_revenue numeric, view_operativa_cost numeric, view_operativa_denom numeric,
+  view_operativa_markup numeric, view_operativa_margin numeric, view_operativa_budget_util numeric,
+  rc_revenue_native numeric, rc_cost_native numeric, rc_price_native numeric, fx numeric,
+  flags_json jsonb default '[]', computed_at timestamptz default now(),
+  PRIMARY KEY(project_id, period_key),
+  FOREIGN KEY(period_key) REFERENCES dim_period(period_key)
+);
+Contratos que consumen las pestañas
+Dashboard/Financiero → agg_project_month (KPIs, % presupuesto, markup/margen).
+Equipo → fact_labor_month (por persona: target/asana/billing, rate, cost).
+Tiempo → fact_labor_month (solo horas target/asana, progreso).
+Costos → fact_labor_month (costos por persona y totales).
+Ingresos → fact_rc_month (ingresos del período).
+Migración en 6 pasos
+Crear tablas dim_*, fact_*, agg_*.
+Backfill desde planillas → fact_labor_month y fact_rc_month (jul–dic por ejemplo).
+Computar agg_project_month (job diario y on-demand).
+Cambiar API para leer exclusivamente estas tablas.
+Hacer feature switch en FE para las nuevas rutas (per-period key).
+Agregar flags y auditoría (mismatch RC vs detalle >10%).
+Beneficios
+Consistencia total: todas las vistas leen la misma verdad por período.
+Velocidad: KPIs precalculados; sin recomputar ni tocar planillas.
+Auditoría: trazabilidad por source_row_id y flags.
+Escalabilidad: nuevos dashboards = nuevas queries, no nuevos cálculos.
+Si querés, te paso un script de backfill (Node/TS) que:
+parsea Mes/Año → period_key,
+aplica ANTI×100,
+genera fact_labor_month y fact_rc_month,
+computa agg_project_month,
+y te imprime los invariantes por proyecto/mes

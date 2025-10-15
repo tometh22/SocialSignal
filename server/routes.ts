@@ -11334,6 +11334,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🌟 SOT ETL ENDPOINT - Star Schema Data Pipeline
+  app.post("/api/etl/sot/run", requireAuth, async (req, res) => {
+    try {
+      console.log('🌟 SoT ETL API: Starting Star Schema ETL process...');
+      
+      // Import services
+      const { executeSoTETL } = await import('./etl/sot-etl');
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      // 1. Read Excel MAESTRO data
+      console.log('📊 Reading Excel MAESTRO sheets...');
+      
+      // Read "Costos directos e indirectos" sheet
+      const costosRaw = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        'Costos directos e indirectos'
+      );
+      
+      // Read "Rendimiento Cliente" sheet
+      const rcRaw = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        'Rendimiento Cliente'
+      );
+      
+      console.log(`📋 Read ${costosRaw.length} rows from Costos directos, ${rcRaw.length} rows from RC`);
+      
+      // 2. Parse headers and convert to objects
+      const costosHeaders = costosRaw[0] || [];
+      const rcHeaders = rcRaw[0] || [];
+      
+      const costosRows = costosRaw.slice(1).map((row, idx) => {
+        const obj: any = { __rowId: `costos_${idx}` };
+        costosHeaders.forEach((header, i) => {
+          obj[header] = row[i];
+        });
+        return obj;
+      });
+      
+      const rcRows = rcRaw.slice(1).map((row, idx) => {
+        const obj: any = { __rowId: `rc_${idx}` };
+        rcHeaders.forEach((header, i) => {
+          obj[header] = row[i];
+        });
+        return obj;
+      });
+      
+      console.log(`📦 Parsed ${costosRows.length} costo objects, ${rcRows.length} RC objects`);
+      
+      // 3. Execute SoT ETL
+      const result = await executeSoTETL(costosRows, rcRows);
+      
+      res.json({
+        success: result.success,
+        summary: {
+          periods: result.periodsProcessed,
+          laborRows: result.laborRowsProcessed,
+          rcRows: result.rcRowsProcessed,
+          aggregates: result.aggregatesComputed,
+          executionTimeMs: result.executionTimeMs
+        },
+        errors: result.errors,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ SoT ETL API Error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  

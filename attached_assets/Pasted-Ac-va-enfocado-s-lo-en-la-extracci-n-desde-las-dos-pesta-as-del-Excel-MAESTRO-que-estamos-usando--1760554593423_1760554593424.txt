@@ -1,0 +1,183 @@
+Acá va, enfocado sólo en la extracción desde las dos pestañas del Excel MAESTRO que estamos usando, con mapeo de columnas → campos de la SoT, normalizaciones y reglas. Incluyo pseudo-código del ETL para que lo implementes tal cual.
+1) Pestaña: Costos directos e indirectos → fact_labor_month
+Objetivo: construir una fila por persona, proyecto y período con las 3 horas (objetivo/asana/facturación), valor hora y costos en ARS/USD.
+1.1 Filtro y claves
+Incluir sólo: Tipo de Costo = "Directo" (normalizado, ver helper).
+Claves de join (normalizadas):
+client_key = normKey(Cliente)
+project_key = normKey(Proyecto)
+person_key = normKey(Detalle)
+Período: period_key = toPeriodKey(Mes, Año) → "YYYY-MM" (mes con cero).
+1.2 Mapeo de columnas → campos crudos
+Columna en Excel	Campo crudo (ETL)
+Cliente	client_name_raw
+Proyecto	project_name_raw
+Mes (ej. “07 jul”)	month_raw
+Año	year_raw
+Detalle (persona)	person_name_raw
+Subtipo/Tipo de costo	tipo_costo_raw
+Cantidad de horas objetivo (J / W)	target_hours_raw
+Cantidad de horas reales Asana (K / X)	asana_hours_raw
+Cantidad de horas para facturación (L)	billing_hours_raw (si existe)
+Valor hora ARS (N / Y)	hourly_rate_ars_raw
+Total ARS (O / Z)	total_ars_raw
+Cotización (FX) (Q)	fx_raw
+Monto Total USD (R / AA)	total_usd_raw
+Rol (si existe)	role_name_raw
+Nota: según tu hoja, las letras pueden variar por duplicado de bloques (ej. J/K/L/N/O/Q/R o W/X/Y/Z/AA…); el ETL debe tolerar ambos.
+1.3 Normalizaciones y reglas
+Strings: normKey = lower → trim → NFKD sin tildes → colapsar espacios.
+Números: parseNum("1.040.684,50") → 1040684.5 (quita separador de miles y usa . como decimal).
+ANTI×100: si una hora > 500 ⇒ dividir por 100 (error típico de carga) sólo en asana_hours y billing_hours. No en target_hours.
+Derivación de horas de facturación:
+billing_hours = prefer(billing_raw, asana_hours, target_hours).
+Costos:
+cost_ars = prefer(total_ars_sheet, billing_hours * hourly_rate_ars)
+cost_usd = prefer(total_usd_sheet, fx>0 ? cost_ars / fx : null)
+1.4 Pseudo-código (ETL)
+const MONTHS = {ene:'01',feb:'02',mar:'03',abr:'04',may:'05',jun:'06',
+                jul:'07',ago:'08',sep:'09',oct:'10',nov:'11',dic:'12'};
+
+const toPeriodKey = (mes:any, anio:any) => {
+  const y = String(anio).trim();
+  const s = String(mes).toLowerCase().trim();            // "07 jul" | "jul" | "7"
+  const mm = MONTHS[s.slice(-3)] ?? String(s).padStart(2,'0');
+  return `${y}-${mm}`;                                    // "2025-07"
+};
+
+const normKey = (s:string) =>
+  s?.toLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu,'')
+    .replace(/\s+/g,' ').trim();
+
+const parseNum = (x:any) => {
+  if (x==null || x==='') return 0;
+  const n = Number(String(x).replace(/\./g,'').replace(',','.'));
+  return Number.isFinite(n) ? n : 0;
+};
+
+for (const row of hojaCostos) {
+  // 1) Filtro
+  const tipo = normKey(row['Tipo de costo'] || row['Tipo de Coste']);
+  if (tipo !== 'directo') continue;
+
+  // 2) Claves
+  const period_key = toPeriodKey(row['Mes'], row['Año']);
+  const client_key = normKey(row['Cliente']);
+  const project_key = normKey(row['Proyecto']);
+  const person_key  = normKey(row['Detalle']);
+
+  // 3) Horas
+  const target = parseNum(row['Cantidad de horas objetivo']);
+  let asana  = parseNum(row['Cantidad de horas reales Asana']);
+  let bill   = parseNum(row['Cantidad de horas para facturación']);
+  if (asana > 500) asana /= 100;
+  if (bill  > 500) bill  /= 100;
+  const billing = bill || asana || target;
+
+  // 4) Valores y costos
+  const rateARS   = parseNum(row['Valor Hora'] ?? row['Valor hora ARS']);
+  const fx        = parseNum(row['Cotización'] ?? row['Tipo de cambio']);
+  const totalARSs = parseNum(row['Total ARS']);
+  const totalUSDs = parseNum(row['Monto Total USD']);
+
+  const costARS = totalARSs || (billing * rateARS);
+  const costUSD = totalUSDs || (fx>0 ? costARS / fx : 0);
+
+  // 5) Upsert -> fact_labor_month
+  upsertFactLaborMonth({
+    project_key, client_key, person_key, period_key,
+    target_hours: target,
+    asana_hours: asana,
+    billing_hours: billing,
+    hourly_rate_ars: rateARS,
+    cost_ars: costARS,
+    cost_usd: costUSD,
+    fx,
+    role_name: row['Rol'] ?? null,
+    flags: [
+      ...(asana>500 ? ['anti_x100_asana'] : []),
+      ...(bill>500 ? ['anti_x100_billing'] : []),
+      ...(bill ? [] : ['fallback_billing']),
+      ...(totalARSs ? [] : ['derived_cost_ars']),
+      ...(totalUSDs ? [] : ['derived_cost_usd'])
+    ],
+    source_row_id: row.__rowId
+  });
+}
+2) Pestaña: Rendimiento de Cliente → fact_rc_month
+Objetivo: traer ingresos/costos mensuales del proyecto y el precio del mes (denominador del presupuesto). Es la fuente para “Ingresos” y para la vista financiera (Dashboard/Financiero).
+2.1 Mapeo de columnas → campos crudos
+Columna en Excel	Campo crudo (ETL)	Nota
+Cliente / Proyecto	client_name_raw / project_name_raw	normalizados
+Mes / Año	month_raw / year_raw	para period_key
+Facturación [USD] (F)	revenue_usd_raw	si el cliente factura en USD
+Costos [USD] (G)	cost_usd_raw	
+Facturación [ARS] (I)	revenue_ars_raw	si factura en ARS
+Costos [ARS] (J)	cost_ars_raw	
+Cotización (E o campo “Cotización/Precio”)	price_native_raw	Precio del mes (denominador), no FX bancario
+FX (si está)	fx_raw	para conversión nativa↔USD si hace falta
+Ejemplo cliente USD (Kimberly): price_native_raw = 8,450 (precio mensual cotizado), no 1,345.
+2.2 Normalizaciones
+period_key = toPeriodKey(Mes, Año)
+revenue_usd/ars = parseNum(...), idem cost_..., price_native, fx.
+Determinar moneda nativa del proyecto (catálogo dim_project.currency_native).
+2.3 Pseudo-código (ETL)
+for (const row of hojaRC) {
+  const period_key = toPeriodKey(row['Mes'], row['Año']);
+  const client_key = normKey(row['Cliente']);
+  const project_key = normKey(row['Proyecto']);
+
+  const revenue_usd = parseNum(row['Facturación [USD]']);
+  const cost_usd    = parseNum(row['Costos [USD]']);
+  const revenue_ars = parseNum(row['Facturación [ARS]']);
+  const cost_ars    = parseNum(row['Costos [ARS]']);
+  const price_native = parseNum(row['Cotización']); // <- PRECIO del mes
+  const fx = parseNum(row['FX'] ?? row['Tipo de cambio']);
+
+  upsertFactRCMonth({
+    project_key, client_key, period_key,
+    revenue_usd, cost_usd, revenue_ars, cost_ars,
+    price_native, fx,
+    source_row_id: row.__rowId
+  });
+}
+3) Cómo se combina todo (derivación del agregado) → agg_project_month
+De fact_labor_month (mismo project_id, period_key):
+est_hours = Σ target_hours
+total_asana_hours = Σ asana_hours
+total_billing_hours = Σ billing_hours
+total_cost_ars = Σ cost_ars
+total_cost_usd = Σ cost_usd
+De fact_rc_month (mismo project_id, period_key):
+rc_revenue_native, rc_cost_native, rc_price_native (= denom), fx
+Vista Operativa (según moneda nativa del proyecto):
+Cliente USD:
+revenue = revenue_usd, cost = total_cost_usd o rc_cost_usd (según política),
+denom = rc_price_native (ej. 8,450)
+Cliente ARS:
+revenue = revenue_ars, cost = total_cost_ars, denom = rc_price_native (ARS)
+KPIs:
+budget_util = cost / denom
+markup = revenue / cost (si cost>0)
+margin = (revenue - cost) / revenue (si revenue>0)
+Recomendación: para operación/rentabilidad, usar costos desde fact_labor_month (detalle) y reservar cost_rc para control financiero. Si hay diferencia >10% ⇒ flag labor_vs_rc_cost_mismatch.
+4) Validaciones que deben pasar
+Por project+period:
+Σ target_hours === agg.est_hours
+Σ asana_hours === agg.total_asana_hours
+Σ billing_hours === agg.total_billing_hours
+Σ cost_usd/ars (detalle) === agg.total_cost_usd/ars
+En vista operativa:
+budget_util === cost / denom
+Moneda consistente (no mezclar ARS/USD).
+5) Qué usa cada pestaña (desde la SoT)
+Dashboard/Financiero → agg_project_month (KPIs + horas totales).
+Equipo → fact_labor_month (por persona).
+Tiempo → fact_labor_month (horas) + agg.est_hours.
+Costos → fact_labor_month (detalle) + agg.total_cost_*.
+Ingresos → fact_rc_month.
+Mini-ejemplo (Kimberly – Ago/2025)
+Costos directos: Σtarget=320, Σasana=288.28 (ANTI×100), Σbilling=288.28, Σcost_usd≈2,436.09
+Rendimiento Cliente: revenue_usd=8,450, price_native=8,450 (denom)
+Agg: budget_util ≈ 4,098.44 / 8,450 = 48.5%, markup ≈ 2.06x, margin ≈ 51.5%
+Si querés, te paso estos helpers listos en TS (toPeriodKey, parseNum, normKey, prefer) en un archivo etl/utils.ts para no duplicar lógica entre las dos extracciones.
