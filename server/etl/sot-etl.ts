@@ -184,6 +184,8 @@ export interface CostoDirectoRow {
   Año?: string | number;
   Detalle?: string; // Persona
   'Tipo de Costo'?: string;
+  'Tipo de Coste'?: string; // Variante header
+  'Tipo Costo'?: string; // Variante header
   'Cantidad de horas objetivo'?: any;
   'Cantidad de horas reales Asana'?: any;
   'Cantidad de horas para facturación'?: any;
@@ -650,7 +652,8 @@ export async function executeSoTETL(
     
     return result;
     
-  } catch (error) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('❌ [SoT ETL] Error ejecutando ETL:', error);
     return {
       success: false,
@@ -658,7 +661,7 @@ export async function executeSoTETL(
       laborRowsProcessed: 0,
       rcRowsProcessed: 0,
       aggregatesComputed: 0,
-      errors: [error.message],
+      errors: [errorMessage],
       executionTimeMs: Date.now() - startTime
     };
   }

@@ -1,0 +1,115 @@
+¡Vamos con un checklist robusto end-to-end para validar que TODO quedó bien implementado y que backend y frontend están conectados sin fugas—independiente del período seleccionado.
+0) Periodo / claves
+ El selector de UI siempre envía period=YYYY-MM (cero-padded).
+ Todas las queries (React Query) incluyen projectId, view, period en la queryKey:
+['project-complete', projectId, view, period]
+['time-tracking', projectId, period]
+['project-costs', projectId, period]
+ Al cambiar período no hay mezclas de cache (keepPreviousData:false y states con defaults).
+1) Extracción desde Excel (2 pestañas)
+1.1 Costos directos e indirectos (solo “Directo”)
+ Filtro normalizado Tipo de Costo = "Directo" (lower/trim/sin tildes).
+ period_key = toPeriodKey(Mes, Año) → 'YYYY-MM'.
+ Mapeo columnas:
+target_hours ← Cantidad de horas objetivo (J/W) (sin ANTI×100)
+asana_hours ← Cantidad de horas reales Asana (K/X) (ANTI×100 si >500)
+billing_hours ← Cantidad de horas para facturación (L) (ANTI×100 si >500; fallback: asana → target)
+hourly_rate_ars ← Valor Hora (N/Y)
+cost_ars ← Total ARS (O/Z) (si falta: billing_hours×rate)
+fx ← Cotización (Q)
+cost_usd ← Monto Total USD (R/AA) (si falta: cost_ars / fx)
+Persona/rol normalizados (+ IDs si existen).
+ Numeros: parseNum (quita miles y usa punto decimal).
+ Flags: anti_x100_*, fallback_billing, derived_cost_* si aplica.
+1.2 Rendimiento de Cliente
+ period_key consistente con la hoja de costos.
+ revenue_usd/ars, cost_usd/ars parseados.
+ price_native = precio del mes (denominador de presupuesto), no FX bancario.
+ fx presente si se requiere conversión referencial.
+2) ETL → Tablas SoT
+ Inserta/actualiza fact_labor_month(project_id, person_id, period_key) con:
+target_hours, asana_hours, billing_hours, hourly_rate_ars, cost_ars, cost_usd, fx, role_name, flags.
+ Inserta/actualiza fact_rc_month(project_id, period_key) con:
+revenue_native, cost_native, price_native, fx, revenue_usd, cost_usd.
+ Calcula agg_project_month(project_id, period_key):
+est_hours = Σ target_hours
+total_asana_hours = Σ asana_hours
+total_billing_hours = Σ billing_hours
+total_cost_ars/usd = Σ cost_ars/usd
+Vista Operativa (según moneda del proyecto):
+revenue, cost, denom(=price_native)
+budget_util = cost/denom, markup = revenue/cost, margin = (revenue-cost)/revenue
+Flags: labor_vs_rc_cost_mismatch si |Σdetalle − RC|/RC > 10%.
+3) Invariantes de datos (DB)
+ Σfact_labor_month.target_hours = agg.est_hours.
+ Σfact_labor_month.asana_hours = agg.total_asana_hours.
+ Σfact_labor_month.billing_hours = agg.total_billing_hours.
+ Σfact_labor_month.cost_usd/ars = agg.total_cost_usd/ars.
+ agg.view_operativa_budget_util = agg.view_operativa_cost / agg.view_operativa_denom.
+ No mezcla ARS/USD dentro de la misma vista.
+4) API (contratos vivos)
+ GET /api/projects/:id/complete-data?period=YYYY-MM&view=operativa
+quotation.estimatedHours, actuals.totalAsanaHours, actuals.totalBillingHours.
+actuals.teamBreakdown[] con las 3 horas + hourly_rate_ars, cost_ars/usd, roleName.
+views[view]: {revenue, cost, denom, budgetUtilization, markup, margin, currency}.
+Defaults seguros: arrays [], números 0 (nunca undefined).
+ GET /api/projects/:id/time-tracking?period=YYYY-MM
+summary: { totalAsanaHours, estimatedHours, progressPct, membersActive }
+members[]: { targetHours, hoursAsana, hoursBilling, name, roleName, status }
+Fuente: SoT (fact_labor_month/agg_project_month), no el Excel directo.
+ GET /api/projects/:id/costs?period=YYYY-MM (si lo usan)
+Detalle por persona (mismo shape que teamBreakdown).
+5) Frontend (mapeo por pestaña)
+Dashboard
+ Usa solo vm.views para finanzas (no recalcular): revenue/cost/denom/budgetUtilization/markup/margin.
+ “Total trabajado (h)” = vm.totalAsanaHours; “Horas objetivo” = vm.estimatedHours.
+Equipo
+ Tabla/fichas usan teamBreakdown:
+Progreso = hoursAsana / targetHours.
+$/h = cost(view) / hoursBilling (si hoursBilling>0).
+Costo mostrado según vista (USD/ARS).
+ Resumen: miembros, totalAsanaHours, estimatedHours, eff = totalAsana/estimated.
+Performance
+ Eficiencia equipo = totalAsanaHours / estimatedHours.
+ Rankings usan teamBreakdown + ponderación económica sobre cost(view).
+Tiempo
+ Resumen: summary.totalAsanaHours, summary.estimatedHours, progressPct.
+ Filas: hoursAsana de targetHours; badges por exceso/cumplido/pendiente.
+Costos / Financiero
+ Totales = agg.total_cost_(vista); detalle por persona de fact_labor_month.
+ Si Σdetalle difiere de RC >10% → badge/flag visible (si se configuró).
+6) Estados vacíos / cambios de período
+ Si no hay horas para el período (pero hay RC): Dashboard muestra RC; Equipo/Tiempo muestran empty state (no error).
+ Cambiar de período no produce spreads de undefined:
+No hay ...obj ni ...[arr] sobre undefined (usar ?? {} / ?? []).
+ Loading: skeletons antes de mapear arrays.
+7) Moneda / denominador
+ Cliente USD: currency='USD', denom=price_native_usd_del_mes (p. ej., 8,450), no FX.
+ Cliente ARS: currency='ARS', denom=price_native_ars_del_mes.
+ budgetUtilization y barras de presupuesto usan denom correcto.
+8) Pruebas funcionales (dos periodos contrastados)
+Caso USD (Kimberly 2025-08)
+ totalAsanaHours=288.28, estimatedHours=320.00.
+ Σcost_usd detalle ≈ 2,436.09; RC: revenue=8,450.
+ Dashboard: presupuesto usado ≈ 4,098.44 / 8,450 = 48.5%.
+ Equipo/Tiempo: progreso por persona (A/B pruebas con tu hoja).
+Caso ARS (un cliente local)
+ Vistas operativas en ARS; denom = price_native_ars.
+Caso sin horas (julio si aplica)
+ Dashboard muestra RC si existe; Equipo/Tiempo en empty-state sin errores.
+9) Observabilidad / logs (dev)
+ Log ETL por project+period: Σtarget/Σasana/Σbilling, Σcost_ars/usd, rc.fact/cost, denom, flags.
+ Log API por respuesta: tamaños de arrays y totales clave.
+ Aserciones (solo DEV):
+assertClose(sum(tb.map(t=>t.targetHours)), vm.estimatedHours, 'Σtarget != estimated');
+assertClose(sum(tb.map(t=>t.hoursAsana)),  vm.totalAsanaHours, 'Σasana != total');
+assertClose(sum(tb.map(t=>t.hoursBilling)),vm.totalBillingHours,'Σbilling != total');
+assertClose(vm.views.cost / vm.views.denom, vm.views.budgetUtilization, 'BU mismatch');
+10) Anti-regresiones (tests mínimos)
+ Parser numérico: “1.040.684,50” → 1040684.5.
+ ANTI×100: 10133 → 101.33 (solo Asana/Billing).
+ Fallback billing: billing ← asana ← target (con flags).
+ Paddings de período: “7” → “07”.
+ Moneda: no mezclar ARS/USD en la misma vista.
+ React Query: cambio de período refresca datos y no rompe el render.
+Si marcás todos estos checks, tenés consistencia total: Excel → ETL → SoT → API → UI. Si algo falla, dime proyecto+período y el punto exacto del checklist que no pasa, y lo depuramos quirúrgicamente.
