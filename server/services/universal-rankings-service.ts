@@ -1,18 +1,8 @@
 /**
- * Servicio universal de rankings que puede ser usado desde cualquier endpoint
- * Consolida toda la lógica en un solo lugar
+ * Servicio universal de rankings - REFACTORIZADO
+ * Usa el MISMO MOTOR (view-aggregator) que complete-data
+ * Arquitectura 3-hours: targetHours, hoursAsana, hoursBilling
  */
-
-import { resolveProject } from './project-resolver.js';
-import { resolvePeriod } from '../../shared/utils/project-config.js';
-import { 
-  computeRankings, 
-  filterByPeriod 
-} from '../../shared/utils/rankings-universal.js';
-import { 
-  adaptExcelToUniversal, 
-  formatForExistingInterface 
-} from '../../shared/utils/universal-adapter.js';
 
 export interface UniversalRankingsRequest {
   projectId: string | number;
@@ -37,137 +27,200 @@ export interface UniversalRankingsResponse {
   configuracion?: any;
 }
 
-export async function getUniversalRankings(request: UniversalRankingsRequest): Promise<UniversalRankingsResponse> {
-  // Validación defensiva contra llamadas incorrectas
-  if (!request || typeof request !== 'object') {
-    throw new Error(`Invalid request for getUniversalRankings: received ${typeof request}`);
-  }
-  
-  const { projectId, timeFilter = 'all', start, end } = request;
-  
-  console.log(`🌟 UNIVERSAL SERVICE: Computing rankings for project ${projectId}, filter ${timeFilter}`);
-  
-  // 1. Resolver configuración del proyecto (dinámico, sin hardcode)
-  const cfg = resolveProject({ projectId });
-  
-  // Obtener projectKey desde el resolvido de id
-  const idMapModule = await import('../../shared/config/project-id-map.json', { assert: { type: 'json' } });
-  const idMap = idMapModule.default;
-  const projectKey = (idMap as any)[String(projectId)] || 'kimberly_huggies';
-  
-  // 2. Resolver período temporal usando sistema universal
-  let period: { start: string; end: string };
-  try {
-    if (start && end) {
-      period = { start, end };
-    } else {
-      period = resolvePeriod(timeFilter || 'all', projectKey);
+/**
+ * Parse timeFilter to period (YYYY-MM)
+ */
+function parseTimeFilterToPeriod(timeFilter: string): string {
+  // august_2025 → 2025-08
+  const parts = timeFilter.split('_');
+  if (parts.length === 2) {
+    const monthMap: Record<string, string> = {
+      january: '01', february: '02', march: '03', april: '04',
+      may: '05', june: '06', july: '07', august: '08',
+      september: '09', october: '10', november: '11', december: '12'
+    };
+    const month = monthMap[parts[0].toLowerCase()];
+    const year = parts[1];
+    if (month && year) {
+      return `${year}-${month}`;
     }
-  } catch (error) {
-    console.warn(`⚠️ Unknown period format: ${timeFilter}, using current month`);
-    const now = new Date();
-    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    period = { start: currentMonth, end: currentMonth };
   }
   
-  console.log(`📅 Resolved period for ${timeFilter}:`, period);
-
-  // 3. Obtener datos raw 2D del Excel MAESTRO (para usar con índices numéricos)
-  const googleSheetsModule = await import('./googleSheetsWorking.js');
+  // Already in YYYY-MM format
+  if (/^\d{4}-\d{2}$/.test(timeFilter)) {
+    return timeFilter;
+  }
   
-  // Usar función que devuelve raw 2D arrays compatible con columnMap numérico
-  const rawData = await googleSheetsModule.googleSheetsWorkingService.getSheetValues(cfg.spreadsheetId, cfg.sheetName);
+  // Default: current month
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Calcula score de eficiencia individual (0-100)
+ * Basado en hoursAsana vs targetHours
+ */
+function calcularEficienciaScore(hoursAsana: number, targetHours: number): number {
+  if (targetHours === 0) return 70; // Sin objetivo = neutro
   
-
+  const efficiency = (hoursAsana / targetHours) * 100;
   
+  // Score basado en cumplimiento
+  if (efficiency <= 100) {
+    // Dentro o bajo objetivo: 70-100 pts
+    return 70 + (efficiency / 100) * 30;
+  } else {
+    // Sobre objetivo: penalización
+    const overrun = efficiency - 100;
+    return Math.max(0, 70 - overrun * 0.5); // -0.5 pts por cada % de sobrecosto
+  }
+}
 
+/**
+ * Calcula score de impacto económico (0-100)
+ * Combina eficiencia con participación en ingresos
+ */
+function calcularImpactoScore(
+  eficienciaScore: number, 
+  participacionPct: number
+): number {
+  // Participación típica: 5-30%
+  // Normalizar a 0-100: 30% participación = 100 pts
+  const participacionNormalizada = Math.min(100, (participacionPct / 30) * 100);
+  
+  // Impacto = eficiencia * peso de participación
+  return (eficienciaScore * participacionNormalizada) / 100;
+}
 
-  // 4. Convertir datos al formato universal
-  const universalRows = adaptExcelToUniversal(rawData, projectKey, projectId.toString());
-  console.log(`🔄 Converted ${rawData.length} Excel rows to ${universalRows.length} universal rows using config:`, cfg.columnMap);
+/**
+ * Clasificación por score
+ */
+function clasificar(score: number): { label: string; color: string } {
+  if (score >= 70) return { label: 'Excelente', color: 'text-green-600' };
+  if (score >= 50) return { label: 'Bueno', color: 'text-yellow-600' };
+  return { label: 'Crítico', color: 'text-red-600' };
+}
 
-  // 5. Filtrar por período temporal
-  const filteredRows = filterByPeriod(universalRows, period);
-  console.log(`📅 Filtered to ${filteredRows.length} rows for period ${period.start} to ${period.end}`);
+export async function getUniversalRankings(request: UniversalRankingsRequest): Promise<UniversalRankingsResponse> {
+  const { projectId, timeFilter = 'august_2025', start, end } = request;
+  
+  console.log(`🌟 UNIVERSAL RANKINGS (NEW): Project ${projectId}, filter ${timeFilter}`);
+  
+  try {
+    const numericProjectId = Number(projectId);
+    const period = parseTimeFilterToPeriod(timeFilter);
+    
+    // 🎯 USAR MISMO AGGREGATOR que complete-data (garantiza 3-hours + ANTI_×100)
+    const { getProjectPeriodView } = await import('../domain/view-aggregator.js');
+    const viewData = await getProjectPeriodView(numericProjectId, period, 'operativa');
 
-  if (filteredRows.length === 0) {
-    console.log('⚠️ No data found for the specified period');
+    if (!viewData) {
+      console.warn(`⚠️ No view data for project ${projectId}, period ${period}`);
+      return {
+        rankings: [],
+        totalEconomicoPeriodo: 0,
+        periodLabel: timeFilter,
+        period: { start: period, end: period },
+        metadata: {
+          universalSystem: true,
+          projectKey: `project_${projectId}`,
+          spreadsheetId: 'N/A',
+          filteredRows: 0,
+          originalRows: 0
+        }
+      };
+    }
+
+    const teamBreakdown = viewData.teamBreakdown || [];
+    const totalRevenue = viewData.revenueDisplay || 1;
+    
+    console.log(`📊 RANKINGS: Procesando ${teamBreakdown.length} miembros con datos 3-hours`);
+
+    // Construir rankings con la MISMA DATA que usa el frontend
+    const rankings = teamBreakdown.map((member: any) => {
+      const hoursAsana = member.hoursAsana || member.actualHours || 0;
+      const targetHours = member.targetHours || member.estimatedHours || 0;
+      const cost = member.actualCost || member.costUSD || 0;
+      
+      // Calcular participación en ingresos (proxy: costo / revenue)
+      const participacionPct = totalRevenue > 0 ? (cost / totalRevenue) * 100 : 0;
+      
+      // Scores
+      const eficienciaScore = calcularEficienciaScore(hoursAsana, targetHours);
+      const impactoScore = calcularImpactoScore(eficienciaScore, participacionPct);
+      const unificadoScore = (eficienciaScore + impactoScore) / 2; // Balance 50/50
+      
+      return {
+        persona: member.name || member.personnelName || 'Sin nombre',
+        eficiencia: {
+          score: Math.round(eficienciaScore),
+          display: `${Math.round(eficienciaScore)}%`,
+          clasificacion: clasificar(eficienciaScore)
+        },
+        impacto: {
+          score: Math.round(impactoScore),
+          scoreDecimal: impactoScore,
+          display: `${Math.round(impactoScore)} pts`,
+          clasificacion: clasificar(impactoScore)
+        },
+        unificado: {
+          score: Math.round(unificadoScore),
+          display: `${unificadoScore.toFixed(1)} pts`,
+          clasificacion: clasificar(unificadoScore)
+        },
+        horas: {
+          real: hoursAsana,      // ✅ Usa hoursAsana (ya normalizado con ANTI_×100)
+          objetivo: targetHours  // ✅ Usa targetHours (budgeted)
+        },
+        economia: {
+          participacion_pct: Math.round(participacionPct * 10) / 10
+        }
+      };
+    });
+
+    // Ordenar por score unificado (descendente)
+    rankings.sort((a: any, b: any) => b.unificado.score - a.unificado.score);
+
+    console.log(`✅ RANKINGS calculados: ${rankings.length} miembros`);
+    console.log(`📊 Top 3:`, rankings.slice(0, 3).map((r: any) => `${r.persona}: ${r.unificado.score} pts`));
+
+    // Validaciones
+    const validaciones = {
+      datosCompletos: rankings.length,
+      sinObjetivo: rankings.filter((r: any) => r.horas.objetivo === 0).length,
+      participacionTotal: rankings.reduce((sum: number, r: any) => sum + r.economia.participacion_pct, 0),
+      noDataForPeriod: rankings.length === 0,
+      sinIngresos: totalRevenue <= 1e-6,
+      totalEconomicoPeriodo: totalRevenue,
+      totalMembers: rankings.length
+    };
+
+    const configuracion = {
+      balanceEficienciaImpacto: "50-50",
+      periodoAnalisis: timeFilter,
+      algoritmo: "3hours_architecture",
+      version: "2025.10.14",
+      motor: "view-aggregator"
+    };
+
     return {
-      rankings: [],
-      totalEconomicoPeriodo: 0,
+      rankings,
+      totalEconomicoPeriodo: totalRevenue,
       periodLabel: timeFilter,
-      period: period,
+      period: { start: period, end: period },
       metadata: {
         universalSystem: true,
-        projectKey,
-        spreadsheetId: cfg.spreadsheetId,
-        filteredRows: 0,
-        originalRows: rawData.length
-      }
+        projectKey: `project_${projectId}`,
+        spreadsheetId: 'N/A',
+        filteredRows: rankings.length,
+        originalRows: rankings.length
+      },
+      validaciones,
+      configuracion
     };
+
+  } catch (error) {
+    console.error('❌ Error in universal rankings:', error);
+    throw error;
   }
-
-  // 6. Calcular rankings usando sistema universal
-  const universalRankings = computeRankings(filteredRows);
-  console.log(`📊 Universal rankings calculated: ${universalRankings.length} results`);
-
-  // 7. Formatear para compatibilidad con frontend existente
-  const compatibleRankings = universalRankings.map(formatForExistingInterface);
-
-  // 8. Calcular total económico del período para banner
-  const { parseDec } = await import('../../shared/utils/num.js');
-  const totalEconomicoPeriodo = filteredRows.reduce((sum, row) => {
-    const M = parseDec(row.horasFacturacion);
-    const VH = parseDec(row.valorHoraARS);
-    const USD = parseDec(row.montoUSD);
-    return sum + (USD > 0 ? USD : (M * VH));
-  }, 0);
-
-  console.log(`💰 Total económico del período: $${totalEconomicoPeriodo}`);
-  console.log(`📊 Returning ${compatibleRankings.length} rankings with universal system`);
-
-  // 9. Validaciones adicionales (compatibilidad con frontend)
-  const validaciones = {
-    datosCompletos: universalRankings.length,
-    sinObjetivo: universalRankings.filter(r => r.horasObjetivo === 0).length,
-    participacionTotal: universalRankings.reduce((sum, r) => {
-      // Calcular participación desde los datos filtrados
-      const personData = filteredRows.filter(row => row.person === r.person);
-      const totalEconomico = personData.reduce((sum, row) => {
-        const M = parseDec(row.horasFacturacion);
-        const VH = parseDec(row.valorHoraARS);
-        const USD = parseDec(row.montoUSD);
-        return sum + (USD > 0 ? USD : (M * VH));
-      }, 0);
-      return sum + (totalEconomicoPeriodo > 0 ? (totalEconomico / totalEconomicoPeriodo) * 100 : 0);
-    }, 0),
-    noDataForPeriod: universalRankings.length === 0,
-    sinIngresos: totalEconomicoPeriodo <= 1e-6,
-    totalEconomicoPeriodo: totalEconomicoPeriodo,
-    totalMembers: universalRankings.length
-  };
-
-  const configuracion = {
-    balanceEficienciaImpacto: "50-50",
-    periodoAnalisis: timeFilter,
-    algoritmo: "universal_system",
-    version: "2025.09.15"
-  };
-
-  // 10. Respuesta compatible con frontend existente
-  return {
-    rankings: compatibleRankings,
-    totalEconomicoPeriodo,
-    periodLabel: timeFilter,
-    period: period,
-    metadata: {
-      universalSystem: true,
-      projectKey,
-      spreadsheetId: cfg.spreadsheetId,
-      filteredRows: filteredRows.length,
-      originalRows: rawData.length
-    },
-    validaciones,
-    configuracion
-  };
 }
