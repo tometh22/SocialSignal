@@ -106,7 +106,16 @@ export default function TimeTracking({ projectId, timeFilter }: TimeTrackingProp
     );
   }
 
-  const { summary, members } = timeData;
+  // Guards defensivos para evitar spreads sobre undefined/null
+  const summary = timeData?.summary ?? {
+    totalAsanaHours: 0,
+    estimatedHours: 0,
+    progressPercent: 0,
+    membersActive: 0,
+    avgDailyHoursPerMember: 0
+  };
+  
+  const members = Array.isArray(timeData?.members) ? timeData.members : [];
 
   // Función para obtener color según status
   const getStatusColor = (status: string) => {

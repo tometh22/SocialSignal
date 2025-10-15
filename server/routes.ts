@@ -8454,11 +8454,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getProjectPeriodView } = await import('./domain/view-aggregator');
       const vm = await getProjectPeriodView(projectId, period, 'operativa');
       
-      if (!vm) {
-        return res.status(404).json({ message: "Project not found" });
-      }
-
-      const { teamBreakdown = [], totalAsanaHours = 0, estimatedHours = 0 } = vm;
+      // Guards defensivos: NUNCA devolver undefined, siempre arrays/objetos vacíos
+      const vmSafe = vm ?? {};
+      const { teamBreakdown = [], totalAsanaHours = 0, estimatedHours = 0 } = vmSafe;
 
       // Calcular días hábiles del período (22 días promedio por mes)
       const diasHabiles = 22;
@@ -8524,9 +8522,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         console.assert(
-          summary.totalAsanaHours === vm.totalAsanaHours,
+          summary.totalAsanaHours === vmSafe.totalAsanaHours,
           '[Tiempo] totalAsanaHours != Dashboard',
-          { tiempo: summary.totalAsanaHours, dashboard: vm.totalAsanaHours }
+          { tiempo: summary.totalAsanaHours, dashboard: vmSafe.totalAsanaHours }
         );
       }
 

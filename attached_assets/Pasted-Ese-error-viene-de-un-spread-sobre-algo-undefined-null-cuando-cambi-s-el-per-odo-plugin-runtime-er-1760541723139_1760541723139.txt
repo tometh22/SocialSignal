@@ -1,0 +1,96 @@
+Ese error viene de un spread sobre algo undefined/null cuando cambiás el período:
+[plugin:runtime-error-plugin] Spread syntax requires ...iterable not be null or undefined
+Eso pasa con:
+...[obj] si obj es undefined/null (en objetos también rompe: {...undefined}),
+[...arr] si arr es undefined/null.
+Te dejo un plan corto y quirúrgico para que no vuelva a pasar, más los snippets exactos.
+1) Normalizá SIEMPRE el payload (API → FE)
+En el backend, antes de responder:
+// server: asegúrate de NUNCA mandar undefined
+const tb = Array.isArray(actuals.teamBreakdown) ? actuals.teamBreakdown : [];
+const rankings = Array.isArray(rankingsData) ? rankingsData : [];
+const timeEntries = Array.isArray(timeEntriesData) ? timeEntriesData : [];
+
+res.json({
+  ...payload,
+  actuals: { ...payload.actuals, teamBreakdown: tb },
+  rankings,
+  timeEntries,
+});
+2) Query Keys y estado por período (React Query)
+Asegurate que las queries incluyan period en la key y que no mezclen cache:
+const period = usePeriodKey(); // "2025-08"
+const { data, isLoading } = useQuery({
+  queryKey: ['project-complete', projectId, view, period],
+  queryFn: () => api.getComplete(projectId, { view, period }),
+  staleTime: 0,
+  keepPreviousData: false,   // evita pasar data vieja con shape distinto
+});
+3) Guards en el selector/hook
+Nunca asumas arrays/objetos; da defaults “seguros”:
+// client/src/hooks/useCompleteProjectData.ts
+const raw = data ?? {};
+const actuals = raw.actuals ?? {};
+const teamBreakdown = Array.isArray(actuals.teamBreakdown) ? actuals.teamBreakdown : [];
+const rankings = Array.isArray(raw.rankings) ? raw.rankings : [];
+const timeEntries = Array.isArray(raw.timeEntries) ? raw.timeEntries : [];
+
+return {
+  ...raw,
+  actuals: {
+    totalAsanaHours: Number(actuals.totalAsanaHours ?? 0),
+    totalBillingHours: Number(actuals.totalBillingHours ?? 0),
+    teamBreakdown,
+  },
+  rankings,
+  timeEntries,
+};
+4) Evitá spreads peligrosos en el render
+Reemplazá cualquier ...algo por ...(algo ?? {}) u ...[...(algo ?? [])]:
+// Objetos
+const vm = { ...(projectVM ?? {}), currency: projectVM?.currency ?? 'USD' };
+
+// Arrays
+const members = [...(vm?.teamBreakdown ?? [])];
+
+// Map seguro
+(vm?.teamBreakdown ?? []).map(m => /* ... */)
+Buscá en el repo: rg -n "\.\.\." client | rg -v "props" y arreglá donde el spread pueda recibir undefined.
+5) useMemo / derive-state robusto
+Cuando derives estado según period/view, devolvé defaults mientras carga:
+const vm = useMemo(() => {
+  if (!data) {
+    return { views: {}, actuals: { teamBreakdown: [] }, quotation: {} };
+  }
+  // construir vm normal...
+}, [data, period, view]);
+6) Pestaña Tiempo (endpoint nuevo)
+Al consumir /time-tracking:
+const { data: tt } = useQuery({
+  queryKey: ['time-tracking', projectId, period],
+  queryFn: () => api.getTimeTracking(projectId, { period }),
+});
+
+const members = tt?.members ?? [];
+const summary = tt?.summary ?? { totalAsanaHours:0, estimatedHours:0, membersActive:0, progressPct:0 };
+7) Estados intermedios (loading/empty)
+No renderices spreads hasta tener data:
+if (isLoading) return <SkeletonDashboard />;
+
+if (!data) return <EmptyState message="Sin datos para el período seleccionado" />;
+8) Tests rápidos (pegá y validá)
+// Aserciones en DEV
+console.assert(Array.isArray(vm.actuals?.teamBreakdown), 'teamBreakdown no es array');
+console.assert(vm.views?.budgetUtilization !== undefined, 'budgetUtilization faltante');
+console.assert(Array.isArray(time?.members), 'time.members no es array');
+9) Lugares típicos donde rompe al cambiar período
+const rows = [...unifiedData.rankings.economicMetrics] → usa ...(unifiedData?.rankings?.economicMetrics ?? [])
+const merged = {...unifiedData.metrics, ...projectVM.metrics} → usa ...((unifiedData?.metrics) ?? {})
+setState(prev => ({ ...prev, ...next })) cuando prev puede ser null → inicializá prev con {}.
+Mini checklist de verificación
+ Las keys de React Query incluyen period.
+ No hay ...undefined ni ...[undefined] (buscado y reemplazado).
+ Los arrays del payload vienen siempre como [].
+ keepPreviousData:false para no mezclar shapes entre períodos.
+ Loading/empty states antes de map/spread.
+Con estos cambios, el cambio de período deja de explotar y todo queda consistente en todas las pestañas. Si querés, te paso un diff con los replace más comunes del spread y los guards en useCompleteProjectData.

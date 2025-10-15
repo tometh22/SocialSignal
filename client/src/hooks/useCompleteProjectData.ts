@@ -298,9 +298,10 @@ export const useCompleteProjectData = (
         const data = await response.json();
         
         // 🛡️ MERGE FUNCIONAL: Preservar summary si el nuevo fetch no lo trae
+        // Guard defensivo para evitar spread sobre undefined/null
         const mergedData = {
-          ...data,
-          summary: data.summary || lastGoodSummaryRef.current || undefined
+          ...(data ?? {}),
+          summary: data?.summary || lastGoodSummaryRef.current || undefined
         };
         
         console.log('🔍 HOOK: Success data received:', {
@@ -338,6 +339,7 @@ export const useCompleteProjectData = (
     gcTime: 5 * 60 * 1000, // 5 minute cache - better performance
     refetchOnWindowFocus: false, // Disable refetch on window focus
     refetchInterval: false, // Disable automatic polling
+    placeholderData: undefined, // No usar datos previos al cambiar período (evita mezclar shapes)
   });
 
   // 🛡️ Actualizar cache cuando llegue un summary válido
