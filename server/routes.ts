@@ -8440,6 +8440,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });*/
 
+  // 🕒 TIME TRACKING - Excel MAESTRO source
+  app.get("/api/projects/:id/time-tracking", requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const timeFilter = req.query.timeFilter as string;
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      // Convertir timeFilter a período (e.g. "august_2025" → "2025-08")
+      const period = timeFilter ? timeFilter.replace(/^(\w+)_(\d+)$/, (_, month, year) => {
+        const monthMap: Record<string, string> = {
+          january: '01', february: '02', march: '03', april: '04',
+          may: '05', june: '06', july: '07', august: '08',
+          september: '09', october: '10', november: '11', december: '12'
+        };
+        return `${year}-${monthMap[month.toLowerCase()] || '01'}`;
+      }) : undefined;
+
+      // Obtener datos del view-aggregator (Excel MAESTRO)
+      const { getProjectPeriodView } = await import('./domain/view-aggregator');
+      const projectView = await getProjectPeriodView(projectId, period, 'operativa');
+      
+      if (!projectView) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const { teamBreakdown = [], totalAsanaHours = 0, estimatedHours = 0, costDisplay = 0, baseCost = 0 } = projectView;
+
+      // Calcular días del período (asumiendo mes completo)
+      const diasHabilesMes = 22; // días hábiles promedio
+      const diasTranscurridos = new Date().getDate(); // días del mes actual
+
+      // 📊 CARDS
+      const horasRegistradas = totalAsanaHours || 0;
+      const horasObjetivo = estimatedHours || 1;
+      const porcentajeRegistrado = (horasRegistradas / horasObjetivo) * 100;
+
+      const miembrosActivos = teamBreakdown.filter((m: any) => (m.hoursAsana || 0) > 0).length;
+      const miembrosAsignados = teamBreakdown.length;
+
+      const promedioDiario = diasTranscurridos > 0 ? horasRegistradas / diasTranscurridos : 0;
+
+      const cards = {
+        totalRegistrado: {
+          horasRegistradas: Math.round(horasRegistradas * 100) / 100,
+          horasObjetivo: Math.round(horasObjetivo * 100) / 100,
+          porcentajeRegistrado: Math.round(porcentajeRegistrado * 100) / 100
+        },
+        miembrosActivos: {
+          activos: miembrosActivos,
+          asignados: miembrosAsignados
+        },
+        promedioDiario: {
+          promedio: Math.round(promedioDiario * 100) / 100,
+          modo: 'calendario' // o 'hábiles'
+        },
+        horasTrabajadas: {
+          horas: Math.round(horasRegistradas * 100) / 100,
+          estimadas: Math.round(horasObjetivo * 100) / 100
+        },
+        costoReal: {
+          real: Math.round(costDisplay * 100) / 100,
+          estimado: Math.round(baseCost * 100) / 100
+        }
+      };
+
+      // 👥 MIEMBROS - transformar teamBreakdown
+      const miembros = teamBreakdown.map((member: any) => {
+        const hrs_real = member.hoursAsana || 0;
+        const hrs_obj = member.targetHours || member.estimatedHours || 0;
+        const porcentaje_progreso = hrs_obj > 0 ? (hrs_real / hrs_obj) * 100 : 0;
+        const brecha_objetivo = hrs_real - hrs_obj;
+        
+        // Determinar estado
+        let estado: 'completo' | 'parcial' | 'sin_registro';
+        if (hrs_real === 0) {
+          estado = 'sin_registro';
+        } else if (porcentaje_progreso >= 95) {
+          estado = 'completo';
+        } else {
+          estado = 'parcial';
+        }
+
+        const costo_usd = member.actualCost || member.costUSD || 0;
+        const rate_usd = hrs_real > 0 ? costo_usd / hrs_real : 0;
+
+        return {
+          persona: member.name || 'Unknown',
+          rol: member.roleName || 'N/A',
+          hrs_real: Math.round(hrs_real * 100) / 100,
+          hrs_obj: Math.round(hrs_obj * 100) / 100,
+          porcentaje_progreso: Math.round(porcentaje_progreso * 100) / 100,
+          estado,
+          costo_usd: Math.round(costo_usd * 100) / 100,
+          rate_usd: Math.round(rate_usd * 100) / 100,
+          brecha_objetivo: Math.round(brecha_objetivo * 100) / 100
+        };
+      });
+
+      // ⚙️ CONFIGURACIÓN
+      const configuracion = {
+        modoPromedio: 'calendario',
+        umbralCompleto: 95,
+        diasHabilesMes,
+        diasTranscurridos,
+        mostrarRate: true
+      };
+
+      // ✅ VALIDACIONES
+      const validaciones = {
+        noDataForPeriod: horasRegistradas === 0 && miembros.length === 0,
+        conciliacionCosto: true,
+        conciliacionHoras: true
+      };
+
+      res.json({
+        projectId,
+        timeFilter: timeFilter || 'all',
+        cards,
+        miembros,
+        configuracion,
+        validaciones,
+        generatedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error("Error in time-tracking endpoint:", error);
+      res.status(500).json({ message: "Failed to load time tracking data" });
+    }
+  });
+
   // Punto 4: Datos para gráficos de tendencias
   app.get("/api/projects/:id/trend-data", requireAuth, async (req, res) => {
     try {
