@@ -449,13 +449,13 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
  * Valida invariantes matemáticos
  */
 export async function computeAggProjectMonth(projectId: number, periodKey: string): Promise<void> {
-  // 1) Obtener agregados de labor
+  // 1) Obtener agregados de labor (COALESCE para manejar NULL de SUM)
   const laborAgg = await db.select({
-    estHours: sql<number>`SUM(CAST(${factLaborMonth.targetHours} AS NUMERIC))`,
-    totalAsanaHours: sql<number>`SUM(CAST(${factLaborMonth.asanaHours} AS NUMERIC))`,
-    totalBillingHours: sql<number>`SUM(CAST(${factLaborMonth.billingHours} AS NUMERIC))`,
-    totalCostARS: sql<number>`SUM(CAST(${factLaborMonth.costARS} AS NUMERIC))`,
-    totalCostUSD: sql<number>`SUM(CAST(${factLaborMonth.costUSD} AS NUMERIC))`
+    estHours: sql<number>`COALESCE(SUM(CAST(${factLaborMonth.targetHours} AS NUMERIC)), 0)`,
+    totalAsanaHours: sql<number>`COALESCE(SUM(CAST(${factLaborMonth.asanaHours} AS NUMERIC)), 0)`,
+    totalBillingHours: sql<number>`COALESCE(SUM(CAST(${factLaborMonth.billingHours} AS NUMERIC)), 0)`,
+    totalCostARS: sql<number>`COALESCE(SUM(CAST(${factLaborMonth.costARS} AS NUMERIC)), 0)`,
+    totalCostUSD: sql<number>`COALESCE(SUM(CAST(${factLaborMonth.costUSD} AS NUMERIC)), 0)`
   })
   .from(factLaborMonth)
   .where(and(

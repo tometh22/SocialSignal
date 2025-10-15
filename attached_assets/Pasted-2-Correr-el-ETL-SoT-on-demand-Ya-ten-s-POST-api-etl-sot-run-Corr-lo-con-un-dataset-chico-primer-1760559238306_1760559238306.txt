@@ -1,0 +1,91 @@
+2) Correr el ETL SoT (on-demand)
+Ya tenés POST /api/etl/sot/run. Corrélo con un dataset chico primero.
+# ejemplo con filtros (si los implementaste)
+curl -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scopes": {
+      "periods": ["2025-07","2025-08"],
+      "projects": ["kimberly clark|fee huggies"]
+    },
+    "dryRun": false
+  }'
+Qué mirar en el output/log:
+Conteos por tabla insertada/actualizada.
+Resumen por project+period: Σtarget / Σasana / Σbilling, Σcost_ARS/USD, RC.revenue/cost, denom.
+Flags: anti_x100_*, fallback_billing, derived_cost_*, labor_vs_rc_cost_mismatch.
+3) Health checks rápidos (POST-ETL)
+SQL sanity (copiar/pegar):
+-- Totales de detalle (fact_labor_month)
+SELECT
+  SUM(target_hours)  est_hours,
+  SUM(asana_hours)   total_asana,
+  SUM(billing_hours) total_billing,
+  SUM(cost_usd)      sum_cost_usd,
+  SUM(cost_ars)      sum_cost_ars
+FROM fact_labor_month
+WHERE project_id = :pid AND period_key = '2025-08';
+
+-- Agregado (agg_project_month)
+SELECT
+  est_hours, total_asana_hours, total_billing_hours,
+  total_cost_usd, total_cost_ars,
+  view_operativa_revenue, view_operativa_cost, view_operativa_denom, view_operativa_budget_util
+FROM agg_project_month
+WHERE project_id = :pid AND period_key = '2025-08';
+Debe cumplirse:
+Σtarget = est_hours
+Σasana = total_asana_hours
+Σbilling = total_billing_hours
+Σcost_* = total_cost_*
+budget_util = cost / denom (denom = precio del mes, no FX)
+4) Conexión FE ↔ BE (endpoints y keys)
+GET /api/projects/:id/complete-data?period=YYYY-MM&view=operativa
+GET /api/projects/:id/time-tracking?period=YYYY-MM
+(Opc.) GET /api/projects/:id/costs?period=YYYY-MM
+React Query
+Keys deben incluir period y view:
+['project-complete', projectId, view, period]
+['time-tracking', projectId, period]
+keepPreviousData:false, defaults seguros (?? {} / ?? []).
+Evitá spreads de undefined en render.
+5) Smoke test funcional (sin tocar código)
+Kimberly 2025-08 (USD)
+Dashboard:
+Ingresos: 8,450
+Costo: ≈ 4,098.44 (o RC.cost si así lo definiste)
+Presupuesto usado: ≈ 48.5% (cost/denom con denom=8,450)
+Horas: 288.28 trabajadas / 320 objetivo
+Equipo/Tiempo:
+Filas con hoursAsana vs target (sin ×100)
+$ / h = cost(view) / hoursBilling (si >0)
+Cliente ARS (cualquiera)
+Verificar que la vista operativa esté en ARS y denom sea el precio ARS del mes.
+Cambio a 2025-07
+Si hay horas: aparecen sin error.
+Si no hay horas: empty-state (no crash). Dashboard puede mostrar RC si existe.
+6) Orquestación / Programación
+Endpoint orquestador: dejá POST /api/etl/sot/run.
+Schedule (si Replit cron o externo):
+Diario 02:00 AR → procesa último mes y mes corriente.
+Idempotente (upsert por PK (project_id, person_id, period_key)).
+7) Observabilidad mínima en prod
+Logs por project+period con: Σhoras, Σcostos, RC, denom, flags.
+Aserciones en modo DEV (no en prod) para invariantes.
+Endpoint read-only auxiliar (opcional):
+GET /api/debug/periods/:projectId → periodos disponibles, miembros, RC presente.
+8) Rollback rápido
+Tené a mano el ID del deployment previo estable (p.ej. 831c1c71 en la lista).
+Si algo sale mal: Replit → Deployments → Roll back a ese ID.
+9) Recursos / límites de Replit (tu plan)
+Autoscale (4 vCPU / 4 GiB RAM / Max 3 réplicas).
+Revisa picos de memoria durante ETL; si sube, particiona por periodo/proyecto.
+DB dev 46.63MB/10GB → OK.
+TL;DR (3 pasos)
+Restringí secretos + Republish.
+Corré POST /api/etl/sot/run para 2025-07 y 2025-08.
+Verificá:
+Dashboard: denom = precio del mes, no FX; % usado correcto.
+Equipo/Tiempo: hoursAsana vs target, sin ×100.
+Si querés, te armo un script de verificación que consuma los 2 endpoints y valide invariantes automáticamente (te imprime OK/FAIL por proyecto/mes).
