@@ -1,0 +1,153 @@
+vamos por todo el histórico (todos los meses × todos los proyectos) y lo dejamos blindado. Te paso un plan “end-to-end” con pasos, SQL y jobs para que la extracción, normalización y agregados queden correctos en todo el rango temporal.
+1) Calendario de períodos (base para todo)
+Poblar dim_period con todos los meses que debés cubrir.
+-- Rango 2023-01 .. 2025-12 (ajustá)
+INSERT INTO dim_period(period_key, year, month, first_day, business_days)
+SELECT to_char(d, 'YYYY-MM')                           AS period_key,
+       EXTRACT(YEAR FROM d)::int                       AS year,
+       EXTRACT(MONTH FROM d)::int                      AS month,
+       date_trunc('month', d)::date                    AS first_day,
+       22                                              AS business_days   -- opcional
+FROM generate_series('2023-01-01'::date, '2025-12-01'::date, interval '1 month') AS d
+ON CONFLICT (period_key) DO NOTHING;
+2) Catálogo de tarifas para todos los meses (capas 2 y 3, masivo)
+2.1 Semillado histórico (last-known forward fill por persona)
+Toma la última tarifa conocida (cualquier proyecto) y la propaga a todos los meses que no la tengan.
+-- Última tarifa conocida antes de cada período; propaga a todos los periodos sin tarifa
+WITH rates AS (
+  SELECT person_id, period_key, hourly_rate_ars,
+         ROW_NUMBER() OVER (PARTITION BY person_id ORDER BY period_key DESC) AS rn
+  FROM fact_labor_month
+  WHERE hourly_rate_ars IS NOT NULL AND hourly_rate_ars > 0
+),
+last_known AS (
+  SELECT person_id, hourly_rate_ars
+  FROM rates WHERE rn = 1
+),
+target_periods AS (
+  SELECT p.id AS person_id, dp.period_key
+  FROM personnel p
+  CROSS JOIN dim_period dp
+)
+INSERT INTO dim_person_rate (person_id, project_id, period_key, hourly_rate_ars, source)
+SELECT tp.person_id, NULL, tp.period_key, lk.hourly_rate_ars, 'historical-forward-fill'
+FROM target_periods tp
+JOIN last_known lk ON lk.person_id = tp.person_id
+LEFT JOIN dim_person_rate r
+  ON r.person_id = tp.person_id AND r.project_id IS NULL AND r.period_key = tp.period_key
+WHERE r.person_id IS NULL;
+2.2 Baselines por rol para huecos (cuando no hubo histórico jamás)
+-- Ajustá baselines por rol a tu realidad
+WITH role_baseline AS (
+  SELECT 'Dev'::text AS role_name, 11000.00::numeric AS hourly_rate_ars UNION ALL
+  SELECT 'PM', 12500.00 UNION ALL
+  SELECT 'Design', 10000.00
+),
+targets AS (
+  SELECT p.id AS person_id, p.role_name, dp.period_key
+  FROM personnel p
+  CROSS JOIN dim_period dp
+  LEFT JOIN dim_person_rate r
+    ON r.person_id = p.id AND r.project_id IS NULL AND r.period_key = dp.period_key
+  WHERE r.person_id IS NULL
+)
+INSERT INTO dim_person_rate (person_id, project_id, period_key, hourly_rate_ars, source)
+SELECT t.person_id, NULL, t.period_key, rb.hourly_rate_ars, 'role-baseline'
+FROM targets t
+JOIN role_baseline rb ON lower(t.role_name) = lower(rb.role_name);
+Si necesitás overrides por proyecto (tarifas distintas por cliente/proyecto): cargalos en dim_person_rate (project_id, period_key) con source='manual'.
+3) ETL masivo de ambas hojas del Excel (todo histórico)
+Clave: usar siempre period_key = YYYY-MM, normalizar strings, ANTI×100 en Asana/Billing, fallback de billing y derivar costos con rate o Total ARS.
+Ejecutá el orquestador con scopes de períodos completos:
+# Recomendado por ventanas para no estresar memoria/DB:
+# 1) 2023 completo, 2) 2024, 3) 2025…
+curl -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2023-01","2023-12"]},"dryRun":false}'
+
+curl -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2024-01","2024-12"]},"dryRun":false}'
+
+curl -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-01","2025-12"]},"dryRun":false}'
+El ETL ya trae el fallback de 6 niveles (Excel → catálogo proyecto → catálogo general → histórico → baseline rol → reconciliación RC). Con el catálogo cargado, no deberías necesitar reconciliar salvo excepciones, y si lo hace, quedará flaggeado (reconciled_to_rc_cost).
+4) Recalcular agregados para todos los períodos
+# Si tu orquestador ya computa agg luego de hecho, perfecto.
+# Si no, ejecutá un job que recalcule agg_project_month en todo el rango:
+curl -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"recomputeAgg":true,"scopes":{"periods":["2023-01","2025-12"]},"dryRun":false}'
+5) Validaciones automáticas (global sweep)
+5.1 Invariantes por proyecto/mes (sumas vs agregados)
+WITH d AS (
+  SELECT project_id, period_key,
+         SUM(target_hours)  AS est,
+         SUM(asana_hours)   AS asana,
+         SUM(billing_hours) AS bill,
+         SUM(cost_ars)      AS c_ars,
+         SUM(cost_usd)      AS c_usd
+  FROM fact_labor_month
+  GROUP BY project_id, period_key
+),
+a AS (
+  SELECT project_id, period_key,
+         est_hours, total_asana_hours, total_billing_hours,
+         total_cost_ars, total_cost_usd,
+         view_operativa_cost, view_operativa_denom,
+         view_operativa_budget_util
+  FROM agg_project_month
+)
+SELECT d.project_id, d.period_key,
+       (d.est  = a.est_hours)              AS ok_est,
+       (d.asana= a.total_asana_hours)      AS ok_asana,
+       (d.bill = a.total_billing_hours)    AS ok_bill,
+       (d.c_ars= a.total_cost_ars)         AS ok_cost_ars,
+       (d.c_usd= a.total_cost_usd)         AS ok_cost_usd,
+       ROUND(a.view_operativa_cost / NULLIF(a.view_operativa_denom,0),6) AS bu_calc,
+       a.view_operativa_budget_util AS bu_api
+FROM d JOIN a USING(project_id, period_key)
+WHERE (
+   d.est  <> a.est_hours
+OR d.asana<> a.total_asana_hours
+OR d.bill <> a.total_billing_hours
+OR d.c_ars<> a.total_cost_ars
+OR d.c_usd<> a.total_cost_usd
+OR ROUND(a.view_operativa_cost / NULLIF(a.view_operativa_denom,0),6)
+   <> ROUND(a.view_operativa_budget_util,6)
+);
+Resultado esperado: 0 filas. Si aparecen, tenés desalineaciones puntuales a corregir.
+5.2 Moneda/denominador correcto por vista operativa
+-- Detecta uso indebido de FX como denominador o mezclas de moneda
+SELECT project_id, period_key, view_operativa_denom, view_operativa_cost, view_operativa_revenue
+FROM agg_project_month
+WHERE view_operativa_denom IS NULL
+   OR view_operativa_denom = 0;
+5.3 Personas con horas pero tarifa/costo en 0 (post-semillado)
+SELECT project_id, period_key, person_id, role_name, billing_hours, hourly_rate_ars, cost_ars
+FROM fact_labor_month
+WHERE billing_hours > 0
+  AND (hourly_rate_ars IS NULL OR hourly_rate_ars = 0 OR cost_ars = 0);
+Resultado esperado: 0 filas. Si no, cargás tarifa puntual en dim_person_rate y rerun ETL de esos períodos.
+6) Frontend (consistencia total)
+Todas las queries incluyen period en key; no mezclan cache.
+Dashboard/Financiero: solo agg_project_month (KPIs precalculados).
+Equipo/Costos/Tiempo: fact_labor_month del período activo; horas Asana vs Objetivo; costo vista-operativa (USD si cliente USD, ARS si cliente ARS).
+Empty states cuando un período no tenga horas (pero nunca error por undefined).
+7) Orquestación recurrente (para no volver a tocar)
+Job diario 02:00 AR:
+ingest de ambas hojas del Excel para el mes corriente y mes anterior,
+ETL con fallback,
+recompute de agg_project_month solo para esos meses,
+reporte de invariantes (en logs + tabla etl_audit_log si querés).
+8) Plan de contingencia
+Si algún período sigue sin rate después de semillado (caso raro), activar reconciliación con RC proporcional a billing_hours y flaggear reconciled_to_rc_cost para auditar/ajustar después. Así nunca te quedás con costos cero teniendo horas.
+TL;DR operativo
+Poblar dim_period para todo el rango.
+Semillar dim_person_rate globalmente (histórico → baseline rol → overrides).
+Correr ETL para todo el histórico en ventanas (2023, 2024, 2025).
+Recalcular agg_project_month para todos los períodos.
+Correr las consultas de validación global: deben devolver 0 filas.
+Dejar job diario y diagnóstico de “missing rates” para nuevos datos.
+Si necesitás, te armo un script único (SQL + bash) que corre los pasos 1–5 en orden, imprime un reporte OK/FAIL por período y te deja todo listo para prod.
