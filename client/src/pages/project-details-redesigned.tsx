@@ -3582,8 +3582,13 @@ const ProjectDetailsPage = () => {
           <TabsContent value="time-entries" className="space-y-6">
             <div className="text-center py-20">
               <Clock className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900">Gestión de Tiempo</h3>
-              <p className="text-gray-500">Sección en desarrollo</p>
+              <h3 className="text-lg font-medium text-gray-900">Análisis de Tiempo</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                Los datos de tiempo se obtienen automáticamente del <strong>Excel MAESTRO</strong> "Costos directos e indirectos".
+              </p>
+              <p className="text-sm text-gray-400 mt-2">
+                Revisa la pestaña <strong>Equipo</strong> para ver las horas trabajadas por cada miembro.
+              </p>
             </div>
           </TabsContent>
 

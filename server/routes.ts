@@ -8460,9 +8460,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const whereConditions = [eq(timeEntries.projectId, projectId)];
       
       if (startDate && endDate) {
+        // 🔧 FIX: Convertir strings a Date para Drizzle
+        const startDateObj = new Date(startDate as string);
+        const endDateObj = new Date(endDate as string);
         whereConditions.push(
-          gte(timeEntries.date, startDate as string),
-          lte(timeEntries.date, endDate as string)
+          gte(timeEntries.date, startDateObj),
+          lte(timeEntries.date, endDateObj)
         );
       }
 
