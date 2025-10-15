@@ -568,7 +568,36 @@ export async function computeAggProjectMonth(projectId: number, periodKey: strin
       }
     });
   
-  console.log(`✅ [SoT AGG] Proyecto ${projectId} - ${periodKey}: BU=${(budgetUtil * 100).toFixed(1)}%, Markup=${markup.toFixed(2)}x`);
+  // 📊 OBSERVABILIDAD: Log detallado por project+period
+  console.log(`📊 [SoT AGG] Project ${projectId} - ${periodKey}:`);
+  console.log(`  ├─ Hours: target=${laborAgg.estHours.toFixed(1)}, asana=${laborAgg.totalAsanaHours.toFixed(1)}, billing=${laborAgg.totalBillingHours.toFixed(1)}`);
+  console.log(`  ├─ Costs: ARS=${laborAgg.totalCostARS.toFixed(0)}, USD=${laborAgg.totalCostUSD.toFixed(2)}`);
+  console.log(`  ├─ RC: revenue=${viewRevenue.toFixed(2)}, cost=${viewCost.toFixed(2)}, denom=${viewDenom.toFixed(2)} [${currencyNative}]`);
+  console.log(`  ├─ KPIs: BU=${(budgetUtil * 100).toFixed(1)}%, Markup=${markup.toFixed(2)}x, Margin=${(margin * 100).toFixed(1)}%`);
+  console.log(`  └─ Flags: ${flags.join(', ') || 'none'}`);
+  
+  // 🔬 DEV ASSERTIONS: Invariantes matemáticos
+  if (process.env.NODE_ENV !== 'production') {
+    const epsilon = 0.01; // Tolerancia para comparaciones float
+    
+    // Invariante: budgetUtil = cost / denom
+    const expectedBU = viewDenom > 0 ? viewCost / viewDenom : 0;
+    if (Math.abs(budgetUtil - expectedBU) > epsilon) {
+      console.warn(`⚠️ [ASSERTION] BU mismatch: computed=${budgetUtil.toFixed(4)} vs expected=${expectedBU.toFixed(4)}`);
+    }
+    
+    // Invariante: markup = revenue / cost
+    const expectedMarkup = viewCost > 0 ? viewRevenue / viewCost : 0;
+    if (Math.abs(markup - expectedMarkup) > epsilon) {
+      console.warn(`⚠️ [ASSERTION] Markup mismatch: computed=${markup.toFixed(4)} vs expected=${expectedMarkup.toFixed(4)}`);
+    }
+    
+    // Invariante: margin = (revenue - cost) / revenue
+    const expectedMargin = viewRevenue > 0 ? (viewRevenue - viewCost) / viewRevenue : 0;
+    if (Math.abs(margin - expectedMargin) > epsilon) {
+      console.warn(`⚠️ [ASSERTION] Margin mismatch: computed=${margin.toFixed(4)} vs expected=${expectedMargin.toFixed(4)}`);
+    }
+  }
 }
 
 // ==================== ORQUESTADOR COMPLETO ====================
