@@ -1,0 +1,89 @@
+Vamos con un checklist “a prueba de balas” para validar que la extracción y pintado de datos está OK —sin importar el rango temporal seleccionado!
+Checklist de Consistencia End-to-End (por período seleccionado)
+1) Selección de período (fuente única de verdad)
+ El selector UI produce period_key = YYYY-MM (p.ej. 2025-08).
+ Todas las llamadas (ETL/API/UI) usan ese mismo period_key (no august_2025, no nombres).
+ Cambio de período invalida cache (React Query) y rehace las queries.
+2) Extracción desde planillas (Costos Directos e Indirectos)
+ Filtro Tipo de Costo = "Directo" aplicado.
+ Join por Cliente + Proyecto + period_key (no por nombre parcial).
+Mapear columnas:
+ Objetivo → targetHours ← Cantidad de horas objetivo (J/W)
+ Horas Asana → hoursAsana ← Cantidad de horas reales Asana (normalizar ANTI×100 si >500)
+ Horas para facturación → hoursBilling (normalizar si >500)
+ Valor Hora ARS → hourlyRateARS
+ Total ARS → costARS (si no viene: hoursBilling*hourlyRateARS)
+ Total USD → costUSD (si no viene: costARS / fx_mes)
+ FX mes detectado para el período (si hace falta derivación)
+3) Agregados del proyecto (ETL)
+ quotation.estimatedHours = Σ targetHours
+ actuals.totalAsanaHours = Σ hoursAsana
+ actuals.totalBillingHours = Σ hoursBilling
+ actuals.totalWorkedCostARS = Σ costARS
+ actuals.totalWorkedCostUSD = Σ costUSD
+ Guardar teamBreakdown[] con las 3 horas + costos por persona.
+4) Rendimiento Cliente (ingresos/costos del mes)
+ Ingresos = rc.fact_usd/rc.fact_ars del mismo período.
+ Costos RC = rc.cost_usd/rc.cost_ars (agregado mensual).
+ Denominador (cotización del mes) = precio/amount del mes, NO el FX.
+5) Construcción de “views” (Operativa | USD | Original)
+ Operativa (cliente USD): revenue=rc.fact_usd, cost=rc.cost_usd, denom=price_usd_mes.
+ Operativa (cliente ARS): revenue=rc.fact_ars, cost=rc.cost_ars, denom=price_ars_mes.
+ budgetUtilization = cost / denom (precalculado en backend).
+ markup = revenue / cost, margin = (revenue - cost)/revenue.
+6) API (contratos)
+/api/projects/:id/complete-data?period=YYYY-MM&view=operativa
+ Expone quotation.estimatedHours, actuals.totalAsanaHours, actuals.totalBillingHours.
+ Expone actuals.teamBreakdown[] con {targetHours, hoursAsana, hoursBilling, hourlyRateARS, costARS, costUSD, roleName, name}.
+ Expone views[view] con {revenue, cost, denom, budgetUtilization, markup, margin, currency}.
+/api/projects/:id/time-tracking?period=YYYY-MM
+ No relee planillas; toma del agregado y devuelve:
+summary: {totalAsanaHours, estimatedHours, progressPct, membersActive}
+members[]: {targetHours, hoursAsana, hoursBilling, status}
+7) Invariantes (deben cumplirse siempre)
+ Σ teamBreakdown.targetHours === quotation.estimatedHours
+ Σ teamBreakdown.hoursAsana === actuals.totalAsanaHours
+ Σ teamBreakdown.hoursBilling === actuals.totalBillingHours
+ Para la vista activa: Σ cost(vista) === actuals.totalWorkedCost(vista) (± redondeo)
+ budgetUtilization === views.cost / views.denom
+ Moneda consistente en toda la vista (no mezclar ARS/USD).
+Flag: si |Σ costUSD_detalle − rc.cost_usd| / rc.cost_usd > 0.10 ⇒ labor_vs_rc_cost_mismatch.
+8) UI por pestaña (mapeos correctos)
+Dashboard
+ Total trabajado (h): actuals.totalAsanaHours
+ Presupuesto usado: views.budgetUtilization (denom correcto)
+ Ingresos/Costos: views.revenue/cost
+Equipo
+ Progreso persona: hoursAsana / targetHours
+ $/h: cost(vista) / hoursBilling (si hoursBilling>0)
+ Totales coinciden con Dashboard (horas Asana, no Billing)
+Tiempo
+ Progreso total: totalAsanaHours / estimatedHours
+ Filas: “Xh de Y objetivo” con hoursAsana y targetHours
+Costos/Financiero
+ Totales = Σ cost por persona en moneda de la vista
+ Markup/Margen desde views.* (no recalcular en FE)
+9) Pruebas rápidas (por período)
+ Caso USD (p.ej. Kimberly 2025-08):
+comparar con hoja: ΣW=320, ΣAsana=288.28, ΣUSD=2,436.09, RC: fact=8,450, cost=7,655.65
+→ Dashboard: trabajo 288.28h, BU ≈ cost/denom (usa denom=8,450), Equipo/Time con mismas horas.
+ Caso ARS (cliente local): validar conversión y que la vista operativa use ARS.
+ Edge cases: sin horas, sin rate, con horas > objetivo, faltan USD → derivar con FX.
+10) Observabilidad / Logs
+ Log por período con: Σtarget/Σasana/Σbilling, ΣcostARS/ΣcostUSD, rc.fact, rc.cost, denom.
+ Advertencias si: legacy hours>500 normalizadas, roleName vacío, o mismatch RC>10%.
+Snippets de aserciones (útiles en DEV)
+// Totales
+assertClose(sum(tb.map(p=>p.targetHours)), estimatedHours, 'Σtarget');
+assertClose(sum(tb.map(p=>p.hoursAsana)), totalAsanaHours, 'Σasana');
+assertClose(sum(tb.map(p=>p.hoursBilling)), totalBillingHours, 'Σbilling');
+
+// Vista
+assertClose(views.cost / views.denom, views.budgetUtilization, 'BU');
+
+// Moneda única en vista
+console.assert(['USD','ARS'].includes(views.currency), 'currency inválida');
+
+// Time tab = mismos totales que dashboard
+console.assert(time.summary.totalAsanaHours === vm.totalAsanaHours, 'Tiempo vs Dashboard');
+Con este checklist podés validar período a período que todo está alineado (extracción → ETL → API → UI) y detectar rápido si se coló mezcla de monedas, períodos, o horas sin normalizar.
