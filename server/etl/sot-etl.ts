@@ -570,8 +570,8 @@ export async function computeAggProjectMonth(projectId: number, periodKey: strin
   
   // 📊 OBSERVABILIDAD: Log detallado por project+period
   console.log(`📊 [SoT AGG] Project ${projectId} - ${periodKey}:`);
-  console.log(`  ├─ Hours: target=${laborAgg.estHours.toFixed(1)}, asana=${laborAgg.totalAsanaHours.toFixed(1)}, billing=${laborAgg.totalBillingHours.toFixed(1)}`);
-  console.log(`  ├─ Costs: ARS=${laborAgg.totalCostARS.toFixed(0)}, USD=${laborAgg.totalCostUSD.toFixed(2)}`);
+  console.log(`  ├─ Hours: target=${Number(laborAgg.estHours || 0).toFixed(1)}, asana=${Number(laborAgg.totalAsanaHours || 0).toFixed(1)}, billing=${Number(laborAgg.totalBillingHours || 0).toFixed(1)}`);
+  console.log(`  ├─ Costs: ARS=${Number(laborAgg.totalCostARS || 0).toFixed(0)}, USD=${Number(laborAgg.totalCostUSD || 0).toFixed(2)}`);
   console.log(`  ├─ RC: revenue=${viewRevenue.toFixed(2)}, cost=${viewCost.toFixed(2)}, denom=${viewDenom.toFixed(2)} [${currencyNative}]`);
   console.log(`  ├─ KPIs: BU=${(budgetUtil * 100).toFixed(1)}%, Markup=${markup.toFixed(2)}x, Margin=${(margin * 100).toFixed(1)}%`);
   console.log(`  └─ Flags: ${flags.join(', ') || 'none'}`);
