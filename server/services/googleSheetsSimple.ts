@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { parseNumberRobust, parseIntRobust } from '../utils/number';
 
 interface CostoDirectoIndirecto {
   persona: string;
@@ -183,11 +184,11 @@ class GoogleSheetsSimpleService {
         const costoData: CostoDirectoIndirecto = {
           persona: this.getCellValue(row, columnMap.persona) || '',
           mes: this.getCellValue(row, columnMap.mes) || '',
-          año: parseInt(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
-          costoDirecto: parseFloat(this.getCellValue(row, columnMap.costoDirecto)) || 0,
-          costoIndirecto: parseFloat(this.getCellValue(row, columnMap.costoIndirecto)) || 0,
-          costoTotal: parseFloat(this.getCellValue(row, columnMap.costoTotal)) || 0,
-          valorHora: parseFloat(this.getCellValue(row, columnMap.valorHora)) || 0,
+          año: parseIntRobust(this.getCellValue(row, columnMap.año)) || new Date().getFullYear(),
+          costoDirecto: parseNumberRobust(this.getCellValue(row, columnMap.costoDirecto)) || 0,
+          costoIndirecto: parseNumberRobust(this.getCellValue(row, columnMap.costoIndirecto)) || 0,
+          costoTotal: parseNumberRobust(this.getCellValue(row, columnMap.costoTotal)) || 0,
+          valorHora: parseNumberRobust(this.getCellValue(row, columnMap.valorHora)) || 0,
           categoria: this.getCellValue(row, columnMap.categoria) || '',
           proyecto: this.getCellValue(row, columnMap.proyecto) || undefined
         };

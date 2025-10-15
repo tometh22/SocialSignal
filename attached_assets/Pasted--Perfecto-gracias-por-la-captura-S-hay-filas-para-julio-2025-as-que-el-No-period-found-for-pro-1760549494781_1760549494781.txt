@@ -1,0 +1,89 @@
+¡Perfecto, gracias por la captura! Sí hay filas para julio 2025, así que el “No period found for project … 2025-07” no es por falta de datos, sino por desalineo en la construcción de la clave de período o el join. Te dejo el diagnóstico + fixes concretos para que julio aparezca ya, sin ambigüedad.
+Causas típicas (y el fix exacto)
+Clave de período mal construida
+En la planilla el mes viene como “07 jul” / “jul” (texto), y en DB esperamos YYYY-MM.
+Fix (ETL):
+const MONTHS: Record<string,string> = {
+  'ene':'01','feb':'02','mar':'03','abr':'04','may':'05','jun':'06',
+  'jul':'07','ago':'08','sep':'09','oct':'10','nov':'11','dic':'12'
+};
+function toPeriodKey(mesRaw: string|number, yearRaw: string|number) {
+  const y = String(yearRaw).trim();
+  const mtxt = String(mesRaw).toLowerCase().trim();          // "07 jul" | "jul" | "07"
+  const mm = MONTHS[mtxt.slice(-3)] ?? String(mtxt).padStart(2,'0');
+  return `${y}-${mm}`; // "2025-07"
+}
+Join por mes/año en vez de period_key
+Fix (ETL + agregador): siempre une por period_key y project_id:
+// nunca por "Mes"/"Año" sueltos
+JOIN project_periods pp ON pp.project_id = :pid AND pp.period_key = :periodKey
+“Directo” vs espacios/acentos
+Algunas filas vienen como Directo⎵, directo.
+Fix (filtro):
+const tipo = normalize(cell('Tipo de Costo')); // lower, trim, sin acentos
+if (tipo !== 'directo') skip();
+Nombres con espacios/acentos
+Cliente/Proyecto pueden traer espacios dobles o acentos distintos.
+Fix (normalizador de claves):
+function normKey(s:string){return s.toLowerCase().normalize('NFKD').replace(/\p{Diacritic}/gu,'').replace(/\s+/g,' ').trim();}
+const kCliente  = normKey(row.cliente);
+const kProyecto = normKey(row.proyecto);
+// usa estas claves para el join contra tus tablas maestras
+Números con coma decimal (AR)
+“101,33” se parsea como 10133 si no normalizás.
+Fix (parser numérico):
+function parseNum(x:any){
+  if (x==null) return 0;
+  const s = String(x).replace(/\./g,'').replace(',','.');
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
+Mes cero-padded
+Asegurate de 07 (no 7):
+Period key: YYYY-MM con MM padded.
+Queries del FE: period=2025-07 (no “july_2025”).
+ETL no re-corrió julio
+Si el agregado de julio se creó antes del fix, hay que reprocesarlo.
+SQL para limpiar sólo ese mes/proyecto y re-ingestar:
+-- variables: :project_id, :period_key='2025-07'
+WITH t AS (
+  SELECT pa.id FROM project_aggregates pa
+  JOIN project_periods pp ON pa.project_period_id=pp.id
+  WHERE pp.project_id=:project_id AND pp.period_key=:period_key
+)
+DELETE FROM project_aggregates WHERE id IN (SELECT id FROM t);
+-- luego corre el ETL para ese scope
+FE usa otra convención
+Incluí period en todas las query keys:
+useQuery(['project-complete', projectId, view, period], ...);
+useQuery(['time-tracking', projectId, period], ...);
+y no cambies formato al volar; envía YYYY-MM al backend.
+Check rápido para julio (paso a paso)
+SQL: ¿existe el agregado?
+SELECT pp.period_key, jsonb_array_length(pa.actuals_data->'teamBreakdown') AS members
+FROM project_aggregates pa
+JOIN project_periods pp ON pp.id=pa.project_period_id
+WHERE pp.project_id=:pid AND pp.period_key='2025-07';
+Si no hay filas → corre el ETL (con fixes de parsing/período).
+Si hay filas y members=0 → comportamiento esperado: Dashboard con RC, Equipo/Tiempo vacíos.
+Log ETL: imprime para julio una línea por proyecto:
+[ETL] period=2025-07 project=Fee Huggies/Kimberly
+rows=5 directos, Σtarget=320, Σasana=288.28, Σbilling=288.28
+API /complete-data?period=2025-07 devuelve al menos:
+{
+  "quotation":{"estimatedHours":320},
+  "actuals":{"totalAsanaHours":288.28,"teamBreakdown":[...]},
+  "views":{"operativa":{"revenue":8450,"cost":7655.65,"denom":8450}}
+}
+UI:
+Dashboard: “Total trabajado 288.28h”, “Presupuesto usado ≈ 48.5%”.
+Equipo/Tiempo: listas con miembros; si tu Excel no tiene horas de julio para ese proyecto, empty-state claro (no error).
+Instrumentación mínima (para no volver a cazarlo a ciegas)
+Loggea en ETL por fila: period_key, cliente, proyecto (normalizados), y si fue descartada (no Directo / período no parseable).
+Endpoint auxiliar: GET /api/projects/:id/periods → lista de period_key disponibles con members_count y has_rc.
+TL;DR
+Tus filas de julio están, pero el sistema está construyendo/uniendo mal la clave de período o no re-ingestó ese mes. Aplicá:
+toPeriodKey(), parseNum(), normalizadores de strings,
+re-ingestá 2025-07,
+y asegurate que FE/BE usen siempre YYYY-MM.
+Con eso, julio aparece igual de sólido que agosto.
