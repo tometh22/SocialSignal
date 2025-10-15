@@ -1,0 +1,109 @@
+Excelente validación! Ya tenemos el “esqueleto” perfecto y el ANTI×100 funcionando. El único blocker real ahora es rate=0 ⇒ costos=0. Te doy un plan quirúrgico para cerrarlo, con cambios mínimos y seguros.
+Qué pasa
+La hoja Costos directos e indirectos trae Valor hora ARS = 0 para todos → al derivar cost_ars = billing_hours * hourly_rate_ars, queda 0.
+Tus flags derived_cost_ars/usd confirman que no vino Total ARS en la fila y que derivamos por rate.
+Cierre en 3 capas (recomendado)
+1) Fuente (Excel) — corrección preferida
+Completar “Valor hora ARS” por persona/proyecto/mes.
+(Opcional) Si tenés Total ARS calculado en la hoja, completar esa columna; el ETL la prioriza sobre el rate.
+Luego: re-ejecutar ETL y listo.
+Si no podés corregir la hoja ya, seguí con 2) y 3) para que el sistema no se quede sin costos.
+2) Catálogo de tarifas (persistente, por período)
+Crear una tabla de soporte para tarifas y usarla como fallback si el Excel trae 0 o vacío.
+DDL sugerido
+CREATE TABLE dim_person_rate (
+  person_id   int NOT NULL,
+  project_id  int NULL,            -- null = tarifa general de la persona
+  period_key  char(7) NOT NULL,    -- 'YYYY-MM'
+  hourly_rate_ars numeric NOT NULL,
+  source      text,                 -- 'manual'|'hist'|'role'
+  updated_at  timestamptz default now(),
+  PRIMARY KEY(person_id, COALESCE(project_id, -1), period_key)
+);
+Reglas de toma de tarifa (prioridad):
+rate_excel (si > 0)
+rate_catalog(person_id, project_id, period)
+rate_catalog(person_id, null, period)
+Última tarifa conocida del mismo person_id (mes anterior, histórico)
+Tarifa base por rol (role_baseline_rate_ars)
+Si nada: marcar flag rate_missing y (ver capa 3) usar tarifa provisional
+3) Salvaguarda ETL (provisional para no cortar KPIs)
+Cuando haya horas>0 y no tengamos ni Total ARS ni rate válido:
+Opción A (provisional): usar última tarifa conocida del person_id (misma persona, cualquier proyecto) del mes anterior.
+Opción B (rol): usar tarifa baseline del rol.
+Opción C (reconciliación con RC): sólo si A y B no existen, repartir el RC.cost_native del período proporcional a las billing_hours. Marcar flag fuerte reconciled_to_rc_cost.
+Así nunca queda Σcostos=0 si hay horas cargadas, y el Dashboard no se desconfigura. Queda auditado por flags y se puede ajustar luego con el catálogo.
+Cambios mínimos en el ETL (pseudocódigo)
+// Antes:
+const rateARS = parseNum(row['Valor Hora ARS']);
+const costARS = totalARSs || (billing * rateARS);
+
+// Propuesto (prioridades/fallbacks)
+let rateARS = parseNum(row['Valor Hora ARS']);
+
+if (!(rateARS > 0)) {
+  rateARS = lookupRateCatalog(person_id, project_id, period_key) ??
+            lookupRateCatalog(person_id, null, period_key) ??
+            lastKnownRate(person_id) ??
+            roleBaselineRate(role_name) ?? 0;
+}
+
+let costARS = totalARSs; // si vino Total ARS de hoja, priorizarlo
+let flags = [];
+
+if (!costARS) {
+  if (rateARS > 0) {
+    costARS = billing * rateARS;
+    flags.push('derived_cost_ars_from_rate');
+  } else {
+    // Salvaguarda (solo si hay horas)
+    if (billing > 0) {
+      const fallback = tryReconcileToRCCost(project_id, period_key, billing);
+      if (fallback != null) {
+        costARS = fallback;
+        flags.push('reconciled_to_rc_cost'); // flag fuerte para auditoría
+      } else {
+        costARS = 0;
+        flags.push('rate_missing_zero_cost');
+      }
+    } else {
+      costARS = 0;
+    }
+  }
+}
+
+const costUSD = totalUSDs || (fx > 0 ? costARS / fx : 0);
+Nota: la reconciliación a RC se hace en ARS o USD según moneda nativa del proyecto para mantener consistencia por vista.
+Reportes y consultas para cerrar rápido
+1) Detectar filas con rate=0 (y horas>0)
+SELECT project_id, period_key, person_id, role_name,
+       billing_hours, hourly_rate_ars
+FROM fact_labor_month
+WHERE period_key = '2025-08'
+  AND billing_hours > 0
+  AND (hourly_rate_ars IS NULL OR hourly_rate_ars = 0);
+2) Cargar catálogo manual (ejemplo)
+INSERT INTO dim_person_rate (person_id, project_id, period_key, hourly_rate_ars, source)
+VALUES
+  (42, NULL, '2025-08', 10270.25, 'manual'),  -- general
+  (42, 40,   '2025-08', 11000.00, 'manual');  -- específico proyecto
+3) Reprocesar sólo el período afectado
+-- borrar agregado para recalcular
+WITH t AS (
+  SELECT pa.id
+  FROM agg_project_month pa
+  JOIN project_periods pp ON pp.project_id = :pid AND pp.period_key = '2025-08' AND pp.id = pa.project_period_id
+)
+DELETE FROM agg_project_month WHERE id IN (SELECT id FROM t);
+
+-- vuelve a correr el ETL del mes/proyecto
+-- (usa tu /api/etl/sot/run con scopes o script)
+Señales en la UI (para que sea claro y no confunda)
+Si una persona viene con rate_missing_zero_cost o reconciled_to_rc_cost, mostrar un badge “Tarifa faltante (provisional)” con tooltip:
+“Se usó tarifa histórica / por rol / reconciliación RC. Cargar tarifa para precisión.”
+En Costos/Equipo: permitir override manual (opcional), que escribe en dim_person_rate y reprocesa.
+Checklist express para revalidar (después del fix)
+ Σ billing_hours > 0 y Σ cost_* > 0 en fact_labor_month.
+ agg.total_cost_* > 0 y budget_util = cost/denom correcto.
+ Sin flags rate_missing_zero_cost en períodos clave (o sólo con reconciliación provisional claramente marcada).
+ UI muestra $/h = cost(view)/hoursBilling (no cero) y sin N/

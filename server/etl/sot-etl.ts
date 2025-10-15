@@ -255,16 +255,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       // Derivar billing_hours con prefer
       const billingHours = prefer(billing, asana, target);
       
-      // 4) Valores y costos
-      const rateARS = parseNum(row['Valor hora ARS'] || row['Valor Hora']);
-      const fx = parseNum(row['Cotización'] || row['Tipo de cambio']);
-      const totalARSSheet = parseNum(row['Total ARS']);
-      const totalUSDSheet = parseNum(row['Monto Total USD']);
-      
-      const costARS = totalARSSheet || (billingHours * rateARS);
-      const costUSD = totalUSDSheet || (fx > 0 ? costARS / fx : 0);
-      
-      // 5) Buscar projectId y personId - USAR VALORES RAW
+      // 4) Buscar projectId y personId PRIMERO (necesarios para fallback de tarifas)
       const projectId = await resolveProjectId(clientRaw, projectRaw);
       
       if (!projectId) {
@@ -274,7 +265,6 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       }
       
       // Buscar persona con normalización de acentos en ambos lados
-      // COALESCE y TRIM para manejar NULL y whitespace
       const person = await db.query.personnel.findFirst({
         where: (pers) => sql`
           TRIM(LOWER(UNACCENT(COALESCE(${pers.name}, '')))) = 
@@ -283,13 +273,39 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         `
       });
       
-      // 6) Flags
+      // 5) Valores y costos con sistema de fallback de tarifas
+      const rateARSExcel = parseNum(row['Valor hora ARS'] || row['Valor Hora']);
+      const fx = parseNum(row['Cotización'] || row['Tipo de cambio']);
+      const totalARSSheet = parseNum(row['Total ARS']);
+      const totalUSDSheet = parseNum(row['Monto Total USD']);
+      const roleName = row.Rol || null;
+      
+      // Importar resolveHourlyRate dinámicamente (lazy load para evitar ciclos)
+      const { resolveHourlyRate } = await import('./sot-rate-fallback');
+      
+      // Resolver tarifa con sistema de fallback (6 niveles de prioridad)
+      const rateResolution = await resolveHourlyRate({
+        excelRate: rateARSExcel,
+        personId: person?.id || null,
+        projectId,
+        periodKey,
+        billingHours,
+        personKey,
+        roleName
+      });
+      
+      const rateARS = rateResolution.rate;
+      const costARS = totalARSSheet || (billingHours * rateARS);
+      const costUSD = totalUSDSheet || (fx > 0 ? costARS / fx : 0);
+      
+      // 6) Flags (combinar flags base + flags de fallback de tarifas)
       const flags = generateFlags({
         'anti_x100_asana': needsAntiX100(asanaRaw),
         'anti_x100_billing': needsAntiX100(billingRaw),
         'fallback_billing': !billingRaw,
         'derived_cost_ars': !totalARSSheet,
-        'derived_cost_usd': !totalUSDSheet
+        'derived_cost_usd': !totalUSDSheet,
+        ...rateResolution.flags.reduce((acc, flag) => ({ ...acc, [flag]: true }), {})
       });
       
       // 7) Upsert fact_labor_month

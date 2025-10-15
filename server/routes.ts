@@ -11407,6 +11407,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 SOT DIAGNOSTICS - Detect missing rates
+  app.get("/api/etl/sot/diagnostics/missing-rates", requireAuth, async (req, res) => {
+    try {
+      const periodKey = req.query.period as string || '2025-08';
+      
+      const { factLaborMonth } = await import('../shared/schema');
+      
+      const missingRates = await db.select({
+        projectId: factLaborMonth.projectId,
+        periodKey: factLaborMonth.periodKey,
+        personKey: factLaborMonth.personKey,
+        roleName: factLaborMonth.roleName,
+        billingHours: factLaborMonth.billingHours,
+        hourlyRateARS: factLaborMonth.hourlyRateARS,
+        costARS: factLaborMonth.costARS,
+        flags: factLaborMonth.flags
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.periodKey, periodKey),
+        sql`CAST(${factLaborMonth.billingHours} AS NUMERIC) > 0`,
+        sql`(${factLaborMonth.hourlyRateARS} IS NULL OR CAST(${factLaborMonth.hourlyRateARS} AS NUMERIC) = 0)`
+      ))
+      .orderBy(desc(factLaborMonth.billingHours));
+      
+      res.json({
+        periodKey,
+        count: missingRates.length,
+        rows: missingRates,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Diagnostics Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  

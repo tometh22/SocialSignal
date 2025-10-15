@@ -2397,6 +2397,26 @@ export const insertDimPeriodSchema = createInsertSchema(dimPeriod).omit({ create
 export type DimPeriod = typeof dimPeriod.$inferSelect;
 export type InsertDimPeriod = z.infer<typeof insertDimPeriodSchema>;
 
+// Dimensión: Tarifas por persona/período (catálogo de fallback)
+export const dimPersonRate = pgTable("dim_person_rate", {
+  id: serial("id").primaryKey(),
+  personId: integer("person_id").references(() => personnel.id),
+  projectId: integer("project_id").references(() => activeProjects.id), // null = tarifa general
+  periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
+  hourlyRateARS: numeric("hourly_rate_ars", { precision: 10, scale: 2 }).notNull(),
+  source: varchar("source", { length: 50 }), // 'manual', 'historical', 'role', 'excel'
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  uniquePersonProjectPeriod: unique().on(table.personId, table.projectId, table.periodKey)
+}));
+
+export const insertDimPersonRateSchema = createInsertSchema(dimPersonRate).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type DimPersonRate = typeof dimPersonRate.$inferSelect;
+export type InsertDimPersonRate = z.infer<typeof insertDimPersonRateSchema>;
+
 // Hechos: Rendimiento Cliente (RC) por proyecto/mes
 export const factRCMonth = pgTable("fact_rc_month", {
   id: serial("id").primaryKey(),
