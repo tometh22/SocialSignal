@@ -7,6 +7,7 @@ import { db } from '../db';
 import { financialSot } from '../../shared/schema';
 import { sql } from 'drizzle-orm';
 import { googleSheetsWorkingService } from '../services/googleSheetsWorking';
+import { parseNumberRobust } from '../utils/number';
 
 interface RendimientoClienteRow {
   Cliente?: string;
@@ -28,20 +29,6 @@ export interface ImportRendimientoClienteResult {
   errors: string[];
 }
 
-/**
- * Parsear dinero robusto (soporta puntos de miles, comas decimales)
- */
-function parseMoneyRobust(value: string | number | undefined | null): number | null {
-  if (!value) return null;
-  
-  const str = String(value)
-    .replace(/[^\d.,-]/g, '') // quitar símbolos
-    .replace(/\./g, '')       // eliminar puntos de miles
-    .replace(/,/g, '.');      // normalizar coma decimal a punto
-  
-  const parsed = parseFloat(str);
-  return isNaN(parsed) ? null : parsed;
-}
 
 /**
  * Convertir mes español a month_key YYYY-MM
@@ -198,11 +185,11 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
         const monthNum = parseInt(monthKey.split('-')[1]);
 
         // Parsear valores - usar nombres exactos de las columnas de la hoja (con corchetes)
-        const revenueUsd = parseMoneyRobust(row["Facturación [USD]"]); // Columna G
-        const revenueArs = parseMoneyRobust(row["Facturación [ARS]"]); // Columna I
-        const costUsd = parseMoneyRobust(row["Costos [USD]"]); // Columna H
-        const costArs = parseMoneyRobust(row["Costos [ARS]"]); // Columna K
-        const quotation = parseMoneyRobust(row["Cotización"]); // Columna F
+        const revenueUsd = parseNumberRobust(row["Facturación [USD]"]); // Columna G
+        const revenueArs = parseNumberRobust(row["Facturación [ARS]"]); // Columna I
+        const costUsd = parseNumberRobust(row["Costos [USD]"]); // Columna H
+        const costArs = parseNumberRobust(row["Costos [ARS]"]); // Columna K
+        const quotation = parseNumberRobust(row["Cotización"]); // Columna F
         
         // Obtener FX del mes desde exchange_rates
         const fx = await getFXForMonth(year, monthNum);

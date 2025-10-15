@@ -9,6 +9,7 @@
  */
 
 import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind } from './types';
+import { parseNumberRobust } from '../../utils/number';
 
 // ==================== CANONICALIZATION ====================
 
@@ -201,23 +202,19 @@ function extractNumericField(record: RawCostRecord, mappings: string[]): number 
             return numValue;
           }
         }
-        // Último intento: usar toString()
+        // Último intento: usar toString() + parseNumberRobust
         const strValue = value.toString();
         if (strValue !== '[object Object]') {
-          const cleaned = strValue.replace(/[$,\s]/g, '');
-          const parsed = parseFloat(cleaned);
-          if (!isNaN(parsed)) {
+          const parsed = parseNumberRobust(strValue);
+          if (parsed !== null) {
             return parsed;
           }
         }
       }
       
-      // 🔧 STANDARD HANDLING: Strings y números primitivos
-      const strValue = String(value).trim();
-      const cleaned = strValue.replace(/[$,\s]/g, '');
-      const parsed = parseFloat(cleaned);
-      
-      if (!isNaN(parsed)) {
+      // 🔧 STANDARD HANDLING: Usar parseNumberRobust para manejar formato argentino
+      const parsed = parseNumberRobust(value);
+      if (parsed !== null) {
         return parsed;
       }
     }
