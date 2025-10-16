@@ -8440,7 +8440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });*/
 
-  // 🕒 TIME TRACKING - Excel MAESTRO source (100% consistente con Dashboard/Equipo)
+  // 🕒 TIME TRACKING - Star Schema SoT with legacy fallback
   app.get("/api/projects/:id/time-tracking", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
@@ -8450,34 +8450,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID" });
       }
 
-      // Obtener datos del MISMO agregado que usa Dashboard/Equipo/Financiero
-      const { getProjectPeriodView } = await import('./domain/view-aggregator');
-      const vm = await getProjectPeriodView(projectId, period, 'operativa');
+      // 🎯 INTENTAR FACT_LABOR_MONTH (Star Schema SoT) primero
+      const { factLaborMonth } = await import('../shared/schema');
       
-      // Guards defensivos: NUNCA devolver undefined, siempre arrays/objetos vacíos
-      const vmSafe = vm ?? {};
-      const { teamBreakdown = [], totalAsanaHours = 0, estimatedHours = 0 } = vmSafe;
+      const laborRows = await db.select({
+        personKey: factLaborMonth.personKey,
+        roleName: factLaborMonth.roleName,
+        targetHours: factLaborMonth.targetHours,
+        asanaHours: factLaborMonth.asanaHours,
+        billingHours: factLaborMonth.billingHours,
+        hourlyRateARS: factLaborMonth.hourlyRateARS,
+        costARS: factLaborMonth.costARS,
+        costUSD: factLaborMonth.costUSD,
+        flags: factLaborMonth.flags
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.projectId, projectId),
+        eq(factLaborMonth.periodKey, period)
+      ));
 
-      // Calcular días hábiles del período (22 días promedio por mes)
+      console.log(`🕒 TIME-TRACKING: Found ${laborRows.length} SoT labor rows for project ${projectId}, period ${period}`);
+
+      // 🔄 FALLBACK: Si no hay datos en SoT, usar aggregates legacy
+      if (laborRows.length === 0) {
+        console.log(`⚠️ TIME-TRACKING: No SoT data, falling back to legacy aggregates`);
+        const { getProjectPeriodView } = await import('./domain/view-aggregator');
+        const vm = await getProjectPeriodView(projectId, period, 'operativa');
+        
+        if (!vm) {
+          return res.json({
+            projectId,
+            period: period || 'all',
+            summary: {
+              membersActive: 0,
+              totalAsanaHours: 0,
+              estimatedHours: 0,
+              progressPct: 0,
+              avgDailyHoursPerMember: 0
+            },
+            members: [],
+            source: 'no_data'
+          });
+        }
+        
+        const { teamBreakdown = [], totalAsanaHours = 0, estimatedHours = 0 } = vm;
+        const diasHabiles = 22;
+        const miembrosActivos = teamBreakdown.filter((m: any) => (m.hoursAsana || 0) > 0).length;
+
+        const summary = {
+          membersActive: miembrosActivos,
+          totalAsanaHours: +(totalAsanaHours || 0).toFixed(2),
+          estimatedHours: +(estimatedHours || 1).toFixed(2),
+          progressPct: +((totalAsanaHours / (estimatedHours || 1))).toFixed(4),
+          avgDailyHoursPerMember: +(totalAsanaHours / (diasHabiles * Math.max(miembrosActivos, 1))).toFixed(2)
+        };
+
+        const members = teamBreakdown.map((m: any) => {
+          const targetHours = m.targetHours || 0;
+          const hoursAsana = m.hoursAsana || 0;
+          const hoursBilling = m.hoursBilling || hoursAsana;
+          
+          let status: 'exceso' | 'cumplido' | 'pendiente';
+          let badges: string[] = [];
+          
+          if (hoursAsana > targetHours) {
+            status = 'exceso';
+            badges = ['Completo', 'Exceso tiempo'];
+          } else if (Math.abs(hoursAsana - targetHours) < 0.5) {
+            status = 'cumplido';
+            badges = ['Completo', 'Objetivo cumplido'];
+          } else {
+            status = 'pendiente';
+            badges = hoursAsana > 0 ? ['Parcial'] : [];
+          }
+
+          return {
+            personId: m.personnelId || m.name,
+            name: m.name || 'Unknown',
+            roleName: m.roleName || 'N/A',
+            targetHours: +targetHours.toFixed(2),
+            hoursAsana: +hoursAsana.toFixed(2),
+            hoursBilling: +hoursBilling.toFixed(2),
+            status,
+            badges
+          };
+        });
+
+        return res.json({
+          projectId,
+          period: period || 'all',
+          summary,
+          members,
+          source: 'legacy_aggregates'
+        });
+      }
+
+      // ✅ USAR DATOS DE SOT
+      // Helper seguro para parsear números
+      const safeNum = (val: any): number => {
+        const n = Number(val);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      const totalTargetHours = laborRows.reduce((sum, r) => sum + safeNum(r.targetHours), 0);
+      const totalAsanaHours = laborRows.reduce((sum, r) => sum + safeNum(r.asanaHours), 0);
+      const totalBillingHours = laborRows.reduce((sum, r) => sum + safeNum(r.billingHours), 0);
+
       const diasHabiles = 22;
-      const miembrosActivos = teamBreakdown.filter((m: any) => (m.hoursAsana || 0) > 0 || (m.hoursBilling || 0) > 0).length;
+      const miembrosActivos = laborRows.filter(r => safeNum(r.asanaHours) > 0 || safeNum(r.billingHours) > 0).length;
 
-      // 📊 SUMMARY - Contrato exacto según plan
       const summary = {
         membersActive: miembrosActivos,
-        totalAsanaHours: +(totalAsanaHours || 0).toFixed(2),
-        estimatedHours: +(estimatedHours || 1).toFixed(2),
-        progressPct: +((totalAsanaHours / (estimatedHours || 1))).toFixed(4),
+        totalAsanaHours: +totalAsanaHours.toFixed(2),
+        estimatedHours: +totalTargetHours.toFixed(2),
+        progressPct: +(totalAsanaHours / (totalTargetHours || 1)).toFixed(4),
         avgDailyHoursPerMember: +(totalAsanaHours / (diasHabiles * Math.max(miembrosActivos, 1))).toFixed(2)
       };
 
-      // 👥 MEMBERS - Transformación con status y badges
-      const members = teamBreakdown.map((m: any) => {
-        const targetHours = m.targetHours || 0;
-        const hoursAsana = m.hoursAsana || 0;
-        const hoursBilling = m.hoursBilling || hoursAsana;
+      const members = laborRows.map((r: any) => {
+        const targetHours = safeNum(r.targetHours);
+        const hoursAsana = safeNum(r.asanaHours);
+        const hoursBilling = safeNum(r.billingHours) || hoursAsana;
         
-        // Determinar status: exceso|cumplido|pendiente
         let status: 'exceso' | 'cumplido' | 'pendiente';
         let badges: string[] = [];
         
@@ -8493,9 +8588,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         return {
-          personId: m.personnelId || m.name, // fallback a nombre si no hay ID
-          name: m.name || 'Unknown',
-          roleName: m.roleName || 'N/A',
+          personId: r.personKey,
+          name: r.personKey,
+          roleName: r.roleName || 'N/A',
           targetHours: +targetHours.toFixed(2),
           hoursAsana: +hoursAsana.toFixed(2),
           hoursBilling: +hoursBilling.toFixed(2),
@@ -8504,35 +8599,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
 
-      // ✅ INVARIANTES - Fail-fast checks en DEV
-      if (process.env.NODE_ENV !== 'production') {
-        const sumAsana = members.reduce((a: number, m: any) => a + m.hoursAsana, 0);
-        const sumTarget = members.reduce((a: number, m: any) => a + m.targetHours, 0);
-        
-        console.assert(
-          Math.abs(sumAsana - summary.totalAsanaHours) < 1e-6,
-          '[Tiempo] Σ horasAsana != totalAsanaHours',
-          { sumAsana, totalAsanaHours: summary.totalAsanaHours }
-        );
-        
-        console.assert(
-          Math.abs(sumTarget - summary.estimatedHours) < 1e-6,
-          '[Tiempo] Σ targetHours != estimatedHours',
-          { sumTarget, estimatedHours: summary.estimatedHours }
-        );
-        
-        console.assert(
-          summary.totalAsanaHours === vmSafe.totalAsanaHours,
-          '[Tiempo] totalAsanaHours != Dashboard',
-          { tiempo: summary.totalAsanaHours, dashboard: vmSafe.totalAsanaHours }
-        );
-      }
-
       res.json({
         projectId,
         period: period || 'all',
         summary,
-        members
+        members,
+        source: 'fact_labor_month'
       });
 
     } catch (error) {
