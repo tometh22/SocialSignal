@@ -12514,6 +12514,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupCostsSOTEndpoints(app, requireAuth);
   console.log("✅ COSTS SOT ENDPOINTS: Fuente única de verdad para costos configurada");
 
+  // ==================== EXCHANGE RATES MANAGEMENT ====================
+  // GET /api/exchange-rates - List exchange rates by year
+  app.get("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+      
+      const { exchangeRates } = await import('../shared/schema');
+      const rates = await db.select()
+        .from(exchangeRates)
+        .where(eq(exchangeRates.year, year))
+        .orderBy(asc(exchangeRates.month));
+      
+      return res.json(rates);
+    } catch (error) {
+      console.error("Error fetching exchange rates:", error);
+      return res.status(500).json({ message: "Failed to fetch exchange rates" });
+    }
+  });
+
+  // POST /api/exchange-rates - Create new exchange rate
+  app.post("/api/exchange-rates", requireAuth, async (req, res) => {
+    try {
+      const { exchangeRates, insertExchangeRateSchema } = await import('../shared/schema');
+      
+      const validatedData = insertExchangeRateSchema.parse({
+        ...req.body,
+        createdBy: req.user?.id,
+        createdAt: new Date(),
+      });
+      
+      const [newRate] = await db.insert(exchangeRates)
+        .values(validatedData)
+        .returning();
+      
+      return res.json(newRate);
+    } catch (error) {
+      console.error("Error creating exchange rate:", error);
+      return res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create exchange rate" 
+      });
+    }
+  });
+
+  // PATCH /api/exchange-rates/:id - Update exchange rate
+  app.patch("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid exchange rate ID" });
+      }
+      
+      const { exchangeRates } = await import('../shared/schema');
+      
+      const [updatedRate] = await db.update(exchangeRates)
+        .set({
+          ...req.body,
+          updatedBy: req.user?.id,
+          updatedAt: new Date(),
+        })
+        .where(eq(exchangeRates.id, id))
+        .returning();
+      
+      if (!updatedRate) {
+        return res.status(404).json({ message: "Exchange rate not found" });
+      }
+      
+      return res.json(updatedRate);
+    } catch (error) {
+      console.error("Error updating exchange rate:", error);
+      return res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to update exchange rate" 
+      });
+    }
+  });
+
+  // DELETE /api/exchange-rates/:id - Delete exchange rate
+  app.delete("/api/exchange-rates/:id", requireAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid exchange rate ID" });
+      }
+      
+      const { exchangeRates } = await import('../shared/schema');
+      
+      await db.delete(exchangeRates)
+        .where(eq(exchangeRates.id, id));
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting exchange rate:", error);
+      return res.status(500).json({ message: "Failed to delete exchange rate" });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }
