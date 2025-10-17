@@ -11568,6 +11568,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 COMPLETE DATA VALIDATION - Run all integrity checks
+  app.get("/api/etl/sot/validate", requireAuth, async (req, res) => {
+    try {
+      console.log('🔍 Running complete data validation...');
+      
+      const { factLaborMonth, factRCMonth, aggProjectMonth } = await import('../shared/schema');
+      const periodKey = req.query.period as string || '2025-08';
+      
+      // 1. Check for missing rates
+      const missingRates = await db.select({
+        projectId: factLaborMonth.projectId,
+        personKey: factLaborMonth.personKey,
+        roleName: factLaborMonth.roleName,
+        billingHours: factLaborMonth.billingHours
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.periodKey, periodKey),
+        sql`CAST(${factLaborMonth.billingHours} AS NUMERIC) > 0`,
+        sql`(${factLaborMonth.hourlyRateARS} IS NULL OR CAST(${factLaborMonth.hourlyRateARS} AS NUMERIC) = 0)`
+      ));
+      
+      // 2. Check for ANTI×100 violations (hours > 500 or costs > 1M)
+      const anti100Violations = await db.select({
+        projectId: factLaborMonth.projectId,
+        personKey: factLaborMonth.personKey,
+        asanaHours: factLaborMonth.asanaHours,
+        billingHours: factLaborMonth.billingHours,
+        costARS: factLaborMonth.costARS,
+        costUSD: factLaborMonth.costUSD,
+        flags: factLaborMonth.flags
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.periodKey, periodKey),
+        or(
+          sql`CAST(${factLaborMonth.asanaHours} AS NUMERIC) > 500`,
+          sql`CAST(${factLaborMonth.billingHours} AS NUMERIC) > 500`,
+          sql`CAST(${factLaborMonth.costARS} AS NUMERIC) > 1000000`,
+          sql`CAST(${factLaborMonth.costUSD} AS NUMERIC) > 1000000`
+        )
+      ));
+      
+      // 3. Check for currency inconsistencies (ARS == USD or USD > 100K)
+      const currencyIssues = await db.select({
+        projectId: factLaborMonth.projectId,
+        personKey: factLaborMonth.personKey,
+        costARS: factLaborMonth.costARS,
+        costUSD: factLaborMonth.costUSD,
+        flags: factLaborMonth.flags
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.periodKey, periodKey),
+        or(
+          sql`CAST(${factLaborMonth.costARS} AS NUMERIC) = CAST(${factLaborMonth.costUSD} AS NUMERIC)`,
+          sql`CAST(${factLaborMonth.costUSD} AS NUMERIC) > 100000`
+        )
+      ));
+      
+      // 4. Check mathematical invariants: aggregates should match fact sums
+      const aggInvariants = await db.execute(sql`
+        WITH labor_sums AS (
+          SELECT 
+            project_id,
+            period_key,
+            SUM(CAST(cost_usd AS NUMERIC)) as total_labor_usd
+          FROM fact_labor_month
+          WHERE period_key = ${periodKey}
+          GROUP BY project_id, period_key
+        ),
+        rc_sums AS (
+          SELECT 
+            project_id,
+            period_key,
+            SUM(CAST(revenue_usd AS NUMERIC)) as total_revenue_usd
+          FROM fact_rc_month
+          WHERE period_key = ${periodKey}
+          GROUP BY project_id, period_key
+        ),
+        agg_values AS (
+          SELECT 
+            project_id,
+            period_key,
+            CAST(total_cost_usd AS NUMERIC) as agg_cost_usd,
+            CAST(revenue_usd AS NUMERIC) as agg_revenue_usd
+          FROM agg_project_month
+          WHERE period_key = ${periodKey}
+        )
+        SELECT 
+          COALESCE(l.project_id, r.project_id, a.project_id) as project_id,
+          l.total_labor_usd,
+          r.total_revenue_usd,
+          a.agg_cost_usd,
+          a.agg_revenue_usd,
+          CASE 
+            WHEN ABS(COALESCE(l.total_labor_usd, 0) - COALESCE(a.agg_cost_usd, 0)) > 1 THEN 'COST_MISMATCH'
+            WHEN ABS(COALESCE(r.total_revenue_usd, 0) - COALESCE(a.agg_revenue_usd, 0)) > 1 THEN 'REVENUE_MISMATCH'
+            ELSE 'OK'
+          END as status
+        FROM labor_sums l
+        FULL OUTER JOIN rc_sums r ON l.project_id = r.project_id
+        FULL OUTER JOIN agg_values a ON COALESCE(l.project_id, r.project_id) = a.project_id
+        WHERE ABS(COALESCE(l.total_labor_usd, 0) - COALESCE(a.agg_cost_usd, 0)) > 1
+           OR ABS(COALESCE(r.total_revenue_usd, 0) - COALESCE(a.agg_revenue_usd, 0)) > 1
+      `);
+      
+      // 5. Check for orphaned labor records (project not in agg)
+      const orphanedLabor = await db.select({
+        projectId: factLaborMonth.projectId,
+        count: sql<number>`COUNT(*)`
+      })
+      .from(factLaborMonth)
+      .where(and(
+        eq(factLaborMonth.periodKey, periodKey),
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${aggProjectMonth} 
+          WHERE ${aggProjectMonth.projectId} = ${factLaborMonth.projectId} 
+            AND ${aggProjectMonth.periodKey} = ${factLaborMonth.periodKey}
+        )`
+      ))
+      .groupBy(factLaborMonth.projectId);
+      
+      const summary = {
+        periodKey,
+        missingRates: missingRates.length,
+        anti100Violations: anti100Violations.length,
+        currencyIssues: currencyIssues.length,
+        invariantViolations: aggInvariants.rows.length,
+        orphanedLabor: orphanedLabor.length,
+        status: (
+          missingRates.length === 0 && 
+          anti100Violations.length === 0 && 
+          currencyIssues.length === 0 && 
+          aggInvariants.rows.length === 0 &&
+          orphanedLabor.length === 0
+        ) ? 'HEALTHY' : 'ISSUES_FOUND'
+      };
+      
+      res.json({
+        summary,
+        details: {
+          missingRates: missingRates.slice(0, 10),
+          anti100Violations: anti100Violations.slice(0, 10),
+          currencyIssues: currencyIssues.slice(0, 10),
+          invariantViolations: aggInvariants.rows.slice(0, 10),
+          orphanedLabor: orphanedLabor.slice(0, 10)
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Validation Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  
