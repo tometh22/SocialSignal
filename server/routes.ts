@@ -11415,6 +11415,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { executeSoTETL } = await import('./etl/sot-etl');
       const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
       
+      // Parse options from request body
+      const options = {
+        scopes: req.body.scopes,
+        dryRun: req.body.dryRun || false,
+        recomputeAgg: req.body.recomputeAgg || false
+      };
+      
+      console.log('📋 Options:', JSON.stringify(options, null, 2));
+      
       // 1. Read Excel MAESTRO data
       console.log('📊 Reading Excel MAESTRO sheets...');
       
@@ -11454,8 +11463,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📦 Parsed ${costosRows.length} costo objects, ${rcRows.length} RC objects`);
       
-      // 3. Execute SoT ETL
-      const result = await executeSoTETL(costosRows, rcRows);
+      // 3. Execute SoT ETL with options
+      const result = await executeSoTETL(costosRows, rcRows, options);
       
       res.json({
         success: result.success,

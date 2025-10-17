@@ -618,6 +618,15 @@ export async function computeAggProjectMonth(projectId: number, periodKey: strin
 
 // ==================== ORQUESTADOR COMPLETO ====================
 
+export interface SoTETLOptions {
+  scopes?: {
+    periods?: string[]; // Filtrar por períodos específicos (e.g. ["2023-01", "2023-12"])
+    projects?: number[]; // Filtrar por proyectos específicos
+  };
+  dryRun?: boolean; // Simular sin guardar
+  recomputeAgg?: boolean; // Forzar recálculo de agregados
+}
+
 export interface SoTETLResult {
   success: boolean;
   periodsProcessed: string[];
@@ -636,20 +645,55 @@ export interface SoTETLResult {
  */
 export async function executeSoTETL(
   costosDirectosRows: CostoDirectoRow[],
-  rendimientoClienteRows: RendimientoClienteRow[]
+  rendimientoClienteRows: RendimientoClienteRow[],
+  options: SoTETLOptions = {}
 ): Promise<SoTETLResult> {
   const startTime = Date.now();
   console.log('🚀 [SoT ETL] Iniciando ETL completo...');
+  
+  if (options.scopes?.periods) {
+    console.log(`🎯 [SoT ETL] Filtrado por períodos: ${options.scopes.periods.join(', ')}`);
+  }
   
   try {
     // Limpiar cache de proyectos para forzar re-resolve
     clearProjectCache();
     
+    // Filtrar datos por scopes si están definidos
+    let filteredCostos = costosDirectosRows;
+    let filteredRC = rendimientoClienteRows;
+    
+    if (options.scopes?.periods) {
+      const periodSet = new Set(options.scopes.periods);
+      filteredCostos = costosDirectosRows.filter(row => {
+        const period = toPeriodKey(row.Mes, false);
+        return period && periodSet.has(period);
+      });
+      filteredRC = rendimientoClienteRows.filter(row => {
+        const period = toPeriodKey(row.Mes, false);
+        return period && periodSet.has(period);
+      });
+      console.log(`📊 [SoT ETL] Filtrado: ${filteredCostos.length}/${costosDirectosRows.length} costos, ${filteredRC.length}/${rendimientoClienteRows.length} RC`);
+    }
+    
+    if (options.dryRun) {
+      console.log('🔍 [SoT ETL] DRY RUN - No se guardarán cambios');
+      return {
+        success: true,
+        periodsProcessed: options.scopes?.periods || [],
+        laborRowsProcessed: filteredCostos.length,
+        rcRowsProcessed: filteredRC.length,
+        aggregatesComputed: 0,
+        errors: [],
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+    
     // 1. Procesar labor (costos directos)
-    await processDirectCostsToFactLabor(costosDirectosRows);
+    await processDirectCostsToFactLabor(filteredCostos);
     
     // 2. Procesar RC (rendimiento cliente)
-    await processRendimientoClienteToFactRC(rendimientoClienteRows);
+    await processRendimientoClienteToFactRC(filteredRC);
     
     // 3. Obtener períodos únicos de ambas tablas
     const periods = await db.select({ periodKey: factLaborMonth.periodKey })
@@ -685,8 +729,8 @@ export async function executeSoTETL(
     const result: SoTETLResult = {
       success: true,
       periodsProcessed: periods,
-      laborRowsProcessed: costosDirectosRows.length,
-      rcRowsProcessed: rendimientoClienteRows.length,
+      laborRowsProcessed: filteredCostos.length,
+      rcRowsProcessed: filteredRC.length,
       aggregatesComputed,
       errors: [],
       executionTimeMs
