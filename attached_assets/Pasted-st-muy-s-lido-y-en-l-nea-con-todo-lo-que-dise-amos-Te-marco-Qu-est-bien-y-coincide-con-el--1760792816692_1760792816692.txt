@@ -1,0 +1,45 @@
+stá muy sólido y en línea con todo lo que diseñamos. Te marco:
+	•	✅ Qué está bien y coincide con el modelo SoT.
+	•	⚠️ Qué ajustaría (pequeños pero importantes detalles).
+	•	🚀 Un checklist final de salida a producción para que no se escape nada.
+
+⸻
+
+✅ Coincidencias correctas (bien ahí)
+	•	Single Source of Truth (SoT): fact_labor_month + fact_rc_month → agg_project_month y ambas vistas (listado y proyecto único) consumen el mismo agregado ➝ consistencia garantizada entre cards y header.
+	•	period_key = 'YYYY-MM' en todas las tablas/queries.
+	•	3 tipos de horas por persona (target / asana / billing) con ANTI×100 en Asana/Billing ✔️ y fallback billing ← asana ← target ✔️.
+	•	Ingresos (RC) correctamente mapeados a fact_rc_month con price_native como denominador del presupuesto (fee del mes) — NO es el FX ✔️.
+	•	Costos: nacen en fact_labor_month (detalle), se agregan en agg_project_month y la UI no recalcula KPIs en FE ✔️.
+	•	Moneda operativa por proyecto: USD para clientes USD, ARS para locales, y conversión a USD solo para consolidación ✔️.
+	•	KPIs: markup = revenue/cost, margin = (rev-cost)/rev, budget_util = cost/denom (denom = price_native) ✔️.
+	•	Tabs: Dashboard/Financiero desde agg_project_month; Equipo/Costos/Tiempo desde fact_labor_month; Ingresos desde fact_rc_month ✔️.
+
+⸻
+
+⚠️ Ajustes/precisiones recomendadas
+	1.	Prioridad exacta del “Valor hora” (tarifa ARS)
+	•	Proponé este orden determinístico (lo usábamos en el fallback de 6 niveles):
+	1.	Excel (si hourly_rate_ars_raw > 0)
+	2.	Catálogo proyecto dim_person_rate(person, project, period)
+	3.	Catálogo general dim_person_rate(person, null, period)
+	4.	Histórico (última tarifa conocida de esa persona)
+	5.	Baseline por rol
+	6.	Reconciliación con RC proporcional a billing_hours (último recurso; flag fuerte reconciled_to_rc_cost)
+	•	En tu texto aparece el catálogo y baseline, pero no está la prioridad completa con histórico y reconciliación RC explícitos. Sumalo.
+	2.	Guard de ANTI×100 en costos
+	•	Evitá dividir costos por un umbral absoluto (ej. “> 1.000.000 ⇒ ÷100”). Puede dar falsos positivos en hiperinflación.
+	•	Mejor: guard relacional: si total_ars_raw viene y
+total_ars_raw / (hourly_rate_ars * billing_hours) ∈ [90, 110] ⇒ probablemente ×100 ⇒ ÷100.
+	•	O usar el flag de horas: si billing_hours fue ANTI×100 y además total_ars_raw / rate parece ×100, entonces corrige.
+	3.	FX faltante / period-level FX
+	•	Si fx faltara en alguna fila de costos, definí fallback: FX del período (de RC o tabla auxiliar dim_fx(period_key)), antes de dejar cost_usd=0. Dejalo explícito.
+	4.	Detección de moneda nativa
+	•	Asegurate que la moneda nativa sea atributo del proyecto (dim_project.currency_native) y no se derive “al vuelo” por fila. Evita inconsistencias si un mes tiene carga errónea.
+	5.	Casos borde de disponibilidad de datos (UI):
+	•	Con RC y sin horas: Dashboard debe mostrar KPIs de RC; Equipo/Tiempo en empty state (no error).
+	•	Con horas y sin RC: Dashboard muestra costos/horas; KPIs que dependan de denom/revenue con — + badge “RC faltante”. Dejalo explícito (ya está implícito, pero conviene fijarlo como regla).
+	6.	Listado de proyectos
+	•	Asegurate que el listado solo lea agg_project_month del período activo (nada de sumar períodos ni recalcular). Esto lo decís, pero remarco porque es el origen típico de desvíos.
+	7.	/time-tracking
+	•	Confirmá que el endpoint existe y que deriva sus datos de SoT (fact_labor_month + agg.est_hours). Tu texto lo infiere, dejalo 100% explícito.
