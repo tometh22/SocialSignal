@@ -350,7 +350,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
           hourlyRateARS: rateARS.toString(),
           costARS: costARS.toString(),
           costUSD: costUSD.toString(),
-          fx: fx.toString(),
+          fx: fxToUse.toString(), // Usar fxToUse (incluye fallback) en lugar de fx
           roleName: row.Rol || null,
           flags,
           sourceRowId: row.__rowId || `row_${processed}`
@@ -364,7 +364,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
             hourlyRateARS: rateARS.toString(),
             costARS: costARS.toString(),
             costUSD: costUSD.toString(),
-            fx: fx.toString(),
+            fx: fxToUse.toString(), // Usar fxToUse (incluye fallback) en lugar de fx
             roleName: row.Rol || null,
             flags
           }
