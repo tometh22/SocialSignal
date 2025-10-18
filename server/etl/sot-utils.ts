@@ -94,10 +94,60 @@ export function normHours(hours: number): number {
 }
 
 /**
- * Determina si se debe aplicar ANTI×100 a un valor
+ * Determina si se debe aplicar ANTI×100 a un valor de horas
  */
 export function needsAntiX100(value: number, threshold: number = 500): boolean {
   return value > threshold;
+}
+
+/**
+ * Guard ANTI×100 mejorado para costos usando verificación relacional
+ * Detecta si un costo está multiplicado por 100 comparando con el valor esperado
+ * 
+ * @param costRaw - Costo raw del Excel
+ * @param hourlyRate - Tarifa horaria en ARS
+ * @param billingHours - Horas de facturación
+ * @returns Costo normalizado (÷100 si detecta multiplicación)
+ */
+export function normalizeCost(costRaw: number, hourlyRate: number, billingHours: number): {
+  cost: number;
+  wasNormalized: boolean;
+} {
+  if (costRaw === 0 || hourlyRate === 0 || billingHours === 0) {
+    return { cost: costRaw, wasNormalized: false };
+  }
+  
+  // Calcular costo esperado
+  const expectedCost = hourlyRate * billingHours;
+  
+  // Verificar si costRaw / expectedCost está en rango [90, 110]
+  // Esto indica que probablemente costRaw está multiplicado por 100
+  const ratio = costRaw / expectedCost;
+  
+  if (ratio >= 90 && ratio <= 110) {
+    // Detectado patrón ×100, normalizar
+    console.log(`🛡️ ANTI×100 COST: ${costRaw} / ${expectedCost} = ${ratio.toFixed(1)}x → Dividiendo por 100`);
+    return {
+      cost: costRaw / 100,
+      wasNormalized: true
+    };
+  }
+  
+  // Si el costo es muy alto en términos absolutos Y la razón sugiere error
+  // (más de 1M ARS y más de 10x el esperado)
+  if (costRaw > 1_000_000 && ratio > 10) {
+    console.log(`🛡️ ANTI×100 COST (fallback): Costo ${costRaw} > 1M y ${ratio.toFixed(1)}x esperado → Dividiendo por 100`);
+    return {
+      cost: costRaw / 100,
+      wasNormalized: true
+    };
+  }
+  
+  // Costo parece correcto
+  return {
+    cost: costRaw,
+    wasNormalized: false
+  };
 }
 
 /**

@@ -295,14 +295,41 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       });
       
       const rateARS = rateResolution.rate;
-      const costARS = totalARSSheet || (billingHours * rateARS);
-      const costUSD = totalUSDSheet || (fx > 0 ? costARS / fx : 0);
       
-      // 6) Flags (combinar flags base + flags de fallback de tarifas)
+      // 5.5) Aplicar guard ANTI×100 mejorado para costos usando verificación relacional
+      const { normalizeCost } = await import('./sot-utils');
+      const costARSNormalized = totalARSSheet 
+        ? normalizeCost(totalARSSheet, rateARS, billingHours)
+        : { cost: billingHours * rateARS, wasNormalized: false };
+      
+      const costARS = costARSNormalized.cost;
+      
+      // Fallback de FX: priorizar fx del Excel, sino buscar desde fact_rc_month del período
+      let fxToUse = fx;
+      if (fx === 0 || fx === null) {
+        // Buscar FX del período desde fact_rc_month
+        const rcFx = await db.query.factRCMonth.findFirst({
+          where: and(
+            eq(factRCMonth.projectId, projectId),
+            eq(factRCMonth.periodKey, periodKey)
+          )
+        });
+        
+        if (rcFx && parseNum(rcFx.fx) > 0) {
+          fxToUse = parseNum(rcFx.fx);
+          console.log(`💱 FX fallback: Usando FX ${fxToUse} del RC para ${personKey} en ${periodKey}`);
+        }
+      }
+      
+      const costUSD = totalUSDSheet || (fxToUse > 0 ? costARS / fxToUse : 0);
+      
+      // 6) Flags (combinar flags base + flags de fallback de tarifas + ANTI×100 costos)
       const flags = generateFlags({
         'anti_x100_asana': needsAntiX100(asanaRaw),
         'anti_x100_billing': needsAntiX100(billingRaw),
+        'anti_x100_cost_ars': costARSNormalized.wasNormalized,
         'fallback_billing': !billingRaw,
+        'fallback_fx': fx === 0 && fxToUse > 0,
         'derived_cost_ars': !totalARSSheet,
         'derived_cost_usd': !totalUSDSheet,
         ...rateResolution.flags.reduce((acc, flag) => ({ ...acc, [flag]: true }), {})
