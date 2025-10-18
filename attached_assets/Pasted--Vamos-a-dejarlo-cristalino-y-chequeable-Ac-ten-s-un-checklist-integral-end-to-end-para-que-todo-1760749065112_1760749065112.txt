@@ -1,0 +1,256 @@
+¡Vamos a dejarlo cristalino y chequeable! Acá tenés un checklist integral (end-to-end) para que todo el sistema quede coherente: Vista de Proyectos (listado) → Vista Única de Proyecto (tabs), con de dónde sale cada dato, cómo se carga, y cómo deben funcionar los filtros temporales.
+
+✅ A. Fundamentos (comunes a todo)
+
+ Período canónico: period_key = 'YYYY-MM' (mes con cero).
+
+ Moneda operativa por proyecto: si el cliente factura en USD → vista operativa en USD; si factura en ARS → vista operativa en ARS.
+
+ SoT Star Schema poblado y consistente:
+
+ dim_period
+
+ fact_labor_month (detalle por persona, 3 horas: target/asana/billing, hourly_rate_ars, cost_ars/usd, fx, role_name, flags)
+
+ fact_rc_month (RC de “Rendimiento Cliente”: revenue_native/usd, cost_native/usd, price_native=precio del mes, fx)
+
+ agg_project_month (KPIs precalculados por período: est_hours, total_asana_hours, total_billing_hours, total_cost_ars/usd, view_operativa_{revenue,cost,denom,budget_util,markup,margin}, flags)
+
+ Invariantes matemáticos por project+period:
+
+ Σtarget_hours = agg.est_hours
+
+ Σasana_hours = agg.total_asana_hours
+
+ Σbilling_hours = agg.total_billing_hours
+
+ Σcost_ars/usd = agg.total_cost_ars/usd
+
+ agg.view_operativa_budget_util = agg.view_operativa_cost / agg.view_operativa_denom
+
+ ANTI×100 aplicado a horas Asana/Billing (>500 → ÷100).
+
+ Fallback horas de facturación: billing ← asana ← target.
+
+ Fallback tarifas/costos (capas 2/3): catálogo dim_person_rate (general/proyecto/período) → histórico → baseline por rol → reconciliación RC (flag reconciled_to_rc_cost).
+
+🚀 B. APIs (contratos y defaults)
+
+ GET /api/projects?period=YYYY-MM → Vista de Proyectos (lista)
+
+ Por cada proyecto: KPIs de agg_project_month del período activo:
+
+revenue, cost, denom, budgetUtilization, markup, margin, currency
+
+est_hours, total_asana_hours
+
+ Defaults seguros: nros 0, strings '', arrays [] (nunca undefined)
+
+ GET /api/projects/:id/complete-data?period=YYYY-MM&view=operativa → Vista Única
+
+ quotation.estimatedHours (= agg.est_hours)
+
+ actuals.totalAsanaHours, actuals.totalBillingHours
+
+ actuals.teamBreakdown[] (de fact_labor_month):
+targetHours, hoursAsana, hoursBilling, hourlyRateARS, costARS, costUSD, roleName, name, personId, flags
+
+ views[view]: { revenue, cost, denom, budgetUtilization, markup, margin, currency }
+
+ Defaults seguros en toda la jerarquía.
+
+ GET /api/projects/:id/time-tracking?period=YYYY-MM
+
+ summary: { totalAsanaHours, estimatedHours, progressPct, membersActive }
+
+ members[]: { name, roleName, targetHours, hoursAsana, hoursBilling, status } (de fact_labor_month)
+
+ (Opc.) GET /api/projects/:id/costs?period=YYYY-MM (si tenés tab dedicada)
+
+ rows[] = fact_labor_month del período (misma estructura que teamBreakdown)
+
+ (Opc.) GET /api/projects/:id/periods
+
+ Lista de period_key disponibles con members_count, has_rc
+
+🧭 C. Frontend (React Query + estado)
+
+ Query Keys incluyen siempre period (y view cuando aplique):
+
+ ['projects-list', period]
+
+ ['project-complete', projectId, view, period]
+
+ ['time-tracking', projectId, period]
+
+ keepPreviousData: false, placeholder undefined, sin mezclar cache.
+
+ Defensas en render (no crashea al cambiar período):
+
+ No usar ...undefined (usar ?? {} / ?? [])
+
+ Skeletons mientras carga + Empty States cuando no hay datos.
+
+ Aserciones DEV (opcional): arrays y KPIs presentes.
+
+📋 D. Vista de Proyectos (Listado)
+
+Objetivo: mostrar snapshot por proyecto en el período activo y permitir filtrar/ordenar.
+
+Datos (por item) — salen de agg_project_month:
+
+ Finanzas (vista operativa): revenue, cost, denom, % presupuesto usado (budgetUtilization), markup, margin, currency
+
+ Operación: est_hours, total_asana_hours
+
+ Badges/flags: labor_vs_rc_cost_mismatch, no_hours_for_period, reconciled_to_rc_cost (si querés mostrar)
+
+Filtros/orden:
+
+ Filtro por período (selector que manda period=YYYY-MM)
+
+ Orden por budgetUtilization, margin, markup, revenue, cost
+
+ Búsqueda por cliente/proyecto (normalizada)
+
+Consistencia:
+
+ No recalcular KPIs; siempre usar los precalculados del backend (agg_project_month).
+
+ Moneda coherente por proyecto (USD vs ARS).
+
+🧱 E. Vista Única de Proyecto (Tabs y map de datos)
+1) Dashboard (Resumen ejecutivo)
+
+ Fuente: agg_project_month (+ horas totales)
+
+ Muestra:
+
+Finanzas: views.operativa.{revenue,cost,denom,budgetUtilization,markup,margin,currency}
+
+Horas: totalAsanaHours vs est_hours
+
+Estado: rentable/deficit según revenue vs cost
+
+ NO recalcular conversiones ni KPIs en FE.
+
+2) Equipo (detalle por persona)
+
+ Fuente: fact_labor_month (vía actuals.teamBreakdown)
+
+ Muestra por persona:
+name, roleName, targetHours, hoursAsana, hoursBilling, hourlyRateARS, cost(view), flags
+
+ Cálculos en FE (ligeros):
+
+Progreso = hoursAsana / targetHours
+
+$/h (vista operativa) = cost(view) / hoursBilling (si >0)
+
+ Totales de cabecera:
+
+ΣhoursAsana = actuals.totalAsanaHours
+
+ΣtargetHours = quotation.estimatedHours
+
+ΣbillingHours = actuals.totalBillingHours
+
+3) Performance (eficiencia y rankings)
+
+ Fuente: agg_project_month (totales) + teamBreakdown (por persona)
+
+ KPI equipo: eff = totalAsanaHours / est_hours
+
+ Rankings: por eficiencia (hoursAsana/target), impacto económico (peso por cost(view)), etc.
+
+4) Tiempo (gestión de horas)
+
+ Fuente: /time-tracking (derivado del SoT)
+
+ Resumen: summary.totalAsanaHours, summary.estimatedHours, progressPct
+
+ Filas: members[] con targetHours vs hoursAsana
+
+5) Ingresos
+
+ Fuente: fact_rc_month
+
+ Muestra: ingresos del período (nativo + USD si aplica), price_native (precio del mes)
+
+ Nota: aquí no se muestran costos, solo RC (para trazabilidad comercial).
+
+6) Costos
+
+ Fuente: fact_labor_month (detalle) + agg_project_month (totales)
+
+ Muestra: costos por persona (costARS/ costUSD según vista), Σtotales = agg.total_cost_(vista)
+
+ Auditoría: badge si |Σdetalle − RC|/RC > 10% (labor_vs_rc_cost_mismatch)
+
+7) Financiero
+
+ Fuente: agg_project_month
+
+ Muestra: KPIs, series históricas por mes (agregando múltiples period_key)
+
+🧪 F. Filtros temporales (cómo deben funcionar)
+
+ El selector de período dispara refetch de todas las queries del proyecto con period=YYYY-MM.
+
+ React Query keys incluyen period ⇒ evita mezclar respuestas de meses distintos.
+
+ Si no hay horas para ese período:
+
+ Dashboard igual muestra finanzas de RC si existen.
+
+ Equipo / Tiempo / Costos muestran Empty State (informativo, sin error).
+
+ Si no hay RC pero hay horas:
+
+ Dashboard muestra costos y horas; KPIs que requieran denom/revenue aparecen con fallback 0/— y/o badge de “RC faltante”.
+
+ Nunca se rompe el render: arrays [], objetos {}, números 0 por defecto.
+
+🔭 G. QA & Observabilidad
+
+ Logs ETL por project+period: Σhoras (target/asana/billing), Σcostos (ARS/USD), RC (rev/cost), denom, flags aplicados.
+
+ Endpoint diagnóstico (opcional):
+
+GET /api/etl/sot/diagnostics/missing-rates?period=YYYY-MM
+
+Muestra personas con hoursBilling>0 y rate=0/cost=0.
+
+ Consultas de validación masiva (global sweep) que devuelvan 0 filas cuando todo está ok:
+
+Invariantes Σdetalle vs agg
+
+budgetUtil = cost/denom
+
+Personas con horasBilling>0 y costo==0
+
+🔐 H. Seguridad / Deploy
+
+ Variables sensibles (SESSION_SECRET, DATABASE_URL, GOOGLE_*) protegidas (App invites/roles).
+
+ Migrations aplicadas (PKs por (project_id, period_key); índices).
+
+ Orquestador ETL disponible (POST /api/etl/sot/run) y job diario 02:00 AR (mes actual + anterior).
+
+ Rollback fácil al deployment previo si algo se desvía.
+
+TL;DR (resumen operativo)
+
+Listado Proyectos: todo sale de agg_project_month del período activo (KPIs precalculados).
+
+Vista Única:
+
+Dashboard/Financiero → agg_project_month
+
+Equipo/Costos/Tiempo → fact_labor_month (+ resumen de agg)
+
+Ingresos → fact_rc_month
+
+Filtros temporales: claves con period, defaults seguros, empty states; nunca recalcular KPIs en FE.
+
+Si querés, te paso una plantilla de pruebas (SQL + curl) para chequear 3–5 proyectos en 3 meses cada uno y que veas OK/FAIL por cada pestaña en menos de 5 minutos.
