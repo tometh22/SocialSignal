@@ -22,9 +22,14 @@ const MONTHS: Record<string, string> = {
 /**
  * Convierte mes/año a period_key en formato YYYY-MM
  * Ejemplos: ("07 jul", 2025) → "2025-07", ("jul", 2025) → "2025-07"
+ * Maneja años en formato "2025-8" (del Excel) → extrae solo "2025"
  */
 export function toPeriodKey(mes: any, anio: any): string {
-  const y = String(anio).trim();
+  // Extraer solo el año (primeros 4 dígitos) para manejar "2025-8" → "2025"
+  const yearStr = String(anio).trim();
+  const yearMatch = yearStr.match(/^\d{4}/);
+  const y = yearMatch ? yearMatch[0] : yearStr;
+  
   const s = String(mes).toLowerCase().trim();
   
   // Intentar extraer mes de diferentes formatos
@@ -56,6 +61,7 @@ export function normKey(s: string | null | undefined): string {
  * Parsea números en formato argentino (1.040.684,50 → 1040684.5)
  * - Punto (.) como separador de miles (se elimina)
  * - Coma (,) como separador decimal (se convierte a punto)
+ * - Símbolo de moneda ($) se remueve
  * Retorna 0 si no es un número válido
  */
 export function parseNum(x: any): number {
@@ -67,8 +73,12 @@ export function parseNum(x: any): number {
   // Convertir a string y procesar
   const str = String(x);
   
-  // Remover separadores de miles (puntos) y convertir decimal (coma a punto)
-  const cleaned = str.replace(/\./g, '').replace(',', '.');
+  // Remover símbolo de moneda ($), separadores de miles (puntos) y convertir decimal (coma a punto)
+  const cleaned = str
+    .replace(/\$/g, '')              // Remover símbolo $
+    .replace(/\s/g, '')               // Remover espacios
+    .replace(/\./g, '')               // Remover separadores de miles
+    .replace(',', '.');               // Convertir decimal coma a punto
   const n = Number(cleaned);
   
   return Number.isFinite(n) ? n : 0;

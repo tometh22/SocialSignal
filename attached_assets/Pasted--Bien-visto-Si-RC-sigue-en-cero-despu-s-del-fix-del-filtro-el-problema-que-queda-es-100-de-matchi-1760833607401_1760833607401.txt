@@ -1,0 +1,108 @@
+¡Bien visto! Si RC sigue en cero después del fix del filtro, el problema que queda es 100% de matching entre “Rendimiento Cliente” y tus proyectos reales (p. ej., “Fee” vs “Fee Huggies”). Te dejo un plan quirúrgico y repetible para cerrar este gap en minutos y que quede blindado para todos los meses y proyectos.
+1) Cerrar el matching con alias determinísticos (cliente + proyecto)
+1.1. Tablas de alias (si no las tenés aún)
+-- Alias de CLIENTE
+CREATE TABLE IF NOT EXISTS dim_client_alias (
+  alias_norm   text PRIMARY KEY,      -- "kimberly clark"
+  client_id    int NOT NULL,
+  source       text DEFAULT 'manual',
+  updated_at   timestamptz DEFAULT now()
+);
+
+-- Alias de PROYECTO (scopeado por cliente para evitar colisiones tipo "fee")
+CREATE TABLE IF NOT EXISTS dim_project_alias (
+  client_id    int NOT NULL,
+  alias_norm   text NOT NULL,         -- "fee"
+  project_id   int NOT NULL,          -- -> "Fee Huggies"
+  source       text DEFAULT 'manual',
+  updated_at   timestamptz DEFAULT now(),
+  PRIMARY KEY (client_id, alias_norm)
+);
+1.2. Cargar alias para Kimberly
+Ajustá los IDs a los tuyos: client_id = <Kimberly> y project_id = <Fee Huggies>.
+-- Cliente
+INSERT INTO dim_client_alias(alias_norm, client_id, source)
+VALUES ('kimberly clark', <CLIENT_ID_KIMBERLY>, 'manual')
+ON CONFLICT (alias_norm) DO UPDATE SET client_id=EXCLUDED.client_id, updated_at=now();
+
+-- Proyecto bajo ese cliente
+INSERT INTO dim_project_alias(client_id, alias_norm, project_id, source)
+VALUES (<CLIENT_ID_KIMBERLY>, 'fee', <PROJECT_ID_FEE_HUGGIES>, 'manual')
+ON CONFLICT (client_id, alias_norm) DO UPDATE SET project_id=EXCLUDED.project_id, updated_at=now();
+Esto convierte cualquier “Fee” que venga en la hoja RC para Kimberly Clark en el proyecto Fee Huggies.
+2) Orden de resolución en el ETL (determinístico > fuzzy)
+Dentro del ETL (RC), aplicá esta secuencia al normalizar cada fila:
+Normalizar: client_norm = normKey(Cliente), project_norm = normKey(Proyecto)
+Resolver cliente:
+a) exact match por client_norm en dim_client_alias
+b) si no existe, exact match con catálogo dim_client normalizado
+c) si no, fuzzy (≥0.92) y cachear alias en dim_client_alias
+Resolver proyecto (con client_id ya resuelto):
+a) exact match en dim_project_alias (client_id, alias_norm=project_norm)
+b) exact match directo contra catálogo dim_project de ese client_id (normalizado)
+c) token-subset único: si project_norm es subconjunto de tokens del nombre oficial y no hay ambigüedad → aceptar
+d) fuzzy (≥0.92) solo si única coincidencia; si hay empates → quedate “unmatched” y logueá
+Si no matchea → no insertes en fact_rc_month; logueá la fila en un buffer rc_unmatched (ver §3).
+Con esto, “Fee” + Kimberly se mapea siempre a Fee Huggies sin fuzzy.
+3) Diagnóstico y auditoría (saber qué RC quedó sin match)
+3.1. Endpoint rápido (opcional)
+GET /api/etl/sot/diagnostics/rc-unmatched?period=YYYY-MM
+Debe listar: period_key, cliente_raw, proyecto_raw, cliente_norm, proyecto_norm, motivo
+Motivos: unknown_client, unknown_project, ambiguous_project, below_threshold.
+3.2. SQL para ver RC sin match (si lo guardás en staging)
+-- Si guardás staging en una tabla temporal/transient durante ETL:
+SELECT period_key, cliente_raw, proyecto_raw, cliente_norm, proyecto_norm, reason
+FROM rc_unmatched_staging
+WHERE period_key IN ('2025-05','2025-06','2025-07','2025-08','2025-09')
+ORDER BY period_key, cliente_norm, proyecto_norm;
+4) Reprocesar RC (los meses que querés) y recomputar agregados
+# Reprocesá los meses clave de Kimberly (y cualquier otro cliente con alias nuevo)
+curl -s -X POST "https://mind-epical.replit.app/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-05","2025-06","2025-07","2025-08","2025-09"]},"recomputeAgg":true}'
+Esperado en logs del ETL: rcRows > 0 y “Kimberly / Fee → project_id <Fee Huggies>”.
+5) Verificación de Kimberly (RC + costos + KPIs)
+5.1. RC cargado
+SELECT period_key, revenue_usd, cost_usd, revenue_native, cost_native, price_native
+FROM fact_rc_month
+WHERE project_id = <PROJECT_ID_FEE_HUGGIES>
+  AND period_key IN ('2025-05','2025-06','2025-07','2025-08','2025-09')
+ORDER BY period_key;
+5.2. Costos laborales (ya los tenías OK)
+SELECT period_key,
+       SUM(billing_hours) billing_hours,
+       SUM(cost_usd)      cost_usd,
+       SUM(cost_ars)      cost_ars
+FROM fact_labor_month
+WHERE project_id = <PROJECT_ID_FEE_HUGGIES>
+  AND period_key IN ('2025-05','2025-06','2025-07','2025-08','2025-09')
+GROUP BY period_key ORDER BY period_key;
+5.3. Agregado y KPIs (vista operativa)
+SELECT period_key,
+       view_operativa_revenue, view_operativa_cost, view_operativa_denom,
+       view_operativa_budget_util, view_operativa_markup, view_operativa_margin
+FROM agg_project_month
+WHERE project_id = <PROJECT_ID_FEE_HUGGIES>
+  AND period_key IN ('2025-05','2025-06','2025-07','2025-08','2025-09')
+ORDER BY period_key;
+Para USD: denom = price_native (USD) (ej. 8,450), no FX.
+budget_util = cost / denom, markup = revenue / cost, margin = (rev - cost)/rev.
+6) Qué reviso en el Front (proyectos + detalle)
+Vista de Proyectos (listado)
+Debe reflejar para cada mes: revenue/cost/denom/budgetUtilization/markup/margin desde agg_project_month.
+Filtros por período funcionan porque queryKey incluye period.
+Vista Única de Proyecto
+Dashboard: usa views.operativa de agg_project_month (no recalcular en FE).
+Equipo / Costos / Tiempo: vienen de fact_labor_month (y resumen de agg).
+Ingresos: vienen de fact_rc_month (RC ya matched).
+Cambio de período: refetch todo con period=YYYY-MM; skeletons/empty states si un tab no tiene filas, sin romper.
+7) Si algo aún no matchea (hard cases)
+Añadí más alias (cliente y/o proyecto) en las tablas.
+Activá la heurística de subset de tokens para nombres abreviados (“fee”, “retainer”, “ads”, etc.), pero solo si es único dentro del cliente.
+Dejá fuzzy como última opción (≥0.92) y con cache de alias automático si el match es único.
+TL;DR
+Insertá alias: ('kimberly clark') → client_id, ('fee'|client_id=Kimberly) → project_id Fee Huggies.
+Asegurá el orden de resolución: alias cliente → alias proyecto → exact → subset tokens (único) → fuzzy (único).
+Reprocesá RC de los meses objetivos y recomputá agg.
+Validá con las 3 queries (RC, costos, KPIs) y mirá el listado + detalle; cambio de período consistente.
+Si querés, te paso un diff de ETL con el bloque de resolución (cliente/proyecto) listo para pegar, y un endpoint /diagnostics/rc-unmatched mínimo para auditar filas RC sin match en cualquier período.
