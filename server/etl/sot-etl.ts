@@ -693,11 +693,11 @@ export async function executeSoTETL(
     if (options.scopes?.periods) {
       const periodSet = new Set(options.scopes.periods);
       filteredCostos = costosDirectosRows.filter(row => {
-        const period = toPeriodKey(row.Mes, false);
+        const period = toPeriodKey(row.Mes, row.Año);
         return period && periodSet.has(period);
       });
       filteredRC = rendimientoClienteRows.filter(row => {
-        const period = toPeriodKey(row.Mes, false);
+        const period = toPeriodKey(row.Mes, row.Año);
         return period && periodSet.has(period);
       });
       console.log(`📊 [SoT ETL] Filtrado: ${filteredCostos.length}/${costosDirectosRows.length} costos, ${filteredRC.length}/${rendimientoClienteRows.length} RC`);
