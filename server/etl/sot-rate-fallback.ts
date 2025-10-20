@@ -140,6 +140,7 @@ async function reconcileToRCCost(
  */
 export async function resolveHourlyRate(params: {
   excelRate: number | null;
+  calculatedRate?: number; // Nueva opción: tarifa calculada desde Monto Total ARS / horas
   personId: number | null;
   projectId: number | null;
   periodKey: string;
@@ -148,15 +149,25 @@ export async function resolveHourlyRate(params: {
   roleName: string | null;
 }): Promise<RateLookupResult> {
   
-  const { excelRate, personId, projectId, periodKey, billingHours, personKey, roleName } = params;
+  const { excelRate, calculatedRate = 0, personId, projectId, periodKey, billingHours, personKey, roleName } = params;
   const flags: string[] = [];
   
-  // Prioridad 1: Excel (si > 0)
+  // Prioridad 1: Excel explícito (si > 0)
   if (excelRate && excelRate > 0) {
     return {
       rate: excelRate,
       source: 'excel',
       flags: ['rate_from_excel']
+    };
+  }
+  
+  // Prioridad 1.5: Tarifa calculada desde costo total del Excel (Monto Total ARS / horas)
+  if (calculatedRate && calculatedRate > 0) {
+    console.log(`🧮 Using calculated rate from Excel cost for ${personKey}: ${calculatedRate.toFixed(2)} ARS/h`);
+    return {
+      rate: calculatedRate,
+      source: 'excel',
+      flags: ['rate_calculated_from_cost']
     };
   }
   

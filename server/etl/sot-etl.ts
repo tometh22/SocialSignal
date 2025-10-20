@@ -190,9 +190,11 @@ export interface CostoDirectoRow {
   'Cantidad de horas objetivo'?: any;
   'Cantidad de horas reales Asana'?: any;
   'Cantidad de horas para facturación'?: any;
-  'Valor hora ARS'?: any;
-  'Valor Hora'?: any;
-  'Total ARS'?: any;
+  'Valor hora ARS'?: any; // Puede no existir en el Excel
+  'Valor Hora'?: any; // Puede no existir en el Excel
+  'Total ARS'?: any; // Variante antigua
+  'Monto Total ARS'?: any; // Nombre real del Excel
+  'Monto Original ARS'?: any; // Columna adicional del Excel
   'Cotización'?: any;
   'Tipo de cambio'?: any;
   'Monto Total USD'?: any;
@@ -284,18 +286,45 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       });
       
       // 5) Valores y costos con sistema de fallback de tarifas
-      const rateARSExcel = parseNum(row['Valor hora ARS'] || row['Valor Hora']);
-      const fx = parseNum(row['Cotización'] || row['Tipo de cambio']);
-      const totalARSSheet = parseNum(row['Total ARS']);
+      // Leer tarifa horaria del Excel (columna N: "Valor Hora")
+      const rateARSExcelRaw = row['Valor Hora'] || row['Valor hora ARS'];
+      const rateARSExcel = parseNum(rateARSExcelRaw);
+      
+      // Leer tipo de cambio del Excel
+      const fxRaw = row['Tipo de cambio'] || row['Cotización'];
+      const fx = parseNum(fxRaw);
+      
+      // Leer costo total (usar nombre real del Excel: "Monto Total ARS")
+      const totalARSSheet = parseNum(row['Monto Total ARS'] || row['Total ARS']);
       const totalUSDSheet = parseNum(row['Monto Total USD']);
+      
       const roleName = row.Rol || null;
+      
+      // 🔍 DEBUG: Log valores leídos del Excel para detectar problemas de parsing
+      if (processed < 5) {
+        console.log(`📋 [DEBUG Row ${processed}] ${personKey}:`);
+        console.log(`   - Valor Hora (raw): "${rateARSExcelRaw}" → parsed: ${rateARSExcel}`);
+        console.log(`   - Tipo cambio (raw): "${fxRaw}" → parsed: ${fx}`);
+        console.log(`   - Monto Total ARS: ${totalARSSheet}`);
+        console.log(`   - Horas billing: ${billingHours}`);
+      }
+      
+      // 🔍 CALCULAR tarifa horaria desde costo total si no existe en Excel
+      // Si no hay tarifa explícita pero hay costo total y horas, calcular tarifa implícita
+      let calculatedRateFromCost = 0;
+      if ((!rateARSExcel || rateARSExcel === 0) && totalARSSheet > 0 && billingHours > 0) {
+        calculatedRateFromCost = totalARSSheet / billingHours;
+        console.log(`🧮 Tarifa calculada desde costo: ${personKey} = ${totalARSSheet} / ${billingHours} = ${calculatedRateFromCost.toFixed(2)} ARS/h`);
+      }
       
       // Importar resolveHourlyRate dinámicamente (lazy load para evitar ciclos)
       const { resolveHourlyRate } = await import('./sot-rate-fallback');
       
       // Resolver tarifa con sistema de fallback (6 niveles de prioridad)
+      // Prioridad: Excel explícito → Calculado desde costo → Catálogo → Histórico → Rol → RC
       const rateResolution = await resolveHourlyRate({
         excelRate: rateARSExcel,
+        calculatedRate: calculatedRateFromCost, // Nueva opción: tarifa calculada desde costo
         personId: person?.id || null,
         projectId,
         periodKey,
