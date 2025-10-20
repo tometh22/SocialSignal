@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, json, numeric, varchar, unique, pgEnum, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -676,6 +676,86 @@ export const insertProjectAliasSchema = createInsertSchema(projectAliases).omit(
 
 export type ProjectAlias = typeof projectAliases.$inferSelect;
 export type InsertProjectAlias = z.infer<typeof insertProjectAliasSchema>;
+
+// ==================== DIMENSIONAL ALIAS TABLES (SOT ETL V2) ====================
+
+/**
+ * dim_client_alias: Alias de clientes para normalización determinística
+ * Mapea variaciones del nombre de cliente en Excel → client_id normalizado
+ */
+export const dimClientAlias = pgTable("dim_client_alias", {
+  id: serial("id").primaryKey(),
+  aliasNorm: varchar("alias_norm", { length: 255 }).notNull().unique(), // Nombre normalizado (normKey)
+  clientId: integer("client_id").references(() => activeProjects.id), // ID del proyecto principal del cliente
+  clientRaw: varchar("client_raw", { length: 255 }).notNull(), // Nombre original del Excel
+  source: varchar("source", { length: 50 }).notNull().default("manual"), // "manual", "migration", "auto"
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDimClientAliasSchema = createInsertSchema(dimClientAlias).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DimClientAlias = typeof dimClientAlias.$inferSelect;
+export type InsertDimClientAlias = z.infer<typeof insertDimClientAliasSchema>;
+
+/**
+ * dim_project_alias: Alias de proyectos bajo un cliente específico
+ * Mapea variaciones del nombre de proyecto + cliente → project_id
+ */
+export const dimProjectAlias = pgTable("dim_project_alias", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => activeProjects.id), // ID del cliente (puede ser null para global)
+  aliasNorm: varchar("alias_norm", { length: 255 }).notNull(), // Nombre normalizado del proyecto (normKey)
+  projectId: integer("project_id").notNull().references(() => activeProjects.id), // ID del proyecto real
+  projectRaw: varchar("project_raw", { length: 255 }).notNull(), // Nombre original del Excel
+  source: varchar("source", { length: 50 }).notNull().default("manual"), // "manual", "migration", "auto"
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  // Unique constraint: client_id + alias_norm debe ser único
+  uniqueClientProject: unique("unique_client_project_alias").on(table.clientId, table.aliasNorm),
+}));
+
+export const insertDimProjectAliasSchema = createInsertSchema(dimProjectAlias).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type DimProjectAlias = typeof dimProjectAlias.$inferSelect;
+export type InsertDimProjectAlias = z.infer<typeof insertDimProjectAliasSchema>;
+
+/**
+ * rc_unmatched_staging: Staging de filas RC sin match para auditoría
+ * Registra todas las filas de Rendimiento Cliente que no pudieron resolverse a un projectId
+ */
+export const rcUnmatchedStaging = pgTable("rc_unmatched_staging", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull(), // YYYY-MM
+  clienteRaw: varchar("cliente_raw", { length: 255 }).notNull(),
+  proyectoRaw: varchar("proyecto_raw", { length: 255 }).notNull(),
+  clienteNorm: varchar("cliente_norm", { length: 255 }).notNull(), // normKey(clienteRaw)
+  proyectoNorm: varchar("proyecto_norm", { length: 255 }).notNull(), // normKey(proyectoRaw)
+  motivo: varchar("motivo", { length: 100 }).notNull(), // "unknown_client", "unknown_project", "ambiguous_project", "below_threshold"
+  fuzzyScore: doublePrecision("fuzzy_score"), // Score del fuzzy match (si aplicó)
+  candidateProjectId: integer("candidate_project_id").references(() => activeProjects.id), // Candidato más cercano (si hay)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  // Index para búsqueda rápida por período
+  periodIdx: index("rc_unmatched_period_idx").on(table.periodKey),
+}));
+
+export const insertRcUnmatchedStagingSchema = createInsertSchema(rcUnmatchedStaging).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type RcUnmatchedStaging = typeof rcUnmatchedStaging.$inferSelect;
+export type InsertRcUnmatchedStaging = z.infer<typeof insertRcUnmatchedStagingSchema>;
 
 // ==================== PLANTILLAS DE RECURRENCIA ====================
 // Plantillas para generar automáticamente subproyectos recurrentes
