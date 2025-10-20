@@ -217,7 +217,14 @@ class GoogleSheetsWorkingService {
   /**
    * Obtener datos raw 2D de cualquier hoja (para uso con índices numéricos)
    */
-  async getSheetValues(spreadsheetId: string, sheetName: string): Promise<any[][]> {
+  async getSheetValues(
+    spreadsheetId: string,
+    sheetName: string,
+    options?: {
+      valueRenderOption?: 'FORMATTED_VALUE' | 'UNFORMATTED_VALUE' | 'FORMULA';
+      dateTimeRenderOption?: 'SERIAL_NUMBER' | 'FORMATTED_STRING';
+    }
+  ): Promise<any[][]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
       const range = `'${sheetName}'!A:Z`;
@@ -225,10 +232,15 @@ class GoogleSheetsWorkingService {
       console.log(`🔄 Obteniendo datos raw 2D de ${sheetName}...`);
       console.log(`📊 Spreadsheet ID: ${spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
+      if (options) {
+        console.log(`⚙️ Options: valueRenderOption=${options.valueRenderOption}, dateTimeRenderOption=${options.dateTimeRenderOption}`);
+      }
       
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: spreadsheetId,
         range: range,
+        ...(options?.valueRenderOption && { valueRenderOption: options.valueRenderOption }),
+        ...(options?.dateTimeRenderOption && { dateTimeRenderOption: options.dateTimeRenderOption }),
       });
 
       const rows = response.data.values;

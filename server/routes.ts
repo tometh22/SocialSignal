@@ -11427,16 +11427,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Read Excel MAESTRO data
       console.log('📊 Reading Excel MAESTRO sheets...');
       
-      // Read "Costos directos e indirectos" sheet
+      // Read "Costos directos e indirectos" sheet with UNFORMATTED values
       const costosRaw = await googleSheetsWorkingService.getSheetValues(
         '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
-        'Costos directos e indirectos'
+        'Costos directos e indirectos',
+        {
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'SERIAL_NUMBER'
+        }
       );
       
-      // Read "Rendimiento Cliente" sheet
+      // Read "Rendimiento Cliente" sheet with UNFORMATTED values
       const rcRaw = await googleSheetsWorkingService.getSheetValues(
         '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
-        'Rendimiento Cliente'
+        'Rendimiento Cliente',
+        {
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'SERIAL_NUMBER'
+        }
       );
       
       console.log(`📋 Read ${costosRaw.length} rows from Costos directos, ${rcRaw.length} rows from RC`);
@@ -11444,6 +11452,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Parse headers and convert to objects
       const costosHeaders = costosRaw[0] || [];
       const rcHeaders = rcRaw[0] || [];
+      
+      // 🔍 DEBUG: Log primeros 5 headers de costos para debugging
+      console.log('📋 [DEBUG] Primeros headers de costos:', costosHeaders.slice(0, 20));
       
       const costosRows = costosRaw.slice(1).map((row, idx) => {
         const obj: any = { __rowId: `costos_${idx}` };
