@@ -11727,6 +11727,219 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 SOT DIAGNOSTICS V2 - RC Unmatched Staging
+  app.get("/api/etl/sot/diagnostics/rc-unmatched", requireAuth, async (req, res) => {
+    try {
+      const periodKey = req.query.period as string;
+      const { rcUnmatchedStaging } = await import('../shared/schema');
+      
+      let query = db.select().from(rcUnmatchedStaging);
+      
+      if (periodKey) {
+        query = query.where(eq(rcUnmatchedStaging.periodKey, periodKey));
+      }
+      
+      const unmatchedRows = await query.orderBy(rcUnmatchedStaging.createdAt);
+      
+      // Agrupar por motivo para resumen
+      const summary = unmatchedRows.reduce((acc, row) => {
+        acc[row.motivo] = (acc[row.motivo] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      res.json({
+        periodKey: periodKey || 'all',
+        totalUnmatched: unmatchedRows.length,
+        summary,
+        rows: unmatchedRows,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ RC Unmatched Diagnostics Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // 🔄 MIGRATE PROJECT ALIASES - One-time migration to new alias tables
+  app.post("/api/etl/sot/migrate-aliases", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Migrating project_aliases to dim_client_alias + dim_project_alias...');
+      
+      const { projectAliases, dimClientAlias, dimProjectAlias, activeProjects } = await import('../shared/schema');
+      const { normKey } = await import('./etl/sot-utils');
+      
+      // 1. Fetch all project aliases
+      const aliases = await db.select().from(projectAliases).where(eq(projectAliases.isActive, true));
+      
+      console.log(`📦 Found ${aliases.length} active project aliases to migrate`);
+      
+      // 2. Fetch all active projects to get client info
+      const projects = await db.query.activeProjects.findMany({
+        with: {
+          client: true,
+        },
+      });
+      
+      const projectMap = new Map(projects.map(p => [p.id, p]));
+      
+      // 3. Extract unique clients and create dim_client_alias entries
+      const clientMap = new Map<string, number>(); // normKey → clientId (project ID representing client)
+      
+      for (const alias of aliases) {
+        const clientNorm = normKey(alias.excelClient);
+        const project = projectMap.get(alias.projectId);
+        
+        if (!project || !clientNorm) continue;
+        
+        // Use the first project's clientId as the canonical clientId
+        if (!clientMap.has(clientNorm)) {
+          const clientId = project.clientId;
+          clientMap.set(clientNorm, clientId);
+          
+          // Insert into dim_client_alias
+          await db.insert(dimClientAlias)
+            .values({
+              aliasNorm: clientNorm,
+              clientId: clientId,
+              clientRaw: alias.excelClient,
+              source: 'migration',
+            })
+            .onConflictDoNothing();
+        }
+      }
+      
+      console.log(`✅ Created ${clientMap.size} unique client aliases`);
+      
+      // 4. Create dim_project_alias entries
+      let projectAliasesCreated = 0;
+      for (const alias of aliases) {
+        const clientNorm = normKey(alias.excelClient);
+        const projectNorm = normKey(alias.excelProject);
+        const clientId = clientMap.get(clientNorm);
+        
+        if (!clientId || !projectNorm) continue;
+        
+        await db.insert(dimProjectAlias)
+          .values({
+            clientId,
+            aliasNorm: projectNorm,
+            projectId: alias.projectId,
+            projectRaw: alias.excelProject,
+            source: 'migration',
+          })
+          .onConflictDoNothing();
+        
+        projectAliasesCreated++;
+      }
+      
+      console.log(`✅ Created ${projectAliasesCreated} project aliases`);
+      
+      // 5. Invalidate resolver cache
+      const { invalidateCache } = await import('./etl/sot-project-resolver');
+      invalidateCache();
+      
+      res.json({
+        success: true,
+        clientAliasesCreated: clientMap.size,
+        projectAliasesCreated,
+        sourceAliases: aliases.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Migration Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
+  // 🔄 SOT REPROCESS RC - Rerun ETL for specific periods
+  app.post("/api/etl/sot/reprocess-rc", requireAuth, async (req, res) => {
+    try {
+      const { periods, recomputeAgg } = req.body as { 
+        periods: string[]; 
+        recomputeAgg?: boolean;
+      };
+      
+      if (!periods || !Array.isArray(periods) || periods.length === 0) {
+        return res.status(400).json({ 
+          error: 'periods array is required (e.g., ["2025-05", "2025-06"])' 
+        });
+      }
+      
+      console.log(`🔄 Reprocesando RC para períodos: ${periods.join(', ')}`);
+      
+      const { factRCMonth, rcUnmatchedStaging } = await import('../shared/schema');
+      const { processRendimientoClienteToFactRC, computeAggProjectMonth } = await import('./etl/sot-etl');
+      const { fetchGoogleSheetData } = await import('./etl/google-sheets-etl');
+      
+      // 1. Limpiar datos existentes de esos períodos
+      for (const period of periods) {
+        await db.delete(factRCMonth).where(eq(factRCMonth.periodKey, period));
+        await db.delete(rcUnmatchedStaging).where(eq(rcUnmatchedStaging.periodKey, period));
+        console.log(`🗑️ Limpiados datos de período ${period}`);
+      }
+      
+      // 2. Fetch fresh data desde Google Sheets
+      const sheetData = await fetchGoogleSheetData('Rendimiento Cliente');
+      
+      // 3. Filtrar solo filas de los períodos solicitados
+      const filteredRows = sheetData.filter((row: any) => {
+        const rowPeriod = `${row.Año}-${String(row.Mes).padStart(2, '0')}`;
+        return periods.includes(rowPeriod);
+      });
+      
+      console.log(`📥 Fetched ${filteredRows.length} RC rows para ${periods.length} períodos`);
+      
+      // 4. Reprocesar con nuevo resolver
+      await processRendimientoClienteToFactRC(filteredRows);
+      
+      // 5. Recomputar agregados si se solicita
+      let aggregatesRecomputed = 0;
+      if (recomputeAgg) {
+        const combinations = await db.selectDistinct({
+          projectId: factRCMonth.projectId,
+          periodKey: factRCMonth.periodKey
+        })
+        .from(factRCMonth)
+        .where(sql`${factRCMonth.periodKey} = ANY(${periods})`);
+        
+        for (const { projectId, periodKey } of combinations) {
+          if (projectId && periodKey) {
+            await computeAggProjectMonth(projectId, periodKey);
+            aggregatesRecomputed++;
+          }
+        }
+      }
+      
+      // 6. Obtener nuevos unmatched
+      const newUnmatched = await db.select().from(rcUnmatchedStaging)
+        .where(sql`${rcUnmatchedStaging.periodKey} = ANY(${periods})`);
+      
+      res.json({
+        success: true,
+        periodsReprocessed: periods,
+        rowsReprocessed: filteredRows.length,
+        aggregatesRecomputed,
+        newUnmatched: newUnmatched.length,
+        unmatchedDetails: newUnmatched,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ Reprocess RC Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  

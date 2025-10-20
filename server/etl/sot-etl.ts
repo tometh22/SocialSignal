@@ -7,6 +7,7 @@ import { db } from '../db';
 import { dimPeriod, factLaborMonth, factRCMonth, aggProjectMonth, activeProjects, personnel, projectAliases } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { toPeriodKey, normKey, parseNum, prefer, normHours, needsAntiX100, generateFlags } from './sot-utils';
+import { resolveRCRow } from './sot-project-resolver';
 
 // ==================== PROJECT ID RESOLVER ====================
 
@@ -255,13 +256,22 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       // Derivar billing_hours con prefer
       const billingHours = prefer(billing, asana, target);
       
-      // 4) Buscar projectId y personId PRIMERO (necesarios para fallback de tarifas)
-      const projectId = await resolveProjectId(clientRaw, projectRaw);
+      // 4) Buscar projectId usando nuevo resolver V2 con logging automático
+      const resolution = await resolveRCRow(periodKey, clientRaw, projectRaw);
+      const projectId = resolution.projectId;
       
       if (!projectId) {
-        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey}`);
+        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey} [${resolution.diagnostics.motivo}]`);
         skipped++;
         continue;
+      }
+      
+      // Log nuevos alias auto-creados
+      if (resolution.diagnostics.clientResolution?.isNewAlias) {
+        console.log(`✨ Cliente auto-resuelto: "${clientRaw}" (score: ${resolution.diagnostics.clientResolution.fuzzyScore?.toFixed(2)})`);
+      }
+      if (resolution.diagnostics.projectResolution?.isNewAlias) {
+        console.log(`✨ Proyecto auto-resuelto: "${projectRaw}" via ${resolution.diagnostics.projectResolution.matchType}`);
       }
       
       // Buscar persona con normalización de acentos en ambos lados
@@ -440,13 +450,22 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
       const priceNative = parseNum(row['Cotización'] || row['Precio']); // PRECIO del mes
       const fx = parseNum(row.FX || row['Tipo de cambio']);
       
-      // 3) Buscar projectId - USAR VALORES RAW
-      const projectId = await resolveProjectId(clientRaw, projectRaw);
+      // 3) Buscar projectId usando nuevo resolver V2 con logging automático
+      const resolution = await resolveRCRow(periodKey, clientRaw, projectRaw);
+      const projectId = resolution.projectId;
       
       if (!projectId) {
-        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey}`);
+        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey} [${resolution.diagnostics.motivo}]`);
         skipped++;
         continue;
+      }
+      
+      // Log nuevos alias auto-creados
+      if (resolution.diagnostics.clientResolution?.isNewAlias) {
+        console.log(`✨ Cliente auto-resuelto: "${clientRaw}" (score: ${resolution.diagnostics.clientResolution.fuzzyScore?.toFixed(2)})`);
+      }
+      if (resolution.diagnostics.projectResolution?.isNewAlias) {
+        console.log(`✨ Proyecto auto-resuelto: "${projectRaw}" via ${resolution.diagnostics.projectResolution.matchType}`);
       }
       
       // 4) Upsert fact_rc_month
