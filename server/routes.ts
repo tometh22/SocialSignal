@@ -11449,6 +11449,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📋 Read ${costosRaw.length} rows from Costos directos, ${rcRaw.length} rows from RC`);
       
+      // 🔍 DEBUG: Log first row headers and a sample numeric value to verify UNFORMATTED_VALUE
+      if (costosRaw.length > 1) {
+        const headers = costosRaw[0];
+        const sampleRow = costosRaw[1]; // First data row
+        console.log('🔍 DEBUG COSTOS Headers:', headers);
+        console.log('🔍 DEBUG Sample row (row 1):', sampleRow);
+        const valorHoraIndex = headers.findIndex((h: string) => h && (h.includes('Valor') || h.includes('Hora')));
+        if (valorHoraIndex >= 0) {
+          console.log(`🔍 DEBUG Column "${headers[valorHoraIndex]}" sample value:`, typeof sampleRow[valorHoraIndex], sampleRow[valorHoraIndex]);
+        }
+      }
+      
       // 2. Parse headers and convert to objects
       const costosHeaders = costosRaw[0] || [];
       const rcHeaders = rcRaw[0] || [];
