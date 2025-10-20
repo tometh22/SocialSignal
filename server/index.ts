@@ -113,14 +113,15 @@ const port = Number(process.env.PORT || 5000);
     await initializeDatabase();
     console.log("💾 Database initialized successfully");
 
+    // TEMPORARILY DISABLED: Auto-sync services causing OOM
     // Start automatic synchronization service
-    autoSyncService.start();
-    console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
+    // autoSyncService.start();
+    // console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
 
     // Start daily SoT ETL synchronization job
-    const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
-    startDailySoTSync();
-    console.log("📅 Job diario SoT ETL programado (02:00 AR)");
+    // const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
+    // startDailySoTSync();
+    // console.log("📅 Job diario SoT ETL programado (02:00 AR)");
 
     const server = app.listen(port, "0.0.0.0", () => {
       console.log(`🚀 Server running on port ${port}`);

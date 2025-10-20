@@ -1,0 +1,126 @@
+e dejo un runbook de rescate con comandos listos para pegar en Replit para (1) asegurar que corre el código nuevo, (2) ver exactamente qué llega desde Sheets, (3) re-ejecutar el ETL con opciones correctas, y (4) validar que la app y la DB (SoT) quedaron iguales a tu Excel.
+Sustituí CLIENT_NAME, PROJECT_NAME y PERIOD si hace falta. Pegá los bloques completos en la consola del Repl.
+0) Variables base (pegá una sola vez)
+export APP="https://mind-epical.replit.app"
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+export CLIENT_NAME="Kimberly Clark"
+export PROJECT_NAME="Fee Huggies"
+export PERIOD="2025-05"     # form: YYYY-MM
+1) Asegurar que corre el código nuevo
+1.1 Reinicio duro del servidor
+# mata cualquier proceso node/tsx y reinicia el runner de Replit
+pkill -9 -f "node|tsx" || true
+sleep 2
+# Replit relanza "Start application" solo; opcionalmente golpea health:
+curl -s "$APP/__health" || true
+1.2 Encender logs verbosos del ETL
+Solo para esta sesión.
+export SOT_LOG_LEVEL=debug
+export DEBUG="sot:*,etl:*"
+Qué esperar: en /tmp/logs/Start_application_*.log vas a ver líneas con SOT DEBUG ….
+2) Ver exactamente qué devuelve Google Sheets (RAW)
+Estos endpoints existen en tu Repl; si alguno faltara te paso snippet, pero probá primero.
+2.1 Cabeceras y 3 filas ejemplo – Costos directos e indirectos
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Costos%20directos%20e%20indirectos&sample=3&render=UNFORMATTED_VALUE" | jq
+2.2 Cabeceras y 3 filas ejemplo – Rendimiento Cliente
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Rendimiento%20Cliente&sample=3&render=UNFORMATTED_VALUE" | jq
+Qué mirar: que columnas claves salgan como números “crudos” (sin puntos ni comas), por ejemplo:
+Cantidad de horas reales Asar = 101.33 (no 10.133,00)
+Valor Hora = 10270.25 (no 10.270,25)
+Cotización = 1.345
+Si no es así, el problema está en valueRenderOption/dateTimeRenderOption.
+3) Re-ejecutar ETL forzando UNFORMATTED_VALUE + SERIAL_NUMBER
+El endpoint acepta scopes y opciones; pasamos explícitamente el render.
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d "{\"scopes\":{\"periods\":[\"$PERIOD\"]},\"recomputeAgg\":true, \"gs\":{\"valueRenderOption\":\"UNFORMATTED_VALUE\",\"dateTimeRenderOption\":\"SERIAL_NUMBER\"}}" | jq
+Esperado: counters laborRows > 0 y/o rcRows > 0. Si salen 0, el filtro de período o el matching de columnas está fallando.
+4) Resolver matching cliente/proyecto y período
+4.1 Obtener project_id
+$PSQL <<'SQL'
+SELECT prj.id, c.name AS cliente, prj.name AS proyecto
+FROM dim_project prj
+JOIN dim_client  c ON c.id=prj.client_id
+WHERE lower(unaccent(c.name)) = lower(unaccent('${CLIENT_NAME}'))
+  AND lower(unaccent(prj.name))=lower(unaccent('${PROJECT_NAME}'))
+LIMIT 1;
+SQL
+Copia el id:
+export PROJECT_ID=<ID_QUE_SALIO>
+echo $PROJECT_ID
+4.2 Ver alias RC no matcheados (si RC=0)
+curl -s "$APP/api/etl/sot/diagnostics/rc-unmatched?period=$PERIOD" | jq
+Si aparece tu proyecto/cliente acá, hay que agregar alias (ya sabés hacerlo).
+5) Validar detalle por persona (DB vs Excel)
+5.1 Detalle SoT por persona
+$PSQL <<'SQL'
+SELECT
+  dp.name                                  AS persona,
+  flm.role_name                            AS rol,
+  ROUND(flm.target_hours::numeric,2)       AS horas_objetivo,
+  ROUND(flm.asana_hours::numeric,2)        AS horas_asana,
+  ROUND(flm.billing_hours::numeric,2)      AS horas_facturacion,
+  ROUND(flm.hourly_rate_ars::numeric,2)    AS valor_hora_ars,
+  ROUND(flm.cost_ars::numeric,2)           AS total_ars,
+  ROUND(flm.fx::numeric,6)                 AS cotizacion,
+  ROUND(flm.cost_usd::numeric,2)           AS total_usd,
+  flm.flags
+FROM fact_labor_month flm
+JOIN dim_person  dp  ON dp.id=flm.person_id
+WHERE flm.project_id=${PROJECT_ID} AND flm.period_key='${PERIOD}'
+ORDER BY persona;
+SQL
+5.2 Totales del período (deben igualar “Suma total” del Excel)
+$PSQL <<'SQL'
+SELECT
+  'TOTAL' AS _,
+  ROUND(SUM(target_hours)::numeric,2)   AS sum_horas_obj,
+  ROUND(SUM(asana_hours)::numeric,2)    AS sum_horas_asana,
+  ROUND(SUM(billing_hours)::numeric,2)  AS sum_horas_fact,
+  ROUND(SUM(cost_ars)::numeric,2)       AS sum_ars,
+  ROUND(SUM(cost_usd)::numeric,2)       AS sum_usd
+FROM fact_labor_month
+WHERE project_id=${PROJECT_ID} AND period_key='${PERIOD}';
+SQL
+Si valor_hora_ars o fx están en 0 pero en el Excel no son 0:
+Corré Paso 2 (RAW) para confirmar cómo viene la celda.
+Si el Excel trae “10.270,25”, el parser debe estar en modo UNFORMATTED_VALUE y luego parseNum() (coma decimal → punto).
+Como workaround inmediato: cargá tarifas en catálogo dim_person_rate (te paso comando si querés).
+6) Validar Rendimiento Cliente (ingresos/costos)
+$PSQL <<'SQL'
+SELECT
+  period_key,
+  ROUND(revenue_usd::numeric,2)     AS fact_usd,
+  ROUND(cost_usd::numeric,2)        AS costos_usd,
+  ROUND(revenue_native::numeric,2)  AS fact_native,
+  ROUND(cost_native::numeric,2)     AS costos_native,
+  ROUND(price_native::numeric,2)    AS precio_native
+FROM fact_rc_month
+WHERE project_id=${PROJECT_ID}
+  AND period_key='${PERIOD}';
+SQL
+7) Ver lo que ve la UI para ese período
+curl -s "$APP/api/projects/$PROJECT_ID/complete-data?view=operativa&period=$PERIOD" | jq '{
+  summary: {revenueDisplay, costDisplay, currencyNative},
+  quotation: {totalAmountNative},
+  actuals: {
+    totalAsanaHours, totalBillingHours,
+    teamBreakdown: ( .teamBreakdown // .actuals?.teamBreakdown // [] | map({
+      name, roleName, targetHours, hoursAsana, hoursBilling, hourlyRateARS, fx, costARS, costUSD
+    }))
+  }
+}'
+Esto debe calzar con los SQL de los pasos 5 y 6 (y con el Excel).
+8) Si algo sigue raro – focos de corrección rápida
+A. Período: confirma PERIOD con cero a la izquierda (2025-05).
+B. Render: si el RAW trae “10.270,25”, obliga UNFORMATTED_VALUE + SERIAL_NUMBER (Paso 3) y que el ETL aplique parseNum() (coma → punto).
+C. FX 0: verificar columna Cotización en RAW; si viene como string con símbolo, limpiarlo en parseo.
+D. RC=0: usa rc-unmatched (Paso 4.2) y agrega alias.
+E. Tarifas 0: carga dim_person_rate como fallback temporal:
+$PSQL <<'SQL'
+INSERT INTO dim_person_rate (person_id, project_id, period_key, hourly_rate_ars, source)
+SELECT dp.id, ${PROJECT_ID}, '${PERIOD}', 10270.25, 'manual'
+FROM dim_person dp WHERE lower(unaccent(dp.name))=lower(unaccent('Sol Ayala'))
+ON CONFLICT DO NOTHING;
+SQL
+Luego re-ejecutá ETL del período (Paso 3).

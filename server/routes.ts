@@ -11406,6 +11406,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG ENDPOINT - View RAW Google Sheets data
+  app.get("/api/etl/google-sheets/raw", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      const sheetName = req.query.sheetName as string || 'Costos directos e indirectos';
+      const sample = parseInt(req.query.sample as string || '3');
+      const render = req.query.render as string || 'UNFORMATTED_VALUE';
+      
+      console.log(`🔍 DEBUG RAW: Reading "${sheetName}" with render=${render}, sample=${sample}`);
+      
+      const rawData = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        sheetName,
+        {
+          valueRenderOption: render as any,
+          dateTimeRenderOption: 'SERIAL_NUMBER'
+        }
+      );
+      
+      const headers = rawData[0] || [];
+      const sampleRows = rawData.slice(1, sample + 1);
+      
+      res.json({
+        success: true,
+        sheetName,
+        renderOption: render,
+        rowCount: rawData.length,
+        headers,
+        sampleRows,
+        sampleData: sampleRows.map((row, idx) => {
+          const obj: any = { _rowIndex: idx + 2 };
+          headers.forEach((header, i) => {
+            obj[header] = {
+              value: row[i],
+              type: typeof row[i]
+            };
+          });
+          return obj;
+        })
+      });
+      
+    } catch (error) {
+      console.error('❌ Debug RAW Error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🌟 SOT ETL ENDPOINT - Star Schema Data Pipeline
   app.post("/api/etl/sot/run", requireAuth, async (req, res) => {
     try {

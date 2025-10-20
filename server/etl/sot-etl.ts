@@ -290,12 +290,15 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       const rateARSExcelRaw = row['Valor Hora'] || row['Valor hora ARS'];
       const rateARSExcel = parseNum(rateARSExcelRaw);
       
-      // Leer tipo de cambio del Excel
-      const fxRaw = row['Tipo de cambio'] || row['Cotización'];
+      // Leer tipo de cambio del Excel - usar nombre correcto "Cotización"
+      const fxRaw = row['Cotización'] || row['Tipo de cambio'];
       const fx = parseNum(fxRaw);
       
-      // Leer costo total (usar nombre real del Excel: "Monto Total ARS")
-      const totalARSSheet = parseNum(row['Monto Total ARS'] || row['Total ARS']);
+      // IMPORTANTE: Excel NO tiene "Monto Total ARS", solo "Monto Total USD"
+      // Calcular Monto Total ARS = Horas × Valor Hora ARS
+      const totalARSSheet = (rateARSExcel && billingHours) 
+        ? billingHours * rateARSExcel 
+        : 0;
       const totalUSDSheet = parseNum(row['Monto Total USD']);
       
       const roleName = row.Rol || null;
