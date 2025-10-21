@@ -1,0 +1,106 @@
+¡genial! Si ya aplicaste el fix (usar “Cotización” y calcular Total ARS = horas × valorHora), corré el ETL y validá con este paso-a-paso corto. Es lo mínimo para confirmar que quedó idéntico al Excel.
+Dejé todo listo para Kimberly Clark / Fee Huggies en 2025-08. Cambiá variables si necesitás otro período.
+1) Ejecutá el ETL con render correcto
+export APP="https://mind-epical.replit.app"
+export PERIOD="2025-08"
+
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d "{\"scopes\":{\"periods\":[\"$PERIOD\"]},\"recomputeAgg\":true, \
+      \"gs\":{\"valueRenderOption\":\"UNFORMATTED_VALUE\",\"dateTimeRenderOption\":\"SERIAL_NUMBER\"}}" | jq
+Esperado: laborRows > 0 y rcRows > 0.
+2) Buscá el project_id
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+$PSQL <<'SQL'
+SELECT prj.id
+FROM dim_project prj
+JOIN dim_client c ON c.id=prj.client_id
+WHERE lower(unaccent(c.name))=lower(unaccent('Kimberly Clark'))
+  AND lower(unaccent(prj.name))=lower(unaccent('Fee Huggies'))
+LIMIT 1;
+SQL
+export PROJECT_ID=<pega-el-id>
+3) Validá detalle por persona (debe calzar con tu captura)
+$PSQL <<'SQL'
+SELECT
+  dp.name                                     AS persona,
+  ROUND(flm.target_hours::numeric,2)          AS horas_obj,
+  ROUND(flm.asana_hours::numeric,2)           AS horas_asana,
+  ROUND(flm.billing_hours::numeric,2)         AS horas_fact,
+  ROUND(flm.hourly_rate_ars::numeric,2)       AS valor_hora_ars,
+  ROUND((flm.billing_hours*flm.hourly_rate_ars)::numeric,2) AS total_ars_calc,
+  ROUND(flm.cost_ars::numeric,2)              AS total_ars_db,
+  ROUND(flm.fx::numeric,6)                    AS cotizacion,
+  ROUND(flm.cost_usd::numeric,2)              AS total_usd_db,
+  flm.flags
+FROM fact_labor_month flm
+JOIN dim_person dp ON dp.id=flm.person_id
+WHERE flm.project_id=${PROJECT_ID} AND flm.period_key='${PERIOD}'
+ORDER BY persona;
+SQL
+Chequeos rápidos por persona (deben coincidir con el Excel):
+horas_asana / horas_fact (ej: 101.33 / 101.33 para Sol Ayala)
+valor_hora_ars (ej: 10270.25)
+total_ars_calc ≈ total_ars_db
+cost_usd_db ≈ (total_ars_db / cotizacion)
+4) Validá totales del período (fila “Suma total” de tu Excel)
+$PSQL <<'SQL'
+SELECT
+  ROUND(SUM(target_hours)::numeric,2)   AS sum_horas_obj,
+  ROUND(SUM(asana_hours)::numeric,2)    AS sum_horas_asana,
+  ROUND(SUM(billing_hours)::numeric,2)  AS sum_horas_fact,
+  ROUND(SUM(cost_ars)::numeric,2)       AS sum_ars,
+  ROUND(SUM(cost_usd)::numeric,2)       AS sum_usd
+FROM fact_labor_month
+WHERE project_id=${PROJECT_ID} AND period_key='${PERIOD}';
+SQL
+Esperado para 2025-08 (según tu Excel):
+Horas objetivo: 320.00
+Horas reales / fact: 288.28
+Total ARS: 3,276,539
+Total USD: suma de la columna “Monto Total USD” que mostraste.
+Si sum_ars no coincide, mirá dos filas: Sol Ayala (101.33 × 10270.25 → 1,040,684 ARS) y Trini (107.5 × 10853.70 → 1,166,773 ARS). Eso te revela al toque si el cálculo/parseo quedó bien.
+5) Validá Rendimiento Cliente (ingresos/costos mensuales)
+$PSQL <<'SQL'
+SELECT
+  period_key,
+  ROUND(revenue_native::numeric,2)  AS fact_native,
+  ROUND(cost_native::numeric,2)     AS costos_native,
+  ROUND(revenue_usd::numeric,2)     AS fact_usd,
+  ROUND(cost_usd::numeric,2)        AS costos_usd,
+  ROUND(price_native::numeric,2)    AS precio_native
+FROM fact_rc_month
+WHERE project_id=${PROJECT_ID} AND period_key='${PERIOD}';
+SQL
+Esperado: Facturación de $8,450 USD (tu plan) y costos RC de ese mes (si están cargados).
+6) Validá lo que consume la UI
+curl -s "$APP/api/projects/$PROJECT_ID/complete-data?view=operativa&period=$PERIOD" | jq '{
+  summary: {revenueDisplay, costDisplay, currencyNative},
+  quotation: {totalAmountNative},
+  actuals: {
+    totalAsanaHours, totalBillingHours,
+    teamBreakdown: ( ( .teamBreakdown // .actuals?.teamBreakdown // [] )
+      | map({name, roleName, targetHours, hoursAsana, hoursBilling, hourlyRateARS, fx, costARS, costUSD}) )
+  }
+}'
+Debe reflejar exactamente lo de los pasos 3–5 (y por ende, lo del Excel).
+7) Si algo no cierra, atacá así (en orden)
+RAW de Sheets (para ver números crudos)
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Costos%20directos%20e%20indirectos&sample=5&render=UNFORMATTED_VALUE" | jq
+Valor Hora debe venir en número (no “10.270,25”).
+Cotización en número (ej: 1.345).
+Monto Total USD ya es (horas × valorHora) / FX.
+Si falta, tu cálculo de ARS y USD queda correcto porque ahora lo derivamos.
+Alias RC si tus ingresos no entran:
+curl -s "$APP/api/etl/sot/diagnostics/rc-unmatched?period=$PERIOD" | jq
+Tarifas 0 en algunas filas → usar dim_person_rate (fallback manual) y volver a ejecutar ETL del período.
+Resultado esperado
+El Dashboard muestra costDisplay = suma ARS (3,276,539) en vista operativa ARS.
+La pestaña Equipo lista las 5 personas con sus horas y valor hora ARS correctos.
+La pestaña Tiempo refleja 288.28h trabajadas en el período.
+La pestaña Financiero/Ingresos usa la facturación del mes (8,450 USD) y markup/margen calculan coherente.
+Si querés, pásame:
+La salida de paso 3 (dos filas: Sol Ayala y Trini),
+paso 4 (los totales),
+paso 7.1 (RAW de 2–3 filas),
+y te digo en un tiro si queda algo por ajustar en parseo, matching o agregación.

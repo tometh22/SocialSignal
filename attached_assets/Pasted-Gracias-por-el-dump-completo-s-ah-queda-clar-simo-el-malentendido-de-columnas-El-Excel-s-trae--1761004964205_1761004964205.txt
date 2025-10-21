@@ -1,0 +1,145 @@
+Gracias por el dump completo —sí, ahí queda clarísimo el malentendido de columnas. El Excel sí trae:
+Valor Hora (ARS)
+Cotización (FX del mes)
+Monto Total USD
+(y NO trae “Monto Total ARS”)
+Aquí tienes un kit de reparación + verificación para dejarlo consistente de punta a punta, con comandos listos para Replit.
+0) Verificar qué llega desde Sheets (RAW)
+# 0.1 - Salud del server
+curl -s "$APP/api/health" | jq
+
+# 0.2 - Ver headers reales de la hoja
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Costos%20directos%20e%20indirectos&sample=2&render=UNFORMATTED_VALUE" \
+| jq '{headers}'
+
+# 0.3 - Ver una muestra con los campos clave (¡nombres reales!)
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Costos%20directos%20e%20indirectos&sample=5&render=UNFORMATTED_VALUE" \
+| jq '.sampleData[] | {
+  persona: ."Detalle".value,
+  cliente: ."Cliente".value,
+  proyecto: ."Proyecto".value,
+  horas_asana: ."Cantidad de horas reales Asana".value,
+  horas_fact:  ."Cantidad de horas para facturación".value,
+  valor_hora_ars: ."Valor Hora".value,
+  fx: ."Cotización".value,
+  total_usd: ."Monto Total USD".value
+}'
+Si aquí ves valores numéricos, estás bien: UNFORMATTED_VALUE está funcionando y el problema es solo de mapeo/uso en el ETL.
+1) Ajuste de mapeo en el ETL (lo esencial)
+En tu ETL (donde parseás cada fila de “Costos directos e indirectos”), aplicá estos mapeos y derivaciones:
+// helper seguro: toma number si ya viene como number, si viene string usa parse flotante con puntos
+const asNum = (v: any) => (v == null ? null : Number(v));
+
+const hoursTarget   = asNum(row['Cantidad de horas objetivo']);
+const hoursAsana    = asNum(row['Cantidad de horas reales Asana']);
+const hoursBilling  = asNum(row['Cantidad de horas para facturación']); // preferido para costo
+const rateARS       = asNum(row['Valor Hora']);        // ARS
+const fx            = asNum(row['Cotización']);        // FX del mes (NO buscar "Tipo de cambio")
+const totalUSDsheet = asNum(row['Monto Total USD']);   // ya viene calculado en la hoja
+
+// Reglas de horas (como definimos):
+const billH = (hoursBilling ?? hoursAsana ?? hoursTarget ?? 0);
+
+// Derivaciones coherentes:
+const costARS = (rateARS != null ? billH * rateARS : null);
+
+// Si falta rate pero hay totalUSD y fx → retrocalculo rateARS
+const rateFromUsd = (rateARS == null && totalUSDsheet != null && fx)
+  ? (totalUSDsheet * fx) / (billH || 1)
+  : null;
+
+const finalRateARS = rateARS ?? rateFromUsd ?? 0;
+
+// costUSD: preferir el de la hoja si existe; si no, derivar
+const costUSD = (totalUSDsheet != null)
+  ? totalUSDsheet
+  : (costARS != null && fx ? costARS / fx : null);
+Puntos clave del fix
+NO busques row['Monto Total ARS']: no existe.
+Toma “Cotización” (no “Tipo de cambio”).
+Calculá costARS = hoursBilling × Valor Hora.
+Calculá costUSD = costARS / fx (si la hoja no lo trae).
+Si faltó Valor Hora pero la hoja trae Monto Total USD y Cotización, retrocalculá rate.
+2) Reinicio limpio para aplicar el ETL
+Si tenías cronjobs automáticos que consumen RAM, dejalos apagados mientras probás. Luego:
+# 2.1 - (opcional) aumentar memoria de Node en Replit
+export NODE_OPTIONS="--max-old-space-size=2048"
+
+# 2.2 - Reinicio “duro” (desde Replit: Stop ▶ Run)
+
+# 2.3 - Ejecutar ETL solo para los meses objetivo (evitá OOM)
+export APP="https://mind-epical.replit.app"
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-05","2025-06","2025-07","2025-08","2025-09"]},"recomputeAgg":true, "gs":{"valueRenderOption":"UNFORMATTED_VALUE","dateTimeRenderOption":"SERIAL_NUMBER"}}' \
+| jq '{success, summary}'
+Esperado: laborRows y rcRows > 0.
+3) Validación SQL (detalle por persona y totales)
+Cambiá PROJECT_ID por el de Kimberly Clark / Fee Huggies.
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+export PERIOD="2025-08"
+export PROJECT_ID=<ID>
+
+# 3.1 Detalle por persona (todo debe calzar con la hoja)
+$PSQL <<SQL
+SELECT
+  dp.name AS persona,
+  ROUND(flm.target_hours::numeric,2)  AS horas_obj,
+  ROUND(flm.asana_hours::numeric,2)   AS horas_asana,
+  ROUND(flm.billing_hours::numeric,2) AS horas_fact,
+  ROUND(flm.hourly_rate_ars::numeric,2) AS valor_hora_ars,
+  ROUND((flm.billing_hours*flm.hourly_rate_ars)::numeric,2) AS total_ars_calc,
+  ROUND(flm.cost_ars::numeric,2)    AS total_ars_db,
+  ROUND(flm.fx::numeric,6)          AS cotizacion,
+  ROUND(flm.cost_usd::numeric,2)    AS total_usd_db,
+  flm.flags
+FROM fact_labor_month flm
+JOIN dim_person dp ON dp.id=flm.person_id
+WHERE flm.project_id=${PROJECT_ID} AND flm.period_key='${PERIOD}'
+ORDER BY persona;
+SQL
+
+# 3.2 Totales del período (deben matchar “Suma total” del Excel)
+$PSQL <<SQL
+SELECT
+  ROUND(SUM(target_hours)::numeric,2)  AS sum_horas_obj,
+  ROUND(SUM(asana_hours)::numeric,2)   AS sum_horas_asana,
+  ROUND(SUM(billing_hours)::numeric,2) AS sum_horas_fact,
+  ROUND(SUM(cost_ars)::numeric,2)      AS sum_ars,
+  ROUND(SUM(cost_usd)::numeric,2)      AS sum_usd
+FROM fact_labor_month
+WHERE project_id=${PROJECT_ID} AND period_key='${PERIOD}';
+SQL
+Para 2025-08 (tu captura):
+Horas objetivo: 320.00
+Horas reales/fact: 288.28
+Total ARS: 3,276,539
+Total USD = suma de “Monto Total USD” de la misma tabla
+4) Validación del ViewModel que consume la UI
+curl -s "$APP/api/projects/$PROJECT_ID/complete-data?view=operativa&period=$PERIOD" | jq '{
+  summary: {revenueDisplay, costDisplay, currencyNative},
+  quotation: {totalAmountNative},
+  actuals: {
+    totalAsanaHours, totalBillingHours,
+    teamBreakdown: (
+      (.teamBreakdown // .actuals?.teamBreakdown // [])
+      | map({name, roleName, targetHours, hoursAsana, hoursBilling, hourlyRateARS, fx, costARS, costUSD})
+    )
+  }
+}'
+Dashboard debe mostrar costDisplay = sum_ars del paso 3.2 (en vista operativa ARS).
+Equipo debe listar personas con horas y valor hora correctos.
+Tiempo debe reflejar totalAsanaHours = 288.28h.
+5) Si algo sigue desfasado
+Columnas “no existen” → re-lanza el RAW (paso 0). Si en RAW está, el problema es mapeo/alias en ETL.
+FX = 0 → asegurate de usar row['Cotización'] (no “Tipo de cambio”) y Number(v).
+Valor hora = 0 → usa fallback:
+si totalUSD y fx existen: rate = (totalUSD * fx) / horas_fact
+OOM → corré ETL por lotes de meses, y sin cronjobs.
+En resumen (por qué te decía “no existen”)
+Porque el ETL original buscaba “Monto Total ARS” y “Tipo de cambio”, y tu hoja no tiene esos headers. La corrección es usar los nombres reales (Valor Hora, Cotización, Monto Total USD) y derivar ARS (= horas_fact × Valor Hora). Con eso + reinicio limpio y ETL por período, los números de BD y UI quedan idénticos a tu Excel.
+Si querés, pasame:
+La salida del paso 0.3 (2–3 filas),
+El detalle por persona del paso 3.1,
+Y los totales del paso 3.2,
+y te digo en un vistazo si quedó perfecto o dónde afinar.
