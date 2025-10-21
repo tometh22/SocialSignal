@@ -1,0 +1,69 @@
+🧪 Checks + Plan para cerrar el gap de Agosto
+Ajustá PROJECT_ID si usás otro. Solo lectura salvo que ejecutes la opción B/C.
+1) Ver RC del mes (Rendimiento Cliente)
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+export PROJECT_ID=34
+
+$PSQL <<'SQL'
+SELECT period_key,
+       ROUND(revenue_usd::numeric,2) AS rc_revenue_usd,
+       ROUND(cost_usd::numeric,2)    AS rc_cost_usd,
+       ROUND(fx_rate::numeric,2)     AS fx
+FROM fact_rc_month
+WHERE project_id=:PROJECT_ID AND period_key='2025-08';
+SQL
+2) Detalle Labor agosto (outliers/redondeos)
+$PSQL <<'SQL'
+SELECT person_key,
+       ROUND(billing_hours::numeric,2)   AS hours_billing,
+       ROUND(hourly_rate_ars::numeric,2) AS rate_ars,
+       ROUND(cost_ars::numeric,2)        AS cost_ars,
+       ROUND(cost_usd::numeric,2)        AS cost_usd
+FROM fact_labor_month
+WHERE project_id=:PROJECT_ID AND period_key='2025-08'
+ORDER BY cost_usd DESC;
+SQL
+3) Recalcular Labor USD usando el FX de RC (aislar redondeos)
+$PSQL <<'SQL'
+WITH fx AS (
+  SELECT fx_rate FROM fact_rc_month
+  WHERE project_id=:PROJECT_ID AND period_key='2025-08'
+),
+labor AS (
+  SELECT SUM(cost_ars)::numeric AS sum_ars
+  FROM fact_labor_month
+  WHERE project_id=:PROJECT_ID AND period_key='2025-08'
+)
+SELECT ROUND(l.sum_ars / f.fx_rate, 2) AS labor_usd_recalc_with_rc_fx
+FROM labor l CROSS JOIN fx f;
+SQL
+Si esto ≈ 7,047.21, el gap está del lado de RC (ajuste/redondeo consolidado), no en Labor.
+Política de materialidad (propuesta)
+Aceptar sin ajuste si |Labor – RC| ≤ 1% o ≤ USD 100.
+UI ya usa Labor como fuente de costo (correcto operativamente).
+Opciones de cierre (solo si querés “match perfecto”):
+A) No tocar datos (recomendado si el gap es chico)
+Mantener Labor como costo real.
+Dejar trazado el flag labor_vs_rc_cost_mismatch.
+B) Ajuste contable directo en RC para 2025-08
+“Snap” RC = suma Labor (simple y deja todo igual que la UI)
+$PSQL <<'SQL'
+WITH labor AS (
+  SELECT ROUND(SUM(cost_usd)::numeric, 2) AS labor_cost_usd
+  FROM fact_labor_month
+  WHERE project_id=:PROJECT_ID AND period_key='2025-08'
+)
+UPDATE fact_rc_month r
+SET cost_usd = l.labor_cost_usd,
+    cost_ars = ROUND(l.labor_cost_usd * r.fx_rate, 2)
+FROM labor l
+WHERE r.project_id=:PROJECT_ID AND r.period_key='2025-08';
+SQL
+C) Tabla de ajustes auditable (preferida si habrá más casos)
+Crear rc_adjustments(project_id, period_key, cost_usd_delta, reason) y consumir rc.cost_usd + delta desde la vista.
+Ventaja: no se pisa el RC original; queda auditoría y control.
+Estado final
+✅ Warner validado: reglas e invariantes correctas.
+⚠️ Agosto: delta USD 42.01 (0.6%) explicado/diagnosticado.
+🔧 Te dejé checks reproducibles y dos caminos (B/C) si deseás cerrar el gap; si no, A y seguimos.
+¿Querés que deje la opción C (tabla de ajustes) lista con el SQL de creación + un endpoint para cargar ajustes desde la UI?

@@ -1,0 +1,98 @@
+Abajo te dejo:
+el mapeo exacto de columnas RC → SoT,
+los comandos para comparar lo que hay en tu base (SoT) contra lo que muestra la planilla, y
+un mini-checklist para incluir también Fee Insights (sep).
+1) Mapeo “Rendimiento Cliente” → fact_rc_month
+Excel (Rendimiento Cliente)	SoT (fact_rc_month)	Nota
+Cliente	client_id	alias “Warner”
+Proyecto	project_id	alias “Fee Marketing” (y “Fee Insights” en sep)
+Mes + Año	period_key	YYYY-MM (con pad de mes)
+Cotización	fx_rate	tipo de cambio del mes
+Facturación [USD]	revenue_usd y quote_native	en USD (precio/venta del mes)
+Costos [USD]	cost_usd	costo en USD (labor derivado)
+Facturación [ARS]	revenue_ars	si viene vacío, lo derivamos revenue_usd*fx
+Costos [ARS]	cost_ars	si viene vacío, lo derivamos cost_usd*fx
+Recordatorio: en SoT ya separamos fx_rate (tipo de cambio) de quote_native (precio mensual).
+Para Warner, currencyNative="USD".
+2) Comandos de verificación (copy/paste)
+Asumo Warner / Fee Marketing = project_id 34 (ajústalo si tu id es otro) y que tienes DATABASE_URL configurado en Replit.
+Esto te imprime por cada período lo que está en SoT (DB) y te deja ver diferencias vs la planilla.
+2.1. RC por período (SoT → debería igualar la planilla)
+# ← Ajusta si el id de Warner/Fee Marketing es distinto
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+export PROJECT_ID=34
+
+$PSQL <<'SQL'
+SELECT 
+  period_key,
+  ROUND(revenue_usd::numeric,2)   AS ingreso_usd,
+  ROUND(cost_usd::numeric,2)      AS costo_usd,
+  ROUND(quote_native::numeric,2)  AS cotizacion_proyecto,
+  ROUND(fx_rate::numeric,2)       AS fx
+FROM fact_rc_month
+WHERE project_id = :PROJECT_ID
+ORDER BY period_key;
+SQL
+Compará contra la planilla (de tu captura):
+Período	Facturación USD	Costos USD	FX
+2025-01	13,450.00	7,655.65	1,220
+2025-02	13,450.00	8,908.71	1,230
+2025-03	13,450.00	7,296.93	1,325
+2025-04	13,450.00	7,838.36	1,185
+2025-05	29,230.00	11,424.89	1,180
+2025-06	29,230.00	10,386.38	1,215
+2025-07	29,230.00	8,877.32	1,320
+2025-08	29,230.00	7,005.20	1,345
+2025-09	29,230.00	8,431.00 (≈8,431.37)	1,445
+Pequeñas diferencias de centavos son normales por redondeo.
+2.2. Cruce Labor vs RC (invariante: Δ≈0)
+$PSQL <<'SQL'
+WITH labor AS (
+  SELECT period_key, 
+         ROUND(SUM(cost_usd)::numeric,2) AS labor_cost_usd
+  FROM fact_labor_month
+  WHERE project_id = :PROJECT_ID
+  GROUP BY period_key
+),
+rc AS (
+  SELECT period_key, ROUND(cost_usd::numeric,2) AS rc_cost_usd
+  FROM fact_rc_month
+  WHERE project_id = :PROJECT_ID
+)
+SELECT l.period_key,
+       l.labor_cost_usd,
+       r.rc_cost_usd,
+       ROUND((l.labor_cost_usd - r.rc_cost_usd)::numeric,2) AS delta_usd
+FROM labor l JOIN rc r USING(period_key)
+ORDER BY l.period_key;
+SQL
+Esperado: delta_usd ∈ {-0.01, 0.00, 0.01}.
+2.3. API (lo que ve el Front)
+export APP="https://mind-epical.replit.app"  # o tu URL local
+
+for M in 01 02 03 04 05 06 07 08 09; do
+  echo -n "2025-$M | "
+  curl -s "$APP/api/projects/$PROJECT_ID/complete-data?view=operativa&period=2025-$M" \
+  | jq -r '"revenue=\(.summary.revenueDisplay) cost=\(.summary.costDisplay) quote=\(.project.cotizacion) fx=\(.summary.fxRate // .summary.fx)'"
+done
+Esperado (según planilla):
+revenue=Facturación USD, cost=Costos USD, quote=Facturación USD, fx=“Cotización”.
+3) “Fee Insights” (Warner) en septiembre
+En tu captura aparece también Warner / Fee Insights – 2025-09: Facturación USD 7,580 | Costos USD 384 | FX 1,445.
+Eso es otro proyecto. Para que entre bien:
+Checklist
+En alias: agregar ("Warner","Fee Insights") → project_id correspondiente.
+Reprocesar SoT para setear RC:
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-09"]},"recomputeAgg":true}'
+Validar:
+# reemplaza PROJECT_ID por el id de "Fee Insights"
+$PSQL -c "SELECT period_key, revenue_usd, cost_usd, fx_rate FROM fact_rc_month WHERE project_id = <ID_INSIGHTS> AND period_key='2025-09';"
+Esperado: revenue_usd=7580.00 | cost_usd≈384.00 | fx_rate=1445.00.
+Si algo no matchea…
+Revisa que el alias proyecto sea exactamente “Fee Marketing” / “Fee Insights”.
+Confirma que el Cliente resuelve a “Warner” en dim_client_alias.
+El ETL de RC debe usar UNFORMATTED_VALUE (número “puro”) para leer USD/FX y formatear recién al mostrar.
+Si detectás diferencias de ~40 USD en agosto (lo vimos en pruebas), revisamos si la planilla de Costos directos y Rendimiento Cliente discrepan ese mes (ha pasado).
+¿Querés que te arme los alias SQL exactos para Fee Insights (si aún no existe) y te deje el comando listo para pegar?
