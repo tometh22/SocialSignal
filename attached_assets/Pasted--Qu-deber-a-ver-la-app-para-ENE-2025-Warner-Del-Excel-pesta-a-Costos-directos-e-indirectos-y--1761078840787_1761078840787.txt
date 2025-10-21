@@ -1,0 +1,82 @@
+✅ Qué debería ver la app para ENE-2025 (Warner)
+Del Excel (pestaña “Costos directos e indirectos” y “Rendimiento Cliente”):
+FX (Cotización): 1,220
+Revenue USD (quote_native): 13,450
+Total Cost ARS: 9,339,898
+Total Cost USD (ARS / FX): 9,339,898 / 1,220 = 7,655.65
+Horas objetivo (suma fila): 776
+Horas facturación (suma fila): 814.70 (según tu cuadro de resumen)
+Spot-checks de personas (Excel → cálculo esperado en la DB):
+Lola Camara: 133.10 h × $13,704 = $1,824,002.40 ARS → ≈ $1,495.08 USD
+Romi Figueroa: 149.80 h × $9,687.50 = $1,451,187.50 ARS → ≈ $1,189.50 USD
+Tomi Facio: 109.00 h × $8,801 = $959,309 ARS → ≈ $786.32 USD
+Xavi Aranzana: 120.00 h × $18,000 = $2,160,000 ARS → ≈ $1,770.49 USD
+Regla: cost_ars_persona ≈ hours_billing × hourly_rate_ars y cost_usd_persona ≈ cost_ars_persona / fx.
+🧪 Comandos para validar (copia/pega en Replit)
+Proyecto Warner/Fee Marketing = project_id 34 (ajústalo si en tu DB es otro).
+1) (opcional) Reprocesar ENE por si falta algo
+curl -s -X POST "http://localhost:5000/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-01"]}, "recomputeAgg": true, "gs":{"valueRenderOption":"UNFORMATTED_VALUE","dateTimeRenderOption":"SERIAL_NUMBER"}}' | jq '{success, summary}'
+2) RC (Rendimiento Cliente) del mes
+-- fact_rc_month (debería reflejar la planilla)
+SELECT period_key,
+       CAST(quote_native AS numeric(12,2)) AS cotizacion_usd,
+       CAST(fx_rate      AS numeric(10,2)) AS fx,
+       CAST(revenue_usd  AS numeric(12,2)) AS revenue_usd,
+       CAST(cost_usd     AS numeric(12,2)) AS cost_usd,
+       CAST(cost_ars     AS numeric(14,2)) AS cost_ars
+FROM fact_rc_month
+WHERE project_id = 34 AND period_key = '2025-01';
+Esperado: cotización=13450, fx=1220, revenue_usd=13450, cost_usd≈7655.65, cost_ars≈9339898.
+3) Totales Labor (deben igualar RC cost)
+-- fact_labor_month (totales)
+SELECT
+  ROUND(SUM(target_hours)::numeric,2)     AS horas_objetivo,
+  ROUND(SUM(asana_hours)::numeric,2)      AS horas_asana,
+  ROUND(SUM(billing_hours)::numeric,2)    AS horas_facturacion,
+  ROUND(SUM(cost_ars)::numeric,2)         AS total_ars,
+  ROUND(SUM(cost_usd)::numeric,2)         AS total_usd
+FROM fact_labor_month
+WHERE project_id=34 AND period_key='2025-01';
+Esperado: total_ars≈9339898 y total_usd≈7655.65 (Δ con RC ≤ 0.05 USD por redondeo).
+4) Spot-checks por persona (muestra)
+-- Lola Camara
+SELECT person_key, billing_hours, hourly_rate_ars, cost_ars, cost_usd
+FROM fact_labor_month
+WHERE project_id=34 AND period_key='2025-01' AND person_key ILIKE '%lola%';
+
+-- Romi Figueroa
+SELECT person_key, billing_hours, hourly_rate_ars, cost_ars, cost_usd
+FROM fact_labor_month
+WHERE project_id=34 AND period_key='2025-01' AND person_key ILIKE '%romi%';
+
+-- Tomi Facio
+SELECT person_key, billing_hours, hourly_rate_ars, cost_ars, cost_usd
+FROM fact_labor_month
+WHERE project_id=34 AND period_key='2025-01' AND person_key ILIKE '%tomi%';
+
+-- Xavi Aranzana
+SELECT person_key, billing_hours, hourly_rate_ars, cost_ars, cost_usd
+FROM fact_labor_month
+WHERE project_id=34 AND period_key='2025-01' AND person_key ILIKE '%xavi%';
+Esperado (aprox):
+Lola: cost_ars≈1824002.4 | cost_usd≈1495.08
+Romi: 1451187.5 | ≈1189.50
+Tomi: 959309 | ≈786.32
+Xavi: 2160000 | ≈1770.49
+5) API que consume el front
+curl -s "http://localhost:5000/api/projects/34/complete-data?view=operativa&period=2025-01" \
+| jq '{ summary: {currencyNative, revenueDisplay, costDisplay, markup, margin, budgetUtilization}, project: {cotizacion}, actuals: { totalBillingHours, teamCount: (.teamBreakdown|length) } }'
+Esperado (operativa):
+cotizacion = 13450
+revenueDisplay ≈ 13450
+costDisplay ≈ 7655.65
+markup ≈ 13450 / 7655.65 ≈ 1.76
+margin ≈ 1 - (7655.65/13450) ≈ 0.43 (tu cuadro de “RESULTADO ENE” indica 1.76 de MarkUp; el margen mostrado puede incluir impuestos – si lo aplicas, compáralo con tu lógica de UI)
+totalBillingHours ≈ 814.70 (o el valor que la hoja base reporte para “Cantidad de horas para facturación”)
+🔎 Si algo no cuadra
+Cost USD en API ≠ cost_ars / fx_rate: revisa fx_rate en fact_rc_month y que cost_ars de fact_labor_month sea la suma de rate_ars × billing_hours por fila.
+Revenue incorrecto: valida quote_native (precio del proyecto) en fact_rc_month para 2025-01.
+Horas: si ves valores imposibles (>500 por persona), se rompió la normalización ANTI×100 para ese registro.
+Si quieres, pásame ahora tu captura consolidada de FEB-2025, y te armo las expectativas + queries para ese mes también
