@@ -1,0 +1,76 @@
+¡Buenísimo! Lo que detectaste y arreglaste cierra justo el porqué no aparecían los meses: las FK de los alias apuntaban a active_projects en lugar de clients, y por eso el ETL de Rendimiento Cliente descartaba filas. Con la FK corregida y el re-proceso, ya queda:
+RC completo para mayo→sept (con quote_native y fx_rate correctos).
+Labor ok en todos los meses.
+API devolviendo KPIs coherentes (markup/margen/budget).
+Si querés dejarlo blindado, te dejo un smoke test corto (sirve siempre que integres nuevos clientes/meses):
+Smoke test de fin de obra
+1) RC por período (debe existir y tener cotización + fx)
+SELECT period_key,
+       CAST(quote_native AS numeric(12,2)) AS cotizacion,
+       CAST(fx_rate AS numeric(10,2))      AS fx,
+       CAST(revenue_usd AS numeric(12,2))  AS ingreso_usd,
+       CAST(cost_usd AS numeric(12,2))     AS costo_usd
+FROM fact_rc_month
+WHERE project_id = 39
+ORDER BY period_key;
+2) Labor por período (invariantes de horas y costos)
+SELECT period_key,
+       ROUND(SUM(target_hours)::numeric,2)  AS target_h,
+       ROUND(SUM(asana_hours)::numeric,2)   AS asana_h,
+       ROUND(SUM(billing_hours)::numeric,2) AS billing_h,
+       ROUND(SUM(cost_usd)::numeric,2)      AS cost_usd
+FROM fact_labor_month
+WHERE project_id = 39
+GROUP BY period_key
+ORDER BY period_key;
+3) Invariante Labor vs RC (Δ debe ser ~0)
+WITH labor AS (
+  SELECT period_key, SUM(cost_usd) cost_usd
+  FROM fact_labor_month
+  WHERE project_id = 39 GROUP BY period_key
+),
+rc AS (
+  SELECT period_key, cost_usd FROM fact_rc_month
+  WHERE project_id = 39
+)
+SELECT l.period_key,
+       ROUND(l.cost_usd::numeric,2) AS labor_cost_usd,
+       ROUND(r.cost_usd::numeric,2) AS rc_cost_usd,
+       ROUND((l.cost_usd - r.cost_usd)::numeric,4) AS delta
+FROM labor l JOIN rc r USING (period_key)
+ORDER BY l.period_key;
+4) API por mes (lo mismo que ve el Front)
+APP="https://mind-epical.replit.app"
+for M in 05 06 07 08 09; do
+  curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-$M" |
+  jq -r --arg m "2025-$M" '
+    "\($m) | revenue=\(.summary.revenueDisplay // "null") \
+    cost=\(.summary.costDisplay // "null") \
+    cotiz=\(.project.cotizacion // "null") \
+    fx=\(.summary.fxRate // .summary.fx // "null") \
+    hrs=\(.actuals.totalBillingHours // "null") \
+    team=\(.actuals.teamBreakdown|length)"
+  '
+done
+Esperado (KC Fee Huggies):
+May: revenue 8450, fx 1180, cost 394.86
+Jun: revenue 8450, fx 1215, cost 1046.56
+Jul: revenue 8450, fx 1320, cost 2759.73
+Ago: revenue 8450, fx 1345, cost 2436.09
+Sep: revenue 7550, fx 1445, cost 2899.04
+Recomendaciones finales (para que no vuelva a romperse)
+Schema/constraints
+dim_client_alias.client_id → clients.id (✅ ya corregido).
+Agregar UNIQUE (client_id, alias_normalized) y lo mismo para project_alias para evitar duplicados.
+ETL
+Mantener UNFORMATTED_VALUE + SERIAL_NUMBER en lectura Sheets.
+Validaciones duras: si RC trae fila sin Facturación [USD] o Cotización, loggear y marcar rc_missing_fields.
+Alias
+Al cargar nuevos clientes/proyectos, primero crear alias en dim_client_alias/dim_project_alias (apunta a clients.id).
+Reporte de “alias no resueltos” en cada run.
+UI/Cache
+Asegurar que el selector de período envía YYYY-MM con padStart(2,'0').
+React Query: queryKey [projectId, view, period] y placeholderData: undefined para no mezclar meses.
+Regresión rápida
+Repetir los 4 pasos de smoke test con otro proyecto (uno USD nativo, otro ARS nativo/dual) para confirmar que la separación quote_native vs fx_rate funciona general.
+Si querés, pegame aquí los resultados de los pasos 1–4 (copypaste) y te confirmo en caliente que
