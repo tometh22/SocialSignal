@@ -161,12 +161,15 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
         }
 
         // ⚠️ FILTRO CRÍTICO: Solo importar proyectos confirmados
-        // Si la columna "Pasado/Futuro" existe, solo aceptar "Real"
-        // Si no existe, asumir que todos son confirmados
-        const hasPasadoFuturo = row["Pasado/Futuro"] !== undefined && row["Pasado/Futuro"] !== null;
+        // Si la columna "Pasado/Futuro" existe Y tiene valor, solo aceptar "Real"
+        // Si está vacía o no existe, asumir que son confirmados
+        const statusValue = row["Pasado/Futuro"];
+        const hasPasadoFuturo = statusValue !== undefined && 
+                                statusValue !== null && 
+                                String(statusValue).trim() !== '';
         
         if (hasPasadoFuturo) {
-          const statusFlag = row["Pasado/Futuro"].trim().toLowerCase();
+          const statusFlag = String(statusValue).trim().toLowerCase();
           statusValues.add(statusFlag);
           
           if (statusFlag !== 'real') {
@@ -175,9 +178,9 @@ export async function importRendimientoCliente(): Promise<ImportRendimientoClien
             continue; // Skip rows que no son "Real" (futuro/pasado proyectado)
           }
         } else {
-          // Pestaña sin columna "Pasado/Futuro" - asumir todos confirmados
-          statusValues.add('(sin filtro - todos confirmados)');
-          console.log(`✅ Procesando fila (sin filtro): ${row.Cliente} - ${row.Proyecto}`);
+          // Columna vacía o sin valor - asumir confirmado
+          statusValues.add('(vacío - confirmado)');
+          console.log(`✅ Procesando fila (status vacío): ${row.Cliente} - ${row.Proyecto}`);
         }
 
         const year = typeof row.Año === 'string' ? parseInt(row.Año) : Number(row.Año);
