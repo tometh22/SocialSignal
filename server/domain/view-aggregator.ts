@@ -83,10 +83,12 @@ async function getProjectPeriodViewFromSoT(
       )
     );
 
-  // 3) Rendimiento Cliente (revenue + price_native)
+  // 3) Rendimiento Cliente (revenue + quote/fx)
   const rcResult = await db
     .select({
-      priceNative: factRCMonth.priceNative,
+      quoteNative: factRCMonth.quoteNative,
+      fxRate: factRCMonth.fxRate,
+      priceNative: factRCMonth.priceNative, // DEPRECATED
       revenueARS: factRCMonth.revenueARS,
       revenueUSD: factRCMonth.revenueUSD,
       costARS: factRCMonth.costARS,
@@ -116,7 +118,9 @@ async function getProjectPeriodViewFromSoT(
   };
 
   const rc = rcResult[0] || {
-    priceNative: '0',
+    quoteNative: '0',
+    fxRate: '0',
+    priceNative: '0', // DEPRECATED
     revenueARS: '0',
     revenueUSD: '0',
     costARS: '0',
@@ -136,14 +140,11 @@ async function getProjectPeriodViewFromSoT(
   
   const revenueDisplay = isUSD ? Number(rc.revenueUSD) : Number(rc.revenueARS);
   
-  // 🔧 HOTFIX: price_native might contain FX instead of actual price
-  // If price_native looks like FX (e.g., 1200-1400 range), use revenue as price
-  const priceNativeRaw = Number(rc.priceNative || 0);
-  const cotizacion = (priceNativeRaw > 1000 && priceNativeRaw < 2000 && revenueDisplay > priceNativeRaw) 
-    ? revenueDisplay  // priceNative parece ser FX, usar revenue como cotización
-    : priceNativeRaw;
+  // ✅ Usar quoteNative (precio/cotización del proyecto) directamente - NO más hotfix
+  const cotizacion = Number(rc.quoteNative || 0);
+  const fxRate = Number(rc.fxRate || 0);
   
-  console.log(`💰 [SoT Reader] priceNative=${priceNativeRaw}, revenue=${revenueDisplay}, cotizacion=${cotizacion}`);
+  console.log(`💰 [SoT Reader] quoteNative=${cotizacion}, fxRate=${fxRate}, revenue=${revenueDisplay}, currency=${currencyNative}`);
 
   // 5) Calcular métricas
   const markup = (costDisplay > 0 && revenueDisplay > 0) 

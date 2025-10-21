@@ -479,8 +479,18 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
       const costUSD = parseNum(row['Costos [USD]']);
       const revenueARS = parseNum(row['Facturación [ARS]']);
       const costARS = parseNum(row['Costos [ARS]']);
-      const priceNative = parseNum(row['Cotización'] || row['Precio']); // PRECIO del mes
-      const fx = parseNum(row.FX || row['Tipo de cambio']);
+      
+      // Separación semántica: FX vs Precio/Cotización
+      const fxRate = parseNum(row['Cotización'] || row.FX || row['Tipo de cambio']); // Tipo de cambio
+      const priceNative = parseNum(row['Precio']); // DEPRECATED: precio del mes
+      
+      // quoteNative: precio/cotización del proyecto (denominador presupuesto)
+      // Usa revenue en moneda nativa como precio del proyecto
+      const isUSDProject = revenueUSD > 0 && (revenueARS === 0 || revenueUSD > (revenueARS / (fxRate || 1300)));
+      const quoteNative = isUSDProject ? revenueUSD : revenueARS;
+      
+      // DEPRECATED: mantener fx para compatibilidad
+      const fx = fxRate;
       
       // 3) Buscar projectId usando nuevo resolver V2 con logging automático
       const resolution = await resolveRCRow(periodKey, clientRaw, projectRaw);
@@ -509,8 +519,10 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
           costUSD: costUSD.toString(),
           revenueARS: revenueARS.toString(),
           costARS: costARS.toString(),
-          priceNative: priceNative.toString(),
-          fx: fx.toString(),
+          quoteNative: quoteNative.toString(),
+          fxRate: fxRate.toString(),
+          priceNative: priceNative.toString(), // DEPRECATED
+          fx: fx.toString(), // DEPRECATED
           sourceRowId: row.__rowId || `row_${processed}`
         })
         .onConflictDoUpdate({
@@ -520,8 +532,10 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
             costUSD: costUSD.toString(),
             revenueARS: revenueARS.toString(),
             costARS: costARS.toString(),
-            priceNative: priceNative.toString(),
-            fx: fx.toString()
+            quoteNative: quoteNative.toString(),
+            fxRate: fxRate.toString(),
+            priceNative: priceNative.toString(), // DEPRECATED
+            fx: fx.toString() // DEPRECATED
           }
         });
       

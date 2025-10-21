@@ -1,0 +1,84 @@
+¡Lo vi! 👀 Buenísimo el avance: el puente SoT ya está devolviendo para KC-Ago:
+costDisplay: 2436.09 ✅
+revenueDisplay: 8450 ✅
+totalBillingHours: 288.28 ✅
+breakdown por persona correcto ✅
+Eso confirma que fact_labor_month + fact_rc_month están bien y que el front ya puede vivir solo del SoT.
+Te dejo una revisión técnica + ajustes recomendados para cerrar prolijo y evitar “parches” futuros.
+1) Lo que está OK
+Reader SoT en view-aggregator con prioridad sobre legacy.
+Cálculos de markup, margin, budgetUtilization (con denominador de “precio nativo del mes”) ✔️
+teamBreakdown completo (hoursBilling para costos, hoursAsana para operación) ✔️
+Índices en SoT para performance ✔️
+2) Lo que hay que mejorar (para sacar el hotfix y blindar datos)
+A) Separar “precio nativo” y “tipo de cambio” en SoT
+Ahora mismo hiciste un hotfix que detecta si price_native≈[1000..2000] (parece FX) y entonces usa revenue como cotización. Funciona, pero es frágil.
+Recomendación definitiva (sin heurísticas):
+En ETL RC mapeá explícitamente:
+fx_rate ← columna “Cotización” cuando es tipo de cambio
+quote_native ← precio/cotización del proyecto para el mes (lo que usás de denominador en Dashboard)
+revenue_ars/usd, cost_ars/usd (como ya está)
+En fact_rc_month guardá ambos campos (fx_rate, quote_native).
+Si ya tenés price_native, renómbralo a quote_native y agregá fx_rate.
+Migración SQL (propuesta simple):
+ALTER TABLE fact_rc_month
+  ADD COLUMN IF NOT EXISTS fx_rate numeric(18,6),
+  ADD COLUMN IF NOT EXISTS quote_native numeric(18,2);
+
+-- si hoy price_native contiene a veces el FX: deja de usarlo y migra ETL a quote_native/fx_rate
+Reader SoT (view-aggregator):
+currencyNative = si revenue_usd > 0 → 'USD' else 'ARS'
+denominator para budget = quote_native
+NO uses más el rango 1000–2000; usá fx_rate para conversiones cuando hagan falta.
+Beneficio: desaparece el hotfix, y el VM queda estable aunque cambie el formato de la hoja.
+B) Casos sin RC del mes
+Si en un período no hay fila en RC:
+currencyNative: inferí por convención del proyecto o del último mes con datos.
+quote_native: traé el último valor disponible (carry-forward) o setealo 0 y mostrás estado “sin precio”.
+revenueDisplay: 0 (o null), budgetUtilization: 0.
+Así evitás summary: null y el front muestra estados vacíos consistentes.
+C) Consistencia de tipos
+Asegurate de parsear todo lo numérico a Number en el Reader (ya lo hacés) para evitar toFixed() sobre strings (bug típico con NUMERIC de Postgres).
+3) Verificaciones rápidas (te sirven para Replit)
+3.1. SoT RC (debe existir una fila por mes)
+-- Ver RC del mes
+SELECT period_key, revenue_usd, revenue_ars, cost_usd, cost_ars,
+       quote_native, fx_rate
+FROM fact_rc_month
+WHERE project_id = 39 AND period_key = '2025-08';
+Esperado KC Agosto: revenue_usd=8450, quote_native=8450, fx_rate (si aplica), cost_usd=2436.09 / cost_ars=3276539.
+3.2. SoT Labor (detalles por persona)
+SELECT person_key, billing_hours, hourly_rate_ars, cost_ars, cost_usd, fx, flags
+FROM fact_labor_month
+WHERE project_id = 39 AND period_key = '2025-08'
+ORDER BY person_key;
+Spot-check: Sol Ayala 101.33h × 10270.25 ≈ 1040684 ARS.
+3.3. Totales de Labor (para cruzar con RC)
+SELECT
+  ROUND(SUM(target_hours)::numeric,2)  AS target_h,
+  ROUND(SUM(asana_hours)::numeric,2)   AS asana_h,
+  ROUND(SUM(billing_hours)::numeric,2) AS billing_h,
+  ROUND(SUM(cost_ars)::numeric,2)      AS total_ars,
+  ROUND(SUM(cost_usd)::numeric,2)      AS total_usd
+FROM fact_labor_month
+WHERE project_id=39 AND period_key='2025-08';
+3.4. API UI (lo que ve el front)
+APP="https://mind-epical.replit.app"
+curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-08" \
+| jq '{summary, quotation, actuals: {totalAsanaHours, totalBillingHours, team: (.actuals.teamBreakdown | map({name, hoursBilling, hourlyRateARS, costARS}))}}'
+Esperado:
+summary.costDisplay = en moneda nativa (USD si exterior, ARS si local)
+quotation.totalAmountNative = quote_native del mes
+budgetUtilization = costDisplay / quotation.totalAmountNative
+4) Limpieza final (cuando agregues fx_rate / quote_native)
+ETL RC: poblar fx_rate y quote_native (no reusar price_native ambiguo).
+view-aggregator: quitar el hotfix del rango 1000–2000, usar quote_native.
+Pruebas: correr los 4 comandos de arriba para mayo–septiembre (KC) y 2-3 proyectos más.
+Caches: invalidar React Query (keys incluyen {projectId,view,period} → OK).
+5) Notas de diseño (para que nadie se confunda mañana)
+quote_native = el “precio/cotización del proyecto” del período (denominador del dashboard).
+fx_rate = tipo de cambio del período (solo para conversiones).
+currencyNative = moneda operativa del proyecto en ese mes (decide si costDisplay y revenueDisplay se muestran en ARS o USD).
+Operación vs Rentabilidad:
+Operación: compará targetHours vs hoursAsana.
+Rentabilidad: costeo con hoursBilling × hourlyRateARS (y suma en costDisplay).

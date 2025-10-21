@@ -2511,10 +2511,14 @@ export const factRCMonth = pgTable("fact_rc_month", {
   revenueARS: numeric("revenue_ars", { precision: 14, scale: 2 }),
   costARS: numeric("cost_ars", { precision: 14, scale: 2 }),
   
-  // Precio del mes (denominador presupuesto)
-  priceNative: numeric("price_native", { precision: 12, scale: 2 }),
+  // Precio/Cotización del proyecto para el mes (denominador presupuesto)
+  quoteNative: numeric("quote_native", { precision: 12, scale: 2 }),
   
-  // Tipo de cambio
+  // Tipo de cambio del período (para conversiones ARS/USD)
+  fxRate: numeric("fx_rate", { precision: 10, scale: 4 }),
+  
+  // DEPRECATED: Mantener por compatibilidad, usar quoteNative y fxRate
+  priceNative: numeric("price_native", { precision: 12, scale: 2 }),
   fx: numeric("fx", { precision: 10, scale: 4 }),
   
   // Metadata
