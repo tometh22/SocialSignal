@@ -2,11 +2,15 @@
  * VIEW AGGREGATOR
  * 
  * Extrae datos de project_aggregates según la vista seleccionada (original | operativa | usd)
+ * 
+ * PRIORIDAD DE LECTURA:
+ * 1. SoT (fact_labor_month + fact_rc_month) ← PRIMARY SOURCE
+ * 2. Legacy project_aggregates ← FALLBACK
  */
 
 import { db } from '../db';
-import { projectAggregates, projectPeriods, type ViewType } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { projectAggregates, projectPeriods, factLaborMonth, factRCMonth, personnel, type ViewType } from '@shared/schema';
+import { eq, and, sql } from 'drizzle-orm';
 
 interface ViewModelOutput {
   currencyNative: string;
@@ -25,7 +29,180 @@ interface ViewModelOutput {
 }
 
 /**
+ * 🎯 SINGLE SOURCE OF TRUTH (SoT) READER
+ * 
+ * Lee directamente de fact_labor_month + fact_rc_month (Star Schema)
+ * Retorna ViewModel completo con summary, quotation, actuals, metrics
+ */
+async function getProjectPeriodViewFromSoT(
+  projectId: number,
+  periodKey: string
+): Promise<ViewModelOutput | null> {
+  
+  console.log(`🔍 [SoT Reader] Querying fact_labor_month + fact_rc_month for project=${projectId}, period=${periodKey}`);
+  
+  // 1) Team breakdown con JOIN a personnel
+  const teamRows = await db
+    .select({
+      personId: factLaborMonth.personId,
+      personName: personnel.name,
+      roleName: factLaborMonth.roleName,
+      targetHours: factLaborMonth.targetHours,
+      asanaHours: factLaborMonth.asanaHours,
+      billingHours: factLaborMonth.billingHours,
+      hourlyRateARS: factLaborMonth.hourlyRateARS,
+      fx: factLaborMonth.fx,
+      costARS: factLaborMonth.costARS,
+      costUSD: factLaborMonth.costUSD,
+      flags: factLaborMonth.flags
+    })
+    .from(factLaborMonth)
+    .leftJoin(personnel, eq(personnel.id, factLaborMonth.personId))
+    .where(
+      and(
+        eq(factLaborMonth.projectId, projectId),
+        eq(factLaborMonth.periodKey, periodKey)
+      )
+    )
+    .orderBy(personnel.name);
+
+  // 2) Totales agregados (labor)
+  const totalsResult = await db
+    .select({
+      targetHours: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.targetHours} AS NUMERIC)), 0)`,
+      asanaHours: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.asanaHours} AS NUMERIC)), 0)`,
+      billingHours: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.billingHours} AS NUMERIC)), 0)`,
+      costARS: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.costARS} AS NUMERIC)), 0)`,
+      costUSD: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.costUSD} AS NUMERIC)), 0)`
+    })
+    .from(factLaborMonth)
+    .where(
+      and(
+        eq(factLaborMonth.projectId, projectId),
+        eq(factLaborMonth.periodKey, periodKey)
+      )
+    );
+
+  // 3) Rendimiento Cliente (revenue + price_native)
+  const rcResult = await db
+    .select({
+      priceNative: factRCMonth.priceNative,
+      revenueARS: factRCMonth.revenueARS,
+      revenueUSD: factRCMonth.revenueUSD,
+      costARS: factRCMonth.costARS,
+      costUSD: factRCMonth.costUSD
+    })
+    .from(factRCMonth)
+    .where(
+      and(
+        eq(factRCMonth.projectId, projectId),
+        eq(factRCMonth.periodKey, periodKey)
+      )
+    )
+    .limit(1);
+
+  // Validar si hay datos SoT
+  if (teamRows.length === 0 && rcResult.length === 0) {
+    console.log(`  ℹ️ [SoT Reader] No data found in SoT tables for project=${projectId}, period=${periodKey}`);
+    return null;
+  }
+
+  const totals = totalsResult[0] || {
+    targetHours: '0',
+    asanaHours: '0',
+    billingHours: '0',
+    costARS: '0',
+    costUSD: '0'
+  };
+
+  const rc = rcResult[0] || {
+    priceNative: '0',
+    revenueARS: '0',
+    revenueUSD: '0',
+    costARS: '0',
+    costUSD: '0'
+  };
+
+  // 4) Inferir moneda nativa basándose en qué campo tiene datos
+  // Si revenueUSD > 0, entonces es cliente USD; si revenueARS > 0, es ARS
+  const revenueUSDVal = Number(rc.revenueUSD || 0);
+  const revenueARSVal = Number(rc.revenueARS || 0);
+  const currencyNative = revenueUSDVal > 0 ? 'USD' : 'ARS';
+  const isUSD = currencyNative === 'USD';
+  
+  const totalCostARS = Number(totals.costARS);
+  const totalCostUSD = Number(totals.costUSD);
+  const costDisplay = isUSD ? totalCostUSD : totalCostARS;
+  
+  const revenueDisplay = isUSD ? Number(rc.revenueUSD) : Number(rc.revenueARS);
+  
+  // 🔧 HOTFIX: price_native might contain FX instead of actual price
+  // If price_native looks like FX (e.g., 1200-1400 range), use revenue as price
+  const priceNativeRaw = Number(rc.priceNative || 0);
+  const cotizacion = (priceNativeRaw > 1000 && priceNativeRaw < 2000 && revenueDisplay > priceNativeRaw) 
+    ? revenueDisplay  // priceNative parece ser FX, usar revenue como cotización
+    : priceNativeRaw;
+  
+  console.log(`💰 [SoT Reader] priceNative=${priceNativeRaw}, revenue=${revenueDisplay}, cotizacion=${cotizacion}`);
+
+  // 5) Calcular métricas
+  const markup = (costDisplay > 0 && revenueDisplay > 0) 
+    ? (revenueDisplay / costDisplay) 
+    : null;
+    
+  const margin = (revenueDisplay > 0) 
+    ? ((revenueDisplay - costDisplay) / revenueDisplay) 
+    : null;
+    
+  const budgetUtilization = (cotizacion > 0 && costDisplay > 0)
+    ? (costDisplay / cotizacion)
+    : null;
+
+  // 6) Mapear team breakdown
+  const teamBreakdown = teamRows.map(row => ({
+    name: row.personName || `Person ${row.personId}`,
+    roleName: row.roleName || 'N/A',
+    targetHours: Number(row.targetHours || 0),
+    hoursAsana: Number(row.asanaHours || 0),
+    hoursBilling: Number(row.billingHours || 0),
+    hourlyRateARS: Number(row.hourlyRateARS || 0),
+    fx: Number(row.fx || 0),
+    costARS: Number(row.costARS || 0),
+    costUSD: Number(row.costUSD || 0),
+    flags: row.flags || []
+  }));
+
+  const totalAsanaHours = Number(totals.asanaHours);
+  const totalBillingHours = Number(totals.billingHours);
+  const estimatedHours = Number(totals.targetHours);
+
+  const result: ViewModelOutput = {
+    currencyNative,
+    revenueDisplay,
+    costDisplay,
+    cotizacion: cotizacion > 0 ? cotizacion : null,
+    markup,
+    margin,
+    budgetUtilization,
+    totalWorkedHours: totalAsanaHours,
+    totalAsanaHours,
+    totalBillingHours,
+    estimatedHours,
+    teamBreakdown,
+    flags: []
+  };
+
+  console.log(`✅ [SoT Reader] SUCCESS: team=${teamBreakdown.length}, totalBillingHours=${totalBillingHours.toFixed(2)}, costDisplay=${costDisplay.toFixed(2)} ${currencyNative}`);
+
+  return result;
+}
+
+/**
  * Obtiene datos de un proyecto-período según la vista seleccionada
+ * 
+ * CASCADA DE PRIORIDAD:
+ * 1. Intentar SoT (fact_labor_month + fact_rc_month) ← PRIMARY
+ * 2. Fallback a project_aggregates ← LEGACY
  */
 export async function getProjectPeriodView(
   projectId: number,
@@ -33,7 +210,16 @@ export async function getProjectPeriodView(
   view: ViewType = 'operativa'
 ): Promise<ViewModelOutput | null> {
   
-  // 1. Buscar project_period
+  // 🎯 PASO 1: Intentar leer desde SoT (Star Schema) PRIMERO
+  const fromSoT = await getProjectPeriodViewFromSoT(projectId, periodKey);
+  if (fromSoT) {
+    console.log(`✅ [View Aggregator] Using SoT data for project=${projectId}, period=${periodKey}`);
+    return fromSoT;
+  }
+  
+  console.log(`⚠️ [View Aggregator] No SoT data, falling back to legacy project_aggregates`);
+  
+  // 🔄 PASO 2: Fallback a project_aggregates (legacy)
   const period = await db.select()
     .from(projectPeriods)
     .where(

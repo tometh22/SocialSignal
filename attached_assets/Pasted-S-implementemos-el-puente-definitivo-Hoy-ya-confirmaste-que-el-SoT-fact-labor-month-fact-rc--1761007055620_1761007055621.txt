@@ -1,0 +1,163 @@
+Sí, implementemos el “puente” definitivo!
+Hoy ya confirmaste que el SoT (fact_labor_month + fact_rc_month) quedó perfecto y que el fallo está en que /complete-data todavía intenta leer project_aggregates (legacy). Abajo te dejo el “kit de merge” para que la API pase a leer directo del SoT y todo el front quede consistente.
+1) Qué cambia (resumen)
+Antes: /complete-data → view-aggregator → project_aggregates (vacío) → cae a legacy → datos malos.
+Después: /complete-data → view-aggregator consulta SoT (fact_labor_month + fact_rc_month + dim_period) y arma el VM (summary, quotation, actuals, metrics, teamBreakdown).
+No tocamos tus ETLs (ya validaste que están bien). Solo cambiamos el reader.
+2) Reglas de negocio (SoT → ViewModel)
+2.1. Team (por persona)
+De fact_labor_month (filtrado por project_id, period_key):
+name (join dim_person)
+roleName
+targetHours ← target_hours
+hoursAsana ← asana_hours
+hoursBilling ← billing_hours (¡usar esta para costo!)
+hourlyRateARS← hourly_rate_ars
+fx ← fx
+costARS ← cost_ars (o billing_hours * hourly_rate_ars)
+costUSD ← cost_usd
+flags
+2.2. Totales (operativa)
+totalAsanaHours = Σ asana_hours
+totalBillingHours = Σ billing_hours
+totalCostARS = Σ cost_ars
+totalCostUSD = Σ cost_usd
+2.3. Ingresos y cotización (Rendimiento Cliente)
+De fact_rc_month (mismo filtro):
+revenue_ars, revenue_usd, cost_ars, cost_usd, price_native, currency_native
+currencyNative = currency_native del mes.
+denominador (para presupuesto y métricas) = price_native (lo que en tu hoja llamás Cotización/Precio nativo del mes).
+2.4. Vistas y métricas
+Vista Operativa
+Si currencyNative='ARS':
+costDisplay = totalCostARS
+revenueDisplay = revenue_ars
+Si currencyNative='USD':
+costDisplay = totalCostUSD
+revenueDisplay = revenue_usd
+markup = revenueDisplay / costDisplay (si ambos > 0)
+margin = (revenueDisplay - costDisplay) / revenueDisplay
+budgetUtilization (lo que muestra “% Presupuesto usado” del Dashboard)
+= costDisplay / quotation.totalAmountNative
+y quotation.totalAmountNative = price_native de Rendimiento Cliente (tu regla).
+Nota: esto replica exactamente lo que validaste manualmente para KC Agosto (8,450 / 3,276,539, etc.) en la moneda nativa del proyecto.
+3) Cambios de código (mínimos y seguros)
+3.1. server/domain/view-aggregator.ts
+Añadí un lector SoT y úsalo como primera opción:
+// pseudo-implementación, orientativa
+import { db } from '../db';
+
+export async function getProjectPeriodViewFromSoT(projectId: number, periodKey: string) {
+  // 1) Team breakdown
+  const teamRows = await db.query(`
+    SELECT p.name, flm.role_name, flm.target_hours, flm.asana_hours, flm.billing_hours,
+           flm.hourly_rate_ars, flm.fx, flm.cost_ars, flm.cost_usd, flm.flags
+    FROM fact_labor_month flm
+    JOIN dim_person p ON p.id = flm.person_id
+    WHERE flm.project_id = $1 AND flm.period_key = $2
+    ORDER BY p.name
+  `, [projectId, periodKey]);
+
+  // 2) Totales SoT
+  const totals = await db.query(`
+    SELECT
+      COALESCE(SUM(target_hours),0)  AS target_hours,
+      COALESCE(SUM(asana_hours),0)   AS asana_hours,
+      COALESCE(SUM(billing_hours),0) AS billing_hours,
+      COALESCE(SUM(cost_ars),0)      AS cost_ars,
+      COALESCE(SUM(cost_usd),0)      AS cost_usd
+    FROM fact_labor_month
+    WHERE project_id = $1 AND period_key = $2
+  `, [projectId, periodKey]);
+
+  // 3) Rendimiento Cliente del mes
+  const rc = await db.query(`
+    SELECT currency_native, price_native,
+           COALESCE(SUM(revenue_ars),0) AS revenue_ars,
+           COALESCE(SUM(revenue_usd),0) AS revenue_usd,
+           COALESCE(SUM(cost_ars),0)    AS rc_cost_ars,
+           COALESCE(SUM(cost_usd),0)    AS rc_cost_usd
+    FROM fact_rc_month
+    WHERE project_id = $1 AND period_key = $2
+    GROUP BY currency_native, price_native
+    LIMIT 1
+  `, [projectId, periodKey]);
+
+  if (!rc.rows.length && !teamRows.rows.length) return null; // sin datos SoT
+
+  const t = totals.rows[0] || {};
+  const r = rc.rows[0] || { currency_native: 'ARS', price_native: 0, revenue_ars: 0, revenue_usd: 0 };
+
+  // 4) Vista operativa en moneda nativa
+  const currencyNative = r.currency_native || 'ARS';
+  const costDisplay    = currencyNative === 'USD' ? Number(t.cost_usd) : Number(t.cost_ars);
+  const revenueDisplay = currencyNative === 'USD' ? Number(r.revenue_usd) : Number(r.revenue_ars);
+
+  const summary = {
+    currencyNative,
+    costDisplay,
+    revenueDisplay,
+    markup: (costDisplay > 0 && revenueDisplay > 0) ? (revenueDisplay / costDisplay) : null,
+    margin: (revenueDisplay > 0) ? ((revenueDisplay - costDisplay) / revenueDisplay) : null,
+  };
+
+  const quotation = {
+    totalAmountNative: Number(r.price_native || 0)  // tu “precio nativo / cotización” del mes
+  };
+
+  const actuals = {
+    totalAsanaHours:   Number(t.asana_hours || 0),
+    totalBillingHours: Number(t.billing_hours || 0),
+    teamBreakdown: teamRows.rows.map(x => ({
+      name: x.name,
+      roleName: x.role_name,
+      targetHours:  Number(x.target_hours || 0),
+      hoursAsana:   Number(x.asana_hours || 0),
+      hoursBilling: Number(x.billing_hours || 0),
+      hourlyRateARS: Number(x.hourly_rate_ars || 0),
+      fx: Number(x.fx || 0),
+      costARS: Number(x.cost_ars || 0),
+      costUSD: Number(x.cost_usd || 0),
+      flags: x.flags,
+    }))
+  };
+
+  return { summary, quotation, actuals };
+}
+Y en el resolver actual de view-aggregator, antes del fallback a project_aggregates, hacé:
+// 1) Intentar SoT primero
+const fromSoT = await getProjectPeriodViewFromSoT(projectId, periodKey);
+if (fromSoT) return fromSoT;
+
+// 2) Si no hay SoT, recién ahí usar project_aggregates o legacy
+3.2. server/routes/complete-data.ts
+Si el route llama a getProjectPeriodView(...), se beneficia solo con el cambio anterior. Si hay un acceso directo, inyectá la misma prioridad: SoT → aggregates → legacy.
+4) Índices (por performance, opcional pero recomendado)
+CREATE INDEX IF NOT EXISTS flm_idx_proj_period ON fact_labor_month(project_id, period_key);
+CREATE INDEX IF NOT EXISTS rc_idx_proj_period  ON fact_rc_month(project_id, period_key);
+5) Pruebas rápidas (lo que debe devolver ahora)
+export APP="https://mind-epical.replit.app"
+export PROJECT_ID=39
+export PERIOD="2025-08"
+
+# 5.1 - VM para la UI
+curl -s "$APP/api/projects/$PROJECT_ID/complete-data?view=operativa&period=$PERIOD" | jq '{
+  summary, quotation, 
+  actuals: { totalAsanaHours, totalBillingHours, teamBreakdown: ( .actuals.teamBreakdown | map({name, hoursBilling, hourlyRateARS, costARS}) ) }
+}'
+Esperado para KC Agosto:
+summary.costDisplay = 3,276,539 (ARS)
+summary.revenueDisplay = 8,450 (USD → OJO: si tu currencyNative es USD, entonces costDisplay saldrá en USD; si la nativa es ARS, revenueDisplay debe venir en ARS. Usa la que validaste en Rendimiento Cliente para ese proyecto/mes.)
+actuals.totalBillingHours = 288.28
+En teamBreakdown, por ejemplo:
+Sol Ayala → hoursBilling: 101.33, hourlyRateARS: 10270.25, costARS: 1040684
+Si querés fijar que la vista operativa sea ARS para KC y USD para exterior, solo asegura que currency_native en fact_rc_month esté correcto (tu ETL ya lo hace) y el agregador seguirá esa bandera.
+6) Checklist express de cierre
+ RAW Sheets trae Valor Hora, Cotización, Monto Total USD (OK)
+ ETL SoT actualizado (ya lo está)
+ view-aggregator usa SoT primero (cambio de hoy)
+ /complete-data devuelve summary, quotation, actuals completos
+ Dashboard muestra presupuesto usado = costDisplay / quotation.totalAmountNative
+ Pestaña Equipo usa hoursAsana vs targetHours y muestra hoursBilling × rateARS en costos
+ Filtros por periodo funcionan (YYYY-MM)
+ Sanity check contra Excel (KC Agosto) coincide en horas y montos
