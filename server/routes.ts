@@ -13063,6 +13063,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Ver datos raw de Google Sheets para Warner
+  app.get("/api/debug/sheets-warner", async (req, res) => {
+    try {
+      const { googleSheetsWorking } = await import('./services/googleSheetsWorking');
+      const rcData = await googleSheetsWorking.getRendimientoCliente();
+      
+      const warnerRows = rcData.filter(row => 
+        row.Cliente && row.Cliente.toLowerCase().includes('warner')
+      );
+      
+      res.json({
+        total: warnerRows.length,
+        rows: warnerRows.map(r => ({
+          periodo: r.Mes + '/' + r.Año,
+          cliente: r.Cliente,
+          proyecto: r.Proyecto,
+          facturacion_usd: r['Facturación [USD]'],
+          costos_usd: r['Costos [USD]'],
+          fx: r.Cotización
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }
