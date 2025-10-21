@@ -1,0 +1,40 @@
+Claves únicas por fila (para evitar duplicados al unir ambas capturas):
+(Cliente, Proyecto, Detalle, Año, Mes, Nro Proyecto, billing_hours, hourly_rate_ars)
+Reglas de negocio y saneo
+Normalización ANTI×100
+Si cualquiera de las horas > 500 → dividir por 100 (error típico de planilla copiada).
+Fallbacks de horas
+billing_hours := firstNonNull(Cant. facturación, Cant. Asana, Cant. objetivo).
+Cálculo de costos
+Si Moneda Original ARS viene con valor ⇒ ese es el cost_ars (prioridad alta).
+Si está vacío ⇒ cost_ars = billing_hours * hourly_rate_ars.
+cost_usd: si Monto Total USD viene con valor ⇒ usarlo; si no ⇒ cost_ars / fx_rate (si fx_rate > 0).
+Validaciones
+fx_rate debe ser > 0 cuando cost_usd se derive.
+Invariante por fila (si hay ambos): | cost_usd - (cost_ars / fx_rate) | < 0.05.
+Horas no negativas; rate no negativo.
+Periodos
+Construimos period_key = "YYYY-MM" con cero a la izquierda (ej. “2025-05”).
+Ejemplo de mapeo (ilustrativo con tus columnas)
+Fila: Detalle = “Xavi Aranzana”, Mes = “06 jun”, Año = 2025, Proyecto = “Fee Marketing”, Cliente = “Warner”,
+Cant. facturación = 42.0, Valor Hora = $11.000, Moneda Original ARS = $462.000, Cotización = 1.180, Monto Total USD = $391.53
+Resultado SoT:
+period_key: 2025-06
+person_key: xavi aranzana
+target_hours: (la de columna)
+asana_hours: (la de columna)
+billing_hours: 42.0
+hourly_rate_ars: 11000
+cost_ars: 462000 (tomado directo de “Moneda Original ARS”)
+fx_rate: 1180
+cost_usd: 391.53 (tomado directo de “Monto Total USD”)
+Check: 462000 / 1180 = 391.53 ✔️
+Mini-checklist para verificar Warner rápido
+Conteo: número de filas filtradas en Excel = número de filas insertadas en fact_labor_month para project_id=Warner y el período.
+Horas: Σ billing_hours por (mes, proyecto) = suma visible en Excel (sumatoria de la columna “Cant. de horas para facturación”).
+Costos:
+Σ cost_ars por (mes, proyecto) = suma “Moneda Original ARS”.
+Σ cost_usd por (mes, proyecto) = suma “Monto Total USD”.
+Invariante: si ambos montos existen por fila, promedio de |(cost_ars/fx_rate) - cost_usd| < 0.05.
+Rates: muestrear 3–5 filas ⇒ hourly_rate_ars = “Valor Hora” y cost_ars ≈ horas * rate cuando “Moneda Original ARS” está vacío.
+Duplicados: chequear que no existan duplicados con la clave compuesta listada arriba.
