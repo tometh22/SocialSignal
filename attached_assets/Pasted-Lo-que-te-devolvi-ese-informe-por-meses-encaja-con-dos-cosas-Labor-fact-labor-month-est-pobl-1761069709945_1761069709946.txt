@@ -1,0 +1,128 @@
+Lo que te devolvió ese “informe por meses” encaja con dos cosas:
+
+Labor (fact_labor_month) está poblado en todos los meses (mayo–sept).
+
+RC (fact_rc_month) sólo está completo en agosto → por eso en mayo/junio/julio/sep te aparece ingresos = 0 / cotización N/D.
+
+Abajo te dejo un checklist + comandos para cerrar todos los meses y verificar que la app muestre lo mismo que el Excel.
+
+1) Verificar qué trae el Excel (fuente)
+Costos directos e indirectos (horas/rates)
+APP="https://mind-epical.replit.app"
+
+# Muestra 5 filas crudas tal cual vienen de Google Sheets
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Costos%20directos%20e%20indirectos&sample=5&render=UNFORMATTED_VALUE" \
+| jq '[.sampleData[] | {
+  mes: ."Mes".value, anio: ."Año".value, persona: ."Detalle".value,
+  cliente: ."Cliente".value, proyecto: ."Proyecto".value,
+  horas_fact: ."Cantidad de horas para facturación".value,
+  valor_hora_ars: ."Valor Hora".value, fx: .["Cotización"].value,
+  monto_usd: ."Monto Total USD".value
+}]'
+
+Rendimiento Cliente (ingresos/costo por mes)
+curl -s "$APP/api/etl/google-sheets/raw?sheetName=Rendimiento%20Cliente&sample=5&render=UNFORMATTED_VALUE" \
+| jq '[.sampleData[] | {
+  cliente: ."Cliente".value, proyecto: ."Proyecto".value,
+  mes: ."Mes".value, anio: ."Año".value,
+  cotizacion_fx: .["Cotización"].value,
+  fact_usd: ."Facturación [USD]".value,
+  costo_usd: ."Costos [USD]".value, costo_ars: ."Costos [ARS]".value
+}]'
+
+
+Esperado por mes (para KC–Fee Huggies): Facturación [USD] = quote_native, Cotización = fx_rate.
+
+2) Reprocesar SoT para los meses faltantes
+# Reprocesa mayo–sept 2025 con las opciones correctas de render
+curl -s -X POST "$APP/api/etl/sot/run" -H "Content-Type: application/json" \
+-d '{
+  "scopes": {"periods": ["2025-05","2025-06","2025-07","2025-08","2025-09"]},
+  "recomputeAgg": true,
+  "gs": {"valueRenderOption":"UNFORMATTED_VALUE","dateTimeRenderOption":"SERIAL_NUMBER"}
+}' | jq '{success, summary}'
+
+3) Validar que RC quedó bien (SQL)
+-- RC por período (debe tener quote_native y fx_rate no nulos)
+SELECT period_key,
+       CAST(quote_native AS numeric(12,2)) AS cotizacion,
+       CAST(fx_rate      AS numeric(10,2)) AS fx,
+       CAST(revenue_usd  AS numeric(12,2)) AS ingreso_usd,
+       CAST(cost_usd     AS numeric(12,2)) AS costo_usd,
+       CAST(cost_ars     AS numeric(14,2)) AS costo_ars
+FROM fact_rc_month
+WHERE project_id = 39
+ORDER BY period_key;
+
+
+Si ves cotización/fx en NULL o 0 para algún mes:
+
+Asegurate que en “Rendimiento Cliente” exista la fila de ese mes.
+
+Que “Proyecto” sea Fee Huggies (alias correcto).
+
+Que Facturación [USD] y Cotización tengan número.
+
+4) Validar labor (horas y costos por mes) (SQL)
+-- Totales labor por período
+SELECT period_key,
+       ROUND(SUM(target_hours)::numeric,2)  AS target_h,
+       ROUND(SUM(asana_hours)::numeric,2)   AS asana_h,
+       ROUND(SUM(billing_hours)::numeric,2) AS billing_h,
+       ROUND(SUM(cost_ars)::numeric,2)      AS total_ars,
+       ROUND(SUM(cost_usd)::numeric,2)      AS total_usd
+FROM fact_labor_month
+WHERE project_id = 39
+GROUP BY period_key
+ORDER BY period_key;
+
+-- Personas con tarifa ARS = 0 (deben cargarse o usar catálogo)
+SELECT period_key, person_key, billing_hours, hourly_rate_ars
+FROM fact_labor_month
+WHERE project_id = 39 AND (hourly_rate_ars IS NULL OR hourly_rate_ars = 0)
+ORDER BY period_key, person_key;
+
+
+Si hay rates en 0: completa “Valor Hora” en el Excel o carga catálogo:
+
+-- Ejemplo de inserción en catálogo para un mes específico (general)
+INSERT INTO dim_person_rate(person_id, project_id, period_key, hourly_rate_ars, source)
+SELECT p.id, NULL, '2025-07', 10000, 'manual'
+FROM personnel p WHERE p.name = 'Vanu Lanza';
+
+
+(Reprocesá SoT después.)
+
+5) Ver la misma info que el Excel en la API (UI)
+# Cambiá el período para mayo, junio, julio, agosto, septiembre
+for M in 05 06 07 08 09; do
+  curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-$M" \
+  | jq -r --arg m "2025-$M" '
+    "\($m)  | revenue=\(.summary.revenueDisplay // "null")  cost=\(.summary.costDisplay // "null")  cotiz=\(.project.cotizacion // "null")  hrs=\(.actuals.totalBillingHours // "null")  team=\(.actuals.teamBreakdown|length)"
+  '
+done
+
+
+Esperado:
+
+Agosto: revenue 8450, cost 2436.09, cotiz 8450, hrs 288.28, team 5 (como ya viste).
+
+Otros meses: si tu Excel de Rendimiento Cliente tiene filas, deberían aparecer revenue/cotiz completos; si no hay fila, deben quedar en null (correcto).
+
+6) Causas típicas de que un mes “no aparezca”
+
+En Rendimiento Cliente falta la fila de ese mes (o el nombre del Proyecto no coincide con “Fee Huggies”).
+
+Cotización o Facturación [USD] están vacíos → quote_native / fx_rate quedan null.
+
+En Costos directos e indirectos faltan Valor Hora para algunos miembros → costos ARS/USD parciales o 0.
+
+El período no llegó padded (2025-7 en vez de 2025-07) → no matchea.
+
+Qué debería quedarte ahora
+
+Agosto ya está perfecto (lo validamos).
+
+Para mayo, junio, julio, septiembre: con los comandos de arriba ves inmediatamente quién falta y por qué (fila de RC, rate ARS, alias, etc.). Completás en el Excel (o catálogo), corres el paso 2 otra vez y revalidás con 3/4/5.
+
+Si me pegas los outputs de (3) y (4) para los meses que fallan, te digo exactamente qué tocar (RC, rates, alias o período) para que queden todos en verde.

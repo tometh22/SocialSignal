@@ -55,6 +55,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Time Tracking SoT Migration**: Critical data visibility fix where `/api/projects/:id/time-tracking` endpoint now queries `fact_labor_month` (Star Schema SoT) directly with intelligent fallback.
 - **SoT ETL Enhancements**: Corrected budget utilization, 6-level rate fallback logic, relational ANTI×100 guard for costs, and FX fallback. Semantic separation of FX rate vs Project Quotation for accurate `quote_native` and `fx_rate` values.
 - **Deterministic + Fuzzy Project Resolver V2**: 3-stage cascade resolution for project matching using `dim_client_alias` and `dim_project_alias`, with `rc_unmatched_staging` for auditing unmatched rows. System learns from Excel data automatically.
+- **Foreign Key Constraint Fix (Oct 2025)**: Corrected `dim_client_alias` and `dim_project_alias` foreign key constraints to reference `clients.id` instead of `activeProjects.id`, enabling proper RC ETL processing for all periods without violations.
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering.

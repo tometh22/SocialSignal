@@ -686,7 +686,7 @@ export type InsertProjectAlias = z.infer<typeof insertProjectAliasSchema>;
 export const dimClientAlias = pgTable("dim_client_alias", {
   id: serial("id").primaryKey(),
   aliasNorm: varchar("alias_norm", { length: 255 }).notNull().unique(), // Nombre normalizado (normKey)
-  clientId: integer("client_id").references(() => activeProjects.id), // ID del proyecto principal del cliente
+  clientId: integer("client_id").references(() => clients.id), // ID del cliente normalizado
   clientRaw: varchar("client_raw", { length: 255 }).notNull(), // Nombre original del Excel
   source: varchar("source", { length: 50 }).notNull().default("manual"), // "manual", "migration", "auto"
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -708,7 +708,7 @@ export type InsertDimClientAlias = z.infer<typeof insertDimClientAliasSchema>;
  */
 export const dimProjectAlias = pgTable("dim_project_alias", {
   id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => activeProjects.id), // ID del cliente (puede ser null para global)
+  clientId: integer("client_id").references(() => clients.id), // ID del cliente (puede ser null para global)
   aliasNorm: varchar("alias_norm", { length: 255 }).notNull(), // Nombre normalizado del proyecto (normKey)
   projectId: integer("project_id").notNull().references(() => activeProjects.id), // ID del proyecto real
   projectRaw: varchar("project_raw", { length: 255 }).notNull(), // Nombre original del Excel
