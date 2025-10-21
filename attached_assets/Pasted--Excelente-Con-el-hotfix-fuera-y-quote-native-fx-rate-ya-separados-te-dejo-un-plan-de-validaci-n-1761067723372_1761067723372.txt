@@ -1,0 +1,117 @@
+¡Excelente! Con el hotfix fuera y quote_native / fx_rate ya separados, te dejo un plan de validación/regresión listo para correr en Replit. Incluye comandos, consultas SQL y criterios de aprobación. Puedes ejecutar todo o hacer spot-checks por proyecto/mes.
+1) Pre-flight
+# Salud del server
+curl -s "$APP/api/health" | jq
+
+# (Opcional) limpiar caches del front si usas React Query persistida
+# No aplica a la API.
+2) Reprocesar períodos (ETL SoT)
+Últimos 6 meses (ajusta a tu rango real)
+APP="https://mind-epical.replit.app"
+PERIODS='["2025-05","2025-06","2025-07","2025-08","2025-09","2025-10"]'
+
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d "{\"scopes\":{\"periods\":$PERIODS},\"recomputeAgg\":true}" \
+| jq '{success, summary}'
+Debe devolver: success: true y contadores laborRows > 0, rcRows > 0, aggregates > 0.
+3) Validación SQL (BD → verdad única)
+Sustituye 39 por otros project_id relevantes.
+3.1. Totales Labor por período (invariantes)
+-- Labor: las sumas deben ser consistentes
+SELECT
+  period_key,
+  ROUND(SUM(target_hours)::numeric,2)  AS target_h,
+  ROUND(SUM(asana_hours)::numeric,2)   AS asana_h,
+  ROUND(SUM(billing_hours)::numeric,2) AS billing_h,
+  ROUND(SUM(cost_ars)::numeric,2)      AS total_ars,
+  ROUND(SUM(cost_usd)::numeric,2)      AS total_usd
+FROM fact_labor_month
+WHERE project_id = 39 AND period_key IN ('2025-08','2025-09')
+GROUP BY period_key
+ORDER BY period_key;
+3.2. RC por período (ingresos / cotización / FX)
+SELECT
+  period_key,
+  CAST(revenue_usd AS numeric(12,2))   AS revenue_usd,
+  CAST(revenue_ars AS numeric(14,2))   AS revenue_ars,
+  CAST(cost_usd    AS numeric(12,2))   AS cost_usd,
+  CAST(cost_ars    AS numeric(14,2))   AS cost_ars,
+  CAST(quote_native AS numeric(12,2))  AS quote_native, -- precio proyecto (denominador)
+  CAST(fx_rate      AS numeric(10,4))  AS fx_rate        -- tipo de cambio
+FROM fact_rc_month
+WHERE project_id = 39 AND period_key IN ('2025-08','2025-09')
+ORDER BY period_key;
+Criterios de OK
+quote_native ≠ 0 / NULL (p.ej. 8450 para KC Ago).
+fx_rate correcto (p.ej. 1345).
+cost_usd / cost_ars compatibles con FX y moneda del período.
+3.3. Cruce Labor vs RC (no deben “pegar saltos”)
+-- Diferencia absoluta entre costos RC y suma Labor (en USD, si existe)
+WITH l AS (
+  SELECT period_key, SUM(cost_usd) AS labor_usd
+  FROM fact_labor_month
+  WHERE project_id=39 AND period_key IN ('2025-08','2025-09')
+  GROUP BY period_key
+),
+r AS (
+  SELECT period_key, cost_usd
+  FROM fact_rc_month
+  WHERE project_id=39 AND period_key IN ('2025-08','2025-09')
+)
+SELECT
+  COALESCE(l.period_key,r.period_key) AS period_key,
+  ROUND(l.labor_usd::numeric,2) AS labor_usd,
+  ROUND(r.cost_usd::numeric,2)  AS rc_usd,
+  ROUND((COALESCE(r.cost_usd,0)-COALESCE(l.labor_usd,0))::numeric,2) AS delta_usd
+FROM l FULL JOIN r USING (period_key)
+ORDER BY period_key;
+OK: delta_usd ~ 0 (tolerancia chica por redondeo).
+4) Validación API (lo que consume el front)
+4.1. Resumen + cotización + horas
+APP="https://mind-epical.replit.app"
+curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-08" \
+| jq '{summary, quotation, actuals: {totalAsanaHours, totalBillingHours}, currencyNative}'
+Esperado para KC Ago 2025:
+summary.costDisplay: 2436.09
+summary.revenueDisplay: 8450
+quotation.totalAmountNative: 8450
+actuals.totalBillingHours: 288.28
+currencyNative: "USD"
+budgetUtilization ≈ 0.288 (cost / quote)
+4.2. Breakdown por persona (muestra costes correctos)
+curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-08" \
+| jq '.actuals.teamBreakdown | map({name, hoursBilling, hourlyRateARS, costARS, costUSD})'
+Spot-checks: Sol, Trini, etc. deben coincidir con la hoja.
+5) Validación UI (manual breve)
+Vista Proyectos
+Cambiar período (Jul → Ago → Sep) sin errores.
+Markup, Margen, Presupuesto usado coherentes con API.
+Proyecto único
+Dashboard: Ingresos, Costos, Multiplicador, Presupuesto usado = API.
+Equipo: tarjetas con hoursAsana vs targetHours y costos basados en hoursBilling.
+Tiempo: progreso total = totalAsanaHours / estimatedHours.
+Ingresos: toma de SoT RC (no cotización).
+Costos: coincide con suma Labor del período.
+Cambiar período en tabs mantiene consistencia.
+6) Edge cases a chequear
+Mes sin fila RC: revenueDisplay=0 (o null), budgetUtilization=0; quote_native carry-forward si aplica o vacío con estado “sin precio”.
+Proyecto en ARS nativa: currencyNative="ARS", costDisplay y quote_native en ARS, sin conversión a USD.
+Personal con tarifa faltante: usar tu endpoint de diagnóstico y verificar que el fallback (catálogo/histórico) resuelve.
+curl -s "$APP/api/etl/sot/diagnostics/missing-rates?period=2025-08" | jq
+7) Alertas / observabilidad (recomendado)
+Loggear por período: team=n, totalBillingHours, costDisplay, quoteNative, fxRate, currency.
+Contadores de flags (e.g. rate_from_excel, rate_from_catalog, rate_from_historical).
+Métrica de mismatch RC vs Labor por período (ver 3.3).
+8) Criterios de “GO”
+✅ ETL success + contadores > 0
+✅ Invariantes de sumas OK
+✅ quote_native y fx_rate no nulos en RC
+✅ API complete-data devuelve lo mismo que SQL
+✅ UI sin crash y consistente al cambiar período
+Si quieres, te dejo un “pack” de proyectos/períodos sugeridos para spot-check (además de KC):
+1 USD nativo, 1 ARS nativo
+1 sin RC en un mes
+1 con cambio de moneda histórica
+1 con varias personas y tarifas diferentes
+Con esto, tienes todo para validar que el puente SoT quedó sólido y que los filtros temporales funcionan perfecto de punta a punta. 🚀
