@@ -1,0 +1,89 @@
+Con lo que compartiste de agosto / Kimberly – Fee Huggies, esto es lo que debe verse 1:1 en la app (y en la API/DB) si todo quedó bien.
+📌 Números “fuente de verdad” (desde tus capturas)
+Rendimiento Cliente (ago-2025)
+Cotización / Precio: USD 8,450
+Costos: USD 2,436.09 | ARS 3,276,539
+Markup: 3.47×
+Margen: ≈ 71.2%
+(8,450 − 2,436.09 = 6,013.91 → 6,013.91 / 8,450 ≈ 71.2%)
+Costos directos e indirectos (ago-2025)
+Miembros: 5
+Horas objetivo (suma): 320.00 h
+Horas reales Asana (normalizadas): 288.28 h
+Horas para facturación (preferidas): 288.28 h
+Detalle por persona (hrs facturación y rate ARS):
+Trini Petreigne: 107.50 h × $10,853.70
+Sol Ayala: 101.33 h × $10,270.25
+Vanu Lanza: 40.00 h × $13,390.34
+Aylu Tamer: 31.07 h × $12,743.03
+Vicky Achabal: 8.38 h × $26,583.33
+Totales que deben cerrar:
+Σ ARS (team) → $3,276,539
+Σ USD (team) → $2,436.09
+FX Agosto (para cálculos) → 1,345
+🖥️ ¿Dónde debe verse en la app?
+Dashboard / Summary (Vista Operativa, ago-2025)
+Cotización/Precio (project.cotizacion): 8,450
+CostDisplay (summary.costDisplay): 2,436.09
+RevenueDisplay (summary.revenueDisplay): 8,450
+BudgetUtilization (project.budgetUtilization): ≈ 28.8% (2,436.09 / 8,450)
+Markup: 3.47×
+Margin: ≈ 71.2%
+CurrencyNative: USD
+Pestaña Equipo / Tiempo
+Miembros = 5
+Total Horas trabajadas (Asana) = 288.28 h
+Horas objetivo = 320.00 h
+Cada tarjeta de persona con sus horas y rate ARS (arriba) y estado de “excedido” cuando h>target.
+🔎 Verificación rápida por API/SQL (copiar/pegar)
+API (ViewModel de la UI)
+# Cambia APP si corresponde
+APP="https://mind-epical.replit.app"
+curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-08" | jq '{
+  summary:{currencyNative, revenueDisplay, costDisplay, markup, margin},
+  project:{cotizacion, budgetUtilization},
+  actuals:{totalAsanaHours, totalBillingHours, teamCount: (.teamBreakdown|length)},
+  teamSample: (.actuals.teamBreakdown
+    | map({name, hoursBilling, hourlyRateARS, costARS, costUSD})
+    | sort_by(.name))
+}'
+Deberías ver:
+revenueDisplay: 8450
+costDisplay: 2436.09
+cotizacion: 8450
+budgetUtilization: ~0.288
+totalAsanaHours: 288.28, totalBillingHours: 288.28
+teamCount: 5
+Cada persona con los rates ARS anteriores y ΣcostARS = 3,276,539
+SQL (capas SoT)
+-- Totales de labor (deben cerrar con el Excel)
+SELECT
+  ROUND(SUM(target_hours)::numeric,2)  AS target_h,
+  ROUND(SUM(asana_hours)::numeric,2)   AS asana_h,
+  ROUND(SUM(billing_hours)::numeric,2) AS billing_h,
+  ROUND(SUM(cost_ars)::numeric,2)      AS total_ars,
+  ROUND(SUM(cost_usd)::numeric,2)      AS total_usd
+FROM fact_labor_month
+WHERE project_id = 39 AND period_key = '2025-08';
+
+-- RC con separación semántica (precio vs FX)
+SELECT
+  revenue_usd, cost_usd, cost_ars,
+  quote_native, fx_rate
+FROM fact_rc_month
+WHERE project_id = 39 AND period_key = '2025-08';
+Esperado:
+target_h=320.00, asana_h=288.28, billing_h=288.28
+total_ars=3276539.00, total_usd=2436.09
+quote_native=8450.00, fx_rate=1345.00, revenue_usd=8450.00
+✅ Qué significa si todo coincide
+La extracción de ambas hojas (RC + Costos) está correcta.
+La normalización ANTI×100 solo afecta horas reales/billing, no target.
+La API ya está leyendo del SoT (fact_labor_month + fact_rc_month) y no del legacy.
+Los cálculos de Dashboard/Equipo/Performance se alimentan del mismo VM.
+🧭 Si algo NO coincide
+Ver si el período en el selector es 2025-08 (padded).
+Confirmar que quote_native y fx_rate no estén null/0 en fact_rc_month.
+Revisar que en fact_labor_month cada persona tenga hourly_rate_ars > 0.
+Chequear que la vista “operativa” esté llamando a complete-data (no otro endpoint).
+Si querés, cuando corras los comandos me pegás el JSON/SQL que te devuelven y te digo al toque si está todo perfecto o dónde ajustar. 🚀
