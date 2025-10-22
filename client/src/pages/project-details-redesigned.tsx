@@ -540,26 +540,35 @@ function ProjectTeamSection({
   const completeTeam = teamBreakdownArray.map((member: any) => {
     const quotationMember = quotationTeam.find((q: any) => q.personnelId === member.personnelId);
     
+    // 🎯 3-HOURS ARCHITECTURE: Extract correct hour values from SoT
+    const hoursAsana = member.hoursAsana || 0;  // Real tracked hours
+    const hoursBilling = member.hoursBilling || 0;  // Billable hours
+    const targetHours = member.targetHours || quotationMember?.hours || 0;  // Budget hours
+    const costValue = member.costUSD || member.costARS || member.cost || 0;
+    
     return {
       personnelId: member.personnelId,
       name: member.name || member.roleName || 'Sin Nombre',
       roleName: member.roleName || 'Sin Rol',
-      hours: member.hours || 0,
-      cost: member.cost || 0,
-      rate: member.rate || (member.cost && member.hours ? member.cost / member.hours : 0),
+      hours: hoursBilling,  // Use billing hours for legacy compatibility
+      cost: costValue,
+      rate: member.rate || (costValue && hoursBilling ? costValue / hoursBilling : 0),
       // Datos de cotización (si existen)
       quotedHours: quotationMember?.hours || 0,
       quotedRate: quotationMember?.rate || 0,
       // Para compatibilidad con el template
-      actualHours: member.hours || 0,
+      actualHours: hoursAsana,  // ✅ FIX: Use hoursAsana from SoT
       actualName: member.name || 'Sin Nombre',
       actualRoleName: member.roleName || 'Sin Rol',
-      actualRate: member.rate || (member.cost && member.hours ? member.cost / member.hours : 0),
-      actualCost: member.cost || 0,
-      estimatedHours: quotationMember?.hours || 0,
-      targetHours: quotationMember?.hours || 0,
+      actualRate: member.rate || (costValue && hoursBilling ? costValue / hoursBilling : 0),
+      actualCost: costValue,
+      estimatedHours: targetHours,
+      targetHours: targetHours,
+      // 🎯 3-HOURS: Include all hour types for detailed analysis
+      hoursAsana: hoursAsana,
+      hoursBilling: hoursBilling,
       isQuoted: !!quotationMember,
-      isUnquoted: !quotationMember && member.hours > 0
+      isUnquoted: !quotationMember && hoursAsana > 0
     };
   });
   

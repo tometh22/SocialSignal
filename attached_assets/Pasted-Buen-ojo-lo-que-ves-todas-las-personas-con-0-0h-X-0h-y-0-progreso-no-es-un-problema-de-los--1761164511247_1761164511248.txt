@@ -1,0 +1,38 @@
+Buen ojo — lo que ves (todas las personas con 0.0h / X.0h y “0% progreso”) no es un problema de los datos del Excel, sino de cómo la API arma el teamBreakdown para la vista de Equipo.
+Qué pasa hoy
+En la cabecera del proyecto (tarjetas grandes) sí aparecen las horas totales correctas (Objetivo K y Asana L). Eso sale de los totales del ETL (fact_labor_month).
+En el detalle por miembro, la API está enviando (o el front está leyendo) solo billingHours para calcular costos, pero no está pasando targetHours (K) ni hoursAsana (L) por persona.
+Resultado: el front cae al fallback 0 para horas y muestra “0% progreso”, aunque el costo por persona esté bien.
+Prueba de coherencia
+Los costos por persona coinciden perfecto con el Excel (porque sí estamos usando billing_hours × valor_hora_ars).
+Las horas por persona no aparecen porque no las estamos exponiendo en actuals.teamBreakdown.
+Cómo debe quedar (fuente → API → UI)
+Excel “Costos directos e indirectos”
+K = Cantidad de horas objetivo → targetHours
+L = Cantidad de horas reales Asana → hoursAsana
+M = Cantidad de horas para facturación → billingHours (se usa para costos)
+DB (fact_labor_month)
+Debe guardar por persona y mes: target_hours, asana_hours, billing_hours, hourly_rate_ars, cost_ars, fx, etc. (esto ya lo tenemos).
+API (/api/projects/:id/complete-data) – teamBreakdown
+Debe agregar por persona:
+targetHours: SUM(target_hours)
+hoursAsana: SUM(asana_hours)
+hoursBilling: SUM(billing_hours) (ya está)
+costUSD/costARS (ya está)
+UI (vista Equipo)
+La barra debe usar Asana vs Objetivo (L vs K). El costo seguirá saliendo de billing (M).
+Qué cambiar (en el backend)
+En el aggregator que lee del SoT (lo que agregamos), al construir teamBreakdown:
+Agrupar por persona y traer además de SUM(billing_hours):
+SUM(target_hours) AS targetHours
+SUM(asana_hours) AS hoursAsana
+Incluir esos campos en el JSON que devuelve actuals.teamBreakdown.
+Con eso, para Warner / Julio, ejemplos esperados:
+Santi Berisso: targetHours=160, hoursAsana≈150.5 → 91.0%
+Romi Figueroa: targetHours=150, hoursAsana=82.5 → 55.0%
+Tomas Facio: targetHours=70, hoursAsana≈62.17 → 88.8%
+…y el total seguirá mostrando 902.8h Asana y 985.0h objetivo como ya ves en cabecera.
+Por qué el costo aparece bien pero las horas no
+El costo se calcula con billing_hours (columna M) × valor_hora_ars (columna N) → eso sí lo mandamos.
+Las horas de objetivo (K) y Asana (L) no estaban incluidas en el payload por persona → la UI muestra 0.
+Si querés, te paso el diff exacto que hay que meter en el view-aggregator para sumar esos dos campos y te dejo listo un JSON de ejemplo con los valores de julio ya mapeados (Santi, Romi, Tomi, etc.) para que lo pegues en Replit y verifiques en la UI.
