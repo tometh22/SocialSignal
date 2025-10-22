@@ -1,0 +1,112 @@
+! Dejemos todo listo para que vos ejecutes los checks de auditoría desde Replit (o tu terminal) y veas rápido si el sistema está 100% OK.
+🔎 Auditoría SoT — comandos listos para correr
+Previo (una sola vez por sesión)
+Ajustá tus variables si usás otra app o DB.
+# URL de tu backend y conexión a la DB (ya configuradas en Replit)
+export APP="https://mind-epical.replit.app"
+export PSQL="psql $DATABASE_URL -X --tuples-only --no-align"
+1) Salud del ETL y recomputación (opcional pero recomendado)
+# Reprocesar meses puntuales (ej: 2025-01..2025-09) y forzar agregados
+curl -s -X POST "$APP/api/etl/sot/run" \
+  -H "Content-Type: application/json" \
+  -d '{"scopes":{"periods":["2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09"]},"recomputeAgg":true}' \
+  | jq '{success, summary}'
+Pasa si: success: true y ves números > 0 en laborRows y rcRows.
+2) RC por período (Warner y Kimberly) — debe coincidir con planilla
+Warner / Fee Marketing (Project 34)
+$PSQL <<'SQL'
+SELECT period_key,
+       ROUND(quote_native::numeric,2) AS quote_native,
+       ROUND(fx_rate::numeric,2)       AS fx,
+       ROUND(revenue_usd::numeric,2)   AS revenue_usd,
+       ROUND(cost_usd::numeric,2)      AS cost_usd
+FROM fact_rc_month
+WHERE project_id = 34
+  AND period_key BETWEEN '2025-01' AND '2025-09'
+ORDER BY period_key;
+SQL
+Kimberly Clark / Fee Huggies (Project 39)
+$PSQL <<'SQL'
+SELECT period_key,
+       ROUND(quote_native::numeric,2) AS quote_native,
+       ROUND(fx_rate::numeric,2)       AS fx,
+       ROUND(revenue_usd::numeric,2)   AS revenue_usd,
+       ROUND(cost_usd::numeric,2)      AS cost_usd
+FROM fact_rc_month
+WHERE project_id = 39
+  AND period_key BETWEEN '2025-05' AND '2025-09'
+ORDER BY period_key;
+SQL
+Pasa si:
+Warner mayo–sept → quote_native = 29230, fx = 1180/1215/1320/1345/1445, cost_usd ≈ planilla.
+Kimberly mayo–sept → quote_native = 8450 (sep 7550), fx correcto, cost_usd ≈ planilla.
+3) Invariante Labor vs RC (Δ ≤ 0.05 USD por redondeo)
+# Cambiá el project_id si querés (34 o 39)
+for PID in 34 39; do
+  echo "== Proyecto $PID =="
+  $PSQL <<SQL
+SELECT period_key,
+       ROUND(SUM(cost_usd)::numeric,2)                    AS labor_cost_usd,
+       (SELECT ROUND(cost_usd::numeric,2) FROM fact_rc_month r
+         WHERE r.project_id = $PID AND r.period_key = flm.period_key) AS rc_cost_usd,
+       ROUND(SUM(cost_usd)::numeric,2) -
+       (SELECT ROUND(cost_usd::numeric,2) FROM fact_rc_month r
+         WHERE r.project_id = $PID AND r.period_key = flm.period_key) AS delta
+FROM fact_labor_month flm
+WHERE project_id = $PID
+GROUP BY period_key
+ORDER BY period_key;
+SQL
+done
+Pasa si: todas las filas muestran |delta| ≤ 0.05.
+(Warner agosto puede dar ~42 si la planilla RC difiere de la de costos; eso es una discrepancia “aceptable si documentada”).
+4) Consistencia por persona (muestra mensual)
+Verifica que cost_ars ≈ billing_hours × hourly_rate_ars.
+# Muestra: Warner agosto 2025
+$PSQL <<'SQL'
+SELECT person_key,
+       ROUND(billing_hours::numeric,2)     AS hours_billing,
+       ROUND(hourly_rate_ars::numeric,2)   AS rate_ars,
+       ROUND(cost_ars::numeric,2)          AS cost_ars,
+       ROUND((billing_hours*hourly_rate_ars)::numeric,2) AS calc_ars,
+       ROUND(cost_ars - (billing_hours*hourly_rate_ars),2) AS diff
+FROM fact_labor_month
+WHERE project_id = 34 AND period_key = '2025-08'
+ORDER BY cost_ars DESC
+LIMIT 10;
+SQL
+Pasa si: diff ∈ [-0.1, 0.1] (redondeo).
+5) Flags y normalización (ANTI×100, etc.)
+$PSQL <<'SQL'
+SELECT period_key, person_key, flags
+FROM fact_labor_month
+WHERE (flags IS NOT NULL AND flags::text ~ 'anti_x100')
+  AND period_key BETWEEN '2025-01' AND '2025-09'
+ORDER BY period_key, person_key;
+SQL
+Pasa si: no hay casos inesperados; cualquier “anti_x100_*” debería ser revisado pero no es error per se.
+6) Aliases sin resolver (debería dar 0)
+$PSQL <<'SQL'
+SELECT COUNT(*) AS rc_unmatched
+FROM rc_unmatched_staging
+WHERE created_at > NOW() - INTERVAL '15 days';
+SQL
+Pasa si: rc_unmatched = 0. Si no, hay filas de RC que no resolvieron a proyecto/cliente.
+7) API que consume el front (debe reflejar la DB)
+Warner — agosto
+curl -s "$APP/api/projects/34/complete-data?view=operativa&period=2025-08" \
+  | jq '{ revenue: .summary.revenueDisplay, cost: .summary.costDisplay, cotiz: .project.cotizacion, fxRate: .quotation.fxRate, hours: .actuals.totalBillingHours, team: (.actuals.teamBreakdown|length) }'
+Kimberly — agosto
+curl -s "$APP/api/projects/39/complete-data?view=operativa&period=2025-08" \
+  | jq '{ revenue: .summary.revenueDisplay, cost: .summary.costDisplay, cotiz: .project.cotizacion, fxRate: .quotation.fxRate, hours: .actuals.totalBillingHours, team: (.actuals.teamBreakdown|length) }'
+Pasa si: coincide con los valores del SQL (se permiten ±0.01 por redondeo).
+8) Export rápido a CSV (por si querés guardar evidencia)
+$PSQL <<'SQL' > warner_rc_2025.csv
+\copy (
+  SELECT period_key, quote_native, fx_rate, revenue_usd, cost_usd
+  FROM fact_rc_month
+  WHERE project_id = 34 AND period_key BETWEEN '2025-01' AND '2025-09'
+  ORDER BY period_key
+) TO STDOUT WITH CSV HEADER
+SQL
+echo "Exportado: warner_rc_2025.csv"
