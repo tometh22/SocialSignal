@@ -354,9 +354,10 @@ function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC
     const person = groups[personName];
     
     // Acumular K, L, M
-    const K = parseDec(row.K || row.hrs_obj || 0);
-    const L = parseDec(row.L || row.hrs_reales || 0);
-    const M = parseDec(row.M || row.hrs_facturacion || 0);
+    // 🎯 SUPPORT FOR BOTH: Google Sheets (K/L/M) AND directCosts table (horasObjetivo/horasRealesAsana/horasParaFacturacion)
+    const K = parseDec(row.horasObjetivo || row.K || row.hrs_obj || row.hrs_objetivo || 0);
+    const L = parseDec(row.horasRealesAsana || row.L || row.hrs_reales || 0);
+    const M = parseDec(row.horasParaFacturacion || row.M || row.hrs_facturacion || 0);
     
     person.targetHours += K;
     person.actualHours += L;
