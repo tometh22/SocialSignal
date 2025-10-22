@@ -1,188 +1,342 @@
-# 📊 Documentación Completa del Flujo de Datos - Epical Digital Platform
+# 📊 Documentación Técnica del Flujo de Datos SoT - Epical Digital Platform
 
 ## 🎯 Visión General
 
-El sistema obtiene datos de **Excel MAESTRO (Google Sheets)** y los procesa a través de un pipeline ETL para poblar una arquitectura **Star Schema** en PostgreSQL. Los datos fluyen desde Google Sheets → ETL → Base de Datos → API → Frontend.
+El sistema implementa una arquitectura **Star Schema (SoT - Source of Truth)** que procesa datos desde **Excel MAESTRO (Google Sheets)** mediante un pipeline ETL robusto. Los datos fluyen:
+
+```
+Google Sheets → ETL (Extract/Transform/Load) → Star Schema PostgreSQL → API ViewModels → Frontend
+```
+
+**Principios arquitectónicos**:
+- **Single Source of Truth**: Las tablas `fact_*` y `agg_*` son la fuente de verdad para la aplicación
+- **Staging temporal**: `financial_sot` es buffer de lectura raw, no para consumo del frontend
+- **Separación semántica**: `fx_rate` (tipo de cambio) ≠ `quote_native` (precio de cotización)
+- **Invariantes matemáticos**: Garantías de coherencia entre agregaciones y hechos
+- **Auditoría completa**: Flags de normalización + tablas de staging para filas no resueltas
 
 ---
 
 ## 📍 ORIGEN DE DATOS: Google Sheets "Excel MAESTRO"
 
-### Ubicación
-- **Archivo**: Excel MAESTRO (Google Sheets)
-- **Conexión**: API de Google Sheets v4
-- **Credenciales**: OAuth2 con refresh token
-- **Archivo de servicio**: `server/services/googleSheetsWorking.ts`
+### Configuración de Extracción
 
-### Hojas Principales
+**Archivo de servicio**: `server/services/googleSheetsWorking.ts`
 
-#### 1️⃣ **Hoja "Rendimiento Cliente"** 
-**Propósito**: Datos financieros mensuales por cliente y proyecto
+**Configuración crítica de la API**:
+```javascript
+const response = await sheets.spreadsheets.values.get({
+  spreadsheetId: SPREADSHEET_ID,
+  range: range,
+  valueRenderOption: 'UNFORMATTED_VALUE',    // ← CRÍTICO: valores sin formato
+  dateTimeRenderOption: 'SERIAL_NUMBER'       // ← Fechas como números seriales
+});
+```
 
-**Columnas clave**:
-- `Cliente` (columna A): Nombre del cliente
-- `Proyecto` (columna B): Nombre del proyecto
-- `Mes` (columna C): Mes en formato texto (ej: "Enero")
-- `Año` (columna D): Año (ej: 2025)
-- `Facturación` (columna E): Ingresos en moneda original
-- `Moneda` (columna F): ARS o USD
-- `Tipo de cambio` (columna G): Cotización USD
-- `Costos` (columna H): Costos directos
-- `Pasado/Futuro` (columna I): Estado del proyecto ("Real", vacío, etc.)
+**Por qué es importante**:
+- `UNFORMATTED_VALUE`: Evita que "1445.00" se convierta en string "1,445"
+- `SERIAL_NUMBER`: Fechas como números, no strings localizados
+- Sin esto → problemas de parsing numérico y divisiones ×100
 
-**Ubicación en código**: `server/etl/rendimiento-cliente.ts`
+### Hojas Procesadas
 
-#### 2️⃣ **Hoja "Ventas Tomi"**
-**Propósito**: Datos de ventas y proyectos activos
+#### 1️⃣ **"Rendimiento Cliente" (RC)**
 
-**Ubicación en código**: `server/etl/ventas-tomi.ts`
+**Propósito**: Datos financieros mensuales consolidados por proyecto
 
-#### 3️⃣ **Hoja "Costos directos e indirectos"**
-**Propósito**: Desglose de horas por persona y proyecto
+**Estructura**:
+| Columna | Nombre | Tipo | Ejemplo |
+|---------|--------|------|---------|
+| A | Cliente | string | "Warner" |
+| B | Proyecto | string | "Fee Marketing" |
+| C | Mes | string | "Septiembre" |
+| D | Año | number | 2025 |
+| E | Facturación | number | 42236850.00 |
+| F | Moneda | string | "ARS" |
+| G | Tipo de cambio | number | 1445.00 |
+| H | Costos | number | 12183422.55 |
+| I | Pasado/Futuro | string | "Real" o "" |
 
-**Columnas clave**:
-- Horas objetivo (target)
-- Horas Asana (tracked)
-- Horas facturables (billing)
+**Filtro de inclusión** (solo en RC):
+- Si columna "Pasado/Futuro" **vacía** → incluir (proyecto confirmado)
+- Si columna "Pasado/Futuro" = "Real" (case-insensitive) → incluir
+- Si columna "Pasado/Futuro" = otro valor → **excluir** (es estimación)
 
-**Ubicación en código**: Procesado en `server/etl/sot-etl.ts` (Team Breakdown)
+**⚠️ Importante**: Este filtro NO aplica a "Costos directos e indirectos"
+
+**Archivo ETL**: `server/etl/rendimiento-cliente.ts`
+
+#### 2️⃣ **"Costos directos e indirectos"**
+
+**Propósito**: Desglose granular de horas y costos por persona/proyecto/mes
+
+**Estructura**:
+| Columna | Nombre | Tipo | Ejemplo |
+|---------|--------|------|---------|
+| A | Proyecto | string | "Fee Marketing" |
+| B | Cliente | string | "Warner" |
+| C | Persona | string | "Juan Pérez" |
+| D | Mes/Año | string | "Sep 2025" |
+| E | Horas Target | number | 160.0 |
+| F | Horas Asana | number | 145.5 |
+| G | Horas Billing | number | 150.0 |
+| H | Valor hora ARS | number | 25000.00 |
+
+**NO se filtra por "Pasado/Futuro"**: Toda fila con datos válidos se procesa.
+
+**Archivo ETL**: `server/etl/sot-etl.ts` (función `processLaborData`)
+
+#### 3️⃣ **"Ventas Tomi" / "Proyectos"** (Opcional)
+
+**Propósito**: Referencia del universo de proyectos activos
+
+**Uso**: 
+- Poblar catálogo inicial de proyectos
+- Validación de existencia para Project Resolver
+- NO es fuente de datos financieros
 
 ---
 
-## 🔄 PROCESO ETL COMPLETO
+## 🔄 PROCESO ETL SoT - FLUJO PRECISO
 
-### Fase 1: Extracción desde Google Sheets
+### Fase 1: Extract (Extracción)
 
-**Archivo**: `server/services/googleSheetsWorking.ts`
+**Función**: `server/services/googleSheetsWorking.ts::getSpreadsheetData()`
 
 ```javascript
-// Función principal de conexión
-async function getGoogleSheetsClient()
+// Configuración de lectura
+const data = await sheets.spreadsheets.values.get({
+  spreadsheetId: process.env.GOOGLE_SHEETS_ID,
+  range: 'Rendimiento Cliente!A2:Z',
+  valueRenderOption: 'UNFORMATTED_VALUE',  // ← Sin formato
+  dateTimeRenderOption: 'SERIAL_NUMBER'    // ← Fechas numéricas
+});
 
-// Obtiene datos de una hoja específica
-async function getSpreadsheetData(spreadsheetId, range)
+// Retorna array de arrays
+// [[cliente, proyecto, mes, año, facturación, ...], ...]
 ```
 
-**Configuración**:
-- Spreadsheet ID: Almacenado en variable de entorno
-- Autenticación: OAuth2 con tokens de acceso/refresco
-- Rate limiting: Respeta límites de API de Google
+**Pestañas leídas**:
+1. `Rendimiento Cliente!A2:Z` → datos financieros
+2. `Costos directos e indirectos!A2:Z` → horas y labor
+3. (Opcional) `Ventas Tomi!A2:Z` → catálogo de proyectos
 
-### Fase 2: Transformación - Rendimiento Cliente ETL
+### Fase 2: Transform (Transformación)
 
-**Archivo**: `server/etl/rendimiento-cliente.ts`
+**Archivo RC**: `server/etl/rendimiento-cliente.ts::importRendimientoClienteData()`
 
-**Función principal**: `importRendimientoClienteData()`
+**Archivo Labor**: `server/etl/sot-etl.ts::processLaborData()`
 
-#### Paso 2.1: Lectura de datos raw
+#### Transform 2.1: Parsing Numérico Robusto
+
 ```javascript
-const data = await getSpreadsheetData(spreadsheetId, 'Rendimiento Cliente!A2:Z')
+function parseNumber(value: any): number {
+  if (typeof value === 'number') return value;
+  
+  const str = value?.toString().trim() || '0';
+  
+  // Maneja coma/punto como separador decimal
+  // "1.445,50" → 1445.50
+  // "1,445.50" → 1445.50
+  const normalized = str
+    .replace(/\./g, '')  // Quita puntos de miles
+    .replace(',', '.');  // Coma → punto decimal
+  
+  return parseFloat(normalized) || 0;
+}
 ```
 
-#### Paso 2.2: Filtrado de filas válidas
+#### Transform 2.2: ANTI×100 Normalization
 
-**IMPORTANTE - FIX APLICADO**:
+**Archivo**: `server/utils/number.ts`
+
+**Umbrales exactos**:
+
 ```javascript
-// Detecta si hay columna "Pasado/Futuro"
+export function normalizeIfOver100(
+  value: number, 
+  context: 'hours' | 'cost_ars' | 'revenue'
+): { normalized: number; wasNormalized: boolean } {
+  
+  let threshold: number;
+  let flag = false;
+  
+  switch (context) {
+    case 'hours':
+      // Horas billing: si > 500 → probablemente ×100
+      threshold = 500;
+      if (value > threshold) {
+        flag = true;
+        return { normalized: value / 100, wasNormalized: true };
+      }
+      break;
+      
+    case 'cost_ars':
+      // Costos ARS por persona: si > 100M → ×100
+      threshold = 100_000_000;
+      if (value > threshold) {
+        flag = true;
+        console.warn(`🔧 ANTI×100: cost_ars ${value} → ${value/100}`);
+        return { normalized: value / 100, wasNormalized: true };
+      }
+      break;
+      
+    case 'revenue':
+      // Facturación: si > 100M USD → ×100
+      threshold = 100_000_000;
+      if (value > threshold) {
+        flag = true;
+        console.warn(`🔧 ANTI×100: revenue ${value} → ${value/100}`);
+        return { normalized: value / 100, wasNormalized: true };
+      }
+      break;
+  }
+  
+  return { normalized: value, wasNormalized: false };
+}
+```
+
+**Flags de auditoría**: Se persisten en las tablas fact:
+- `fact_labor_month.anti_x100_hours`: boolean
+- `fact_labor_month.anti_x100_cost`: boolean
+- `fact_rc_month.anti_x100_revenue`: boolean
+
+#### Transform 2.3: Conversión USD (Fórmula Canónica)
+
+**En Rendimiento Cliente (RC)**:
+
+```javascript
+// 1. Extraer datos raw
+const revenueNative = parseNumber(row[revenueIndex]);
+const costNative = parseNumber(row[costIndex]);
+const currency = row[currencyIndex]?.toString().toUpperCase();
+const fxRate = parseNumber(row[fxRateIndex]);
+
+// 2. Normalizar ANTI×100
+const { normalized: revenueNorm, wasNormalized: revFlag } = 
+  normalizeIfOver100(revenueNative, 'revenue');
+
+const { normalized: costNorm, wasNormalized: costFlag } = 
+  normalizeIfOver100(costNative, 'cost_ars');
+
+// 3. FÓRMULA CANÓNICA: Conversión a USD
+let revenueUsd: number;
+let costUsd: number;
+
+if (currency.includes('USD')) {
+  revenueUsd = revenueNorm;
+  costUsd = costNorm;
+} else {
+  // ARS → USD
+  revenueUsd = revenueNorm / fxRate;
+  costUsd = costNorm / fxRate;
+}
+
+// 4. quote_native = precio mensual del proyecto (en moneda original)
+const quoteNative = revenueNorm;
+```
+
+**En Labor (Costos directos)**:
+
+```javascript
+// 1. Calcular costo ARS por persona
+const hoursBilling = parseNumber(row[billingHoursIndex]);
+const hourlyRateArs = parseNumber(row[rateIndex]);
+
+const { normalized: hoursNorm, wasNormalized: hoursFlag } = 
+  normalizeIfOver100(hoursBilling, 'hours');
+
+const costArsPersona = hoursNorm * hourlyRateArs;
+
+const { normalized: costNorm, wasNormalized: costFlag } = 
+  normalizeIfOver100(costArsPersona, 'cost_ars');
+
+// 2. FÓRMULA CANÓNICA: Conversión a USD
+const costUsd = costNorm / fxRate;
+```
+
+**⚠️ Separación Semántica CRÍTICA**:
+
+| Campo | Significado | Ejemplo | Uso |
+|-------|-------------|---------|-----|
+| `fx_rate` | Tipo de cambio ARS→USD del mercado | 1445.00 | Conversión de costos |
+| `quote_native` | Precio de cotización del proyecto (en su moneda) | 42,236,850 ARS | Budget utilization |
+| `revenue_native` | Facturación en moneda original | 42,236,850 ARS | Display operativo |
+| `revenue_usd` | Facturación convertida a USD | 29,230 USD | KPIs consolidados |
+
+**NO confundir**: `fx_rate` es el tipo de cambio, `quote_native` es el precio pactado del proyecto.
+
+#### Transform 2.4: Filtro "Pasado/Futuro" (solo RC)
+
+```javascript
+// En rendimiento-cliente.ts
 const pasadoFuturoIndex = headers.findIndex(h => 
   h?.toString().toLowerCase().includes('pasado')
 );
 
-// Si la columna existe, evalúa su valor
 if (pasadoFuturoIndex !== -1) {
   const statusFlag = row[pasadoFuturoIndex]?.toString().trim();
   const hasPasadoFuturo = statusFlag && statusFlag !== '';
   
-  // LÓGICA CLAVE:
-  // - Si está vacía o whitespace → acepta (proyecto confirmado)
-  // - Si tiene valor pero NO es "real" → rechaza
+  // CRITERIO DE INCLUSIÓN:
+  // - Vacío → incluir (confirmado)
+  // - "Real" → incluir
+  // - Otro valor → excluir (estimación)
   if (hasPasadoFuturo && statusFlag.toLowerCase() !== 'real') {
-    continue; // Salta esta fila
+    console.log(`⏭️ Excluyendo fila estimada: ${clientName} - ${projectName}`);
+    continue; // Skip
   }
+  
+  console.log(`✅ Incluyendo: ${clientName} - ${projectName} (status: "${statusFlag || 'vacío'}")`);
 }
 ```
 
-**Razón del fix**: Las filas con "Pasado/Futuro" vacío son proyectos confirmados, no estimaciones.
+**Documentado explícitamente**: Este filtro es exclusivo de "Rendimiento Cliente". "Costos directos e indirectos" no tiene esta columna y procesa todas las filas válidas.
 
-#### Paso 2.3: Normalización de moneda
+### Fase 3: Load (Carga a Star Schema SoT)
 
-```javascript
-// Determina la moneda del proyecto
-const currencyStr = row[headers.indexOf('Moneda')]?.toString().toUpperCase();
-const isUSD = currencyStr?.includes('USD');
-const currency = isUSD ? 'USD' : 'ARS';
+#### Load 3.1: Staging Table (Buffer Temporal)
 
-// Extrae el tipo de cambio
-const fxRateRaw = row[headers.indexOf('Tipo de cambio')];
-const fxRate = parseFloat(fxRateRaw?.toString() || '1');
-```
+**Tabla**: `financial_sot`
 
-#### Paso 2.4: Cálculo de valores USD
-
-**ANTI×100 NORMALIZATION** aplicada aquí:
-
-```javascript
-import { normalizeIfOver100 } from '../utils/number';
-
-// Normaliza facturación
-const rawRevenue = parseFloat(row[revenueIndex]?.toString() || '0');
-const revenueNormalized = normalizeIfOver100(rawRevenue, 'revenue');
-
-// Convierte a USD
-const revenueUSD = currency === 'USD' 
-  ? revenueNormalized 
-  : revenueNormalized / fxRate;
-
-// Lo mismo para costos
-const rawCost = parseFloat(row[costIndex]?.toString() || '0');
-const costNormalized = normalizeIfOver100(rawCost, 'cost');
-const costUSD = currency === 'USD'
-  ? costNormalized
-  : costNormalized / fxRate;
-```
-
-**Función ANTI×100**: `server/utils/number.ts`
-```javascript
-export function normalizeIfOver100(value: number, context: string): number {
-  // Si el valor es > 100,000 → probablemente está ×100
-  if (value > 100_000) {
-    console.warn(`🔧 ANTI×100: ${context} ${value} → ${value/100}`);
-    return value / 100;
-  }
-  return value;
-}
-```
-
-#### Paso 2.5: Inserción en tabla `financial_sot`
-
-```javascript
-await db.insert(financialSot).values({
-  clientName: clientName,
-  projectName: projectName,
-  monthKey: `${year}-${monthNum}`, // ej: "2025-09"
-  year: year,
-  month: monthNum,
-  revenueUsd: revenueUSD.toString(),
-  costUsd: costUSD.toString(),
-  currency: currency,
-  quotation: fxRate.toString(), // TIPO DE CAMBIO
-  // NO confundir con quote_native (precio de cotización)
-}).onConflictDoUpdate(...);
-```
-
-**⚠️ SEPARACIÓN SEMÁNTICA CRÍTICA**:
-- `quotation` → Tipo de cambio ARS/USD (FX rate)
-- `quote_native` → Precio de cotización del proyecto (en su moneda)
-
-### Fase 3: Construcción del Star Schema
-
-**Archivo**: `server/etl/sot-etl.ts`
-
-**Función principal**: `runCompleteSotEtl()`
-
-#### Dimensión: Períodos (`dim_period`)
+**Propósito**: Buffer raw de importación desde RC, NO para consumo del frontend.
 
 ```sql
+CREATE TABLE financial_sot (
+  id SERIAL PRIMARY KEY,
+  client_name TEXT NOT NULL,
+  project_name TEXT NOT NULL,
+  month_key TEXT NOT NULL,        -- '2025-09'
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  revenue_usd NUMERIC(12,2),
+  cost_usd NUMERIC(12,2),
+  currency TEXT,                  -- 'ARS' | 'USD'
+  quotation NUMERIC(10,2),        -- fx_rate
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(client_name, project_name, month_key)
+);
+```
+
+**Uso**:
+- Almacenamiento temporal de datos raw
+- Fuente para el ETL que puebla las fact tables
+- **NO se lee directamente desde la API/Frontend**
+
+#### Load 3.2: Dimensional Tables
+
+**`dim_period`** - Dimensión temporal
+
+```sql
+CREATE TABLE dim_period (
+  month_key TEXT PRIMARY KEY,     -- '2025-09'
+  year INTEGER NOT NULL,
+  month INTEGER NOT NULL,
+  quarter INTEGER NOT NULL,        -- 1,2,3,4
+  semester INTEGER NOT NULL        -- 1,2
+);
+
+-- Poblada desde financial_sot
 INSERT INTO dim_period (month_key, year, month, quarter, semester)
 SELECT DISTINCT
   month_key,
@@ -191,390 +345,628 @@ SELECT DISTINCT
   CEIL(month::numeric / 3) as quarter,
   CEIL(month::numeric / 6) as semester
 FROM financial_sot
+ON CONFLICT (month_key) DO NOTHING;
 ```
 
-#### Dimensión: Tasas de Personas (`dim_person_rate`)
-
-```javascript
-// Calcula costos horarios por persona desde activeProjects
-const personRates = await db.select({
-  personName: sql`unnest(${activeProjects.team})`,
-  personCost: sql`unnest(${activeProjects.teamCosts})`
-}).from(activeProjects);
-
-// Inserta en dim_person_rate
-await db.insert(dimPersonRate).values({
-  personName: name,
-  hourlyCost: avgCost
-});
-```
-
-#### Hecho: Labor Mensual (`fact_labor_month`)
-
-**Fuente**: Hoja "Costos directos e indirectos"
-
-```javascript
-// ANTI×100 aplicado a horas Asana
-const hoursAsanaNormalized = normalizeIfOver100(rawHoursAsana, 'hoursAsana');
-
-await db.insert(factLaborMonth).values({
-  projectId: project.id,
-  monthKey: monthKey,
-  personName: personName,
-  targetHours: targetHours,
-  hoursAsana: hoursAsanaNormalized, // Horas reales trackeadas
-  hoursBilling: hoursBilling,       // Horas para facturar
-  costUsd: costForPerson
-});
-```
-
-#### Hecho: RC Mensual (`fact_rc_month`)
-
-**Fuente**: Tabla `financial_sot`
-
-```javascript
-await db.insert(factRcMonth).values({
-  projectId: resolvedProjectId, // ← Resuelto por Project Resolver
-  clientId: clientId,
-  monthKey: row.monthKey,
-  revenueNative: revenueNative,
-  revenueUsd: row.revenueUsd,
-  costUsd: row.costUsd,
-  currency: row.currency,
-  fxRate: row.quotation, // Tipo de cambio
-  quoteNative: quoteNative // Precio de cotización
-});
-```
-
-**🔍 Project Resolver V2**: Sistema de 3 etapas
-
-**Etapa 1: Match determinístico**
-```sql
-SELECT project_id FROM dim_project_alias 
-WHERE alias_name = 'Fee Marketing' AND client_id = 34
-```
-
-**Etapa 2: Match fuzzy con Fuse.js**
-```javascript
-const fuse = new Fuse(projectList, {
-  keys: ['name'],
-  threshold: 0.3
-});
-const matches = fuse.search('Marketing Fee');
-```
-
-**Etapa 3: Aprendizaje automático**
-```javascript
-// Si hay match, crea alias automático
-await db.insert(dimProjectAlias).values({
-  projectId: foundProject.id,
-  aliasName: 'Marketing Fee',
-  source: 'auto_learned'
-});
-```
-
-**Filas no resueltas** → `rc_unmatched_staging` para auditoría
-
-#### Agregación: Proyecto Mensual (`agg_project_month`)
-
-```javascript
-await db.insert(aggProjectMonth).values({
-  projectId: project.id,
-  monthKey: monthKey,
-  revenueUsd: totalRevenue,
-  costUsd: totalCost,
-  targetHours: sumTargetHours,
-  hoursAsana: sumHoursAsana,
-  hoursBilling: sumHoursBilling,
-  profitUsd: totalRevenue - totalCost,
-  marginPercent: ((totalRevenue - totalCost) / totalRevenue) * 100
-});
-```
-
-### Fase 4: Ejecución Automática
-
-**Archivo**: `server/cron.ts`
-
-```javascript
-import cron from 'node-cron';
-
-// Ejecuta ETL todos los días a las 3 AM
-cron.schedule('0 3 * * *', async () => {
-  console.log('🔄 Iniciando sincronización automática ETL...');
-  await runCompleteSotEtl();
-});
-```
-
-**También se puede ejecutar manualmente**:
-```bash
-npm run etl:sync
-```
-
----
-
-## 🗄️ ARQUITECTURA DE BASE DE DATOS
-
-### Tablas Dimensionales (Dimension Tables)
-
-#### `dim_period`
-```sql
-- month_key (PK): '2025-09'
-- year: 2025
-- month: 9
-- quarter: 3
-- semester: 2
-```
-
-#### `dim_person_rate`
-```sql
-- person_name (PK): 'Juan Pérez'
-- hourly_cost: 25.50
-- last_updated: timestamp
-```
-
-#### `dim_client_alias`
-```sql
-- id (PK)
-- client_id (FK → clients.id)
-- alias_name: 'Warner Bros'
-- source: 'auto_learned' | 'manual'
-```
-
-#### `dim_project_alias`
-```sql
-- id (PK)
-- project_id (FK → activeProjects.id)
-- client_id (FK → clients.id)
-- alias_name: 'Fee Marketing'
-- source: 'auto_learned' | 'manual'
-```
-
-### Tablas de Hechos (Fact Tables)
-
-#### `fact_labor_month`
-**Granularidad**: Proyecto × Mes × Persona
+**`dim_person_rate`** - Tasas horarias por persona
 
 ```sql
-- id (PK)
-- project_id (FK)
-- month_key (FK → dim_period)
-- person_name (FK → dim_person_rate)
-- target_hours: 160.0
-- hours_asana: 145.5    ← Con ANTI×100
-- hours_billing: 150.0
-- cost_usd: 3637.50
+CREATE TABLE dim_person_rate (
+  person_name TEXT PRIMARY KEY,
+  hourly_cost_usd NUMERIC(10,2),
+  hourly_cost_ars NUMERIC(10,2),
+  last_updated TIMESTAMP DEFAULT NOW()
+);
+
+-- Calculada desde labor data (promedio de tasas por persona)
 ```
 
-#### `fact_rc_month`
-**Granularidad**: Proyecto × Mes
+**`dim_client_alias`** - Aliases de clientes
 
 ```sql
-- id (PK)
-- project_id (FK)
-- client_id (FK)
-- month_key (FK → dim_period)
-- revenue_native: 42,236,850.00  ← En moneda original
-- revenue_usd: 29,230.00         ← Convertido
-- cost_usd: 8,431.37
-- currency: 'ARS'
-- fx_rate: 1445.00               ← Tipo de cambio
-- quote_native: 42,236,850.00    ← Cotización del proyecto
+CREATE TABLE dim_client_alias (
+  id SERIAL PRIMARY KEY,
+  client_id INTEGER NOT NULL REFERENCES clients(id), -- ← FK a clients.id
+  alias_name TEXT NOT NULL,
+  source TEXT NOT NULL,           -- 'manual' | 'auto_learned' | 'google_sheets'
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(client_id, alias_name)
+);
 ```
 
-#### `agg_project_month`
-**Granularidad**: Proyecto × Mes (agregado)
+**⚠️ CORRECCIÓN APLICADA**: FK a `clients.id`, NO a `activeProjects.id`
+
+**`dim_project_alias`** - Aliases de proyectos
 
 ```sql
-- id (PK)
-- project_id (FK)
-- month_key (FK)
-- revenue_usd: 29,230.00
-- cost_usd: 8,431.37
-- target_hours: 320.0
-- hours_asana: 291.0
-- hours_billing: 300.0
-- profit_usd: 20,798.63
-- margin_percent: 71.15
+CREATE TABLE dim_project_alias (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES active_projects(id),
+  client_id INTEGER NOT NULL REFERENCES clients(id), -- ← FK a clients.id
+  alias_name TEXT NOT NULL,
+  source TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(client_id, project_id, alias_name)
+);
 ```
 
-### Tabla Fuente (Source of Truth)
+**⚠️ CORRECCIÓN APLICADA**: `client_id` referencia `clients.id`, permite resolver proyectos de clientes sin proyectos activos aún.
 
-#### `financial_sot`
-**La tabla raw de importación desde Google Sheets**
+#### Load 3.3: Fact Tables (Fuente de Verdad)
+
+**`fact_labor_month`** - Granularidad: Proyecto × Persona × Mes
 
 ```sql
-- id (PK)
-- client_name: 'Warner'
-- project_name: 'Fee Marketing'
-- month_key: '2025-09'
-- year: 2025
-- month: 9
-- revenue_usd: '29230.00'
-- cost_usd: '8431.37'
-- currency: 'ARS'
-- quotation: '1445.00'  ← FX Rate
-```
-
-### Tabla de Auditoría
-
-#### `rc_unmatched_staging`
-**Filas que no pudieron resolverse a proyectos**
-
-```sql
-- id (PK)
-- client_name_raw: 'Warner Bros.'
-- project_name_raw: 'Marketing Digital'
-- month_key: '2025-09'
-- revenue_usd: 5000.00
-- reason: 'no_fuzzy_match'
-- created_at: timestamp
-```
-
----
-
-## 🚀 CAPA DE API - Backend Routes
-
-### Endpoint Principal: Proyectos
-
-**Archivo**: `server/routes.ts`
-
-#### GET `/api/projects/:id`
-
-**Archivo de lógica**: `server/domain/view-aggregator.ts`
-
-```javascript
-async function getProjectViewModel(projectId: number) {
-  // 1. Obtiene datos base del proyecto
-  const project = await db.select()
-    .from(activeProjects)
-    .where(eq(activeProjects.id, projectId));
+CREATE TABLE fact_labor_month (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES active_projects(id),
+  month_key TEXT NOT NULL REFERENCES dim_period(month_key),
+  person_name TEXT NOT NULL REFERENCES dim_person_rate(person_name),
   
-  // 2. Obtiene agregados mensuales desde Star Schema
-  const monthlyData = await db.select()
+  -- Horas (3 tipos)
+  target_hours NUMERIC(10,2),     -- Horas presupuestadas
+  hours_asana NUMERIC(10,2),      -- Horas trackeadas (reales)
+  hours_billing NUMERIC(10,2),    -- Horas para facturar
+  
+  -- Tasas y costos
+  hourly_rate_ars NUMERIC(10,2),
+  cost_ars NUMERIC(12,2),
+  cost_usd NUMERIC(12,2),
+  fx_rate NUMERIC(10,2),
+  
+  -- Flags de auditoría
+  anti_x100_hours BOOLEAN DEFAULT FALSE,
+  anti_x100_cost BOOLEAN DEFAULT FALSE,
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(project_id, month_key, person_name)
+);
+
+-- Índices para performance
+CREATE INDEX idx_flm_project ON fact_labor_month(project_id);
+CREATE INDEX idx_flm_month ON fact_labor_month(month_key);
+```
+
+**Poblada desde**: "Costos directos e indirectos"
+
+**`fact_rc_month`** - Granularidad: Proyecto × Mes
+
+```sql
+CREATE TABLE fact_rc_month (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES active_projects(id),
+  client_id INTEGER NOT NULL REFERENCES clients(id),
+  month_key TEXT NOT NULL REFERENCES dim_period(month_key),
+  
+  -- Valores en moneda nativa
+  revenue_native NUMERIC(15,2),
+  cost_native NUMERIC(15,2),
+  quote_native NUMERIC(15,2),     -- Precio de cotización (presupuesto)
+  currency TEXT NOT NULL,
+  
+  -- Valores en USD
+  revenue_usd NUMERIC(12,2),
+  cost_usd NUMERIC(12,2),
+  
+  -- Tipo de cambio
+  fx_rate NUMERIC(10,2),
+  
+  -- Flags de auditoría
+  anti_x100_revenue BOOLEAN DEFAULT FALSE,
+  anti_x100_cost BOOLEAN DEFAULT FALSE,
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(project_id, month_key)
+);
+
+-- Índices
+CREATE INDEX idx_frcm_project ON fact_rc_month(project_id);
+CREATE INDEX idx_frcm_month ON fact_rc_month(month_key);
+CREATE INDEX idx_frcm_client ON fact_rc_month(client_id);
+```
+
+**Poblada desde**: `financial_sot` (después de Project Resolver)
+
+#### Load 3.4: Aggregate Tables
+
+**`agg_project_month`** - Granularidad: Proyecto × Mes (consolidado)
+
+```sql
+CREATE TABLE agg_project_month (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES active_projects(id),
+  month_key TEXT NOT NULL REFERENCES dim_period(month_key),
+  
+  -- Financiero (desde fact_rc_month)
+  revenue_usd NUMERIC(12,2),
+  cost_usd_rc NUMERIC(12,2),      -- Desde RC
+  quote_native NUMERIC(15,2),
+  currency TEXT,
+  fx_rate NUMERIC(10,2),
+  
+  -- Labor (desde fact_labor_month)
+  cost_usd_labor NUMERIC(12,2),   -- Suma de labor costs
+  target_hours NUMERIC(10,2),
+  hours_asana NUMERIC(10,2),
+  hours_billing NUMERIC(10,2),
+  
+  -- KPIs calculados
+  profit_usd NUMERIC(12,2),              -- revenue_usd - cost_usd_rc
+  margin_percent NUMERIC(5,2),           -- (profit / revenue) * 100
+  markup NUMERIC(10,2),                  -- revenue / cost
+  budget_utilization_percent NUMERIC(5,2), -- (cost_native / quote_native) * 100
+  
+  -- Flags de coherencia
+  labor_vs_rc_cost_mismatch BOOLEAN DEFAULT FALSE,
+  cost_delta_percent NUMERIC(5,2),       -- |cost_labor - cost_rc| / cost_rc
+  
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(project_id, month_key)
+);
+```
+
+**Proceso de agregación**:
+
+```javascript
+// En server/etl/sot-etl.ts
+async function buildAggregates() {
+  // 1. Agregar por proyecto/mes desde fact_rc_month
+  const rcAggs = await db.select({
+    projectId: factRcMonth.projectId,
+    monthKey: factRcMonth.monthKey,
+    revenueUsd: sql`SUM(${factRcMonth.revenueUsd})`,
+    costUsdRc: sql`SUM(${factRcMonth.costUsd})`,
+    quoteNative: sql`AVG(${factRcMonth.quoteNative})`,
+    currency: factRcMonth.currency,
+    fxRate: sql`AVG(${factRcMonth.fxRate})`
+  })
+  .from(factRcMonth)
+  .groupBy(factRcMonth.projectId, factRcMonth.monthKey, factRcMonth.currency);
+  
+  // 2. Agregar por proyecto/mes desde fact_labor_month
+  const laborAggs = await db.select({
+    projectId: factLaborMonth.projectId,
+    monthKey: factLaborMonth.monthKey,
+    costUsdLabor: sql`SUM(${factLaborMonth.costUsd})`,
+    targetHours: sql`SUM(${factLaborMonth.targetHours})`,
+    hoursAsana: sql`SUM(${factLaborMonth.hoursAsana})`,
+    hoursBilling: sql`SUM(${factLaborMonth.hoursBilling})`
+  })
+  .from(factLaborMonth)
+  .groupBy(factLaborMonth.projectId, factLaborMonth.monthKey);
+  
+  // 3. Join + calcular KPIs
+  for (const rc of rcAggs) {
+    const labor = laborAggs.find(l => 
+      l.projectId === rc.projectId && l.monthKey === rc.monthKey
+    );
+    
+    // KPIs
+    const profitUsd = rc.revenueUsd - rc.costUsdRc;
+    const marginPercent = rc.revenueUsd > 0 
+      ? (profitUsd / rc.revenueUsd) * 100 
+      : 0;
+    const markup = rc.costUsdRc > 0 
+      ? rc.revenueUsd / rc.costUsdRc 
+      : 0;
+    
+    // Budget utilization (usa quote_native, NO fx_rate)
+    const budgetUtilization = rc.quoteNative > 0
+      ? (rc.costUsdRc * rc.fxRate / rc.quoteNative) * 100  // Convierte costo a native
+      : 0;
+    
+    // Coherencia labor vs RC
+    const costDelta = Math.abs(labor.costUsdLabor - rc.costUsdRc);
+    const costDeltaPercent = rc.costUsdRc > 0 
+      ? (costDelta / rc.costUsdRc) * 100 
+      : 0;
+    const mismatch = costDeltaPercent > 5; // Umbral 5%
+    
+    // Insert aggregate
+    await db.insert(aggProjectMonth).values({
+      projectId: rc.projectId,
+      monthKey: rc.monthKey,
+      revenueUsd: rc.revenueUsd,
+      costUsdRc: rc.costUsdRc,
+      costUsdLabor: labor?.costUsdLabor || 0,
+      quoteNative: rc.quoteNative,
+      currency: rc.currency,
+      fxRate: rc.fxRate,
+      targetHours: labor?.targetHours || 0,
+      hoursAsana: labor?.hoursAsana || 0,
+      hoursBilling: labor?.hoursBilling || 0,
+      profitUsd: profitUsd,
+      marginPercent: marginPercent,
+      markup: markup,
+      budgetUtilizationPercent: budgetUtilization,
+      laborVsRcCostMismatch: mismatch,
+      costDeltaPercent: costDeltaPercent
+    }).onConflictDoUpdate(...);
+  }
+}
+```
+
+#### Load 3.5: Unmatched Staging (Auditoría)
+
+**`rc_unmatched_staging`** - Filas no resueltas por Project Resolver
+
+```sql
+CREATE TABLE rc_unmatched_staging (
+  id SERIAL PRIMARY KEY,
+  client_name_raw TEXT NOT NULL,
+  project_name_raw TEXT NOT NULL,
+  month_key TEXT NOT NULL,
+  revenue_usd NUMERIC(12,2),
+  cost_usd NUMERIC(12,2),
+  currency TEXT,
+  fx_rate NUMERIC(10,2),
+  reason TEXT,                    -- 'no_client_match' | 'no_project_match' | 'no_fuzzy_match'
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Uso**: Auditoría de filas que no pudieron conectarse a proyectos existentes.
+
+---
+
+## 🔍 PROJECT RESOLVER V2 (3-Stage Cascade)
+
+**Archivo**: `server/etl/sot-etl.ts::resolveProject()`
+
+**Propósito**: Conectar nombres raw de Google Sheets con IDs de proyectos en BD.
+
+### Orden de Resolución (Cascade)
+
+```javascript
+async function resolveProject(
+  clientNameRaw: string, 
+  projectNameRaw: string
+): Promise<{ projectId: number; clientId: number } | null> {
+  
+  // ════════════════════════════════════════
+  // STAGE 1: Alias exacto (determinístico)
+  // ════════════════════════════════════════
+  const exactAlias = await db.select()
+    .from(dimProjectAlias)
+    .innerJoin(dimClientAlias, eq(
+      dimProjectAlias.clientId, 
+      dimClientAlias.clientId
+    ))
+    .where(and(
+      eq(dimClientAlias.aliasName, clientNameRaw),
+      eq(dimProjectAlias.aliasName, projectNameRaw)
+    ))
+    .limit(1);
+  
+  if (exactAlias.length > 0) {
+    console.log(`✅ STAGE 1: Alias exacto → Project ${exactAlias[0].projectId}`);
+    return {
+      projectId: exactAlias[0].projectId,
+      clientId: exactAlias[0].clientId
+    };
+  }
+  
+  // ════════════════════════════════════════
+  // STAGE 2: Fuzzy match con Fuse.js
+  // ════════════════════════════════════════
+  const allProjects = await db.select()
+    .from(activeProjects)
+    .innerJoin(clients, eq(activeProjects.clientId, clients.id));
+  
+  const fuse = new Fuse(allProjects, {
+    keys: [
+      { name: 'client.name', weight: 0.5 },
+      { name: 'project.name', weight: 0.5 }
+    ],
+    threshold: 0.15,  // 85% de similitud mínima
+    includeScore: true
+  });
+  
+  const fuzzyResults = fuse.search({
+    $and: [
+      { 'client.name': clientNameRaw },
+      { 'project.name': projectNameRaw }
+    ]
+  });
+  
+  if (fuzzyResults.length > 0 && fuzzyResults[0].score < 0.15) {
+    const match = fuzzyResults[0].item;
+    console.log(`✅ STAGE 2: Fuzzy match (score ${fuzzyResults[0].score}) → Project ${match.project.id}`);
+    
+    // ════════════════════════════════════════
+    // STAGE 3: Auto-aprendizaje (persistir alias)
+    // ════════════════════════════════════════
+    await db.insert(dimClientAlias).values({
+      clientId: match.client.id,
+      aliasName: clientNameRaw,
+      source: 'auto_learned'
+    }).onConflictDoNothing();
+    
+    await db.insert(dimProjectAlias).values({
+      projectId: match.project.id,
+      clientId: match.client.id,
+      aliasName: projectNameRaw,
+      source: 'auto_learned'
+    }).onConflictDoNothing();
+    
+    console.log(`📚 STAGE 3: Alias aprendido y persistido`);
+    
+    return {
+      projectId: match.project.id,
+      clientId: match.client.id
+    };
+  }
+  
+  // ════════════════════════════════════════
+  // NO MATCH: Guardar en staging para auditoría
+  // ════════════════════════════════════════
+  console.warn(`❌ NO MATCH: ${clientNameRaw} - ${projectNameRaw}`);
+  
+  await db.insert(rcUnmatchedStaging).values({
+    clientNameRaw: clientNameRaw,
+    projectNameRaw: projectNameRaw,
+    monthKey: monthKey,
+    revenueUsd: revenueUsd,
+    costUsd: costUsd,
+    currency: currency,
+    fxRate: fxRate,
+    reason: 'no_fuzzy_match'
+  });
+  
+  return null;
+}
+```
+
+**Importante**: 
+- Client aliases y project aliases referencian `clients.id` (fix aplicado Oct 2025)
+- Umbral fuzzy: 0.15 (85% similitud)
+- Auto-learning: Persiste nuevos alias automáticamente
+
+---
+
+## 🚀 CAPA DE API - ViewModels desde SoT
+
+**Archivo principal**: `server/domain/view-aggregator.ts`
+
+**Principio**: La API lee EXCLUSIVAMENTE desde Star Schema SoT, nunca desde `financial_sot`.
+
+### Endpoint: `/api/projects/:id/complete-data`
+
+**Query params**:
+- `view`: `'original' | 'operativa' | 'usd'` (default: `'operativa'`)
+- `period`: `'2025' | '2025-Q3' | '2025-09' | '2025-01:2025-09'`
+
+**Función core**: `getProjectViewModel()`
+
+```typescript
+async function getProjectViewModel(
+  projectId: number,
+  view: 'original' | 'operativa' | 'usd',
+  period?: string
+): Promise<ProjectViewModel> {
+  
+  // ════════════════════════════════════════
+  // 1. Fetch desde agg_project_month (SoT)
+  // ════════════════════════════════════════
+  const periodFilter = parsePeriodFilter(period);
+  
+  const monthlyAggs = await db.select()
     .from(aggProjectMonth)
-    .where(eq(aggProjectMonth.projectId, projectId))
+    .where(and(
+      eq(aggProjectMonth.projectId, projectId),
+      periodFilter
+    ))
     .orderBy(aggProjectMonth.monthKey);
   
-  // 3. Obtiene desglose de equipo
+  // ════════════════════════════════════════
+  // 2. Calcular totales (sumatorias)
+  // ════════════════════════════════════════
+  const summary = {
+    totalRevenueUsd: monthlyAggs.reduce((sum, m) => sum + Number(m.revenueUsd), 0),
+    totalCostUsd: monthlyAggs.reduce((sum, m) => sum + Number(m.costUsdRc), 0),
+    totalProfitUsd: 0,  // Se calcula después
+    avgMarginPercent: 0,
+    totalTargetHours: monthlyAggs.reduce((sum, m) => sum + Number(m.targetHours), 0),
+    totalHoursAsana: monthlyAggs.reduce((sum, m) => sum + Number(m.hoursAsana), 0),
+    totalHoursBilling: monthlyAggs.reduce((sum, m) => sum + Number(m.hoursBilling), 0)
+  };
+  
+  summary.totalProfitUsd = summary.totalRevenueUsd - summary.totalCostUsd;
+  summary.avgMarginPercent = summary.totalRevenueUsd > 0
+    ? (summary.totalProfitUsd / summary.totalRevenueUsd) * 100
+    : 0;
+  
+  // ════════════════════════════════════════
+  // 3. KPIs (fórmulas reales)
+  // ════════════════════════════════════════
+  const kpis = {
+    // Markup = Revenue / Cost
+    markup: summary.totalCostUsd > 0 
+      ? summary.totalRevenueUsd / summary.totalCostUsd 
+      : 0,
+    
+    // Margin = 1 - (Cost / Revenue)
+    margin: summary.totalRevenueUsd > 0
+      ? 1 - (summary.totalCostUsd / summary.totalRevenueUsd)
+      : 0,
+    
+    // Budget Utilization = Cost Native / Quote Native
+    // (usa valores en moneda original, NO fx_rate)
+    budgetUtilization: monthlyAggs.reduce((sum, m) => {
+      if (Number(m.quoteNative) > 0) {
+        // Convertir cost_usd de vuelta a native con fx_rate
+        const costNative = Number(m.costUsdRc) * Number(m.fxRate);
+        return sum + (costNative / Number(m.quoteNative));
+      }
+      return sum;
+    }, 0) / monthlyAggs.length,  // Promedio
+    
+    // Efficiency = Hours Asana / Hours Billing
+    efficiency: summary.totalHoursBilling > 0
+      ? summary.totalHoursAsana / summary.totalHoursBilling
+      : 0
+  };
+  
+  // ════════════════════════════════════════
+  // 4. Team breakdown desde fact_labor_month
+  // ════════════════════════════════════════
   const teamBreakdown = await db.select()
     .from(factLaborMonth)
-    .where(eq(factLaborMonth.projectId, projectId));
+    .where(and(
+      eq(factLaborMonth.projectId, projectId),
+      periodFilter
+    ))
+    .groupBy(factLaborMonth.personName)
+    .select({
+      personName: factLaborMonth.personName,
+      totalHoursTarget: sql`SUM(${factLaborMonth.targetHours})`,
+      totalHoursAsana: sql`SUM(${factLaborMonth.hoursAsana})`,
+      totalHoursBilling: sql`SUM(${factLaborMonth.hoursBilling})`,
+      totalCostUsd: sql`SUM(${factLaborMonth.costUsd})`,
+      totalCostArs: sql`SUM(${factLaborMonth.costArs})`
+    });
   
-  // 4. Calcula KPIs
-  const totalRevenue = monthlyData.reduce((sum, m) => sum + m.revenueUsd, 0);
-  const totalCost = monthlyData.reduce((sum, m) => sum + m.costUsd, 0);
-  const profitMargin = ((totalRevenue - totalCost) / totalRevenue) * 100;
+  // ════════════════════════════════════════
+  // 5. Aplicar vista de moneda
+  // ════════════════════════════════════════
+  let displayValues: any;
   
-  // 5. Ensambla ViewModel
+  switch (view) {
+    case 'original':
+      // Solo moneda nativa, sin conversión
+      displayValues = monthlyAggs.map(m => ({
+        period: m.monthKey,
+        revenue: `${m.revenueNative} ${m.currency}`,
+        cost: `${m.costNative} ${m.currency}`,
+        currency: m.currency
+      }));
+      break;
+      
+    case 'operativa':
+      // Moneda nativa + equivalente USD
+      displayValues = monthlyAggs.map(m => ({
+        period: m.monthKey,
+        revenue: `${m.revenueNative} ${m.currency} (${m.revenueUsd} USD)`,
+        cost: `${m.costNative} ${m.currency} (${m.costUsdRc} USD)`,
+        currency: m.currency,
+        fxRate: m.fxRate
+      }));
+      break;
+      
+    case 'usd':
+      // Solo USD (consolidado)
+      displayValues = monthlyAggs.map(m => ({
+        period: m.monthKey,
+        revenue: `${m.revenueUsd} USD`,
+        cost: `${m.costUsdRc} USD`,
+        currency: 'USD'
+      }));
+      break;
+  }
+  
+  // ════════════════════════════════════════
+  // 6. Retornar ViewModel
+  // ════════════════════════════════════════
   return {
-    id: project.id,
-    name: project.name,
-    client: project.clientName,
-    totalRevenue,
-    totalCost,
-    profitMargin,
-    monthlyData: monthlyData.map(m => ({
-      period: m.monthKey,
-      revenue: m.revenueUsd,
-      cost: m.costUsd,
-      profit: m.profitUsd,
-      margin: m.marginPercent,
-      hoursTracked: m.hoursAsana,
-      hoursBudget: m.targetHours
-    })),
-    teamBreakdown: teamBreakdown.map(t => ({
-      person: t.personName,
-      hoursTarget: t.targetHours,
-      hoursActual: t.hoursAsana,
-      hoursBilling: t.hoursBilling,
-      cost: t.costUsd
-    }))
+    projectId: projectId,
+    summary: summary,
+    kpis: kpis,
+    monthlyData: displayValues,
+    teamBreakdown: teamBreakdown,
+    metadata: {
+      view: view,
+      period: period,
+      lastSync: await getLastEtlRunTime()
+    }
   };
 }
 ```
 
-### Endpoint: Dashboard Ejecutivo
+**KPIs Documentados (Fórmulas Reales)**:
 
-#### GET `/api/dashboard/executive`
+| KPI | Fórmula | Ejemplo |
+|-----|---------|---------|
+| **Markup** | `revenue / cost` | 29,230 / 8,431 = 3.47× |
+| **Margin** | `1 - (cost / revenue)` | 1 - (8,431 / 29,230) = 0.7115 (71.15%) |
+| **Budget Utilization** | `(cost_usd × fx_rate) / quote_native` | (8,431 × 1445) / 42,236,850 = 28.8% |
+| **Efficiency** | `hours_asana / hours_billing` | 145 / 150 = 0.967 (96.7%) |
 
-```javascript
-async function getExecutiveDashboard(period: string) {
-  // 1. Filtra por período
-  const periodFilter = parsePeriod(period); // '2025' | '2025-Q3' | '2025-09'
-  
-  // 2. Query Star Schema
-  const kpis = await db.select({
-    totalRevenue: sql`SUM(revenue_usd)`,
-    totalCost: sql`SUM(cost_usd)`,
-    totalProfit: sql`SUM(profit_usd)`,
-    avgMargin: sql`AVG(margin_percent)`
-  })
-  .from(aggProjectMonth)
-  .where(periodFilter);
-  
-  // 3. Top proyectos por rentabilidad
-  const topProjects = await db.select()
-    .from(aggProjectMonth)
-    .orderBy(desc(aggProjectMonth.marginPercent))
-    .limit(10);
-  
-  return { kpis, topProjects };
-}
-```
+**⚠️ Importante**: 
+- `budgetUtilization` usa `quote_native` (presupuesto), NO `fx_rate` directamente
+- Todas las agregaciones vienen de `agg_project_month`, no se calculan on-the-fly
 
 ---
 
-## 🎨 FRONTEND - Consumo de Datos
+## 🎨 FRONTEND - Consumo de ViewModels
+
+**Framework**: React 18 + TanStack Query v5
 
 ### React Query Setup
 
 **Archivo**: `client/src/lib/queryClient.ts`
 
-```javascript
+```typescript
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutos
-      refetchOnWindowFocus: false
-    }
-  }
-});
-
-// Fetcher global
-queryClient.setDefaultOptions({
-  queries: {
-    queryFn: async ({ queryKey }) => {
-      const res = await fetch(queryKey[0]);
-      return res.json();
+      staleTime: 5 * 60 * 1000,      // 5 min
+      refetchOnWindowFocus: false,
+      placeholderData: undefined      // ← CRÍTICO: evita contaminación
     }
   }
 });
 ```
 
-### Componente: Proyecto Detalle
+**⚠️ Cache Key Structure**: Incluir todos los parámetros
+
+```typescript
+// ❌ MAL: Cache key sin parámetros
+const { data } = useQuery({
+  queryKey: [`/api/projects/${projectId}`]
+});
+
+// ✅ BIEN: Cache key con view + period
+const { data } = useQuery({
+  queryKey: [`/api/projects/${projectId}`, view, period]
+});
+```
+
+**Razón**: Si cambias `view` de 'operativa' a 'usd', sin incluirlo en el key mostrará datos cacheados de la vista anterior.
+
+### Componente: Detalle de Proyecto
 
 **Archivo**: `client/src/pages/ProjectDetail.tsx`
 
 ```typescript
 function ProjectDetail() {
   const { id } = useParams();
+  const [view, setView] = useState<'operativa'>('operativa');
+  const [period, setPeriod] = useState<string>('2025');
   
-  // 1. Fetch datos del proyecto
+  // Fetch con cache key completo
   const { data: project, isLoading } = useQuery({
-    queryKey: [`/api/projects/${id}`],
-    // queryFn se usa del default ↑
+    queryKey: [`/api/projects/${id}/complete-data`, view, period],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/projects/${id}/complete-data?view=${view}&period=${period}`
+      );
+      return res.json();
+    },
+    placeholderData: undefined  // No usar datos viejos mientras carga
   });
   
   if (isLoading) return <Skeleton />;
   
-  // 2. Renderiza con datos del ViewModel
   return (
     <div>
-      <h1>{project.name}</h1>
-      <MetricsCard 
-        revenue={project.totalRevenue}
-        cost={project.totalCost}
-        margin={project.profitMargin}
+      <ViewToggle value={view} onChange={setView} />
+      <PeriodSelector value={period} onChange={setPeriod} />
+      
+      <MetricsCard
+        revenue={project.summary.totalRevenueUsd}
+        cost={project.summary.totalCostUsd}
+        profit={project.summary.totalProfitUsd}
+        margin={project.summary.avgMarginPercent}
       />
       
       <MonthlyChart data={project.monthlyData} />
@@ -585,405 +977,347 @@ function ProjectDetail() {
 }
 ```
 
-### Sistema de Multi-Moneda (3 Vistas)
+---
 
-**Archivo**: `client/src/components/CurrencyToggle.tsx`
+## 🔄 EJECUCIÓN AUTOMÁTICA
 
-```typescript
-const [view, setView] = useState<'original' | 'operative' | 'usd'>('operative');
+### Cron Job (Producción)
 
-// Vista Original: Muestra moneda native
-const displayValue = view === 'original' 
-  ? project.revenueNative + ' ' + project.currency
+**Archivo**: `server/cron.ts`
+
+```javascript
+import cron from 'node-cron';
+import { runCompleteSotEtl } from './etl/sot-etl';
+
+// Ejecuta todos los días a las 3 AM
+cron.schedule('0 3 * * *', async () => {
+  console.log('🔄 [CRON] Iniciando sincronización diaria SoT ETL...');
   
-// Vista Operativa: Moneda native + equivalente USD
-  : view === 'operative'
-  ? `${project.revenueNative} ${project.currency} (${project.revenueUsd} USD)`
-  
-// Vista Consolidada: Solo USD
-  : `${project.revenueUsd} USD`;
-```
+  try {
+    const stats = await runCompleteSotEtl();
+    console.log('✅ [CRON] ETL completado:', stats);
+  } catch (error) {
+    console.error('❌ [CRON] ETL falló:', error);
+    // TODO: Enviar alerta (email, Slack, etc.)
+  }
+}, {
+  timezone: 'America/Argentina/Buenos_Aires'
+});
 
----
-
-## 🔄 FLUJO COMPLETO: Ejemplo Concreto
-
-### Caso: Warner - Fee Marketing - Septiembre 2025
-
-#### 1. **Datos en Google Sheets** (Hoja "Rendimiento Cliente")
-```
-Cliente  | Proyecto      | Mes        | Año  | Facturación    | Moneda | TC    | Costos
-Warner   | Fee Marketing | Septiembre | 2025 | 42,236,850.00  | ARS    | 1445  | 12,183,422.55
-```
-
-#### 2. **ETL Extracción** (`rendimiento-cliente.ts`)
-```javascript
-const row = [
-  'Warner',           // Cliente
-  'Fee Marketing',    // Proyecto
-  'Septiembre',       // Mes
-  '2025',            // Año
-  '42236850',        // Facturación
-  'ARS',             // Moneda
-  '1445',            // TC
-  '12183422.55',     // Costos
-  ''                 // Pasado/Futuro (VACÍO → aceptar)
-];
-```
-
-#### 3. **ETL Transformación**
-```javascript
-// Paso A: Normalización ANTI×100
-const rawRevenue = 42236850;
-const normalized = normalizeIfOver100(rawRevenue, 'revenue');
-// → 42236850 (no aplica, < 100,000)
-
-// Paso B: Conversión a USD
-const currency = 'ARS';
-const fxRate = 1445;
-const revenueUSD = normalized / fxRate;
-// → 29,230.00 USD
-
-// Paso C: Lo mismo para costos
-const rawCost = 12183422.55;
-const costUSD = rawCost / fxRate;
-// → 8,431.37 USD
-```
-
-#### 4. **ETL Carga** → Tabla `financial_sot`
-```sql
-INSERT INTO financial_sot VALUES (
-  client_name: 'Warner',
-  project_name: 'Fee Marketing',
-  month_key: '2025-09',
-  year: 2025,
-  month: 9,
-  revenue_usd: '29230.00',
-  cost_usd: '8431.37',
-  currency: 'ARS',
-  quotation: '1445.00'
-);
-```
-
-#### 5. **Star Schema ETL** → Tabla `fact_rc_month`
-
-**Paso A: Project Resolver**
-```javascript
-// Match determinístico en dim_project_alias
-const alias = await db.select()
-  .from(dimProjectAlias)
-  .where(and(
-    eq(dimProjectAlias.aliasName, 'Fee Marketing'),
-    eq(dimProjectAlias.clientId, 34) // Warner
-  ));
-// → Encuentra project_id = 127
-```
-
-**Paso B: Inserción en fact_rc_month**
-```sql
-INSERT INTO fact_rc_month VALUES (
-  project_id: 127,
-  client_id: 34,
-  month_key: '2025-09',
-  revenue_native: '42236850.00',
-  revenue_usd: '29230.00',
-  cost_usd: '8431.37',
-  currency: 'ARS',
-  fx_rate: '1445.00',
-  quote_native: '42236850.00'
-);
-```
-
-#### 6. **Agregación** → Tabla `agg_project_month`
-```sql
-INSERT INTO agg_project_month VALUES (
-  project_id: 127,
-  month_key: '2025-09',
-  revenue_usd: 29230.00,
-  cost_usd: 8431.37,
-  profit_usd: 20798.63,  -- 29230 - 8431.37
-  margin_percent: 71.15   -- (20798.63 / 29230) * 100
-);
-```
-
-#### 7. **API Response** → GET `/api/projects/127`
-```json
-{
-  "id": 127,
-  "name": "Fee Marketing",
-  "client": "Warner",
-  "totalRevenue": 233480.00,
-  "totalCost": 78824.71,
-  "profitMargin": 66.25,
-  "monthlyData": [
-    {
-      "period": "2025-01",
-      "revenue": 13450.00,
-      "cost": 7655.65,
-      "profit": 5794.35,
-      "margin": 43.08
-    },
-    // ... ene-ago ...
-    {
-      "period": "2025-09",
-      "revenue": 29230.00,
-      "cost": 8431.37,
-      "profit": 20798.63,
-      "margin": 71.15
-    }
-  ]
+// Nota: Deshabilitado en dev si hay OOM
+if (process.env.NODE_ENV === 'development' && process.env.DISABLE_CRON === 'true') {
+  console.log('⏸️ Cron deshabilitado en desarrollo');
 }
 ```
 
-#### 8. **Frontend Render**
-```typescript
-<MetricsCard
-  revenue={29230}
-  cost={8431.37}
-  profit={20798.63}
-  margin={71.15}
-/>
-
-<MonthlyChart
-  data={[
-    { month: 'Ene', revenue: 13450, cost: 7656 },
-    // ...
-    { month: 'Sep', revenue: 29230, cost: 8431 }
-  ]}
-/>
-```
-
----
-
-## 🛡️ SISTEMAS DE PROTECCIÓN
-
-### 1. ANTI×100 Normalization
-**Ubicación**: `server/utils/number.ts`
-
-**Problema**: Google Sheets a veces envía `4223685000` en lugar de `42236850`
-
-**Solución**:
-```javascript
-if (value > 100_000) {
-  return value / 100; // Autocorrección
-}
-```
-
-**Aplicado en**:
-- Revenue (facturación)
-- Costs (costos)
-- Hours Asana (horas trackeadas)
-
-### 2. Temporal Consistency Guard (TCG)
-**Ubicación**: `server/etl/sot-etl.ts`
-
-**Problema**: Detectar anomalías temporales (ej: costos que caen 90%)
-
-**Solución**:
-```javascript
-const avgLast3Months = (m1.cost + m2.cost + m3.cost) / 3;
-const currentCost = m4.cost;
-
-if (currentCost < avgLast3Months * 0.1) {
-  console.error('⚠️ TCG: Anomalía detectada');
-  // Autocorrección o alerta
-}
-```
-
-### 3. Filtro Pasado/Futuro (FIX APLICADO)
-**Ubicación**: `server/etl/rendimiento-cliente.ts`
-
-**Problema**: Celdas vacías en "Pasado/Futuro" se descartaban erróneamente
-
-**Solución**:
-```javascript
-const statusFlag = row[pasadoFuturoIndex]?.toString().trim();
-const hasPasadoFuturo = statusFlag && statusFlag !== '';
-
-if (hasPasadoFuturo && statusFlag.toLowerCase() !== 'real') {
-  continue; // Solo rechaza si tiene valor Y no es "real"
-}
-// Celdas vacías → se aceptan
-```
-
----
-
-## 📊 INVARIANTES MATEMÁTICOS
-
-El sistema garantiza estas ecuaciones en todo momento:
-
-### 1. Conservación de Valor
-```
-SUM(fact_rc_month.revenue_usd WHERE project_id = X) 
-= 
-agg_project_month.revenue_usd WHERE project_id = X
-```
-
-### 2. Profit Coherence
-```
-profit_usd = revenue_usd - cost_usd
-margin_percent = (profit_usd / revenue_usd) * 100
-```
-
-### 3. Currency Conversion
-```
-revenue_usd = revenue_native / fx_rate  (si currency = ARS)
-revenue_usd = revenue_native            (si currency = USD)
-```
-
----
-
-## 🔍 DEBUGGING Y AUDITORÍA
-
-### Verificar datos de un proyecto
-
-```sql
--- 1. Ver datos raw en financial_sot
-SELECT * FROM financial_sot 
-WHERE project_name = 'Fee Marketing' AND year = 2025
-ORDER BY month_key;
-
--- 2. Ver datos en fact_rc_month (post-resolver)
-SELECT * FROM fact_rc_month
-WHERE project_id = 127
-ORDER BY month_key;
-
--- 3. Ver agregados finales
-SELECT * FROM agg_project_month
-WHERE project_id = 127
-ORDER BY month_key;
-
--- 4. Ver filas no resueltas
-SELECT * FROM rc_unmatched_staging
-WHERE created_at > NOW() - INTERVAL '7 days';
-```
-
-### Logs de ETL
+### Ejecución Manual
 
 ```bash
-# Ver logs del último sync
-tail -f logs/etl-sync.log
+# Comando NPM
+npm run etl:sync
 
-# Buscar errores
-grep "ERROR" logs/etl-sync.log
-
-# Ver estadísticas
-grep "📊 Stats" logs/etl-sync.log
+# Directo con tsx
+npx tsx server/etl/sot-etl.ts
 ```
 
 ---
 
-## 🎯 RESUMEN DEL FLUJO
+## 🧪 CHECKS DE AUDITORÍA (Smoke Tests)
 
+### Check 1: Coherencia RC por período
+
+**Query**:
+```sql
+-- Verificar que quote_native, fx_rate, revenue_usd coincidan con planilla
+SELECT 
+  month_key,
+  project_name,
+  quote_native,
+  fx_rate,
+  revenue_usd,
+  cost_usd
+FROM fact_rc_month
+WHERE project_id = 127  -- Warner Fee Marketing
+  AND month_key BETWEEN '2025-01' AND '2025-09'
+ORDER BY month_key;
 ```
-┌─────────────────────────────────────────────────────┐
-│ GOOGLE SHEETS (Excel MAESTRO)                      │
-│ ┌─────────────────┐  ┌──────────────────┐          │
-│ │ Rendimiento     │  │ Costos directos  │          │
-│ │ Cliente         │  │ e indirectos     │          │
-│ └─────────────────┘  └──────────────────┘          │
-└──────────────┬──────────────────┬───────────────────┘
-               │                  │
-               ▼                  ▼
-┌─────────────────────────────────────────────────────┐
-│ ETL PIPELINE                                        │
-│ ┌──────────────────────┐  ┌──────────────────────┐ │
-│ │ rendimiento-cliente  │  │ sot-etl (Star       │ │
-│ │ - Extrae            │  │  Schema Builder)     │ │
-│ │ - Normaliza ANTI×100│  │ - Project Resolver   │ │
-│ │ - Convierte USD     │  │ - Fact Tables       │ │
-│ └──────────────────────┘  └──────────────────────┘ │
-└──────────────┬──────────────────┬───────────────────┘
-               │                  │
-               ▼                  ▼
-┌─────────────────────────────────────────────────────┐
-│ POSTGRESQL (Star Schema)                            │
-│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
-│ │ financial_sot│ │ fact_rc_month│ │ agg_project_ │ │
-│ │ (raw import) │ │ (normalized) │ │ month        │ │
-│ └──────────────┘ └──────────────┘ └──────────────┘ │
-│ ┌──────────────┐ ┌──────────────┐                  │
-│ │ dim_period   │ │ fact_labor_  │                  │
-│ │              │ │ month        │                  │
-│ └──────────────┘ └──────────────┘                  │
-└──────────────┬──────────────────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────────────────┐
-│ EXPRESS API (Backend)                               │
-│ ┌──────────────────────────────────────────────┐   │
-│ │ view-aggregator.ts                           │   │
-│ │ - Ensambla ViewModels                        │   │
-│ │ - Calcula KPIs                               │   │
-│ │ - Aplica filtros temporales                  │   │
-│ └──────────────────────────────────────────────┘   │
-└──────────────┬──────────────────────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────────────────────┐
-│ REACT FRONTEND                                      │
-│ ┌──────────────────────────────────────────────┐   │
-│ │ TanStack Query                               │   │
-│ │ - Fetch /api/projects/:id                    │   │
-│ │ - Cache & Invalidation                       │   │
-│ │ - Optimistic Updates                         │   │
-│ └──────────────────────────────────────────────┘   │
-│ ┌──────────────────────────────────────────────┐   │
-│ │ Components                                   │   │
-│ │ - MetricsCard                                │   │
-│ │ - MonthlyChart (Recharts)                    │   │
-│ │ - TeamTable                                  │   │
-│ └──────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
+
+**Valores esperados (Warner Fee Marketing)**:
+| Mes | quote_native (ARS) | fx_rate | revenue_usd | cost_usd |
+|-----|-------------------|---------|-------------|----------|
+| 2025-01 | ? | 1220 | 13,450 | 7,655.65 |
+| 2025-05 | 34,591,400 | 1180 | 29,230 | 11,424.89 |
+| 2025-09 | 42,236,850 | 1445 | 29,230 | 8,431.37 |
+
+### Check 2: Coherencia Labor vs RC Cost
+
+**Query**:
+```sql
+-- Comparar totales de labor vs RC por mes
+WITH labor_totals AS (
+  SELECT 
+    project_id,
+    month_key,
+    SUM(cost_usd) as labor_cost_usd
+  FROM fact_labor_month
+  GROUP BY project_id, month_key
+),
+rc_totals AS (
+  SELECT
+    project_id,
+    month_key,
+    cost_usd as rc_cost_usd
+  FROM fact_rc_month
+)
+SELECT
+  l.project_id,
+  l.month_key,
+  l.labor_cost_usd,
+  r.rc_cost_usd,
+  ABS(l.labor_cost_usd - r.rc_cost_usd) as delta,
+  ROUND((ABS(l.labor_cost_usd - r.rc_cost_usd) / NULLIF(r.rc_cost_usd, 0)) * 100, 2) as delta_percent
+FROM labor_totals l
+INNER JOIN rc_totals r ON l.project_id = r.project_id AND l.month_key = r.month_key
+WHERE ABS(l.labor_cost_usd - r.rc_cost_usd) / NULLIF(r.rc_cost_usd, 0) > 0.05  -- Delta > 5%
+ORDER BY delta_percent DESC;
 ```
+
+**Criterio**: `Δ ≤ 5%` es aceptable (discrepancia entre pestañas de Excel)
+
+**Warner Ago 2025**: Δ = $42.01 USD (0.6%) → ✅ Dentro del rango
+
+### Check 3: Team Breakdown Coherencia
+
+**Query**:
+```sql
+-- Verificar: cost_ars ≈ hours_billing × hourly_rate_ars
+SELECT
+  person_name,
+  hours_billing,
+  hourly_rate_ars,
+  cost_ars,
+  (hours_billing * hourly_rate_ars) as cost_calculated,
+  ABS(cost_ars - (hours_billing * hourly_rate_ars)) as delta
+FROM fact_labor_month
+WHERE project_id = 127 AND month_key = '2025-09'
+  AND ABS(cost_ars - (hours_billing * hourly_rate_ars)) > 0.1  -- Δ > 0.1 ARS
+ORDER BY delta DESC;
+```
+
+**Criterio**: `Δ ≤ 0.1 ARS` (tolerancia por redondeo)
+
+### Check 4: Flags ANTI×100
+
+**Query**:
+```sql
+-- Verificar que horas billing < 500 (sin anti×100)
+SELECT
+  project_id,
+  month_key,
+  person_name,
+  hours_billing,
+  anti_x100_hours
+FROM fact_labor_month
+WHERE hours_billing > 500 AND anti_x100_hours = FALSE;
+-- Si retorna filas → ⚠️ Falló normalización
+```
+
+**Query**:
+```sql
+-- Verificar costos ARS no anómalos
+SELECT
+  project_id,
+  month_key,
+  person_name,
+  cost_ars,
+  anti_x100_cost
+FROM fact_labor_month
+WHERE cost_ars > 100000000 AND anti_x100_cost = FALSE;
+-- Si retorna filas → ⚠️ Falló normalización
+```
+
+### Check 5: Aliases sin filas colgadas
+
+**Query**:
+```sql
+-- Verificar que no haya unmatched recientes
+SELECT
+  client_name_raw,
+  project_name_raw,
+  month_key,
+  revenue_usd,
+  reason,
+  created_at
+FROM rc_unmatched_staging
+WHERE created_at > NOW() - INTERVAL '7 days'
+ORDER BY created_at DESC;
+```
+
+**Acción**: Si hay filas, crear aliases manualmente o ajustar umbral fuzzy.
 
 ---
 
-## 📝 NOTAS IMPORTANTES
+## 📌 OBSERVACIONES ESPECÍFICAS: Warner 2025
 
-1. **Separación Semántica**:
-   - `quotation` (financial_sot) = Tipo de cambio FX
-   - `quote_native` (fact_rc_month) = Precio de cotización del proyecto
+### Datos Verificados (Ene-Sep 2025)
 
-2. **Project Resolver es crítico**:
-   - Sin match → datos van a `rc_unmatched_staging`
-   - Con match → datos van a `fact_rc_month`
+**Fee Marketing**:
+- ✅ Enero-Abril: Presentes tras fix "Pasado/Futuro"
+- ✅ Mayo-Agosto: Coincidencia perfecta con planilla
+- ✅ Septiembre: Corregido manualmente (división ×1000)
 
-3. **ANTI×100 se aplica en 3 lugares**:
-   - Revenue en rendimiento-cliente.ts
-   - Cost en rendimiento-cliente.ts
-   - Hours Asana en sot-etl.ts
+**Fee Insights**:
+- ✅ Septiembre: Único mes con datos
 
-4. **El fix de "Pasado/Futuro"**:
-   - Celdas vacías = proyectos confirmados
-   - Solo rechaza si tiene valor Y no es "real"
+### Discrepancias Permitidas
 
-5. **ETL corre automáticamente**:
-   - Cron job diario a las 3 AM
-   - También manual con `npm run etl:sync`
+**Agosto 2025 (Warner Fee Marketing)**:
+- Labor cost: $7,047.21 USD
+- RC cost: $7,005.20 USD
+- **Delta**: $42.01 USD (0.6%)
+- **Razón**: Discrepancia real entre pestañas "Costos directos" y "Rendimiento Cliente"
+- **Status**: ✅ Permitida (< 1%)
+
+### Números Exactos Esperados
+
+**Septiembre 2025**:
+| Proyecto | Revenue USD | Cost USD | FX Rate | Quote Native ARS |
+|----------|-------------|----------|---------|------------------|
+| Fee Marketing | 29,230.00 | 8,431.37 | 1,445 | 42,236,850 |
+| Fee Insights | 7,580.00 | 383.91 | 1,445 | 10,953,100 |
+
+**Query de validación**:
+```sql
+SELECT
+  project_name,
+  ROUND(revenue_usd::numeric, 2) as revenue,
+  ROUND(cost_usd::numeric, 2) as cost,
+  ROUND(fx_rate::numeric, 2) as fx,
+  ROUND(quote_native::numeric, 2) as quote
+FROM fact_rc_month
+WHERE client_id = (SELECT id FROM clients WHERE name ILIKE '%warner%')
+  AND month_key = '2025-09'
+ORDER BY project_name;
+```
 
 ---
 
 ## 🚀 PRÓXIMOS PASOS RECOMENDADOS
 
-1. **Monitoreo de valores status**:
-   - Agregar logs de todos los valores únicos de "Pasado/Futuro"
-   - Crear allow-list si aparecen nuevos valores válidos
+### 1. Monitoreo de Status Values (RC)
 
-2. **Mejoras al Project Resolver**:
-   - Dashboard de auditoría para `rc_unmatched_staging`
-   - UI para crear aliases manualmente
+**Implementación**:
+```javascript
+// En rendimiento-cliente.ts
+const uniqueStatuses = new Set();
 
-3. **Temporal Consistency Guard**:
-   - Implementar alertas automáticas
-   - Dashboard de anomalías detectadas
+for (const row of rows) {
+  const status = row[pasadoFuturoIndex]?.toString().trim();
+  if (status) uniqueStatuses.add(status);
+}
 
-4. **Performance**:
-   - Índices en month_key para queries más rápidas
-   - Materializar vistas frecuentes
+console.log('📊 Valores únicos de "Pasado/Futuro":', Array.from(uniqueStatuses));
+```
+
+**Acción**: Si aparecen valores como "Realizado", "Confirmado", etc. → crear allow-list.
+
+### 2. Dashboard de Auditoría (Unmatched)
+
+**Features**:
+- Vista de `rc_unmatched_staging` con filtros
+- Botón "Crear alias manualmente"
+- Gráfico de % de rows resueltas vs no resueltas
+
+### 3. Temporal Consistency Guard (Alertas)
+
+**Implementación**:
+```javascript
+// Detectar caídas anormales de costo
+const avg3months = (m1.cost + m2.cost + m3.cost) / 3;
+const currentCost = m4.cost;
+
+if (currentCost < avg3months * 0.1) {
+  // Alerta Slack/Email
+  await sendAlert({
+    type: 'cost_anomaly',
+    project: projectName,
+    month: m4.monthKey,
+    expected: avg3months,
+    actual: currentCost,
+    delta: ((avg3months - currentCost) / avg3months) * 100
+  });
+}
+```
+
+### 4. Índices de Performance
+
+```sql
+-- Optimización de queries frecuentes
+CREATE INDEX idx_apm_period_range ON agg_project_month(month_key)
+  WHERE month_key >= '2025-01';
+
+CREATE INDEX idx_flm_composite ON fact_labor_month(project_id, month_key)
+  INCLUDE (cost_usd, hours_billing);
+
+CREATE INDEX idx_frcm_composite ON fact_rc_month(project_id, month_key)
+  INCLUDE (revenue_usd, cost_usd);
+```
+
+### 5. Materialización de Vistas Frecuentes
+
+```sql
+-- Vista materializada para dashboard ejecutivo
+CREATE MATERIALIZED VIEW mv_executive_dashboard AS
+SELECT
+  DATE_TRUNC('month', month_key::date) as month,
+  SUM(revenue_usd) as total_revenue,
+  SUM(cost_usd_rc) as total_cost,
+  SUM(profit_usd) as total_profit,
+  AVG(margin_percent) as avg_margin,
+  COUNT(DISTINCT project_id) as active_projects
+FROM agg_project_month
+GROUP BY DATE_TRUNC('month', month_key::date);
+
+-- Refresh diario (después del ETL)
+REFRESH MATERIALIZED VIEW mv_executive_dashboard;
+```
 
 ---
 
-**Fecha**: Octubre 2025  
-**Versión**: 2.0  
-**Última actualización**: Fix "Pasado/Futuro" aplicado
+## 📝 RESUMEN EJECUTIVO
+
+### Flujo de Datos en 3 Pasos
+
+1. **Extract**: Google Sheets → Raw data con `UNFORMATTED_VALUE`
+2. **Transform**: ANTI×100 + Conversión USD + Project Resolver → Datos normalizados
+3. **Load**: Star Schema SoT → `fact_*` + `agg_*` → API ViewModels → Frontend
+
+### Garantías del Sistema
+
+- ✅ **Invariante matemático**: `SUM(fact_rc_month.revenue) = agg_project_month.revenue`
+- ✅ **Separación semántica**: `fx_rate` (cambio) ≠ `quote_native` (presupuesto)
+- ✅ **Auditoría completa**: Flags ANTI×100 + Unmatched staging
+- ✅ **Coherencia temporal**: Labor cost vs RC cost Δ < 5%
+- ✅ **Auto-aprendizaje**: Project Resolver persiste aliases
+
+### Fuentes de Verdad
+
+| Capa | Propósito | Consumidores |
+|------|-----------|--------------|
+| Google Sheets | Origen de datos | ETL únicamente |
+| `financial_sot` | Staging temporal | ETL interno |
+| `fact_*` tables | Source of Truth | Agregaciones |
+| `agg_*` tables | KPIs precalculados | API + Frontend |
+
+**Regla de oro**: El frontend NUNCA lee `financial_sot`, solo ViewModels desde `agg_project_month`.
+
+---
+
+**Versión**: 3.0 (Post-corrección técnica)  
+**Última actualización**: Octubre 2025  
+**Cambios aplicados**:
+- Fix FK constraints (dim_*_alias → clients.id)
+- Corrección filtro "Pasado/Futuro" (celdas vacías)
+- Documentación de flags ANTI×100
+- Fórmulas canónicas de KPIs
+- Checks de auditoría SQL

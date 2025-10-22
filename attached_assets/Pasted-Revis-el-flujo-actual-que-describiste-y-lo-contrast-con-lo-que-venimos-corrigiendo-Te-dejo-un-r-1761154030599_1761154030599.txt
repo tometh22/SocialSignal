@@ -1,0 +1,79 @@
+Revisé el “flujo actual” que describiste y lo contrasté con lo que venimos corrigiendo. Te dejo un review honesto + ajustes concretos para que el documento quede 100% alineado con la arquitectura SoT vigente.
+✅ Qué está bien en tu descripción
+Origen de datos (Google Sheets): las hojas clave son correctas.
+Rendimiento Cliente → ingresos/costos/FX por mes
+Costos directos e indirectos → horas, valor hora, costos por persona
+(Opcional/aux) Proyectos / “Ventas Tomi” → referencia para universo de proyectos
+Extracción: usar UNFORMATTED_VALUE + SERIAL_NUMBER es imprescindible (lo tenemos aplicado).
+Normalización:
+Separación quote_native (precio del proyecto) vs fx_rate (tipo de cambio) ✔
+ANTI×100 para horas/costos anómalos ✔
+Capa SoT:
+fact_labor_month (por persona/mes) ✔
+fact_rc_month (financiero mensual por proyecto) con quote_native + fx_rate ✔
+agg_project_month (agregados y KPIs) ✔
+Project Resolver / Aliases: ya corregimos FKs para que los alias apunten a clients.id (no active_projects). ✔
+API: view-aggregator ahora lee directo del SoT y es la fuente de verdad para /complete-data. ✔
+⚠️ Cosas a ajustar en la doc (y por qué)
+Filtro “Pasado/Futuro”
+Tu texto dice: “si celda vacía → acepta; si dice Real → acepta; si otra cosa → rechaza”.
+👉 Recomendación: documentalo como criterio de inclusión de RC (Rendimiento Cliente). En Costos directos no se filtra por ese campo. Y si existe una columna distinta (p. ej. “confirmado/estimado”), nómbrala exacto para evitar ambigüedad.
+Reglas ANTI×100 (deja explícito el umbral)
+Horas: si billing_hours > 500 → ÷100
+Costos ARS (por persona): si cost_ars_persona > 1_000_000 * 100 por patrón obvio → ÷100
+Documentá que se marcan flags (anti_x100_hours, anti_x100_cost) para auditoría.
+Conversión USD
+Fórmula canónica en SoT:
+cost_usd = cost_ars / fx_rate
+revenue_usd viene de RC (si está en ARS, lo convertimos con fx_rate)
+Importante: no mezclar monedas en “operativa”: siempre usar una sola vista (USD o ARS nativa del proyecto) y documentar la elección.
+Capas “financial_sot” vs SoT
+Si mantenés una staging/raw (ej. financial_sot), aclará que es buffer de lectura, pero la fuente de verdad para la app son fact_* + agg_*.
+Evitar sugerir que el front lee financial_sot.
+Project Resolver
+Orden real de resolución (dejar en doc):
+alias exacto (tabla dim_project_alias)
+alias de cliente + proyecto
+fuzzy match con umbral (p. ej. 0.85)
+si se resuelve, persistir alias normalizado (para que la próxima sea exacto)
+Aclará que client alias (dim_client_alias) y project alias referencian a clients.id.
+Cache & Cron
+Cron Diario: ok, pero anotalo como “habilitado en producción; deshabilitado en dev si hay OOM”.
+React Query: importante dejar explícito que el cache key incluye [projectId, view, period] y se usa placeholderData: undefined para evitar contaminación de estados.
+KPIs en la vista operativa
+Documentá fórmulas usadas realmente por la API:
+markup = revenue / cost (si cost>0)
+margin = 1 - (cost / revenue) (si revenue>0)
+budgetUtilization = cost_native / quote_native (usa quote_native, no FX)
+🔁 “Flujo SoT” — versión precisa y concisa
+Extract (Google Sheets)
+Sheets leídas con valueRenderOption=UNFORMATTED_VALUE, dateTimeRenderOption=SERIAL_NUMBER.
+Pestañas: Costos directos e indirectos, Rendimiento Cliente.
+Transform
+Parse numérico robusto (coma/punto, miles).
+ANTI×100 (horas/costos), con flags.
+Cálculo de total_ars_persona = billing_hours × hourly_rate_ars.
+En RC: poblar
+quote_native (precio mensual del proyecto, p. ej. 8,450 / 29,230 / 7,550)
+fx_rate (p. ej. 1,180 / 1,215 / 1,320 / 1,345 / 1,445)
+revenue_usd|ars y cost_usd|ars.
+Load (SoT)
+fact_labor_month (por persona, proyecto, período): horas target|asana|billing, hourly_rate_ars, cost_ars|usd, fx, flags.
+fact_rc_month (por proyecto, período): quote_native, fx_rate, revenue_usd|ars, cost_usd|ars.
+agg_project_month: sumatorias + KPIs + bandera de coherencia labor_vs_rc_cost_mismatch.
+API / View
+GET /api/projects/:id/complete-data?view=operativa&period=YYYY-MM
+view-aggregator lee SoT → arma summary, quotation, actuals.teamBreakdown.
+Sin hotfixes (ya removidos).
+🧪 Checks rápidos que deben venir en el doc (para auditar)
+RC por período (coincide con planilla): quote_native, fx_rate, revenue_usd, cost_usd|ars.
+Labor totales vs RC cost: Σ fact_labor_month.cost_usd ≈ fact_rc_month.cost_usd (Δ ≤ 0.05).
+Team breakdown: cost_ars_persona ≈ hours_billing × hourly_rate_ars (Δ ≤ 0.1 ARS).
+Horas: hours_billing < 500 por persona (si no, anti_x100_hours).
+Aliases: sin filas colgadas; si hay, van a *_unmatched_staging para revisión.
+📌 Observaciones puntuales de Warner (para que queden documentadas)
+Mayo–Septiembre 2025: coincidencia perfecta con la planilla (revenue, costs, FX).
+Enero–Abril 2025: si querés que aparezcan en RC, asegurate de que estén en Rendimiento Cliente con el mismo alias de proyecto y cliente (sino, alias).
+Delta agosto (Warner): ~$42.01 entre Labor vs RC → discrepancia real entre pestañas; dejar asentado como “permitida” (<1%).
+Siguiente paso
+Si querés, pego esta versión corregida como texto listo para tu FLUJO_DE_DATOS_COMPLETO.md (o te lo doy en bullets para anexar). Y cuando me pases FEB/2025 de Warner, te digo los números exactos esperados + las queries de smoke para que lo cotejes en la app.
