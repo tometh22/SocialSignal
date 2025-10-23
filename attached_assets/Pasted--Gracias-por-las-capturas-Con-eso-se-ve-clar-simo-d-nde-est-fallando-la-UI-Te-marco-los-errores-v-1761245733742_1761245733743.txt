@@ -1,0 +1,48 @@
+¡Gracias por las capturas! Con eso se ve clarísimo dónde está fallando la UI. Te marco los errores visibles (y la causa probable) comparando con tu Excel “Costos directos e indirectos” (cols K–L–N–O–P–Q) para junio:
+Qué está mal en la app (Equipo ▸ Análisis detallado por miembro)
+Horas en 0.0h para todos
+En la tabla aparecen 0.0h / 70.0h, 0.0h / 40.0h, etc.
+Pero en tus tarjetas/scorecards del mismo período se muestran horas no-cero (ej: Vanu Lanza 19.67h / 40h, Sol Ayala 10.08h / 100h, Trini 7.33h / 100h), y en el Excel (col. L) también.
+Causa: ese componente está leyendo hoursBilling (o hoursWorked normalizadas) en vez de hoursAsana para “progreso”, o está filtrando por la columna/mes equivocado.
+Síntoma asociado: todos quedan con estado “Sin Actividad” aunque sí tuvieron actividad.
+Costo “actual” ridículamente bajo y presup = actual
+Ej: Aylen Tamer muestra $76.54 con “Presup: $76.54” y desvío -100%.
+Con tu Excel: costo ARS = Valor Hora (N) × Horas Asana (L) y luego a USD con FX (Q). Para Aylen en junio (del Excel) debería dar un orden de magnitud muy superior (cientos, no decenas).
+Causa: el cálculo de costo actual en la tabla está usando (valor hora ÷ FX) sin multiplicar por horas, o está multiplicando por 1h.
+Causa 2 (presupuesto): “Presup” debería ser Valor Hora × Horas Objetivo (K) (y luego a USD si corresponde). Está usando la misma fórmula que el actual o sólo el rate.
+Inconsistencia dentro de la misma vista
+Las tarjetas de “Eficiencia/Impacto/Unificado” y la vista “Detalle por miembro (barras violeta)” sí reflejan las horas de Asana del Excel (ej: Vanu 19.67h, Sol 10.08h, Trini 7.33h).
+La tabla de “Análisis detallado por miembro” muestra todo en 0h y costos mal.
+Causa: dos componentes distintos están consumiendo fuentes distintas del ViewModel:
+Tarjetas/barras: usan actuals.hoursAsana y targetHours. ✅
+Tabla: usa hoursBilling y un costo mal armado (o una ruta legacy del aggregator). ❌
+Estado “Sin objetivo” / conteos
+Pie de página marca “Sin objetivo: 1”; eso está bien (en junio Tomi Facio tiene 0h objetivo en tu Excel).
+Pero se informa “Sin actividad” para todos aunque varios tienen horas; vuelve a apuntar al uso de hoursBilling=0 en vez de hoursAsana.
+Qué debería mostrar (reglas canónicas desde el Excel)
+Para cada persona y mes:
+Objetivo (tabla HORAS) = Col K (“Cantidad de horas objetivo”).
+Progreso (Asana) = Col L (“Cantidad de horas reales Asana”).
+Horas para facturación (si querés esa columna) = Col M.
+Costo ARS (actual) = Valor Hora (N) × Horas Asana (L).
+Costo USD (actual) = Costo ARS / FX (Q).
+Presupuesto ARS = Valor Hora (N) × Horas Objetivo (K).
+Presupuesto USD = Presupuesto ARS / FX (Q).
+(Esto es exactamente lo que ya usa tu ETL SoT; el fallo está en cómo la tabla arma/lee el ViewModel).
+Fix concreto (rápido y seguro)
+Tabla “Análisis detallado por miembro”
+Cambiar fuente de datos a view.actuals.teamBreakdown[].
+Usar hoursAsana para progreso y targetHours para objetivo.
+Estado “Sin actividad” si hoursAsana > 0 ? "Con Actividad" : "Sin Actividad".
+Cálculo de costos en la tabla
+Actual USD = (hourlyRateARS * hoursAsana) / fxRate.
+Presupuesto USD = (hourlyRateARS * targetHours) / fxRate.
+Mostrar también ARS (opcional) con el numerador antes de dividir por FX.
+Evitar “mezclas” de fuentes
+Deshabilitar el path legacy que trae hoursBilling para este componente.
+Asegurar el mismo período/ID de proyecto en la query que usa la tabla que en las tarjetas (parece correcto porque las tarjetas muestran junio).
+Chequeo rápido (regresión visual)
+Vanu Lanza (junio): 40h objetivo / 19.67h Asana, costo USD ≈ (rateARS × 19.67) / 1215.
+Sol Ayala (junio): 100h objetivo / 10.08h Asana, idem fórmula.
+Trini (junio): 100h objetivo / 7.33h Asana.
+Estados deben pasar a “Con Actividad” para esas personas.
