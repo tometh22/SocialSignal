@@ -11,9 +11,11 @@ import { AlertTriangle, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from "lu
 interface TeamMember {
   name: string;
   roleName: string;
-  hours: number;
+  hoursAsana: number;
+  hoursBilling: number;
   targetHours: number;
   hourlyRateARS?: number;
+  fx?: number;
   costARS?: number;
   costUSD?: number;
 }
@@ -95,7 +97,7 @@ function useTeamData({
   // 🎯 CONVERTIR teamBreakdown a Deviation[] si está inyectado
   if (injected?.teamBreakdown && injected.teamBreakdown.length > 0) {
     const deviations: Deviation[] = injected.teamBreakdown.map((member, index) => {
-      const actualHours = member.hours || 0;
+      const actualHours = member.hoursAsana || 0;
       const budgetedHours = member.targetHours || 0;
       const actualCost = member.costUSD || 0;
       const budgetedCost = budgetedHours > 0 && actualHours > 0 
