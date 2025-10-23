@@ -1,0 +1,41 @@
+✅ Lo que está perfecto
+Pestañas y campos: mapeo correcto de “Rendimiento Cliente” y “Costos directos e indirectos” (K/L/M/N/Q) → fact_rc_month y fact_labor_month.
+Separación semántica: fx_rate (tipo de cambio) ≠ quote_native (presupuesto/cotización). ✔️
+Fórmula canónica por persona:
+cost_usd = (hourly_rate_ars × hours_asana) / fx_rate. ✔️
+Invariantes: suma de costos persona ≈ costo RC (tolerancia chica). ✔️
+Flujo: Sheets → ETL SoT → DB (facts) → API → Frontend. ✔️
+🔧 Dos ajustes que te sugiero
+KPI “Presupuesto usado”
+Lo pones como:
+(cost_usd × fx_rate / quote_native) × 100
+Eso está bien siempre que quote_native esté en ARS. Para proyectos nativos en USD debe evitarse reconversión:
+Si currency_native = "ARS" → %budget = (cost_usd × fx_rate) / quote_native.
+Si currency_native = "USD" → %budget = cost_usd / quote_native.
+(En la práctica ya lo resolvemos detectando la moneda nativa; vale dejarlo explícito en la doc.)
+Horas mostradas en la UI (tabla de miembros)
+En varias vistas vimos horas en 0.0h con “Sin Actividad” aunque en Excel (col L) sí hay actividad. La doc es correcta; el bug está en la UI que lee hoursBilling o una ruta legacy en lugar de hoursAsana (y usa mal el costo). Añadí esto como pitfall en la sección Frontend:
+“Progreso” = hoursAsana
+“Objetivo” = targetHours
+“Costo actual” (USD) = (hourlyRateARS × hoursAsana) / fxRate
+“Presupuesto” (USD) = (hourlyRateARS × targetHours) / fxRate (o en ARS antes de dividir, si la tarjeta muestra ARS)
+🧪 Checks rápidos (deberían pasar siempre)
+Check 1 – Totales por mes (Warner junio):
+ΣhoursAsana (UI) = suma col L (Excel).
+Costo USD (UI) ≈ Σ(N×L)/Q (Excel) ± 0,01.
+Revenue USD (UI) = fact_rc_month.revenue_usd (planilla “Rendimiento Cliente”).
+Check 2 – Por persona (Warner junio): para Vanu Lanza, Sol Ayala, Trini
+Objetivo = col K
+Asana = col L
+Facturación = col M (si se muestra)
+Costo ARS = N×L
+Costo USD = (N×L)/Q
+Check 3 – Presupuesto usado
+Si nativo ARS: (ΣN×L)/quote_native usando FX del período.
+Si nativo USD: Σ(N×L)/Q / quote_native.
+🧭 Próximo paso concreto
+UI fix (componente “Análisis detallado por miembro”):
+Cambiar fuente a view.actuals.teamBreakdown.
+Usar hoursAsana y targetHours para la barra.
+Recalcular costo actual/presupuesto con la fórmula canónica.
+Quitar fallback legacy que trae hoursBilling.
