@@ -78,7 +78,7 @@ export default function PerformanceTab() {
                   <div className="text-center">
                     <div className="text-sm text-gray-500">Horas</div>
                     <div className="font-medium" data-testid={`text-performance-hours-${member.personnelId}`}>
-                      {member.totalHours?.toFixed(1) || 0}h
+                      {member.actualHours?.toFixed(1) || 0}h
                     </div>
                   </div>
 
