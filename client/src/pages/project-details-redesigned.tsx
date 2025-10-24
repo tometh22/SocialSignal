@@ -3296,6 +3296,11 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="team-analysis" className="space-y-6">
             {/* Análisis operativo del equipo */}
+            {(() => {
+              console.log('✅ TAB EQUIPO CARGADO - project-details-redesigned.tsx');
+              console.log('📊 projectVM.teamBreakdown:', projectVM?.teamBreakdown);
+              return null;
+            })()}
             <div className="space-y-6">
               
               {/* Resumen de Métricas Clave */}
@@ -3312,7 +3317,7 @@ const ProjectDetailsPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
                     {/* Miembros Activos */}
                     <div className="text-center p-4 bg-white rounded-xl border border-blue-100 shadow-sm">
                       <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
@@ -3377,6 +3382,24 @@ const ProjectDetailsPage = () => {
                       </div>
                       <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
                       <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
+                    </div>
+
+                    {/* Costo Real del Equipo en ARS */}
+                    <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
+                        <DollarSign className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-orange-600 mb-1">
+                        {(() => {
+                          const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
+                            return sum + (member.costARS || 0);
+                          }, 0) || 0;
+                          console.log('💰 Costo total ARS calculado:', totalARS);
+                          return formatCurrency(totalARS, 'ARS');
+                        })()}
+                      </div>
+                      <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
+                      <div className="text-xs text-gray-500 mt-1">pesos argentinos</div>
                     </div>
                   </div>
                 </CardContent>
