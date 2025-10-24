@@ -101,12 +101,11 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-500">No hay suficientes datos para mostrar tendencias</p>
-            <p className="text-sm text-gray-400 mt-1">
-              Los gráficos aparecerán cuando haya más registros de tiempo
-            </p>
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <Activity className="h-12 w-12 text-gray-400 mb-3" />
+            <p className="text-base font-medium text-gray-700 mb-1">Sin datos de tendencias</p>
+            <p className="text-sm text-gray-500">No hay suficientes registros de tiempo para generar gráficos</p>
+            <p className="text-xs text-gray-400 mt-2">Se necesitan múltiples períodos con actividad para análisis de tendencias</p>
           </div>
         </CardContent>
       </Card>
