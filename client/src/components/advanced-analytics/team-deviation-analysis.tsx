@@ -409,8 +409,11 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter, teamB
 
   if (!deviationData.deviations || deviationData.deviations.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        <p className="text-sm">No hay datos de desviación para el período seleccionado</p>
+      <div className="flex flex-col items-center justify-center py-12 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+        <AlertTriangle className="h-12 w-12 text-gray-400 mb-3" />
+        <p className="text-base font-medium text-gray-700 mb-1">Sin datos de equipo</p>
+        <p className="text-sm text-gray-500">No hay registros de horas o costos para el período seleccionado</p>
+        <p className="text-xs text-gray-400 mt-2">Verifica que el Excel MAESTRO tenga datos para este proyecto y período</p>
       </div>
     );
   }
