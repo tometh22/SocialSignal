@@ -60,6 +60,32 @@ app.use(
   })
 );
 
+// Auth check endpoint - CRITICAL FOR FRONTEND
+app.get('/auth/check', (req: Request, res: Response) => {
+  const userId = req.session?.userId;
+  
+  console.log(`🔍 Auth check: Session ID = ${req.sessionID}, User ID = ${userId}`);
+  
+  if (userId) {
+    res.json({
+      authenticated: true,
+      user: { email: userId }
+    });
+  } else {
+    // Auto-authenticate in development
+    req.session.userId = 'demo@epical.digital';
+    req.session.save((err) => {
+      if (err) {
+        console.error('Error saving session:', err);
+      }
+    });
+    res.json({
+      authenticated: true,
+      user: { email: 'demo@epical.digital' }
+    });
+  }
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
