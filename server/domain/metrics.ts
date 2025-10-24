@@ -35,6 +35,7 @@ export interface PeriodMetrics {
     totalHours: number;
     efficiencyPct: number;
     teamCostUSD: number;
+    teamCostARS: number;
     revenueUSD: number;
     markupUSD: number;
     emptyStates: {
@@ -59,6 +60,7 @@ export interface PersonMetrics {
   role: string;
   actualHours: number;
   actualCost: number;
+  actualCostARS: number;
   targetHours: number;
   budgetCost: number;
   efficiency: number;
@@ -177,6 +179,7 @@ export async function computeProjectPeriodMetrics(
   const sumL = totalActualHours > 0 ? totalActualHours : Object.values(personGroups).reduce((sum, p) => sum + p.actualHours, 0);
   const efficiency = sumK > 0 ? (sumL / sumK * 100) : 70;
   const teamCost = Object.values(personGroups).reduce((sum, p) => sum + p.actualCost, 0);
+  const teamCostARS = Object.values(personGroups).reduce((sum, p) => sum + p.actualCostARS, 0);
   
   // 7. FIXED: Get revenue using same strategy as project list - search by project name
   let revenueUSD = 0;
@@ -218,7 +221,7 @@ export async function computeProjectPeriodMetrics(
       
       // Calculate revenue from filtered sales
       revenueUSD = filteredSales.reduce((sum, sale) => {
-        const montoUSD = parseFloat(sale.amountUsd) || 0;
+        const montoUSD = parseFloat(sale.amountUsd || '0') || 0;
         console.log(`💰 Sale entry: ${montoUSD} USD, confirmed: ${sale.confirmed}`);
         return sum + montoUSD;
       }, 0);
@@ -272,6 +275,7 @@ export async function computeProjectPeriodMetrics(
       totalHours: sumL,
       efficiencyPct: Math.round(efficiency * 100) / 100,
       teamCostUSD: Math.round(teamCost * 100) / 100,
+      teamCostARS: Math.round(teamCostARS * 100) / 100,
       revenueUSD: Math.round(revenueUSD * 100) / 100,
       markupUSD: Math.round(markupUSD * 100) / 100,
       emptyStates,
@@ -342,6 +346,7 @@ function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC
         role: 'From Excel MAESTRO',
         actualHours: 0,
         actualCost: 0,
+        actualCostARS: 0,
         targetHours: 0,
         budgetCost: 0,
         efficiency: 0,
@@ -365,12 +370,16 @@ function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC
     // rateUSD = Valor_Hora_ARS / fxForRow(rng, row)
     const rate = rateUSD(timeRange, row);
     
+    // rateARS = Valor_Hora_ARS (columna N del Excel MAESTRO)
+    const rateARS = parseDec(row.valorHoraARS || row.N || row.hourlyRateARS || 0);
+    
     // budgetUSD += K_row * rateUSD
     person.budgetCost += K * rate;
     
     // actualUSD += (basis==='ECON' ? M_row : L_row) * rateUSD OR montoTotalUSD if present
     const hoursForCost = basis === 'ECON' ? M : L;
     const directCost = parseDec(row.montoTotalUSD || 0);
+    const directCostARS = parseDec(row.montoTotalARS || row.O || row.costARS || 0);
     
     if (directCost > 0 && basis === 'ECON') {
       // Usar el monto directo del Excel MAESTRO (suma row-by-row)
@@ -378,6 +387,14 @@ function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC
     } else {
       // Calcular basado en horas × rate (suma row-by-row)
       person.actualCost += hoursForCost * rate;
+    }
+    
+    // 🎯 COSTO EN ARS: Usar monto directo o calcular L × rateARS
+    if (directCostARS > 0) {
+      person.actualCostARS += directCostARS;
+    } else {
+      // Fórmula del Excel MAESTRO: Costo ARS = L (horasRealesAsana) × N (Valor_Hora_ARS)
+      person.actualCostARS += L * rateARS;
     }
   });
   
