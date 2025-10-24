@@ -41,17 +41,21 @@ app.use(cors({
 }));
 
 // Configuración de la sesión - Compatible con Replit webview y pestañas externas
+const isProduction = process.env.NODE_ENV === 'production';
+const isReplit = process.env.REPL_ID !== undefined;
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'tu-clave-secreta-muy-segura',
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true, // Crear sesión automáticamente en primera visita
     cookie: {
-      secure: false, // Cambiar a true en producción con HTTPS
-      httpOnly: false, // IMPORTANTE: false para que sea accesible desde el frontend
-      sameSite: 'lax', // Compatible con Replit tanto en webview como en pestañas externas
+      secure: isReplit, // true en Replit (usa HTTPS), false en local
+      httpOnly: false, // false para que sea accesible desde el frontend si es necesario
+      sameSite: isReplit ? 'none' : 'lax', // 'none' para cross-origin en Replit, 'lax' en local
       maxAge: 24 * 60 * 60 * 1000, // 24 horas
-      path: '/' // Asegurar que la cookie esté disponible en todas las rutas
+      path: '/', // Cookie disponible en todas las rutas
+      domain: undefined // Auto-detectar el dominio
     }
   })
 );
