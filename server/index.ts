@@ -40,7 +40,7 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Configuración de la sesión
+// Configuración de la sesión - Compatible con Replit webview y pestañas externas
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'tu-clave-secreta-muy-segura',
@@ -49,7 +49,9 @@ app.use(
     cookie: {
       secure: false, // Cambiar a true en producción con HTTPS
       httpOnly: false, // IMPORTANTE: false para que sea accesible desde el frontend
-      maxAge: 24 * 60 * 60 * 1000 // 24 horas
+      sameSite: 'lax', // Compatible con Replit tanto en webview como en pestañas externas
+      maxAge: 24 * 60 * 60 * 1000, // 24 horas
+      path: '/' // Asegurar que la cookie esté disponible en todas las rutas
     }
   })
 );
