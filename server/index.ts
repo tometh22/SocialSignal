@@ -8,6 +8,8 @@ import cors from 'cors';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 
+// Note: Session types are declared in server/auth.ts
+
 const app = express();
 
 // 🚫 ENDPOINT DUPLICADO ELIMINADO - Ahora usa implementación universal en routes.ts
@@ -61,28 +63,44 @@ app.use(
 );
 
 // Auth check endpoint - CRITICAL FOR FRONTEND
-app.get('/auth/check', (req: Request, res: Response) => {
+app.get('/auth/check', async (req: Request, res: Response) => {
   const userId = req.session?.userId;
   
   console.log(`🔍 Auth check: Session ID = ${req.sessionID}, User ID = ${userId}`);
   
   if (userId) {
-    res.json({
-      authenticated: true,
-      user: { email: userId }
-    });
+    // Get user from storage
+    const user = await storage.getUser(userId);
+    if (user) {
+      res.json({
+        authenticated: true,
+        user: { email: user.email }
+      });
+    } else {
+      res.json({ authenticated: false });
+    }
   } else {
-    // Auto-authenticate in development
-    req.session.userId = 'demo@epical.digital';
-    req.session.save((err) => {
-      if (err) {
-        console.error('Error saving session:', err);
+    // Auto-authenticate in development - use default user ID 1
+    try {
+      const user = await storage.getUser(1);
+      if (user) {
+        req.session.userId = user.id;
+        req.session.save((err) => {
+          if (err) {
+            console.error('Error saving session:', err);
+          }
+        });
+        res.json({
+          authenticated: true,
+          user: { email: user.email }
+        });
+      } else {
+        res.json({ authenticated: false });
       }
-    });
-    res.json({
-      authenticated: true,
-      user: { email: 'demo@epical.digital' }
-    });
+    } catch (err) {
+      console.error('Error getting user:', err);
+      res.json({ authenticated: false });
+    }
   }
 });
 
@@ -118,10 +136,14 @@ const port = Number(process.env.PORT || 5000);
       console.log(`🚀 Server running on port ${port}`);
     });
 
-    // Setup Vite middleware after server is created
-    await setupVite(app, server);
-    
-    // Note: serveStatic is only needed in production, Vite handles static files in development
+    // Setup Vite or static file serving based on environment
+    if (isProduction) {
+      console.log("📦 Production mode: serving static files from dist/public");
+      serveStatic(app);
+    } else {
+      console.log("🔧 Development mode: setting up Vite middleware");
+      await setupVite(app, server);
+    }
     
   } catch (error) {
     console.error("❌ Failed to start server:", error);
