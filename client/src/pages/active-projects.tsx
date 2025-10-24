@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   Building2, 
@@ -470,7 +471,7 @@ function ProjectCard({
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <div className="text-sm font-bold text-blue-800">
-                    ${price.toLocaleString()}
+                    {formatCurrency(price, 'USD')}
                   </div>
                   <div className="text-xs text-blue-600">
                     {timeFilter !== 'all' ? 'Facturación del período' : 'Facturación total'}
@@ -482,7 +483,7 @@ function ProjectCard({
                 
                 <div className="bg-red-50 p-3 rounded-lg border border-red-200">
                   <div className="text-sm font-bold text-red-800">
-                    ${cost.toLocaleString()}
+                    {formatCurrency(cost, 'USD')}
                   </div>
                   <div className="text-xs text-red-600">
                     {timeFilter !== 'all' ? 'Costos del período' : 'Costos totales'}
@@ -494,7 +495,7 @@ function ProjectCard({
                 
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200">
                   <div className="text-sm font-bold text-green-800">
-                    ${markupUSD.toLocaleString()}
+                    {formatCurrency(markupUSD, 'USD')}
                   </div>
                   <div className="text-xs text-green-600">Markup (beneficio)</div>
                   <div className="text-xs text-green-500 mt-1">
