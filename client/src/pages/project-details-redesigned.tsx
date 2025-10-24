@@ -3373,16 +3373,30 @@ const ProjectDetailsPage = () => {
                     </div>
 
                     {/* Costo Real del Equipo */}
-                    <div className="text-center p-4 bg-white rounded-xl border border-red-100 shadow-sm">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-3">
-                        <DollarSign className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-red-600 mb-1">
-                        {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
-                      </div>
-                      <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
-                      <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
-                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-center p-4 bg-white rounded-xl border border-red-100 shadow-sm cursor-help">
+                            <div className="inline-flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mb-3">
+                              <DollarSign className="h-6 w-6 text-red-600" />
+                            </div>
+                            <div className="text-3xl font-bold text-red-600 mb-1">
+                              {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
+                            </div>
+                            <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
+                            <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="font-semibold">Tipo de cambio aplicado:</p>
+                          <p className="text-sm">
+                            {projectVM?.cotizacion 
+                              ? `1 USD = ${projectVM.cotizacion.toFixed(2)} ARS`
+                              : 'No disponible'}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
 
                     {/* Costo Real del Equipo en ARS */}
                     <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
