@@ -117,6 +117,7 @@ const port = Number(process.env.PORT || 5000);
 (async () => {
   try {
     console.log("🔄 Starting application...");
+    console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
     
     // Initialize database connection and data
     await initializeDatabase();
@@ -137,6 +138,7 @@ const port = Number(process.env.PORT || 5000);
     });
 
     // Setup Vite or static file serving based on environment
+    // CRITICAL: This must be called AFTER API routes are registered
     if (isProduction) {
       console.log("📦 Production mode: serving static files from dist/public");
       serveStatic(app);
