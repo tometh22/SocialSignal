@@ -3390,9 +3390,12 @@ const ProjectDetailsPage = () => {
                         <TooltipContent>
                           <p className="font-semibold">Tipo de cambio aplicado:</p>
                           <p className="text-sm">
-                            {projectVM?.cotizacion 
-                              ? `1 USD = ${projectVM.cotizacion.toFixed(2)} ARS`
-                              : 'No disponible'}
+                            {(() => {
+                              const fxRate = projectVM?.cotizacion || projectVM?.teamBreakdown?.[0]?.fx;
+                              return fxRate 
+                                ? `1 USD = ${Number(fxRate).toFixed(2)} ARS`
+                                : 'No disponible';
+                            })()}
                           </p>
                         </TooltipContent>
                       </Tooltip>
