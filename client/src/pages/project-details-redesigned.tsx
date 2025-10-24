@@ -3338,8 +3338,8 @@ const ProjectDetailsPage = () => {
                       <div className="text-3xl font-bold text-green-600 mb-1">
                         {(projectVM?.totalAsanaHours || projectVM?.totalHours || 0).toFixed(1)}h
                       </div>
-                      <div className="text-sm font-medium text-gray-600">Horas Trabajadas (Asana)</div>
-                      <div className="text-xs text-gray-500 mt-1">horas reales rastreadas</div>
+                      <div className="text-sm font-medium text-gray-600">Horas Trabajadas</div>
+                      <div className="text-xs text-gray-500 mt-1">rastreadas en Asana</div>
                     </div>
 
                     {/* Horas Objetivo */}
@@ -3351,7 +3351,7 @@ const ProjectDetailsPage = () => {
                         {(projectVM?.estimatedHours || 0).toFixed(1)}h
                       </div>
                       <div className="text-sm font-medium text-gray-600">Horas Objetivo</div>
-                      <div className="text-xs text-gray-500 mt-1">presupuestadas</div>
+                      <div className="text-xs text-gray-500 mt-1">según presupuesto</div>
                     </div>
 
                     {/* Eficiencia del Equipo vs Objetivo - usa totalAsanaHours */}

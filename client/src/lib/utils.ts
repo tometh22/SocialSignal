@@ -6,17 +6,27 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formatea un número como moneda USD
+ * Formatea un número como moneda con soporte para ARS y USD
+ * Muestra K para miles automáticamente
  * @param value Valor a formatear
+ * @param currency Moneda ('USD' o 'ARS')
  * @returns Cadena formateada como moneda
  */
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value);
+export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): string {
+  const absValue = Math.abs(value);
+  const isNegative = value < 0;
+  const symbol = currency === 'USD' ? '$' : 'ARS';
+  
+  // Para valores mayores a 999, usar formato con K
+  if (absValue >= 1000) {
+    const thousands = absValue / 1000;
+    const formatted = thousands.toFixed(1);
+    return `${isNegative ? '-' : ''}${symbol} ${formatted}K`;
+  }
+  
+  // Para valores menores, usar formato normal con decimales
+  const formatted = absValue.toFixed(2);
+  return `${isNegative ? '-' : ''}${symbol} ${formatted}`;
 }
 
 /**

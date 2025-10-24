@@ -198,7 +198,7 @@ function ProjectCard({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <Card className="group hover:shadow-lg hover:scale-[1.01] transition-all duration-300 border border-gray-200 hover:border-blue-300">
+    <Card className="group hover:shadow-md transition-all duration-200 border border-gray-200 hover:border-blue-300 shadow-sm">
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
