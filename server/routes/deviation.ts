@@ -55,7 +55,9 @@ async function deviationAnalysisHandler(req: Request, res: Response) {
         activeMembers: (data.teamBreakdown ?? []).filter(p => (p.actualHours ?? 0) > 0).length,
         totalHours: data.summary?.totalHours,
         efficiencyPct: data.summary?.efficiencyPct,
-        teamCost: basis === 'ECON' ? data.summary?.teamCostUSD : data.summary?.teamCostUSD, // mismo nombre en front
+        teamCostUSD: data.summary?.teamCostUSD,
+        teamCostARS: data.summary?.teamCostARS,
+        teamCost: data.summary?.teamCostUSD, // Legacy compatibility
         emptyStates: data.summary?.emptyStates,
         hasData: data.summary?.hasData,
       },

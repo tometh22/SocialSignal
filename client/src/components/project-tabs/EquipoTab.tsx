@@ -148,12 +148,12 @@ export default function EquipoTab() {
 
         <Card data-testid="card-team-cost-usd">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Costo del Equipo</CardTitle>
+            <CardTitle className="text-sm font-medium">Costo del Equipo (USD)</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600" data-testid="text-team-cost-usd">
-              $ {summary.teamCostUSD?.toLocaleString() || 0}
+              USD {summary.teamCostUSD?.toLocaleString() || 0}
             </div>
             <p className="text-xs text-muted-foreground">inversión total registrada</p>
           </CardContent>
@@ -164,12 +164,12 @@ export default function EquipoTab() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card data-testid="card-team-cost-ars">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Costo en ARS</CardTitle>
+            <CardTitle className="text-sm font-medium">Costo del Equipo (ARS)</CardTitle>
             <DollarSign className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600" data-testid="text-team-cost-ars">
-              $ {summary.teamCostARS?.toLocaleString('es-AR') || 0}
+              ARS {summary.teamCostARS?.toLocaleString('es-AR') || 0}
             </div>
             <p className="text-xs text-muted-foreground">sin convertir a dólares</p>
           </CardContent>
@@ -278,11 +278,11 @@ export default function EquipoTab() {
                     <div className="text-sm text-gray-500">Costo USD</div>
                     <div className="font-medium">
                       <span data-testid={`text-actual-cost-${deviation.personnelId}`}>
-                        ${deviation.actualCost.toFixed(0)}
+                        USD {deviation.actualCost.toFixed(0)}
                       </span>
                       <span className="text-gray-400 mx-1">/</span>
                       <span data-testid={`text-budgeted-cost-${deviation.personnelId}`}>
-                        ${deviation.budgetedCost.toFixed(0)}
+                        USD {deviation.budgetedCost.toFixed(0)}
                       </span>
                     </div>
                   </div>
