@@ -60,54 +60,13 @@ app.use(
   })
 );
 
-// Middleware de autenticación temporal para desarrollo
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  console.log(`🔍 Auth middleware - Headers: ${req.headers.authorization}`);
-  console.log(`🔍 Auth middleware - Session ID: ${req.sessionID}`);
-  console.log(`🔍 Auth middleware - Session data:`, req.session);
-
-  // Verificar si el usuario ya está autenticado
-  if (req.session?.userId) {
-    console.log(`✅ User authenticated: ${req.session.userId}`);
-    return next();
-  }
-
-  // TEMP FIX: Permitir cualquier usuario en desarrollo
-  console.log(`🚀 TEMP FIX requireAuth: No session found, attempting auto-login for development`);
-  req.session.userId = 'demo@epical.digital';
-  req.session.save((err) => {
-    if (err) {
-      console.error('Error saving session:', err);
-    } else {
-      console.log(`✅ TEMP FIX requireAuth: Auto-logged in demo user: demo@epical.digital`);
-    }
-  });
-  return next();
-};
-
-// Auth status check endpoint - DEBE IR ANTES DE registerRoutes()
-app.get('/auth/check', (req: Request, res: Response) => {
-  const userId = req.session?.userId;
-  
-  console.log(`🔍 Auth check: Session ID = ${req.sessionID}, User ID = ${userId}`);
-  
-  if (userId) {
-    res.json({
-      authenticated: true,
-      user: { email: userId }
-    });
-  } else {
-    res.json({ authenticated: false });
-  }
-});
-
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Register all API routes with auth middleware
-registerRoutes(app, requireAuth);
+// Register all API routes (registerRoutes configura su propia autenticación internamente)
+registerRoutes(app);
 
 const port = Number(process.env.PORT || 5000);
 
