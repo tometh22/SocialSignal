@@ -3391,7 +3391,7 @@ const ProjectDetailsPage = () => {
                           <p className="font-semibold">Tipo de cambio aplicado:</p>
                           <p className="text-sm">
                             {(() => {
-                              const fxRate = projectVM?.cotizacion || projectVM?.teamBreakdown?.[0]?.fx;
+                              const fxRate = projectVM?.cotizacion || (projectVM?.teamBreakdown?.[0] as any)?.fx;
                               return fxRate 
                                 ? `1 USD = ${Number(fxRate).toFixed(2)} ARS`
                                 : 'No disponible';
