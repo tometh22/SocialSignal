@@ -17,8 +17,10 @@ import {
 import { useDeviationAnalysis } from '@/contexts/ProjectDataProvider';
 
 // 🎯 EQUIPO TAB - usa /deviation-analysis endpoint según handoff
+// v2.0 - Incluye segunda fila con costo ARS
 export default function EquipoTab() {
   const { data: deviationData, isLoading } = useDeviationAnalysis();
+  console.log('✅ EquipoTab v2.0 cargado - con segunda fila ARS');
 
   if (isLoading) {
     return (
