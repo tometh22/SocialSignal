@@ -10,7 +10,7 @@
 
 import { db } from '../db';
 import { projectAggregates, projectPeriods, factLaborMonth, factRCMonth, personnel, type ViewType } from '@shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 
 interface ViewModelOutput {
   currencyNative: string;
@@ -459,4 +459,132 @@ export function toProjectVM(aggregateData: any, view: ViewType): ViewModelOutput
     teamBreakdown: actualsData?.teamBreakdown || [],
     flags: aggregateData.flags || []
   };
+}
+
+/**
+ * 🎯 STAR SCHEMA AGGREGATOR - Reemplazo de financial_sot
+ * 
+ * Agrega TODOS los proyectos activos desde fact_labor_month + fact_rc_month
+ * Compatible con interfaz FinancialProjectMetrics
+ */
+export interface FinancialProjectMetrics {
+  projectKey: string;
+  projectId: number;
+  clientName: string;
+  projectName: string;
+  projectType: string | null;
+  currencyNative: 'USD' | 'ARS';
+  metrics: {
+    revenueDisplay: number;
+    costDisplay: number;
+    revenueUSDNormalized: number;
+    costUSDNormalized: number;
+    profitUSD: number;
+    margin: number | null;
+    markup: number | null;
+  };
+}
+
+export async function aggregateProjectsFromStarSchema(
+  periodKey: string,
+  view: ViewType = 'operativa'
+): Promise<FinancialProjectMetrics[]> {
+  console.log(`🌟 [Star Schema Aggregator] Fetching projects for period=${periodKey}, view=${view}`);
+  
+  try {
+    // 1) Obtener todos los projectIds únicos del Star Schema para este período
+    const projectsInPeriod = await db
+      .selectDistinct({ projectId: factRCMonth.projectId })
+      .from(factRCMonth)
+      .where(eq(factRCMonth.periodKey, periodKey));
+
+    console.log(`  📊 Found ${projectsInPeriod.length} projects in Star Schema for period ${periodKey}`);
+
+    if (projectsInPeriod.length === 0) {
+      return [];
+    }
+
+    // 2) Para cada proyecto, obtener datos completos con join a activeProjects
+    const { activeProjects, clients, quotations } = await import('@shared/schema');
+    
+    const projectsData = await db
+      .select({
+        projectId: activeProjects.id,
+        clientName: clients.name,
+        projectName: quotations.projectName,
+        projectType: sql<string>`NULL`
+      })
+      .from(activeProjects)
+      .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+      .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+      .where(
+        inArray(
+          activeProjects.id,
+          projectsInPeriod.map(p => p.projectId)
+        )
+      );
+
+    console.log(`  ✅ Retrieved metadata for ${projectsData.length} projects`);
+
+    // 3) Para cada proyecto, obtener ViewModelOutput del Star Schema
+    const results: FinancialProjectMetrics[] = [];
+
+    for (const project of projectsData) {
+      if (!project.clientName || !project.projectName) {
+        console.warn(`  ⚠️ Skipping project ${project.projectId} - missing client/project name`);
+        continue;
+      }
+
+      const viewData = await getProjectPeriodViewFromSoT(
+        project.projectId,
+        periodKey,
+        view
+      );
+
+      if (!viewData) {
+        console.warn(`  ⚠️ No Star Schema data for project ${project.projectId}`);
+        continue;
+      }
+
+      // 4) Convertir a formato FinancialProjectMetrics
+      const { canonicalizeKey } = await import('./shared/strings');
+      const projectKey = canonicalizeKey(`${project.clientName}|${project.projectName}`);
+
+      // Calcular USD normalizado (para KPIs)
+      const revenueUSD = viewData.currencyNative === 'USD' 
+        ? viewData.revenueDisplay 
+        : viewData.revenueDisplay / (viewData.cotizacion || 1345);
+      
+      const costUSD = viewData.currencyNative === 'USD'
+        ? viewData.costDisplay
+        : viewData.costDisplay / (viewData.cotizacion || 1345);
+
+      results.push({
+        projectKey,
+        projectId: project.projectId,
+        clientName: project.clientName,
+        projectName: project.projectName,
+        projectType: project.projectType,
+        currencyNative: viewData.currencyNative as 'USD' | 'ARS',
+        metrics: {
+          revenueDisplay: viewData.revenueDisplay,
+          costDisplay: viewData.costDisplay,
+          revenueUSDNormalized: revenueUSD,
+          costUSDNormalized: costUSD,
+          profitUSD: revenueUSD - costUSD,
+          margin: viewData.margin,
+          markup: viewData.markup
+        }
+      });
+
+      console.log(`  ✅ ${projectKey}: ${viewData.currencyNative} ${viewData.revenueDisplay.toFixed(0)} revenue`);
+    }
+
+    console.log(`🌟 [Star Schema Aggregator] SUCCESS: ${results.length} projects aggregated`);
+    return results;
+
+  } catch (error) {
+    console.error('❌ [Star Schema Aggregator] Error:', error);
+    throw error;
+  }
 }

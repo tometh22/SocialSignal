@@ -686,46 +686,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`✅ CONSOLIDATED RESPONSE: ${aggregatorResponse?.projects?.length || 'undefined'} projects from ActiveProjectsAggregator`);
       
-      // 🚀 FINANCIAL SoT: If using period=YYYY-MM, override display values with financial_sot data
+      // 🌟 STAR SCHEMA SoT: If using period=YYYY-MM, override display values with Star Schema data
       if (usingSoT && aggregatorResponse?.projects) {
-        const { aggregateFinancialProjects } = await import('./domain/financial-aggregator');
+        const { aggregateProjectsFromStarSchema } = await import('./domain/view-aggregator');
         const { canonicalizeKey } = await import('./domain/shared/strings');
         
-        console.log(`🔍 FINANCIAL SoT: Fetching from financial_sot for ${aggregatorResponse.projects.length} projects`);
+        console.log(`🌟 STAR SCHEMA SoT: Fetching from fact_rc_month + fact_labor_month for period ${periodQuery}`);
         
-        // Get all projects from database with relations
-        const allProjectsData = await db.query.activeProjects.findMany({
-          with: {
-            client: true,
-            quotation: true
-          }
-        });
-        
-        // Get financial data from financial_sot for the period
-        const financialData = await aggregateFinancialProjects(periodQuery);
-        console.log(`📊 FINANCIAL SoT: Found ${financialData.length} projects in financial_sot`);
+        // Get financial data from Star Schema for the period
+        const financialData = await aggregateProjectsFromStarSchema(periodQuery, 'operativa');
+        console.log(`📊 STAR SCHEMA SoT: Found ${financialData.length} projects in Star Schema`);
         
         // Create lookup map: projectId -> financial data
         const financialByProjectId = new Map();
-        for (const projectData of allProjectsData) {
-          if (projectData.client && projectData.quotation?.projectName) {
-            const clientName = projectData.client.name;
-            const projectName = projectData.quotation.projectName;
-            const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
-            
-            const finData = financialData.find(f => f.projectKey === projectKey);
-            if (finData) {
-              financialByProjectId.set(projectData.id, finData);
-              console.log(`✅ FINANCIAL MATCH: Project ${projectData.id} (${projectKey}) → ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
-            }
-          }
+        for (const finData of financialData) {
+          financialByProjectId.set(finData.projectId, finData);
+          console.log(`✅ STAR SCHEMA: Project ${finData.projectId} (${finData.projectKey}) → ${finData.currencyNative} ${finData.metrics.revenueDisplay.toFixed(0)}`);
         }
         
-        // Override display values with financial_sot data
+        // Override display values with Star Schema data
         for (const project of aggregatorResponse.projects) {
           const finData = financialByProjectId.get(project.projectId);
           if (finData && project.metrics) {
-            console.log(`🔄 FINANCIAL SoT: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
+            console.log(`🔄 STAR SCHEMA: Project ${project.projectId} - Replacing ${project.metrics.revenueDisplay?.currency} ${project.metrics.revenueDisplay?.amount} with ${finData.currencyNative} ${finData.metrics.revenueDisplay}`);
             
             project.metrics.revenueDisplay = {
               amount: finData.metrics.revenueDisplay,
@@ -745,9 +728,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
-        console.log(`✅ FINANCIAL SoT: Updated ${financialByProjectId.size} projects with financial_sot data`);
+        console.log(`✅ STAR SCHEMA SoT: Updated ${financialByProjectId.size} projects with Star Schema data`);
         
-        // 🔢 Recalcular summary desde financial_sot
+        // 🔢 Recalcular summary desde Star Schema
         if (financialData.length > 0) {
           const totalRevenueUSD = financialData.reduce((sum, p) => sum + p.metrics.revenueUSDNormalized, 0);
           const totalCostUSD = financialData.reduce((sum, p) => sum + p.metrics.costUSDNormalized, 0);
@@ -767,7 +750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             monthCount: 1
           };
           
-          console.log(`📊 FINANCIAL SoT SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Projects=${financialData.length}`);
+          console.log(`📊 STAR SCHEMA SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Projects=${financialData.length}`);
         }
       }
       
