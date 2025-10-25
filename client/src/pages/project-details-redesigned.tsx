@@ -3967,9 +3967,9 @@ const ProjectDetailsPage = () => {
                 {/* Vista por Rol */}
                 <div className="space-y-4 breakdown-role-view">
                   {(() => {
-                    const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                    const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
-                    const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                    const totalCost = projectVM?.costDisplay || 0;
+                    const totalRevenue = projectVM?.revenueDisplay || 0;
+                    const teamBreakdown = projectVM?.teamBreakdown || [];
                     
                     // Vista por roles configurados en la app
                     const roleGroups: { [key: string]: { cost: number, count: number, color: string } } = {};
@@ -4002,7 +4002,7 @@ const ProjectDetailsPage = () => {
                           color: colorMap[roleName] || 'bg-indigo-500'
                         };
                       }
-                      roleGroups[roleName].cost += (member.actualCost || member.cost || 0);
+                      roleGroups[roleName].cost += (member.costUSD || member.cost || 0);
                       roleGroups[roleName].count += 1;
                     });
                     
@@ -4030,7 +4030,7 @@ const ProjectDetailsPage = () => {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-semibold text-gray-900">${category.cost.toLocaleString()}</div>
+                              <div className="text-sm font-semibold text-gray-900">{formatCurrency(category.cost, projectVM?.currencyNative || 'USD')}</div>
                               <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
                             </div>
                           </div>
@@ -4049,16 +4049,16 @@ const ProjectDetailsPage = () => {
                 {/* Vista por Persona */}
                 <div className="space-y-4 breakdown-person-view hidden">
                   {(() => {
-                    const totalCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                    const totalRevenue = unifiedData?.quotation?.totalAmount || 0;
-                    const teamBreakdown = Array.isArray(unifiedData?.actuals?.teamBreakdown) ? unifiedData.actuals.teamBreakdown : Object.values(unifiedData?.actuals?.teamBreakdown || {});
+                    const totalCost = projectVM?.costDisplay || 0;
+                    const totalRevenue = projectVM?.revenueDisplay || 0;
+                    const teamBreakdown = projectVM?.teamBreakdown || [];
                     
                     // Vista por persona individual
                     const personColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-cyan-500', 'bg-pink-500', 'bg-yellow-500', 'bg-indigo-500', 'bg-red-500', 'bg-gray-500'];
                     
                     const categories = teamBreakdown.map((member: any, index: number) => ({
                       name: member.name,
-                      cost: member.actualCost || member.cost || 0,
+                      cost: member.costUSD || member.cost || 0,
                       color: personColors[index % personColors.length],
                       count: 1,
                       subtitle: member.role || member.roleName || 'Sin rol asignado'
@@ -4082,7 +4082,7 @@ const ProjectDetailsPage = () => {
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-sm font-semibold text-gray-900">${category.cost.toLocaleString()}</div>
+                              <div className="text-sm font-semibold text-gray-900">{formatCurrency(category.cost, projectVM?.currencyNative || 'USD')}</div>
                               <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
                             </div>
                           </div>
@@ -4102,10 +4102,10 @@ const ProjectDetailsPage = () => {
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-900">Total del Proyecto</span>
                       <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}</div>
+                        <div className="text-lg font-bold text-gray-900">{formatCurrency(projectVM?.revenueDisplay || 0, projectVM?.currencyNative || 'USD')}</div>
                         <div className="text-xs text-gray-500">
-                          Costo: ${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()} | 
-                          Beneficio: ${((unifiedData?.quotation?.totalAmount || 0) - (unifiedData?.actuals?.totalWorkedCost || 0)).toLocaleString()}
+                          Costo: {formatCurrency(projectVM?.costDisplay || 0, projectVM?.currencyNative || 'USD')} | 
+                          Beneficio: {formatCurrency((projectVM?.revenueDisplay || 0) - (projectVM?.costDisplay || 0), projectVM?.currencyNative || 'USD')}
                         </div>
                       </div>
                     </div>
@@ -4201,10 +4201,11 @@ const ProjectDetailsPage = () => {
                 </div>
 
                 {(() => {
-                  const revenue = unifiedData?.quotation?.totalAmount || 0;
-                  const costs = unifiedData?.actuals?.totalWorkedCost || 0;
-                  const profitMargin = revenue > 0 && costs > 0 ? (revenue - costs) / revenue : 0;
-                  const efficiency = unifiedData?.efficiency || 0;
+                  const revenue = projectVM?.revenueDisplay || 0;
+                  const costs = projectVM?.costDisplay || 0;
+                  const profitMargin = projectVM?.margin || 0;
+                  const budgetUtil = projectVM?.budgetUtilization || 0;
+                  const efficiency = budgetUtil > 0 ? Math.max(0, (1 - budgetUtil) * 100) : 100;
                   // Better Financial Health calculation: weight profit margin more heavily
                   const profitScore = Math.max(0, Math.min(100, profitMargin * 100));
                   const efficiencyScore = Math.max(0, Math.min(100, efficiency));
@@ -4257,20 +4258,29 @@ const ProjectDetailsPage = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Ingresos Actuales</span>
-                    <span className="font-semibold">${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}</span>
+                    <span className="font-semibold">{formatCurrency(projectVM?.revenueDisplay || 0, projectVM?.currencyNative || 'USD')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Costos Totales</span>
-                    <span className="font-semibold">${(unifiedData?.actuals?.totalWorkedCost || 0).toLocaleString()}</span>
+                    <span className="font-semibold">{formatCurrency(projectVM?.costDisplay || 0, projectVM?.currencyNative || 'USD')}</span>
                   </div>
                   <div className="border-t pt-2">
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Estado de Punto de Equilibrio</span>
-                      <span className={`font-semibold ${(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'text-green-600' : 'text-red-600'}`}>
-                        {(unifiedData?.quotation?.totalAmount || 0) > (unifiedData?.actuals?.totalWorkedCost || 0) ? 'Alcanzado' : 'Pendiente'}
+                      <span className={`font-semibold ${(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) ? 'text-green-600' : 'text-red-600'}`}>
+                        {(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) ? 'Alcanzado ✓' : 'Pendiente'}
                       </span>
                     </div>
                   </div>
+                  {(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) && (
+                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+                      <div className="text-sm text-green-800">
+                        <span className="font-semibold">Margen: </span>
+                        {formatCurrency((projectVM?.revenueDisplay || 0) - (projectVM?.costDisplay || 0), projectVM?.currencyNative || 'USD')}
+                        <span className="text-xs ml-2">({((projectVM?.margin || 0) * 100).toFixed(1)}%)</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
