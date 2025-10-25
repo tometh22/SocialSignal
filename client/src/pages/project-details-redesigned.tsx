@@ -3401,23 +3401,24 @@ const ProjectDetailsPage = () => {
                       </Tooltip>
                     </TooltipProvider>
 
-                    {/* Costo Real del Equipo en ARS */}
-                    <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
-                        <DollarSign className="h-6 w-6 text-orange-600" />
+                    {/* Costo Real del Equipo en ARS - Solo para proyectos USD */}
+                    {projectVM?.currencyNative === 'USD' && (
+                      <div className="text-center p-4 bg-white rounded-xl border border-orange-100 shadow-sm">
+                        <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
+                          <DollarSign className="h-6 w-6 text-orange-600" />
+                        </div>
+                        <div className="text-3xl font-bold text-orange-600 mb-1">
+                          {(() => {
+                            const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
+                              return sum + (member.costARS || 0);
+                            }, 0) || 0;
+                            return formatCurrency(totalARS, 'ARS');
+                          })()}
+                        </div>
+                        <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
+                        <div className="text-xs text-gray-500 mt-1">equivalente en pesos</div>
                       </div>
-                      <div className="text-3xl font-bold text-orange-600 mb-1">
-                        {(() => {
-                          const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
-                            return sum + (member.costARS || 0);
-                          }, 0) || 0;
-                          console.log('💰 Costo total ARS calculado:', totalARS);
-                          return formatCurrency(totalARS, 'ARS');
-                        })()}
-                      </div>
-                      <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
-                      <div className="text-xs text-gray-500 mt-1">pesos argentinos</div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
