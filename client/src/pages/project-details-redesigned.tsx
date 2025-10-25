@@ -3843,43 +3843,111 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-blue-100 rounded-lg">
                     <TrendingUp className="h-5 w-5 text-blue-600" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Tendencia Financiera</h3>
-                    <p className="text-sm text-gray-500">Análisis temporal de ingresos vs costos</p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-gray-900">Comparación Financiera</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs">Vista comparativa de ingresos totales vs costos reales del proyecto según datos del Star Schema</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-sm text-gray-500">Análisis de rentabilidad actual</p>
                   </div>
                 </div>
                 
                 {(() => {
-                  const revenue = unifiedData?.quotation?.totalAmount || 0;
-                  const costs = unifiedData?.actuals?.totalWorkedCost || 0;
-                  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+                  const revenue = projectVM?.revenueDisplay || 0;
+                  const costs = projectVM?.costDisplay || 0;
+                  const profit = revenue - costs;
+                  const maxValue = Math.max(revenue, costs) || 1000;
+                  const currency = projectVM?.currencyNative || 'USD';
                   
                   return (
                     <div className="h-64">
-                      <div className="flex justify-between items-end h-48 px-4">
-                        {months.map((month, index) => {
-                          const monthRevenue = revenue * (0.8 + Math.random() * 0.4);
-                          const monthCosts = costs * (0.7 + Math.random() * 0.6);
-                          const maxValue = Math.max(revenue, costs) || 1000;
-                          
-                          return (
-                            <div key={month} className="flex flex-col items-center gap-2">
-                              <div className="flex items-end gap-1">
+                      <div className="flex justify-center items-end h-48 px-4 gap-8">
+                        {/* Revenue Bar */}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex flex-col items-center gap-2 cursor-help">
                                 <div 
-                                  className="bg-green-500 rounded-t w-4"
-                                  style={{ height: `${(monthRevenue / maxValue) * 120}px` }}
-                                  title={`Ingresos: $${monthRevenue.toFixed(0)}`}
+                                  className="bg-gradient-to-t from-green-600 to-green-400 rounded-t w-20 shadow-lg"
+                                  style={{ height: `${(revenue / maxValue) * 180}px` }}
                                 ></div>
-                                <div 
-                                  className="bg-red-500 rounded-t w-4"
-                                  style={{ height: `${(monthCosts / maxValue) * 120}px` }}
-                                  title={`Costos: $${monthCosts.toFixed(0)}`}
-                                ></div>
+                                <span className="text-sm font-medium text-gray-700">Ingresos</span>
+                                <span className="text-xs font-semibold text-green-600">
+                                  {formatCurrency(revenue, currency)}
+                                </span>
                               </div>
-                              <span className="text-xs text-gray-500">{month}</span>
-                            </div>
-                          );
-                        })}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-sm">
+                                <p className="font-semibold mb-1">Ingresos Totales</p>
+                                <p>{formatCurrency(revenue, currency)}</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        {/* Costs Bar */}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex flex-col items-center gap-2 cursor-help">
+                                <div 
+                                  className="bg-gradient-to-t from-red-600 to-red-400 rounded-t w-20 shadow-lg"
+                                  style={{ height: `${(costs / maxValue) * 180}px` }}
+                                ></div>
+                                <span className="text-sm font-medium text-gray-700">Costos</span>
+                                <span className="text-xs font-semibold text-red-600">
+                                  {formatCurrency(costs, currency)}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-sm">
+                                <p className="font-semibold mb-1">Costos Totales</p>
+                                <p>{formatCurrency(costs, currency)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {projectVM?.totalAsanaHours || 0}h trabajadas
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        {/* Profit Bar */}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex flex-col items-center gap-2 cursor-help">
+                                <div 
+                                  className={`rounded-t w-20 shadow-lg ${profit >= 0 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : 'bg-gradient-to-t from-orange-600 to-orange-400'}`}
+                                  style={{ height: `${(Math.abs(profit) / maxValue) * 180}px` }}
+                                ></div>
+                                <span className="text-sm font-medium text-gray-700">Margen</span>
+                                <span className={`text-xs font-semibold ${profit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                                  {formatCurrency(profit, currency)}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-sm">
+                                <p className="font-semibold mb-1">Margen de Ganancia</p>
+                                <p>{formatCurrency(profit, currency)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {((projectVM?.margin || 0) * 100).toFixed(1)}% margen
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                       <div className="mt-4 flex justify-center gap-4">
                         <div className="flex items-center gap-2">
@@ -3889,6 +3957,10 @@ const ProjectDetailsPage = () => {
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 bg-red-500 rounded"></div>
                           <span className="text-sm text-gray-600">Costos</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                          <span className="text-sm text-gray-600">Margen</span>
                         </div>
                       </div>
                     </div>
