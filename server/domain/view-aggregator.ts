@@ -36,7 +36,8 @@ interface ViewModelOutput {
  */
 async function getProjectPeriodViewFromSoT(
   projectId: number,
-  periodKey: string
+  periodKey: string,
+  view: ViewType = 'operativa'
 ): Promise<ViewModelOutput | null> {
   
   console.log(`🔍 [SoT Reader] Querying fact_labor_month + fact_rc_month for project=${projectId}, period=${periodKey}`);
@@ -127,18 +128,35 @@ async function getProjectPeriodViewFromSoT(
     costUSD: '0'
   };
 
-  // 4) Inferir moneda nativa basándose en qué campo tiene datos
-  // Si revenueUSD > 0, entonces es cliente USD; si revenueARS > 0, es ARS
+  // 4) Determinar moneda y valores de display según la vista seleccionada
   const revenueUSDVal = Number(rc.revenueUSD || 0);
   const revenueARSVal = Number(rc.revenueARS || 0);
-  const currencyNative = revenueUSDVal > 0 ? 'USD' : 'ARS';
-  const isUSD = currencyNative === 'USD';
-  
   const totalCostARS = Number(totals.costARS);
   const totalCostUSD = Number(totals.costUSD);
-  const costDisplay = isUSD ? totalCostUSD : totalCostARS;
   
-  const revenueDisplay = isUSD ? Number(rc.revenueUSD) : Number(rc.revenueARS);
+  // 🎯 LÓGICA DE 3 VISTAS
+  let currencyNative: string;
+  let costDisplay: number;
+  let revenueDisplay: number;
+  
+  if (view === 'usd') {
+    // Vista USD: Siempre mostrar en USD
+    currencyNative = 'USD';
+    costDisplay = totalCostUSD;
+    revenueDisplay = revenueUSDVal;
+  } else if (view === 'operativa') {
+    // Vista Operativa: Usar moneda nativa del cliente
+    // Si hay datos significativos en ARS, es cliente argentino
+    const hasARSData = revenueARSVal > revenueUSDVal * 100; // ARS significativamente mayor
+    currencyNative = hasARSData ? 'ARS' : 'USD';
+    costDisplay = hasARSData ? totalCostARS : totalCostUSD;
+    revenueDisplay = hasARSData ? revenueARSVal : revenueUSDVal;
+  } else {
+    // Vista Original: Datos crudos (priorizar USD por simplicidad)
+    currencyNative = 'USD';
+    costDisplay = totalCostUSD;
+    revenueDisplay = revenueUSDVal;
+  }
   
   // ✅ Usar quoteNative (precio/cotización del proyecto) directamente - NO más hotfix
   const cotizacion = Number(rc.quoteNative || 0);
@@ -212,9 +230,9 @@ export async function getProjectPeriodView(
 ): Promise<ViewModelOutput | null> {
   
   // 🎯 PASO 1: Intentar leer desde SoT (Star Schema) PRIMERO
-  const fromSoT = await getProjectPeriodViewFromSoT(projectId, periodKey);
+  const fromSoT = await getProjectPeriodViewFromSoT(projectId, periodKey, view);
   if (fromSoT) {
-    console.log(`✅ [View Aggregator] Using SoT data for project=${projectId}, period=${periodKey}`);
+    console.log(`✅ [View Aggregator] Using SoT data for project=${projectId}, period=${periodKey}, view=${view}`);
     return fromSoT;
   }
   
