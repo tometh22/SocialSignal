@@ -3683,7 +3683,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-violet-100 text-sm">Margen Operativo</p>
                       <p className="text-2xl font-bold">
-                        {projectVM?.margin != null ? `${projectVM.margin.toFixed(1)}%` : 'N/A'}
+                        {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
                       </p>
                       <p className="text-xs text-violet-200">
                         {(() => {
