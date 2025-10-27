@@ -7,7 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Formatea un número como moneda con soporte para ARS y USD
- * Muestra K para miles automáticamente
+ * Muestra K para miles y M para millones automáticamente
+ * Para ARS, añade el sufijo "ARS" para claridad
  * @param value Valor a formatear
  * @param currency Moneda ('USD' o 'ARS')
  * @returns Cadena formateada como moneda
@@ -15,18 +16,35 @@ export function cn(...inputs: ClassValue[]) {
 export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): string {
   const absValue = Math.abs(value);
   const isNegative = value < 0;
-  const symbol = currency === 'USD' ? '$' : 'ARS';
+  const prefix = isNegative ? '-' : '';
+  const symbol = '$';
   
-  // Para valores mayores a 999, usar formato con K
+  // Para valores mayores a 999,999 usar formato con M (millones)
+  if (absValue >= 1000000) {
+    const millions = absValue / 1000000;
+    const formatted = millions.toFixed(2);
+    if (currency === 'ARS') {
+      return `${prefix}${symbol}${formatted}M ARS`;
+    }
+    return `${prefix}${symbol}${formatted}M`;
+  }
+  
+  // Para valores mayores a 999, usar formato con K (miles)
   if (absValue >= 1000) {
     const thousands = absValue / 1000;
     const formatted = thousands.toFixed(1);
-    return `${isNegative ? '-' : ''}${symbol} ${formatted}K`;
+    if (currency === 'ARS') {
+      return `${prefix}${symbol}${formatted}K ARS`;
+    }
+    return `${prefix}${symbol}${formatted}K`;
   }
   
   // Para valores menores, usar formato normal con decimales
   const formatted = absValue.toFixed(2);
-  return `${isNegative ? '-' : ''}${symbol} ${formatted}`;
+  if (currency === 'ARS') {
+    return `${prefix}${symbol}${formatted} ARS`;
+  }
+  return `${prefix}${symbol}${formatted}`;
 }
 
 /**
@@ -74,6 +92,33 @@ export function formatNumericInput(input: string): string {
   }
   
   return result;
+}
+
+/**
+ * Obtiene las clases de estilo para un badge de moneda
+ * @param currency Moneda ('USD' o 'ARS')
+ * @returns Objeto con clases de estilo para el badge
+ */
+export function getCurrencyBadgeStyles(currency: 'USD' | 'ARS'): { 
+  bgColor: string; 
+  textColor: string; 
+  borderColor: string;
+  label: string;
+} {
+  if (currency === 'ARS') {
+    return {
+      bgColor: 'bg-orange-50',
+      textColor: 'text-orange-700',
+      borderColor: 'border-orange-200',
+      label: 'ARS'
+    };
+  }
+  return {
+    bgColor: 'bg-green-50',
+    textColor: 'text-green-700',
+    borderColor: 'border-green-200',
+    label: 'USD'
+  };
 }
 
 /**
