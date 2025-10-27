@@ -3407,7 +3407,7 @@ const ProjectDetailsPage = () => {
                         <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
                           <DollarSign className="h-6 w-6 text-orange-600" />
                         </div>
-                        <div className="text-3xl font-bold text-orange-600 mb-1">
+                        <div className="text-2xl font-bold text-orange-600 mb-1 break-words">
                           {(() => {
                             const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
                               return sum + (member.costARS || 0);
