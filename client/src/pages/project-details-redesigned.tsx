@@ -3382,10 +3382,10 @@ const ProjectDetailsPage = () => {
                               <DollarSign className="h-6 w-6 text-red-600" />
                             </div>
                             <div className="text-3xl font-bold text-red-600 mb-1">
-                              {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
+                              {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative).replace('$ ', 'US$ ') : 'US$ 0'}
                             </div>
                             <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
-                            <div className="text-xs text-gray-500 mt-1">inversión total registrada</div>
+                            <div className="text-xs text-gray-500 mt-1">equivalente en dólares</div>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -3411,7 +3411,7 @@ const ProjectDetailsPage = () => {
                               <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-100 rounded-full mb-3">
                                 <DollarSign className="h-6 w-6 text-orange-600" />
                               </div>
-                              <div className="text-2xl font-bold text-orange-600 mb-1 break-words">
+                              <div className="text-3xl font-bold text-orange-600 mb-1 break-words">
                                 {(() => {
                                   const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
                                     return sum + (member.costARS || 0);
