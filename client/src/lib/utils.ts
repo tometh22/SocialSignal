@@ -6,9 +6,38 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Formatea un número completo para mostrar en tooltips
+ * Usa separador de miles y decimales apropiados
+ * @param value Valor a formatear
+ * @param currency Moneda ('USD' o 'ARS')
+ * @returns Cadena formateada completa
+ */
+export function formatCurrencyFull(value: number, currency: 'USD' | 'ARS' = 'USD'): string {
+  const absValue = Math.abs(value);
+  const isNegative = value < 0;
+  const prefix = isNegative ? '-' : '';
+  
+  // Para ARS usar formato con puntos como separadores de miles y coma para decimales
+  if (currency === 'ARS') {
+    const formatted = new Intl.NumberFormat('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(absValue);
+    return `${prefix}ARS ${formatted}`;
+  }
+  
+  // Para USD usar formato estándar
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(absValue);
+  return `${prefix}$ ${formatted}`;
+}
+
+/**
  * Formatea un número como moneda con soporte para ARS y USD
  * Muestra K para miles y M para millones automáticamente
- * Para ARS, añade el sufijo "ARS" para claridad
+ * Para ARS, añade el prefijo "ARS" para claridad
  * @param value Valor a formatear
  * @param currency Moneda ('USD' o 'ARS')
  * @returns Cadena formateada como moneda
@@ -17,16 +46,15 @@ export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): 
   const absValue = Math.abs(value);
   const isNegative = value < 0;
   const prefix = isNegative ? '-' : '';
-  const symbol = '$';
   
   // Para valores mayores a 999,999 usar formato con M (millones)
   if (absValue >= 1000000) {
     const millions = absValue / 1000000;
     const formatted = millions.toFixed(2);
     if (currency === 'ARS') {
-      return `${prefix}${symbol}${formatted}M ARS`;
+      return `${prefix}ARS ${formatted}M`;
     }
-    return `${prefix}${symbol}${formatted}M`;
+    return `${prefix}$ ${formatted}M`;
   }
   
   // Para valores mayores a 999, usar formato con K (miles)
@@ -34,17 +62,17 @@ export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): 
     const thousands = absValue / 1000;
     const formatted = thousands.toFixed(1);
     if (currency === 'ARS') {
-      return `${prefix}${symbol}${formatted}K ARS`;
+      return `${prefix}ARS ${formatted}K`;
     }
-    return `${prefix}${symbol}${formatted}K`;
+    return `${prefix}$ ${formatted}K`;
   }
   
   // Para valores menores, usar formato normal con decimales
   const formatted = absValue.toFixed(2);
   if (currency === 'ARS') {
-    return `${prefix}${symbol}${formatted} ARS`;
+    return `${prefix}ARS ${formatted}`;
   }
-  return `${prefix}${symbol}${formatted}`;
+  return `${prefix}$ ${formatted}`;
 }
 
 /**
