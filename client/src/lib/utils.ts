@@ -47,14 +47,15 @@ export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): 
   const isNegative = value < 0;
   const prefix = isNegative ? '-' : '';
   
+  console.log('🎨 formatCurrency called:', { value, currency, absValue });
+  
   // Para valores mayores a 999,999 usar formato con M (millones)
   if (absValue >= 1000000) {
     const millions = absValue / 1000000;
     const formatted = millions.toFixed(2);
-    if (currency === 'ARS') {
-      return `${prefix}ARS ${formatted}M`;
-    }
-    return `${prefix}$ ${formatted}M`;
+    const result = currency === 'ARS' ? `${prefix}ARS ${formatted}M` : `${prefix}$ ${formatted}M`;
+    console.log('💰 formatCurrency returning (millions):', result);
+    return result;
   }
   
   // Para valores mayores a 999, usar formato con K (miles)
