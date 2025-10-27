@@ -3416,7 +3416,22 @@ const ProjectDetailsPage = () => {
                                   const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
                                     return sum + (member.costARS || 0);
                                   }, 0) || 0;
-                                  return formatCurrency(totalARS, 'ARS');
+                                  
+                                  const absValue = Math.abs(totalARS);
+                                  const isNegative = totalARS < 0;
+                                  const prefix = isNegative ? '-' : '';
+                                  
+                                  if (absValue >= 1000000) {
+                                    const millions = absValue / 1000000;
+                                    return `${prefix}ARS ${millions.toFixed(2)}M`;
+                                  }
+                                  
+                                  if (absValue >= 1000) {
+                                    const thousands = absValue / 1000;
+                                    return `${prefix}ARS ${thousands.toFixed(2)}K`;
+                                  }
+                                  
+                                  return `${prefix}ARS ${absValue.toFixed(2)}`;
                                 })()}
                               </div>
                               <div className="text-sm font-medium text-gray-600">Costo Real del Equipo</div>
@@ -3430,7 +3445,15 @@ const ProjectDetailsPage = () => {
                                 const totalARS = projectVM?.teamBreakdown?.reduce((sum, member) => {
                                   return sum + (member.costARS || 0);
                                 }, 0) || 0;
-                                return formatCurrencyFull(totalARS, 'ARS');
+                                
+                                const absValue = Math.abs(totalARS);
+                                const isNegative = totalARS < 0;
+                                const prefix = isNegative ? '-' : '';
+                                
+                                return `${prefix}ARS ${absValue.toLocaleString('es-AR', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}`;
                               })()}
                             </p>
                           </TooltipContent>
