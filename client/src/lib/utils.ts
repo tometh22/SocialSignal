@@ -40,7 +40,7 @@ export function formatCurrencyFull(value: number, currency: 'USD' | 'ARS' = 'USD
  * Para ARS, añade el prefijo "ARS" para claridad
  * @param value Valor a formatear
  * @param currency Moneda ('USD' o 'ARS')
- * @returns Cadena formateada como moneda
+ * @returns Cadena formateada como moneda (version 2.0)
  */
 export function formatCurrency(value: number, currency: 'USD' | 'ARS' = 'USD'): string {
   const absValue = Math.abs(value);
