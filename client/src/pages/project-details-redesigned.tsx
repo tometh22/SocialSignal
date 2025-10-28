@@ -56,7 +56,8 @@ import {
   Brain,
   XCircle,
   Cog,
-  Award
+  Award,
+  Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,7 +87,7 @@ import { CostDashboard } from "@/components/CostDashboard";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 
 interface ProjectMetric {
@@ -874,6 +875,78 @@ function ProjectTeamSection({
   );
 }
 
+// 📊 Simple Sparkline Component
+function Sparkline({ data, color = "white", className = "" }: { data: number[], color?: string, className?: string }) {
+  // Handle edge cases
+  if (!data || data.length === 0) return null;
+  
+  const width = 80;
+  const height = 24;
+  
+  // Single data point - render as a horizontal line
+  if (data.length === 1) {
+    const y = height / 2;
+    return (
+      <svg width={width} height={height} className={className}>
+        <line
+          x1="0"
+          y1={y}
+          x2={width}
+          y2={y}
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity="0.8"
+        />
+      </svg>
+    );
+  }
+  
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  
+  const points = data.map((value, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((value - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+  
+  return (
+    <svg width={width} height={height} className={className}>
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.8"
+      />
+    </svg>
+  );
+}
+
+// 🎨 Get threshold color for KPIs
+function getThresholdColor(value: number, metric: 'margin' | 'markup' | 'roi'): string {
+  if (metric === 'margin') {
+    if (value >= 30) return 'text-green-400';
+    if (value >= 15) return 'text-yellow-300';
+    return 'text-red-400';
+  }
+  if (metric === 'markup') {
+    if (value >= 2.0) return 'text-green-400';
+    if (value >= 1.5) return 'text-yellow-300';
+    return 'text-red-400';
+  }
+  if (metric === 'roi') {
+    if (value >= 50) return 'text-green-400';
+    if (value >= 25) return 'text-yellow-300';
+    return 'text-red-400';
+  }
+  return 'text-white';
+}
+
 const ProjectDetailsPage = () => {
   // Obtener projectId de la URL de manera más robusta
   const [location, setLocation] = useLocation();
@@ -1043,6 +1116,12 @@ const ProjectDetailsPage = () => {
     finalPeriod, // 🎯 Use URL period or calculated period from filter
     selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)
   );
+
+  // 📊 Datos de tendencias mensuales para sparklines y gráficos
+  const { data: monthlyTrends } = useQuery({
+    queryKey: [`/api/projects/${projectId}/monthly-trends`, selectedView],
+    enabled: !!projectId,
+  });
 
   // Cliente del proyecto
   const { data: client } = useQuery({
@@ -1419,6 +1498,29 @@ const ProjectDetailsPage = () => {
     periodFromUrl,
     periodFromFilter
   ]);
+
+  // 📊 Procesar datos de tendencias mensuales para sparklines
+  const trendData = useMemo(() => {
+    if (!monthlyTrends?.rows || monthlyTrends.rows.length === 0) {
+      return { markup: [], margin: [], burnRate: [], roi: [] };
+    }
+    
+    // Ordenar por período y tomar últimos 6 meses
+    const sorted = [...monthlyTrends.rows]
+      .sort((a: any, b: any) => a.period.localeCompare(b.period))
+      .slice(-6);
+    
+    return {
+      markup: sorted.map((row: any) => row.markup || 0),
+      margin: sorted.map((row: any) => (row.margin_pct || 0)),
+      burnRate: sorted.map((row: any) => 
+        row.hours_asana > 0 ? row.cost_usd / row.hours_asana : 0
+      ),
+      roi: sorted.map((row: any) => 
+        row.markup ? (row.markup - 1) * 100 : 0
+      )
+    };
+  }, [monthlyTrends]);
 
   // MÉTRICAS SIMPLIFICADAS - TODAS DESDE SINGLE SOURCE OF TRUTH
   const metrics = useMemo(() => {
@@ -3722,25 +3824,26 @@ const ProjectDetailsPage = () => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-violet-100 text-sm">Markup</p>
-                              <Info className="h-3 w-3 text-violet-200" />
-                            </div>
-                            <p className="text-2xl font-bold">
-                              {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
-                            </p>
-                            <p className="text-xs text-violet-200">
-                              {(() => {
-                                if (!projectVM) return '$0 sobre costo';
-                                const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                                return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
-                              })()}
-                            </p>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <p className="text-violet-100 text-sm">Markup</p>
+                            <Info className="h-3 w-3 text-violet-200" />
                           </div>
                           <DollarSign className="h-6 w-6 text-violet-200" />
                         </div>
+                        <p className={`text-2xl font-bold ${getThresholdColor(projectVM?.markup || 0, 'markup')}`}>
+                          {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
+                        </p>
+                        <p className="text-xs text-violet-200 mb-2">
+                          {(() => {
+                            if (!projectVM) return '$0 sobre costo';
+                            const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                            return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
+                          })()}
+                        </p>
+                        {trendData.markup.length > 0 && (
+                          <Sparkline data={trendData.markup} color="#ffffff" />
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
@@ -3758,25 +3861,26 @@ const ProjectDetailsPage = () => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-violet-100 text-sm">Margen Operativo</p>
-                              <Info className="h-3 w-3 text-violet-200" />
-                            </div>
-                            <p className="text-2xl font-bold">
-                              {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
-                            </p>
-                            <p className="text-xs text-violet-200">
-                              {(() => {
-                                if (!projectVM) return '$0 beneficio';
-                                const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                                return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
-                              })()}
-                            </p>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <p className="text-violet-100 text-sm">Margen Operativo</p>
+                            <Info className="h-3 w-3 text-violet-200" />
                           </div>
                           <TrendingUp className="h-6 w-6 text-violet-200" />
                         </div>
+                        <p className={`text-2xl font-bold ${getThresholdColor((projectVM?.margin || 0) * 100, 'margin')}`}>
+                          {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
+                        </p>
+                        <p className="text-xs text-violet-200 mb-2">
+                          {(() => {
+                            if (!projectVM) return '$0 beneficio';
+                            const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                            return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
+                          })()}
+                        </p>
+                        {trendData.margin.length > 0 && (
+                          <Sparkline data={trendData.margin} color="#ffffff" />
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
@@ -3794,25 +3898,26 @@ const ProjectDetailsPage = () => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-violet-100 text-sm">Burn Rate</p>
-                              <Info className="h-3 w-3 text-violet-200" />
-                            </div>
-                            <p className="text-2xl font-bold">
-                              {(() => {
-                                if (!projectVM) return '$0';
-                                const burnPerHour = projectVM.totalAsanaHours > 0 
-                                  ? projectVM.costDisplay / projectVM.totalAsanaHours 
-                                  : 0;
-                                return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
-                              })()}
-                            </p>
-                            <p className="text-xs text-violet-200">costo por hora trabajada</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <p className="text-violet-100 text-sm">Burn Rate</p>
+                            <Info className="h-3 w-3 text-violet-200" />
                           </div>
                           <Flame className="h-6 w-6 text-violet-200" />
                         </div>
+                        <p className="text-2xl font-bold text-white">
+                          {(() => {
+                            if (!projectVM) return '$0';
+                            const burnPerHour = projectVM.totalAsanaHours > 0 
+                              ? projectVM.costDisplay / projectVM.totalAsanaHours 
+                              : 0;
+                            return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
+                          })()}
+                        </p>
+                        <p className="text-xs text-violet-200 mb-2">costo por hora trabajada</p>
+                        {trendData.burnRate.length > 0 && (
+                          <Sparkline data={trendData.burnRate} color="#ffffff" />
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
@@ -3830,29 +3935,30 @@ const ProjectDetailsPage = () => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-violet-100 text-sm">ROI del Proyecto</p>
-                              <Info className="h-3 w-3 text-violet-200" />
-                            </div>
-                            <p className="text-2xl font-bold">
-                              {(() => {
-                                if (!projectVM || !projectVM.markup) return '0%';
-                                const roi = (projectVM.markup - 1) * 100;
-                                return roi.toFixed(0);
-                              })()}%
-                            </p>
-                            <p className="text-xs text-violet-200">
-                              {(() => {
-                                if (!projectVM || !projectVM.markup) return 'N/A';
-                                const roi = (projectVM.markup - 1) * 100;
-                                return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
-                              })()} retorno
-                            </p>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-1">
+                            <p className="text-violet-100 text-sm">ROI del Proyecto</p>
+                            <Info className="h-3 w-3 text-violet-200" />
                           </div>
                           <Target className="h-6 w-6 text-violet-200" />
                         </div>
+                        <p className={`text-2xl font-bold ${getThresholdColor(projectVM?.markup ? (projectVM.markup - 1) * 100 : 0, 'roi')}`}>
+                          {(() => {
+                            if (!projectVM || !projectVM.markup) return '0%';
+                            const roi = (projectVM.markup - 1) * 100;
+                            return roi.toFixed(0);
+                          })()}%
+                        </p>
+                        <p className="text-xs text-violet-200 mb-2">
+                          {(() => {
+                            if (!projectVM || !projectVM.markup) return 'N/A';
+                            const roi = (projectVM.markup - 1) * 100;
+                            return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
+                          })()} retorno
+                        </p>
+                        {trendData.roi.length > 0 && (
+                          <Sparkline data={trendData.roi} color="#ffffff" />
+                        )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
@@ -3866,6 +3972,431 @@ const ProjectDetailsPage = () => {
                 </TooltipProvider>
               </div>
             </div>
+
+            {/* MONTHLY TRENDS CHART */}
+            {monthlyTrends?.rows && monthlyTrends.rows.length > 0 && (
+              <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Tendencia Mensual</h3>
+                    <p className="text-sm text-gray-500">Evolución de ingresos, costos y margen</p>
+                  </div>
+                  <Activity className="h-5 w-5 text-indigo-600" />
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RechartsLineChart data={monthlyTrends.rows.sort((a: any, b: any) => a.period.localeCompare(b.period))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="period" 
+                      stroke="#6b7280"
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => {
+                        const date = new Date(value + '-01');
+                        return date.toLocaleDateString('es', { month: 'short', year: '2-digit' });
+                      }}
+                    />
+                    <YAxis yAxisId="left" stroke="#6b7280" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#6b7280" tick={{ fontSize: 12 }} tickFormatter={(value) => `${value}%`} />
+                    <RechartsTooltip 
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                      labelFormatter={(value) => {
+                        const date = new Date(value + '-01');
+                        return date.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+                      }}
+                      formatter={(value: any, name: string) => {
+                        if (name === 'Margen %') return `${Number(value).toFixed(1)}%`;
+                        return `$${Number(value).toLocaleString()}`;
+                      }}
+                    />
+                    <Legend />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="revenue_usd" 
+                      name="Ingresos" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={{ fill: '#10b981', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="cost_usd" 
+                      name="Costos" 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      dot={{ fill: '#ef4444', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      yAxisId="right"
+                      type="monotone" 
+                      dataKey="margin_pct" 
+                      name="Margen %" 
+                      stroke="#6366f1" 
+                      strokeWidth={2}
+                      dot={{ fill: '#6366f1', r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </RechartsLineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* WATERFALL CHART */}
+            {projectVM && (
+              <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Flujo Financiero (Waterfall)</h3>
+                    <p className="text-sm text-gray-500">Desde ingresos hasta resultado neto</p>
+                  </div>
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex items-end justify-around h-64 relative">
+                  {/* Base line */}
+                  <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-300"></div>
+                  
+                  {/* Ingresos Bar */}
+                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                    <div 
+                      className="bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg w-full transition-all duration-500 shadow-lg"
+                      style={{ 
+                        height: `${Math.min((projectVM.revenueDisplay / Math.max(projectVM.revenueDisplay, projectVM.costDisplay, 1)) * 200, 200)}px`,
+                      }}
+                    ></div>
+                    <div className="mt-2 text-center">
+                      <p className="text-xs font-medium text-gray-600">Ingresos</p>
+                      <p className="text-sm font-bold text-green-700">
+                        {formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex items-center mb-12">
+                    <ChevronDown className="h-6 w-6 text-gray-400 rotate-[-90deg]" />
+                  </div>
+
+                  {/* Costos Bar (negative) */}
+                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                    <div className="relative w-full flex flex-col items-center">
+                      <div className="text-center mb-2">
+                        <p className="text-xs font-medium text-gray-600">Menos Costos</p>
+                        <p className="text-sm font-bold text-red-700">
+                          -{formatCurrency(projectVM.costDisplay, projectVM.currencyNative)}
+                        </p>
+                      </div>
+                      <div 
+                        className="bg-gradient-to-t from-red-500 to-red-400 rounded-t-lg w-full transition-all duration-500 shadow-lg border-2 border-red-600"
+                        style={{ 
+                          height: `${Math.min((projectVM.costDisplay / Math.max(projectVM.revenueDisplay, projectVM.costDisplay, 1)) * 200, 200)}px`,
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Arrow */}
+                  <div className="flex items-center mb-12">
+                    <ChevronDown className="h-6 w-6 text-gray-400 rotate-[-90deg]" />
+                  </div>
+
+                  {/* Beneficio Neto Bar */}
+                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                    {(() => {
+                      const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                      const isPositive = profit >= 0;
+                      return (
+                        <>
+                          <div 
+                            className={`rounded-t-lg w-full transition-all duration-500 shadow-lg ${
+                              isPositive 
+                                ? 'bg-gradient-to-t from-blue-500 to-blue-400' 
+                                : 'bg-gradient-to-t from-orange-500 to-orange-400'
+                            }`}
+                            style={{ 
+                              height: `${Math.min((Math.abs(profit) / Math.max(projectVM.revenueDisplay, projectVM.costDisplay, 1)) * 200, 200)}px`,
+                            }}
+                          ></div>
+                          <div className="mt-2 text-center">
+                            <p className="text-xs font-medium text-gray-600">Resultado Neto</p>
+                            <p className={`text-sm font-bold ${isPositive ? 'text-blue-700' : 'text-orange-700'}`}>
+                              {formatCurrency(profit, projectVM.currencyNative)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {isPositive ? 'Ganancia' : 'Pérdida'}
+                            </p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* UNIT ECONOMICS */}
+            {projectVM && projectVM.totalAsanaHours > 0 && (
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 shadow-sm p-6 mb-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-indigo-600 rounded-lg">
+                    <Calculator className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900">Unit Economics</h3>
+                    <p className="text-sm text-gray-600">Métricas por hora de trabajo</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Precio por Hora (Revenue/Billing Hours) */}
+                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                      </div>
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">Precio por Hora</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(
+                        projectVM.totalAsanaHours > 0 ? projectVM.revenueDisplay / projectVM.totalAsanaHours : 0,
+                        projectVM.currencyNative
+                      )}/h
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Revenue ÷ Horas trabajadas</p>
+                  </div>
+
+                  {/* Costo por Hora */}
+                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-red-100 rounded-lg">
+                        <Flame className="h-4 w-4 text-red-600" />
+                      </div>
+                      <TrendingDown className="h-4 w-4 text-red-500" />
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">Costo por Hora</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(
+                        projectVM.totalAsanaHours > 0 ? projectVM.costDisplay / projectVM.totalAsanaHours : 0,
+                        projectVM.currencyNative
+                      )}/h
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Costo ÷ Horas trabajadas</p>
+                  </div>
+
+                  {/* Realization Rate */}
+                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Percent className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <Activity className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">Realization Rate</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        const estimatedHours = projectVM.estimatedHours || 0;
+                        const realizationRate = estimatedHours > 0 
+                          ? (projectVM.totalAsanaHours / estimatedHours) * 100 
+                          : 0;
+                        return `${realizationRate.toFixed(0)}%`;
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Horas trabajadas vs estimadas</p>
+                  </div>
+
+                  {/* EBIT por Hora */}
+                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Target className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <Star className="h-4 w-4 text-purple-500" />
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">EBIT por Hora</p>
+                    <p className={`text-2xl font-bold ${
+                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {formatCurrency(
+                        projectVM.totalAsanaHours > 0 
+                          ? (projectVM.revenueDisplay - projectVM.costDisplay) / projectVM.totalAsanaHours 
+                          : 0,
+                        projectVM.currencyNative
+                      )}/h
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Beneficio ÷ Horas trabajadas</p>
+                  </div>
+                </div>
+
+                {/* Interpretation Guide */}
+                <div className="mt-4 bg-white/60 rounded-lg p-4 border border-indigo-100">
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    <strong>💡 Interpretación:</strong> Precio/h {'>'} Costo/h = Rentable. 
+                    Realization Rate {'>'} 100% indica sobre-uso de horas vs presupuesto. 
+                    EBIT/h positivo es el objetivo final.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* HEALTH PANEL - AUTOMATED ALERTS */}
+            {projectVM && (() => {
+              const alerts = [];
+              
+              // Alert 1: Budget Overrun
+              if (projectVM.budgetUtilization && projectVM.budgetUtilization > 1.0) {
+                const overrun = ((projectVM.budgetUtilization - 1) * 100).toFixed(1);
+                alerts.push({
+                  type: 'error',
+                  icon: AlertCircle,
+                  title: 'Sobrecosto Detectado',
+                  message: `El proyecto excede el presupuesto en ${overrun}%. Se están usando más recursos de los planificados.`,
+                  recommendation: 'Revisar scope creep, optimizar recursos o renegociar presupuesto con cliente.'
+                });
+              }
+              
+              // Alert 2: Low Margin
+              if (projectVM.margin != null && projectVM.margin < 0.15) {
+                alerts.push({
+                  type: 'warning',
+                  icon: TrendingDown,
+                  title: 'Margen Bajo',
+                  message: `Margen operativo de ${(projectVM.margin * 100).toFixed(1)}% está por debajo del objetivo (15%).`,
+                  recommendation: 'Incrementar facturación, reducir costos operativos o revisar pricing strategy.'
+                });
+              }
+              
+              // Alert 3: Negative Profit
+              const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+              if (profit < 0) {
+                alerts.push({
+                  type: 'error',
+                  icon: XCircle,
+                  title: 'Proyecto en Pérdida',
+                  message: `Resultado neto negativo: ${formatCurrency(profit, projectVM.currencyNative)}`,
+                  recommendation: 'Acción inmediata requerida. Revisar viabilidad del proyecto o buscar value recovery.'
+                });
+              }
+              
+              // Alert 4: Low Efficiency (if available)
+              if (efficiencyFromDeviationAPI != null && efficiencyFromDeviationAPI < 80) {
+                alerts.push({
+                  type: 'warning',
+                  icon: Gauge,
+                  title: 'Eficiencia Baja',
+                  message: `Eficiencia del equipo en ${efficiencyFromDeviationAPI.toFixed(1)}%, por debajo del estándar (80%).`,
+                  recommendation: 'Identificar blockers, mejorar procesos o proveer capacitación al equipo.'
+                });
+              }
+              
+              // Alert 5: Currency Risk (if native currency is not USD)
+              if (projectVM.currencyNative === 'ARS') {
+                alerts.push({
+                  type: 'info',
+                  icon: Info,
+                  title: 'Riesgo Cambiario',
+                  message: 'Proyecto en ARS expuesto a volatilidad del tipo de cambio.',
+                  recommendation: 'Considerar cláusula de ajuste FX o facturación en USD para proyectos futuros.'
+                });
+              }
+              
+              // Alert 6: High Realization Rate (over budget hours)
+              const realizationRate = projectVM.estimatedHours > 0 
+                ? (projectVM.totalAsanaHours / projectVM.estimatedHours) * 100 
+                : 0;
+              if (realizationRate > 110) {
+                alerts.push({
+                  type: 'warning',
+                  icon: Clock,
+                  title: 'Sobre-uso de Horas',
+                  message: `El equipo trabajó ${realizationRate.toFixed(0)}% de las horas estimadas (${projectVM.totalAsanaHours.toFixed(1)}h vs ${projectVM.estimatedHours.toFixed(1)}h).`,
+                  recommendation: 'Evaluar si la estimación inicial fue incorrecta o si hubo scope creep.'
+                });
+              }
+
+              return alerts.length > 0 ? (
+                <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Panel de Salud del Proyecto</h3>
+                      <p className="text-sm text-gray-600">{alerts.length} alerta{alerts.length > 1 ? 's' : ''} detectada{alerts.length > 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {alerts.map((alert, index) => (
+                      <div 
+                        key={index}
+                        className={`rounded-lg p-4 border-l-4 ${
+                          alert.type === 'error' 
+                            ? 'bg-red-50 border-red-500' 
+                            : alert.type === 'warning' 
+                            ? 'bg-yellow-50 border-yellow-500' 
+                            : 'bg-blue-50 border-blue-500'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            alert.type === 'error' 
+                              ? 'bg-red-100' 
+                              : alert.type === 'warning' 
+                              ? 'bg-yellow-100' 
+                              : 'bg-blue-100'
+                          }`}>
+                            <alert.icon className={`h-5 w-5 ${
+                              alert.type === 'error' 
+                                ? 'text-red-600' 
+                                : alert.type === 'warning' 
+                                ? 'text-yellow-600' 
+                                : 'text-blue-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-semibold mb-1 ${
+                              alert.type === 'error' 
+                                ? 'text-red-900' 
+                                : alert.type === 'warning' 
+                                ? 'text-yellow-900' 
+                                : 'text-blue-900'
+                            }`}>
+                              {alert.title}
+                            </h4>
+                            <p className={`text-sm mb-2 ${
+                              alert.type === 'error' 
+                                ? 'text-red-700' 
+                                : alert.type === 'warning' 
+                                ? 'text-yellow-700' 
+                                : 'text-blue-700'
+                            }`}>
+                              {alert.message}
+                            </p>
+                            <p className="text-xs text-gray-600 bg-white/60 rounded px-2 py-1">
+                              <strong>💡 Recomendación:</strong> {alert.recommendation}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {alerts.filter(a => a.type === 'error').length === 0 && (
+                    <div className="mt-4 bg-green-50 rounded-lg p-4 border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <p className="text-sm text-green-800">
+                          <strong>Ninguna alerta crítica.</strong> El proyecto está dentro de parámetros aceptables.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
 
             {/* FINANCIAL PROJECTIONS & ANALYSIS */}
             <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
