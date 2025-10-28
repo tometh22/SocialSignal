@@ -1407,6 +1407,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // RUTA RESTAURADA TEMPORALMENTE PARA DEBUG
   const { completeDataHandler } = await import('./routes/complete-data');
   app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
+
+  // 📊 ENDPOINT: Monthly trends from Star Schema agg_project_month
+  app.get('/api/projects/:id/monthly-trends', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      const { months = '6' } = req.query;
+      const monthsLimit = parseInt(months as string) || 6;
+
+      // Obtener datos mensuales desde Star Schema
+      const { rows } = await db.execute(sql`
+        SELECT 
+          period_key,
+          CAST(est_hours AS NUMERIC) as est_hours,
+          CAST(total_asana_hours AS NUMERIC) as total_asana_hours,
+          CAST(total_billing_hours AS NUMERIC) as total_billing_hours,
+          CAST(total_cost_ars AS NUMERIC) as total_cost_ars,
+          CAST(total_cost_usd AS NUMERIC) as total_cost_usd,
+          CAST(view_operativa_revenue AS NUMERIC) as revenue,
+          CAST(view_operativa_cost AS NUMERIC) as cost,
+          CAST(view_operativa_denom AS NUMERIC) as budget,
+          CAST(view_operativa_markup AS NUMERIC) as markup,
+          CAST(view_operativa_margin AS NUMERIC) as margin,
+          CAST(view_operativa_budget_util AS NUMERIC) as budget_util,
+          CAST(rc_revenue_native AS NUMERIC) as rc_revenue,
+          CAST(rc_cost_native AS NUMERIC) as rc_cost,
+          CAST(fx AS NUMERIC) as fx_rate
+        FROM agg_project_month
+        WHERE project_id = ${projectId}
+        ORDER BY period_key DESC
+        LIMIT ${monthsLimit}
+      `);
+
+      // Ordenar por fecha ascendente para sparklines
+      const trends = rows.reverse().map((row: any) => ({
+        period: row.period_key,
+        revenue: Number(row.revenue || 0),
+        cost: Number(row.cost || 0),
+        margin: Number(row.margin || 0),
+        markup: Number(row.markup || 0),
+        budgetUtilization: Number(row.budget_util || 0),
+        estHours: Number(row.est_hours || 0),
+        asanaHours: Number(row.total_asana_hours || 0),
+        billingHours: Number(row.total_billing_hours || 0),
+        fxRate: Number(row.fx_rate || 0)
+      }));
+
+      res.json({
+        projectId,
+        trends,
+        monthsCount: trends.length
+      });
+
+    } catch (error) {
+      console.error("❌ Error fetching monthly trends:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch monthly trends",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
   /*
   // RUTA ORIGINAL COMENTADA
   app.get('/api/projects/:id/complete-data', requireAuth, async (req, res) => {
