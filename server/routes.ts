@@ -1536,21 +1536,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 11. Calcular Riesgo Operativo (0-100)
       const totalCapacity = Array.from(capacityMap.values()).reduce((sum, cap) => sum + (cap * 4 * periodsCount), 0);
       const wipCapRatio = totalCapacity > 0 ? wipTotal / totalCapacity : 0;
-      const wipScore = Math.min(wipCapRatio * 40, 40);
+      const wipScore = Math.min(wipCapRatio * 100, 40);
 
       const overloadedCount = workloadData.filter(w => w.utilizationRate > 100).length;
       const overloadScore = workloadData.length > 0 ? (overloadedCount / workloadData.length) * 30 : 0;
 
       const uniqueRoles = new Set(Array.from(roleByPersonId.values())).size;
-      const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
+      const dependencyScore = uniqueRoles <= 1 ? 30 : uniqueRoles <= 3 ? 20 : 10;
 
       const operationalRisk = Math.min(wipScore + overloadScore + dependencyScore, 100);
 
       // 12. Generar acciones recomendadas
       const actions = [];
       const overloadedMembers = workloadData.filter(w => w.utilizationRate > 100);
+      const highUtilizationMembers = workloadData.filter(w => w.utilizationRate > 85 && w.utilizationRate <= 100);
       const underutilizedMembers = workloadData.filter(w => w.utilizationRate < 60);
 
+      // Acción 1: Balancear carga si hay sobrecarga y subutilización
       if (overloadedMembers.length > 0 && underutilizedMembers.length > 0) {
         const topOverloaded = overloadedMembers[0];
         const topUnderutilized = underutilizedMembers[0];
@@ -1567,24 +1569,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Acción 2: Repriorizar si hay miembros sobrecargados
       if (overloadedMembers.length > 0) {
         actions.push({
           icon: '🎯',
-          priority: 'medium',
+          priority: 'high',
           title: 'Repriorizar Tareas',
           description: `Revisar backlog de ${overloadedMembers[0].name} y delegar tareas no críticas`
         });
       }
 
-      if (wipCapRatio > 0.9) {
+      // Acción 3: Reducir WIP si está alto (>70% de capacidad)
+      if (wipCapRatio > 0.7 && wipCapRatio <= 0.9) {
         actions.push({
-          icon: '🔔',
+          icon: '📉',
           priority: 'medium',
-          title: 'Crear Alerta',
-          description: 'Configurar alerta si WIP/Cap > 90% durante 3 días'
+          title: 'Reducir WIP',
+          description: `WIP al ${(wipCapRatio * 100).toFixed(0)}% de capacidad. Considerar limitar trabajo en paralelo.`
         });
       }
 
+      // Acción 4: Alerta crítica si WIP está muy alto (>90%)
+      if (wipCapRatio > 0.9) {
+        actions.push({
+          icon: '🚨',
+          priority: 'high',
+          title: 'WIP Crítico',
+          description: `WIP al ${(wipCapRatio * 100).toFixed(0)}%. Pausar nuevas tareas y completar las en curso.`
+        });
+      }
+
+      // Acción 5: Mitigar dependencias si hay pocos roles
+      if (uniqueRoles <= 2) {
+        actions.push({
+          icon: '👥',
+          priority: 'medium',
+          title: 'Reducir Dependencias',
+          description: `Solo ${uniqueRoles} rol(es) en equipo. Considerar documentación o knowledge sharing.`
+        });
+      }
+
+      // Acción 6: Distribuir conocimiento si hay alta utilización concentrada
+      if (highUtilizationMembers.length > 0 && uniqueRoles <= 3) {
+        actions.push({
+          icon: '📚',
+          priority: 'medium',
+          title: 'Compartir Conocimiento',
+          description: `${highUtilizationMembers.length} miembro(s) con alta carga. Revisar knowledge silos.`
+        });
+      }
+
+      // Acción 7: Mantener si todo está bien
       if (actions.length === 0) {
         actions.push({
           icon: '✅',
