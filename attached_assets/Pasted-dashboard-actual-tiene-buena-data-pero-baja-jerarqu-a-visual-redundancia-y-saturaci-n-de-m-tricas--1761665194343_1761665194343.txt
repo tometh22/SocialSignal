@@ -1,0 +1,83 @@
+dashboard actual tiene buena data pero baja jerarquía visual, redundancia y saturación de métricas. Vamos a desmenuzarlo desde un enfoque de product design + UX financiero para dejarlo limpio, jerárquico y con storytelling analítico.
+🔍 Diagnóstico visual y funcional
+1. Problema principal: redundancia + pérdida de jerarquía
+Hay 3 secciones que muestran el mismo número de beneficio/margen (ROI, Beneficio Neto, Margen Operativo, Margen %, Punto de Equilibrio).
+👉 El usuario siente que ve lo mismo con distinto nombre.
+La proporción visual entre tarjetas es pareja (todas rectangulares iguales), lo cual aplasta la lectura jerárquica: no hay “momento wow” ni foco principal.
+Espaciados desiguales y mezcla de fondos (violeta, lilas, blancos) generan sensación de desorden.
+2. Problema conceptual: métricas repetidas sin contexto
+El “Unit Economics” está bien, pero repite información del bloque principal (por ej. Burn Rate y Costo por hora).
+“Proyecciones” no proyecta: muestra los mismos valores actuales.
+“Waterfall”, “Comparación Financiera” y “Punto de Equilibrio” cuentan la misma historia con 3 visualizaciones distintas → esto confunde en vez de sumar.
+3. Problema UX: no hay flujo narrativo
+La pantalla no guía al usuario a una conclusión. El orden actual:
+KPI generales → waterfall → unit economics → proyecciones → comparación → costos → eficiencia → salud → equilibrio
+parece un dump de widgets, no un storyboard analítico.
+🧠 Recomendación de arquitectura narrativa (versión pro)
+Objetivo: mostrar el camino “¿Estoy ganando plata? ¿Por qué? ¿Qué puedo optimizar?”
+🟣 BLOQUE 1 – Resumen ejecutivo (header compacto)
+Renombrar: Overview Financiero
+Mostrar 4 KPIs clave con mini sparklines:
+ROI
+Margen Operativo
+Burn Rate
+Estado (Rentable / En Riesgo)
+Encima, una línea contextual:
+“Vista: Operativa | Periodo: Mes actual | Moneda: USD”
+El botón “Exportar” puede ir arriba a la derecha, más chico, con ícono minimalista.
+💵 BLOQUE 2 – Flujo de resultados (la historia)
+Un solo gráfico Waterfall completo (Ingresos → Costos Directos → Indirectos → Beneficio).
+Tooltip por paso con fórmula + % sobre ingresos.
+Evita duplicar con “Comparación financiera”.
+Añadir debajo una línea de resumen interpretativa:
+“El 71% de margen operativo indica alta eficiencia frente a costos directos”.
+⚙️ BLOQUE 3 – Unit Economics
+Clarísimo, pero necesita jerarquía y menos repetición.
+Mantener:
+Precio por hora
+Costo por hora
+Realization Rate
+EBIT por hora
+Eliminar: Burn Rate (ya mostrado arriba)
+Agregar: Utilización (% horas facturadas / horas disponibles)
+💡 Añadí una barra visual tipo “gauge” o “progress ring” por métrica, con umbrales (rojo/amarillo/verde).
+📈 BLOQUE 4 – Proyecciones y Escenarios
+Renombrar a “Forecast & Escenarios”
+Mostrar:
+Gráfico de línea (3 meses) con proyección de cashflow.
+Mini tabla debajo: Base / Optimista / Pesimista.
+Eliminar el bloque actual de “Proyecciones” (no aporta valor real).
+💰 BLOQUE 5 – Costos & Eficiencia
+Combinar “Análisis de Costos por Categoría” + “Eficiencia de Recursos”.
+Dos tabs:
+Por Rol / Por Persona
+Por Tipo (Directo / Indirecto)
+Mostrar % del total y coste hora.
+“Eficiencia Global” (90.1%) puede ser una métrica resumen arriba.
+💡 BLOQUE 6 – Salud Financiera / Break-even
+Integrar en una sola tarjeta inteligente de estado financiero:
+“Salud: 71/100 · Bueno”
+Subtexto: “Margen actual 71.2% — Punto de equilibrio alcanzado”.
+Y debajo, un badge dinámico:
+🟢 Rentable / 🟡 Riesgo / 🔴 Pérdida.
+🎨 Recomendaciones visuales (UI/UX)
+Color principal: mantener el violeta, pero usarlo solo en header.
+Secciones intermedias → fondo blanco con sombras suaves.
+Margen vertical consistente (40px) entre secciones.
+Reducir la cantidad de tonos pastel simultáneos.
+Ideal: violeta (KPI), verde (positivo), rojo (costo/pérdida), azul (neutral).
+Tipografía: usa escalas claras de jerarquía:
+H1 (24px bold) → nombre sección
+H2 (18px semibold) → subtítulo
+Body (14px) → datos numéricos
+Small (12px gray) → labels/fórmulas
+Indicadores visuales clave:
+✅ / ⚠️ / ❌ para performance (sin leer texto)
+Mini-trendlines para mostrar evolución temporal.
+🚀 Propuesta de flujo final
+1️⃣ Header: título + KPIs principales
+2️⃣ Flujo financiero: waterfall + breve insight
+3️⃣ Unit Economics: tasas clave con gauges
+4️⃣ Forecast: cashflow y escenarios
+5️⃣ Costos & Eficiencia: análisis cruzado
+6️⃣ Salud Financiera: puntuación + estado global

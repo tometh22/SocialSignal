@@ -3785,307 +3785,226 @@ const ProjectDetailsPage = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="financial-analysis" className="space-y-6">
-            {/* IMPROVED HEADER WITH TOOLBAR */}
-            <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-8 text-white">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">Finanzas & Unit Economics</h2>
-                  <p className="text-violet-100">Rentabilidad, eficiencia y proyección de caja • Vista: {selectedView} • Moneda: {projectVM?.currencyNative || 'USD'}</p>
+          <TabsContent value="financial-analysis" className="space-y-10">
+            {/* BLOQUE 1: OVERVIEW FINANCIERO - Header compacto con jerarquía clara */}
+            <div>
+              {/* Línea contextual */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-gray-600">
+                  Vista: <span className="font-semibold text-gray-900">{selectedView}</span> • 
+                  Periodo: <span className="font-semibold text-gray-900">{dateFilter.label}</span> • 
+                  Moneda: <span className="font-semibold text-gray-900">{projectVM?.currencyNative || 'USD'}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      const roi = projectVM?.markup ? ((projectVM.markup - 1) * 100).toFixed(1) : '0';
-                      const burnRate = (projectVM?.totalAsanaHours && projectVM.totalAsanaHours > 0) ? (projectVM.costDisplay / projectVM.totalAsanaHours).toFixed(2) : '0';
-                      const csv = `Métrica,Valor\nIngresos,${projectVM?.revenueDisplay || 0}\nCostos,${projectVM?.costDisplay || 0}\nMargen,${((projectVM?.margin || 0) * 100).toFixed(1)}%\nMarkup,${(projectVM?.markup || 0).toFixed(2)}x\nBurn Rate,${burnRate}\nROI,${roi}%`;
-                      const blob = new Blob([csv], { type: 'text/csv' });
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `financiero-${project?.name || 'proyecto'}-${dateFilter.label}.csv`;
-                      a.click();
-                    }}
-                    className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm border border-white/20 transition-colors flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Exportar
-                  </button>
-                  <div className="bg-white/20 rounded-lg p-4">
-                    <BarChart3 className="h-8 w-8" />
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    const roi = projectVM?.markup ? ((projectVM.markup - 1) * 100).toFixed(1) : '0';
+                    const burnRate = (projectVM?.totalAsanaHours && projectVM.totalAsanaHours > 0) ? (projectVM.costDisplay / projectVM.totalAsanaHours).toFixed(2) : '0';
+                    const csv = `Métrica,Valor\nIngresos,${projectVM?.revenueDisplay || 0}\nCostos,${projectVM?.costDisplay || 0}\nMargen,${((projectVM?.margin || 0) * 100).toFixed(1)}%\nMarkup,${(projectVM?.markup || 0).toFixed(2)}x\nBurn Rate,${burnRate}\nROI,${roi}%`;
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `financiero-${project?.name || 'proyecto'}-${dateFilter.label}.csv`;
+                    a.click();
+                  }}
+                  className="text-sm text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
+                  data-testid="button-export-financiero"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Exportar
+                </button>
               </div>
-              
-              {/* FINANCIAL METRICS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Markup con Tooltip */}
+
+              {/* Header principal con título */}
+              <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-6 text-white shadow-lg mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <BarChart3 className="h-7 w-7" />
+                  <h2 className="text-2xl font-bold">Overview Financiero</h2>
+                </div>
+                <p className="text-violet-100 text-sm">Indicadores clave de rentabilidad y desempeño</p>
+              </div>
+
+              {/* 4 KPIs principales con jerarquía visual */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* ROI del Proyecto */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="bg-white rounded-xl border-2 border-violet-100 p-5 cursor-help hover:border-violet-300 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-1">
-                            <p className="text-violet-100 text-sm">Markup</p>
-                            <Info className="h-3 w-3 text-violet-200" />
+                            <p className="text-gray-600 text-sm font-medium">ROI</p>
+                            <Info className="h-3.5 w-3.5 text-gray-400" />
                           </div>
-                          <DollarSign className="h-6 w-6 text-violet-200" />
+                          <Target className="h-5 w-5 text-violet-500" />
                         </div>
-                        <p className={`text-2xl font-bold ${getThresholdColor(projectVM?.markup || 0, 'markup')}`}>
-                          {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
-                        </p>
-                        <p className="text-xs text-violet-200 mb-2">
+                        <p className={`text-3xl font-bold mb-1 ${getThresholdColor(projectVM?.markup ? (projectVM.markup - 1) * 100 : 0, 'roi')}`}>
                           {(() => {
-                            if (!projectVM) return '$0 sobre costo';
-                            const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                            return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
+                            if (!projectVM || !projectVM.markup) return '0%';
+                            const roi = (projectVM.markup - 1) * 100;
+                            return `${roi.toFixed(0)}%`;
                           })()}
                         </p>
-                        {trendData.markup.length > 0 && (
-                          <Sparkline data={trendData.markup} color="#ffffff" />
+                        <p className="text-xs text-gray-500 mb-3">
+                          {(() => {
+                            if (!projectVM || !projectVM.markup) return 'N/A';
+                            const roi = (projectVM.markup - 1) * 100;
+                            return roi > 50 ? '🟢 Excelente' : roi > 25 ? '🟡 Bueno' : roi > 0 ? '🟠 Aceptable' : '🔴 Bajo';
+                          })()}
+                        </p>
+                        {trendData.roi.length > 0 && (
+                          <Sparkline data={trendData.roi} color="#8b5cf6" />
                         )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
-                      <div className="space-y-2">
-                        <p className="font-semibold">Fórmula: Ingresos / Costos</p>
-                        <p className="text-sm">Ejemplo: ${(projectVM?.revenueDisplay || 0).toLocaleString()} / ${(projectVM?.costDisplay || 0).toLocaleString()} = {projectVM?.markup?.toFixed(2) || 0}x</p>
-                        <p className="text-xs text-gray-400">Indica cuántas veces el precio de venta supera el costo. Un markup de 2.0x significa que vendes al doble del costo.</p>
-                      </div>
+                      <p className="font-semibold mb-1">ROI = (Markup - 1) × 100</p>
+                      <p className="text-xs text-gray-500">Retorno sobre inversión en costos. ROI {'>'}50% es excelente.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
 
-                {/* Margen Operativo con Tooltip */}
+                {/* Margen Operativo */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="bg-white rounded-xl border-2 border-violet-100 p-5 cursor-help hover:border-violet-300 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-1">
-                            <p className="text-violet-100 text-sm">Margen Operativo</p>
-                            <Info className="h-3 w-3 text-violet-200" />
+                            <p className="text-gray-600 text-sm font-medium">Margen</p>
+                            <Info className="h-3.5 w-3.5 text-gray-400" />
                           </div>
-                          <TrendingUp className="h-6 w-6 text-violet-200" />
+                          <TrendingUp className="h-5 w-5 text-green-500" />
                         </div>
-                        <p className={`text-2xl font-bold ${getThresholdColor((projectVM?.margin || 0) * 100, 'margin')}`}>
+                        <p className={`text-3xl font-bold mb-1 ${getThresholdColor((projectVM?.margin || 0) * 100, 'margin')}`}>
                           {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
                         </p>
-                        <p className="text-xs text-violet-200 mb-2">
+                        <p className="text-xs text-gray-500 mb-3">
                           {(() => {
                             if (!projectVM) return '$0 beneficio';
                             const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                            return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
+                            return `${formatCurrency(profit, projectVM.currencyNative)}`;
                           })()}
                         </p>
                         {trendData.margin.length > 0 && (
-                          <Sparkline data={trendData.margin} color="#ffffff" />
+                          <Sparkline data={trendData.margin} color="#10b981" />
                         )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
-                      <div className="space-y-2">
-                        <p className="font-semibold">Fórmula: (Ingresos - Costos) / Ingresos × 100</p>
-                        <p className="text-sm">Ejemplo: (${(projectVM?.revenueDisplay || 0).toLocaleString()} - ${(projectVM?.costDisplay || 0).toLocaleString()}) / ${(projectVM?.revenueDisplay || 0).toLocaleString()} = {((projectVM?.margin || 0) * 100).toFixed(1)}%</p>
-                        <p className="text-xs text-gray-400">Porcentaje de cada peso de ingresos que queda como beneficio. {'>'}30% es excelente, 15-30% es bueno, {'<'}15% requiere optimización.</p>
-                      </div>
+                      <p className="font-semibold mb-1">Margen = (Ingresos - Costos) / Ingresos</p>
+                      <p className="text-xs text-gray-500">% de ingresos que queda como beneficio. {'>'}30% es excelente.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
 
-                {/* Burn Rate con Tooltip */}
+                {/* Burn Rate */}
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="bg-white rounded-xl border-2 border-violet-100 p-5 cursor-help hover:border-violet-300 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-1">
-                            <p className="text-violet-100 text-sm">Burn Rate</p>
-                            <Info className="h-3 w-3 text-violet-200" />
+                            <p className="text-gray-600 text-sm font-medium">Burn Rate</p>
+                            <Info className="h-3.5 w-3.5 text-gray-400" />
                           </div>
-                          <Flame className="h-6 w-6 text-violet-200" />
+                          <Flame className="h-5 w-5 text-orange-500" />
                         </div>
-                        <p className="text-2xl font-bold text-white">
+                        <p className="text-3xl font-bold text-gray-900 mb-1">
                           {(() => {
                             if (!projectVM) return '$0';
                             const burnPerHour = projectVM.totalAsanaHours > 0 
                               ? projectVM.costDisplay / projectVM.totalAsanaHours 
                               : 0;
-                            return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
+                            return `${formatCurrency(burnPerHour, projectVM.currencyNative)}`;
                           })()}
                         </p>
-                        <p className="text-xs text-violet-200 mb-2">costo por hora trabajada</p>
+                        <p className="text-xs text-gray-500 mb-3">por hora trabajada</p>
                         {trendData.burnRate.length > 0 && (
-                          <Sparkline data={trendData.burnRate} color="#ffffff" />
+                          <Sparkline data={trendData.burnRate} color="#f97316" />
                         )}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-sm">
-                      <div className="space-y-2">
-                        <p className="font-semibold">Fórmula: Costos Totales / Horas Trabajadas</p>
-                        <p className="text-sm">Ejemplo: ${(projectVM?.costDisplay || 0).toLocaleString()} / {(projectVM?.totalAsanaHours || 0).toFixed(1)}h = ${projectVM?.totalAsanaHours && projectVM.totalAsanaHours > 0 ? (projectVM.costDisplay / projectVM.totalAsanaHours).toFixed(2) : 0}/h</p>
-                        <p className="text-xs text-gray-400">Costo promedio por hora de trabajo del equipo. Útil para estimar proyectos futuros y controlar gastos operativos.</p>
-                      </div>
+                      <p className="font-semibold mb-1">Burn Rate = Costos / Horas</p>
+                      <p className="text-xs text-gray-500">Costo promedio por hora. Útil para estimar futuros proyectos.</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
 
-                {/* ROI con Tooltip */}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-1">
-                            <p className="text-violet-100 text-sm">ROI del Proyecto</p>
-                            <Info className="h-3 w-3 text-violet-200" />
-                          </div>
-                          <Target className="h-6 w-6 text-violet-200" />
-                        </div>
-                        <p className={`text-2xl font-bold ${getThresholdColor(projectVM?.markup ? (projectVM.markup - 1) * 100 : 0, 'roi')}`}>
-                          {(() => {
-                            if (!projectVM || !projectVM.markup) return '0%';
-                            const roi = (projectVM.markup - 1) * 100;
-                            return roi.toFixed(0);
-                          })()}%
-                        </p>
-                        <p className="text-xs text-violet-200 mb-2">
-                          {(() => {
-                            if (!projectVM || !projectVM.markup) return 'N/A';
-                            const roi = (projectVM.markup - 1) * 100;
-                            return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
-                          })()} retorno
-                        </p>
-                        {trendData.roi.length > 0 && (
-                          <Sparkline data={trendData.roi} color="#ffffff" />
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm">
-                      <div className="space-y-2">
-                        <p className="font-semibold">Fórmula: (Markup - 1) × 100</p>
-                        <p className="text-sm">Ejemplo: ({(projectVM?.markup || 0).toFixed(2)} - 1) × 100 = {projectVM?.markup ? ((projectVM.markup - 1) * 100).toFixed(0) : 0}%</p>
-                        <p className="text-xs text-gray-400">Retorno sobre la inversión en costos. Un ROI de 100% significa que duplicaste la inversión. {'>'}50% es excelente.</p>
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                {/* Estado Global */}
+                <div className="bg-white rounded-xl border-2 border-violet-100 p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-gray-600 text-sm font-medium">Estado</p>
+                    <Activity className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <p className={`text-3xl font-bold mb-1 ${
+                    projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {projectVM && projectVM.revenueDisplay > projectVM.costDisplay ? 'Rentable' : 'En Riesgo'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
+                      ? '🟢 Proyecto saludable' 
+                      : '🔴 Requiere atención'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* MONTHLY TRENDS CHART */}
-            {monthlyTrends?.rows && monthlyTrends.rows.length > 0 && (
-              <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Tendencia Mensual</h3>
-                    <p className="text-sm text-gray-500">Evolución de ingresos, costos y margen</p>
-                  </div>
-                  <Activity className="h-5 w-5 text-indigo-600" />
-                </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RechartsLineChart data={monthlyTrends.rows.sort((a: any, b: any) => a.period.localeCompare(b.period))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="period" 
-                      stroke="#6b7280"
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => {
-                        const date = new Date(value + '-01');
-                        return date.toLocaleDateString('es', { month: 'short', year: '2-digit' });
-                      }}
-                    />
-                    <YAxis yAxisId="left" stroke="#6b7280" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="right" orientation="right" stroke="#6b7280" tick={{ fontSize: 12 }} tickFormatter={(value) => `${value}%`} />
-                    <RechartsTooltip 
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                      labelFormatter={(value) => {
-                        const date = new Date(value + '-01');
-                        return date.toLocaleDateString('es', { month: 'long', year: 'numeric' });
-                      }}
-                      formatter={(value: any, name: string) => {
-                        if (name === 'Margen %') return `${Number(value).toFixed(1)}%`;
-                        return `$${Number(value).toLocaleString()}`;
-                      }}
-                    />
-                    <Legend />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="revenue_usd" 
-                      name="Ingresos" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={{ fill: '#10b981', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      yAxisId="left"
-                      type="monotone" 
-                      dataKey="cost_usd" 
-                      name="Costos" 
-                      stroke="#ef4444" 
-                      strokeWidth={2}
-                      dot={{ fill: '#ef4444', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      yAxisId="right"
-                      type="monotone" 
-                      dataKey="margin_pct" 
-                      name="Margen %" 
-                      stroke="#6366f1" 
-                      strokeWidth={2}
-                      dot={{ fill: '#6366f1', r: 4 }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* WATERFALL CHART */}
+            {/* BLOQUE 2: FLUJO DE RESULTADOS - Waterfall con insight interpretativo */}
             {projectVM && (
-              <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Flujo Financiero (Waterfall)</h3>
-                    <p className="text-sm text-gray-500">Desde ingresos hasta resultado neto</p>
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <TrendingUp className="h-5 w-5 text-green-600" />
                   </div>
-                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Flujo de Resultados</h3>
+                    <p className="text-sm text-gray-600">La historia de tu rentabilidad</p>
+                  </div>
                 </div>
-                <div className="flex items-end justify-around h-64 relative">
-                  {/* Base line */}
+
+                {/* Waterfall Chart */}
+                <div className="flex items-end justify-around h-64 relative mb-6">
                   <div className="absolute bottom-0 left-0 right-0 h-px bg-gray-300"></div>
                   
-                  {/* Ingresos Bar */}
-                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                  {/* Ingresos */}
+                  <div className="flex flex-col items-center relative" style={{ width: '28%' }}>
                     <div 
                       className="bg-gradient-to-t from-green-500 to-green-400 rounded-t-lg w-full transition-all duration-500 shadow-lg"
                       style={{ 
                         height: `${Math.min((projectVM.revenueDisplay / Math.max(projectVM.revenueDisplay, projectVM.costDisplay, 1)) * 200, 200)}px`,
                       }}
-                    ></div>
-                    <div className="mt-2 text-center">
-                      <p className="text-xs font-medium text-gray-600">Ingresos</p>
-                      <p className="text-sm font-bold text-green-700">
+                    >
+                      <div className="absolute top-2 left-0 right-0 text-center">
+                        <p className="text-xs font-bold text-white">100%</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 text-center">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Ingresos</p>
+                      <p className="text-lg font-bold text-green-700">
                         {formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative)}
                       </p>
                     </div>
                   </div>
 
-                  {/* Arrow */}
                   <div className="flex items-center mb-12">
                     <ChevronDown className="h-6 w-6 text-gray-400 rotate-[-90deg]" />
                   </div>
 
-                  {/* Costos Bar (negative) */}
-                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                  {/* Costos */}
+                  <div className="flex flex-col items-center relative" style={{ width: '28%' }}>
                     <div className="relative w-full flex flex-col items-center">
                       <div className="text-center mb-2">
-                        <p className="text-xs font-medium text-gray-600">Menos Costos</p>
-                        <p className="text-sm font-bold text-red-700">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Costos Directos</p>
+                        <p className="text-lg font-bold text-red-700">
                           -{formatCurrency(projectVM.costDisplay, projectVM.currencyNative)}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de ingresos
                         </p>
                       </div>
                       <div 
@@ -4097,13 +4016,12 @@ const ProjectDetailsPage = () => {
                     </div>
                   </div>
 
-                  {/* Arrow */}
                   <div className="flex items-center mb-12">
                     <ChevronDown className="h-6 w-6 text-gray-400 rotate-[-90deg]" />
                   </div>
 
-                  {/* Beneficio Neto Bar */}
-                  <div className="flex flex-col items-center relative" style={{ width: '25%' }}>
+                  {/* Resultado */}
+                  <div className="flex flex-col items-center relative" style={{ width: '28%' }}>
                     {(() => {
                       const profit = projectVM.revenueDisplay - projectVM.costDisplay;
                       const isPositive = profit >= 0;
@@ -4118,14 +4036,20 @@ const ProjectDetailsPage = () => {
                             style={{ 
                               height: `${Math.min((Math.abs(profit) / Math.max(projectVM.revenueDisplay, projectVM.costDisplay, 1)) * 200, 200)}px`,
                             }}
-                          ></div>
-                          <div className="mt-2 text-center">
-                            <p className="text-xs font-medium text-gray-600">Resultado Neto</p>
-                            <p className={`text-sm font-bold ${isPositive ? 'text-blue-700' : 'text-orange-700'}`}>
+                          >
+                            <div className="absolute top-2 left-0 right-0 text-center">
+                              <p className="text-xs font-bold text-white">
+                                {((profit / projectVM.revenueDisplay) * 100).toFixed(0)}%
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-3 text-center">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Resultado Neto</p>
+                            <p className={`text-lg font-bold ${isPositive ? 'text-blue-700' : 'text-orange-700'}`}>
                               {formatCurrency(profit, projectVM.currencyNative)}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {isPositive ? 'Ganancia' : 'Pérdida'}
+                              {isPositive ? '✅ Ganancia' : '⚠️ Pérdida'}
                             </p>
                           </div>
                         </>
@@ -4133,886 +4057,479 @@ const ProjectDetailsPage = () => {
                     })()}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* UNIT ECONOMICS */}
-            {projectVM && projectVM.totalAsanaHours > 0 && (
-              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-200 shadow-sm p-6 mb-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-indigo-600 rounded-lg">
-                    <Calculator className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Unit Economics</h3>
-                    <p className="text-sm text-gray-600">Métricas por hora de trabajo</p>
+                {/* Insight interpretativo */}
+                <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
+                  <div className="flex items-start gap-3">
+                    <Lightbulb className="h-5 w-5 text-violet-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-900 mb-1">💡 Interpretación</p>
+                      <p className="text-sm text-gray-700">
+                        {(() => {
+                          const margin = (projectVM.margin || 0) * 100;
+                          const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                          
+                          if (margin >= 30) {
+                            return `Excelente performance: el ${margin.toFixed(1)}% de margen operativo indica alta eficiencia. Los costos representan solo el ${((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de los ingresos.`;
+                          } else if (margin >= 15) {
+                            return `Buen margen operativo del ${margin.toFixed(1)}%. El proyecto es rentable, pero hay oportunidad de optimizar costos para mejorar el resultado.`;
+                          } else if (margin > 0) {
+                            return `El ${margin.toFixed(1)}% de margen es bajo. Los costos (${((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de ingresos) están consumiendo gran parte de la facturación. Considerar ajuste de precios o reducción de costos.`;
+                          } else {
+                            return `⚠️ El proyecto está en pérdida. Los costos superan los ingresos. Se requiere acción inmediata: incrementar facturación, reducir costos o renegociar alcance.`;
+                          }
+                        })()}
+                      </p>
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  {/* Precio por Hora (Revenue/Billing Hours) */}
-                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                      </div>
-                      <TrendingUp className="h-4 w-4 text-green-500" />
+                {/* Tendencia Mensual (si hay datos) */}
+                {monthlyTrends?.rows && monthlyTrends.rows.length > 1 && (
+                  <div className="mt-6 pt-6 border-t">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Activity className="h-4 w-4 text-indigo-600" />
+                      <h4 className="font-medium text-gray-900">Evolución Temporal</h4>
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">Precio por Hora</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <ResponsiveContainer width="100%" height={250}>
+                      <RechartsLineChart data={monthlyTrends.rows.sort((a: any, b: any) => a.period.localeCompare(b.period))}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis 
+                          dataKey="period" 
+                          stroke="#6b7280"
+                          tick={{ fontSize: 12 }}
+                          tickFormatter={(value) => {
+                            const date = new Date(value + '-01');
+                            return date.toLocaleDateString('es', { month: 'short', year: '2-digit' });
+                          }}
+                        />
+                        <YAxis yAxisId="left" stroke="#6b7280" tick={{ fontSize: 12 }} />
+                        <YAxis yAxisId="right" orientation="right" stroke="#6b7280" tick={{ fontSize: 12 }} tickFormatter={(value) => `${value}%`} />
+                        <RechartsTooltip 
+                          contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                          labelFormatter={(value) => {
+                            const date = new Date(value + '-01');
+                            return date.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+                          }}
+                          formatter={(value: any, name: string) => {
+                            if (name === 'Margen %') return `${Number(value).toFixed(1)}%`;
+                            return `$${Number(value).toLocaleString()}`;
+                          }}
+                        />
+                        <Legend />
+                        <Line 
+                          yAxisId="left"
+                          type="monotone" 
+                          dataKey="revenue_usd" 
+                          name="Ingresos" 
+                          stroke="#10b981" 
+                          strokeWidth={2}
+                          dot={{ fill: '#10b981', r: 3 }}
+                        />
+                        <Line 
+                          yAxisId="left"
+                          type="monotone" 
+                          dataKey="cost_usd" 
+                          name="Costos" 
+                          stroke="#ef4444" 
+                          strokeWidth={2}
+                          dot={{ fill: '#ef4444', r: 3 }}
+                        />
+                        <Line 
+                          yAxisId="right"
+                          type="monotone" 
+                          dataKey="margin_pct" 
+                          name="Margen %" 
+                          stroke="#6366f1" 
+                          strokeWidth={2}
+                          dot={{ fill: '#6366f1', r: 3 }}
+                        />
+                      </RechartsLineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* BLOQUE 3: UNIT ECONOMICS - Métricas por hora con gauges visuales */}
+            {projectVM && projectVM.totalAsanaHours > 0 && (
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-indigo-100 rounded-lg">
+                    <Calculator className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900">Unit Economics</h3>
+                    <p className="text-sm text-gray-600">Análisis de rentabilidad por hora</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  {/* Precio por Hora */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <DollarSign className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-semibold text-green-900">Precio/Hora</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-700 mb-2">
                       {formatCurrency(
                         projectVM.totalAsanaHours > 0 ? projectVM.revenueDisplay / projectVM.totalAsanaHours : 0,
                         projectVM.currencyNative
-                      )}/h
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Revenue ÷ Horas trabajadas</p>
+                    <div className="h-2 bg-green-200 rounded-full overflow-hidden mb-2">
+                      <div className="h-full bg-green-500" style={{ width: '100%' }}></div>
+                    </div>
+                    <p className="text-xs text-green-600">Ingresos por hora</p>
                   </div>
 
                   {/* Costo por Hora */}
-                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="p-2 bg-red-100 rounded-lg">
-                        <Flame className="h-4 w-4 text-red-600" />
-                      </div>
-                      <TrendingDown className="h-4 w-4 text-red-500" />
+                  <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border border-red-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Flame className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-semibold text-red-900">Costo/Hora</p>
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">Costo por Hora</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                    <p className="text-2xl font-bold text-red-700 mb-2">
                       {formatCurrency(
                         projectVM.totalAsanaHours > 0 ? projectVM.costDisplay / projectVM.totalAsanaHours : 0,
                         projectVM.currencyNative
-                      )}/h
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Costo ÷ Horas trabajadas</p>
-                  </div>
-
-                  {/* Realization Rate */}
-                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Percent className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <Activity className="h-4 w-4 text-blue-500" />
+                    <div className="h-2 bg-red-200 rounded-full overflow-hidden mb-2">
+                      <div 
+                        className="h-full bg-red-500" 
+                        style={{ 
+                          width: `${Math.min((projectVM.costDisplay / projectVM.revenueDisplay) * 100, 100)}%` 
+                        }}
+                      ></div>
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">Realization Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {(() => {
-                        const estimatedHours = projectVM.estimatedHours || 0;
-                        const realizationRate = estimatedHours > 0 
-                          ? (projectVM.totalAsanaHours / estimatedHours) * 100 
-                          : 0;
-                        return `${realizationRate.toFixed(0)}%`;
-                      })()}
+                    <p className="text-xs text-red-600">
+                      {((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de ingresos
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Horas trabajadas vs estimadas</p>
                   </div>
 
                   {/* EBIT por Hora */}
-                  <div className="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="p-2 bg-purple-100 rounded-lg">
-                        <Target className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <Star className="h-4 w-4 text-purple-500" />
+                  <div className={`rounded-xl p-4 border-2 ${
+                    (projectVM.revenueDisplay - projectVM.costDisplay) > 0 
+                      ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300' 
+                      : 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-300'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="h-4 w-4 text-blue-600" />
+                      <p className="text-xs font-semibold text-blue-900">EBIT/Hora</p>
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">EBIT por Hora</p>
-                    <p className={`text-2xl font-bold ${
-                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-green-700' : 'text-red-700'
+                    <p className={`text-2xl font-bold mb-2 ${
+                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-700' : 'text-orange-700'
                     }`}>
                       {formatCurrency(
                         projectVM.totalAsanaHours > 0 
                           ? (projectVM.revenueDisplay - projectVM.costDisplay) / projectVM.totalAsanaHours 
                           : 0,
                         projectVM.currencyNative
-                      )}/h
+                      )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">Beneficio ÷ Horas trabajadas</p>
+                    <div className={`h-2 rounded-full overflow-hidden mb-2 ${
+                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-200' : 'bg-orange-200'
+                    }`}>
+                      <div 
+                        className={`h-full ${
+                          (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-500' : 'bg-orange-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(Math.abs((projectVM.margin || 0) * 100), 100)}%` 
+                        }}
+                      ></div>
+                    </div>
+                    <p className={`text-xs ${
+                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-600' : 'text-orange-600'
+                    }`}>
+                      {(projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? '✅ Beneficio' : '⚠️ Pérdida'}
+                    </p>
+                  </div>
+
+                  {/* Realization Rate */}
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Percent className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-semibold text-purple-900">Realization</p>
+                    </div>
+                    {(() => {
+                      const estimatedHours = projectVM.estimatedHours || 0;
+                      const realizationRate = estimatedHours > 0 
+                        ? (projectVM.totalAsanaHours / estimatedHours) * 100 
+                        : 0;
+                      const isGood = realizationRate >= 80 && realizationRate <= 100;
+                      
+                      return (
+                        <>
+                          <p className={`text-2xl font-bold mb-2 ${
+                            isGood ? 'text-green-700' : realizationRate > 100 ? 'text-orange-700' : 'text-gray-700'
+                          }`}>
+                            {realizationRate.toFixed(0)}%
+                          </p>
+                          <div className="h-2 bg-purple-200 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className={`h-full ${
+                                isGood ? 'bg-green-500' : realizationRate > 100 ? 'bg-orange-500' : 'bg-purple-500'
+                              }`}
+                              style={{ width: `${Math.min(realizationRate, 100)}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-purple-600">
+                            {projectVM.totalAsanaHours.toFixed(0)}h / {estimatedHours}h
+                          </p>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Utilización (nuevo) */}
+                  <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-4 border border-cyan-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Activity className="h-4 w-4 text-cyan-600" />
+                      <p className="text-xs font-semibold text-cyan-900">Utilización</p>
+                    </div>
+                    {(() => {
+                      const totalTeamMembers = projectVM.teamBreakdown?.length || 0;
+                      const avgHoursPerMonth = 160;
+                      const totalAvailableHours = totalTeamMembers * avgHoursPerMonth;
+                      const utilizationRate = totalAvailableHours > 0 
+                        ? (projectVM.totalAsanaHours / totalAvailableHours) * 100 
+                        : 0;
+                      const isGood = utilizationRate >= 60 && utilizationRate <= 85;
+                      
+                      return (
+                        <>
+                          <p className={`text-2xl font-bold mb-2 ${
+                            isGood ? 'text-green-700' : utilizationRate > 85 ? 'text-orange-700' : 'text-gray-700'
+                          }`}>
+                            {utilizationRate.toFixed(0)}%
+                          </p>
+                          <div className="h-2 bg-cyan-200 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className={`h-full ${
+                                isGood ? 'bg-green-500' : utilizationRate > 85 ? 'bg-orange-500' : 'bg-cyan-500'
+                              }`}
+                              style={{ width: `${Math.min(utilizationRate, 100)}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-cyan-600">
+                            {totalTeamMembers} personas
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
                 {/* Interpretation Guide */}
-                <div className="mt-4 bg-white/60 rounded-lg p-4 border border-indigo-100">
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    <strong>💡 Interpretación:</strong> Precio/h {'>'} Costo/h = Rentable. 
-                    Realization Rate {'>'} 100% indica sobre-uso de horas vs presupuesto. 
-                    EBIT/h positivo es el objetivo final.
-                  </p>
+                <div className="mt-6 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
+                  <div className="flex items-start gap-2">
+                    <Info className="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-gray-700 leading-relaxed">
+                      <strong>Guía de interpretación:</strong> Precio/h debe superar Costo/h para ser rentable. 
+                      EBIT/h positivo confirma beneficio por hora trabajada. 
+                      Realization 80-100% es óptimo (menos indica subutilización, más indica sobrecostos). 
+                      Utilización 60-85% es saludable (más indica riesgo de burnout).
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* HEALTH PANEL - AUTOMATED ALERTS */}
+            {/* BLOQUE 6: SALUD FINANCIERA - Puntuación y estado global integrado */}
             {projectVM && (() => {
-              const alerts = [];
-              
-              // Alert 1: Budget Overrun
-              if (projectVM.budgetUtilization && projectVM.budgetUtilization > 1.0) {
-                const overrun = ((projectVM.budgetUtilization - 1) * 100).toFixed(1);
-                alerts.push({
-                  type: 'error',
-                  icon: AlertCircle,
-                  title: 'Sobrecosto Detectado',
-                  message: `El proyecto excede el presupuesto en ${overrun}%. Se están usando más recursos de los planificados.`,
-                  recommendation: 'Revisar scope creep, optimizar recursos o renegociar presupuesto con cliente.'
-                });
-              }
-              
-              // Alert 2: Low Margin
-              if (projectVM.margin != null && projectVM.margin < 0.15) {
-                alerts.push({
-                  type: 'warning',
-                  icon: TrendingDown,
-                  title: 'Margen Bajo',
-                  message: `Margen operativo de ${(projectVM.margin * 100).toFixed(1)}% está por debajo del objetivo (15%).`,
-                  recommendation: 'Incrementar facturación, reducir costos operativos o revisar pricing strategy.'
-                });
-              }
-              
-              // Alert 3: Negative Profit
               const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-              if (profit < 0) {
-                alerts.push({
-                  type: 'error',
-                  icon: XCircle,
-                  title: 'Proyecto en Pérdida',
-                  message: `Resultado neto negativo: ${formatCurrency(profit, projectVM.currencyNative)}`,
-                  recommendation: 'Acción inmediata requerida. Revisar viabilidad del proyecto o buscar value recovery.'
-                });
-              }
-              
-              // Alert 4: Low Efficiency (if available)
-              if (efficiencyFromDeviationAPI != null && efficiencyFromDeviationAPI < 80) {
-                alerts.push({
-                  type: 'warning',
-                  icon: Gauge,
-                  title: 'Eficiencia Baja',
-                  message: `Eficiencia del equipo en ${efficiencyFromDeviationAPI.toFixed(1)}%, por debajo del estándar (80%).`,
-                  recommendation: 'Identificar blockers, mejorar procesos o proveer capacitación al equipo.'
-                });
-              }
-              
-              // Alert 5: Currency Risk (if native currency is not USD)
-              if (projectVM.currencyNative === 'ARS') {
-                alerts.push({
-                  type: 'info',
-                  icon: Info,
-                  title: 'Riesgo Cambiario',
-                  message: 'Proyecto en ARS expuesto a volatilidad del tipo de cambio.',
-                  recommendation: 'Considerar cláusula de ajuste FX o facturación en USD para proyectos futuros.'
-                });
-              }
-              
-              // Alert 6: High Realization Rate (over budget hours)
+              const margin = (projectVM.margin || 0) * 100;
               const realizationRate = projectVM.estimatedHours > 0 
                 ? (projectVM.totalAsanaHours / projectVM.estimatedHours) * 100 
                 : 0;
-              if (realizationRate > 110) {
-                alerts.push({
-                  type: 'warning',
-                  icon: Clock,
-                  title: 'Sobre-uso de Horas',
-                  message: `El equipo trabajó ${realizationRate.toFixed(0)}% de las horas estimadas (${projectVM.totalAsanaHours.toFixed(1)}h vs ${projectVM.estimatedHours.toFixed(1)}h).`,
-                  recommendation: 'Evaluar si la estimación inicial fue incorrecta o si hubo scope creep.'
-                });
+              
+              // Calculate Health Score (0-100)
+              let healthScore = 0;
+              let scoreFactors = [];
+              
+              // Factor 1: Profitability (40 points)
+              if (profit > 0) {
+                if (margin >= 30) {
+                  healthScore += 40;
+                  scoreFactors.push({ name: 'Rentabilidad', score: 40, status: 'excellent' });
+                } else if (margin >= 15) {
+                  healthScore += 30;
+                  scoreFactors.push({ name: 'Rentabilidad', score: 30, status: 'good' });
+                } else {
+                  healthScore += 20;
+                  scoreFactors.push({ name: 'Rentabilidad', score: 20, status: 'fair' });
+                }
+              } else {
+                scoreFactors.push({ name: 'Rentabilidad', score: 0, status: 'poor' });
               }
-
-              return alerts.length > 0 ? (
-                <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
+              
+              // Factor 2: Budget Control (30 points)
+              const budgetUtil = projectVM.budgetUtilization || 0;
+              if (budgetUtil <= 0.9) {
+                healthScore += 30;
+                scoreFactors.push({ name: 'Control de Costos', score: 30, status: 'excellent' });
+              } else if (budgetUtil <= 1.0) {
+                healthScore += 25;
+                scoreFactors.push({ name: 'Control de Costos', score: 25, status: 'good' });
+              } else if (budgetUtil <= 1.1) {
+                healthScore += 15;
+                scoreFactors.push({ name: 'Control de Costos', score: 15, status: 'warning' });
+              } else {
+                healthScore += 0;
+                scoreFactors.push({ name: 'Control de Costos', score: 0, status: 'poor' });
+              }
+              
+              // Factor 3: Hour Efficiency (30 points)
+              if (realizationRate >= 80 && realizationRate <= 100) {
+                healthScore += 30;
+                scoreFactors.push({ name: 'Eficiencia Horaria', score: 30, status: 'excellent' });
+              } else if (realizationRate < 80) {
+                healthScore += 20;
+                scoreFactors.push({ name: 'Eficiencia Horaria', score: 20, status: 'fair' });
+              } else if (realizationRate <= 110) {
+                healthScore += 20;
+                scoreFactors.push({ name: 'Eficiencia Horaria', score: 20, status: 'warning' });
+              } else {
+                healthScore += 10;
+                scoreFactors.push({ name: 'Eficiencia Horaria', score: 10, status: 'poor' });
+              }
+              
+              // Determine overall status
+              let overallStatus = 'Crítico';
+              let statusColor = 'red';
+              let statusBadge = '🔴';
+              
+              if (healthScore >= 80) {
+                overallStatus = 'Excelente';
+                statusColor = 'green';
+                statusBadge = '🟢';
+              } else if (healthScore >= 60) {
+                overallStatus = 'Bueno';
+                statusColor = 'blue';
+                statusBadge = '🟡';
+              } else if (healthScore >= 40) {
+                overallStatus = 'Aceptable';
+                statusColor = 'yellow';
+                statusBadge = '🟠';
+              }
+              
+              return (
+                <div className="bg-white rounded-xl border shadow-sm p-6">
                   <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-red-100 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                    <div className={`p-2 rounded-lg ${
+                      statusColor === 'green' ? 'bg-green-100' :
+                      statusColor === 'blue' ? 'bg-blue-100' :
+                      statusColor === 'yellow' ? 'bg-yellow-100' : 'bg-red-100'
+                    }`}>
+                      <Heart className={`h-5 w-5 ${
+                        statusColor === 'green' ? 'text-green-600' :
+                        statusColor === 'blue' ? 'text-blue-600' :
+                        statusColor === 'yellow' ? 'text-yellow-600' : 'text-red-600'
+                      }`} />
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Panel de Salud del Proyecto</h3>
-                      <p className="text-sm text-gray-600">{alerts.length} alerta{alerts.length > 1 ? 's' : ''} detectada{alerts.length > 1 ? 's' : ''}</p>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-gray-900">Salud Financiera</h3>
+                      <p className="text-sm text-gray-600">Evaluación integral del proyecto</p>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-4xl font-bold ${
+                        statusColor === 'green' ? 'text-green-600' :
+                        statusColor === 'blue' ? 'text-blue-600' :
+                        statusColor === 'yellow' ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {healthScore}
+                      </div>
+                      <div className="text-sm text-gray-500">/ 100 puntos</div>
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    {alerts.map((alert, index) => (
-                      <div 
-                        key={index}
-                        className={`rounded-lg p-4 border-l-4 ${
-                          alert.type === 'error' 
-                            ? 'bg-red-50 border-red-500' 
-                            : alert.type === 'warning' 
-                            ? 'bg-yellow-50 border-yellow-500' 
-                            : 'bg-blue-50 border-blue-500'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            alert.type === 'error' 
-                              ? 'bg-red-100' 
-                              : alert.type === 'warning' 
-                              ? 'bg-yellow-100' 
-                              : 'bg-blue-100'
-                          }`}>
-                            <alert.icon className={`h-5 w-5 ${
-                              alert.type === 'error' 
-                                ? 'text-red-600' 
-                                : alert.type === 'warning' 
-                                ? 'text-yellow-600' 
-                                : 'text-blue-600'
-                            }`} />
+                  {/* Status Badge */}
+                  <div className={`rounded-lg p-4 mb-6 border-2 ${
+                    statusColor === 'green' ? 'bg-green-50 border-green-300' :
+                    statusColor === 'blue' ? 'bg-blue-50 border-blue-300' :
+                    statusColor === 'yellow' ? 'bg-yellow-50 border-yellow-300' : 'bg-red-50 border-red-300'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-700">Estado Global</p>
+                        <p className={`text-2xl font-bold ${
+                          statusColor === 'green' ? 'text-green-700' :
+                          statusColor === 'blue' ? 'text-blue-700' :
+                          statusColor === 'yellow' ? 'text-yellow-700' : 'text-red-700'
+                        }`}>
+                          {statusBadge} {overallStatus}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-700">Break-even</p>
+                        <p className={`text-lg font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                          {profit >= 0 ? '✅ Alcanzado' : '⚠️ No alcanzado'}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Margen: {margin.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown */}
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-gray-700 mb-2">Desglose de Puntuación</p>
+                    {scoreFactors.map((factor, index) => (
+                      <div key={index} className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-gray-700">{factor.name}</span>
+                            <span className={`text-sm font-semibold ${
+                              factor.status === 'excellent' ? 'text-green-600' :
+                              factor.status === 'good' ? 'text-blue-600' :
+                              factor.status === 'fair' ? 'text-yellow-600' :
+                              factor.status === 'warning' ? 'text-orange-600' : 'text-red-600'
+                            }`}>
+                              {factor.score} pts
+                            </span>
                           </div>
-                          <div className="flex-1">
-                            <h4 className={`font-semibold mb-1 ${
-                              alert.type === 'error' 
-                                ? 'text-red-900' 
-                                : alert.type === 'warning' 
-                                ? 'text-yellow-900' 
-                                : 'text-blue-900'
-                            }`}>
-                              {alert.title}
-                            </h4>
-                            <p className={`text-sm mb-2 ${
-                              alert.type === 'error' 
-                                ? 'text-red-700' 
-                                : alert.type === 'warning' 
-                                ? 'text-yellow-700' 
-                                : 'text-blue-700'
-                            }`}>
-                              {alert.message}
-                            </p>
-                            <p className="text-xs text-gray-600 bg-white/60 rounded px-2 py-1">
-                              <strong>💡 Recomendación:</strong> {alert.recommendation}
-                            </p>
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${
+                                factor.status === 'excellent' ? 'bg-green-500' :
+                                factor.status === 'good' ? 'bg-blue-500' :
+                                factor.status === 'fair' ? 'bg-yellow-500' :
+                                factor.status === 'warning' ? 'bg-orange-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${(factor.score / (index === 0 ? 40 : 30)) * 100}%` }}
+                            ></div>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {alerts.filter(a => a.type === 'error').length === 0 && (
-                    <div className="mt-4 bg-green-50 rounded-lg p-4 border border-green-200">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <p className="text-sm text-green-800">
-                          <strong>Ninguna alerta crítica.</strong> El proyecto está dentro de parámetros aceptables.
-                        </p>
+                  {/* Quick Actions / Recommendations */}
+                  {healthScore < 80 && (
+                    <div className="mt-6 bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
+                      <div className="flex items-start gap-2">
+                        <Lightbulb className="h-4 w-4 text-violet-600 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900 mb-1">Recomendaciones para mejorar</p>
+                          <ul className="text-xs text-gray-700 space-y-1 list-disc list-inside">
+                            {margin < 15 && <li>Incrementar márgenes reduciendo costos o aumentando precios</li>}
+                            {budgetUtil > 1.0 && <li>Controlar scope creep y optimizar uso de recursos</li>}
+                            {realizationRate > 110 && <li>Revisar estimaciones iniciales y procesos de planificación</li>}
+                            {realizationRate < 80 && <li>Mejorar utilización del equipo y asignación de tareas</li>}
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
-              ) : null;
+              );
             })()}
 
-            {/* FINANCIAL PROJECTIONS & ANALYSIS */}
-            <div className="bg-white rounded-xl border shadow-sm p-6 mb-6">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <BarChart3 className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Proyecciones Financieras y Análisis</h3>
-                  <p className="text-sm text-gray-500">Métricas clave de rentabilidad y cash flow</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Ingresos Facturados */}
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-700">Ingresos Facturados</span>
-                  </div>
-                  <div className="text-2xl font-bold text-green-800">
-                    {projectVM ? formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative) : '$0'}
-                  </div>
-                  <div className="text-xs text-green-600">
-                    del período seleccionado
-                  </div>
-                </div>
-
-                {/* Break-even Point */}
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-4 border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium text-blue-700">Estado Financiero</span>
-                  </div>
-                  <div className="text-2xl font-bold text-blue-800">
-                    {(() => {
-                      if (!projectVM) return 'N/A';
-                      return projectVM.revenueDisplay >= projectVM.costDisplay ? 'Rentable' : 'En Déficit';
-                    })()} 
-                  </div>
-                  <div className="text-xs text-blue-600">
-                    {(() => {
-                      if (!projectVM) return 'Sin datos';
-                      const diff = projectVM.revenueDisplay - projectVM.costDisplay;
-                      return diff >= 0 ? `+${formatCurrency(diff, projectVM.currencyNative)}` : formatCurrency(diff, projectVM.currencyNative);
-                    })()} 
-                  </div>
-                </div>
-
-                {/* Cash Flow Actual */}
-                <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium text-purple-700">Beneficio Neto</span>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-800">
-                    {(() => {
-                      if (!projectVM) return '$0';
-                      const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                      return formatCurrency(profit, projectVM.currencyNative);
-                    })()}
-                  </div>
-                  <div className="text-xs text-purple-600">
-                    {(() => {
-                      if (!projectVM) return 'Sin datos';
-                      const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                      return profit > 0 ? 'Flujo positivo' : profit < 0 ? 'Flujo negativo' : 'Equilibrado';
-                    })()} 
-                  </div>
-                </div>
-
-                {/* Rentabilidad del Proyecto */}
-                <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-lg p-4 border border-yellow-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-yellow-600" />
-                    <span className="text-sm font-medium text-yellow-700">Margen (%)</span>
-                  </div>
-                  <div className="text-2xl font-bold text-yellow-800">
-                    {(() => {
-                      if (!projectVM || projectVM.margin == null) return '0%';
-                      return projectVM.margin > 0 ? `+${projectVM.margin.toFixed(1)}%` : `${projectVM.margin.toFixed(1)}%`;
-                    })()} 
-                  </div>
-                  <div className="text-xs text-yellow-600">
-                    {(() => {
-                      if (!projectVM || projectVM.margin == null) return 'Sin datos';
-                      return projectVM.margin > 30 ? 'Muy rentable' : projectVM.margin > 15 ? 'Rentable' : projectVM.margin > 0 ? 'Mínimo' : 'Pérdida';
-                    })()} 
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* FINANCIAL CHARTS SECTION */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {/* Cost vs Revenue Trend Chart */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Comparación Financiera</h3>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Vista comparativa de ingresos totales vs costos reales del proyecto según datos del Star Schema</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <p className="text-sm text-gray-500">Análisis de rentabilidad actual</p>
-                  </div>
-                </div>
-                
-                {(() => {
-                  const revenue = projectVM?.revenueDisplay || 0;
-                  const costs = projectVM?.costDisplay || 0;
-                  const profit = revenue - costs;
-                  const maxValue = Math.max(revenue, costs) || 1000;
-                  const currency = projectVM?.currencyNative || 'USD';
-                  
-                  return (
-                    <div className="h-64">
-                      <div className="flex justify-center items-end h-48 px-4 gap-8">
-                        {/* Revenue Bar */}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex flex-col items-center gap-2 cursor-help">
-                                <div 
-                                  className="bg-gradient-to-t from-green-600 to-green-400 rounded-t w-20 shadow-lg"
-                                  style={{ height: `${(revenue / maxValue) * 180}px` }}
-                                ></div>
-                                <span className="text-sm font-medium text-gray-700">Ingresos</span>
-                                <span className="text-xs font-semibold text-green-600">
-                                  {formatCurrency(revenue, currency)}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <p className="font-semibold mb-1">Ingresos Totales</p>
-                                <p>{formatCurrency(revenue, currency)}</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-
-                        {/* Costs Bar */}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex flex-col items-center gap-2 cursor-help">
-                                <div 
-                                  className="bg-gradient-to-t from-red-600 to-red-400 rounded-t w-20 shadow-lg"
-                                  style={{ height: `${(costs / maxValue) * 180}px` }}
-                                ></div>
-                                <span className="text-sm font-medium text-gray-700">Costos</span>
-                                <span className="text-xs font-semibold text-red-600">
-                                  {formatCurrency(costs, currency)}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <p className="font-semibold mb-1">Costos Totales</p>
-                                <p>{formatCurrency(costs, currency)}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {projectVM?.totalAsanaHours || 0}h trabajadas
-                                </p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-
-                        {/* Profit Bar */}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex flex-col items-center gap-2 cursor-help">
-                                <div 
-                                  className={`rounded-t w-20 shadow-lg ${profit >= 0 ? 'bg-gradient-to-t from-blue-600 to-blue-400' : 'bg-gradient-to-t from-orange-600 to-orange-400'}`}
-                                  style={{ height: `${(Math.abs(profit) / maxValue) * 180}px` }}
-                                ></div>
-                                <span className="text-sm font-medium text-gray-700">Margen</span>
-                                <span className={`text-xs font-semibold ${profit >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
-                                  {formatCurrency(profit, currency)}
-                                </span>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <p className="font-semibold mb-1">Margen de Ganancia</p>
-                                <p>{formatCurrency(profit, currency)}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {((projectVM?.margin || 0) * 100).toFixed(1)}% margen
-                                </p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <div className="mt-4 flex justify-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-green-500 rounded"></div>
-                          <span className="text-sm text-gray-600">Ingresos</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-red-500 rounded"></div>
-                          <span className="text-sm text-gray-600">Costos</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                          <span className="text-sm text-gray-600">Margen</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Cost Breakdown Analysis */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-lg">
-                      <BarChart3 className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-gray-900">Análisis de Costos por Categoría</h3>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">Desglose detallado de los costos del proyecto por tipo de recurso y su impacto en la rentabilidad total</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                      <p className="text-sm text-gray-500">Distribución de costos y rentabilidad</p>
-                    </div>
-                  </div>
-                  
-                  {/* Toggle View Button */}
-                  <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={(e) => {
-                        // Mostrar vista por rol
-                        document.querySelectorAll('.breakdown-person-view').forEach(el => el.classList.add('hidden'));
-                        document.querySelector('.breakdown-role-view')?.classList.remove('hidden');
-                        
-                        // Actualizar botones
-                        document.querySelectorAll('.breakdown-toggle-btn').forEach(btn => {
-                          btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-                          btn.classList.add('text-gray-500');
-                        });
-                        
-                        e.currentTarget.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-                        e.currentTarget.classList.remove('text-gray-500');
-                      }}
-                      className="breakdown-toggle-btn px-3 py-1 text-xs font-medium rounded-md transition-colors bg-white text-gray-900 shadow-sm"
-                    >
-                      Por Rol
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        // Mostrar vista por persona
-                        document.querySelectorAll('.breakdown-role-view').forEach(el => el.classList.add('hidden'));
-                        document.querySelector('.breakdown-person-view')?.classList.remove('hidden');
-                        
-                        // Actualizar botones
-                        document.querySelectorAll('.breakdown-toggle-btn').forEach(btn => {
-                          btn.classList.remove('bg-white', 'text-gray-900', 'shadow-sm');
-                          btn.classList.add('text-gray-500');
-                        });
-                        
-                        e.currentTarget.classList.add('bg-white', 'text-gray-900', 'shadow-sm');
-                        e.currentTarget.classList.remove('text-gray-500');
-                      }}
-                      className="breakdown-toggle-btn px-3 py-1 text-xs font-medium rounded-md transition-colors text-gray-500 hover:text-gray-700"
-                    >
-                      Por Persona
-                    </button>
-                  </div>
-                </div>
-
-                {/* Vista por Rol */}
-                <div className="space-y-4 breakdown-role-view">
-                  {(() => {
-                    const totalCost = projectVM?.costDisplay || 0;
-                    const totalRevenue = projectVM?.revenueDisplay || 0;
-                    const teamBreakdown = projectVM?.teamBreakdown || [];
-                    
-                    // Vista por roles configurados en la app
-                    const roleGroups: { [key: string]: { cost: number, count: number, color: string } } = {};
-                    
-                    teamBreakdown.forEach((member: any) => {
-                      const roleName = member.role || member.roleName || 'Sin Rol Asignado';
-                      if (!roleGroups[roleName]) {
-                        // Mapeo de colores para los roles REALES en la base de datos
-                        const colorMap: { [key: string]: string } = {
-                          'Analista Senior': 'bg-blue-500',
-                          'Data Senior': 'bg-green-500', 
-                          'Analista Semi Senior': 'bg-blue-400',
-                          'Project Manager': 'bg-orange-500',
-                          'Lead Project Manager': 'bg-orange-600',
-                          'Data Semi Senior': 'bg-green-400',
-                          'Analista Junior': 'bg-blue-300',
-                          'Data Junior': 'bg-green-300',
-                          'CEO': 'bg-red-600',
-                          'COO': 'bg-red-500',
-                          'Operations Lead': 'bg-gray-600',
-                          'Account Director': 'bg-purple-500',
-                          'Tech Lead': 'bg-cyan-500',
-                          'Diseñador/a': 'bg-pink-500',
-                          'Freelancer Excel': 'bg-yellow-500',
-                          'Sin Rol Asignado': 'bg-gray-500'
-                        };
-                        roleGroups[roleName] = {
-                          cost: 0,
-                          count: 0,
-                          color: colorMap[roleName] || 'bg-indigo-500'
-                        };
-                      }
-                      roleGroups[roleName].cost += (member.costUSD || member.cost || 0);
-                      roleGroups[roleName].count += 1;
-                    });
-                    
-                    // Convertir a array (SOLO roles de personal)
-                    const categories = Object.entries(roleGroups).map(([name, data]) => ({
-                      name,
-                      cost: data.cost,
-                      color: data.color,
-                      count: data.count
-                    }));
-                    
-                    // REMOVIDO: Margen de Beneficio no es un rol
-                    
-                    return categories.map((category, index) => {
-                      const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
-                      
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded ${category.color}`}></div>
-                              <div>
-                                <span className="text-sm font-medium text-gray-900">{category.name}</span>
-                                <span className="text-xs text-gray-500 ml-2">({category.count} {category.count === 1 ? 'recurso' : 'recursos'})</span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold text-gray-900">{formatCurrency(category.cost, projectVM?.currencyNative || 'USD')}</div>
-                              <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
-                            </div>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${category.color}`} 
-                              style={{ width: `${Math.min(percentage, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-                
-                {/* Vista por Persona */}
-                <div className="space-y-4 breakdown-person-view hidden">
-                  {(() => {
-                    const totalCost = projectVM?.costDisplay || 0;
-                    const totalRevenue = projectVM?.revenueDisplay || 0;
-                    const teamBreakdown = projectVM?.teamBreakdown || [];
-                    
-                    // Vista por persona individual
-                    const personColors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-orange-500', 'bg-cyan-500', 'bg-pink-500', 'bg-yellow-500', 'bg-indigo-500', 'bg-red-500', 'bg-gray-500'];
-                    
-                    const categories = teamBreakdown.map((member: any, index: number) => ({
-                      name: member.name,
-                      cost: member.costUSD || member.cost || 0,
-                      color: personColors[index % personColors.length],
-                      count: 1,
-                      subtitle: member.role || member.roleName || 'Sin rol asignado'
-                    }));
-                    
-                    // REMOVIDO: Margen de Beneficio no es una persona
-                    
-                    return categories.map((category, index) => {
-                      const percentage = totalRevenue > 0 ? (category.cost / totalRevenue * 100) : 0;
-                      
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-4 h-4 rounded ${category.color}`}></div>
-                              <div>
-                                <span className="text-sm font-medium text-gray-900">{category.name}</span>
-                                {category.subtitle && (
-                                  <div className="text-xs text-gray-500">{category.subtitle}</div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold text-gray-900">{formatCurrency(category.cost, projectVM?.currencyNative || 'USD')}</div>
-                              <div className="text-xs text-gray-500">{percentage.toFixed(1)}%</div>
-                            </div>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${category.color}`} 
-                              style={{ width: `${Math.min(percentage, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })()}
-                  
-                  {/* Summary */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-900">Total del Proyecto</span>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">{formatCurrency(projectVM?.revenueDisplay || 0, projectVM?.currencyNative || 'USD')}</div>
-                        <div className="text-xs text-gray-500">
-                          Costo: {formatCurrency(projectVM?.costDisplay || 0, projectVM?.currencyNative || 'USD')} | 
-                          Beneficio: {formatCurrency((projectVM?.revenueDisplay || 0) - (projectVM?.costDisplay || 0), projectVM?.currencyNative || 'USD')}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ADVANCED METRICS DASHBOARD */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Resource Efficiency Gauge */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Gauge className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Eficiencia de Recursos</h3>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Mide qué tan eficientemente se están utilizando los recursos del proyecto. Cálculo: (Horas Trabajadas / Horas Estimadas) * 100. Un valor óptimo está entre 85-100%</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <p className="text-sm text-gray-500">Optimización de recursos</p>
-                  </div>
-                </div>
-                
-                <div className="text-center">
-                  <div className="relative inline-flex items-center justify-center w-32 h-32 mb-4">
-                    <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="#f3f4f6"
-                        strokeWidth="2"
-                      />
-                      <path
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="2"
-                        strokeDasharray={`${(() => {
-                          const workedHours = projectVM?.totalHours || 0;
-                          const estimatedHours = projectVM?.estimatedHours || 1;
-                          return estimatedHours > 0 ? Math.min((workedHours / estimatedHours) * 100, 100) : 0;
-                        })()}, 100`}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {(() => {
-                          const workedHours = projectVM?.totalHours || 0;
-                          const estimatedHours = projectVM?.estimatedHours || 1;
-                          const resourceEfficiency = estimatedHours > 0 ? Math.min((workedHours / estimatedHours) * 100, 100) : 0;
-                          return resourceEfficiency.toFixed(1);
-                        })()}%
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">Eficiencia Global</p>
-                </div>
-              </div>
-
-              {/* Financial Health Score */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Target className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Salud Financiera</h3>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Evalúa la rentabilidad del proyecto combinando margen de beneficio (70%) y eficiencia operacional (30%). Fórmula: [(Ingresos - Costos) / Ingresos] * 0.7 + [Eficiencia] * 0.3</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <p className="text-sm text-gray-500">Puntuación de salud financiera</p>
-                  </div>
-                </div>
-
-                {(() => {
-                  const revenue = projectVM?.revenueDisplay || 0;
-                  const costs = projectVM?.costDisplay || 0;
-                  const profitMargin = projectVM?.margin || 0;
-                  const budgetUtil = projectVM?.budgetUtilization || 0;
-                  const efficiency = budgetUtil > 0 ? Math.max(0, (1 - budgetUtil) * 100) : 100;
-                  // Better Financial Health calculation: weight profit margin more heavily
-                  const profitScore = Math.max(0, Math.min(100, profitMargin * 100));
-                  const efficiencyScore = Math.max(0, Math.min(100, efficiency));
-                  const healthScore = Math.round((profitScore * 0.7) + (efficiencyScore * 0.3));
-                  const healthColor = healthScore > 80 ? 'text-green-600' : healthScore > 60 ? 'text-yellow-600' : 'text-red-600';
-                  const healthStatus = healthScore > 80 ? 'Excelente' : healthScore > 60 ? 'Bueno' : 'Requiere Atención';
-                  
-                  return (
-                    <div className="text-center">
-                      <div className={`text-4xl font-bold mb-2 ${healthColor}`}>
-                        {healthScore}
-                      </div>
-                      <div className="text-sm text-gray-500 mb-3">{healthStatus}</div>
-                      <div className="flex justify-center">
-                        {healthScore > 80 ? 
-                          <CheckCircle className="h-8 w-8 text-green-500" /> : 
-                          healthScore > 60 ?
-                          <AlertCircle className="h-8 w-8 text-yellow-500" /> :
-                          <XCircle className="h-8 w-8 text-red-500" />}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Break-even Analysis */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-indigo-100 rounded-lg">
-                    <Target className="h-5 w-5 text-indigo-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-gray-900">Análisis de Punto de Equilibrio</h3>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs">Compara los ingresos del proyecto contra los costos totales para determinar si el proyecto ha alcanzado su punto de equilibrio financiero</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <p className="text-sm text-gray-500">Punto de equilibrio</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Ingresos Actuales</span>
-                    <span className="font-semibold">{formatCurrency(projectVM?.revenueDisplay || 0, projectVM?.currencyNative || 'USD')}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Costos Totales</span>
-                    <span className="font-semibold">{formatCurrency(projectVM?.costDisplay || 0, projectVM?.currencyNative || 'USD')}</span>
-                  </div>
-                  <div className="border-t pt-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Estado de Punto de Equilibrio</span>
-                      <span className={`font-semibold ${(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) ? 'text-green-600' : 'text-red-600'}`}>
-                        {(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) ? 'Alcanzado ✓' : 'Pendiente'}
-                      </span>
-                    </div>
-                  </div>
-                  {(projectVM?.revenueDisplay || 0) > (projectVM?.costDisplay || 0) && (
-                    <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-                      <div className="text-sm text-green-800">
-                        <span className="font-semibold">Margen: </span>
-                        {formatCurrency((projectVM?.revenueDisplay || 0) - (projectVM?.costDisplay || 0), projectVM?.currencyNative || 'USD')}
-                        <span className="text-xs ml-2">({((projectVM?.margin || 0) * 100).toFixed(1)}%)</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
           </TabsContent>
+
 
           <TabsContent value="operational-analysis" className="space-y-6">
             {/* HEADER PRINCIPAL */}
