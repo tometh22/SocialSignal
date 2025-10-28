@@ -77,7 +77,8 @@ import {
   googleSheetsSales,
   directCosts,
   incomeSot,
-  costsSot
+  costsSot,
+  factLaborMonth
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -1409,6 +1410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
 
   // 🔧 ENDPOINT: Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
+  // MIGRATED TO STAR SCHEMA SoT: Uses fact_labor_month instead of time_entries
   app.get('/api/projects/:id/operational-metrics', requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
@@ -1418,88 +1420,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid project ID" });
       }
 
-      // 1. Obtener todas las time entries del proyecto
-      const allTimeEntries = await storage.getTimeEntriesByProject(projectId);
-      
-      // 2. Aplicar filtro temporal
+      // 1. Convertir timeFilter a rango de fechas
       const { startDate, endDate } = getDateRangeForFilter(timeFilter);
-      const filteredEntries = allTimeEntries.filter(entry => {
-        const entryDate = new Date(entry.date);
-        if (startDate && entryDate < startDate) return false;
-        if (endDate && entryDate > endDate) return false;
-        return true;
-      });
+      
+      // 2. Generar lista de period_keys (YYYY-MM) para el rango
+      const periodKeys: string[] = [];
+      if (startDate && endDate) {
+        const current = new Date(startDate);
+        while (current <= endDate) {
+          const periodKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
+          if (!periodKeys.includes(periodKey)) {
+            periodKeys.push(periodKey);
+          }
+          current.setMonth(current.getMonth() + 1);
+        }
+      } else {
+        const now = new Date();
+        const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        periodKeys.push(periodKey);
+      }
 
-      // 3. Obtener información de personnel para calcular capacidad
-      const personnelIds = [...new Set(filteredEntries.map(e => e.personnelId))];
+      // 3. Consultar fact_labor_month desde Star Schema SoT
+      const { rows: laborRows } = await db.execute(sql`
+        SELECT 
+          person_id,
+          person_key,
+          role_name,
+          period_key,
+          CAST(asana_hours AS NUMERIC) as asana_hours
+        FROM fact_labor_month
+        WHERE project_id = ${projectId}
+          AND period_key = ANY(${periodKeys})
+        ORDER BY person_key, period_key
+      `);
+
+      // 4. Agrupar horas por persona
+      const hoursByPersonId = new Map<number | null, number>();
+      const personKeyByPersonId = new Map<number | null, string>();
+      const roleByPersonId = new Map<number | null, string>();
+      
+      for (const row of laborRows) {
+        const personId = row.person_id as number | null;
+        const personKey = row.person_key as string;
+        const roleName = row.role_name as string | null;
+        const hours = parseFloat(row.asana_hours as string) || 0;
+        
+        const currentHours = hoursByPersonId.get(personId) || 0;
+        hoursByPersonId.set(personId, currentHours + hours);
+        
+        if (personKey) personKeyByPersonId.set(personId, personKey);
+        if (roleName) roleByPersonId.set(personId, roleName);
+      }
+
+      // 5. Obtener información de personnel para capacidades
+      const uniquePersonIds = Array.from(hoursByPersonId.keys()).filter(id => id !== null) as number[];
       const personnelData = await Promise.all(
-        personnelIds.map(id => storage.getPersonnel(id))
+        uniquePersonIds.map(id => storage.getPersonnel(id))
       );
       
-      // 4. Calcular capacidad semanal (monthlyHours / 4)
-      const capacityMap = new Map();
-      personnelData.forEach(person => {
+      const capacityMap = new Map<number, number>();
+      const nameByPersonId = new Map<number, string>();
+      
+      for (const person of personnelData) {
         if (person) {
           capacityMap.set(person.id, (person.monthlyHours || 160) / 4); // weekly capacity
-        }
-      });
-
-      // 5. Agrupar horas por persona
-      const hoursByPerson = new Map();
-      const roleByPerson = new Map();
-      const nameByPerson = new Map();
-      
-      for (const entry of filteredEntries) {
-        const currentHours = hoursByPerson.get(entry.personnelId) || 0;
-        hoursByPerson.set(entry.personnelId, currentHours + entry.hours);
-        
-        const person = personnelData.find(p => p?.id === entry.personnelId);
-        if (person) {
-          nameByPerson.set(entry.personnelId, person.name);
-          // Obtener rol
-          if (person.roleId) {
-            const role = await storage.getRole(person.roleId);
-            if (role) {
-              roleByPerson.set(entry.personnelId, role.name);
-            }
-          }
+          nameByPersonId.set(person.id, person.name);
         }
       }
 
-      // 6. Calcular WIP Total (horas en el período)
-      const wipTotal = filteredEntries.reduce((sum, e) => sum + e.hours, 0);
+      // 6. Calcular WIP Total (total de horas asana en el período)
+      const wipTotal = Array.from(hoursByPersonId.values()).reduce((sum, h) => sum + h, 0);
 
-      // 7. Calcular Lead Time (dispersión temporal como proxy)
-      let leadTime = 0;
-      if (filteredEntries.length > 1) {
-        const dates = filteredEntries.map(e => new Date(e.date).getTime()).sort();
-        const firstDate = dates[0];
-        const lastDate = dates[dates.length - 1];
-        const daysDiff = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
-        leadTime = daysDiff > 0 ? wipTotal / (daysDiff / 7) : 0; // horas por semana promedio
-      }
+      // 7. Calcular Lead Time (dispersión temporal basada en períodos)
+      const periodsCount = periodKeys.length;
+      const leadTime = periodsCount > 1 ? wipTotal / periodsCount : wipTotal;
 
       // 8. Calcular Throughput (horas/semana)
-      const weeksInPeriod = Math.max(1, Math.ceil((endDate ? (endDate.getTime() - (startDate?.getTime() || Date.now())) / (1000 * 60 * 60 * 24 * 7) : 4)));
+      const weeksInPeriod = Math.max(1, periodsCount * 4); // aproximadamente 4 semanas por mes
       const throughput = wipTotal / weeksInPeriod;
 
       // 9. Calcular Workload por persona
-      const workloadData = Array.from(hoursByPerson.entries()).map(([personnelId, hours]) => {
-        const weeklyCapacity = capacityMap.get(personnelId) || 40;
-        // Para período mensual, usar capacidad mensual
-        const monthlyCapacity = weeklyCapacity * 4;
-        const utilizationRate = (hours / monthlyCapacity) * 100;
-        
-        return {
-          personnelId,
-          name: nameByPerson.get(personnelId) || 'Unknown',
-          roleName: roleByPerson.get(personnelId) || 'N/A',
-          hours: hours,
-          weeklyCapacity,
-          monthlyCapacity,
-          utilizationRate
-        };
-      });
+      const workloadData = Array.from(hoursByPersonId.entries())
+        .filter(([personId]) => personId !== null)
+        .map(([personId, hours]) => {
+          const pid = personId as number;
+          const weeklyCapacity = capacityMap.get(pid) || 40;
+          const monthlyCapacity = weeklyCapacity * 4;
+          const totalCapacityForPeriod = monthlyCapacity * periodsCount;
+          const utilizationRate = (hours / totalCapacityForPeriod) * 100;
+          
+          return {
+            personnelId: pid,
+            name: nameByPersonId.get(pid) || personKeyByPersonId.get(personId) || 'Unknown',
+            roleName: roleByPersonId.get(personId) || 'N/A',
+            hours: Math.round(hours * 10) / 10,
+            weeklyCapacity,
+            monthlyCapacity,
+            utilizationRate: Math.round(utilizationRate * 10) / 10
+          };
+        });
 
       // 10. Calcular Cuellos de Botella (Top 3 por utilización)
       const bottlenecks = workloadData
@@ -1507,14 +1526,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .slice(0, 3);
 
       // 11. Calcular Riesgo Operativo (0-100)
-      const totalCapacity = Array.from(capacityMap.values()).reduce((sum, cap) => sum + (cap * 4), 0); // Capacidad mensual total
+      const totalCapacity = Array.from(capacityMap.values()).reduce((sum, cap) => sum + (cap * 4 * periodsCount), 0);
       const wipCapRatio = totalCapacity > 0 ? wipTotal / totalCapacity : 0;
       const wipScore = Math.min(wipCapRatio * 40, 40);
 
       const overloadedCount = workloadData.filter(w => w.utilizationRate > 100).length;
       const overloadScore = workloadData.length > 0 ? (overloadedCount / workloadData.length) * 30 : 0;
 
-      const uniqueRoles = new Set(Array.from(roleByPerson.values())).size;
+      const uniqueRoles = new Set(Array.from(roleByPersonId.values())).size;
       const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
 
       const operationalRisk = Math.min(wipScore + overloadScore + dependencyScore, 100);
@@ -1572,7 +1591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         projectId,
         timeFilter,
         kpis: {
-          wipTotal,
+          wipTotal: Math.round(wipTotal * 10) / 10,
           leadTime: Math.round(leadTime),
           throughput: Math.round(throughput * 10) / 10,
           operationalRisk: Math.round(operationalRisk)
@@ -1587,9 +1606,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         recommendations: actions,
         metadata: {
-          totalEntries: filteredEntries.length,
+          totalEntries: laborRows.length,
           totalPeople: workloadData.length,
           weeksInPeriod,
+          periodsCount,
+          periodKeys,
           dateRange: { startDate, endDate }
         }
       });
