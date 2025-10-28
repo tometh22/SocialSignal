@@ -1,0 +1,94 @@
+🔢 Cómo se calcula cada métrica
+🔹 WIP Total (Work in Progress)
+Qué mide: horas actualmente en progreso dentro del proyecto.
+Fórmula:
+SUM(hours_worked)
+WHERE project_id = X
+AND status = 'in_progress'
+AND date BETWEEN start_date AND NOW()
+Fuente: time-tracker o timesheets
+🔹 Lead Time (tiempo promedio de entrega por persona)
+Qué mide: duración promedio entre el inicio y fin de tareas.
+Fórmula:
+AVG(DATEDIFF(task.completed_at, task.created_at))
+WHERE project_id = X
+AND status = 'completed'
+Fuente: performance o tasks table
+Output: horas o días.
+🔹 Throughput (velocidad semanal)
+Qué mide: cantidad de horas entregadas o tareas completadas por semana.
+Fórmula:
+SUM(hours_worked)
+WHERE project_id = X
+AND status = 'completed'
+AND date BETWEEN NOW() - INTERVAL '7 days' AND NOW()
+Alternativa (por tareas):
+COUNT(task_id)
+WHERE project_id = X
+AND status = 'completed'
+AND completed_at BETWEEN ...
+🔹 Riesgo Operativo (score 0–100)
+Qué mide: combinación ponderada de saturación, retraso y dependencias.
+Fórmula base (ponderada):
+Riesgo = 
+  (WIP / Capacidad) * 40 +
+  (Retrabajo% * 20) +
+  (LeadTimeΔ% * 20) +
+  (DependenciasAbiertas * 20)
+Dónde:
+Capacidad viene de Equipo (weekly_capacity_h).
+Retrabajo% viene de Performance (review_cycles > 1).
+Dependencias puede venir de tasks o inferirse del workflow (bloqueos).
+Categorías:
+🟢 Bajo: < 40
+🟡 Medio: 40–70
+🔴 Alto: > 70
+🔹 Workload & Carga por Rol
+Qué mide: ratio entre horas trabajadas y capacidad semanal por rol.
+Fórmula:
+SELECT role,
+       SUM(hours_worked) / SUM(weekly_capacity_h) AS carga_relativa
+FROM timesheets
+JOIN equipo ON timesheets.user_id = equipo.user_id
+WHERE project_id = X
+GROUP BY role;
+Visual: barras horizontales por rol con colores:
+< 80% → verde
+80–100% → amarillo
+100% → rojo
+🔹 Cuellos de Botella (Top 3)
+Qué mide: roles o fases donde las tareas se acumulan o demoran más.
+Fórmula heurística:
+SELECT phase, COUNT(task_id) AS pendientes, AVG(lead_time) AS demora
+FROM tasks
+WHERE status = 'in_progress'
+GROUP BY phase
+ORDER BY demora DESC
+LIMIT 3;
+Fuente: tasks o performance
+🔹 Acciones Recomendadas
+Qué hace: genera un insight en lenguaje natural basado en el score de riesgo + carga.
+Ejemplo de prompt dinámico:
+Si riesgo < 40 → “Mantener ritmo. La carga está balanceada.”
+Si riesgo 40–70 → “Redistribuir 10–20% de carga en roles críticos.”
+Si riesgo > 70 → “Alerta: riesgo alto. Reasignar tareas o extender deadlines.”
+Esto se puede generar:
+Vía rules.json en backend
+O con GPT-4o-mini en nlp-pipeline para insights prescriptivos.
+🧠 Pipeline de datos recomendado
+[services/time-tracker] → [Redis cache: hours_by_project]
+[services/equipo] → capacidad semanal
+[services/performance] → progreso y lead time
+└── join en Analytics Service → metrics_operational_view
+      ↓
+Frontend (React + Next.js)
+      ↓
+Dashboard /api/operational-metrics?project_id=X
+Refresh: cada 15 min vía Celery/Airflow o manual con botón 🔄 “Actualizar Datos”.
+🧩 Extras que podrías sumar
+Tendencia de riesgo operativo (línea de 7 días).
+Histórico de throughput semanal (mini sparkline en el KPI).
+Comparativa de carga real vs planificada (por rol o persona).
+Alertas automáticas:
+WIP > capacidad → notificación.
+Lead time > promedio histórico → alerta amarilla.

@@ -1408,6 +1408,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { completeDataHandler } = await import('./routes/complete-data');
   app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
 
+  // 🔧 ENDPOINT: Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
+  app.get('/api/projects/:id/operational-metrics', requireAuth, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const timeFilter = req.query.timeFilter as string || 'all';
+      
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "Invalid project ID" });
+      }
+
+      // 1. Obtener todas las time entries del proyecto
+      const allTimeEntries = await storage.getTimeEntriesByProject(projectId);
+      
+      // 2. Aplicar filtro temporal
+      const { startDate, endDate } = getDateRangeForFilter(timeFilter);
+      const filteredEntries = allTimeEntries.filter(entry => {
+        const entryDate = new Date(entry.date);
+        if (startDate && entryDate < startDate) return false;
+        if (endDate && entryDate > endDate) return false;
+        return true;
+      });
+
+      // 3. Obtener información de personnel para calcular capacidad
+      const personnelIds = [...new Set(filteredEntries.map(e => e.personnelId))];
+      const personnelData = await Promise.all(
+        personnelIds.map(id => storage.getPersonnel(id))
+      );
+      
+      // 4. Calcular capacidad semanal (monthlyHours / 4)
+      const capacityMap = new Map();
+      personnelData.forEach(person => {
+        if (person) {
+          capacityMap.set(person.id, (person.monthlyHours || 160) / 4); // weekly capacity
+        }
+      });
+
+      // 5. Agrupar horas por persona
+      const hoursByPerson = new Map();
+      const roleByPerson = new Map();
+      const nameByPerson = new Map();
+      
+      for (const entry of filteredEntries) {
+        const currentHours = hoursByPerson.get(entry.personnelId) || 0;
+        hoursByPerson.set(entry.personnelId, currentHours + entry.hours);
+        
+        const person = personnelData.find(p => p?.id === entry.personnelId);
+        if (person) {
+          nameByPerson.set(entry.personnelId, person.name);
+          // Obtener rol
+          if (person.roleId) {
+            const role = await storage.getRole(person.roleId);
+            if (role) {
+              roleByPerson.set(entry.personnelId, role.name);
+            }
+          }
+        }
+      }
+
+      // 6. Calcular WIP Total (horas en el período)
+      const wipTotal = filteredEntries.reduce((sum, e) => sum + e.hours, 0);
+
+      // 7. Calcular Lead Time (dispersión temporal como proxy)
+      let leadTime = 0;
+      if (filteredEntries.length > 1) {
+        const dates = filteredEntries.map(e => new Date(e.date).getTime()).sort();
+        const firstDate = dates[0];
+        const lastDate = dates[dates.length - 1];
+        const daysDiff = (lastDate - firstDate) / (1000 * 60 * 60 * 24);
+        leadTime = daysDiff > 0 ? wipTotal / (daysDiff / 7) : 0; // horas por semana promedio
+      }
+
+      // 8. Calcular Throughput (horas/semana)
+      const weeksInPeriod = Math.max(1, Math.ceil((endDate ? (endDate.getTime() - (startDate?.getTime() || Date.now())) / (1000 * 60 * 60 * 24 * 7) : 4)));
+      const throughput = wipTotal / weeksInPeriod;
+
+      // 9. Calcular Workload por persona
+      const workloadData = Array.from(hoursByPerson.entries()).map(([personnelId, hours]) => {
+        const weeklyCapacity = capacityMap.get(personnelId) || 40;
+        // Para período mensual, usar capacidad mensual
+        const monthlyCapacity = weeklyCapacity * 4;
+        const utilizationRate = (hours / monthlyCapacity) * 100;
+        
+        return {
+          personnelId,
+          name: nameByPerson.get(personnelId) || 'Unknown',
+          roleName: roleByPerson.get(personnelId) || 'N/A',
+          hours: hours,
+          weeklyCapacity,
+          monthlyCapacity,
+          utilizationRate
+        };
+      });
+
+      // 10. Calcular Cuellos de Botella (Top 3 por utilización)
+      const bottlenecks = workloadData
+        .sort((a, b) => b.utilizationRate - a.utilizationRate)
+        .slice(0, 3);
+
+      // 11. Calcular Riesgo Operativo (0-100)
+      const totalCapacity = Array.from(capacityMap.values()).reduce((sum, cap) => sum + (cap * 4), 0); // Capacidad mensual total
+      const wipCapRatio = totalCapacity > 0 ? wipTotal / totalCapacity : 0;
+      const wipScore = Math.min(wipCapRatio * 40, 40);
+
+      const overloadedCount = workloadData.filter(w => w.utilizationRate > 100).length;
+      const overloadScore = workloadData.length > 0 ? (overloadedCount / workloadData.length) * 30 : 0;
+
+      const uniqueRoles = new Set(Array.from(roleByPerson.values())).size;
+      const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
+
+      const operationalRisk = Math.min(wipScore + overloadScore + dependencyScore, 100);
+
+      // 12. Generar acciones recomendadas
+      const actions = [];
+      const overloadedMembers = workloadData.filter(w => w.utilizationRate > 100);
+      const underutilizedMembers = workloadData.filter(w => w.utilizationRate < 60);
+
+      if (overloadedMembers.length > 0 && underutilizedMembers.length > 0) {
+        const topOverloaded = overloadedMembers[0];
+        const topUnderutilized = underutilizedMembers[0];
+        const hoursToMove = Math.min(
+          topOverloaded.hours - topOverloaded.monthlyCapacity,
+          (topOverloaded.monthlyCapacity * 0.75) - topUnderutilized.hours
+        );
+        
+        actions.push({
+          icon: '⚖️',
+          priority: 'high',
+          title: 'Balancear Carga',
+          description: `Mover ${hoursToMove.toFixed(0)}h de ${topOverloaded.name} a ${topUnderutilized.name}`
+        });
+      }
+
+      if (overloadedMembers.length > 0) {
+        actions.push({
+          icon: '🎯',
+          priority: 'medium',
+          title: 'Repriorizar Tareas',
+          description: `Revisar backlog de ${overloadedMembers[0].name} y delegar tareas no críticas`
+        });
+      }
+
+      if (wipCapRatio > 0.9) {
+        actions.push({
+          icon: '🔔',
+          priority: 'medium',
+          title: 'Crear Alerta',
+          description: 'Configurar alerta si WIP/Cap > 90% durante 3 días'
+        });
+      }
+
+      if (actions.length === 0) {
+        actions.push({
+          icon: '✅',
+          priority: 'low',
+          title: 'Mantener Ritmo',
+          description: 'La carga operativa está balanceada. Continuar monitoreando.'
+        });
+      }
+
+      // Respuesta
+      res.json({
+        projectId,
+        timeFilter,
+        kpis: {
+          wipTotal,
+          leadTime: Math.round(leadTime),
+          throughput: Math.round(throughput * 10) / 10,
+          operationalRisk: Math.round(operationalRisk)
+        },
+        workload: workloadData,
+        bottlenecks,
+        riskBreakdown: {
+          wipScore: Math.round(wipScore),
+          overloadScore: Math.round(overloadScore),
+          dependencyScore: Math.round(dependencyScore),
+          total: Math.round(operationalRisk)
+        },
+        recommendations: actions,
+        metadata: {
+          totalEntries: filteredEntries.length,
+          totalPeople: workloadData.length,
+          weeksInPeriod,
+          dateRange: { startDate, endDate }
+        }
+      });
+
+    } catch (error) {
+      console.error("❌ Error calculating operational metrics:", error);
+      res.status(500).json({ 
+        message: "Failed to calculate operational metrics",
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   // 📊 ENDPOINT: Monthly trends from Star Schema agg_project_month
   app.get('/api/projects/:id/monthly-trends', requireAuth, async (req, res) => {
     try {
