@@ -171,8 +171,63 @@ export async function computeProjectPeriodMetrics(
     return sum + hours;
   }, 0);
   
+  // 5a. Obtener roles desde la base de datos (personnel + roles)
+  const roleMap = new Map<string, { personnelId: number | null; role: string }>();
+  try {
+    const { db } = await import('../db');
+    const { personnel, roles } = await import('@shared/schema');
+    const { eq, sql } = await import('drizzle-orm');
+    
+    const personnelWithRoles = await db
+      .select({
+        personnelId: personnel.id,
+        personnelName: personnel.name,
+        roleName: sql<string | null>`${roles.name}`.as('role_name'),
+      })
+      .from(personnel)
+      .leftJoin(roles, eq(personnel.roleId, roles.id));
+    
+    // Mapeo de nombres con variantes comunes
+    const nameVariants: { [key: string]: string[] } = {
+      'victoria achabal': ['victoria achabal', 'vicky achabal'],
+      'trinidad petreigne': ['trinidad petreigne', 'trini petreigne'],
+      'tomas facio': ['tomas facio', 'tomi facio'],
+      'vanina lanza': ['vanina lanza', 'vanu lanza'],
+      'aylen magali': ['aylen magali', 'aylu tamer'],
+      'gastón guntren': ['gastón guntren', 'gast guntren'],
+      'dolores camara': ['dolores camara', 'lola camara'],
+      'malena quiroga': ['malena quiroga', 'male quiroga']
+    };
+    
+    personnelWithRoles.forEach(p => {
+      if (p.personnelName) {
+        const baseName = p.personnelName.toLowerCase();
+        // Agregar nombre base
+        roleMap.set(baseName, {
+          personnelId: p.personnelId,
+          role: p.roleName || 'N/A'
+        });
+        
+        // Agregar variantes si existen
+        const variants = nameVariants[baseName];
+        if (variants) {
+          variants.forEach(variant => {
+            roleMap.set(variant, {
+              personnelId: p.personnelId,
+              role: p.roleName || 'N/A'
+            });
+          });
+        }
+      }
+    });
+    
+    console.log(`👥 Loaded ${personnelWithRoles.length} personnel with ${roleMap.size} name variants for project ${projectId}`);
+  } catch (roleError) {
+    console.log(`⚠️ Could not load personnel roles:`, roleError instanceof Error ? roleError.message : String(roleError));
+  }
+  
   // 5. Para cada fila de costos: rateUSD, acumular por persona K, L, M, budgetUSD, actualUSD
-  const personGroups = groupByPerson(costRows, rng, basis);
+  const personGroups = groupByPerson(costRows, rng, basis, roleMap);
   
   // 6. Totales: sumK, sumL, efficiency = sumL? (sumL/sumK*100) : 70; teamCost = Σ actualUSD
   const sumK = totalTargetHours > 0 ? totalTargetHours : Object.values(personGroups).reduce((sum, p) => sum + p.targetHours, 0);
@@ -333,17 +388,23 @@ function parseRowDate(row: any): Date | null {
 /**
  * groupByPerson(rows) → agrega K, L, M, budget, actual según basis
  */
-function groupByPerson(rows: any[], timeRange: TimeFilter, basis: 'ECON' | 'EXEC'): { [key: string]: PersonMetrics } {
+function groupByPerson(
+  rows: any[], 
+  timeRange: TimeFilter, 
+  basis: 'ECON' | 'EXEC',
+  roleMap?: Map<string, { personnelId: number | null; role: string }>
+): { [key: string]: PersonMetrics } {
   const groups: { [key: string]: PersonMetrics } = {};
   
   rows.forEach(row => {
     const personName = String(row.persona || row.detalle || row.name || 'Unknown');
     
     if (!groups[personName]) {
+      const roleInfo = roleMap?.get(personName.toLowerCase());
       groups[personName] = {
-        personnelId: null,
+        personnelId: roleInfo?.personnelId || null,
         name: personName,
-        role: 'From Excel MAESTRO',
+        role: roleInfo?.role || 'N/A',
         actualHours: 0,
         actualCost: 0,
         actualCostARS: 0,

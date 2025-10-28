@@ -22,6 +22,7 @@ app.get('/api/projects/:id/deviation-analysis', requireAuth, async (req, res) =>
     const deviations = metrics.teamBreakdown.map(member => ({
       personnelId: member.personnelId || member.name,
       personnelName: member.name,
+      role: member.role,
       budgetedHours: member.targetHours,
       actualHours: member.actualHours,
       budgetedCost: member.budgetCost,
