@@ -3684,15 +3684,34 @@ const ProjectDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="financial-analysis" className="space-y-6">
-            {/* STARTUP-STYLE METRICS HEADER */}
+            {/* IMPROVED HEADER WITH TOOLBAR */}
             <div className="bg-gradient-to-r from-violet-600 to-purple-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Análisis Financiero del Proyecto</h2>
-                  <p className="text-violet-100">Métricas clave de rentabilidad y desempeño financiero</p>
+                  <h2 className="text-2xl font-bold mb-2">Finanzas & Unit Economics</h2>
+                  <p className="text-violet-100">Rentabilidad, eficiencia y proyección de caja • Vista: {selectedView} • Moneda: {projectVM?.currencyNative || 'USD'}</p>
                 </div>
-                <div className="bg-white/20 rounded-lg p-4">
-                  <BarChart3 className="h-8 w-8" />
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      const roi = projectVM?.markup ? ((projectVM.markup - 1) * 100).toFixed(1) : '0';
+                      const burnRate = (projectVM?.totalAsanaHours && projectVM.totalAsanaHours > 0) ? (projectVM.costDisplay / projectVM.totalAsanaHours).toFixed(2) : '0';
+                      const csv = `Métrica,Valor\nIngresos,${projectVM?.revenueDisplay || 0}\nCostos,${projectVM?.costDisplay || 0}\nMargen,${((projectVM?.margin || 0) * 100).toFixed(1)}%\nMarkup,${(projectVM?.markup || 0).toFixed(2)}x\nBurn Rate,${burnRate}\nROI,${roi}%`;
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `financiero-${project?.name || 'proyecto'}-${dateFilter.label}.csv`;
+                      a.click();
+                    }}
+                    className="bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2 text-white text-sm border border-white/20 transition-colors flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportar
+                  </button>
+                  <div className="bg-white/20 rounded-lg p-4">
+                    <BarChart3 className="h-8 w-8" />
+                  </div>
                 </div>
               </div>
               
