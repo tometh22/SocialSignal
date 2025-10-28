@@ -1440,19 +1440,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKeys.push(periodKey);
       }
 
-      // 3. Consultar fact_labor_month desde Star Schema SoT
-      const { rows: laborRows } = await db.execute(sql`
-        SELECT 
-          person_id,
-          person_key,
-          role_name,
-          period_key,
-          CAST(asana_hours AS NUMERIC) as asana_hours
-        FROM fact_labor_month
-        WHERE project_id = ${projectId}
-          AND period_key = ANY(${periodKeys})
-        ORDER BY person_key, period_key
-      `);
+      // 3. Consultar fact_labor_month desde Star Schema SoT usando Drizzle query builder
+      const periodCondition = periodKeys.length === 1
+        ? eq(factLaborMonth.periodKey, periodKeys[0])
+        : inArray(factLaborMonth.periodKey, periodKeys);
+      
+      const laborRows = await db
+        .select({
+          person_id: factLaborMonth.personId,
+          person_key: factLaborMonth.personKey,
+          role_name: factLaborMonth.roleName,
+          period_key: factLaborMonth.periodKey,
+          asana_hours: factLaborMonth.asanaHours,
+        })
+        .from(factLaborMonth)
+        .where(
+          and(
+            eq(factLaborMonth.projectId, projectId),
+            periodCondition
+          )
+        )
+        .orderBy(asc(factLaborMonth.personKey), asc(factLaborMonth.periodKey));
 
       // 4. Agrupar horas por persona
       const hoursByPersonId = new Map<number | null, number>();
