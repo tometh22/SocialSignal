@@ -1467,11 +1467,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const personKeyByPersonId = new Map<number | null, string>();
       const roleByPersonId = new Map<number | null, string>();
       
+      console.log(`📊 OPERATIONAL METRICS DEBUG - Project ${projectId}, Filter: ${timeFilter}`);
+      console.log(`📊 Found ${laborRows.length} labor rows for ${periodKeys.length} periods: ${periodKeys.join(', ')}`);
+      
       for (const row of laborRows) {
         const personId = row.person_id as number | null;
         const personKey = row.person_key as string;
         const roleName = row.role_name as string | null;
         const hours = parseFloat(row.asana_hours as string) || 0;
+        
+        console.log(`  - Person: ${personKey}, Role: ${roleName || 'NULL'}, Hours: ${hours}`);
         
         const currentHours = hoursByPersonId.get(personId) || 0;
         hoursByPersonId.set(personId, currentHours + hours);
@@ -1479,6 +1484,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (personKey) personKeyByPersonId.set(personId, personKey);
         if (roleName) roleByPersonId.set(personId, roleName);
       }
+      
+      console.log(`📊 Unique roles found: ${Array.from(new Set(roleByPersonId.values())).join(', ')}`);
+      console.log(`📊 Total unique roles count: ${new Set(roleByPersonId.values()).size}`);
 
       // 5. Obtener información de personnel para capacidades
       const uniquePersonIds = Array.from(hoursByPersonId.keys()).filter(id => id !== null) as number[];
