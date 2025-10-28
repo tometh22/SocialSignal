@@ -12,6 +12,7 @@ import { parseCostRecords } from './parser';
 
 // Reutilizar infraestructura de income
 import { storage } from '../../storage';
+import { directCosts } from '@shared/schema';
 
 // ==================== CACHE MANAGEMENT ====================
 
@@ -83,7 +84,7 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
   console.log('🔍 COSTS: Fetching from database...');
   
   try {
-    const dbCosts = await storage.db.select().from(storage.schema.directCosts);
+    const dbCosts = await storage.db.select().from(directCosts);
     
     if (!dbCosts || dbCosts.length === 0) {
       console.log('📝 COSTS: No records found in direct_costs table');
