@@ -3717,89 +3717,153 @@ const ProjectDetailsPage = () => {
               
               {/* FINANCIAL METRICS GRID */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Markup */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-violet-100 text-sm">Markup</p>
-                      <p className="text-2xl font-bold">
-                        {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
-                      </p>
-                      <p className="text-xs text-violet-200">
-                        {(() => {
-                          if (!projectVM) return '$0 sobre costo';
-                          const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                          return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
-                        })()}
-                      </p>
-                    </div>
-                    <DollarSign className="h-6 w-6 text-violet-200" />
-                  </div>
-                </div>
+                {/* Markup con Tooltip */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <p className="text-violet-100 text-sm">Markup</p>
+                              <Info className="h-3 w-3 text-violet-200" />
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {projectVM?.markup ? `${projectVM.markup.toFixed(2)}X` : 'N/A'}
+                            </p>
+                            <p className="text-xs text-violet-200">
+                              {(() => {
+                                if (!projectVM) return '$0 sobre costo';
+                                const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                                return `${formatCurrency(profit, projectVM.currencyNative)} sobre costo`;
+                              })()}
+                            </p>
+                          </div>
+                          <DollarSign className="h-6 w-6 text-violet-200" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <div className="space-y-2">
+                        <p className="font-semibold">Fórmula: Ingresos / Costos</p>
+                        <p className="text-sm">Ejemplo: ${(projectVM?.revenueDisplay || 0).toLocaleString()} / ${(projectVM?.costDisplay || 0).toLocaleString()} = {projectVM?.markup?.toFixed(2) || 0}x</p>
+                        <p className="text-xs text-gray-400">Indica cuántas veces el precio de venta supera el costo. Un markup de 2.0x significa que vendes al doble del costo.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-                {/* Margen Operativo */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-violet-100 text-sm">Margen Operativo</p>
-                      <p className="text-2xl font-bold">
-                        {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
-                      </p>
-                      <p className="text-xs text-violet-200">
-                        {(() => {
-                          if (!projectVM) return '$0 beneficio';
-                          const profit = projectVM.revenueDisplay - projectVM.costDisplay;
-                          return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
-                        })()}
-                      </p>
-                    </div>
-                    <TrendingUp className="h-6 w-6 text-violet-200" />
-                  </div>
-                </div>
+                {/* Margen Operativo con Tooltip */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <p className="text-violet-100 text-sm">Margen Operativo</p>
+                              <Info className="h-3 w-3 text-violet-200" />
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {projectVM?.margin != null ? `${(projectVM.margin * 100).toFixed(1)}%` : 'N/A'}
+                            </p>
+                            <p className="text-xs text-violet-200">
+                              {(() => {
+                                if (!projectVM) return '$0 beneficio';
+                                const profit = projectVM.revenueDisplay - projectVM.costDisplay;
+                                return `${formatCurrency(profit, projectVM.currencyNative)} beneficio`;
+                              })()}
+                            </p>
+                          </div>
+                          <TrendingUp className="h-6 w-6 text-violet-200" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <div className="space-y-2">
+                        <p className="font-semibold">Fórmula: (Ingresos - Costos) / Ingresos × 100</p>
+                        <p className="text-sm">Ejemplo: (${(projectVM?.revenueDisplay || 0).toLocaleString()} - ${(projectVM?.costDisplay || 0).toLocaleString()}) / ${(projectVM?.revenueDisplay || 0).toLocaleString()} = {((projectVM?.margin || 0) * 100).toFixed(1)}%</p>
+                        <p className="text-xs text-gray-400">Porcentaje de cada peso de ingresos que queda como beneficio. {'>'}30% es excelente, 15-30% es bueno, {'<'}15% requiere optimización.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-                {/* Burn Rate - Simplificado y auditable */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-violet-100 text-sm">Burn Rate</p>
-                      <p className="text-2xl font-bold">
-                        {(() => {
-                          if (!projectVM) return '$0';
-                          const burnPerHour = projectVM.totalAsanaHours > 0 
-                            ? projectVM.costDisplay / projectVM.totalAsanaHours 
-                            : 0;
-                          return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
-                        })()}
-                      </p>
-                      <p className="text-xs text-violet-200">costo por hora trabajada</p>
-                    </div>
-                    <Flame className="h-6 w-6 text-violet-200" />
-                  </div>
-                </div>
+                {/* Burn Rate con Tooltip */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <p className="text-violet-100 text-sm">Burn Rate</p>
+                              <Info className="h-3 w-3 text-violet-200" />
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {(() => {
+                                if (!projectVM) return '$0';
+                                const burnPerHour = projectVM.totalAsanaHours > 0 
+                                  ? projectVM.costDisplay / projectVM.totalAsanaHours 
+                                  : 0;
+                                return `${formatCurrency(burnPerHour, projectVM.currencyNative)}/h`;
+                              })()}
+                            </p>
+                            <p className="text-xs text-violet-200">costo por hora trabajada</p>
+                          </div>
+                          <Flame className="h-6 w-6 text-violet-200" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <div className="space-y-2">
+                        <p className="font-semibold">Fórmula: Costos Totales / Horas Trabajadas</p>
+                        <p className="text-sm">Ejemplo: ${(projectVM?.costDisplay || 0).toLocaleString()} / {(projectVM?.totalAsanaHours || 0).toFixed(1)}h = ${projectVM?.totalAsanaHours && projectVM.totalAsanaHours > 0 ? (projectVM.costDisplay / projectVM.totalAsanaHours).toFixed(2) : 0}/h</p>
+                        <p className="text-xs text-gray-400">Costo promedio por hora de trabajo del equipo. Útil para estimar proyectos futuros y controlar gastos operativos.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-                {/* ROI */}
-                <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-violet-100 text-sm">ROI del Proyecto</p>
-                      <p className="text-2xl font-bold">
-                        {(() => {
-                          if (!projectVM || !projectVM.markup) return '0%';
-                          const roi = (projectVM.markup - 1) * 100;
-                          return roi.toFixed(0);
-                        })()}%
-                      </p>
-                      <p className="text-xs text-violet-200">
-                        {(() => {
-                          if (!projectVM || !projectVM.markup) return 'N/A';
-                          const roi = (projectVM.markup - 1) * 100;
-                          return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
-                        })()} retorno
-                      </p>
-                    </div>
-                    <Target className="h-6 w-6 text-violet-200" />
-                  </div>
-                </div>
+                {/* ROI con Tooltip */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-white/10 rounded-lg p-4 border border-white/20 cursor-help hover:bg-white/15 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <p className="text-violet-100 text-sm">ROI del Proyecto</p>
+                              <Info className="h-3 w-3 text-violet-200" />
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {(() => {
+                                if (!projectVM || !projectVM.markup) return '0%';
+                                const roi = (projectVM.markup - 1) * 100;
+                                return roi.toFixed(0);
+                              })()}%
+                            </p>
+                            <p className="text-xs text-violet-200">
+                              {(() => {
+                                if (!projectVM || !projectVM.markup) return 'N/A';
+                                const roi = (projectVM.markup - 1) * 100;
+                                return roi > 50 ? 'Excelente' : roi > 25 ? 'Bueno' : roi > 0 ? 'Aceptable' : 'Bajo';
+                              })()} retorno
+                            </p>
+                          </div>
+                          <Target className="h-6 w-6 text-violet-200" />
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <div className="space-y-2">
+                        <p className="font-semibold">Fórmula: (Markup - 1) × 100</p>
+                        <p className="text-sm">Ejemplo: ({(projectVM?.markup || 0).toFixed(2)} - 1) × 100 = {projectVM?.markup ? ((projectVM.markup - 1) * 100).toFixed(0) : 0}%</p>
+                        <p className="text-xs text-gray-400">Retorno sobre la inversión en costos. Un ROI de 100% significa que duplicaste la inversión. {'>'}50% es excelente.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
