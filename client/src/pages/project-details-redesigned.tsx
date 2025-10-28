@@ -1123,6 +1123,12 @@ const ProjectDetailsPage = () => {
     enabled: !!projectId,
   });
 
+  // 🔧 Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
+  const { data: operationalMetrics, isLoading: operationalLoading } = useQuery({
+    queryKey: [`/api/projects/${projectId}/operational-metrics`, timeFilterForHook],
+    enabled: !!projectId,
+  });
+
   // Cliente del proyecto
   const { data: client } = useQuery({
     queryKey: [`/api/clients/${(unifiedData as any)?.project?.clientId}`],
@@ -4630,12 +4636,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-blue-600 text-sm font-medium">WIP Total</p>
                       <p className="text-2xl font-bold text-blue-900">
-                        {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const totalWorked = unifiedData.actuals.teamBreakdown
-                            .filter(m => m.hours > 0)
-                            .reduce((sum, m) => sum + m.hours, 0);
-                          return totalWorked.toFixed(0);
-                        })() : '0'}h
+                        {operationalMetrics?.kpis?.wipTotal?.toFixed(0) || '0'}h
                       </p>
                       <p className="text-xs text-blue-600 mt-1">Horas en progreso</p>
                     </div>
@@ -4651,15 +4652,9 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-purple-600 text-sm font-medium">Lead Time</p>
                       <p className="text-2xl font-bold text-purple-900">
-                        {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                          const avgLeadTime = activeMembers.length > 0 
-                            ? activeMembers.reduce((sum, m) => sum + m.hours, 0) / activeMembers.length 
-                            : 0;
-                          return avgLeadTime.toFixed(0);
-                        })() : '0'}h
+                        {operationalMetrics?.kpis?.leadTime || '0'}h
                       </p>
-                      <p className="text-xs text-purple-600 mt-1">Promedio por persona</p>
+                      <p className="text-xs text-purple-600 mt-1">Dispersión temporal</p>
                     </div>
                     <Clock className="h-8 w-8 text-purple-500" />
                   </div>
@@ -4673,11 +4668,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-green-600 text-sm font-medium">Throughput</p>
                       <p className="text-2xl font-bold text-green-900">
-                        {unifiedData?.actuals?.totalWorkedHours ? (() => {
-                          const weeksInPeriod = 4; // Asumimos período mensual
-                          const throughputPerWeek = unifiedData.actuals.totalWorkedHours / weeksInPeriod;
-                          return throughputPerWeek.toFixed(0);
-                        })() : '0'}h/sem
+                        {operationalMetrics?.kpis?.throughput?.toFixed(1) || '0'}h/sem
                       </p>
                       <p className="text-xs text-green-600 mt-1">Velocidad de entrega</p>
                     </div>
@@ -4693,20 +4684,7 @@ const ProjectDetailsPage = () => {
                     <div>
                       <p className="text-orange-600 text-sm font-medium">Riesgo Operativo</p>
                       <p className="text-2xl font-bold text-orange-900">
-                        {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                          const avgHoursPerMonth = 160;
-                          const totalCapacity = activeMembers.length * avgHoursPerMonth;
-                          const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
-                          const wipCapRatio = totalCapacity > 0 ? (totalWorked / totalCapacity) : 0;
-                          const wipScore = Math.min(wipCapRatio * 40, 40);
-                          const overloadedCount = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0).length;
-                          const overloadScore = (overloadedCount / Math.max(activeMembers.length, 1)) * 30;
-                          const uniqueRoles = new Set(activeMembers.map(m => m.roleName || 'Sin Rol')).size;
-                          const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
-                          const riskScore = Math.min(wipScore + overloadScore + dependencyScore, 100);
-                          return riskScore.toFixed(0);
-                        })() : '0'}
+                        {operationalMetrics?.kpis?.operationalRisk || '0'}
                       </p>
                       <p className="text-xs text-orange-600 mt-1">Score 0-100</p>
                     </div>
@@ -4735,46 +4713,51 @@ const ProjectDetailsPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {unifiedData?.actuals?.teamBreakdown && (() => {
-                    const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                    const avgHoursPerMonth = 160; // Capacidad estándar mensual
-                    
-                    return activeMembers.map((member, index) => {
-                      const utilizationRate = (member.hours / avgHoursPerMonth) * 100;
-                      const isOverloaded = utilizationRate > 100;
-                      const isHigh = utilizationRate > 85;
-                      const isGood = utilizationRate >= 60 && utilizationRate <= 85;
-                      const barColor = isOverloaded ? 'bg-red-500' : isHigh ? 'bg-orange-500' : isGood ? 'bg-green-500' : 'bg-gray-400';
-                      
-                      return (
-                        <div key={index} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${barColor}`}></div>
-                              <span className="text-sm font-medium text-gray-900">{member.name}</span>
-                              <span className="text-xs text-gray-500">({member.roleName || 'N/A'})</span>
+                {operationalLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {operationalMetrics?.workload && operationalMetrics.workload.length > 0 ? (
+                      operationalMetrics.workload.map((member: any, index: number) => {
+                        const utilizationRate = member.utilizationRate;
+                        const isOverloaded = utilizationRate > 100;
+                        const isHigh = utilizationRate > 85;
+                        const isGood = utilizationRate >= 60 && utilizationRate <= 85;
+                        const barColor = isOverloaded ? 'bg-red-500' : isHigh ? 'bg-orange-500' : isGood ? 'bg-green-500' : 'bg-gray-400';
+                        
+                        return (
+                          <div key={index} className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${barColor}`}></div>
+                                <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                                <span className="text-xs text-gray-500">({member.roleName || 'N/A'})</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs text-gray-600">{member.hours.toFixed(0)}h / {member.monthlyCapacity.toFixed(0)}h</span>
+                                <span className={`text-sm font-bold ${
+                                  isOverloaded ? 'text-red-600' : isHigh ? 'text-orange-600' : isGood ? 'text-green-600' : 'text-gray-600'
+                                }`}>
+                                  {utilizationRate.toFixed(0)}%
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs text-gray-600">{member.hours}h / {avgHoursPerMonth}h</span>
-                              <span className={`text-sm font-bold ${
-                                isOverloaded ? 'text-red-600' : isHigh ? 'text-orange-600' : isGood ? 'text-green-600' : 'text-gray-600'
-                              }`}>
-                                {utilizationRate.toFixed(0)}%
-                              </span>
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full ${barColor} transition-all duration-300`}
+                                style={{ width: `${Math.min(utilizationRate, 120)}%` }}
+                              ></div>
                             </div>
                           </div>
-                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${barColor} transition-all duration-300`}
-                              style={{ width: `${Math.min(utilizationRate, 120)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    });
-                  })() || <p className="text-gray-500 text-sm">No hay datos de equipo</p>}
-                </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-sm">No hay datos de equipo</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -4797,77 +4780,70 @@ const ProjectDetailsPage = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  {unifiedData?.actuals?.teamBreakdown && (() => {
-                    const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                    const avgHoursPerMonth = 160;
-                    
-                    // Calcular utilización y ordenar por carga (descendente)
-                    const bottlenecks = activeMembers
-                      .map(member => ({
-                        ...member,
-                        utilizationRate: (member.hours / avgHoursPerMonth) * 100
-                      }))
-                      .sort((a, b) => b.utilizationRate - a.utilizationRate)
-                      .slice(0, 3); // Top 3
-                    
-                    if (bottlenecks.length === 0) {
-                      return <p className="text-gray-500 text-sm col-span-3">No hay cuellos de botella identificados</p>;
-                    }
-                    
-                    return bottlenecks.map((member, index) => {
-                      const isOverloaded = member.utilizationRate > 100;
-                      const isHigh = member.utilizationRate > 85;
-                      const cardColor = isOverloaded ? 'border-red-300 bg-red-50' : 
-                                       isHigh ? 'border-orange-300 bg-orange-50' : 
-                                       'border-green-300 bg-green-50';
-                      const textColor = isOverloaded ? 'text-red-700' : 
-                                       isHigh ? 'text-orange-700' : 
-                                       'text-green-700';
-                      const badgeColor = isOverloaded ? 'bg-red-500' : 
-                                        isHigh ? 'bg-orange-500' : 
-                                        'bg-green-500';
-                      
-                      return (
-                        <div key={index} className={`p-4 rounded-lg border-2 ${cardColor}`}>
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-full ${badgeColor} text-white flex items-center justify-center text-xs font-bold`}>
-                                {index + 1}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-gray-900 text-sm">{member.name}</h4>
-                                <p className="text-xs text-gray-600">{member.roleName || 'N/A'}</p>
+                {operationalLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {operationalMetrics?.bottlenecks && operationalMetrics.bottlenecks.length > 0 ? (
+                      operationalMetrics.bottlenecks.map((member: any, index: number) => {
+                        const utilizationRate = member.utilizationRate;
+                        const isOverloaded = utilizationRate > 100;
+                        const isHigh = utilizationRate > 85;
+                        const cardColor = isOverloaded ? 'border-red-300 bg-red-50' : 
+                                         isHigh ? 'border-orange-300 bg-orange-50' : 
+                                         'border-green-300 bg-green-50';
+                        const textColor = isOverloaded ? 'text-red-700' : 
+                                         isHigh ? 'text-orange-700' : 
+                                         'text-green-700';
+                        const badgeColor = isOverloaded ? 'bg-red-500' : 
+                                          isHigh ? 'bg-orange-500' : 
+                                          'bg-green-500';
+                        
+                        return (
+                          <div key={index} className={`p-4 rounded-lg border-2 ${cardColor}`}>
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-full ${badgeColor} text-white flex items-center justify-center text-xs font-bold`}>
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 text-sm">{member.name}</h4>
+                                  <p className="text-xs text-gray-600">{member.roleName || 'N/A'}</p>
+                                </div>
                               </div>
                             </div>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-600">Carga</span>
+                                <span className={`text-lg font-bold ${textColor}`}>
+                                  {utilizationRate.toFixed(0)}%
+                                </span>
+                              </div>
+                              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full ${badgeColor}`}
+                                  style={{ width: `${Math.min(utilizationRate, 100)}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-2">
+                                {member.hours.toFixed(0)}h / {member.monthlyCapacity.toFixed(0)}h trabajadas
+                              </p>
+                            </div>
+                            {isOverloaded && (
+                              <div className="mt-3 pt-3 border-t border-red-200">
+                                <p className="text-xs text-red-700 font-medium">⚠️ Requiere redistribución</p>
+                              </div>
+                            )}
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs text-gray-600">Carga</span>
-                              <span className={`text-lg font-bold ${textColor}`}>
-                                {member.utilizationRate.toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full ${badgeColor}`}
-                                style={{ width: `${Math.min(member.utilizationRate, 100)}%` }}
-                              ></div>
-                            </div>
-                            <p className="text-xs text-gray-600 mt-2">
-                              {member.hours.toFixed(0)}h / {avgHoursPerMonth}h trabajadas
-                            </p>
-                          </div>
-                          {isOverloaded && (
-                            <div className="mt-3 pt-3 border-t border-red-200">
-                              <p className="text-xs text-red-700 font-medium">⚠️ Requiere redistribución</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })() || <p className="text-gray-500 text-sm col-span-3">No hay datos</p>}
-                </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-gray-500 text-sm col-span-3">No hay cuellos de botella identificados</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -4893,69 +4869,62 @@ const ProjectDetailsPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {(() => {
-                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
-                    const avgHoursPerMonth = 160;
-                    const totalCapacity = activeMembers.length * avgHoursPerMonth;
-                    const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
-                    const wipCapRatio = totalCapacity > 0 ? (totalWorked / totalCapacity) : 0;
-                    
-                    // Factor 1: WIP/Capacidad (0-40 puntos)
-                    const wipScore = Math.min(wipCapRatio * 40, 40);
-                    
-                    // Factor 2: Sobrecarga (0-30 puntos)
-                    const overloadedCount = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0).length;
-                    const overloadScore = (overloadedCount / Math.max(activeMembers.length, 1)) * 30;
-                    
-                    // Factor 3: Dependencias críticas (0-30 puntos)
-                    const uniqueRoles = new Set(activeMembers.map(m => m.roleName || 'Sin Rol')).size;
-                    const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
-                    
-                    const riskScore = Math.min(wipScore + overloadScore + dependencyScore, 100);
-                    const riskLevel = riskScore < 30 ? 'Bajo' : riskScore < 60 ? 'Medio' : 'Alto';
-                    const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
-                    const riskBgColor = riskLevel === 'Bajo' ? 'bg-green-500' : riskLevel === 'Medio' ? 'bg-yellow-500' : 'bg-red-500';
-                    
-                    return (
-                      <>
-                        {/* Score Visual */}
-                        <div className="text-center mb-6">
-                          <div className={`text-5xl font-bold ${riskColor} mb-2`}>
-                            {riskScore.toFixed(0)}
+                  {operationalLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    </div>
+                  ) : (
+                    (() => {
+                      const riskScore = operationalMetrics?.riskBreakdown?.total || 0;
+                      const wipScore = operationalMetrics?.riskBreakdown?.wipScore || 0;
+                      const overloadScore = operationalMetrics?.riskBreakdown?.overloadScore || 0;
+                      const dependencyScore = operationalMetrics?.riskBreakdown?.dependencyScore || 0;
+                      
+                      const riskLevel = riskScore < 30 ? 'Bajo' : riskScore < 60 ? 'Medio' : 'Alto';
+                      const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
+                      const riskBgColor = riskLevel === 'Bajo' ? 'bg-green-500' : riskLevel === 'Medio' ? 'bg-yellow-500' : 'bg-red-500';
+                      
+                      return (
+                        <>
+                          {/* Score Visual */}
+                          <div className="text-center mb-6">
+                            <div className={`text-5xl font-bold ${riskColor} mb-2`}>
+                              {riskScore}
+                            </div>
+                            <p className="text-sm text-gray-600">Score de Riesgo (0-100)</p>
+                            <p className={`text-lg font-semibold ${riskColor} mt-1`}>{riskLevel}</p>
                           </div>
-                          <p className="text-sm text-gray-600">Score de Riesgo (0-100)</p>
-                          <p className={`text-lg font-semibold ${riskColor} mt-1`}>{riskLevel}</p>
-                        </div>
 
-                        {/* Progress Bar */}
-                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-6">
-                          <div 
-                            className={`h-full ${riskBgColor} transition-all duration-500`}
-                            style={{ width: `${riskScore}%` }}
-                          ></div>
-                        </div>
+                          {/* Progress Bar */}
+                          <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-6">
+                            <div 
+                              className={`h-full ${riskBgColor} transition-all duration-500`}
+                              style={{ width: `${riskScore}%` }}
+                            ></div>
+                          </div>
 
-                        {/* Drivers */}
-                        <div className="space-y-3">
-                          <p className="text-sm font-semibold text-gray-700">Principales Drivers:</p>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">WIP/Capacidad</span>
-                              <span className="font-semibold">{wipScore.toFixed(0)} pts</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Sobrecarga</span>
-                              <span className="font-semibold">{overloadScore.toFixed(0)} pts</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Dependencias</span>
-                              <span className="font-semibold">{dependencyScore.toFixed(0)} pts</span>
+                          {/* Drivers */}
+                          <div className="space-y-3">
+                            <p className="text-sm font-semibold text-gray-700">Principales Drivers:</p>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">WIP/Capacidad</span>
+                                <span className="font-semibold">{wipScore} pts</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Sobrecarga</span>
+                                <span className="font-semibold">{overloadScore} pts</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Dependencias</span>
+                                <span className="font-semibold">{dependencyScore} pts</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </>
-                    );
-                  })()}
+                        </>
+                      );
+                    })()
+                  )}
                 </CardContent>
               </Card>
 
@@ -4968,79 +4937,46 @@ const ProjectDetailsPage = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {(() => {
-                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
-                    const avgHoursPerMonth = 160;
-                    const overloadedMembers = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0);
-                    const underutilizedMembers = activeMembers.filter(m => (m.hours / avgHoursPerMonth) < 0.6);
-                    
-                    const actions = [];
-                    
-                    // Acción 1: Redistribuir carga
-                    if (overloadedMembers.length > 0 && underutilizedMembers.length > 0) {
-                      const topOverloaded = overloadedMembers[0];
-                      const topUnderutilized = underutilizedMembers[0];
-                      const hoursToMove = Math.min(
-                        topOverloaded.hours - avgHoursPerMonth,
-                        (avgHoursPerMonth * 0.75) - topUnderutilized.hours
-                      );
-                      
-                      actions.push({
-                        icon: '⚖️',
-                        color: 'bg-orange-50 border-orange-200',
-                        title: 'Balancear Carga',
-                        description: `Mover ${hoursToMove.toFixed(0)}h de ${topOverloaded.name} a ${topUnderutilized.name}`
-                      });
-                    }
-                    
-                    // Acción 2: Priorizar tareas críticas
-                    if (overloadedMembers.length > 0) {
-                      actions.push({
-                        icon: '🎯',
-                        color: 'bg-blue-50 border-blue-200',
-                        title: 'Repriorizar Tareas',
-                        description: `Revisar backlog de ${overloadedMembers[0].name} y delegar tareas no críticas`
-                      });
-                    }
-                    
-                    // Acción 3: Crear alerta
-                    const totalCapacity = activeMembers.length * avgHoursPerMonth;
-                    const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
-                    if ((totalWorked / totalCapacity) > 0.9) {
-                      actions.push({
-                        icon: '🔔',
-                        color: 'bg-purple-50 border-purple-200',
-                        title: 'Crear Alerta',
-                        description: 'Configurar alerta si WIP/Cap > 90% durante 3 días'
-                      });
-                    }
-                    
-                    // Acción por defecto
-                    if (actions.length === 0) {
-                      actions.push({
-                        icon: '✅',
-                        color: 'bg-green-50 border-green-200',
-                        title: 'Mantener Ritmo',
-                        description: 'La carga operativa está balanceada. Continuar monitoreando.'
-                      });
-                    }
-                    
-                    return (
-                      <div className="space-y-3">
-                        {actions.map((action, index) => (
-                          <div key={index} className={`p-4 rounded-lg border-2 ${action.color}`}>
-                            <div className="flex items-start gap-3">
-                              <div className="text-2xl">{action.icon}</div>
-                              <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 text-sm mb-1">{action.title}</h4>
-                                <p className="text-xs text-gray-700">{action.description}</p>
+                  {operationalLoading ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {operationalMetrics?.recommendations && operationalMetrics.recommendations.length > 0 ? (
+                        operationalMetrics.recommendations.map((action: any, index: number) => {
+                          const colorMap: Record<string, string> = {
+                            'high': 'bg-red-50 border-red-200',
+                            'medium': 'bg-orange-50 border-orange-200',
+                            'low': 'bg-green-50 border-green-200'
+                          };
+                          const color = colorMap[action.priority] || 'bg-blue-50 border-blue-200';
+                          
+                          return (
+                            <div key={index} className={`p-4 rounded-lg border-2 ${color}`}>
+                              <div className="flex items-start gap-3">
+                                <div className="text-2xl">{action.icon}</div>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold text-gray-900 text-sm mb-1">{action.title}</h4>
+                                  <p className="text-xs text-gray-700">{action.description}</p>
+                                </div>
                               </div>
                             </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 rounded-lg border-2 bg-green-50 border-green-200">
+                          <div className="flex items-start gap-3">
+                            <div className="text-2xl">✅</div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 text-sm mb-1">Mantener Ritmo</h4>
+                              <p className="text-xs text-gray-700">La carga operativa está balanceada. Continuar monitoreando.</p>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
