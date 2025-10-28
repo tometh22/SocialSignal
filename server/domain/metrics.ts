@@ -196,27 +196,41 @@ export async function computeProjectPeriodMetrics(
       'aylen magali': ['aylen magali', 'aylu tamer'],
       'gastón guntren': ['gastón guntren', 'gast guntren'],
       'dolores camara': ['dolores camara', 'lola camara'],
-      'malena quiroga': ['malena quiroga', 'male quiroga']
+      'malena quiroga': ['malena quiroga', 'male quiroga'],
+      'sol ayala': ['sol ayala']
     };
+    
+    // Add reverse mapping: variant -> canonical
+    const variantToCanonical: { [key: string]: string } = {};
+    for (const [canonical, variants] of Object.entries(nameVariants)) {
+      for (const variant of variants) {
+        variantToCanonical[variant] = canonical;
+      }
+    }
     
     personnelWithRoles.forEach(p => {
       if (p.personnelName) {
         const baseName = p.personnelName.toLowerCase();
-        // Agregar nombre base
-        roleMap.set(baseName, {
+        const roleData = {
           personnelId: p.personnelId,
           role: p.roleName || 'N/A'
-        });
+        };
         
-        // Agregar variantes si existen
-        const variants = nameVariants[baseName];
-        if (variants) {
-          variants.forEach(variant => {
-            roleMap.set(variant, {
-              personnelId: p.personnelId,
-              role: p.roleName || 'N/A'
+        // Agregar nombre base
+        roleMap.set(baseName, roleData);
+        
+        // Buscar si este nombre base está en alguna de las entradas de nameVariants
+        // y agregar TODAS las variantes asociadas
+        for (const [canonical, variants] of Object.entries(nameVariants)) {
+          if (canonical === baseName || variants.includes(baseName)) {
+            // Agregar canonical y todas sus variantes
+            roleMap.set(canonical, roleData);
+            variants.forEach(variant => {
+              roleMap.set(variant, roleData);
             });
-          });
+            console.log(`✅ Added ${variants.length + 1} variants for ${p.personnelName}: [${canonical}, ${variants.join(', ')}]`);
+            break;
+          }
         }
       }
     });

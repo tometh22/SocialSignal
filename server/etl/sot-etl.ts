@@ -276,14 +276,59 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         console.log(`✨ Proyecto auto-resuelto: "${projectRaw}" via ${resolution.diagnostics.projectResolution.matchType}`);
       }
       
-      // Buscar persona con normalización de acentos en ambos lados
-      const person = await db.query.personnel.findFirst({
+      // 🎯 MAPEO DE ROLES: Buscar persona con sistema flexible de mapeo de nombres
+      const nameVariants: { [key: string]: string[] } = {
+        'victoria achabal': ['victoria achabal', 'vicky achabal'],
+        'trinidad petreigne': ['trinidad petreigne', 'trini petreigne'],
+        'tomas facio': ['tomas facio', 'tomi facio'],
+        'vanina lanza': ['vanina lanza', 'vanu lanza'],
+        'aylen magali': ['aylen magali', 'aylu tamer'],
+        'gastón guntren': ['gastón guntren', 'gast guntren'],
+        'dolores camara': ['dolores camara', 'lola camara'],
+        'malena quiroga': ['malena quiroga', 'male quiroga'],
+        'sol ayala': ['sol ayala']
+      };
+      
+      // Buscar persona primero por coincidencia exacta
+      let person = await db.query.personnel.findFirst({
         where: (pers) => sql`
           TRIM(LOWER(UNACCENT(COALESCE(${pers.name}, '')))) = 
           TRIM(LOWER(UNACCENT(COALESCE(${personRaw}, ''))))
           AND ${pers.name} IS NOT NULL
         `
       });
+      
+      // Si no se encontró, buscar usando variantes de nombres
+      if (!person) {
+        const personNormalized = personRaw.toLowerCase().trim();
+        for (const [canonical, variants] of Object.entries(nameVariants)) {
+          if (variants.includes(personNormalized) || canonical === personNormalized) {
+            // Buscar por nombre canónico
+            person = await db.query.personnel.findFirst({
+              where: (pers) => sql`
+                TRIM(LOWER(UNACCENT(COALESCE(${pers.name}, '')))) = ${canonical}
+                AND ${pers.name} IS NOT NULL
+              `
+            });
+            if (person) {
+              console.log(`✅ Role mapping: "${personRaw}" → "${canonical}" → ${person.name}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      let roleFromDB: string | null = null;
+      if (person?.roleId) {
+        const {roles} = await import('@shared/schema');
+        const role = await db.query.roles.findFirst({
+          where: (r) => eq(r.id, person.roleId!)
+        });
+        if (role) {
+          roleFromDB = role.name;
+          console.log(`🎯 Role found for ${personRaw}: ${role.name}`);
+        }
+      }
       
       // 5) Valores y costos con sistema de fallback de tarifas
       // Leer tarifa horaria del Excel (columna N: "Valor Hora")
@@ -301,7 +346,8 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
         : 0;
       const totalUSDSheet = parseNum(row['Monto Total USD']);
       
-      const roleName = row.Rol || null;
+      // Priorizar rol desde BD sobre rol del Excel
+      const roleName = roleFromDB || row.Rol || null;
       
       // 🔍 DEBUG: Log valores leídos del Excel para detectar problemas de parsing
       if (processed < 5) {
