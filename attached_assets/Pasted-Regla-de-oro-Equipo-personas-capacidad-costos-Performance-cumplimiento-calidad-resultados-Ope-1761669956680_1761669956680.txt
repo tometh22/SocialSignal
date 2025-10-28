@@ -1,0 +1,40 @@
+Regla de oro:
+Equipo = personas/capacidad/costos.
+Performance = cumplimiento/calidad/resultados.
+Operacional = flujo en tiempo real (WIP, cuellos, dependencias).
+Finanzas = dinero.
+Qué mover para evitar solapamientos
+Burn rate $/h, costo/h, precio/h ➜ dejar en Finanzas & Unit Economics (no en Operacional).
+Velocidad semanal, progreso % y semanas restantes ➜ Performance.
+Proyección de costos ➜ Finanzas.
+Workload por persona/rol (carga efectiva, saturación) ➜ Operacional (porque es flujo) con link a perfil en Equipo.
+Operacional (nuevo contenido concreto)
+Nombre: Eficiencia Operativa & Riesgo
+Sub: Flujo de trabajo, carga y cuellos de botella en tiempo real.
+Cumulative Flow Diagram (CFD)
+Ejes: tiempo vs cantidad de ítems en Backlog → En curso → En revisión → Listo.
+Insight: crecimiento de “En revisión” = cuello en QA/Insights.
+Workload & Cola por Rol
+Barras apiladas: horas planificadas vs reales por rol/persona, con umbrales (100/120%).
+KPI: WIP/Capacidad y Lead time medio.
+Mapa de Dependencias
+Grafo simple: nodos (roles/tareas), aristas (bloqueos).
+Lista “Top bloqueantes” (quién más bloquea, cuánto tiempo).
+Cuellos de Botella (Top 3)
+Tarjetas con: fase/rol, tiempo en cola, impacto estimado en fecha de entrega.
+Riesgo Operativo (score 0–100)
+Modelo simple (fórmula visible):
+Riesgo = w1*WIP/Cap + w2*LeadTimeΔ + w3*Dependencias críticas + w4*Retrabajo%
+Semáforo + drivers (“80% del riesgo = revisión atascada”).
+Acciones recomendadas (IA/Reglas)
+Sugerencias prescriptivas: “Mover 6h de Insights de Vani a Gastón”, “Dividir revisión en 2 slots”, “Crear fast-lane para urgentes”.
+Botón Crear alerta (ej.: “si WIP/Cap > 1.2 durante 2 días”).
+Componentes UI (shadcn + Recharts)
+Tabs internas: Flujo | Carga | Dependencias | Riesgo.
+Cards KPI (4): WIP total, Lead time, Throughput/semana, Riesgo.
+CFD (áreas apiladas), Workload (barras apiladas), Grafo (force-directed), Lista de cuellos (table compacta).
+Data mínima requerida
+Estado de cada ítem (fase) + timestamps (para lead/queue time).
+Horas planificadas vs reales por persona/rol.
+Relaciones de dependencia entre tareas.
+Retrabajo (issue reabierto o comentario “changes requested”).

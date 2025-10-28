@@ -2154,8 +2154,8 @@ const ProjectDetailsPage = () => {
               value="operational-analysis" 
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:shadow-sm"
             >
-              <Cog className="h-4 w-4" />
-              Operacional
+              <Zap className="h-4 w-4" />
+              Eficiencia & Riesgo
             </TabsTrigger>
           </TabsList>
 
@@ -4609,358 +4609,441 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="operational-analysis" className="space-y-6">
             {/* HEADER PRINCIPAL */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-xl p-8 text-white">
+            <div className="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-xl p-8 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold mb-2">Análisis Operacional</h2>
-                  <p className="text-purple-100">Flujos de trabajo, procesos y optimización del rendimiento operativo</p>
+                  <h2 className="text-2xl font-bold mb-2">Eficiencia Operativa & Riesgo</h2>
+                  <p className="text-cyan-100">Flujo de trabajo, carga y cuellos de botella en tiempo real</p>
                 </div>
                 <div className="bg-white/20 rounded-lg p-4">
-                  <Cog className="h-8 w-8" />
+                  <Zap className="h-8 w-8" />
                 </div>
               </div>
             </div>
 
             {/* MÉTRICAS OPERACIONALES PRINCIPALES */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* WIP Total */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-blue-600 text-sm font-medium">Flujo de Trabajo</p>
+                      <p className="text-blue-600 text-sm font-medium">WIP Total</p>
                       <p className="text-2xl font-bold text-blue-900">
-                        {unifiedData?.actuals?.teamBreakdown ? 
-                          `${unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).length}→${unifiedData.actuals.teamBreakdown.length}` : 
-                          '0→0'
-                        }
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">Activos → Total equipo</p>
-                    </div>
-                    <Zap className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-orange-600 text-sm font-medium">Cuellos de Botella</p>
-                      <p className="text-2xl font-bold text-orange-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const bottlenecks = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 80).length;
-                          return bottlenecks;
-                        })() : 0}
+                          const totalWorked = unifiedData.actuals.teamBreakdown
+                            .filter(m => m.hours > 0)
+                            .reduce((sum, m) => sum + m.hours, 0);
+                          return totalWorked.toFixed(0);
+                        })() : '0'}h
                       </p>
-                      <p className="text-xs text-orange-600 mt-1">Recursos sobrecargados</p>
+                      <p className="text-xs text-blue-600 mt-1">Horas en progreso</p>
                     </div>
-                    <Activity className="h-8 w-8 text-orange-500" />
+                    <Timer className="h-8 w-8 text-blue-500" />
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Lead Time */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-purple-600 text-sm font-medium">Dependencias</p>
+                      <p className="text-purple-600 text-sm font-medium">Lead Time</p>
                       <p className="text-2xl font-bold text-purple-900">
                         {unifiedData?.actuals?.teamBreakdown ? (() => {
-                          const uniqueRoles = new Set(unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0).map(m => m.roleName || 'Sin Rol'));
-                          return uniqueRoles.size;
-                        })() : 0}
+                          const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                          const avgLeadTime = activeMembers.length > 0 
+                            ? activeMembers.reduce((sum, m) => sum + m.hours, 0) / activeMembers.length 
+                            : 0;
+                          return avgLeadTime.toFixed(0);
+                        })() : '0'}h
                       </p>
-                      <p className="text-xs text-purple-600 mt-1">Roles interdependientes</p>
+                      <p className="text-xs text-purple-600 mt-1">Promedio por persona</p>
                     </div>
-                    <Brain className="h-8 w-8 text-purple-500" />
+                    <Clock className="h-8 w-8 text-purple-500" />
                   </div>
                 </CardContent>
               </Card>
 
+              {/* Throughput */}
               <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-green-600 text-sm font-medium">Riesgo Operacional</p>
+                      <p className="text-green-600 text-sm font-medium">Throughput</p>
                       <p className="text-2xl font-bold text-green-900">
-                        {projectVM?.budgetUtilization ? (() => {
-                          const budgetUsed = (projectVM.budgetUtilization || 0) * 100;
-                          const risk = budgetUsed < 50 ? 'Bajo' : budgetUsed < 80 ? 'Medio' : 'Alto';
-                          return risk;
-                        })() : 'N/A'}
+                        {unifiedData?.actuals?.totalWorkedHours ? (() => {
+                          const weeksInPeriod = 4; // Asumimos período mensual
+                          const throughputPerWeek = unifiedData.actuals.totalWorkedHours / weeksInPeriod;
+                          return throughputPerWeek.toFixed(0);
+                        })() : '0'}h/sem
                       </p>
-                      <p className="text-xs text-green-600 mt-1">Evaluación del proceso</p>
+                      <p className="text-xs text-green-600 mt-1">Velocidad de entrega</p>
                     </div>
-                    <Heart className="h-8 w-8 text-green-500" />
+                    <Zap className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Riesgo Operativo */}
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-orange-600 text-sm font-medium">Riesgo Operativo</p>
+                      <p className="text-2xl font-bold text-orange-900">
+                        {unifiedData?.actuals?.teamBreakdown ? (() => {
+                          const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                          const avgHoursPerMonth = 160;
+                          const totalCapacity = activeMembers.length * avgHoursPerMonth;
+                          const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
+                          const wipCapRatio = totalCapacity > 0 ? (totalWorked / totalCapacity) : 0;
+                          const wipScore = Math.min(wipCapRatio * 40, 40);
+                          const overloadedCount = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0).length;
+                          const overloadScore = (overloadedCount / Math.max(activeMembers.length, 1)) * 30;
+                          const uniqueRoles = new Set(activeMembers.map(m => m.roleName || 'Sin Rol')).size;
+                          const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
+                          const riskScore = Math.min(wipScore + overloadScore + dependencyScore, 100);
+                          return riskScore.toFixed(0);
+                        })() : '0'}
+                      </p>
+                      <p className="text-xs text-orange-600 mt-1">Score 0-100</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-orange-500" />
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* ANÁLISIS DETALLADO - PRIMERA FILA */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* Velocidad de Proceso */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Clock className="h-5 w-5 text-blue-600" />
-                    Velocidad de Proceso
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">Análisis de velocidad y ritmo de trabajo</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {(() => {
-                      const totalHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                      const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
-                      const timeFilter = unifiedData?.timeFilter || '';
-                      
-                      // Detectar si es un período histórico (pasado)
-                      const now = new Date();
-                      const currentMonth = now.getMonth() + 1; // 1-12
-                      const currentYear = now.getFullYear();
-                      
-                      let isHistoricalPeriod = false;
-                      
-                      // Verificar diferentes formatos de filtro temporal
-                      if (timeFilter.includes('august_2025') || timeFilter.includes('agosto_2025')) {
-                        isHistoricalPeriod = currentMonth > 8 || currentYear > 2025;
-                      } else if (timeFilter.includes('july_2025') || timeFilter.includes('julio_2025')) {
-                        isHistoricalPeriod = currentMonth > 7 || currentYear > 2025;
-                      } else if (timeFilter.includes('september_2025') || timeFilter.includes('septiembre_2025')) {
-                        isHistoricalPeriod = currentMonth > 9 || currentYear > 2025;
-                      } else if (timeFilter.includes('2024')) {
-                        isHistoricalPeriod = currentYear > 2024;
-                      }
-                      
-                      const weeksElapsed = 4;
-                      const weeklyVelocity = totalHours / weeksElapsed;
-                      const remainingHours = Math.max(0, estimatedHours - totalHours);
-                      
-                      return (
-                        <>
-                          <div className="text-center p-3 bg-blue-50 rounded-lg border">
-                            <div className="text-xl font-bold text-blue-700">{weeklyVelocity.toFixed(1)}h</div>
-                            <div className="text-xs text-blue-600">Velocidad Semanal</div>
-                          </div>
-                          <div className="text-center p-3 bg-green-50 rounded-lg border">
-                            {isHistoricalPeriod ? (
-                              <>
-                                <div className="text-xl font-bold text-green-700">✓</div>
-                                <div className="text-xs text-green-600">Período Completado</div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="text-xl font-bold text-green-700">{weeklyVelocity > 0 ? Math.ceil(remainingHours / weeklyVelocity) : 0}</div>
-                                <div className="text-xs text-green-600">Semanas Restantes</div>
-                              </>
-                            )}
-                          </div>
-                          <div className="text-center p-3 bg-purple-50 rounded-lg border">
-                            <div className="text-xl font-bold text-purple-700">{estimatedHours > 0 ? ((totalHours / estimatedHours) * 100).toFixed(0) : 0}%</div>
-                            <div className="text-xs text-purple-600">Progreso</div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  
-                  <div className="border-t pt-3">
-                    <h5 className="text-sm font-medium text-gray-700 mb-2">Equipo Activo</h5>
-                    <div className="space-y-1 max-h-24 overflow-y-auto">
-                      {unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0).slice(0, 3).map((member, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm">
-                          <span className="text-gray-700">{member.name}</span>
-                          <span className="text-blue-600">{member.hours}h</span>
-                        </div>
-                      )) || <p className="text-gray-500 text-sm">No hay datos</p>}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Patrones de Colaboración */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Heart className="h-5 w-5 text-pink-600" />
-                    Patrones de Colaboración
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">Análisis de roles y trabajo en equipo</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {unifiedData?.actuals?.teamBreakdown && (() => {
-                      const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
-                      
-                      return activeMembers.map((member, index) => {
-                        const workIntensity = member.hours / Math.max(...activeMembers.map(m => m.hours));
-                        const collaborationType = member.roleName === 'Analista Senior' ? 'Ejecutor Principal' :
-                                                 member.roleName === 'Operations Lead' ? 'Coordinador' :
-                                                 member.roleName === 'Project Manager' ? 'Supervisor' : 'Especialista';
-                        
-                        return (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-3 h-3 rounded-full ${
-                                collaborationType === 'Ejecutor Principal' ? 'bg-green-500' :
-                                collaborationType === 'Coordinador' ? 'bg-blue-500' :
-                                collaborationType === 'Supervisor' ? 'bg-purple-500' : 'bg-orange-500'
-                              }`}></div>
-                              <div>
-                                <h4 className="font-medium text-gray-900 text-sm">{member.name}</h4>
-                                <div className="text-xs text-gray-600">{collaborationType}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold">{(workIntensity * 100).toFixed(0)}%</div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })() || <p className="text-gray-500">No hay datos</p>}
-                  </div>
-                </CardContent>
-              </Card>
-
-            </div>
-
-            {/* PREDICCIÓN Y RECOMENDACIONES */}
+            {/* WORKLOAD & CARGA POR ROL */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  Predicción y Recomendaciones
+                  <Users className="h-5 w-5 text-indigo-600" />
+                  Workload & Carga por Rol
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <Info className="h-4 w-4 text-gray-400" />
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="max-w-xs">Proyecciones inteligentes y recomendaciones de optimización</p>
+                      <TooltipContent className="max-w-sm">
+                        <p>Horas trabajadas vs capacidad disponible. Objetivo: 60-85% utilización.</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {(() => {
-                    const workedHours = unifiedData?.actuals?.totalWorkedHours || 0;
-                    const estimatedHours = unifiedData?.quotation?.estimatedHours || 0;
-                    const workedCost = unifiedData?.actuals?.totalWorkedCost || 0;
-                    const budgetCost = unifiedData?.quotation?.totalAmount || 0;
+                <div className="space-y-4">
+                  {unifiedData?.actuals?.teamBreakdown && (() => {
+                    const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                    const avgHoursPerMonth = 160; // Capacidad estándar mensual
                     
-                    const progressPercent = estimatedHours > 0 ? (workedHours / estimatedHours) * 100 : 0;
-                    const currentBurnRate = workedHours > 0 ? workedCost / workedHours : 0;
-                    const projectedTotalCost = currentBurnRate * estimatedHours;
-                    const budgetOverrun = Math.max(0, projectedTotalCost - budgetCost);
-                    const overrunProbability = budgetOverrun > 0 ? Math.min(90, (budgetOverrun / budgetCost) * 100) : 10;
-                    const riskLevel = overrunProbability < 25 ? 'Bajo' : overrunProbability < 60 ? 'Medio' : 'Alto';
-                    const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
+                    return activeMembers.map((member, index) => {
+                      const utilizationRate = (member.hours / avgHoursPerMonth) * 100;
+                      const isOverloaded = utilizationRate > 100;
+                      const isHigh = utilizationRate > 85;
+                      const isGood = utilizationRate >= 60 && utilizationRate <= 85;
+                      const barColor = isOverloaded ? 'bg-red-500' : isHigh ? 'bg-orange-500' : isGood ? 'bg-green-500' : 'bg-gray-400';
+                      
+                      return (
+                        <div key={index} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${barColor}`}></div>
+                              <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                              <span className="text-xs text-gray-500">({member.roleName || 'N/A'})</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-gray-600">{member.hours}h / {avgHoursPerMonth}h</span>
+                              <span className={`text-sm font-bold ${
+                                isOverloaded ? 'text-red-600' : isHigh ? 'text-orange-600' : isGood ? 'text-green-600' : 'text-gray-600'
+                              }`}>
+                                {utilizationRate.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${barColor} transition-all duration-300`}
+                              style={{ width: `${Math.min(utilizationRate, 120)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })() || <p className="text-gray-500 text-sm">No hay datos de equipo</p>}
+                </div>
+              </CardContent>
+            </Card>
 
-                    // Recomendación inteligente
-                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
-                    const overloadedMembers = activeMembers.filter(m => m.hours > 80);
+            {/* CUELLOS DE BOTELLA (TOP 3) */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  Cuellos de Botella (Top 3)
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-gray-400" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p>Personas con mayor carga relativa. Rojo = sobrecarga, requiere balanceo inmediato.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {unifiedData?.actuals?.teamBreakdown && (() => {
+                    const activeMembers = unifiedData.actuals.teamBreakdown.filter(m => m.hours > 0);
+                    const avgHoursPerMonth = 160;
                     
-                    let recommendation = '';
-                    let recommendationIcon = '';
-                    let recommendationColor = 'bg-blue-50 border-blue-200';
-
-                    if (progressPercent > 80) {
-                      recommendation = 'Proyecto en fase final. Mantener calidad y controlar costos.';
-                      recommendationIcon = '✓';
-                      recommendationColor = 'bg-green-50 border-green-200';
-                    } else if (budgetOverrun > budgetCost * 0.1) {
-                      recommendation = 'Riesgo alto de exceso. Revisar scope inmediatamente.';
-                      recommendationIcon = '⚠';
-                      recommendationColor = 'bg-red-50 border-red-200';
-                    } else if (overloadedMembers.length > 0) {
-                      recommendation = `${overloadedMembers.length} miembro(s) sobrecargado(s). Balancear carga de trabajo.`;
-                      recommendationIcon = '⚖️';
-                      recommendationColor = 'bg-orange-50 border-orange-200';
-                    } else {
-                      recommendation = 'Proyecto en desarrollo normal. Continuar monitoreando.';
-                      recommendationIcon = '→';
-                      recommendationColor = 'bg-blue-50 border-blue-200';
+                    // Calcular utilización y ordenar por carga (descendente)
+                    const bottlenecks = activeMembers
+                      .map(member => ({
+                        ...member,
+                        utilizationRate: (member.hours / avgHoursPerMonth) * 100
+                      }))
+                      .sort((a, b) => b.utilizationRate - a.utilizationRate)
+                      .slice(0, 3); // Top 3
+                    
+                    if (bottlenecks.length === 0) {
+                      return <p className="text-gray-500 text-sm col-span-3">No hay cuellos de botella identificados</p>;
                     }
+                    
+                    return bottlenecks.map((member, index) => {
+                      const isOverloaded = member.utilizationRate > 100;
+                      const isHigh = member.utilizationRate > 85;
+                      const cardColor = isOverloaded ? 'border-red-300 bg-red-50' : 
+                                       isHigh ? 'border-orange-300 bg-orange-50' : 
+                                       'border-green-300 bg-green-50';
+                      const textColor = isOverloaded ? 'text-red-700' : 
+                                       isHigh ? 'text-orange-700' : 
+                                       'text-green-700';
+                      const badgeColor = isOverloaded ? 'bg-red-500' : 
+                                        isHigh ? 'bg-orange-500' : 
+                                        'bg-green-500';
+                      
+                      return (
+                        <div key={index} className={`p-4 rounded-lg border-2 ${cardColor}`}>
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-full ${badgeColor} text-white flex items-center justify-center text-xs font-bold`}>
+                                {index + 1}
+                              </div>
+                              <div>
+                                <h4 className="font-semibold text-gray-900 text-sm">{member.name}</h4>
+                                <p className="text-xs text-gray-600">{member.roleName || 'N/A'}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-gray-600">Carga</span>
+                              <span className={`text-lg font-bold ${textColor}`}>
+                                {member.utilizationRate.toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full ${badgeColor}`}
+                                style={{ width: `${Math.min(member.utilizationRate, 100)}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-2">
+                              {member.hours.toFixed(0)}h / {avgHoursPerMonth}h trabajadas
+                            </p>
+                          </div>
+                          {isOverloaded && (
+                            <div className="mt-3 pt-3 border-t border-red-200">
+                              <p className="text-xs text-red-700 font-medium">⚠️ Requiere redistribución</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })() || <p className="text-gray-500 text-sm col-span-3">No hay datos</p>}
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* RIESGO OPERATIVO & ACCIONES RECOMENDADAS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Riesgo Operativo (Score 0-100) */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Gauge className="h-5 w-5 text-purple-600" />
+                    Riesgo Operativo
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-sm">
+                          <p className="font-semibold mb-1">Score = WIP/Cap + Sobrecarga + Dependencias</p>
+                          <p className="text-xs">{'<'}30 = Bajo, 30-60 = Medio, {'>'}60 = Alto</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                    const avgHoursPerMonth = 160;
+                    const totalCapacity = activeMembers.length * avgHoursPerMonth;
+                    const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
+                    const wipCapRatio = totalCapacity > 0 ? (totalWorked / totalCapacity) : 0;
+                    
+                    // Factor 1: WIP/Capacidad (0-40 puntos)
+                    const wipScore = Math.min(wipCapRatio * 40, 40);
+                    
+                    // Factor 2: Sobrecarga (0-30 puntos)
+                    const overloadedCount = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0).length;
+                    const overloadScore = (overloadedCount / Math.max(activeMembers.length, 1)) * 30;
+                    
+                    // Factor 3: Dependencias críticas (0-30 puntos)
+                    const uniqueRoles = new Set(activeMembers.map(m => m.roleName || 'Sin Rol')).size;
+                    const dependencyScore = uniqueRoles > 3 ? 20 : uniqueRoles > 1 ? 10 : 30;
+                    
+                    const riskScore = Math.min(wipScore + overloadScore + dependencyScore, 100);
+                    const riskLevel = riskScore < 30 ? 'Bajo' : riskScore < 60 ? 'Medio' : 'Alto';
+                    const riskColor = riskLevel === 'Bajo' ? 'text-green-600' : riskLevel === 'Medio' ? 'text-yellow-600' : 'text-red-600';
+                    const riskBgColor = riskLevel === 'Bajo' ? 'bg-green-500' : riskLevel === 'Medio' ? 'bg-yellow-500' : 'bg-red-500';
+                    
                     return (
                       <>
-                        {/* Proyección de Costos */}
-                        <div className="p-4 bg-emerald-50 rounded-lg border">
-                          <h4 className="font-medium text-emerald-700 mb-3">Proyección de Costos</h4>
+                        {/* Score Visual */}
+                        <div className="text-center mb-6">
+                          <div className={`text-5xl font-bold ${riskColor} mb-2`}>
+                            {riskScore.toFixed(0)}
+                          </div>
+                          <p className="text-sm text-gray-600">Score de Riesgo (0-100)</p>
+                          <p className={`text-lg font-semibold ${riskColor} mt-1`}>{riskLevel}</p>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="h-3 bg-gray-200 rounded-full overflow-hidden mb-6">
+                          <div 
+                            className={`h-full ${riskBgColor} transition-all duration-500`}
+                            style={{ width: `${riskScore}%` }}
+                          ></div>
+                        </div>
+
+                        {/* Drivers */}
+                        <div className="space-y-3">
+                          <p className="text-sm font-semibold text-gray-700">Principales Drivers:</p>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Actual</span>
-                              <span className="font-semibold">${workedCost.toLocaleString()}</span>
+                              <span className="text-gray-600">WIP/Capacidad</span>
+                              <span className="font-semibold">{wipScore.toFixed(0)} pts</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Proyectado</span>
-                              <span className="font-semibold">${projectedTotalCost.toLocaleString()}</span>
+                              <span className="text-gray-600">Sobrecarga</span>
+                              <span className="font-semibold">{overloadScore.toFixed(0)} pts</span>
                             </div>
-                            <div className="flex justify-between border-t pt-2">
-                              <span className="text-gray-600">Presupuesto</span>
-                              <span className="font-semibold">${budgetCost.toLocaleString()}</span>
-                            </div>
-                            {budgetOverrun > 0 && (
-                              <div className="flex justify-between text-red-600">
-                                <span>Exceso</span>
-                                <span className="font-semibold">+${budgetOverrun.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Análisis de Riesgo */}
-                        <div className="p-4 bg-orange-50 rounded-lg border">
-                          <h4 className="font-medium text-orange-700 mb-3">Análisis de Riesgo</h4>
-                          <div className="text-center mb-3">
-                            <div className={`text-2xl font-bold ${riskColor}`}>{riskLevel}</div>
-                            <div className="text-sm text-gray-600">Riesgo de Exceso</div>
-                          </div>
-                          <div className="text-xs text-gray-600 space-y-1">
-                            <div>• Burn rate: ${currentBurnRate.toFixed(0)}/h</div>
-                            <div>• Progreso: {progressPercent.toFixed(1)}%</div>
-                            <div>• Probabilidad: {overrunProbability.toFixed(0)}%</div>
-                          </div>
-                        </div>
-
-                        {/* Recomendación Principal */}
-                        <div className={`p-4 rounded-lg border-2 ${recommendationColor}`}>
-                          <h4 className="font-medium text-gray-700 mb-3">Recomendación</h4>
-                          <div className="flex items-start gap-3">
-                            <div className="text-lg">{recommendationIcon}</div>
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-700">{recommendation}</p>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Dependencias</span>
+                              <span className="font-semibold">{dependencyScore.toFixed(0)} pts</span>
                             </div>
                           </div>
                         </div>
                       </>
                     );
                   })()}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              {/* Acciones Recomendadas */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Lightbulb className="h-5 w-5 text-amber-600" />
+                    Acciones Recomendadas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const activeMembers = unifiedData?.actuals?.teamBreakdown?.filter(m => m.hours > 0) || [];
+                    const avgHoursPerMonth = 160;
+                    const overloadedMembers = activeMembers.filter(m => (m.hours / avgHoursPerMonth) > 1.0);
+                    const underutilizedMembers = activeMembers.filter(m => (m.hours / avgHoursPerMonth) < 0.6);
+                    
+                    const actions = [];
+                    
+                    // Acción 1: Redistribuir carga
+                    if (overloadedMembers.length > 0 && underutilizedMembers.length > 0) {
+                      const topOverloaded = overloadedMembers[0];
+                      const topUnderutilized = underutilizedMembers[0];
+                      const hoursToMove = Math.min(
+                        topOverloaded.hours - avgHoursPerMonth,
+                        (avgHoursPerMonth * 0.75) - topUnderutilized.hours
+                      );
+                      
+                      actions.push({
+                        icon: '⚖️',
+                        color: 'bg-orange-50 border-orange-200',
+                        title: 'Balancear Carga',
+                        description: `Mover ${hoursToMove.toFixed(0)}h de ${topOverloaded.name} a ${topUnderutilized.name}`
+                      });
+                    }
+                    
+                    // Acción 2: Priorizar tareas críticas
+                    if (overloadedMembers.length > 0) {
+                      actions.push({
+                        icon: '🎯',
+                        color: 'bg-blue-50 border-blue-200',
+                        title: 'Repriorizar Tareas',
+                        description: `Revisar backlog de ${overloadedMembers[0].name} y delegar tareas no críticas`
+                      });
+                    }
+                    
+                    // Acción 3: Crear alerta
+                    const totalCapacity = activeMembers.length * avgHoursPerMonth;
+                    const totalWorked = activeMembers.reduce((sum, m) => sum + m.hours, 0);
+                    if ((totalWorked / totalCapacity) > 0.9) {
+                      actions.push({
+                        icon: '🔔',
+                        color: 'bg-purple-50 border-purple-200',
+                        title: 'Crear Alerta',
+                        description: 'Configurar alerta si WIP/Cap > 90% durante 3 días'
+                      });
+                    }
+                    
+                    // Acción por defecto
+                    if (actions.length === 0) {
+                      actions.push({
+                        icon: '✅',
+                        color: 'bg-green-50 border-green-200',
+                        title: 'Mantener Ritmo',
+                        description: 'La carga operativa está balanceada. Continuar monitoreando.'
+                      });
+                    }
+                    
+                    return (
+                      <div className="space-y-3">
+                        {actions.map((action, index) => (
+                          <div key={index} className={`p-4 rounded-lg border-2 ${action.color}`}>
+                            <div className="flex items-start gap-3">
+                              <div className="text-2xl">{action.icon}</div>
+                              <div className="flex-1">
+                                <h4 className="font-semibold text-gray-900 text-sm mb-1">{action.title}</h4>
+                                <p className="text-xs text-gray-700">{action.description}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
 
           </TabsContent>
 
