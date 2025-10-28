@@ -1125,7 +1125,7 @@ const ProjectDetailsPage = () => {
 
   // 🔧 Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
   const { data: operationalMetrics, isLoading: operationalLoading } = useQuery({
-    queryKey: [`/api/projects/${projectId}/operational-metrics`, timeFilterForHook],
+    queryKey: [`/api/projects/${projectId}/operational-metrics?timeFilter=${timeFilterForHook}`, timeFilterForHook],
     enabled: !!projectId,
   });
 
