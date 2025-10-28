@@ -1440,7 +1440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKeys.push(periodKey);
       }
 
-      // 3. Consultar fact_labor_month desde Star Schema SoT usando Drizzle query builder
+      // 3. Consultar fact_labor_month con LEFT JOIN a personnel y roles para obtener rol actualizado
       const periodCondition = periodKeys.length === 1
         ? eq(factLaborMonth.periodKey, periodKeys[0])
         : inArray(factLaborMonth.periodKey, periodKeys);
@@ -1449,11 +1449,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select({
           person_id: factLaborMonth.personId,
           person_key: factLaborMonth.personKey,
-          role_name: factLaborMonth.roleName,
+          role_name: sql<string | null>`${roles.name}`.as('role_name'),
           period_key: factLaborMonth.periodKey,
           asana_hours: factLaborMonth.asanaHours,
         })
         .from(factLaborMonth)
+        .leftJoin(personnel, eq(factLaborMonth.personId, personnel.id))
+        .leftJoin(roles, eq(personnel.roleId, roles.id))
         .where(
           and(
             eq(factLaborMonth.projectId, projectId),
@@ -1549,8 +1551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const overloadedCount = workloadData.filter(w => w.utilizationRate > 100).length;
       const overloadScore = workloadData.length > 0 ? (overloadedCount / workloadData.length) * 30 : 0;
 
-      const uniqueRoles = new Set(Array.from(roleByPersonId.values())).size;
-      const dependencyScore = uniqueRoles <= 1 ? 30 : uniqueRoles <= 3 ? 20 : 10;
+      const validRoles = Array.from(roleByPersonId.values())
+        .filter(r => r !== null && r !== undefined && r !== 'N/A' && r.trim() !== '');
+      const uniqueRoles = new Set(validRoles).size;
+      const dependencyScore = uniqueRoles === 0 ? 0 : uniqueRoles <= 1 ? 30 : uniqueRoles <= 3 ? 20 : 10;
 
       const operationalRisk = Math.min(wipScore + overloadScore + dependencyScore, 100);
 
