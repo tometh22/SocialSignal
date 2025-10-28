@@ -3933,24 +3933,37 @@ const ProjectDetailsPage = () => {
                 </TooltipProvider>
 
                 {/* Estado Global */}
-                <div className="bg-white rounded-xl border-2 border-violet-100 p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-gray-600 text-sm font-medium">Estado</p>
-                    <Activity className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <p className={`text-3xl font-bold mb-1 ${
-                    projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
-                      ? 'text-green-600' 
-                      : 'text-red-600'
-                  }`}>
-                    {projectVM && projectVM.revenueDisplay > projectVM.costDisplay ? 'Rentable' : 'En Riesgo'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
-                      ? '🟢 Proyecto saludable' 
-                      : '🔴 Requiere atención'}
-                  </p>
-                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="bg-white rounded-xl border-2 border-violet-100 p-5 cursor-help hover:border-violet-300 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-1">
+                            <p className="text-gray-600 text-sm font-medium">Estado</p>
+                            <Info className="h-3.5 w-3.5 text-gray-400" />
+                          </div>
+                          <Activity className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <p className={`text-3xl font-bold mb-1 ${
+                          projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                        }`}>
+                          {projectVM && projectVM.revenueDisplay > projectVM.costDisplay ? 'Rentable' : 'En Riesgo'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {projectVM && projectVM.revenueDisplay > projectVM.costDisplay 
+                            ? '🟢 Proyecto saludable' 
+                            : '🔴 Requiere atención'}
+                        </p>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-sm">
+                      <p className="font-semibold mb-1">Estado = Ingresos vs Costos</p>
+                      <p className="text-xs text-gray-500">Rentable si ingresos {'>'} costos. En Riesgo requiere acción inmediata.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
 
@@ -3961,8 +3974,21 @@ const ProjectDetailsPage = () => {
                   <div className="p-2 bg-green-100 rounded-lg">
                     <TrendingUp className="h-5 w-5 text-green-600" />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">Flujo de Resultados</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xl font-semibold text-gray-900">Flujo de Resultados</h3>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-sm">
+                            <p className="font-semibold mb-1">Waterfall: Ingresos → Costos → Beneficio</p>
+                            <p className="text-xs text-gray-500">Visualización del flujo de dinero del proyecto. Los ingresos se reducen por los costos, dejando el beneficio final.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                     <p className="text-sm text-gray-600">La historia de tu rentabilidad</p>
                   </div>
                 </div>
@@ -4166,160 +4192,210 @@ const ProjectDetailsPage = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                   {/* Precio por Hora */}
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <DollarSign className="h-4 w-4 text-green-600" />
-                      <p className="text-xs font-semibold text-green-900">Precio/Hora</p>
-                    </div>
-                    <p className="text-2xl font-bold text-green-700 mb-2">
-                      {formatCurrency(
-                        projectVM.totalAsanaHours > 0 ? projectVM.revenueDisplay / projectVM.totalAsanaHours : 0,
-                        projectVM.currencyNative
-                      )}
-                    </p>
-                    <div className="h-2 bg-green-200 rounded-full overflow-hidden mb-2">
-                      <div className="h-full bg-green-500" style={{ width: '100%' }}></div>
-                    </div>
-                    <p className="text-xs text-green-600">Ingresos por hora</p>
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 cursor-help hover:border-green-300 hover:shadow-md transition-all">
+                          <div className="flex items-center gap-2 mb-3">
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <p className="text-xs font-semibold text-green-900">Precio/Hora</p>
+                          </div>
+                          <p className="text-2xl font-bold text-green-700 mb-2">
+                            {formatCurrency(
+                              projectVM.totalAsanaHours > 0 ? projectVM.revenueDisplay / projectVM.totalAsanaHours : 0,
+                              projectVM.currencyNative
+                            )}
+                          </p>
+                          <div className="h-2 bg-green-200 rounded-full overflow-hidden mb-2">
+                            <div className="h-full bg-green-500" style={{ width: '100%' }}></div>
+                          </div>
+                          <p className="text-xs text-green-600">Ingresos por hora</p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="font-semibold mb-1">Precio/Hora = Ingresos ÷ Horas Trabajadas</p>
+                        <p className="text-xs text-gray-500">Promedio de ingresos generados por cada hora. Debe ser mayor al costo/hora para ser rentable.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* Costo por Hora */}
-                  <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border border-red-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Flame className="h-4 w-4 text-red-600" />
-                      <p className="text-xs font-semibold text-red-900">Costo/Hora</p>
-                    </div>
-                    <p className="text-2xl font-bold text-red-700 mb-2">
-                      {formatCurrency(
-                        projectVM.totalAsanaHours > 0 ? projectVM.costDisplay / projectVM.totalAsanaHours : 0,
-                        projectVM.currencyNative
-                      )}
-                    </p>
-                    <div className="h-2 bg-red-200 rounded-full overflow-hidden mb-2">
-                      <div 
-                        className="h-full bg-red-500" 
-                        style={{ 
-                          width: `${Math.min((projectVM.costDisplay / projectVM.revenueDisplay) * 100, 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-red-600">
-                      {((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de ingresos
-                    </p>
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-xl p-4 border border-red-200 cursor-help hover:border-red-300 hover:shadow-md transition-all">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Flame className="h-4 w-4 text-red-600" />
+                            <p className="text-xs font-semibold text-red-900">Costo/Hora</p>
+                          </div>
+                          <p className="text-2xl font-bold text-red-700 mb-2">
+                            {formatCurrency(
+                              projectVM.totalAsanaHours > 0 ? projectVM.costDisplay / projectVM.totalAsanaHours : 0,
+                              projectVM.currencyNative
+                            )}
+                          </p>
+                          <div className="h-2 bg-red-200 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className="h-full bg-red-500" 
+                              style={{ 
+                                width: `${Math.min((projectVM.costDisplay / projectVM.revenueDisplay) * 100, 100)}%` 
+                              }}
+                            ></div>
+                          </div>
+                          <p className="text-xs text-red-600">
+                            {((projectVM.costDisplay / projectVM.revenueDisplay) * 100).toFixed(0)}% de ingresos
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="font-semibold mb-1">Costo/Hora = Costos ÷ Horas Trabajadas</p>
+                        <p className="text-xs text-gray-500">Promedio de costo por cada hora trabajada. Debe ser menor al precio/hora para generar margen.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* EBIT por Hora */}
-                  <div className={`rounded-xl p-4 border-2 ${
-                    (projectVM.revenueDisplay - projectVM.costDisplay) > 0 
-                      ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300' 
-                      : 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-300'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Target className="h-4 w-4 text-blue-600" />
-                      <p className="text-xs font-semibold text-blue-900">EBIT/Hora</p>
-                    </div>
-                    <p className={`text-2xl font-bold mb-2 ${
-                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-700' : 'text-orange-700'
-                    }`}>
-                      {formatCurrency(
-                        projectVM.totalAsanaHours > 0 
-                          ? (projectVM.revenueDisplay - projectVM.costDisplay) / projectVM.totalAsanaHours 
-                          : 0,
-                        projectVM.currencyNative
-                      )}
-                    </p>
-                    <div className={`h-2 rounded-full overflow-hidden mb-2 ${
-                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-200' : 'bg-orange-200'
-                    }`}>
-                      <div 
-                        className={`h-full ${
-                          (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-500' : 'bg-orange-500'
-                        }`}
-                        style={{ 
-                          width: `${Math.min(Math.abs((projectVM.margin || 0) * 100), 100)}%` 
-                        }}
-                      ></div>
-                    </div>
-                    <p className={`text-xs ${
-                      (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-600' : 'text-orange-600'
-                    }`}>
-                      {(projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? '✅ Beneficio' : '⚠️ Pérdida'}
-                    </p>
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={`rounded-xl p-4 border-2 cursor-help hover:shadow-md transition-all ${
+                          (projectVM.revenueDisplay - projectVM.costDisplay) > 0 
+                            ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300 hover:border-blue-400' 
+                            : 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-300 hover:border-orange-400'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Target className="h-4 w-4 text-blue-600" />
+                            <p className="text-xs font-semibold text-blue-900">EBIT/Hora</p>
+                          </div>
+                          <p className={`text-2xl font-bold mb-2 ${
+                            (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-700' : 'text-orange-700'
+                          }`}>
+                            {formatCurrency(
+                              projectVM.totalAsanaHours > 0 
+                                ? (projectVM.revenueDisplay - projectVM.costDisplay) / projectVM.totalAsanaHours 
+                                : 0,
+                              projectVM.currencyNative
+                            )}
+                          </p>
+                          <div className={`h-2 rounded-full overflow-hidden mb-2 ${
+                            (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-200' : 'bg-orange-200'
+                          }`}>
+                            <div 
+                              className={`h-full ${
+                                (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'bg-blue-500' : 'bg-orange-500'
+                              }`}
+                              style={{ 
+                                width: `${Math.min(Math.abs((projectVM.margin || 0) * 100), 100)}%` 
+                              }}
+                            ></div>
+                          </div>
+                          <p className={`text-xs ${
+                            (projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? 'text-blue-600' : 'text-orange-600'
+                          }`}>
+                            {(projectVM.revenueDisplay - projectVM.costDisplay) > 0 ? '✅ Beneficio' : '⚠️ Pérdida'}
+                          </p>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="font-semibold mb-1">EBIT/Hora = Beneficio ÷ Horas</p>
+                        <p className="text-xs text-gray-500">Ganancia neta por hora trabajada (Precio/h - Costo/h). Debe ser positivo para rentabilidad.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* Realization Rate */}
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Percent className="h-4 w-4 text-purple-600" />
-                      <p className="text-xs font-semibold text-purple-900">Realization</p>
-                    </div>
-                    {(() => {
-                      const estimatedHours = projectVM.estimatedHours || 0;
-                      const realizationRate = estimatedHours > 0 
-                        ? (projectVM.totalAsanaHours / estimatedHours) * 100 
-                        : 0;
-                      const isGood = realizationRate >= 80 && realizationRate <= 100;
-                      
-                      return (
-                        <>
-                          <p className={`text-2xl font-bold mb-2 ${
-                            isGood ? 'text-green-700' : realizationRate > 100 ? 'text-orange-700' : 'text-gray-700'
-                          }`}>
-                            {realizationRate.toFixed(0)}%
-                          </p>
-                          <div className="h-2 bg-purple-200 rounded-full overflow-hidden mb-2">
-                            <div 
-                              className={`h-full ${
-                                isGood ? 'bg-green-500' : realizationRate > 100 ? 'bg-orange-500' : 'bg-purple-500'
-                              }`}
-                              style={{ width: `${Math.min(realizationRate, 100)}%` }}
-                            ></div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200 cursor-help hover:border-purple-300 hover:shadow-md transition-all">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Percent className="h-4 w-4 text-purple-600" />
+                            <p className="text-xs font-semibold text-purple-900">Realization</p>
                           </div>
-                          <p className="text-xs text-purple-600">
-                            {projectVM.totalAsanaHours.toFixed(0)}h / {estimatedHours}h
-                          </p>
-                        </>
-                      );
-                    })()}
-                  </div>
+                          {(() => {
+                            const estimatedHours = projectVM.estimatedHours || 0;
+                            const realizationRate = estimatedHours > 0 
+                              ? (projectVM.totalAsanaHours / estimatedHours) * 100 
+                              : 0;
+                            const isGood = realizationRate >= 80 && realizationRate <= 100;
+                            
+                            return (
+                              <>
+                                <p className={`text-2xl font-bold mb-2 ${
+                                  isGood ? 'text-green-700' : realizationRate > 100 ? 'text-orange-700' : 'text-gray-700'
+                                }`}>
+                                  {realizationRate.toFixed(0)}%
+                                </p>
+                                <div className="h-2 bg-purple-200 rounded-full overflow-hidden mb-2">
+                                  <div 
+                                    className={`h-full ${
+                                      isGood ? 'bg-green-500' : realizationRate > 100 ? 'bg-orange-500' : 'bg-purple-500'
+                                    }`}
+                                    style={{ width: `${Math.min(realizationRate, 100)}%` }}
+                                  ></div>
+                                </div>
+                                <p className="text-xs text-purple-600">
+                                  {projectVM.totalAsanaHours.toFixed(0)}h / {estimatedHours}h
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="font-semibold mb-1">Realization = Horas Reales ÷ Horas Estimadas</p>
+                        <p className="text-xs text-gray-500">Compara ejecución vs planificación. 80-100% es óptimo. {'>'} 100% indica sobrecostos, {'<'} 80% subutilización.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* Utilización (nuevo) */}
-                  <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-4 border border-cyan-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Activity className="h-4 w-4 text-cyan-600" />
-                      <p className="text-xs font-semibold text-cyan-900">Utilización</p>
-                    </div>
-                    {(() => {
-                      const totalTeamMembers = projectVM.teamBreakdown?.length || 0;
-                      const avgHoursPerMonth = 160;
-                      const totalAvailableHours = totalTeamMembers * avgHoursPerMonth;
-                      const utilizationRate = totalAvailableHours > 0 
-                        ? (projectVM.totalAsanaHours / totalAvailableHours) * 100 
-                        : 0;
-                      const isGood = utilizationRate >= 60 && utilizationRate <= 85;
-                      
-                      return (
-                        <>
-                          <p className={`text-2xl font-bold mb-2 ${
-                            isGood ? 'text-green-700' : utilizationRate > 85 ? 'text-orange-700' : 'text-gray-700'
-                          }`}>
-                            {utilizationRate.toFixed(0)}%
-                          </p>
-                          <div className="h-2 bg-cyan-200 rounded-full overflow-hidden mb-2">
-                            <div 
-                              className={`h-full ${
-                                isGood ? 'bg-green-500' : utilizationRate > 85 ? 'bg-orange-500' : 'bg-cyan-500'
-                              }`}
-                              style={{ width: `${Math.min(utilizationRate, 100)}%` }}
-                            ></div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-4 border border-cyan-200 cursor-help hover:border-cyan-300 hover:shadow-md transition-all">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Activity className="h-4 w-4 text-cyan-600" />
+                            <p className="text-xs font-semibold text-cyan-900">Utilización</p>
                           </div>
-                          <p className="text-xs text-cyan-600">
-                            {totalTeamMembers} personas
-                          </p>
-                        </>
-                      );
-                    })()}
-                  </div>
+                          {(() => {
+                            const totalTeamMembers = projectVM.teamBreakdown?.length || 0;
+                            const avgHoursPerMonth = 160;
+                            const totalAvailableHours = totalTeamMembers * avgHoursPerMonth;
+                            const utilizationRate = totalAvailableHours > 0 
+                              ? (projectVM.totalAsanaHours / totalAvailableHours) * 100 
+                              : 0;
+                            const isGood = utilizationRate >= 60 && utilizationRate <= 85;
+                            
+                            return (
+                              <>
+                                <p className={`text-2xl font-bold mb-2 ${
+                                  isGood ? 'text-green-700' : utilizationRate > 85 ? 'text-orange-700' : 'text-gray-700'
+                                }`}>
+                                  {utilizationRate.toFixed(0)}%
+                                </p>
+                                <div className="h-2 bg-cyan-200 rounded-full overflow-hidden mb-2">
+                                  <div 
+                                    className={`h-full ${
+                                      isGood ? 'bg-green-500' : utilizationRate > 85 ? 'bg-orange-500' : 'bg-cyan-500'
+                                    }`}
+                                    style={{ width: `${Math.min(utilizationRate, 100)}%` }}
+                                  ></div>
+                                </div>
+                                <p className="text-xs text-cyan-600">
+                                  {totalTeamMembers} personas
+                                </p>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm">
+                        <p className="font-semibold mb-1">Utilización = Horas Trabajadas ÷ Capacidad Total</p>
+                        <p className="text-xs text-gray-500">% del tiempo disponible usado en el proyecto. 60-85% es saludable, {'>'} 85% riesgo de burnout.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
 
                 {/* Interpretation Guide */}
