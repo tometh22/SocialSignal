@@ -1,0 +1,94 @@
+Cómo renombraría y ordenaría
+Nuevo nombre de pestaña: “Finanzas & Unit Economics”
+(Subtítulo en la pantalla: “Rentabilidad, eficiencia y proyección de caja por proyecto/cliente”.)
+Estructura propuesta (de arriba hacia abajo)
+Toolbar superior (contexto)
+Selector Rango (Mensual / Trimestral / YTD / Custom).
+Nivel de análisis: Global · Cliente · Proyecto.
+Moneda: ARS / USD (+ tipo de cambio usado y fecha).
+Base: Devengado vs Cobrado (toggle).
+Última actualización y fuente (Google Sheet / DB).
+Botones: Exportar (CSV/PDF), Ver fórmulas (modal), Notas/Flags.
+KPI Strip (8–10 chips con mini-sparklines)
+Ingresos (devengado/cobrado) · sparkline 6–12m.
+Costos directos (CD) y Costos indirectos (CI).
+Margen Bruto % = (Ingresos − CD)/Ingresos.
+EBIT/Operativo = Ingresos − (CD+CI).
+Margen Operativo %.
+Markup = Ingresos/Costos totales.
+ROI del proyecto = (Beneficio neto / Costos totales).
+Burn rate (₂ vistas): $/h y $/mes.
+Runway (si mira caja): caja disponible / burn mensual.
+Cada chip con color por umbral (verde/ámbar/rojo) y tooltip con fórmula y origen.
+Gráfico de tendencia principal (doble eje)
+Ingresos vs Costos por mes (área/barras apiladas).
+Línea secundaria con Margen %.
+Objetivo: leer “la película” rápido.
+Waterfall de Resultado Neto
+De Ingresos → CD → CI → EBIT → Impuestos (si aplica) → Neto.
+Ideal para explicar qué se comió el margen.
+Cost Breakdown
+Barras apiladas por categoría (Roles, Herramientas, Medios, Terceros) y/o por persona.
+Toggle Directo/Indirecto y Fijo/Variable.
+Unit Economics (servicios)
+Precio hora facturada (blended).
+Costo hora (CD por h).
+Realization rate = horas facturadas/horas trabajadas.
+Utilización = horas billables/horas disponibles.
+EBIT por hora = (precio h − costo h − CI/h).
+Si pones objetivos, mostrarlos como gauge o mini-cards con ✓/✗.
+Proyecciones y escenarios
+Cash-flow forecast 90 días (línea) con escenarios: Base / Pesimista / Optimista.
+Backlog & Pipeline: $ comprometido, % probabilidad ponderada → ARR/“Servicios Recurrentes” estimado.
+Tabla drill-down
+Proyecto/Cliente · Ingresos · CD · CI asignado · Bruto % · Operativo % · Neto · Horas · $/h · Responsable.
+Clic abre detalle con timeline de costos, comentarios y adjuntos.
+Panel de salud (riesgos & alerts)
+Sobre-costo (>X% de presupuesto).
+Sub-facturación (realization <Y%).
+Baja utilización (<Z%).
+FX riesgo (gap entre TC real vs asumido).
+Cobranza: días de atraso (aging).
+Qué data falta / reforzaría
+Base contable: devengado vs cobrado (impacta márgenes y cash).
+Desagregación CD/CI y Fijo/Variable.
+Horas: trabajadas, billables, rate por rol, costo hora por rol.
+Utilización y realization (core para servicios).
+Backlog/Pipeline con probabilidades → forecast real.
+Aging de cobranzas (0–30/31–60/61–90/+90).
+FX: tipo de cambio aplicado por fila/mes y diferencias.
+Notas/justificaciones por desvíos (>10%).
+Metas (targets) para comparar (líneas/fajas en gráficos).
+Correcciones/claridad de KPIs actuales
+Burn rate: hoy dice “$/h trabajada”. Sumar vista mensual y aclarar si incluye CI.
+ROI: explicitar fórmula en tooltip:
+ROI = Beneficio Neto / Costos Totales (o sobre inversión incremental).
+Margen Operativo (71.2%): confirmar si (Ingresos − CD − CI)/Ingresos.
+Markup 3.47×: es Ingresos/Costos; al lado, mostrar Bruto % para contexto.
+“Rentable +$6.013,91”: renombrar a “Resultado Neto” y mostrar % sobre ingresos.
+Micro-UX que suma mucho
+Tooltips con fórmulas + ejemplo numérico.
+Indicador de calidad de datos (completitud, duplicados, fecha de sync).
+Sparklines en los chips (6–12 meses).
+Badges de estado: “On budget / Overrun 12%”.
+Segmentación rápida: Cliente, Industria, País.
+Acciones en contexto: “Crear alerta si margen < 25%” (regla persistente).
+Visuales recomendadas
+Tendencia: área + línea de margen.
+Waterfall: resultado neto.
+Barras apiladas: costos por categoría.
+Gauge/target: Utilización y Realization.
+Línea forecast: cash-flow con bandas de escenario.
+Prioridad de implementación (rápido → profundo)
+Quick wins (hoy)
+Toolbar con rango/moneda/base + “Última actualización”.
+KPI strip con sparklines y tooltips de fórmulas.
+Renombrar tarjetas: “Resultado Neto”, “Margen Operativo %”.
+Siguiente sprint
+Waterfall de neto.
+Cost breakdown directo/indirecto + fijo/variable.
+Tabla drill-down con horas y $/h.
+Pro+
+Unit Economics completo (utilización, realization, blended rate).
+Forecast de caja con escenarios + backlog/pipeline.
+Panel de salud con reglas y alertas.
