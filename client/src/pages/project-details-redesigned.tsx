@@ -2147,8 +2147,8 @@ const ProjectDetailsPage = () => {
               value="financial-analysis" 
               className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
-              <TrendingUp className="h-4 w-4" />
-              Financiero
+              <Heart className="h-4 w-4" />
+              Rentabilidad y Salud
             </TabsTrigger>
             <TabsTrigger 
               value="operational-analysis" 
