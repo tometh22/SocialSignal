@@ -1409,6 +1409,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { completeDataHandler } = await import('./routes/complete-data');
   app.get('/api/projects/:id/complete-data', requireAuth, completeDataHandler);
 
+  // 📊 ENDPOINT: Project Lifetime Metrics (for one-shot projects)
+  const { lifetimeMetricsHandler } = await import('./routes/lifetime-metrics');
+  app.get('/api/projects/:id/lifetime-metrics', requireAuth, lifetimeMetricsHandler);
+
   // 🔧 ENDPOINT: Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
   // MIGRATED TO STAR SCHEMA SoT: Uses fact_labor_month instead of time_entries
   app.get('/api/projects/:id/operational-metrics', requireAuth, async (req, res) => {

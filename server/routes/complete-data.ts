@@ -472,6 +472,17 @@ export async function completeDataHandler(req: Request, res: Response) {
       legacyFlags.push('labor_vs_rc_cost_mismatch');
       console.log(`⚠️ COST MISMATCH: Detail labor=${detailedLaborCost.toFixed(2)}, RC=${rcCost.toFixed(2)}, diff=${(laborMismatchPct*100).toFixed(1)}%`);
     }
+
+    // 🎯 ONE-SHOT PROJECT FLAGS
+    const isOneShot = quotationData?.quotationType === 'one-time';
+    const hasRevenueInPeriod = (summary.revenueDisplay || summary.revenueUSD || 0) > 0;
+    
+    if (isOneShot) {
+      legacyFlags.push('one_shot_project');
+      if (!hasRevenueInPeriod) {
+        legacyFlags.push('one_shot_no_revenue_this_period');
+      }
+    }
     
     const response = {
       // 🎯 3-VIEW SYSTEM: Include view field for frontend
@@ -487,7 +498,10 @@ export async function completeDataHandler(req: Request, res: Response) {
         cotizacion: cotizacion, // Budget denominator (monthly revenue for USD operativa)
         currencyNative: currencyNative,
         budgetUtilization: budgetUtilization,
-        name: quotationData?.projectName || null
+        name: quotationData?.projectName || null,
+        // 🎯 ONE-SHOT FLAGS
+        isOneShot,
+        hasRevenueInPeriod
       },
       quotation: quotationData ? {
         id: quotationData.id,
