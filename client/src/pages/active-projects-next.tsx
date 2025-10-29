@@ -318,6 +318,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
 async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsApi> {
   const url = new URL(`/api/projects`, window.location.origin + API_BASE);
   url.searchParams.set("period", period);
+  url.searchParams.set("onlyActiveInPeriod", "true");
   if (fresh) url.searchParams.set("source", "fresh"); // backend bypass cache
 
   const res = await fetch(url.toString(), { cache: "no-store" });
