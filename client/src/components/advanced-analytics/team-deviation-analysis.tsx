@@ -36,6 +36,7 @@ interface TeamDeviationAnalysisProps {
 interface Deviation {
   personnelId: number;
   personnelName: string;
+  roleName?: string;
   budgetedHours: number;
   actualHours: number;
   budgetedCost: number;
@@ -148,6 +149,7 @@ function useTeamData({
       return {
         personnelId: index + 1,
         personnelName: member.name,
+        roleName: member.roleName,
         budgetedHours,
         actualHours,
         budgetedCost,
@@ -585,7 +587,9 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter, teamB
                             <div className="text-sm font-medium text-gray-900">
                               {deviation.personnelName || `Personal #${deviation.personnelId}`}
                             </div>
-                            <div className="text-xs text-gray-500">ID: {deviation.personnelId}</div>
+                            <div className="text-xs text-gray-500">
+                              {deviation.roleName || 'N/A'}
+                            </div>
                           </div>
                         </div>
                       </td>
