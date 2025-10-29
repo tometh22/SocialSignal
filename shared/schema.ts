@@ -612,6 +612,9 @@ export const activeProjects = pgTable("active_projects", {
   
   // Campo para presupuesto del proyecto
   budget: doublePrecision("budget"), // presupuesto total del proyecto (puede diferir de la cotización)
+  
+  // Campo para marcar proyectos como terminados/archivados
+  isFinished: boolean("is_finished").default(false), // indica si el proyecto ha sido marcado como terminado
 });
 
 // Esquema base generado por drizzle-zod
