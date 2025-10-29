@@ -75,6 +75,7 @@ export type ProjectItem = {
   status?: "Active" | "Inactive";
   tags?: string[]; // e.g., ["Fee"|"One-Shot"]
   currencyNative?: Currency; // if not present, infer from clientName
+  isOneShot?: boolean; // One-shot project flag from backend
   metrics: {
     revenueDisplay?: number; // native currency number
     costDisplay?: number;    // native currency number
@@ -280,6 +281,7 @@ function transformBackendResponse(backendData: any): ProjectsApi {
       status,
       tags,
       currencyNative,
+      isOneShot: p.isOneShot,
       metrics: {
         revenueDisplay,
         costDisplay,
@@ -418,6 +420,11 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
           <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">{p.projectName}</div>
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge tone="green">{statusLabel}</Badge>
+            {p.isOneShot && (
+              <Badge tone="purple" className="text-xs font-semibold px-2 py-1">
+                🎯 ONE-SHOT
+              </Badge>
+            )}
             {p.tags?.map((tag, i) => (
               <Badge key={i} tone="slate">{tagLabel(tag)}</Badge>
             ))}

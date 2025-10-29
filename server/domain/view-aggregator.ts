@@ -474,6 +474,7 @@ export interface FinancialProjectMetrics {
   projectName: string;
   projectType: string | null;
   currencyNative: 'USD' | 'ARS';
+  isOneShot?: boolean;
   metrics: {
     revenueDisplay: number;
     costDisplay: number;
@@ -512,7 +513,8 @@ export async function aggregateProjectsFromStarSchema(
         projectId: activeProjects.id,
         clientName: clients.name,
         projectName: quotations.projectName,
-        projectType: sql<string>`NULL`
+        projectType: sql<string>`NULL`,
+        quotationType: quotations.quotationType
       })
       .from(activeProjects)
       .leftJoin(clients, eq(clients.id, activeProjects.clientId))
@@ -566,6 +568,7 @@ export async function aggregateProjectsFromStarSchema(
         projectName: project.projectName,
         projectType: project.projectType,
         currencyNative: viewData.currencyNative as 'USD' | 'ARS',
+        isOneShot: project.quotationType === 'one-time',
         metrics: {
           revenueDisplay: viewData.revenueDisplay,
           costDisplay: viewData.costDisplay,
