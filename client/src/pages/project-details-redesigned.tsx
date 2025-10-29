@@ -90,6 +90,8 @@ import { es } from "date-fns/locale";
 import ProjectSummaryFixed from '@/components/dashboard/project-summary-fixed';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip, LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
+import { OneShotBanner } from '@/components/one-shot-banner';
+import { ProjectLifetimeMetrics } from '@/components/project-lifetime-metrics';
 
 interface ProjectMetric {
   label: string;
@@ -2168,6 +2170,20 @@ const ProjectDetailsPage = () => {
 
           <TabsContent value="dashboard" className="space-y-6">
             
+            {/* ONE-SHOT BANNER */}
+            {unifiedData?.project?.isOneShot && (
+              <OneShotBanner
+                projectName={project?.quotation?.projectName || 'Proyecto'}
+                hasRevenueInPeriod={unifiedData.project.hasRevenueInPeriod || false}
+                periodLabel={(() => {
+                  const [year, month] = selectedPeriod.split('-');
+                  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                  return `${monthNames[parseInt(month) - 1]} ${year}`;
+                })()}
+                periodWithRevenue={null}
+              />
+            )}
+
             {/* EXECUTIVE DASHBOARD HEADER */}
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -3401,6 +3417,14 @@ const ProjectDetailsPage = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* PROJECT LIFETIME METRICS - For one-shot projects */}
+            {unifiedData?.project?.isOneShot && (
+              <ProjectLifetimeMetrics
+                projectId={projectId}
+                currentPeriod={selectedPeriod}
+              />
+            )}
 
           </TabsContent>
 
