@@ -79,6 +79,7 @@ import { DeviationAnalysis } from "@/components/advanced-analytics/deviation-ana
 import { Recommendations } from "@/components/advanced-analytics/recommendations";
 import { TrendCharts } from "@/components/advanced-analytics/trend-charts";
 import { TeamDeviationAnalysis } from "@/components/advanced-analytics/team-deviation-analysis";
+import { RoleAnalysis } from "@/components/advanced-analytics/role-analysis";
 import WeeklyTimeRegister from "@/components/weekly-time-register";
 import { EconomicRankings } from "@/components/EconomicRankings";
 import TimeTracking from "@/components/TimeTracking";
@@ -3600,25 +3601,30 @@ const ProjectDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* 🎯 VISUAL TEAM CARDS - Using projectVM for consistent data */}
+              {/* 🎯 ROLE ANALYSIS - Aggregated metrics by role type */}
               <Card className="border-0 shadow-lg bg-gradient-to-r from-purple-50 to-indigo-50">
                 <CardHeader className="pb-4">
                   <CardTitle className="flex items-center gap-3 text-xl font-bold text-gray-800">
                     <div className="p-2 bg-purple-100 rounded-lg">
-                      <Users className="h-6 w-6 text-purple-600" />
+                      <Briefcase className="h-6 w-6 text-purple-600" />
                     </div>
-                    Vista de Equipo - Tarjetas Visuales
+                    Análisis por Rol
                   </CardTitle>
                   <CardDescription className="text-base">
-                    Desglose detallado por miembro del equipo con progreso y costos
+                    Métricas agregadas y distribución de recursos por tipo de rol
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ProjectTeamSection 
-                    projectId={projectId!}
-                    projectVM={projectVM}
-                    quotationTeam={(unifiedData as any)?.quotation?.team || []}
-                  />
+                  {projectVM?.teamBreakdown && projectVM.teamBreakdown.length > 0 ? (
+                    <RoleAnalysis 
+                      teamBreakdown={projectVM.teamBreakdown}
+                      currency={projectVM.currencyNative}
+                    />
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">No hay datos del equipo disponibles para el período seleccionado</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
