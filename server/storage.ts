@@ -1289,7 +1289,8 @@ export class DatabaseStorage implements IStorage {
     })
     .from(activeProjects)
     .innerJoin(quotations, eq(activeProjects.quotationId, quotations.id))
-    .leftJoin(clients, eq(quotations.clientId, clients.id));
+    .leftJoin(clients, eq(quotations.clientId, clients.id))
+    .where(eq(activeProjects.isFinished, false));
 
     return projects.map(item => ({
       ...item.project,
