@@ -5705,7 +5705,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Marcar proyecto como terminado
+  app.patch("/api/active-projects/:id/finish", requireAuth, async (req, res) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
 
+    try {
+      const updatedProject = await storage.updateActiveProject(id, {
+        isFinished: true,
+        actualEndDate: new Date()
+      });
+
+      if (!updatedProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      res.json(updatedProject);
+    } catch (error) {
+      console.error("Error marking project as finished:", error);
+      res.status(500).json({ message: "Failed to mark project as finished" });
+    }
+  });
 
   // ---------- RUTAS PARA COMPONENTES DE PROYECTO ----------
 
