@@ -439,7 +439,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
           costARS: costARS.toString(),
           costUSD: costUSD.toString(),
           fx: fxToUse.toString(), // Usar fxToUse (incluye fallback) en lugar de fx
-          roleName: row.Rol || null,
+          roleName: roleName,
           flags,
           sourceRowId: row.__rowId || `row_${processed}`
         })
@@ -453,7 +453,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
             costARS: costARS.toString(),
             costUSD: costUSD.toString(),
             fx: fxToUse.toString(), // Usar fxToUse (incluye fallback) en lugar de fx
-            roleName: row.Rol || null,
+            roleName: roleName,
             flags
           }
         });
