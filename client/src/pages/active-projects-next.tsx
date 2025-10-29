@@ -458,10 +458,9 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
             onClick={async () => {
               if (!confirm(`¿Estás seguro de marcar "${p.projectName}" como terminado?`)) return;
               try {
-                const res = await fetch(`/api/projects/${p.projectId}/status`, {
+                const res = await fetch(`/api/active-projects/${p.projectId}/finish`, {
                   method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ status: 'Inactive', endMonthKey: period })
+                  headers: { 'Content-Type': 'application/json' }
                 });
                 if (!res.ok) throw new Error(await res.text());
                 // Invalidate cache to refresh data
@@ -469,7 +468,7 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
                 alert('Proyecto marcado como terminado exitosamente');
               } catch (e) {
                 console.error('Error marking project as finished:', e);
-                alert('No se pudo cerrar el proyecto. El endpoint podría no estar disponible.');
+                alert('No se pudo cerrar el proyecto.');
               }
             }}
             className="text-xs rounded-lg border border-rose-200 dark:border-rose-800 px-3 py-1.5 hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-700 dark:text-rose-400 transition-colors"
