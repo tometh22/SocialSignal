@@ -421,7 +421,7 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
           <div className="mt-2 flex items-center gap-2 flex-wrap">
             <Badge tone="green">{statusLabel}</Badge>
             {p.isOneShot && (
-              <Badge tone="purple" className="text-xs font-semibold px-2 py-1">
+              <Badge tone="indigo">
                 🎯 ONE-SHOT
               </Badge>
             )}

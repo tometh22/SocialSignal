@@ -364,6 +364,7 @@ export const quotations = pgTable("quotations", {
   quotationCurrency: text("quotation_currency").default("ARS"), // 'ARS' o 'USD'
   exchangeRateAtQuote: numeric("exchange_rate_at_quote", { precision: 10, scale: 4 }), // Tipo de cambio al momento de cotizar
   proposalLink: text("proposal_link"), // Link to the proposal document
+  quotationType: text("quotation_type").default("recurring"), // 'one-time' | 'recurring' | 'fee'
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),
