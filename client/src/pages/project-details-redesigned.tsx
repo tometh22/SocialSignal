@@ -2171,12 +2171,12 @@ const ProjectDetailsPage = () => {
           <TabsContent value="dashboard" className="space-y-6">
             
             {/* ONE-SHOT BANNER */}
-            {unifiedData?.project?.isOneShot && (
+            {unifiedData?.project?.isOneShot && finalPeriod && (
               <OneShotBanner
                 projectName={project?.quotation?.projectName || 'Proyecto'}
                 hasRevenueInPeriod={unifiedData.project.hasRevenueInPeriod || false}
                 periodLabel={(() => {
-                  const [year, month] = selectedPeriod.split('-');
+                  const [year, month] = finalPeriod.split('-');
                   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
                   return `${monthNames[parseInt(month) - 1]} ${year}`;
                 })()}
@@ -3422,7 +3422,7 @@ const ProjectDetailsPage = () => {
             {unifiedData?.project?.isOneShot && (
               <ProjectLifetimeMetrics
                 projectId={projectId}
-                currentPeriod={selectedPeriod}
+                currentPeriod={finalPeriod || ''}
               />
             )}
 
