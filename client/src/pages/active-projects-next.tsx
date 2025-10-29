@@ -762,8 +762,18 @@ export default function ActiveProjectsNext(){
 
   const filtered = useMemo(()=>{
     const q = search.trim().toLowerCase();
-    let result = (data?.projects ?? [])
-      .filter(p => !activeOnly || isActiveForPeriod(p, period))
+    const allProjects = data?.projects ?? [];
+    console.log(`🔍 FILTRADO: Total projects=${allProjects.length}, activeOnly=${activeOnly}, period=${period}`);
+    
+    let result = allProjects
+      .filter(p => {
+        const shouldShow = !activeOnly || isActiveForPeriod(p, period);
+        const hasActivity = hasActivityThisPeriod(p);
+        if (!shouldShow) {
+          console.log(`❌ FILTERED OUT: ${p.clientName} - ${p.projectName}, hasActivity=${hasActivity}, revenue=${p.metrics?.revenueDisplay}, cost=${p.metrics?.costDisplay}`);
+        }
+        return shouldShow;
+      })
       .filter(p => !q || `${p.clientName} ${p.projectName}`.toLowerCase().includes(q));
     
     // Tag filtering
