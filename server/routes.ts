@@ -1677,7 +1677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           weeksInPeriod,
           periodsCount,
           periodKeys,
-          dateRange: { startDate, endDate }
+          dateRange: dateRange ? { startDate: dateRange.startDate, endDate: dateRange.endDate } : null
         }
       });
 
@@ -8802,6 +8802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 🎯 INTENTAR FACT_LABOR_MONTH (Star Schema SoT) primero
       const { factLaborMonth } = await import('../shared/schema');
       
+      // Build where conditions based on period
+      const whereConditions = [eq(factLaborMonth.projectId, projectId)];
+      if (period && period !== 'all') {
+        whereConditions.push(eq(factLaborMonth.periodKey, period));
+      }
+      
       const laborRows = await db.select({
         personKey: factLaborMonth.personKey,
         roleName: factLaborMonth.roleName,
@@ -8814,10 +8820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         flags: factLaborMonth.flags
       })
       .from(factLaborMonth)
-      .where(and(
-        eq(factLaborMonth.projectId, projectId),
-        eq(factLaborMonth.periodKey, period)
-      ));
+      .where(and(...whereConditions));
 
       console.log(`🕒 TIME-TRACKING: Found ${laborRows.length} SoT labor rows for project ${projectId}, period ${period}`);
 
