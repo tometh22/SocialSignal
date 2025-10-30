@@ -1,0 +1,90 @@
+No aceptes mover la agregación al frontend. Es pan para hoy y hambre para mañana (duplica lógica, rompe consistencia, mata performance y cache). El 500 es puramente un problema de cómo se está generando el SQL con Drizzle y de cómo estás reiniciando el servidor.
+Acá tenés el plan preciso para dejarlo bien:
+1) Arreglo robusto de agregados (Postgres + Drizzle)
+Usá dos queries separadas para evitar duplicados por joins y evitá CAST. Drizzle permite interpolar columnas dentro de sql\`; envolvé con coalesce` y tipá el resultado.
+import { sql, eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { revenues, costs } from '@/db/schema';
+
+// Ingresos lifetime
+const [revRow] = await db
+  .select({
+    totalRevenue: sql<number>`coalesce(sum(${revenues.amount}), 0)`.mapWith(Number),
+  })
+  .from(revenues)
+  .where(eq(revenues.projectId, projectId));
+
+// Costos lifetime
+const [costRow] = await db
+  .select({
+    totalCost: sql<number>`coalesce(sum(${costs.amount}), 0)`.mapWith(Number),
+  })
+  .from(costs)
+  .where(eq(costs.projectId, projectId));
+
+const totalRevenue = revRow?.totalRevenue ?? 0;
+const totalCost    = costRow?.totalCost ?? 0;
+Claves:
+sum(${table.col}) (interpolando la columna, no strings).
+coalesce(..., 0) para evitar null.
+.mapWith(Number) para salir ya como número.
+Nada de CAST salvo que la columna sea realmente texto (no lo es).
+Si querés aún más estabilidad: hacé una VIEW SQL y leé esa vista desde Drizzle.
+Alternativa VIEW (muy limpia):
+CREATE OR REPLACE VIEW v_project_financials AS
+SELECT p.id AS project_id,
+       coalesce((SELECT sum(r.amount) FROM revenues r WHERE r.project_id = p.id), 0) AS total_revenue,
+       coalesce((SELECT sum(c.amount) FROM costs    c WHERE c.project_id = p.id), 0) AS total_cost
+FROM projects p;
+Luego un select simple sobre la view.
+2) timeFilter='all' sin trucos
+En los endpoints que agregan por rango, hace un guard clause:
+function buildDatePredicate(tableDateCol: AnyColumn, timeFilter: TimeFilter) {
+  if (timeFilter === 'all') return sql`true`; // no filtra
+  if (timeFilter === 'month') {
+    return sql`${tableDateCol} >= date_trunc('month', now()) 
+                AND ${tableDateCol} < (date_trunc('month', now()) + interval '1 month')`;
+  }
+  // …otros casos (quarter, year, customFrom/To)
+}
+Usalo en where() para revenues y costs. Así la vista “operativa” no rompe cuando pedís “todos los períodos”.
+3) Hot-reload que realmente recargue (tu 500 era código viejo)
+Lo que contás (“sigue viendo sum()” / “AS syntax error” aun después de editar) es servidor corriendo build anterior. Dejalo a prueba de balas:
+Si usás pm2:
+pm2 delete all && pm2 start ecosystem.config.cjs
+o pm2 restart <app> con "watch": ["server"].
+Si usás nodemon / ts-node-dev:
+Asegurá --respawn --transpile-only --poll y --ignore node_modules.
+Si buildeás TypeScript:
+rm -rf dist && tsc -p tsconfig.server.json && node dist/server/index.js
+Agregá un log firme al boot: console.info('BUILD_ID', process.env.BUILD_ID || Date.now()) para constatar que subió el nuevo.
+4) Test mínimo del endpoint (para no “adivinar”)
+Hacé una prueba unitaria con DB de prueba:
+// arrange: inserta 2 revenues y 2 costs del mismo projectId
+// act:
+const res = await supertest(app)
+  .get('/api/projects/36/complete-data?timeFilter=all&view=operativa')
+  .expect(200);
+
+// assert:
+expect(res.body.totalRevenue).toBe(5568);
+expect(res.body.totalCost).toBe(689.24);
+Y activá log de SQL en dev:
+db.$client.on('query', (q) => console.debug('[SQL]', q.sql, q.params));
+5) Sobre la propuesta de “agregar en JS”
+Rechazala. Implicaciones:
+Performance: traés miles de filas para sumar en Node/FE.
+Concurrencia: la lógica se desparrama en clientes con distintos estados.
+Caché/consistencia: no podés cachear agregados en DB/Redis.
+Mantenibilidad: duplicás fórmulas.
+6) One-Shot Mode (con los agregados ya fijos)
+Una vez que totalRevenue y totalCost estén bien, podés calcular:
+const VC   = project.contractValue;               // Valor de contrato
+const AC   = totalCost;                           // Actual Cost
+const EV   = project.evValue;                     // % real * presupuesto (de milestones)
+const PV   = project.pvValue;                     // plan a la fecha
+const CPI  = EV && AC ? EV / AC : 1;
+const EAC  = AC + (project.budget - EV) / (CPI || 1);
+const ETC  = EAC - AC;
+const MAC  = (VC - EAC) / VC;                     // margen al cierre proyectado
+Y la UI muestra VC, AC, MAC%, ETC, EAC + Curva S (PV/EV/AC).

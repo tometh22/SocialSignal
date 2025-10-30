@@ -169,35 +169,33 @@ export async function completeDataHandler(req: Request, res: Response) {
         const { factRCMonth, factLaborMonth } = await import('../../shared/schema');
         const { sql } = await import('drizzle-orm');
         
-        console.log('🔥 NEW CODE LOADED - Using correct SQL without CAST');
-        
         // 1. Get ALL revenue from fact_rc_month
-        const revenueRecords = await db.select({
-          totalRevenueUSD: sql<number>`COALESCE(SUM(${factRCMonth.revenueUsd}), 0)`,
-          totalRevenueARS: sql<number>`COALESCE(SUM(${factRCMonth.revenueArs}), 0)`
+        const [revRow] = await db.select({
+          totalRevenueUSD: sql<number>`coalesce(sum("revenue_usd"), 0)`.mapWith(Number),
+          totalRevenueARS: sql<number>`coalesce(sum("revenue_ars"), 0)`.mapWith(Number)
         })
         .from(factRCMonth)
         .where(eq(factRCMonth.projectId, resolvedProjectId));
         
-        const lifetimeRevenueUSD = Number(revenueRecords[0]?.totalRevenueUSD || 0);
-        const lifetimeRevenueARS = Number(revenueRecords[0]?.totalRevenueARS || 0);
+        const lifetimeRevenueUSD = revRow?.totalRevenueUSD ?? 0;
+        const lifetimeRevenueARS = revRow?.totalRevenueARS ?? 0;
         
         // 2. Get ALL costs from fact_labor_month
-        const costRecords = await db.select({
-          totalCostUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUsd}), 0)`,
-          totalCostARS: sql<number>`COALESCE(SUM(${factLaborMonth.costArs}), 0)`,
-          totalHoursAsana: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}), 0)`,
-          totalHoursBilling: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}), 0)`,
-          totalHoursTarget: sql<number>`COALESCE(SUM(${factLaborMonth.targetHours}), 0)`
+        const [costRow] = await db.select({
+          totalCostUSD: sql<number>`coalesce(sum("cost_usd"), 0)`.mapWith(Number),
+          totalCostARS: sql<number>`coalesce(sum("cost_ars"), 0)`.mapWith(Number),
+          totalHoursAsana: sql<number>`coalesce(sum("asana_hours"), 0)`.mapWith(Number),
+          totalHoursBilling: sql<number>`coalesce(sum("billing_hours"), 0)`.mapWith(Number),
+          totalHoursTarget: sql<number>`coalesce(sum("target_hours"), 0)`.mapWith(Number)
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId));
         
-        const lifetimeCostUSD = Number(costRecords[0]?.totalCostUSD || 0);
-        const lifetimeCostARS = Number(costRecords[0]?.totalCostARS || 0);
-        const lifetimeHoursAsana = Number(costRecords[0]?.totalHoursAsana || 0);
-        const lifetimeHoursBilling = Number(costRecords[0]?.totalHoursBilling || 0);
-        const lifetimeHoursTarget = Number(costRecords[0]?.totalHoursTarget || 0);
+        const lifetimeCostUSD = costRow?.totalCostUSD ?? 0;
+        const lifetimeCostARS = costRow?.totalCostARS ?? 0;
+        const lifetimeHoursAsana = costRow?.totalHoursAsana ?? 0;
+        const lifetimeHoursBilling = costRow?.totalHoursBilling ?? 0;
+        const lifetimeHoursTarget = costRow?.totalHoursTarget ?? 0;
         
         // 3. Determine display currency
         const currencyNative = quotationData?.quotationCurrency || 'USD';
@@ -221,11 +219,11 @@ export async function completeDataHandler(req: Request, res: Response) {
           personnelId: factLaborMonth.personnelId,
           persona: factLaborMonth.persona,
           roleName: factLaborMonth.roleName,
-          targetHours: sql<number>`COALESCE(SUM(${factLaborMonth.targetHours}), 0)`,
-          hoursAsana: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}), 0)`,
-          hoursBilling: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}), 0)`,
-          costARS: sql<number>`COALESCE(SUM(${factLaborMonth.costArs}), 0)`,
-          costUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUsd}), 0)`
+          targetHours: sql<number>`coalesce(sum("target_hours"), 0)`.mapWith(Number),
+          hoursAsana: sql<number>`coalesce(sum("asana_hours"), 0)`.mapWith(Number),
+          hoursBilling: sql<number>`coalesce(sum("billing_hours"), 0)`.mapWith(Number),
+          costARS: sql<number>`coalesce(sum("cost_ars"), 0)`.mapWith(Number),
+          costUSD: sql<number>`coalesce(sum("cost_usd"), 0)`.mapWith(Number)
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId))
