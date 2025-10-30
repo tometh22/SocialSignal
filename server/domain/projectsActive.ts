@@ -119,7 +119,9 @@ export class ActiveProjectsAggregator {
     console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
 
     // 3b. 🎯 ONE-SHOT SPECIAL LOGIC: Add one-shot projects with lifetime revenue even if not in current period
+    console.log(`🎯 ONE-SHOT TRIGGER: About to call addOneShotProjectsLifetime for period ${period.start}`);
     await this.addOneShotProjectsLifetime(period, salesData, costsData, allProjects);
+    console.log(`🎯 ONE-SHOT TRIGGER: Completed addOneShotProjectsLifetime`);
 
     // 4. Merge by projectId - bulletproof deduplication to avoid ARS/USD mixing
     const { projects: projectsData, orphanRows } = await this.mergeProjectData(allProjects, salesData, costsData);
@@ -302,15 +304,24 @@ export class ActiveProjectsAggregator {
     costsData: CostRecord[],
     allProjects: any[]
   ): Promise<void> {
-    console.log(`🎯 ONE-SHOT: Looking for one-shot projects to add lifetime metrics`);
+    console.log(`🎯 ONE-SHOT: Looking for one-shot projects to add lifetime metrics for period ${period.start}`);
+    console.log(`🎯 ONE-SHOT: Total projects to check: ${allProjects.length}`);
+    console.log(`🎯 ONE-SHOT: Projects already in period data: ${new Set([...salesData.map(s => s.projectKey), ...costsData.map(c => c.projectKey)]).size}`);
     
     const monthKey = period.start.substring(0, 7);
     const projectsInPeriod = new Set(salesData.map(s => s.projectKey).concat(costsData.map(c => c.projectKey)));
     
+    let oneShotCount = 0;
     for (const project of allProjects) {
       // Check if this is a one-shot project
       const quotationType = project.quotation?.quotationType;
       const isOneShot = quotationType === 'one-time';
+      
+      if (isOneShot) {
+        oneShotCount++;
+        const projectName = project.quotation?.projectName || `Project-${project.id}`;
+        console.log(`🎯 ONE-SHOT FOUND: "${projectName}" (ID: ${project.id}, type: ${quotationType})`);
+      }
       
       if (!isOneShot) continue;
       
