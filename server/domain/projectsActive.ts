@@ -651,6 +651,9 @@ export class ActiveProjectsAggregator {
       
       // Determine if finished (inactive status or explicitly marked)
       const isFinished = projectData.quotation?.status === 'completed' || false;
+      
+      // Determine if one-shot project
+      const isOneShot = quotationType === 'one-time' || mappedType === 'one-shot';
 
       projectItems.push({
         projectId: projectData.projectId,
@@ -680,6 +683,7 @@ export class ActiveProjectsAggregator {
         },
         // Optional metadata for intelligent visibility
         projectType: projectTypeLabel,
+        isOneShot,
         startMonthKey,
         endMonthKey,
         lastActivity,

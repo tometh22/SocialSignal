@@ -2139,6 +2139,7 @@ export const activeProjectItemSchema = z.object({
   period: resolvedPeriodSchema,
   // Optional metadata for intelligent visibility and project management
   projectType: z.enum(['Fee', 'Puntual']).optional(),
+  isOneShot: z.boolean().optional(),     // True if quotationType is 'one-time'
   startMonthKey: z.string().optional(),  // YYYY-MM
   endMonthKey: z.string().optional(),    // YYYY-MM
   lastActivity: z.string().optional(),   // YYYY-MM
