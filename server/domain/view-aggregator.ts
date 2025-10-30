@@ -42,8 +42,18 @@ async function getProjectPeriodViewFromSoT(
   
   console.log(`🔍 [SoT Reader] Querying fact_labor_month + fact_rc_month for project=${projectId}, period=${periodKey}`);
   
+  // Build where conditions based on period
+  const isAllPeriods = periodKey === 'all';
+  const laborWhereConditions = isAllPeriods 
+    ? [eq(factLaborMonth.projectId, projectId)]
+    : [eq(factLaborMonth.projectId, projectId), eq(factLaborMonth.periodKey, periodKey)];
+  
+  const rcWhereConditions = isAllPeriods
+    ? [eq(factRCMonth.projectId, projectId)]
+    : [eq(factRCMonth.projectId, projectId), eq(factRCMonth.periodKey, periodKey)];
+  
   // 1) Team breakdown con JOIN a personnel
-  const teamRows = await db
+  const teamRowsRaw = await db
     .select({
       personId: factLaborMonth.personId,
       personName: personnel.name,
@@ -59,13 +69,38 @@ async function getProjectPeriodViewFromSoT(
     })
     .from(factLaborMonth)
     .leftJoin(personnel, eq(personnel.id, factLaborMonth.personId))
-    .where(
-      and(
-        eq(factLaborMonth.projectId, projectId),
-        eq(factLaborMonth.periodKey, periodKey)
-      )
-    )
+    .where(and(...laborWhereConditions))
     .orderBy(personnel.name);
+
+  // If period='all', aggregate team data by person
+  const teamRows = isAllPeriods ? (() => {
+    const personMap = new Map<number, any>();
+    for (const row of teamRowsRaw) {
+      const key = row.personId || 0;
+      if (!personMap.has(key)) {
+        personMap.set(key, {
+          personId: row.personId,
+          personName: row.personName,
+          roleName: row.roleName,
+          targetHours: 0,
+          asanaHours: 0,
+          billingHours: 0,
+          hourlyRateARS: row.hourlyRateARS,
+          fx: row.fx,
+          costARS: 0,
+          costUSD: 0,
+          flags: row.flags
+        });
+      }
+      const person = personMap.get(key)!;
+      person.targetHours += Number(row.targetHours || 0);
+      person.asanaHours += Number(row.asanaHours || 0);
+      person.billingHours += Number(row.billingHours || 0);
+      person.costARS += Number(row.costARS || 0);
+      person.costUSD += Number(row.costUSD || 0);
+    }
+    return Array.from(personMap.values());
+  })() : teamRowsRaw;
 
   // 2) Totales agregados (labor)
   const totalsResult = await db
@@ -77,15 +112,11 @@ async function getProjectPeriodViewFromSoT(
       costUSD: sql<string>`COALESCE(SUM(CAST(${factLaborMonth.costUSD} AS NUMERIC)), 0)`
     })
     .from(factLaborMonth)
-    .where(
-      and(
-        eq(factLaborMonth.projectId, projectId),
-        eq(factLaborMonth.periodKey, periodKey)
-      )
-    );
+    .where(and(...laborWhereConditions));
 
   // 3) Rendimiento Cliente (revenue + quote/fx)
-  const rcResult = await db
+  // For 'all' periods, aggregate all RC data
+  const rcResultRaw = await db
     .select({
       quoteNative: factRCMonth.quoteNative,
       fxRate: factRCMonth.fxRate,
@@ -96,13 +127,17 @@ async function getProjectPeriodViewFromSoT(
       costUSD: factRCMonth.costUSD
     })
     .from(factRCMonth)
-    .where(
-      and(
-        eq(factRCMonth.projectId, projectId),
-        eq(factRCMonth.periodKey, periodKey)
-      )
-    )
-    .limit(1);
+    .where(and(...rcWhereConditions));
+
+  const rcResult = isAllPeriods && rcResultRaw.length > 0 ? [{
+    quoteNative: rcResultRaw[0].quoteNative, // Use first for quote
+    fxRate: rcResultRaw[0].fxRate, // Use first for FX
+    priceNative: rcResultRaw[0].priceNative,
+    revenueARS: rcResultRaw.reduce((sum, r) => sum + Number(r.revenueARS || 0), 0).toString(),
+    revenueUSD: rcResultRaw.reduce((sum, r) => sum + Number(r.revenueUSD || 0), 0).toString(),
+    costARS: rcResultRaw.reduce((sum, r) => sum + Number(r.costARS || 0), 0).toString(),
+    costUSD: rcResultRaw.reduce((sum, r) => sum + Number(r.costUSD || 0), 0).toString()
+  }] : rcResultRaw;
 
   // Validar si hay datos SoT
   if (teamRows.length === 0 && rcResult.length === 0) {

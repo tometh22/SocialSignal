@@ -28,9 +28,14 @@ export interface UniversalRankingsResponse {
 }
 
 /**
- * Parse timeFilter to period (YYYY-MM)
+ * Parse timeFilter to period (YYYY-MM or 'all')
  */
 function parseTimeFilterToPeriod(timeFilter: string): string {
+  // Handle 'all' case
+  if (timeFilter === 'all') {
+    return 'all';
+  }
+  
   // august_2025 → 2025-08
   const parts = timeFilter.split('_');
   if (parts.length === 2) {
