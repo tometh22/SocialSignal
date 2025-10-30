@@ -1,0 +1,99 @@
+Acá tenés la sintaxis correcta con Drizzle (PostgreSQL) para sumar varias columnas del mismo registro con filtro por project_id, evitando NULL y tipando a number.
+✅ Opción A — Query builder Drizzle con sql + .mapWith(Number) (recomendada)
+import { sql, eq } from 'drizzle-orm';
+import { db } from '@/db';
+import { factRcMonth } from '@/db/schema'; // tu tabla fact_rc_month
+
+type Sums = {
+  revUsd: number;
+  revArs: number;
+};
+
+export async function getRevenueSums(projectId: number): Promise<Sums> {
+  const [row] = await db
+    .select({
+      revUsd: sql<number>`coalesce(sum(${factRcMonth.revenueUsd}), 0)`.mapWith(Number),
+      revArs: sql<number>`coalesce(sum(${factRcMonth.revenueArs}), 0)`.mapWith(Number),
+    })
+    .from(factRcMonth)
+    .where(eq(factRcMonth.projectId, projectId));
+
+  return {
+    revUsd: row?.revUsd ?? 0,
+    revArs: row?.revArs ?? 0,
+  };
+}
+Puntos clave
+Interpolás la columna Drizzle dentro del template: sum(${factRcMonth.revenueUsd}).
+coalesce(..., 0) evita null.
+.mapWith(Number) obliga a número (saca string/Decimal).
+Va todo en un único select({ ... }); podés sumar más columnas igual.
+Si tu definición de columnas es text en DB, casteá una sola vez:
+revUsd: sql<number>`coalesce(sum((${factRcMonth.revenueUsd})::numeric),0)`.mapWith(Number)
+🧱 Opción B — Alias de tabla (si usás joins o hay ambigüedad)
+import { alias } from 'drizzle-orm/pg-core';
+const f = alias(factRcMonth, 'f');
+
+const [row] = await db
+  .select({
+    revUsd: sql<number>`coalesce(sum(${f.revenueUsd}),0)`.mapWith(Number),
+    revArs: sql<number>`coalesce(sum(${f.revenueArs}),0)`.mapWith(Number),
+  })
+  .from(f)
+  .where(eq(f.projectId, projectId));
+🧩 Opción C — VIEW en Postgres (súper estable) + select simple
+SQL (una vez):
+CREATE OR REPLACE VIEW v_project_fact_sums AS
+SELECT
+  project_id,
+  coalesce(sum(revenue_usd), 0) AS rev_usd,
+  coalesce(sum(revenue_ars), 0) AS rev_ars
+FROM fact_rc_month
+GROUP BY project_id;
+Drizzle (leer la view):
+import { pgView, integer, numeric } from 'drizzle-orm/pg-core';
+
+export const vProjectFactSums = pgView('v_project_fact_sums', {
+  projectId: integer('project_id'),
+  revUsd: numeric('rev_usd'),
+  revArs: numeric('rev_ars'),
+});
+
+const [row] = await db
+  .select({
+    projectId: vProjectFactSums.projectId,
+    revUsd: sql<number>`${vProjectFactSums.revUsd}`.mapWith(Number),
+    revArs: sql<number>`${vProjectFactSums.revArs}`.mapWith(Number),
+  })
+  .from(vProjectFactSums)
+  .where(eq(vProjectFactSums.projectId, projectId));
+Ventaja: el SQL queda probado/optimizable en la DB y Drizzle solo lee.
+🧯 Errores típicos que te dieron pelea (y cómo evitarlos)
+function sum() does not exist → se envió sum() sin columna. Solución: interpolar la columna Drizzle dentro del template.
+syntax error near 'AS' → normalmente por CAST(${col} AS ...) con interpolación; preferí (${col})::numeric.
+Valores nulos → siempre coalesce(sum(...), 0).
+Servidor usando build viejo → asegurá restart limpio (pm2/nodemon/tsc) y logueá BUILD_ID al boot.
+🧪 Snippet listo para tu endpoint
+export async function getProjectLifetime(projectId: number) {
+  const [row] = await db
+    .select({
+      revenueUsd: sql<number>`coalesce(sum(${factRcMonth.revenueUsd}),0)`.mapWith(Number),
+      revenueArs: sql<number>`coalesce(sum(${factRcMonth.revenueArs}),0)`.mapWith(Number),
+      costUsd:    sql<number>`coalesce(sum(${factRcMonth.costUsd}),0)`.mapWith(Number),
+      costArs:    sql<number>`coalesce(sum(${factRcMonth.costArs}),0)`.mapWith(Number),
+    })
+    .from(factRcMonth)
+    .where(eq(factRcMonth.projectId, projectId));
+
+  return {
+    revenueUsd: row?.revenueUsd ?? 0,
+    revenueArs: row?.revenueArs ?? 0,
+    costUsd:    row?.costUsd    ?? 0,
+    costArs:    row?.costArs    ?? 0,
+  };
+}
+¿Cuál elijo?
+Primero A (query builder).
+Si seguís viendo rarezas por joins/ambigüedad → B (alias).
+Si querés sencillez operativa y performance → C (VIEW) y listo.
+Con esto resolvés el SUM(...) de Drizzle bien tipado y sin 500, y podés avanzar con el One-Shot Mode arriba de estos agregados.

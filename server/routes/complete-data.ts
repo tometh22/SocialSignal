@@ -171,8 +171,8 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         // 1. Get ALL revenue from fact_rc_month
         const [revRow] = await db.select({
-          totalRevenueUSD: sql<number>`coalesce(sum("revenue_usd"), 0)`.mapWith(Number),
-          totalRevenueARS: sql<number>`coalesce(sum("revenue_ars"), 0)`.mapWith(Number)
+          totalRevenueUSD: sql<number>`coalesce(sum(${factRCMonth.revenueUSD}), 0)`.mapWith(Number),
+          totalRevenueARS: sql<number>`coalesce(sum(${factRCMonth.revenueARS}), 0)`.mapWith(Number)
         })
         .from(factRCMonth)
         .where(eq(factRCMonth.projectId, resolvedProjectId));
@@ -182,11 +182,11 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         // 2. Get ALL costs from fact_labor_month
         const [costRow] = await db.select({
-          totalCostUSD: sql<number>`coalesce(sum("cost_usd"), 0)`.mapWith(Number),
-          totalCostARS: sql<number>`coalesce(sum("cost_ars"), 0)`.mapWith(Number),
-          totalHoursAsana: sql<number>`coalesce(sum("asana_hours"), 0)`.mapWith(Number),
-          totalHoursBilling: sql<number>`coalesce(sum("billing_hours"), 0)`.mapWith(Number),
-          totalHoursTarget: sql<number>`coalesce(sum("target_hours"), 0)`.mapWith(Number)
+          totalCostUSD: sql<number>`coalesce(sum(${factLaborMonth.costUSD}), 0)`.mapWith(Number),
+          totalCostARS: sql<number>`coalesce(sum(${factLaborMonth.costARS}), 0)`.mapWith(Number),
+          totalHoursAsana: sql<number>`coalesce(sum(${factLaborMonth.asanaHours}), 0)`.mapWith(Number),
+          totalHoursBilling: sql<number>`coalesce(sum(${factLaborMonth.billingHours}), 0)`.mapWith(Number),
+          totalHoursTarget: sql<number>`coalesce(sum(${factLaborMonth.targetHours}), 0)`.mapWith(Number)
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId));
@@ -216,22 +216,22 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         // 5. Get team breakdown from fact_labor_month grouped by person
         const teamRecords = await db.select({
-          personnelId: factLaborMonth.personnelId,
-          persona: factLaborMonth.persona,
+          personId: factLaborMonth.personId,
+          personKey: factLaborMonth.personKey,
           roleName: factLaborMonth.roleName,
-          targetHours: sql<number>`coalesce(sum("target_hours"), 0)`.mapWith(Number),
-          hoursAsana: sql<number>`coalesce(sum("asana_hours"), 0)`.mapWith(Number),
-          hoursBilling: sql<number>`coalesce(sum("billing_hours"), 0)`.mapWith(Number),
-          costARS: sql<number>`coalesce(sum("cost_ars"), 0)`.mapWith(Number),
-          costUSD: sql<number>`coalesce(sum("cost_usd"), 0)`.mapWith(Number)
+          targetHours: sql<number>`coalesce(sum(${factLaborMonth.targetHours}), 0)`.mapWith(Number),
+          hoursAsana: sql<number>`coalesce(sum(${factLaborMonth.asanaHours}), 0)`.mapWith(Number),
+          hoursBilling: sql<number>`coalesce(sum(${factLaborMonth.billingHours}), 0)`.mapWith(Number),
+          costARS: sql<number>`coalesce(sum(${factLaborMonth.costARS}), 0)`.mapWith(Number),
+          costUSD: sql<number>`coalesce(sum(${factLaborMonth.costUSD}), 0)`.mapWith(Number)
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId))
-        .groupBy(factLaborMonth.personnelId, factLaborMonth.persona, factLaborMonth.roleName);
+        .groupBy(factLaborMonth.personId, factLaborMonth.personKey, factLaborMonth.roleName);
         
         const teamBreakdown = teamRecords.map(m => ({
-          personnelId: m.personnelId,
-          name: m.persona || 'Unknown',
+          personnelId: m.personId?.toString() || m.personKey || 'unknown',
+          name: m.personKey || 'Unknown',
           roleName: m.roleName || 'N/A',
           role: m.roleName || 'N/A',
           targetHours: Number(m.targetHours || 0),
@@ -646,16 +646,16 @@ export async function completeDataHandler(req: Request, res: Response) {
           
           const revenueRecords = await db.select({
             periodKey: factRCMonth.periodKey,
-            revenueUsd: factRCMonth.revenueUsd,
-            revenueArs: factRCMonth.revenueArs
+            revenueUsd: factRCMonth.revenueUSD,
+            revenueArs: factRCMonth.revenueARS
           })
           .from(factRCMonth)
           .where(
             and(
               eq(factRCMonth.projectId, resolvedProjectId),
               or(
-                gt(factRCMonth.revenueUsd, 0),
-                gt(factRCMonth.revenueArs, 0)
+                gt(factRCMonth.revenueUSD, 0),
+                gt(factRCMonth.revenueARS, 0)
               )
             )
           )

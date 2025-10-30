@@ -309,7 +309,8 @@ export class ActiveProjectsAggregator {
     console.log(`🎯 ONE-SHOT: Projects already in period data: ${new Set([...salesData.map(s => s.projectKey), ...costsData.map(c => c.projectKey)]).size}`);
     
     const monthKey = period.start.substring(0, 7);
-    const projectsInPeriod = new Set(salesData.map(s => s.projectKey).concat(costsData.map(c => c.projectKey)));
+    const projectsWithRevenue = new Set(salesData.map(s => s.projectKey));
+    const projectsWithCosts = new Set(costsData.map(c => c.projectKey));
     
     let oneShotCount = 0;
     for (const project of allProjects) {
@@ -329,10 +330,16 @@ export class ActiveProjectsAggregator {
       const clientName = project.quotation?.client?.name || '';
       const canonicalFields = generateCanonicalFields(clientName, actualProjectName);
       
-      // If project already has data in current period, skip (it's already in salesData/costsData)
-      if (projectsInPeriod.has(canonicalFields.projectKey)) {
-        console.log(`🎯 ONE-SHOT: ${actualProjectName} already in period data, skipping`);
+      // 🎯 CRITICAL FIX: Only skip if project ALREADY has revenue in current period
+      // For one-shot projects with costs but no revenue, we need to add lifetime revenue
+      if (projectsWithRevenue.has(canonicalFields.projectKey)) {
+        console.log(`🎯 ONE-SHOT: ${actualProjectName} already has revenue in period, skipping`);
         continue;
+      }
+      
+      const hasCostsInPeriod = projectsWithCosts.has(canonicalFields.projectKey);
+      if (hasCostsInPeriod) {
+        console.log(`🎯 ONE-SHOT: ${actualProjectName} has costs but NO revenue in period - will add lifetime revenue`);
       }
       
       try {
@@ -378,7 +385,7 @@ export class ActiveProjectsAggregator {
         
         console.log(`🎯 ONE-SHOT LIFETIME: ${actualProjectName} → Lifetime Revenue: $${lifetimeRevenueUSD.toFixed(2)} (billed in ${revenuePeriod}), Period Cost: $${periodCostUSD.toFixed(2)}`);
         
-        // Add to salesData with lifetime revenue
+        // Add to salesData with lifetime revenue (always add if revenue > 0)
         if (lifetimeRevenueUSD > 0) {
           salesData.push({
             clientCanon: canonicalFields.clientCanon,
@@ -397,21 +404,23 @@ export class ActiveProjectsAggregator {
           });
         }
         
-        // Add to costsData with period cost (even if 0, to show project in list)
-        costsData.push({
-          clientCanon: canonicalFields.clientCanon,
-          projectCanon: canonicalFields.projectCanon,
-          projectKey: canonicalFields.projectKey,
-          projectName: actualProjectName,
-          costUSD: periodCostUSD,
-          hoursReal: 0,
-          hoursTarget: 0,
-          month: monthKey.substring(5, 7),
-          year: parseInt(monthKey.substring(0, 4)),
-          displayCurrency: displayCurrency as "ARS" | "USD",
-          costDisplay: costDisplay,
-          costUSDNormalized: periodCostUSD
-        });
+        // 🎯 Only add to costsData if NOT already in period (to avoid duplicates)
+        if (!hasCostsInPeriod) {
+          costsData.push({
+            clientCanon: canonicalFields.clientCanon,
+            projectCanon: canonicalFields.projectCanon,
+            projectKey: canonicalFields.projectKey,
+            projectName: actualProjectName,
+            costUSD: periodCostUSD,
+            hoursReal: 0,
+            hoursTarget: 0,
+            month: monthKey.substring(5, 7),
+            year: parseInt(monthKey.substring(0, 4)),
+            displayCurrency: displayCurrency as "ARS" | "USD",
+            costDisplay: costDisplay,
+            costUSDNormalized: periodCostUSD
+          });
+        }
         
       } catch (error) {
         console.error(`❌ Error adding lifetime metrics for one-shot project ${project.id}:`, error);
