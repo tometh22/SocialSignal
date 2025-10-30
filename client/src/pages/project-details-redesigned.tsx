@@ -2180,7 +2180,7 @@ const ProjectDetailsPage = () => {
                   const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
                   return `${monthNames[parseInt(month) - 1]} ${year}`;
                 })()}
-                periodWithRevenue={null}
+                periodWithRevenue={unifiedData.project.periodWithRevenue || null}
               />
             )}
 

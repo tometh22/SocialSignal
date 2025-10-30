@@ -486,25 +486,25 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         // Search fact_rc_month for period with revenue > 0
         try {
-          const { factRcMonth } = await import('../../shared/schema');
+          const { factRCMonth } = await import('../../shared/schema');
           const { eq, and, gt, or } = await import('drizzle-orm');
           
           const revenueRecords = await db.select({
-            periodKey: factRcMonth.periodKey,
-            revenueUsd: factRcMonth.revenueUsd,
-            revenueArs: factRcMonth.revenueArs
+            periodKey: factRCMonth.periodKey,
+            revenueUsd: factRCMonth.revenueUsd,
+            revenueArs: factRCMonth.revenueArs
           })
-          .from(factRcMonth)
+          .from(factRCMonth)
           .where(
             and(
-              eq(factRcMonth.projectId, resolvedProjectId),
+              eq(factRCMonth.projectId, resolvedProjectId),
               or(
-                gt(factRcMonth.revenueUsd, 0),
-                gt(factRcMonth.revenueArs, 0)
+                gt(factRCMonth.revenueUsd, 0),
+                gt(factRCMonth.revenueArs, 0)
               )
             )
           )
-          .orderBy(factRcMonth.periodKey);
+          .orderBy(factRCMonth.periodKey);
           
           if (revenueRecords.length > 0) {
             periodWithRevenue = revenueRecords[0].periodKey;
