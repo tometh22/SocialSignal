@@ -654,6 +654,46 @@ export class ActiveProjectsAggregator {
       
       // Determine if one-shot project
       const isOneShot = quotationType === 'one-time' || mappedType === 'one-shot';
+      
+      // Calculate lifetime metrics for one-shot projects
+      let lifetimeRevenueUSD: number | undefined;
+      let lifetimeCostUSD: number | undefined;
+      let revenuePeriod: string | undefined;
+      
+      if (isOneShot) {
+        try {
+          const { factRCMonth, factLaborMonth } = await import('../../shared/schema');
+          const { eq, gt, or } = await import('drizzle-orm');
+          const db = this.storage['db']; // Access db instance from storage
+          
+          // Get all revenue records for this project
+          const revenueRecords = await db.select({
+            periodKey: factRCMonth.periodKey,
+            revenueUsd: factRCMonth.revenueUsd
+          })
+          .from(factRCMonth)
+          .where(eq(factRCMonth.projectId, projectData.projectId));
+          
+          lifetimeRevenueUSD = revenueRecords.reduce((sum, r) => sum + (Number(r.revenueUsd) || 0), 0);
+          
+          // Find period with revenue
+          const revenueRecord = revenueRecords.find(r => Number(r.revenueUsd) > 0);
+          revenuePeriod = revenueRecord?.periodKey || undefined;
+          
+          // Get all cost records for this project
+          const costRecords = await db.select({
+            costUsd: factLaborMonth.costUsd
+          })
+          .from(factLaborMonth)
+          .where(eq(factLaborMonth.projectId, projectData.projectId));
+          
+          lifetimeCostUSD = costRecords.reduce((sum, c) => sum + (Number(c.costUsd) || 0), 0);
+          
+          console.log(`🎯 ONE-SHOT LIFETIME: Project ${projectData.projectId} → Revenue: $${lifetimeRevenueUSD}, Cost: $${lifetimeCostUSD}, Period: ${revenuePeriod}`);
+        } catch (error) {
+          console.error(`❌ Error calculating lifetime metrics for project ${projectData.projectId}:`, error);
+        }
+      }
 
       projectItems.push({
         projectId: projectData.projectId,
@@ -684,6 +724,9 @@ export class ActiveProjectsAggregator {
         // Optional metadata for intelligent visibility
         projectType: projectTypeLabel,
         isOneShot,
+        lifetimeRevenueUSD,
+        lifetimeCostUSD,
+        revenuePeriod,
         startMonthKey,
         endMonthKey,
         lastActivity,

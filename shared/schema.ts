@@ -2140,6 +2140,10 @@ export const activeProjectItemSchema = z.object({
   // Optional metadata for intelligent visibility and project management
   projectType: z.enum(['Fee', 'Puntual']).optional(),
   isOneShot: z.boolean().optional(),     // True if quotationType is 'one-time'
+  // One-shot specific lifetime metrics (for display in list view)
+  lifetimeRevenueUSD: z.number().optional(),  // Total revenue across all periods
+  lifetimeCostUSD: z.number().optional(),     // Total cost across all periods
+  revenuePeriod: z.string().optional(),       // Period with revenue (YYYY-MM)
   startMonthKey: z.string().optional(),  // YYYY-MM
   endMonthKey: z.string().optional(),    // YYYY-MM
   lastActivity: z.string().optional(),   // YYYY-MM

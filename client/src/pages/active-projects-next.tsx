@@ -87,6 +87,10 @@ export type ProjectItem = {
   anomaly?: string[]; // optional flags from /debug or SoT
   // Optional metadata for intelligent visibility
   projectType?: "Fee" | "Puntual";
+  // One-shot specific lifetime metrics
+  lifetimeRevenueUSD?: number;  // Total revenue across all periods
+  lifetimeCostUSD?: number;     // Total cost across all periods
+  revenuePeriod?: string;       // Period with revenue (YYYY-MM)
   startMonthKey?: string; // YYYY-MM
   endMonthKey?: string;   // YYYY-MM
   lastActivity?: string;  // YYYY-MM
@@ -373,12 +377,35 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
   const queryClient = useQueryClient();
 
   const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
-  const revenueDisplay = p.metrics.revenueDisplay ?? 0;
+  
+  // For one-shot projects, show lifetime revenue instead of period revenue
+  const revenueDisplay = p.isOneShot && p.lifetimeRevenueUSD 
+    ? p.lifetimeRevenueUSD 
+    : (p.metrics.revenueDisplay ?? 0);
+  
   const costDisplay = p.metrics.costDisplay ?? 0;
-  const profitDisplay = (p.metrics.revenueDisplay ?? 0) - (p.metrics.costDisplay ?? 0);
+  
+  // For one-shot, calculate profit using lifetime revenue
+  const profitDisplay = p.isOneShot && p.lifetimeRevenueUSD && p.lifetimeCostUSD
+    ? p.lifetimeRevenueUSD - p.lifetimeCostUSD
+    : ((p.metrics.revenueDisplay ?? 0) - (p.metrics.costDisplay ?? 0));
 
-  const markup = p.metrics.markup ?? safeRatio(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
-  const margin = p.metrics.margin ?? safeMargin(p.metrics.revenueUSDNormalized, p.metrics.costUSDNormalized);
+  const markup = p.metrics.markup ?? safeRatio(
+    p.isOneShot && p.lifetimeRevenueUSD ? p.lifetimeRevenueUSD : p.metrics.revenueUSDNormalized, 
+    p.isOneShot && p.lifetimeCostUSD ? p.lifetimeCostUSD : p.metrics.costUSDNormalized
+  );
+  const margin = p.metrics.margin ?? safeMargin(
+    p.isOneShot && p.lifetimeRevenueUSD ? p.lifetimeRevenueUSD : p.metrics.revenueUSDNormalized, 
+    p.isOneShot && p.lifetimeCostUSD ? p.lifetimeCostUSD : p.metrics.costUSDNormalized
+  );
+  
+  // Format revenue period for display
+  const formatRevenuePeriod = (periodKey: string | undefined) => {
+    if (!periodKey) return '';
+    const [year, month] = periodKey.split('-');
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return `${monthNames[parseInt(month) - 1]} ${year}`;
+  };
 
   const hasAnomaly = (p.anomaly?.length || 0) > 0;
   
@@ -434,9 +461,18 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
           </div>
         </div>
         <div className="text-right mr-12">
-          <div className="text-sm text-slate-500 dark:text-slate-400">{t("labelRevenue")}</div>
-          <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">{formatKM(revenueDisplay, nativeCurrency)}</div>
-          {p.metrics.revenueUSDNormalized && p.metrics.revenueUSDNormalized !== revenueDisplay && (
+          <div className="text-sm text-slate-500 dark:text-slate-400">
+            {p.isOneShot ? "Facturación Total" : t("labelRevenue")}
+          </div>
+          <div className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            {formatKM(revenueDisplay, nativeCurrency === "USD" ? "USD" : "ARS")}
+          </div>
+          {p.isOneShot && p.revenuePeriod && (
+            <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
+              Facturado en {formatRevenuePeriod(p.revenuePeriod)}
+            </div>
+          )}
+          {!p.isOneShot && p.metrics.revenueUSDNormalized && p.metrics.revenueUSDNormalized !== revenueDisplay && (
             <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
               {t("normalizedUSD")} {formatUSD(p.metrics.revenueUSDNormalized)}
             </div>
