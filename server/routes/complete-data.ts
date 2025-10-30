@@ -167,12 +167,14 @@ export async function completeDataHandler(req: Request, res: Response) {
       
       try {
         const { factRCMonth, factLaborMonth } = await import('../../shared/schema');
-        const { sum } = await import('drizzle-orm');
+        const { sql } = await import('drizzle-orm');
+        
+        console.log('🔥 NEW CODE LOADED - Using correct SQL without CAST');
         
         // 1. Get ALL revenue from fact_rc_month
         const revenueRecords = await db.select({
-          totalRevenueUSD: sum(factRCMonth.revenueUsd),
-          totalRevenueARS: sum(factRCMonth.revenueArs)
+          totalRevenueUSD: sql<number>`COALESCE(SUM(${factRCMonth.revenueUsd}), 0)`,
+          totalRevenueARS: sql<number>`COALESCE(SUM(${factRCMonth.revenueArs}), 0)`
         })
         .from(factRCMonth)
         .where(eq(factRCMonth.projectId, resolvedProjectId));
@@ -182,11 +184,11 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         // 2. Get ALL costs from fact_labor_month
         const costRecords = await db.select({
-          totalCostUSD: sum(factLaborMonth.costUsd),
-          totalCostARS: sum(factLaborMonth.costArs),
-          totalHoursAsana: sum(factLaborMonth.asanaHours),
-          totalHoursBilling: sum(factLaborMonth.billingHours),
-          totalHoursTarget: sum(factLaborMonth.targetHours)
+          totalCostUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUsd}), 0)`,
+          totalCostARS: sql<number>`COALESCE(SUM(${factLaborMonth.costArs}), 0)`,
+          totalHoursAsana: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}), 0)`,
+          totalHoursBilling: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}), 0)`,
+          totalHoursTarget: sql<number>`COALESCE(SUM(${factLaborMonth.targetHours}), 0)`
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId));
@@ -219,11 +221,11 @@ export async function completeDataHandler(req: Request, res: Response) {
           personnelId: factLaborMonth.personnelId,
           persona: factLaborMonth.persona,
           roleName: factLaborMonth.roleName,
-          targetHours: sum(factLaborMonth.targetHours),
-          hoursAsana: sum(factLaborMonth.asanaHours),
-          hoursBilling: sum(factLaborMonth.billingHours),
-          costARS: sum(factLaborMonth.costArs),
-          costUSD: sum(factLaborMonth.costUsd)
+          targetHours: sql<number>`COALESCE(SUM(${factLaborMonth.targetHours}), 0)`,
+          hoursAsana: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}), 0)`,
+          hoursBilling: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}), 0)`,
+          costARS: sql<number>`COALESCE(SUM(${factLaborMonth.costArs}), 0)`,
+          costUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUsd}), 0)`
         })
         .from(factLaborMonth)
         .where(eq(factLaborMonth.projectId, resolvedProjectId))

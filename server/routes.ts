@@ -1425,19 +1425,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // 1. Convertir timeFilter a rango de fechas
-      const { startDate, endDate } = getDateRangeForFilter(timeFilter);
+      const dateRange = getDateRangeForFilter(timeFilter);
       
       // 2. Generar lista de period_keys (YYYY-MM) para el rango
       const periodKeys: string[] = [];
-      if (startDate && endDate) {
-        const current = new Date(startDate);
-        while (current <= endDate) {
+      if (dateRange && dateRange.startDate && dateRange.endDate) {
+        const current = new Date(dateRange.startDate);
+        while (current <= dateRange.endDate) {
           const periodKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
           if (!periodKeys.includes(periodKey)) {
             periodKeys.push(periodKey);
           }
           current.setMonth(current.getMonth() + 1);
         }
+      } else if (timeFilter === 'all') {
+        // For 'all', get all available periods from fact_labor_month for this project
+        const allPeriods = await db
+          .selectDistinct({ periodKey: factLaborMonth.periodKey })
+          .from(factLaborMonth)
+          .where(eq(factLaborMonth.projectId, projectId));
+        periodKeys.push(...allPeriods.map(p => p.periodKey));
       } else {
         const now = new Date();
         const periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
