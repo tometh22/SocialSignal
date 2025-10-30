@@ -17,7 +17,9 @@ import {
   PortfolioSummary,
   ActiveProjectItem,
   ActiveProjectsResponse,
-  projectAliases
+  projectAliases,
+  factRCMonth,
+  factLaborMonth
 } from "@shared/schema";
 
 import { resolvePeriod } from "@shared/utils/timePeriod";
@@ -662,34 +664,30 @@ export class ActiveProjectsAggregator {
       
       if (isOneShot) {
         try {
-          const { factRCMonth, factLaborMonth } = await import('../../shared/schema');
-          const { eq, gt, or } = await import('drizzle-orm');
-          const db = this.storage['db']; // Access db instance from storage
-          
-          // Get all revenue records for this project
+          // Get all revenue records for this project from Star Schema
           const revenueRecords = await db.select({
             periodKey: factRCMonth.periodKey,
-            revenueUsd: factRCMonth.revenueUsd
+            revenueUSD: factRCMonth.revenueUSD
           })
           .from(factRCMonth)
           .where(eq(factRCMonth.projectId, projectData.projectId));
           
-          lifetimeRevenueUSD = revenueRecords.reduce((sum, r) => sum + (Number(r.revenueUsd) || 0), 0);
+          lifetimeRevenueUSD = revenueRecords.reduce((sum, r) => sum + (Number(r.revenueUSD) || 0), 0);
           
           // Find period with revenue
-          const revenueRecord = revenueRecords.find(r => Number(r.revenueUsd) > 0);
+          const revenueRecord = revenueRecords.find(r => Number(r.revenueUSD) > 0);
           revenuePeriod = revenueRecord?.periodKey || undefined;
           
-          // Get all cost records for this project
+          // Get all cost records for this project from Star Schema
           const costRecords = await db.select({
-            costUsd: factLaborMonth.costUsd
+            costUSD: factLaborMonth.costUSD
           })
           .from(factLaborMonth)
           .where(eq(factLaborMonth.projectId, projectData.projectId));
           
-          lifetimeCostUSD = costRecords.reduce((sum, c) => sum + (Number(c.costUsd) || 0), 0);
+          lifetimeCostUSD = costRecords.reduce((sum, c) => sum + (Number(c.costUSD) || 0), 0);
           
-          console.log(`🎯 ONE-SHOT LIFETIME: Project ${projectData.projectId} → Revenue: $${lifetimeRevenueUSD}, Cost: $${lifetimeCostUSD}, Period: ${revenuePeriod}`);
+          console.log(`🎯 ONE-SHOT LIFETIME: Project ${projectData.projectId} → Revenue: $${lifetimeRevenueUSD.toFixed(2)}, Cost: $${lifetimeCostUSD.toFixed(2)}, Period: ${revenuePeriod}`);
         } catch (error) {
           console.error(`❌ Error calculating lifetime metrics for project ${projectData.projectId}:`, error);
         }
