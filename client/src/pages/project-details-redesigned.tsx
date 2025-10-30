@@ -1111,7 +1111,10 @@ const ProjectDetailsPage = () => {
   
   // 🎯 PRIORITY FIX: Use periodFromFilter (calculated from dateFilter) first, fallback to URL
   // This ensures the visual date filter always takes precedence over stale URL params
-  const finalPeriod = periodFromFilter || periodFromUrl || undefined;
+  // 🎯 ONE-SHOT FIX: When filter is "all", force period to be 'all' for lifetime aggregation
+  const finalPeriod = timeFilterForHook === 'all' 
+    ? 'all' 
+    : (periodFromFilter || periodFromUrl || undefined);
   
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
     projectId ? parseInt(projectId) : 0, 
