@@ -1,0 +1,58 @@
+en proyectos one-shot (fee fijo y un solo ingreso) los KPIs clásicos de rentabilidad “por mes” (markup, ROI mensual, etc.) pierden sentido. La vista debe pivotear de “ingresos vs costos del mes” a “avance vs presupuesto” y “rentabilidad al cierre”.
+Te propongo un modo One-Shot con layout, KPIs y fórmulas específicas:
+Modo One-Shot (Fee Fijo)
+Pequeño badge en el header: Contrato fijo • 1 ingreso • N hitos.
+1) Header (big numbers que sí importan)
+Valor de Contrato (VC): $ único.
+Presupuesto Consumido (%) = Costos Acumulados / Presupuesto Aprobado.
+Costo para Completar – ETC = Presupuesto Aprobado − Costos Acumulados − Costos Comprometidos.
+Utilidad Proyectada al Cierre (UPAC) = VC − EAC.
+Margen al Cierre (MAC %) = UPAC / VC.
+EAC (Estimate at Completion) = Costos Acum. + ETC (o AC / CPI si usás EVM).
+2) Curva S de Proyecto (la película correcta)
+Gráfico acumulado en el tiempo (líneas):
+PV (Planned Value): valor planificado a la fecha.
+EV (Earned Value): valor ganado según avance real (% progreso × Presupuesto).
+AC (Actual Cost): costos reales acumulados.
+Indicadores:
+CPI = EV / AC (eficiencia de costo).
+SPI = EV / PV (ritmo de avance).
+Semáforos: CPI/SPI ≥ 1 verde, 0.9–1 ámbar, <0.9 rojo.
+3) Burn vs Progreso (mensual, pero con lectura correcta)
+Burn mensual (AC del mes) vs % avance del mes.
+Insight automático: “El burn supera el avance: riesgo de sobrecosto” o “Avance > burn: buen rendimiento”.
+4) Hitos & Facturación
+Línea de tiempo con hitos, % completado y cronograma de factura (aunque el cobro sea único, mostrás el “valor interno” por hito para lectura del EV).
+Si hubo adelanto/retención, muéstralo como cash-flow separado del EV.
+5) Cost Breakdown relevante
+Costos por Rol (acumulados y % del total).
+Horas por Persona/mes (esto sí queda mensual).
+Costos Comprometidos (POs, freelancers, licencias) para proyectar ETC realista.
+6) Riesgo de Cierre
+Variación de Margen Proyectado (ΔMAC) últimas 4 semanas.
+Top drivers: roles que más mueven el EAC, tareas con mayor retrabajo, dependencia crítica.
+Recomendación prescriptiva (reglas/IA): “Mover 12h de insights de X a Y; impacto +2.3 pts en MAC”.
+Fórmulas (claras en tooltips)
+PV (Planned Value) = % planificado a la fecha × Presupuesto.
+EV (Earned Value) = % real completado × Presupuesto.
+AC (Actual Cost) = costos acumulados reales.
+CPI = EV/AC  · SPI = EV/PV.
+EAC =
+opción simple: AC + (Presupuesto − EV)
+con desempeño: AC + (Presupuesto − EV)/CPI.
+ETC = EAC − AC.
+UPAC = VC − EAC.
+MAC % = UPAC / VC.
+UI/UX (cómo se ve)
+Toggle en toolbar: Modo: One-Shot | Retainer.
+Ocultar o despriorizar Markup/ROI mensual; mostrar MAC/EAC/ETC como KPIs principales.
+Curva S centrada (PV/EV/AC) con callouts de CPI/SPI.
+Panel de Hitos con barras de progreso y monto interno (para EV).
+Tabla de horas por persona/mes como sección secundaria.
+Datos que necesitás (ya los tenés en tu stack)
+Presupuesto aprobado y plan de hitos (para PV).
+% avance real por hito/fase (para EV).
+Costos acumulados + comprometidos (para AC y ETC).
+Horas por persona/mes (para granularidad operativa).
+Texto guía (header)
+One-Shot View — Leé el proyecto como una obra cerrada: cuánto falta gastar (ETC), cuánto costará al final (EAC) y cuál será la utilidad/margen al cierre (UPAC/MAC). La Curva S (PV/EV/AC) te dice si vas bien en costo y ritmo (CPI/SPI).
