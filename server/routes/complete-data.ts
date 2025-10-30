@@ -477,10 +477,45 @@ export async function completeDataHandler(req: Request, res: Response) {
     const isOneShot = quotationData?.quotationType === 'one-time';
     const hasRevenueInPeriod = (summary.revenueDisplay || summary.revenueUSD || 0) > 0;
     
+    // 🎯 Find period with revenue for one-shot projects
+    let periodWithRevenue: string | null = null;
     if (isOneShot) {
       legacyFlags.push('one_shot_project');
       if (!hasRevenueInPeriod) {
         legacyFlags.push('one_shot_no_revenue_this_period');
+        
+        // Search fact_rc_month for period with revenue > 0
+        try {
+          const { factRcMonth } = await import('../../shared/schema');
+          const { eq, and, gt, or } = await import('drizzle-orm');
+          
+          const revenueRecords = await db.select({
+            periodKey: factRcMonth.periodKey,
+            revenueUsd: factRcMonth.revenueUsd,
+            revenueArs: factRcMonth.revenueArs
+          })
+          .from(factRcMonth)
+          .where(
+            and(
+              eq(factRcMonth.projectId, resolvedProjectId),
+              or(
+                gt(factRcMonth.revenueUsd, 0),
+                gt(factRcMonth.revenueArs, 0)
+              )
+            )
+          )
+          .orderBy(factRcMonth.periodKey);
+          
+          if (revenueRecords.length > 0) {
+            periodWithRevenue = revenueRecords[0].periodKey;
+            console.log(`🎯 ONE-SHOT: Found revenue in period ${periodWithRevenue} for project ${resolvedProjectId}`);
+          }
+        } catch (error) {
+          console.error('❌ Error finding period with revenue:', error);
+        }
+      } else {
+        // Current period has revenue
+        periodWithRevenue = period;
       }
     }
     
@@ -501,7 +536,8 @@ export async function completeDataHandler(req: Request, res: Response) {
         name: quotationData?.projectName || null,
         // 🎯 ONE-SHOT FLAGS
         isOneShot,
-        hasRevenueInPeriod
+        hasRevenueInPeriod,
+        periodWithRevenue
       },
       quotation: quotationData ? {
         id: quotationData.id,
