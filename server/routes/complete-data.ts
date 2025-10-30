@@ -101,8 +101,14 @@ export async function completeDataHandler(req: Request, res: Response) {
     // 🎯 SoT INTEGRATION: Parse both period=YYYY-MM and legacy timeFilter
     let period: string;
     let usingSoT = false;
+    let lifetimeMode = false;
     
-    if (periodQuery && /^\d{4}-\d{2}$/.test(periodQuery)) {
+    // 🎯 ONE-SHOT LIFETIME: Detect "all periods" request
+    if (timeFilterQuery === 'all' || periodQuery === 'all') {
+      lifetimeMode = true;
+      period = 'all';
+      console.log(`🎯 COMPLETE-DATA LIFETIME MODE: Project ${projectId}, aggregating all periods, view=${view}, basis=${basis}`);
+    } else if (periodQuery && /^\d{4}-\d{2}$/.test(periodQuery)) {
       // NEW FORMAT: period=YYYY-MM
       period = periodQuery;
       usingSoT = true;
@@ -154,6 +160,155 @@ export async function completeDataHandler(req: Request, res: Response) {
           where: eq(quotations.id, projectData.quotationId)
         })
       : null;
+    
+    // 🎯 ONE-SHOT LIFETIME AGGREGATION: Handle "all periods" case
+    if (lifetimeMode) {
+      console.log(`🎯 LIFETIME: Aggregating ALL periods for project ${resolvedProjectId}`);
+      
+      try {
+        const { factRCMonth, factLaborMonth } = await import('../../shared/schema');
+        const { sum } = await import('drizzle-orm');
+        
+        // 1. Get ALL revenue from fact_rc_month
+        const revenueRecords = await db.select({
+          totalRevenueUSD: sum(factRCMonth.revenueUsd),
+          totalRevenueARS: sum(factRCMonth.revenueArs)
+        })
+        .from(factRCMonth)
+        .where(eq(factRCMonth.projectId, resolvedProjectId));
+        
+        const lifetimeRevenueUSD = Number(revenueRecords[0]?.totalRevenueUSD || 0);
+        const lifetimeRevenueARS = Number(revenueRecords[0]?.totalRevenueARS || 0);
+        
+        // 2. Get ALL costs from fact_labor_month
+        const costRecords = await db.select({
+          totalCostUSD: sum(factLaborMonth.costUsd),
+          totalCostARS: sum(factLaborMonth.costArs),
+          totalHoursAsana: sum(factLaborMonth.asanaHours),
+          totalHoursBilling: sum(factLaborMonth.billingHours),
+          totalHoursTarget: sum(factLaborMonth.targetHours)
+        })
+        .from(factLaborMonth)
+        .where(eq(factLaborMonth.projectId, resolvedProjectId));
+        
+        const lifetimeCostUSD = Number(costRecords[0]?.totalCostUSD || 0);
+        const lifetimeCostARS = Number(costRecords[0]?.totalCostARS || 0);
+        const lifetimeHoursAsana = Number(costRecords[0]?.totalHoursAsana || 0);
+        const lifetimeHoursBilling = Number(costRecords[0]?.totalHoursBilling || 0);
+        const lifetimeHoursTarget = Number(costRecords[0]?.totalHoursTarget || 0);
+        
+        // 3. Determine display currency
+        const currencyNative = quotationData?.quotationCurrency || 'USD';
+        const revenueDisplay = currencyNative === 'USD' ? lifetimeRevenueUSD : lifetimeRevenueARS;
+        const costDisplay = currencyNative === 'USD' ? lifetimeCostUSD : lifetimeCostARS;
+        const cotizacion = quotationData?.totalAmount || 0;
+        
+        // 4. Calculate metrics
+        const markup = lifetimeCostUSD > 0 ? lifetimeRevenueUSD / lifetimeCostUSD : 0;
+        const margin = lifetimeRevenueUSD > 0 ? (lifetimeRevenueUSD - lifetimeCostUSD) / lifetimeRevenueUSD : 0;
+        const budgetUtilization = cotizacion > 0 ? costDisplay / cotizacion : 0;
+        
+        console.log(`✅ LIFETIME AGGREGATION: Project ${resolvedProjectId}
+          Revenue: ${currencyNative} ${revenueDisplay} (USD ${lifetimeRevenueUSD})
+          Cost: ${currencyNative} ${costDisplay} (USD ${lifetimeCostUSD})
+          Hours: Asana=${lifetimeHoursAsana}, Billing=${lifetimeHoursBilling}, Target=${lifetimeHoursTarget}
+          Markup: ${markup.toFixed(2)}x, Margin: ${(margin*100).toFixed(1)}%, BU: ${(budgetUtilization*100).toFixed(1)}%`);
+        
+        // 5. Get team breakdown from fact_labor_month grouped by person
+        const teamRecords = await db.select({
+          personnelId: factLaborMonth.personnelId,
+          persona: factLaborMonth.persona,
+          roleName: factLaborMonth.roleName,
+          targetHours: sum(factLaborMonth.targetHours),
+          hoursAsana: sum(factLaborMonth.asanaHours),
+          hoursBilling: sum(factLaborMonth.billingHours),
+          costARS: sum(factLaborMonth.costArs),
+          costUSD: sum(factLaborMonth.costUsd)
+        })
+        .from(factLaborMonth)
+        .where(eq(factLaborMonth.projectId, resolvedProjectId))
+        .groupBy(factLaborMonth.personnelId, factLaborMonth.persona, factLaborMonth.roleName);
+        
+        const teamBreakdown = teamRecords.map(m => ({
+          personnelId: m.personnelId,
+          name: m.persona || 'Unknown',
+          roleName: m.roleName || 'N/A',
+          role: m.roleName || 'N/A',
+          targetHours: Number(m.targetHours || 0),
+          hoursAsana: Number(m.hoursAsana || 0),
+          hoursBilling: Number(m.hoursBilling || 0),
+          hours: Number(m.hoursAsana || 0),
+          costARS: Number(m.costARS || 0),
+          costUSD: Number(m.costUSD || 0),
+          estimatedHours: Number(m.targetHours || 0),
+          actualHours: Number(m.hoursAsana || 0),
+          actualCost: Number(m.costUSD || 0)
+        }));
+        
+        // 6. Return lifetime response
+        return res.json({
+          view: view,
+          lifetimeMode: true,
+          project: {
+            id: projectData.id,
+            clientId: projectData.clientId,
+            status: projectData.status,
+            revenueDisplay,
+            costDisplay,
+            cotizacion,
+            currencyNative,
+            budgetUtilization,
+            name: quotationData?.projectName || null
+          },
+          quotation: quotationData ? {
+            id: quotationData.id,
+            projectName: quotationData.projectName,
+            baseCost: quotationData.baseCost,
+            totalAmount: cotizacion,
+            totalAmountNative: cotizacion,
+            estimatedHours: lifetimeHoursTarget || -1
+          } : null,
+          actuals: {
+            totalWorkedHours: lifetimeHoursAsana,
+            totalAsanaHours: lifetimeHoursAsana,
+            totalBillingHours: lifetimeHoursBilling,
+            totalWorkedCost: costDisplay,
+            totalEntries: teamBreakdown.length,
+            teamBreakdown
+          },
+          metrics: {
+            efficiency: 0,
+            markup,
+            margin,
+            budgetUtilization,
+            hoursDeviation: 0,
+            costDeviation: 0
+          },
+          summary: {
+            period: 'all',
+            teamCostUSD: lifetimeCostUSD,
+            revenueUSD: lifetimeRevenueUSD,
+            markupUSD: lifetimeRevenueUSD - lifetimeCostUSD,
+            costDisplay,
+            revenueDisplay,
+            currencyNative,
+            markup,
+            margin,
+            flags: ['LIFETIME_MODE', quotationData?.quotationType === 'one-time' ? 'ONE_SHOT_PROJECT' : 'RECURRING_PROJECT']
+          },
+          estimatedHours: lifetimeHoursTarget,
+          workedHours: lifetimeHoursAsana,
+          totalCost: costDisplay,
+          totalRealRevenue: revenueDisplay
+        });
+      } catch (error) {
+        console.error(`❌ LIFETIME AGGREGATION ERROR:`, error);
+        return res.status(500).json({ 
+          error: 'Failed to aggregate lifetime data',
+          message: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
     
     // 🎯 NEW: 3-VIEW SYSTEM - ALWAYS try to use view-aggregator for ALL views (including operativa)
     try {
