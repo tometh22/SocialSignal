@@ -118,6 +118,9 @@ export class ActiveProjectsAggregator {
     const costsData = await this.getCostsInPeriod(period);
     console.log(`📊 Data retrieved: ${salesData.length} sales records, ${costsData.length} cost records`);
 
+    // 3b. 🎯 ONE-SHOT SPECIAL LOGIC: Add one-shot projects with lifetime revenue even if not in current period
+    await this.addOneShotProjectsLifetime(period, salesData, costsData, allProjects);
+
     // 4. Merge by projectId - bulletproof deduplication to avoid ARS/USD mixing
     const { projects: projectsData, orphanRows } = await this.mergeProjectData(allProjects, salesData, costsData);
     console.log(`📊 Projects merged: ${projectsData.length} with data, ${orphanRows} orphan rows (debug only)`);
@@ -286,6 +289,125 @@ export class ActiveProjectsAggregator {
       console.error(`❌ FINANCIAL SOT COSTS ERROR stack:`, error instanceof Error ? error.stack : 'No stack trace');
       return []; // Return empty array on error
     }
+  }
+
+  /**
+   * 🎯 ONE-SHOT LIFETIME LOGIC
+   * Adds one-shot projects to salesData/costsData even if they don't have data in current period
+   * Shows: lifetime revenue + period costs + billing period notation
+   */
+  private async addOneShotProjectsLifetime(
+    period: ResolvedPeriod, 
+    salesData: SalesRecord[], 
+    costsData: CostRecord[],
+    allProjects: any[]
+  ): Promise<void> {
+    console.log(`🎯 ONE-SHOT: Looking for one-shot projects to add lifetime metrics`);
+    
+    const monthKey = period.start.substring(0, 7);
+    const projectsInPeriod = new Set(salesData.map(s => s.projectKey).concat(costsData.map(c => c.projectKey)));
+    
+    for (const project of allProjects) {
+      // Check if this is a one-shot project
+      const quotationType = project.quotation?.quotationType;
+      const isOneShot = quotationType === 'one-time';
+      
+      if (!isOneShot) continue;
+      
+      const actualProjectName = project.quotation?.projectName || `Project-${project.id}`;
+      const clientName = project.quotation?.client?.name || '';
+      const canonicalFields = generateCanonicalFields(clientName, actualProjectName);
+      
+      // If project already has data in current period, skip (it's already in salesData/costsData)
+      if (projectsInPeriod.has(canonicalFields.projectKey)) {
+        console.log(`🎯 ONE-SHOT: ${actualProjectName} already in period data, skipping`);
+        continue;
+      }
+      
+      try {
+        // Get ALL revenue records for lifetime calculation
+        const allRevenueRecords = await db.select({
+          periodKey: factRCMonth.periodKey,
+          revenueUSD: factRCMonth.revenueUSD,
+          revenueARS: factRCMonth.revenueARS
+        })
+        .from(factRCMonth)
+        .where(eq(factRCMonth.projectId, project.id));
+        
+        // Get cost records for CURRENT period only
+        const periodCostRecords = await db.select({
+          costUSD: factLaborMonth.costUSD,
+          costARS: factLaborMonth.costARS
+        })
+        .from(factLaborMonth)
+        .where(and(
+          eq(factLaborMonth.projectId, project.id),
+          eq(factLaborMonth.periodKey, monthKey)
+        ));
+        
+        // If no data at all, skip this project
+        if (allRevenueRecords.length === 0 && periodCostRecords.length === 0) {
+          continue;
+        }
+        
+        // Calculate lifetime revenue
+        const lifetimeRevenueUSD = allRevenueRecords.reduce((sum, r) => sum + (Number(r.revenueUSD) || 0), 0);
+        const lifetimeRevenueARS = allRevenueRecords.reduce((sum, r) => sum + (Number(r.revenueARS) || 0), 0);
+        const revenueRecord = allRevenueRecords.find(r => Number(r.revenueUSD) > 0);
+        const revenuePeriod = revenueRecord?.periodKey;
+        
+        // Determine display currency based on which has data
+        const displayCurrency = lifetimeRevenueARS > 0 ? 'ARS' : 'USD';
+        const revenueDisplay = displayCurrency === 'ARS' ? lifetimeRevenueARS : lifetimeRevenueUSD;
+        
+        // Calculate period cost
+        const periodCostUSD = periodCostRecords.reduce((sum, c) => sum + (Number(c.costUSD) || 0), 0);
+        const periodCostARS = periodCostRecords.reduce((sum, c) => sum + (Number(c.costARS) || 0), 0);
+        const costDisplay = displayCurrency === 'ARS' ? periodCostARS : periodCostUSD;
+        
+        console.log(`🎯 ONE-SHOT LIFETIME: ${actualProjectName} → Lifetime Revenue: $${lifetimeRevenueUSD.toFixed(2)} (billed in ${revenuePeriod}), Period Cost: $${periodCostUSD.toFixed(2)}`);
+        
+        // Add to salesData with lifetime revenue
+        if (lifetimeRevenueUSD > 0) {
+          salesData.push({
+            clientCanon: canonicalFields.clientCanon,
+            projectCanon: canonicalFields.projectCanon,
+            projectKey: canonicalFields.projectKey,
+            projectName: actualProjectName,
+            clientId: project.clientId || 0,
+            clientName: clientName,
+            revenueUSD: lifetimeRevenueUSD,
+            month: monthKey.substring(5, 7),
+            year: parseInt(monthKey.substring(0, 4)),
+            confirmedOnly: true,
+            displayCurrency: displayCurrency as "ARS" | "USD",
+            revenueDisplay: revenueDisplay,
+            revenueUSDNormalized: lifetimeRevenueUSD
+          });
+        }
+        
+        // Add to costsData with period cost (even if 0, to show project in list)
+        costsData.push({
+          clientCanon: canonicalFields.clientCanon,
+          projectCanon: canonicalFields.projectCanon,
+          projectKey: canonicalFields.projectKey,
+          projectName: actualProjectName,
+          costUSD: periodCostUSD,
+          hoursReal: 0,
+          hoursTarget: 0,
+          month: monthKey.substring(5, 7),
+          year: parseInt(monthKey.substring(0, 4)),
+          displayCurrency: displayCurrency as "ARS" | "USD",
+          costDisplay: costDisplay,
+          costUSDNormalized: periodCostUSD
+        });
+        
+      } catch (error) {
+        console.error(`❌ Error adding lifetime metrics for one-shot project ${project.id}:`, error);
+      }
+    }
+    
+    console.log(`🎯 ONE-SHOT: Added lifetime metrics. New totals: ${salesData.length} sales, ${costsData.length} costs`);
   }
 
   /**
@@ -656,42 +778,6 @@ export class ActiveProjectsAggregator {
       
       // Determine if one-shot project
       const isOneShot = quotationType === 'one-time' || mappedType === 'one-shot';
-      
-      // Calculate lifetime metrics for one-shot projects
-      let lifetimeRevenueUSD: number | undefined;
-      let lifetimeCostUSD: number | undefined;
-      let revenuePeriod: string | undefined;
-      
-      if (isOneShot) {
-        try {
-          // Get all revenue records for this project from Star Schema
-          const revenueRecords = await db.select({
-            periodKey: factRCMonth.periodKey,
-            revenueUSD: factRCMonth.revenueUSD
-          })
-          .from(factRCMonth)
-          .where(eq(factRCMonth.projectId, projectData.projectId));
-          
-          lifetimeRevenueUSD = revenueRecords.reduce((sum, r) => sum + (Number(r.revenueUSD) || 0), 0);
-          
-          // Find period with revenue
-          const revenueRecord = revenueRecords.find(r => Number(r.revenueUSD) > 0);
-          revenuePeriod = revenueRecord?.periodKey || undefined;
-          
-          // Get all cost records for this project from Star Schema
-          const costRecords = await db.select({
-            costUSD: factLaborMonth.costUSD
-          })
-          .from(factLaborMonth)
-          .where(eq(factLaborMonth.projectId, projectData.projectId));
-          
-          lifetimeCostUSD = costRecords.reduce((sum, c) => sum + (Number(c.costUSD) || 0), 0);
-          
-          console.log(`🎯 ONE-SHOT LIFETIME: Project ${projectData.projectId} → Revenue: $${lifetimeRevenueUSD.toFixed(2)}, Cost: $${lifetimeCostUSD.toFixed(2)}, Period: ${revenuePeriod}`);
-        } catch (error) {
-          console.error(`❌ Error calculating lifetime metrics for project ${projectData.projectId}:`, error);
-        }
-      }
 
       projectItems.push({
         projectId: projectData.projectId,
@@ -722,9 +808,6 @@ export class ActiveProjectsAggregator {
         // Optional metadata for intelligent visibility
         projectType: projectTypeLabel,
         isOneShot,
-        lifetimeRevenueUSD,
-        lifetimeCostUSD,
-        revenuePeriod,
         startMonthKey,
         endMonthKey,
         lastActivity,
