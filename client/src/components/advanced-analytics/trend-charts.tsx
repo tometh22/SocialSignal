@@ -91,7 +91,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
     );
   }
 
-  if (!trendData || !trendData.trendData || trendData.trendData.length === 0) {
+  if (!trendData || !trendData.trendData || trendData.trendData.length === 0 || !trendData.velocityAnalysis || !trendData.summary) {
     return (
       <Card>
         <CardHeader>
@@ -214,11 +214,13 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                 <span className="text-sm font-medium text-orange-800">Pico de Actividad</span>
               </div>
               <p className="text-lg font-bold text-orange-600">
-                {trendData.summary.peakActivity.hours}h
+                {trendData.summary.peakActivity?.hours || 0}h
               </p>
-              <p className="text-xs text-orange-600">
-                {formatPeriodLabel(trendData.summary.peakActivity.period)}
-              </p>
+              {trendData.summary.peakActivity?.period && (
+                <p className="text-xs text-orange-600">
+                  {formatPeriodLabel(trendData.summary.peakActivity.period)}
+                </p>
+              )}
             </div>
           </div>
 
