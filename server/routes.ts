@@ -8905,12 +8905,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return Number.isFinite(n) ? n : 0;
       };
 
-      const totalTargetHours = laborRows.reduce((sum, r) => sum + safeNum(r.targetHours), 0);
-      const totalAsanaHours = laborRows.reduce((sum, r) => sum + safeNum(r.asanaHours), 0);
-      const totalBillingHours = laborRows.reduce((sum, r) => sum + safeNum(r.billingHours), 0);
+      // 🎯 Si period='all', agrupar por persona para evitar duplicados
+      const aggregatedRows = period === 'all' ? (() => {
+        const personMap = new Map<string, any>();
+        for (const row of laborRows) {
+          const key = row.personKey || 'unknown';
+          if (!personMap.has(key)) {
+            personMap.set(key, {
+              personKey: row.personKey,
+              roleName: row.roleName,
+              targetHours: 0,
+              asanaHours: 0,
+              billingHours: 0,
+              hourlyRateARS: row.hourlyRateARS,
+              costARS: 0,
+              costUSD: 0,
+              flags: row.flags || []
+            });
+          }
+          const person = personMap.get(key)!;
+          person.targetHours += safeNum(row.targetHours);
+          person.asanaHours += safeNum(row.asanaHours);
+          person.billingHours += safeNum(row.billingHours);
+          person.costARS += safeNum(row.costARS);
+          person.costUSD += safeNum(row.costUSD);
+          // Merge flags
+          if (row.flags) {
+            person.flags = [...new Set([...person.flags, ...row.flags])];
+          }
+        }
+        return Array.from(personMap.values());
+      })() : laborRows;
+
+      const totalTargetHours = aggregatedRows.reduce((sum, r) => sum + safeNum(r.targetHours), 0);
+      const totalAsanaHours = aggregatedRows.reduce((sum, r) => sum + safeNum(r.asanaHours), 0);
+      const totalBillingHours = aggregatedRows.reduce((sum, r) => sum + safeNum(r.billingHours), 0);
 
       const diasHabiles = 22;
-      const miembrosActivos = laborRows.filter(r => safeNum(r.asanaHours) > 0 || safeNum(r.billingHours) > 0).length;
+      const miembrosActivos = aggregatedRows.filter(r => safeNum(r.asanaHours) > 0 || safeNum(r.billingHours) > 0).length;
 
       const summary = {
         membersActive: miembrosActivos,
@@ -8920,7 +8952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         avgDailyHoursPerMember: +(totalAsanaHours / (diasHabiles * Math.max(miembrosActivos, 1))).toFixed(2)
       };
 
-      const members = laborRows.map((r: any) => {
+      const members = aggregatedRows.map((r: any) => {
         const targetHours = safeNum(r.targetHours);
         const hoursAsana = safeNum(r.asanaHours);
         const hoursBilling = safeNum(r.billingHours) || hoursAsana;
