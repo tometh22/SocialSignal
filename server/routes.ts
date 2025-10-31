@@ -8997,11 +8997,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Punto 4: Datos para gráficos de tendencias
+  // Punto 4: Datos para gráficos de tendencias (MIGRADO A STAR SCHEMA)
   app.get("/api/projects/:id/trend-data", requireAuth, async (req, res) => {
     try {
       const projectId = parseInt(req.params.id);
-      const period = req.query.period as string || 'weekly'; // weekly, monthly
+      const period = req.query.period as string || 'monthly'; // Solo soportamos 'monthly' ahora
       const { startDate, endDate } = req.query;
       
       if (isNaN(projectId)) {
@@ -9013,91 +9013,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // Construir condiciones de filtro
-      const whereConditions = [eq(timeEntries.projectId, projectId)];
-      
-      if (startDate && endDate) {
-        // 🔧 FIX: Convertir strings a Date para Drizzle
-        const startDateObj = new Date(startDate as string);
-        const endDateObj = new Date(endDate as string);
-        whereConditions.push(
-          gte(timeEntries.date, startDateObj),
-          lte(timeEntries.date, endDateObj)
-        );
+      // ⚠️ Star Schema solo tiene granularidad mensual, deprecar 'weekly'
+      if (period === 'weekly') {
+        console.warn(`⚠️ TREND-DATA: Weekly mode deprecated, using monthly instead`);
       }
 
-      const projectTimeEntries3 = await db.select({
-        timeEntry: timeEntries,
-        personnel: personnel
-      })
-        .from(timeEntries)
-        .innerJoin(personnel, eq(timeEntries.personnelId, personnel.id))
+      // 🔍 Query fact_labor_month agrupado por período
+      const whereConditions = [eq(factLaborMonth.projectId, projectId)];
+      
+      // Filtro de rango de fechas (por period_key)
+      if (startDate) {
+        const startPeriod = (startDate as string).substring(0, 7); // "2025-01"
+        whereConditions.push(gte(factLaborMonth.periodKey, startPeriod));
+      }
+      if (endDate) {
+        const endPeriod = (endDate as string).substring(0, 7);
+        whereConditions.push(lte(factLaborMonth.periodKey, endPeriod));
+      }
+
+      // Agregar por período
+      const monthlyData = await db
+        .select({
+          periodKey: factLaborMonth.periodKey,
+          hours: sql<number>`coalesce(sum(${factLaborMonth.asanaHours}), 0)`.mapWith(Number),
+          cost: sql<number>`coalesce(sum(${factLaborMonth.costUSD}), 0)`.mapWith(Number),
+          uniqueMembers: sql<number>`count(distinct ${factLaborMonth.personKey})`.mapWith(Number),
+        })
+        .from(factLaborMonth)
         .where(and(...whereConditions))
-        .orderBy(asc(timeEntries.date));
+        .groupBy(factLaborMonth.periodKey)
+        .orderBy(asc(factLaborMonth.periodKey));
 
-      // Agrupar por período
-      const groupedData = new Map();
+      // Obtener quotation para targets
       const quotation = await storage.getQuotation(project.quotationId);
-      
-      for (const entry of projectTimeEntries3) {
-        const date = new Date(entry.timeEntry.date);
-        let periodKey;
-        
-        if (period === 'weekly') {
-          // Obtener inicio de semana (lunes)
-          const monday = new Date(date);
-          monday.setDate(date.getDate() - date.getDay() + 1);
-          periodKey = monday.toISOString().split('T')[0];
-        } else {
-          // Mensual
-          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        }
-
-        if (!groupedData.has(periodKey)) {
-          groupedData.set(periodKey, {
-            period: periodKey,
-            hours: 0,
-            cost: 0,
-            entries: 0,
-            uniqueMembers: new Set()
-          });
-        }
-
-        const periodData = groupedData.get(periodKey);
-        periodData.hours += entry.timeEntry.hours;
-        periodData.cost += entry.timeEntry.hours * entry.personnel.hourlyRate;
-        periodData.entries += 1;
-        periodData.uniqueMembers.add(entry.timeEntry.personnelId);
-      }
-
-      // Convertir a array y agregar métricas acumulativas
-      const trendData = Array.from(groupedData.values()).map(data => ({
-        ...data,
-        uniqueMembers: data.uniqueMembers.size,
-        averageHoursPerMember: data.uniqueMembers.size > 0 ? data.hours / data.uniqueMembers.size : 0
-      }));
+      const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
+      const targetCost = quotation?.baseCost || 0;
 
       // Calcular métricas acumulativas
       let cumulativeHours = 0;
       let cumulativeCost = 0;
-      const targetCost = quotation?.baseCost || 0;
-      const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
 
-      const enhancedTrendData = trendData.map(data => {
+      const enhancedTrendData = monthlyData.map(data => {
         cumulativeHours += data.hours;
         cumulativeCost += data.cost;
         
         return {
-          ...data,
-          cumulativeHours,
-          cumulativeCost,
-          progressPercentage: targetHours > 0 ? (cumulativeHours / targetHours) * 100 : 0,
-          budgetUtilization: targetCost > 0 ? (cumulativeCost / targetCost) * 100 : 0,
-          currentMarkup: cumulativeCost > 0 ? (quotation?.totalAmount || 0) / cumulativeCost : 0
+          period: data.periodKey,
+          hours: +data.hours.toFixed(2),
+          cost: +data.cost.toFixed(2),
+          entries: 0, // No disponible en Star Schema
+          uniqueMembers: data.uniqueMembers,
+          averageHoursPerMember: data.uniqueMembers > 0 ? +(data.hours / data.uniqueMembers).toFixed(2) : 0,
+          cumulativeHours: +cumulativeHours.toFixed(2),
+          cumulativeCost: +cumulativeCost.toFixed(2),
+          progressPercentage: targetHours > 0 ? +((cumulativeHours / targetHours) * 100).toFixed(2) : 0,
+          budgetUtilization: targetCost > 0 ? +((cumulativeCost / targetCost) * 100).toFixed(2) : 0,
+          currentMarkup: cumulativeCost > 0 ? +((quotation?.totalAmount || 0) / cumulativeCost).toFixed(2) : 0
         };
       });
 
-      // Análisis de velocidad
+      // Análisis de velocidad (adaptado a meses)
       const velocityAnalysis = calculateVelocityTrends(enhancedTrendData);
 
       // Predicciones futuras
@@ -9105,16 +9080,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         projectId,
-        period,
+        period: 'monthly', // Siempre mensual ahora
         trendData: enhancedTrendData,
         velocityAnalysis,
         futureProjections,
         summary: {
           totalPeriods: enhancedTrendData.length,
-          averageHoursPerPeriod: trendData.reduce((sum, d) => sum + d.hours, 0) / trendData.length || 0,
-          averageCostPerPeriod: trendData.reduce((sum, d) => sum + d.cost, 0) / trendData.length || 0,
-          peakActivity: trendData.reduce((max, d) => d.hours > max.hours ? d : max, { hours: 0 })
-        }
+          averageHoursPerPeriod: enhancedTrendData.length > 0 ?
+            +(enhancedTrendData.reduce((sum, d) => sum + d.hours, 0) / enhancedTrendData.length).toFixed(2) : 0,
+          averageCostPerPeriod: enhancedTrendData.length > 0 ?
+            +(enhancedTrendData.reduce((sum, d) => sum + d.cost, 0) / enhancedTrendData.length).toFixed(2) : 0,
+          peakActivity: enhancedTrendData.reduce((max, d) => d.hours > max.hours ? d : max, { hours: 0, period: '' })
+        },
+        source: 'fact_labor_month'
       });
     } catch (error) {
       console.error("Error generating trend data:", error);
