@@ -50,14 +50,18 @@ export function EconomicRankings({
   
   // Helper function to get performance badge color
   const getPerformanceBadgeColor = (clasificacion: any) => {
-    if (!clasificacion) return 'bg-gray-100 text-gray-800';
+    if (!clasificacion || !clasificacion.color) return 'bg-gray-100 text-gray-800';
     
-    switch(clasificacion.color) {
-      case 'green': return 'bg-green-100 text-green-800 border-green-200';
-      case 'yellow': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'red': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800';
+    // El API devuelve clases de Tailwind como 'text-green-600', 'text-yellow-600', 'text-red-600'
+    if (clasificacion.color.includes('green')) {
+      return 'bg-green-100 text-green-800 border-green-200';
+    } else if (clasificacion.color.includes('yellow')) {
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    } else if (clasificacion.color.includes('red')) {
+      return 'bg-red-100 text-red-800 border-red-200';
     }
+    
+    return 'bg-gray-100 text-gray-800';
   };
   if (isLoadingData) {
     return (
