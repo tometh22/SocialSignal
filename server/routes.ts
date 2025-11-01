@@ -78,7 +78,8 @@ import {
   directCosts,
   incomeSot,
   costsSot,
-  factLaborMonth
+  factLaborMonth,
+  factRCMonth
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -9031,7 +9032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whereConditions.push(lte(factLaborMonth.periodKey, endPeriod));
       }
 
-      // Agregar por período
+      // Agregar costos por período
       const monthlyData = await db
         .select({
           periodKey: factLaborMonth.periodKey,
@@ -9044,6 +9045,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .groupBy(factLaborMonth.periodKey)
         .orderBy(asc(factLaborMonth.periodKey));
 
+      // Obtener revenue por período desde fact_rc_month
+      const whereConditionsRC = [eq(factRCMonth.projectId, projectId)];
+      if (startDate) {
+        const startPeriod = (startDate as string).substring(0, 7);
+        whereConditionsRC.push(gte(factRCMonth.periodKey, startPeriod));
+      }
+      if (endDate) {
+        const endPeriod = (endDate as string).substring(0, 7);
+        whereConditionsRC.push(lte(factRCMonth.periodKey, endPeriod));
+      }
+
+      const revenueByPeriod = await db
+        .select({
+          periodKey: factRCMonth.periodKey,
+          revenue: sql<number>`coalesce(sum(${factRCMonth.revenueUSD}), 0)`.mapWith(Number),
+        })
+        .from(factRCMonth)
+        .where(and(...whereConditionsRC))
+        .groupBy(factRCMonth.periodKey)
+        .orderBy(asc(factRCMonth.periodKey));
+
+      // Crear mapa de revenue por período
+      const revenueMap = new Map(revenueByPeriod.map(r => [r.periodKey, r.revenue]));
+
       // Obtener quotation para targets
       const quotation = await storage.getQuotation(project.quotationId);
       const targetHours = quotation ? await calculateEstimatedHours(quotation.id) : 0;
@@ -9052,15 +9077,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calcular métricas acumulativas
       let cumulativeHours = 0;
       let cumulativeCost = 0;
+      let cumulativeRevenue = 0;
 
       const enhancedTrendData = monthlyData.map(data => {
         cumulativeHours += data.hours;
         cumulativeCost += data.cost;
         
+        // Sumar revenue de este período (si existe)
+        const periodRevenue = revenueMap.get(data.periodKey) || 0;
+        cumulativeRevenue += periodRevenue;
+        
+        // Markup real basado en revenue acumulado vs costo acumulado
+        const currentMarkup = cumulativeCost > 0 ? +(cumulativeRevenue / cumulativeCost).toFixed(2) : 0;
+        
         return {
           period: data.periodKey,
           hours: +data.hours.toFixed(2),
           cost: +data.cost.toFixed(2),
+          revenue: +periodRevenue.toFixed(2),
+          cumulativeRevenue: +cumulativeRevenue.toFixed(2),
           entries: 0, // No disponible en Star Schema
           uniqueMembers: data.uniqueMembers,
           averageHoursPerMember: data.uniqueMembers > 0 ? +(data.hours / data.uniqueMembers).toFixed(2) : 0,
@@ -9068,7 +9103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cumulativeCost: +cumulativeCost.toFixed(2),
           progressPercentage: targetHours > 0 ? +((cumulativeHours / targetHours) * 100).toFixed(2) : 0,
           budgetUtilization: targetCost > 0 ? +((cumulativeCost / targetCost) * 100).toFixed(2) : 0,
-          currentMarkup: cumulativeCost > 0 ? +((quotation?.totalAmount || 0) / cumulativeCost).toFixed(2) : 0
+          currentMarkup
         };
       });
 
