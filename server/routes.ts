@@ -1464,6 +1464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role_name: sql<string | null>`${roles.name}`.as('role_name'),
           period_key: factLaborMonth.periodKey,
           asana_hours: factLaborMonth.asanaHours,
+          target_hours: factLaborMonth.targetHours,
         })
         .from(factLaborMonth)
         .leftJoin(personnel, eq(factLaborMonth.personId, personnel.id))
@@ -1478,6 +1479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 4. Agrupar horas por persona
       const hoursByPersonId = new Map<number | null, number>();
+      const targetHoursByPersonId = new Map<number | null, number>();
       const personKeyByPersonId = new Map<number | null, string>();
       const roleByPersonId = new Map<number | null, string>();
       
@@ -1489,11 +1491,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const personKey = row.person_key as string;
         const roleName = row.role_name as string | null;
         const hours = parseFloat(row.asana_hours as string) || 0;
+        const targetHours = parseFloat(row.target_hours as string) || 0;
         
-        console.log(`  - Person: ${personKey}, Role: ${roleName || 'NULL'}, Hours: ${hours}`);
+        console.log(`  - Person: ${personKey}, Role: ${roleName || 'NULL'}, Asana Hours: ${hours}, Target Hours: ${targetHours}`);
         
         const currentHours = hoursByPersonId.get(personId) || 0;
         hoursByPersonId.set(personId, currentHours + hours);
+        
+        const currentTargetHours = targetHoursByPersonId.get(personId) || 0;
+        targetHoursByPersonId.set(personId, currentTargetHours + targetHours);
         
         if (personKey) personKeyByPersonId.set(personId, personKey);
         if (roleName) roleByPersonId.set(personId, roleName);
@@ -1536,8 +1542,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const pid = personId as number;
           const weeklyCapacity = capacityMap.get(pid) || 40;
           const monthlyCapacity = weeklyCapacity * 4;
-          const totalCapacityForPeriod = monthlyCapacity * periodsCount;
-          const utilizationRate = (hours / totalCapacityForPeriod) * 100;
+          
+          // Usar las horas target asignadas en el proyecto (desde Excel MAESTRO)
+          // En vez de la capacidad genérica de la persona
+          const assignedHours = targetHoursByPersonId.get(personId) || 0;
+          const totalCapacityForPeriod = assignedHours > 0 ? assignedHours : (monthlyCapacity * periodsCount);
+          const utilizationRate = totalCapacityForPeriod > 0 ? (hours / totalCapacityForPeriod) * 100 : 0;
           
           return {
             personnelId: pid,
@@ -1545,7 +1555,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             roleName: roleByPersonId.get(personId) || 'N/A',
             hours: Math.round(hours * 10) / 10,
             weeklyCapacity,
-            monthlyCapacity,
+            monthlyCapacity: Math.round(totalCapacityForPeriod * 10) / 10,
             utilizationRate: Math.round(utilizationRate * 10) / 10
           };
         });
