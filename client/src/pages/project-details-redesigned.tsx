@@ -2113,69 +2113,69 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-10 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-9 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
             >
-              <Gauge className="h-4 w-4" />
+              <Gauge className="h-3.5 w-3.5" />
               Dashboard
             </TabsTrigger>
             <TabsTrigger 
               value="team-analysis" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
-              <BarChart3 className="h-4 w-4" />
+              <BarChart3 className="h-3.5 w-3.5" />
               Equipo
             </TabsTrigger>
             <TabsTrigger 
               value="rankings" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:shadow-sm"
             >
-              <Trophy className="h-4 w-4" />
+              <Trophy className="h-3.5 w-3.5" />
               Rankings
             </TabsTrigger>
             <TabsTrigger 
               value="trends" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
             >
-              <TrendingUp className="h-4 w-4" />
+              <TrendingUp className="h-3.5 w-3.5" />
               Tendencias
             </TabsTrigger>
             <TabsTrigger 
               value="time-management" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
             >
-              <Timer className="h-4 w-4" />
+              <Timer className="h-3.5 w-3.5" />
               Tiempo
             </TabsTrigger>
             <TabsTrigger 
               value="income-details" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
-              <FileSpreadsheet className="h-4 w-4" />
+              <FileSpreadsheet className="h-3.5 w-3.5" />
               Ingresos
             </TabsTrigger>
             <TabsTrigger 
               value="cost-details" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
             >
-              <DollarSign className="h-4 w-4" />
+              <DollarSign className="h-3.5 w-3.5" />
               Costos
             </TabsTrigger>
             <TabsTrigger 
               value="financial-analysis" 
-              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-green-50 data-[state=active]:text-green-700 data-[state=active]:shadow-sm"
             >
-              <Heart className="h-4 w-4" />
-              Rentabilidad y Salud
+              <Heart className="h-3.5 w-3.5" />
+              Rentabilidad
             </TabsTrigger>
             <TabsTrigger 
               value="operational-analysis" 
-              className="flex items-center gap-2 text-sm font-medium px-2 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:shadow-sm"
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-cyan-50 data-[state=active]:text-cyan-700 data-[state=active]:shadow-sm"
             >
-              <Zap className="h-4 w-4" />
-              Eficiencia & Riesgo
+              <Zap className="h-3.5 w-3.5" />
+              Eficiencia
             </TabsTrigger>
           </TabsList>
 
