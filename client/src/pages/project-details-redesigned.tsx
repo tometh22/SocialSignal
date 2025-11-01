@@ -57,7 +57,8 @@ import {
   XCircle,
   Cog,
   Award,
-  Calculator
+  Calculator,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2112,7 +2113,7 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-8 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-9 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -2128,11 +2129,18 @@ const ProjectDetailsPage = () => {
               Equipo
             </TabsTrigger>
             <TabsTrigger 
-              value="performance-analysis" 
-              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm"
+              value="rankings" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-amber-50 data-[state=active]:text-amber-700 data-[state=active]:shadow-sm"
             >
-              <Flame className="h-4 w-4" />
-              Performance
+              <Trophy className="h-4 w-4" />
+              Rankings
+            </TabsTrigger>
+            <TabsTrigger 
+              value="trends" 
+              className="flex items-center gap-2 text-sm font-medium px-3 py-2 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-700 data-[state=active]:shadow-sm"
+            >
+              <TrendingUp className="h-4 w-4" />
+              Tendencias
             </TabsTrigger>
             <TabsTrigger 
               value="time-management" 
@@ -3765,8 +3773,18 @@ const ProjectDetailsPage = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="performance-analysis" className="space-y-6">
+          <TabsContent value="rankings" className="space-y-6">
+            {/* RANKINGS ECONÓMICOS - VISTA COMPLETA */}
+            <div className="grid grid-cols-1 gap-6">
+              <EconomicRankings 
+                projectId={Number(projectId)}
+                timeFilter={timeFilterForHook}
+                loading={!unifiedData}
+              />
+            </div>
+          </TabsContent>
 
+          <TabsContent value="trends" className="space-y-6">
             {/* GRÁFICOS DE TENDENCIAS */}
             <div className="grid grid-cols-1 gap-6">
               <TrendCharts 
@@ -3775,15 +3793,6 @@ const ProjectDetailsPage = () => {
                   startDate: dateFilter.startDate?.toISOString() || new Date(2020, 0, 1).toISOString(),
                   endDate: dateFilter.endDate?.toISOString() || new Date(2030, 11, 31).toISOString()
                 }}
-              />
-            </div>
-
-            {/* RANKINGS ECONÓMICOS - VISTA COMPLETA */}
-            <div className="grid grid-cols-1 gap-6">
-              <EconomicRankings 
-                projectId={Number(projectId)}
-                timeFilter={timeFilterForHook}
-                loading={!unifiedData}
               />
             </div>
           </TabsContent>
