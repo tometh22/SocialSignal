@@ -2056,7 +2056,13 @@ export const resolvedPeriodSchema = z.object({
   
   // 🚀 DUAL CURRENCY FIELDS for native display
   displayCurrency: z.enum(["ARS", "USD"]).optional().nullable(), // Original currency detected
-  revenueDisplay: z.number().optional().nullable()               // Amount in native currency
+  revenueDisplay: z.number().optional().nullable(),              // Amount in native currency
+  
+  // FX Rate metadata from Star Schema fact_labor_month
+  fxRate: z.number().optional().nullable(),        // Weighted FX rate for period
+  fxType: z.string().optional(),                   // 'weighted' | 'fixed'
+  fxFormula: z.string().optional(),                // Formula used for calculation
+  fxSource: z.string().optional()                  // Data source description
 });
 
 export type ResolvedPeriod = z.infer<typeof resolvedPeriodSchema>;
@@ -2110,7 +2116,14 @@ export const portfolioSummarySchema = z.object({
   markupRatio: z.number().nullable(),   // aggregate markup ratio
   // 🚀 DUAL CURRENCY FIELDS at portfolio level
   displayCurrency: z.enum(["ARS", "USD"]).optional().nullable(), // Dominant currency in portfolio
-  revenueDisplay: z.number().optional().nullable()               // Total revenue in display currency
+  revenueDisplay: z.number().optional().nullable(),              // Total revenue in display currency
+  // Star Schema extensions
+  periodAvgMarginPercent: z.number().optional(),     // Average margin percentage across portfolio
+  periodAsanaHours: z.number().optional(),           // Actual hours from Asana
+  periodBillingHours: z.number().optional(),         // Billing hours
+  periodTargetHours: z.number().optional(),          // Target hours
+  billableRate: z.number().optional(),               // (billingHours / asanaHours) * 100
+  dataFreshness: z.string().nullable().optional()    // Timestamp of last ETL load
 });
 
 export type PortfolioSummary = z.infer<typeof portfolioSummarySchema>;

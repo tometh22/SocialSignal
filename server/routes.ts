@@ -787,8 +787,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             periodCostUSD: totalCostUSD,
             periodProfitUSD: totalProfitUSD,
             periodAvgMarginPercent: avgMargin * 100,
-            projectCount: financialData.length,
-            monthCount: 1,
             // Horas detalladas
             periodWorkedHours: periodAsanaHours, // backward compatibility
             periodAsanaHours: periodAsanaHours,
@@ -798,6 +796,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Proyectos activos
             activeProjects: financialData.filter(p => (p.metrics.revenueUSDNormalized || 0) > 0 || (p.metrics.costUSDNormalized || 0) > 0).length,
             totalProjects: financialData.length,
+            efficiencyFrac: null,
+            markupRatio: null,
             // Data freshness
             dataFreshness: dataFreshness
           };
