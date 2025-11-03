@@ -1,0 +1,63 @@
+Las tres cards están bien planteadas, pero hay mejoras de calidad de dato y UX que te dejan esto a prueba de balas.
+Veredicto rápido
+Horas del período: OK, pero separá billables vs non-billables y definí el corte temporal con precisión.
+Proyectos activos: OK, pero definí “activo” por regla explícita (no por “tiene horas” solamente).
+Tipo de cambio: no uses promedio simple; usá promedio ponderado por monto.
+1) Horas del período (periodHours)
+Fuente: fact_labor_month.asana_hours
+Mejoras:
+Mostrar Billables / Non-billables / Total y % billable.
+Definir period boundary (ej.: date_trunc('month', ts) con TZ America/Argentina/Buenos_Aires).
+Evitar doble conteo si hay reprocesos ETL → agrega etl_batch_id y filtra el último batch exitoso.
+Tooltip con fórmula:
+“Suma de horas registradas en Asana (último ETL) dentro del período seleccionado. Corte: 00:00 BUE.”
+Checklist
+☑ BYTZ fija (BUE)
+☑ Billable flag (si está en la ontología / schema)
+☑ COALESCE(SUM(...),0) para nulls
+2) Proyectos activos (active/total)
+Fuente: summary (activeProjects / totalProjects)
+Regla clara para “activo” (elige 1):
+Regla A (horas): tuvo ≥X horas en los últimos N días.
+Regla B (estado): project.status IN ('ongoing','in_delivery').
+Regla C híbrida: estado + horas recientes (más robusta).
+Mejoras:
+Excluir one-shot ya cerrados con 100% EV entregado y sin horas en N días.
+Mostrar delta vs período anterior (↑/↓) para dar contexto.
+Tooltip: “Activos = proyectos con estado ongoing o con ≥X h en ≤N días.”
+3) Tipo de cambio (fx)
+Fuente: fact_rc_month.fx_rate
+Crítico: pasar de promedio simple a promedio ponderado por monto.
+Ponderado por ingresos para KPIs de revenue:
+fx_rev = SUM(revenue_ars) / NULLIF(SUM(revenue_usd_equiv),0)
+Ponderado por costos para costos; o mixto ponderado por monto total si será un solo fx.
+Manejar multi-fx en el mismo período (ARS oficial / MEP / tarjeta) → guardar fx_type y filtrar el aplicado.
+Tooltip
+“TC ponderado por monto del período según fx_type = operational (ingresos + costos).”
+4) Backend: consultas “sanas”
+Siempre COALESCE(SUM(col),0) y tipado numérico (Drizzle: .mapWith(Number)).
+timeFilter='all' → sql\true`` (sin filtro).
+ETL freshness: traer last_success_at del job y mostrar badge: “Data actualizada: 3 Nov 10:05”.
+5) UI/UX de las cards
+Borde violeta: lo sacaría y dejaría cards blancas con sombra suave.
+Orden: Proyectos activos → Horas (B/NB/Total) → TC ponderado.
+Micro-detalles:
+Mini-sparkline en “Horas” (últimas 8–12 semanas).
+Sub-label gris con fuente (“ETL Maestro · batch #342”).
+Iconos consistentes (briefcase, clock, currency).
+Texto de ayuda en hover:
+Proyectos: regla de actividad.
+Horas: qué entra / qué no (p.ej., reuniones internas si no son billables).
+TC: fórmula de ponderación y fx_type.
+6) Edge cases a cubrir
+Mes sin horas → mostrar 0, no —.
+Proyecto sin fx en período → fallback a fx_snapshot de cierre.
+One-shot: que “activo” no dependa solo de horas si ya está en QA/cierre.
+7) Lo que le respondería al dev (copy & paste)
+Dejá la obtención como está, pero:
+Horas: exponer billable_hours, non_billable_hours, total_hours y billable_rate%. Corte mensual con TZ BUE y último etl_batch_id.
+Proyectos activos: usar regla híbrida (estado ongoing o ≥X h en ≤N días). Incluir delta vs período anterior.
+Tipo de cambio: reemplazar promedio simple por promedio ponderado por monto (ingresos+costos) filtrando fx_type='operational'. Devolver también fx_type.
+Agregá en el payload dataFreshness: { lastSuccessAt, batchId } para renderizar badge.
+Sí, ajustá el KPICard: sin borde violeta, sombra suave, sub-label con fuente y tooltip con fórmula.
+Si querés, te paso el contrato del endpoint (/api/projects/summary) con los nuevos campos y un mock de respuesta para que el front lo integre ya.
