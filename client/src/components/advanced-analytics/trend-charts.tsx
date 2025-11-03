@@ -238,11 +238,11 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-lg font-bold text-purple-600">
-                        {getTrendLabel(trendData.velocityAnalysis.trend)}
+                        {getTrendLabel(trendData.velocityAnalysis?.trend || 'stable')}
                       </p>
-                      <Badge variant="outline" className={getTrendColor(trendData.velocityAnalysis.trend)}>
-                        {trendData.velocityAnalysis.velocityChange > 0 ? '+' : ''}
-                        {trendData.velocityAnalysis.velocityChange.toFixed(1)}%
+                      <Badge variant="outline" className={getTrendColor(trendData.velocityAnalysis?.trend || 'stable')}>
+                        {(trendData.velocityAnalysis?.velocityChange || 0) > 0 ? '+' : ''}
+                        {(trendData.velocityAnalysis?.velocityChange || 0).toFixed(1)}%
                       </Badge>
                     </div>
                   </div>
