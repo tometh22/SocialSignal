@@ -343,17 +343,33 @@ function useActiveProjects(period: string, fresh: boolean) {
 }
 
 // ---------- UI Components ----------
-function KPICard({ title, value, icon }: { title: string; value: string; icon: React.ReactNode }) {
+function KPICard({ 
+  title, 
+  value, 
+  icon, 
+  tooltip, 
+  subtitle 
+}: { 
+  title: string; 
+  value: string; 
+  icon: React.ReactNode; 
+  tooltip?: string;
+  subtitle?: string;
+}) {
   return (
-    <div className="relative rounded-2xl p-[1px] bg-gradient-to-br from-indigo-200/70 via-violet-200/70 to-fuchsia-200/70">
-      <div className="rounded-2xl bg-white/90 backdrop-blur px-4 py-3 shadow-sm flex items-center gap-3">
-        <div className="rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white p-2 shadow-sm">
-          {icon}
-        </div>
-        <div>
-          <div className="text-xs text-slate-500">{title}</div>
-          <div className="text-xl font-semibold text-slate-900">{value}</div>
-        </div>
+    <div 
+      className="relative rounded-xl bg-white px-4 py-3 shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex items-center gap-3"
+      title={tooltip}
+    >
+      <div className="rounded-lg bg-slate-100 text-slate-700 p-2">
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="text-xs text-slate-500">{title}</div>
+        <div className="text-xl font-semibold text-slate-900">{value}</div>
+        {subtitle && (
+          <div className="text-[10px] text-slate-400 mt-0.5">{subtitle}</div>
+        )}
       </div>
     </div>
   );
@@ -703,13 +719,63 @@ function Controls({ period, setPeriod, onRefresh, search, setSearch, activeOnly,
 function SummaryBar({ data }:{ data?: ProjectsApi }){
   const active = data?.summary?.activeProjects ?? data?.projects?.filter(p=>p.status!=="Inactive").length ?? 0;
   const total = data?.summary?.totalProjects ?? data?.projects?.length ?? 0;
+  
+  // Horas detalladas
+  const asanaHours = (data?.summary as any)?.periodAsanaHours ?? data?.summary?.periodHours ?? 0;
+  const billingHours = (data?.summary as any)?.periodBillingHours ?? 0;
+  const billableRate = (data?.summary as any)?.billableRate ?? 0;
+  
+  // Formatear horas con detalle
+  const hoursValue = billingHours > 0 
+    ? `${asanaHours.toFixed(0)}h`
+    : `${asanaHours.toFixed(0)}h`;
+  
+  const hoursSubtitle = billingHours > 0 
+    ? `${billingHours.toFixed(0)}h facturables (${billableRate.toFixed(0)}%)`
+    : 'ETL Maestro · Asana';
+  
+  // FX con tipo
+  const fxType = (data?.period as any)?.fxType;
+  const fxValue = data?.fx ? `ARS ${data.fx.toLocaleString()}` : "—";
+  const fxSubtitle = fxType === 'weighted' ? 'Ponderado por monto' : 'ETL Maestro';
+  
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-      <KPICard title={t("kpiRevenue")} value={formatUSD(data?.summary?.periodRevenueUSD)} icon={<DollarSign className="h-5 w-5"/>}/>
-      <KPICard title={t("kpiProfit")} value={formatUSD(data?.summary?.periodProfitUSD)} icon={<TrendingUp className="h-5 w-5"/>}/>
-      <KPICard title={t("kpiHours")} value={`${data?.summary?.periodHours ?? 0}h`} icon={<Clock className="h-5 w-5"/>}/>
-      <KPICard title={t("kpiActive")} value={`${active}/${total}`} icon={<BriefcaseBusiness className="h-5 w-5"/>}/>
-      <KPICard title={t("kpiFx")} value={data?.fx ? `${data.fx}` : "—"} icon={<DollarSign className="h-5 w-5"/>}/>
+      <KPICard 
+        title={t("kpiRevenue")} 
+        value={formatUSD(data?.summary?.periodRevenueUSD)} 
+        icon={<DollarSign className="h-5 w-5"/>}
+        tooltip="Suma de ingresos USD del período desde Star Schema (fact_rc_month)"
+        subtitle="Star Schema SoT"
+      />
+      <KPICard 
+        title={t("kpiProfit")} 
+        value={formatUSD(data?.summary?.periodProfitUSD)} 
+        icon={<TrendingUp className="h-5 w-5"/>}
+        tooltip="Ganancia = Ingresos - Costos (USD)"
+        subtitle="Star Schema SoT"
+      />
+      <KPICard 
+        title={t("kpiHours")} 
+        value={hoursValue} 
+        icon={<Clock className="h-5 w-5"/>}
+        tooltip="Horas trabajadas registradas en Asana (fact_labor_month). Billing hours = horas facturables cuando disponibles."
+        subtitle={hoursSubtitle}
+      />
+      <KPICard 
+        title={t("kpiActive")} 
+        value={`${active}/${total}`} 
+        icon={<BriefcaseBusiness className="h-5 w-5"/>}
+        tooltip="Proyectos activos = con ingresos o costos en el período"
+        subtitle="Con actividad"
+      />
+      <KPICard 
+        title={t("kpiFx")} 
+        value={fxValue} 
+        icon={<DollarSign className="h-5 w-5"/>}
+        tooltip="Tipo de cambio ponderado: SUM(ARS) / SUM(USD) del período (ingresos + costos)"
+        subtitle={fxSubtitle}
+      />
     </div>
   );
 }
@@ -850,7 +916,15 @@ export default function ActiveProjectsNext(){
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
       <div className="mx-auto max-w-6xl p-5 sm:p-8">
         <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("title")}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{t("title")}</h1>
+          {(data?.summary as any)?.dataFreshness && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-200 dark:ring-emerald-800">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Datos: {new Date((data?.summary as any)?.dataFreshness).toLocaleDateString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
         <p className="text-sm text-slate-500 dark:text-slate-400">{t("period")} <span className="font-medium">{periodToLabel(data?.period ?? period)}</span> • {t("subtitle")}</p>
       </div>
 
