@@ -744,23 +744,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .filter((m): m is number => m !== null && !isNaN(m));
           const avgMargin = margins.length > 0 ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
           
-          // ⏱️ Calcular horas del período desde fact_labor_month
+          // ⏱️ Calcular horas del período desde fact_labor_month (separando tipos)
           const laborHoursResult = await db
             .select({
-              totalHours: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}::numeric), 0)`.mapWith(Number)
+              totalAsanaHours: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}::numeric), 0)`.mapWith(Number),
+              totalBillingHours: sql<number>`COALESCE(SUM(${factLaborMonth.billingHours}::numeric), 0)`.mapWith(Number),
+              totalTargetHours: sql<number>`COALESCE(SUM(${factLaborMonth.targetHours}::numeric), 0)`.mapWith(Number),
+              lastLoadedAt: sql<string>`MAX(${factLaborMonth.loadedAt})`
             })
             .from(factLaborMonth)
             .where(eq(factLaborMonth.periodKey, periodQuery));
-          const periodWorkedHours = laborHoursResult[0]?.totalHours || 0;
           
-          // 💱 Obtener FX rate desde fact_rc_month (promedio de todos los proyectos del período)
+          const periodAsanaHours = laborHoursResult[0]?.totalAsanaHours || 0;
+          const periodBillingHours = laborHoursResult[0]?.totalBillingHours || 0;
+          const periodTargetHours = laborHoursResult[0]?.totalTargetHours || 0;
+          const laborLastLoadedAt = laborHoursResult[0]?.lastLoadedAt;
+          
+          // 💱 Obtener FX rate ponderado por monto desde fact_rc_month
+          // FX_ponderado = SUM(ARS) / NULLIF(SUM(USD), 0)
           const fxRateResult = await db
             .select({
-              avgFxRate: sql<number>`AVG(${factRCMonth.fxRate}::numeric)`.mapWith(Number)
+              totalARS: sql<number>`COALESCE(SUM((${factRCMonth.revenueARS} + ${factRCMonth.costARS})::numeric), 0)`.mapWith(Number),
+              totalUSD: sql<number>`COALESCE(SUM((${factRCMonth.revenueUSD} + ${factRCMonth.costUSD})::numeric), 0)`.mapWith(Number),
+              lastLoadedAt: sql<string>`MAX(${factRCMonth.loadedAt})`
             })
             .from(factRCMonth)
             .where(eq(factRCMonth.periodKey, periodQuery));
-          const fxRate = fxRateResult[0]?.avgFxRate || null;
+          
+          const totalARS = fxRateResult[0]?.totalARS || 0;
+          const totalUSD = fxRateResult[0]?.totalUSD || 0;
+          const fxRate = totalUSD > 0 ? Math.round(totalARS / totalUSD) : null;
+          const rcLastLoadedAt = fxRateResult[0]?.lastLoadedAt;
+          
+          // Usar el timestamp más reciente entre labor y RC
+          const dataFreshness = [laborLastLoadedAt, rcLastLoadedAt]
+            .filter(Boolean)
+            .sort()
+            .reverse()[0] || null;
           
           aggregatorResponse.summary = {
             periodRevenueUSD: totalRevenueUSD,
@@ -769,20 +789,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
             periodAvgMarginPercent: avgMargin * 100,
             projectCount: financialData.length,
             monthCount: 1,
-            periodWorkedHours: periodWorkedHours,
+            // Horas detalladas
+            periodWorkedHours: periodAsanaHours, // backward compatibility
+            periodAsanaHours: periodAsanaHours,
+            periodBillingHours: periodBillingHours,
+            periodTargetHours: periodTargetHours,
+            billableRate: periodAsanaHours > 0 ? (periodBillingHours / periodAsanaHours) * 100 : 0,
+            // Proyectos activos
             activeProjects: financialData.filter(p => (p.metrics.revenueUSDNormalized || 0) > 0 || (p.metrics.costUSDNormalized || 0) > 0).length,
-            totalProjects: financialData.length
+            totalProjects: financialData.length,
+            // Data freshness
+            dataFreshness: dataFreshness
           };
           
-          // Añadir FX al response principal
+          // Añadir FX al response principal con metadata
           if (fxRate) {
             aggregatorResponse.period = {
               ...aggregatorResponse.period,
-              fxRate: fxRate
+              fxRate: fxRate,
+              fxType: 'weighted', // indicar que es ponderado
+              fxFormula: 'SUM(ARS) / SUM(USD)' // fórmula usada
             };
           }
           
-          console.log(`📊 STAR SCHEMA SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Hours=${periodWorkedHours.toFixed(1)}h, FX=${fxRate || 'N/A'}, Projects=${financialData.length}`);
+          console.log(`📊 STAR SCHEMA SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Hours=${periodAsanaHours.toFixed(1)}h (Billing=${periodBillingHours.toFixed(1)}h), FX=${fxRate || 'N/A'} [weighted], Projects=${financialData.length}`);
         }
       }
       
