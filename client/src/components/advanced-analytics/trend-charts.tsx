@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from "recharts";
-import { TrendingUp, BarChart3, Activity, Calendar } from "lucide-react";
+import { Tooltip as UITooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, AreaChart, Area } from "recharts";
+import { TrendingUp, BarChart3, Activity, Calendar, Info } from "lucide-react";
 import { useState } from "react";
 
 interface TrendChartsProps {
@@ -174,54 +175,123 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
           
           {/* Resumen de Métricas */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-800">Períodos Totales</span>
-              </div>
-              <p className="text-xl font-bold text-blue-600">{trendData.summary.totalPeriods}</p>
-            </div>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 cursor-help hover:border-blue-300 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800">Períodos Totales</span>
+                      </div>
+                      <Info className="h-3.5 w-3.5 text-blue-400" />
+                    </div>
+                    <p className="text-xl font-bold text-blue-600">{trendData.summary.totalPeriods}</p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Períodos con Actividad</p>
+                  <p className="text-xs text-gray-500">
+                    Cantidad de períodos (semanas o meses) en los que el proyecto tuvo horas registradas. 
+                    Más períodos = proyecto con mayor duración o continuidad.
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
 
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">Prom. Horas/Período</span>
-              </div>
-              <p className="text-xl font-bold text-green-600">
-                {trendData.summary.averageHoursPerPeriod.toFixed(1)}h
-              </p>
-            </div>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-green-50 p-4 rounded-lg border border-green-200 cursor-help hover:border-green-300 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">Prom. Horas/Período</span>
+                      </div>
+                      <Info className="h-3.5 w-3.5 text-green-400" />
+                    </div>
+                    <p className="text-xl font-bold text-green-600">
+                      {trendData.summary.averageHoursPerPeriod.toFixed(1)}h
+                    </p>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Intensidad de Trabajo</p>
+                  <p className="text-xs text-gray-500">
+                    Horas trabajadas en promedio por cada período activo. 
+                    Ayuda a entender la carga de trabajo constante del equipo en el proyecto.
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
 
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-4 w-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-800">Velocidad</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-bold text-purple-600">
-                  {getTrendLabel(trendData.velocityAnalysis.trend)}
-                </p>
-                <Badge variant="outline" className={getTrendColor(trendData.velocityAnalysis.trend)}>
-                  {trendData.velocityAnalysis.velocityChange > 0 ? '+' : ''}
-                  {trendData.velocityAnalysis.velocityChange.toFixed(1)}%
-                </Badge>
-              </div>
-            </div>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200 cursor-help hover:border-purple-300 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-purple-600" />
+                        <span className="text-sm font-medium text-purple-800">Velocidad</span>
+                      </div>
+                      <Info className="h-3.5 w-3.5 text-purple-400" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-lg font-bold text-purple-600">
+                        {getTrendLabel(trendData.velocityAnalysis.trend)}
+                      </p>
+                      <Badge variant="outline" className={getTrendColor(trendData.velocityAnalysis.trend)}>
+                        {trendData.velocityAnalysis.velocityChange > 0 ? '+' : ''}
+                        {trendData.velocityAnalysis.velocityChange.toFixed(1)}%
+                      </Badge>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Tendencia de Actividad</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Compara períodos recientes vs históricos para detectar si el proyecto está acelerando (más horas), 
+                    desacelerando (menos horas) o estable.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    🟢 Acelerando: Proyecto en crecimiento<br />
+                    🔴 Desacelerando: Reduciendo carga<br />
+                    🔵 Estable: Ritmo constante
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
 
-            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-              <div className="flex items-center gap-2 mb-2">
-                <BarChart3 className="h-4 w-4 text-orange-600" />
-                <span className="text-sm font-medium text-orange-800">Pico de Actividad</span>
-              </div>
-              <p className="text-lg font-bold text-orange-600">
-                {trendData.summary.peakActivity?.hours || 0}h
-              </p>
-              {trendData.summary.peakActivity?.period && (
-                <p className="text-xs text-orange-600">
-                  {formatPeriodLabel(trendData.summary.peakActivity.period)}
-                </p>
-              )}
-            </div>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 cursor-help hover:border-orange-300 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-orange-600" />
+                        <span className="text-sm font-medium text-orange-800">Pico de Actividad</span>
+                      </div>
+                      <Info className="h-3.5 w-3.5 text-orange-400" />
+                    </div>
+                    <p className="text-lg font-bold text-orange-600">
+                      {trendData.summary.peakActivity?.hours || 0}h
+                    </p>
+                    {trendData.summary.peakActivity?.period && (
+                      <p className="text-xs text-orange-600">
+                        {formatPeriodLabel(trendData.summary.peakActivity.period)}
+                      </p>
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="font-semibold mb-1">Momento de Mayor Intensidad</p>
+                  <p className="text-xs text-gray-500">
+                    Período con más horas trabajadas del proyecto. 
+                    Útil para identificar sprints intensivos o hitos importantes.
+                  </p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
           </div>
 
         </CardContent>
@@ -247,7 +317,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                   height={60}
                 />
                 <YAxis fontSize={12} />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: any, name: string) => {
                     if (name === 'cumulativeHours') return [`${value}h`, 'Horas Acumuladas'];
                     if (name === 'progressPercentage') return [`${value.toFixed(1)}%`, 'Progreso'];
@@ -278,7 +348,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                   height={60}
                 />
                 <YAxis fontSize={12} />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: any, name: string) => {
                     if (name === 'hours') return [`${value}h`, 'Horas'];
                     if (name === 'uniqueMembers') return [`${value}`, 'Miembros Activos'];
@@ -309,7 +379,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                   height={60}
                 />
                 <YAxis fontSize={12} domain={[0, 100]} />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: any) => [`${value.toFixed(1)}%`, 'Utilización']}
                 />
                 <Line type="monotone" dataKey="budgetUtilization" stroke="#ef4444" strokeWidth={3} />
@@ -335,7 +405,7 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
                   height={60}
                 />
                 <YAxis fontSize={12} />
-                <Tooltip 
+                <RechartsTooltip 
                   formatter={(value: any) => [`${value.toFixed(2)}x`, 'Markup']}
                 />
                 <Line type="monotone" dataKey="currentMarkup" stroke="#8b5cf6" strokeWidth={3} />
