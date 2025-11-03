@@ -303,7 +303,24 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
         {/* Progreso Acumulativo */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Progreso Acumulativo</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              Progreso Acumulativo
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">Seguimiento de Avance Total</p>
+                    <p className="text-xs text-gray-500">
+                      Muestra cómo se acumulan las horas trabajadas a lo largo del tiempo. 
+                      La línea azul son las horas totales trabajadas, y la línea roja muestra 
+                      el porcentaje de avance respecto al presupuesto.
+                    </p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -334,7 +351,24 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
         {/* Actividad por Período */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Actividad por Período</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              Actividad por Período
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">Distribución de Trabajo</p>
+                    <p className="text-xs text-gray-500">
+                      Compara las horas trabajadas (barras verdes) y la cantidad de miembros 
+                      del equipo activos (barras naranjas) en cada período. Útil para 
+                      identificar momentos de alta o baja actividad.
+                    </p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -365,7 +399,24 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
         {/* Utilización de Presupuesto */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Utilización de Presupuesto</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              Utilización de Presupuesto
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">Control de Consumo de Horas</p>
+                    <p className="text-xs text-gray-500">
+                      Indica qué porcentaje del presupuesto total de horas se ha consumido 
+                      en cada período. Valores cercanos a 100% significan que se está 
+                      acercando al límite planificado.
+                    </p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -391,7 +442,24 @@ export function TrendCharts({ projectId, dateFilter }: TrendChartsProps) {
         {/* Evolución del Markup */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Evolución del Markup</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              Evolución del Markup
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-semibold mb-1">Rentabilidad del Proyecto</p>
+                    <p className="text-xs text-gray-500">
+                      Muestra el multiplicador entre lo que se cobra al cliente y lo que 
+                      cuesta el trabajo realizado. Un valor de 2x significa que se cobra 
+                      el doble de lo que cuesta, indicando buena rentabilidad.
+                    </p>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
