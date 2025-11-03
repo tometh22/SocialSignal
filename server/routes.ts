@@ -760,24 +760,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const periodTargetHours = laborHoursResult[0]?.totalTargetHours || 0;
           const laborLastLoadedAt = laborHoursResult[0]?.lastLoadedAt;
           
-          // 💱 Obtener FX rate ponderado por monto desde fact_rc_month
-          // FX_ponderado = SUM(ARS) / NULLIF(SUM(USD), 0)
+          // 💱 Obtener FX rate ponderado desde fact_labor_month (columna Q "Cotización")
+          // FX_ponderado = SUM(costARS) / NULLIF(SUM(costUSD), 0)
           const fxRateResult = await db
             .select({
-              totalARS: sql<number>`COALESCE(SUM((${factRCMonth.revenueARS} + ${factRCMonth.costARS})::numeric), 0)`.mapWith(Number),
-              totalUSD: sql<number>`COALESCE(SUM((${factRCMonth.revenueUSD} + ${factRCMonth.costUSD})::numeric), 0)`.mapWith(Number),
-              lastLoadedAt: sql<string>`MAX(${factRCMonth.loadedAt})`
+              totalARS: sql<number>`COALESCE(SUM(${factLaborMonth.costARS}::numeric), 0)`.mapWith(Number),
+              totalUSD: sql<number>`COALESCE(SUM(${factLaborMonth.costUSD}::numeric), 0)`.mapWith(Number),
+              lastLoadedAt: sql<string>`MAX(${factLaborMonth.loadedAt})`
             })
-            .from(factRCMonth)
-            .where(eq(factRCMonth.periodKey, periodQuery));
+            .from(factLaborMonth)
+            .where(eq(factLaborMonth.periodKey, periodQuery));
           
           const totalARS = fxRateResult[0]?.totalARS || 0;
           const totalUSD = fxRateResult[0]?.totalUSD || 0;
           const fxRate = totalUSD > 0 ? Math.round(totalARS / totalUSD) : null;
-          const rcLastLoadedAt = fxRateResult[0]?.lastLoadedAt;
+          const laborFxLoadedAt = fxRateResult[0]?.lastLoadedAt;
           
-          // Usar el timestamp más reciente entre labor y RC
-          const dataFreshness = [laborLastLoadedAt, rcLastLoadedAt]
+          // Usar el timestamp más reciente entre labor hours y labor FX
+          const dataFreshness = [laborLastLoadedAt, laborFxLoadedAt]
             .filter(Boolean)
             .sort()
             .reverse()[0] || null;
@@ -808,7 +808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ...aggregatorResponse.period,
               fxRate: fxRate,
               fxType: 'weighted', // indicar que es ponderado
-              fxFormula: 'SUM(ARS) / SUM(USD)' // fórmula usada
+              fxFormula: 'SUM(costARS) / SUM(costUSD)', // fórmula desde fact_labor_month
+              fxSource: 'Costos directos e indirectos (columna Q)' // fuente de datos
             };
           }
           
