@@ -1,0 +1,133 @@
+Te dejo el mapeo exacto → ETL → consultas.
+1) De Google Sheets → Star Schema
+Hoja: Rendimiento del cliente
+Campos típicos (según tu captura):
+Cliente, Proyecto, Tipo de proyecto (One Shot / Fee mensual)
+Mes, Año
+Cotización (fx usado)
+Facturación (USD), Costos (USD)
+Facturación (ARS), Costos (ARS)
+👉 ETL → fact_rc_month
+org_id
+project_id            ← match por (Cliente + Proyecto) a tabla de proyectos
+period_key            ← to_char(to_date(Año||'-'||Mes||'-01'),'YYYY-MM')
+revenue_usd           ← “Facturación (USD)”
+cost_usd              ← “Costos (USD)”
+revenue_ars           ← “Facturación (ARS)”
+cost_ars              ← “Costos (ARS)”
+fx_rate               ← “Cotización”   (ver fallback más abajo)
+fx_type               ← 'operational'  (o lo que uses)
+source_row_id         ← id de la fila/gsheet para trazabilidad
+etl_batch_id, etl_ts
+Normalizaciones en ETL
+Quitar símbolos $, . de miles y , decimal → número.
+Cotización vacía: calcular fx implícito ponderado de esa fila:
+fx_row = (revenue_ars + cost_ars) / NULLIF((revenue_usd + cost_usd),0)
+Si toda la fila viene en USD (sin ARS) y hay Cotización, guardá igualmente fx_rate (te sirve para agregados del período).
+Validar Tipo de proyecto → billing_model (one_shot/retainer) en projects.
+Hoja: Costos directos e indirectos
+Campos (por tu captura):
+Mes, Año, Tipo de proyecto, Nro Proyecto, Clientes, Proyecto
+Cantidad de horas reales Asana
+(y otros costos por proveedor/rol)
+👉 ETL → fact_labor_month (horas)
+org_id
+project_id
+period_key
+asana_hours           ← “Cantidad de horas reales Asana”
+is_billable           ← derivado si tenés esa marca; si no, ‘NULL’
+etl_batch_id, etl_ts
+👉 ETL → (opcional) fact_cost_month (si desglosás costos por proveedor/rol)
+org_id, project_id, period_key, cost_usd, cost_ars, cost_role, cost_type
+Con esto resolvés “Proyectos activos por mes” sin tocar otras tablas.
+2) Cómo calcular cada card (backend)
+Usando Drizzle (Postgres) y period_key:
+a) Facturación del período (USD)
+const [{ revenueUsd }] = await db
+  .select({
+    revenueUsd: sql<number>`coalesce(sum(${factRcMonth.revenueUsd}),0)`.mapWith(Number)
+  })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, periodKey)));
+b) Ganancia del período (USD)
+const [{ costUsd }] = await db
+  .select({
+    costUsd: sql<number>`coalesce(sum(${factRcMonth.costUsd}),0)`.mapWith(Number)
+  })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, periodKey)));
+
+const periodProfitUsd = (revenueUsd ?? 0) - (costUsd ?? 0);
+Si en esa hoja algunos costos están solo en ARS, convertí a USD con el fx ponderado del mismo período (ver “fx” abajo) o con fx_rate de cada fila.
+c) Horas del período
+const [{ periodHours }] = await db
+  .select({
+    periodHours: sql<number>`coalesce(sum(${factLaborMonth.asanaHours}),0)`.mapWith(Number)
+  })
+  .from(factLaborMonth)
+  .where(and(eq(factLaborMonth.orgId, orgId), eq(factLaborMonth.periodKey, periodKey)));
+Si querés billables/non-billables: usá filter (where ...) con is_billable.
+d) Proyectos activos (active/total)
+Regla robusta (actividad en el mes o estado operativo):
+const [{ active }] = await db.execute(sql<number>`
+  select count(distinct p.id)::int as active
+  from projects p
+  left join fact_labor_month fl on fl.project_id = p.id and fl.period_key = ${periodKey}
+  left join fact_rc_month fr    on fr.project_id = p.id and fr.period_key = ${periodKey}
+  where p.org_id = ${orgId}
+    and (
+      p.status in ('ongoing','in_delivery')
+      or coalesce(fl.asana_hours,0) > 0
+      or coalesce(fr.revenue_usd,0) > 0
+      or coalesce(fr.cost_usd,0) > 0
+    )
+`);
+
+const [{ total }] = await db.execute(sql<number>`
+  select count(*)::int as total from projects where org_id=${orgId}
+`);
+e) Tipo de cambio (ref.)
+No promedio simple; sí ponderado por monto del período:
+const [{ fxWeighted }] = await db
+  .select({
+    fxWeighted: sql<number>`
+      coalesce(
+        sum(${factRcMonth.revenueArs} + ${factRcMonth.costArs})
+        / nullif(sum(${factRcMonth.revenueUsd} + ${factRcMonth.costUsd}), 0)
+      )
+    `.mapWith(Number)
+  })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, periodKey)));
+Si querés por cliente/proyecto, añadí group by.
+Si manejás distintos fx_type, filtrá fx_type='operational'.
+3) Por qué “no salen bien” ahora (y cómo lo evitás)
+Filtro temporal mal aplicado (estás trayendo all → horas enormes).
+✓ Forzá period_key en todas las sumas de cards.
+Join que duplica revenue/cost por mezclar horas y revenue en la misma query.
+✓ Hacé queries separadas o usa subselects/distinct en el join.
+FX promedio simple de la hoja → sesga si hay mix ARS/USD.
+✓ Cambiá a ponderado como arriba.
+Parsing de números del ETL (símbolos, separadores).
+✓ Normalizá al cargar y guarda source_row_id para auditar.
+Batch viejo del ETL.
+✓ Siempre filtrar por etl_batch_id = last_success y mostrar badge “ETL Maestro · hh:mm”.
+4) Contrato del endpoint para el FE (sugerido)
+{
+  "summary": {
+    "periodKey": "2025-03",
+    "periodRevenueUsd": 36780.23,
+    "periodProfitUsd": 25450.91,
+    "periodHours": 1364,
+    "activeProjects": 4,
+    "totalProjects": 4,
+    "fxWeighted": 460.12,
+    "dataFreshness": { "etlBatchId": 342, "lastSuccessAt": "2025-03-03T10:05:00-03:00" }
+  }
+}
+5) UI: microcopys y verificación visual
+Subtexto de cada card: fuente + período
+“Star Schema SoT · 2025-03” / “ETL Maestro · Asana”
+Tooltip con fórmula (2 líneas).
+Si fxWeighted no se pudo calcular (sin mix), mostrar fx_rate promedio del período.
+Con este mapeo desde Rendimiento del cliente y Costos directos/indirectos tu pipeline queda consistente y las cards van a reflejar exactamente el Excel Maestro. Si querés, te armo los scripts del ETL (parseo y upsert) para esas dos hojas y un test SQL rápido para validar totales por período antes de exponerlos al FE.
