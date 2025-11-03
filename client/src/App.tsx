@@ -132,6 +132,7 @@ function AppRoutes() {
                   
                   {/* Project Management */}
                   <ProtectedRoute path="/active-projects" component={ActiveProjectsNext} />
+                  <ProtectedRoute path="/active-projects-next" component={ActiveProjectsNext} />
                   <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
