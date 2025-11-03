@@ -680,7 +680,7 @@ export async function completeDataHandler(req: Request, res: Response) {
         // Search fact_rc_month for period with revenue > 0
         try {
           const { factRCMonth } = await import('../../shared/schema');
-          const { eq, and, gt, or } = await import('drizzle-orm');
+          const { eq, and, or, sql } = await import('drizzle-orm');
           
           const revenueRecords = await db.select({
             periodKey: factRCMonth.periodKey,
@@ -692,8 +692,8 @@ export async function completeDataHandler(req: Request, res: Response) {
             and(
               eq(factRCMonth.projectId, resolvedProjectId),
               or(
-                gt(factRCMonth.revenueUSD, 0),
-                gt(factRCMonth.revenueARS, 0)
+                sql`CAST(${factRCMonth.revenueUSD} AS NUMERIC) > 0`,
+                sql`CAST(${factRCMonth.revenueARS} AS NUMERIC) > 0`
               )
             )
           )
