@@ -93,6 +93,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTo
 import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 import { OneShotBanner } from '@/components/one-shot-banner';
 import { ProjectLifetimeMetrics } from '@/components/project-lifetime-metrics';
+import { DeltaBadge } from '@/components/ui/delta-badge';
 
 interface ProjectMetric {
   label: string;
@@ -2211,7 +2212,17 @@ const ProjectDetailsPage = () => {
                   <div className="grid grid-cols-2 gap-4">
                     {/* Markup Real */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Markup del Proyecto</div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-300">Markup del Proyecto</span>
+                        {unifiedData?.previousPeriod?.hasData && (
+                          <DeltaBadge
+                            currentValue={projectVM?.markup || 0}
+                            previousValue={unifiedData.previousPeriod.metrics?.markup || 0}
+                            format="multiplier"
+                            showValue={false}
+                          />
+                        )}
+                      </div>
                       <div className={`text-2xl font-bold ${(() => {
                         const markup = projectVM?.markup || 0;
                         return markup >= 3 ? "text-green-400" : markup >= 2.5 ? "text-blue-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
@@ -2226,7 +2237,23 @@ const ProjectDetailsPage = () => {
 
                     {/* ROI Indicator */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">ROI Performance</div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-300">ROI Performance</span>
+                        {unifiedData?.previousPeriod?.hasData && (() => {
+                          const currentMarkup = projectVM?.markup || 0;
+                          const previousMarkup = unifiedData.previousPeriod.metrics?.markup || 0;
+                          const currentROI = currentMarkup > 0 ? (currentMarkup - 1) * 100 : 0;
+                          const previousROI = previousMarkup > 0 ? (previousMarkup - 1) * 100 : 0;
+                          return (
+                            <DeltaBadge
+                              currentValue={currentROI}
+                              previousValue={previousROI}
+                              format="percentage"
+                              showValue={false}
+                            />
+                          );
+                        })()}
+                      </div>
                       <div className="text-2xl font-bold text-blue-400">
                         {(() => {
                           const markup = projectVM?.markup || 0;
@@ -2239,7 +2266,17 @@ const ProjectDetailsPage = () => {
 
                     {/* Team Performance */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Velocidad del Equipo</div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-300">Velocidad del Equipo</span>
+                        {unifiedData?.previousPeriod?.hasData && (
+                          <DeltaBadge
+                            currentValue={projectVM?.totalHours || 0}
+                            previousValue={unifiedData.previousPeriod.metrics?.totalHours || 0}
+                            format="hours"
+                            showValue={false}
+                          />
+                        )}
+                      </div>
                       <div className="text-2xl font-bold text-purple-400">
                         {Math.round((projectVM?.totalHours || 0) / 4)} h/sem
                       </div>
@@ -2248,7 +2285,25 @@ const ProjectDetailsPage = () => {
 
                     {/* Budget Status */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="text-sm text-slate-300 mb-1">Estado Presupuesto</div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-300">Estado Presupuesto</span>
+                        {unifiedData?.previousPeriod?.hasData && (() => {
+                          const currentBU = (projectVM?.budgetUtilization || 0) * 100;
+                          const previousCost = unifiedData.previousPeriod.metrics?.teamCostUSD || 0;
+                          const currentCost = projectVM?.costDisplay || projectVM?.teamCostUSD || 0;
+                          const cotizacion = (unifiedData as any)?.project?.cotizacion || 1;
+                          const previousBU = cotizacion > 0 ? (previousCost / cotizacion) * 100 : 0;
+                          return (
+                            <DeltaBadge
+                              currentValue={currentBU}
+                              previousValue={previousBU}
+                              format="percentage"
+                              showValue={false}
+                              reverse={true}
+                            />
+                          );
+                        })()}
+                      </div>
                       <div className={`text-2xl font-bold ${(() => {
                         const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
                         return budgetUtil > 85 ? "text-red-400" : budgetUtil > 60 ? "text-yellow-400" : "text-green-400";
