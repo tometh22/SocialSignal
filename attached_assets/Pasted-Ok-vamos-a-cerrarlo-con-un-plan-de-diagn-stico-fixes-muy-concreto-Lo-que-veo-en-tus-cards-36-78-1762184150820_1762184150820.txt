@@ -1,0 +1,102 @@
+Ok, vamos a cerrarlo con un plan de diagnóstico + fixes muy concreto. Lo que veo en tus cards (36.78K, 25.45K, 1364h, 4/4, ARS 460) huele a agregados “lifetime” o periodo mal aplicado y/o joins que duplican. Te dejo pasos quirúrgicos que podés pegar ya.
+0) Sanity-probe (2 señales en UI)
+Mientras debugueás, mostrale al costado de las cards:
+periodKey que está usando el backend (ej: 2025-03)
+etlBatchId y lastSuccessAt
+Si eso no cambia al mover el selector, el problema es filtro o cache.
+console.debug('SUMMARY_DEBUG', data?.summary?.periodKey, data?.summary?.dataFreshness);
+1) Forzá el filtro de período en backend (nada de “all”)
+// utils/period.ts
+export const periodKey = sql`to_char(date_trunc('month', now()), 'YYYY-MM')`;
+// O si viene del query:
+const pKey = inputPeriodKey; // '2025-03'
+
+// Siempre en WHERE:
+eq(factRcMonth.periodKey, pKey)
+eq(factLaborMonth.periodKey, pKey)
+Si timeFilter='all' cuela por algún lado, tus 1364h y el 4/4 no van a moverse nunca.
+2) Evitá duplicados: no mezcles hours + revenue en la misma query
+Hacé 3 queries separadas (rev, cost, hours). Ejemplo Drizzle:
+const [{ revUsd }] = await db
+  .select({ revUsd: sql<number>`coalesce(sum(${factRcMonth.revenueUsd}),0)`.mapWith(Number) })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, pKey)));
+
+const [{ costUsd }] = await db
+  .select({ costUsd: sql<number>`coalesce(sum(${factRcMonth.costUsd}),0)`.mapWith(Number) })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, pKey)));
+
+const [{ periodHours }] = await db
+  .select({ periodHours: sql<number>`coalesce(sum(${factLaborMonth.asanaHours}),0)`.mapWith(Number) })
+  .from(factLaborMonth)
+  .where(and(eq(factLaborMonth.orgId, orgId), eq(factLaborMonth.periodKey, pKey)));
+Si unías fact_rc_month con fact_labor_month, multiplicabas filas → montos y horas inflados.
+3) FX ponderado del período (no promedio simple)
+const [{ fxWeighted }] = await db
+  .select({
+    fxWeighted: sql<number>`
+      coalesce(
+        sum(${factRcMonth.revenueArs} + ${factRcMonth.costArs})
+        / nullif(sum(${factRcMonth.revenueUsd} + ${factRcMonth.costUsd}), 0),
+        0
+      )`.mapWith(Number),
+  })
+  .from(factRcMonth)
+  .where(and(eq(factRcMonth.orgId, orgId), eq(factRcMonth.periodKey, pKey)));
+Si todas las filas vienen ya en USD (sin ARS), devolvé el fx_rate medio del período como fallback.
+4) “Proyectos activos” por regla explícita en el mes
+const [{ active }] = await db.execute(sql<number>`
+  select count(distinct p.id)::int as active
+  from projects p
+  left join fact_labor_month fl on fl.project_id=p.id and fl.period_key=${pKey}
+  left join fact_rc_month fr    on fr.project_id=p.id and fr.period_key=${pKey}
+  where p.org_id=${orgId}
+    and (
+      p.status in ('ongoing','in_delivery')
+      or coalesce(fl.asana_hours,0) > 0
+      or coalesce(fr.revenue_usd,0) > 0
+      or coalesce(fr.cost_usd,0) > 0
+    )
+`);
+
+const [{ total }] = await db.execute(sql<number>`
+  select count(*)::int as total from projects where org_id=${orgId}
+`);
+5) Logs que te dicen la verdad (sin adivinar)
+Activalos en dev antes del query:
+db.$client.on('query', (q) => console.debug('[SQL]', q.sql, q.params));
+Esperá ver 3 SUM(...) WHERE period_key = 'YYYY-MM'.
+Si ves all o falta el WHERE, ya encontraste el bug.
+6) Verificación cruzada rápida con Sheets (tu Excel Maestro)
+En SQL (contra tu Star Schema):
+-- Facturación del período (USD) — hoja "Rendimiento del cliente"
+select sum(revenue_usd) 
+from fact_rc_month 
+where org_id = :org and period_key = '2025-03';
+
+-- Horas del período — hoja "Costos directos e indirectos"
+select sum(asana_hours)
+from fact_labor_month
+where org_id = :org and period_key = '2025-03';
+
+-- FX ponderado
+select
+  sum(revenue_ars + cost_ars) / nullif(sum(revenue_usd + cost_usd),0) as fx_weighted
+from fact_rc_month
+where org_id = :org and period_key = '2025-03';
+Los números de las cards deben matchear 1:1 con estos tres selects.
+7) Dos fallos comunes que dejan “todo igual”
+Cache en FE (React Query) sin queryKey que incluya periodKey → recicla respuesta vieja.
+Fix: ['summary', orgId, periodKey].
+Servidor no reinicia o tenés build viejo.
+Fix: restart limpio + log BUILD_ID al boot.
+Resumen accionable
+Añadí periodKey y dataFreshness visibles (temporal).
+Separa en 3 queries (rev/cost/hours) con WHERE period_key = pKey.
+FX ponderado.
+Activos por regla y con period_key.
+Logs SQL on.
+Verificá con 3 selects “a mano”.
+Asegurá queryKey en FE y restart real en BE.
+Con esto, si algo sigue “igual”, te va a quedar trazado en qué capa se está rompiendo (filtro, join, cache o ETL).
