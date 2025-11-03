@@ -79,7 +79,8 @@ import {
   incomeSot,
   costsSot,
   factLaborMonth,
-  factRCMonth
+  factRCMonth,
+  dimPeriod
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -743,16 +744,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .filter((m): m is number => m !== null && !isNaN(m));
           const avgMargin = margins.length > 0 ? margins.reduce((a, b) => a + b, 0) / margins.length : 0;
           
+          // ⏱️ Calcular horas del período desde fact_labor_month
+          const laborHoursResult = await db
+            .select({
+              totalHours: sql<number>`COALESCE(SUM(${factLaborMonth.asanaHours}::numeric), 0)`.mapWith(Number)
+            })
+            .from(factLaborMonth)
+            .where(eq(factLaborMonth.periodKey, periodQuery));
+          const periodWorkedHours = laborHoursResult[0]?.totalHours || 0;
+          
+          // 💱 Obtener FX rate desde fact_rc_month (promedio de todos los proyectos del período)
+          const fxRateResult = await db
+            .select({
+              avgFxRate: sql<number>`AVG(${factRCMonth.fxRate}::numeric)`.mapWith(Number)
+            })
+            .from(factRCMonth)
+            .where(eq(factRCMonth.periodKey, periodQuery));
+          const fxRate = fxRateResult[0]?.avgFxRate || null;
+          
           aggregatorResponse.summary = {
             periodRevenueUSD: totalRevenueUSD,
             periodCostUSD: totalCostUSD,
             periodProfitUSD: totalProfitUSD,
             periodAvgMarginPercent: avgMargin * 100,
             projectCount: financialData.length,
-            monthCount: 1
+            monthCount: 1,
+            periodWorkedHours: periodWorkedHours,
+            activeProjects: financialData.filter(p => (p.metrics.revenueUSDNormalized || 0) > 0 || (p.metrics.costUSDNormalized || 0) > 0).length,
+            totalProjects: financialData.length
           };
           
-          console.log(`📊 STAR SCHEMA SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Projects=${financialData.length}`);
+          // Añadir FX al response principal
+          if (fxRate) {
+            aggregatorResponse.period = {
+              ...aggregatorResponse.period,
+              fxRate: fxRate
+            };
+          }
+          
+          console.log(`📊 STAR SCHEMA SUMMARY: Revenue=${totalRevenueUSD.toFixed(2)} USD, Profit=${totalProfitUSD.toFixed(2)} USD, Hours=${periodWorkedHours.toFixed(1)}h, FX=${fxRate || 'N/A'}, Projects=${financialData.length}`);
         }
       }
       
