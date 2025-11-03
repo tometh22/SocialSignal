@@ -112,6 +112,7 @@ async function resolveProjectKey(projectKey: string): Promise<number | null> {
 }
 
 export async function completeDataHandler(req: Request, res: Response) {
+  console.log('🚨🚨🚨 COMPLETE-DATA HANDLER CALLED', { params: req.params, query: req.query });
   try {
     const projectId = String(req.params.id ?? req.query.projectId ?? '');
     const timeFilterQuery = String(req.query.timeFilter ?? '');
