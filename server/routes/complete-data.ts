@@ -13,6 +13,44 @@ import { storage } from '../storage';
 
 
 /**
+ * Helper: Calculate previous period from YYYY-MM format
+ * Returns null for 'all' (lifetime mode) or invalid formats
+ */
+function getPreviousPeriod(currentPeriod: string): string | null {
+  // Skip calculation for lifetime mode
+  if (currentPeriod === 'all') {
+    return null;
+  }
+  
+  // Validate YYYY-MM format
+  const periodRegex = /^(\d{4})-(\d{2})$/;
+  const match = currentPeriod.match(periodRegex);
+  
+  if (!match) {
+    console.warn(`⚠️ PREVIOUS-PERIOD: Invalid period format "${currentPeriod}", expected YYYY-MM`);
+    return null;
+  }
+  
+  const year = parseInt(match[1]);
+  const month = parseInt(match[2]);
+  
+  // Calculate previous month with year rollback
+  let prevYear = year;
+  let prevMonth = month - 1;
+  
+  if (prevMonth === 0) {
+    prevMonth = 12;
+    prevYear = year - 1;
+  }
+  
+  // Format as YYYY-MM with leading zero
+  const prevPeriod = `${prevYear}-${prevMonth.toString().padStart(2, '0')}`;
+  
+  console.log(`📅 PREVIOUS-PERIOD: ${currentPeriod} → ${prevPeriod}`);
+  return prevPeriod;
+}
+
+/**
  * Helper: Resolve projectKey to activeProject ID
  * ProjectKey format: "clientname|projectname" (canonicalized)
  */
@@ -674,6 +712,56 @@ export async function completeDataHandler(req: Request, res: Response) {
       }
     }
     
+    // 🔄 PERIOD COMPARISON: Calculate previous period metrics if applicable
+    let previousPeriodData: any = null;
+    const previousPeriod = getPreviousPeriod(period);
+    
+    if (previousPeriod && !lifetimeMode) {
+      console.log(`📊 DELTA: Fetching previous period ${previousPeriod} for comparison`);
+      
+      try {
+        // Call computeProjectPeriodMetrics for previous period
+        const prevPM = await computeProjectPeriodMetrics(
+          projectData.id, 
+          previousPeriod, 
+          basis === 'EXEC' ? 'EXEC' : 'ECON'
+        );
+        
+        // Extract key metrics for comparison
+        const prevRevenueUSD = prevPM.summary?.revenueUSD ?? 0;
+        const prevTeamCostUSD = prevPM.summary?.teamCostUSD ?? 0;
+        const prevTotalHours = prevPM.summary?.totalHours ?? 0;
+        const prevEfficiencyPct = prevPM.summary?.efficiencyPct ?? 0;
+        const prevTeamMembers = (prevPM.teamBreakdown ?? []).filter(p => (p.actualHours ?? 0) > 0).length;
+        
+        const prevMarkup = prevTeamCostUSD > 0 ? prevRevenueUSD / prevTeamCostUSD : 0;
+        const prevMargin = prevRevenueUSD > 0 ? (prevRevenueUSD - prevTeamCostUSD) / prevRevenueUSD : 0;
+        
+        previousPeriodData = {
+          period: previousPeriod,
+          hasData: prevTotalHours > 0 || prevRevenueUSD > 0 || prevTeamCostUSD > 0,
+          metrics: {
+            revenueUSD: prevRevenueUSD,
+            teamCostUSD: prevTeamCostUSD,
+            totalHours: prevTotalHours,
+            efficiencyPct: prevEfficiencyPct,
+            teamMembers: prevTeamMembers,
+            markup: prevMarkup,
+            margin: prevMargin
+          }
+        };
+        
+        console.log(`✅ DELTA: Previous period ${previousPeriod} - Revenue: $${prevRevenueUSD}, Cost: $${prevTeamCostUSD}, Hours: ${prevTotalHours}h, Members: ${prevTeamMembers}`);
+      } catch (error) {
+        console.warn(`⚠️ DELTA: Could not fetch previous period ${previousPeriod}:`, error);
+        previousPeriodData = {
+          period: previousPeriod,
+          hasData: false,
+          metrics: null
+        };
+      }
+    }
+
     const response = {
       // 🎯 3-VIEW SYSTEM: Include view field for frontend
       view: view, // CRITICAL: Frontend needs to know which view is being used
@@ -724,11 +812,14 @@ export async function completeDataHandler(req: Request, res: Response) {
       estimatedHours: legacy.estimatedHours,
       workedHours: legacy.workedHours,
       totalCost: legacy.totalCost,
-      totalRealRevenue: summary.revenueUSD
+      totalRealRevenue: summary.revenueUSD,
+      // 🔄 NEW: Previous period data for delta calculations
+      previousPeriod: previousPeriodData
     };
     
     console.log(`🔍 FINAL RESPONSE MARKUP: ${response.metrics.markup}`);
     console.log(`🔍 RESPONSE includes project: ${!!response.project}, quotation: ${!!response.quotation}`);
+    console.log(`🔄 DELTA: Previous period included: ${!!previousPeriodData?.hasData}`);
     return res.json(response);
   } catch (e: any) {
     console.error('❌ COMPLETE-DATA ERROR:', e.message);

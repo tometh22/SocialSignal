@@ -233,6 +233,21 @@ interface CompleteProjectData {
     projectId?: number;
     personnelId?: number;
   }>;
+  
+  // 🔄 NUEVO: Previous period data for delta calculations
+  previousPeriod?: {
+    period: string; // YYYY-MM format
+    hasData: boolean; // Whether previous period has any data
+    metrics: {
+      revenueUSD: number;
+      teamCostUSD: number;
+      totalHours: number;
+      efficiencyPct: number;
+      teamMembers: number;
+      markup: number;
+      margin: number;
+    } | null;
+  };
 }
 
 export const useCompleteProjectData = (
