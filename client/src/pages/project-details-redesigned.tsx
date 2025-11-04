@@ -2367,60 +2367,67 @@ const ProjectDetailsPage = () => {
                           style={{ width: `${Math.min(100, (projectVM?.budgetUtilization || 0) * 100)}%` }}
                         ></div>
                       </div>
-                      <div className="text-xs text-slate-400 flex items-center gap-2">
-                        {(() => {
-                          // 🎯 USAR PROJECT VM: Fuente única de verdad
-                          if (projectVM) {
-                            const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
-                            const marginPercent = projectVM.margin != null ? projectVM.margin.toFixed(1) : '0.0';
-                            return (
-                              <div className="flex items-center gap-2">
-                                <span>Costo: {costStr}</span>
-                                {unifiedData?.previousPeriod?.hasData && (
-                                  <DeltaBadge
-                                    currentValue={projectVM.costDisplay || 0}
-                                    previousValue={unifiedData.previousPeriod.metrics?.teamCostUSD || 0}
-                                    format="currency"
-                                    showValue={false}
-                                    reverse={true}
-                                  />
-                                )}
-                                <span>• Margen: {marginPercent}%</span>
-                              </div>
-                            );
-                          }
-                          return 'Costo: $0 • Margen: 0%';
-                        })()}
+                      <div className="space-y-1">
+                        <div className="text-xs text-slate-400">
+                          {(() => {
+                            // 🎯 USAR PROJECT VM: Fuente única de verdad
+                            if (projectVM) {
+                              const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
+                              const marginPercent = projectVM.margin != null ? projectVM.margin.toFixed(1) : '0.0';
+                              return `Costo: ${costStr} • Margen: ${marginPercent}%`;
+                            }
+                            return 'Costo: $0 • Margen: 0%';
+                          })()}
+                        </div>
+                        {unifiedData?.previousPeriod?.hasData && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-slate-500">vs mes anterior:</span>
+                            <DeltaBadge
+                              currentValue={projectVM?.costDisplay || 0}
+                              previousValue={unifiedData.previousPeriod.metrics?.teamCostUSD || 0}
+                              format="currency"
+                              showValue={false}
+                              reverse={true}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Key Metrics Grid */}
+                    {/* Key Metrics Grid - Redesigned */}
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center">
+                      {/* Multiplicador */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-1">Multiplicador</div>
                         <div className="text-lg font-bold text-blue-400">
                           {(projectVM?.markup || 0).toFixed(1)}x
                         </div>
-                        <div className="text-xs text-slate-400">Multiplicador</div>
                       </div>
-                      <div className="text-center">
-                        <div className="text-lg font-bold text-purple-400 flex items-center justify-center gap-1">
-                          <span>{(projectVM?.totalHours || 0)}h</span>
-                          {unifiedData?.previousPeriod?.hasData && (
+                      
+                      {/* Total Trabajado */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-1">Total Trabajado</div>
+                        <div className="text-lg font-bold text-purple-400">
+                          {(projectVM?.totalHours || 0).toFixed(1)}h
+                        </div>
+                        {unifiedData?.previousPeriod?.hasData && (
+                          <div className="mt-1">
                             <DeltaBadge
                               currentValue={projectVM?.totalHours || 0}
                               previousValue={unifiedData.previousPeriod.metrics?.totalHours || 0}
                               format="hours"
                               showValue={false}
                             />
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-400">Total Trabajado</div>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-center">
+                      
+                      {/* Presupuesto Usado */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-1">Presupuesto Usado</div>
                         <div className="text-lg font-bold text-cyan-400">
                           {((projectVM?.budgetUtilization || 0) * 100).toFixed(0)}%
                         </div>
-                        <div className="text-xs text-slate-400">Presupuesto Usado</div>
                       </div>
                     </div>
                   </div>
