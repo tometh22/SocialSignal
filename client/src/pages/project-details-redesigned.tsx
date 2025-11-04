@@ -2367,13 +2367,27 @@ const ProjectDetailsPage = () => {
                           style={{ width: `${Math.min(100, (projectVM?.budgetUtilization || 0) * 100)}%` }}
                         ></div>
                       </div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-slate-400 flex items-center gap-2">
                         {(() => {
                           // 🎯 USAR PROJECT VM: Fuente única de verdad
                           if (projectVM) {
                             const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
                             const marginPercent = projectVM.margin != null ? projectVM.margin.toFixed(1) : '0.0';
-                            return `Costo: ${costStr} • Margen: ${marginPercent}%`;
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span>Costo: {costStr}</span>
+                                {unifiedData?.previousPeriod?.hasData && (
+                                  <DeltaBadge
+                                    currentValue={projectVM.costDisplay || 0}
+                                    previousValue={unifiedData.previousPeriod.metrics?.teamCostUSD || 0}
+                                    format="currency"
+                                    showValue={false}
+                                    reverse={true}
+                                  />
+                                )}
+                                <span>• Margen: {marginPercent}%</span>
+                              </div>
+                            );
                           }
                           return 'Costo: $0 • Margen: 0%';
                         })()}
@@ -2389,8 +2403,16 @@ const ProjectDetailsPage = () => {
                         <div className="text-xs text-slate-400">Multiplicador</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-bold text-purple-400">
-                          {(projectVM?.totalHours || 0)}h
+                        <div className="text-lg font-bold text-purple-400 flex items-center justify-center gap-1">
+                          <span>{(projectVM?.totalHours || 0)}h</span>
+                          {unifiedData?.previousPeriod?.hasData && (
+                            <DeltaBadge
+                              currentValue={projectVM?.totalHours || 0}
+                              previousValue={unifiedData.previousPeriod.metrics?.totalHours || 0}
+                              format="hours"
+                              showValue={false}
+                            />
+                          )}
                         </div>
                         <div className="text-xs text-slate-400">Total Trabajado</div>
                       </div>
