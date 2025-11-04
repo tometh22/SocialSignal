@@ -261,7 +261,7 @@ export const useCompleteProjectData = (
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const query = useQuery<CompleteProjectData>({
-    queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa'],
+    queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa', Date.now()],
     queryFn: async () => {
       // 🛡️ Abortar fetch anterior si existe
       if (abortControllerRef.current) {
