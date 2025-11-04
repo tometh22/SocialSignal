@@ -717,6 +717,13 @@ export async function completeDataHandler(req: Request, res: Response) {
     let previousPeriodData: any = null;
     const previousPeriod = getPreviousPeriod(period);
     
+    console.log('🔧 PREVIOUS PERIOD GATE:', { 
+      period, 
+      previousPeriod, 
+      lifetimeMode, 
+      willExecute: previousPeriod && !lifetimeMode 
+    });
+    
     if (previousPeriod && !lifetimeMode) {
       console.log(`📊 DELTA: Fetching previous period ${previousPeriod} for comparison`);
       
