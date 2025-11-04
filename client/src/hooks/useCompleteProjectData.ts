@@ -261,7 +261,8 @@ export const useCompleteProjectData = (
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const query = useQuery<CompleteProjectData>({
-    queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa', Date.now()],
+    queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa'],
+    staleTime: 0, // 🔧 TEMPORARY: Force fresh data on every mount for previousPeriod debugging
     queryFn: async () => {
       // 🛡️ Abortar fetch anterior si existe
       if (abortControllerRef.current) {
@@ -350,7 +351,6 @@ export const useCompleteProjectData = (
       return true;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 60 * 1000, // 60 seconds - reasonable freshness for project data
     gcTime: 5 * 60 * 1000, // 5 minute cache - better performance
     refetchOnWindowFocus: false, // Disable refetch on window focus
     refetchInterval: false, // Disable automatic polling
