@@ -369,6 +369,65 @@ export async function completeDataHandler(req: Request, res: Response) {
           console.log(`⚠️ COST MISMATCH (aggregator): Detail labor=${detailedLaborCost.toFixed(2)}, RC=${rcCost.toFixed(2)}, diff=${(laborMismatchPct*100).toFixed(1)}%`);
         }
         
+        // 🔄 PERIOD COMPARISON: Calculate previous period metrics for view-aggregator path
+        let previousPeriodData: any = null;
+        const previousPeriod = getPreviousPeriod(period);
+        
+        console.log('🔧 PREVIOUS PERIOD GATE (VIEW-AGGREGATOR):', { 
+          period, 
+          previousPeriod, 
+          lifetimeMode, 
+          willExecute: previousPeriod && !lifetimeMode 
+        });
+        
+        if (previousPeriod && !lifetimeMode) {
+          console.log(`📊 DELTA (VIEW-AGGREGATOR): Fetching previous period ${previousPeriod} for comparison`);
+          
+          try {
+            // Get previous period data from view-aggregator
+            const prevViewData = await getProjectPeriodView(resolvedProjectId, previousPeriod, view);
+            
+            if (prevViewData) {
+              const prevRevenueUSD = prevViewData.revenueDisplay || 0;
+              const prevTeamCostUSD = prevViewData.costDisplay || 0;
+              const prevTotalHours = prevViewData.totalWorkedHours || 0;
+              const prevTeamMembers = prevViewData.teamBreakdown?.filter((m: any) => (m.hoursAsana || 0) > 0).length || 0;
+              const prevMarkup = prevViewData.markup || 0;
+              const prevMargin = prevViewData.margin || 0;
+              
+              previousPeriodData = {
+                period: previousPeriod,
+                hasData: prevTotalHours > 0 || prevRevenueUSD > 0 || prevTeamCostUSD > 0,
+                metrics: {
+                  revenueUSD: prevRevenueUSD,
+                  teamCostUSD: prevTeamCostUSD,
+                  totalHours: prevTotalHours,
+                  efficiencyPct: 0,
+                  teamMembers: prevTeamMembers,
+                  markup: prevMarkup,
+                  margin: prevMargin
+                }
+              };
+              
+              console.log(`✅ DELTA (VIEW-AGGREGATOR): Previous period ${previousPeriod} - Revenue: $${prevRevenueUSD}, Cost: $${prevTeamCostUSD}, Hours: ${prevTotalHours}h, Members: ${prevTeamMembers}`);
+            } else {
+              console.warn(`⚠️ DELTA (VIEW-AGGREGATOR): No data found for previous period ${previousPeriod}`);
+              previousPeriodData = {
+                period: previousPeriod,
+                hasData: false,
+                metrics: null
+              };
+            }
+          } catch (error) {
+            console.warn(`⚠️ DELTA (VIEW-AGGREGATOR): Could not fetch previous period ${previousPeriod}:`, error);
+            previousPeriodData = {
+              period: previousPeriod,
+              hasData: false,
+              metrics: null
+            };
+          }
+        }
+        
         // Return view-based response with consistent structure
         return res.json({
           view: view, // CRITICAL: Include view field for frontend
@@ -422,7 +481,9 @@ export async function completeDataHandler(req: Request, res: Response) {
           estimatedHours: viewData.estimatedHours,
           workedHours: viewData.totalWorkedHours,
           totalCost: viewData.costDisplay,
-          totalRealRevenue: viewData.revenueDisplay
+          totalRealRevenue: viewData.revenueDisplay,
+          // 🔄 NEW: Previous period data for delta calculations
+          previousPeriod: previousPeriodData
         });
       } else {
         console.warn(`⚠️ VIEW-AGGREGATOR: No data in project_aggregates for ${view} view (project ${resolvedProjectId}, period ${period}), falling back to legacy mode`);
