@@ -272,10 +272,11 @@ export const useCompleteProjectData = (
       const controller = new AbortController();
       abortControllerRef.current = controller;
       
-      // 🎯 Build URL with view parameter
+      // 🎯 Build URL with view parameter + CACHE BUSTING
+      const cacheBuster = `_t=${Date.now()}`; // Force fresh request every time
       const baseUrl = period && /^\d{4}-\d{2}$/.test(period)
-        ? `/api/projects/${projectId}/complete-data?period=${period}&basis=usd`
-        : `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}`;
+        ? `/api/projects/${projectId}/complete-data?period=${period}&basis=usd&${cacheBuster}`
+        : `/api/projects/${projectId}/complete-data?timeFilter=${timeFilter}&${cacheBuster}`;
       
       const url = view ? `${baseUrl}&view=${view}` : baseUrl;
       console.log('🔍 HOOK: Fetching complete project data for:', { projectId, timeFilter, period, view, url });
@@ -290,7 +291,10 @@ export const useCompleteProjectData = (
           signal: controller.signal,
           credentials: "include",
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
           }
         });
         
