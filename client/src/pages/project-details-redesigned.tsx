@@ -2370,7 +2370,7 @@ const ProjectDetailsPage = () => {
                     </div>
 
                     {/* Key Metrics Grid - All Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {/* Costos */}
                       <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
                         <div className="text-xs text-slate-400 mb-1">Costos</div>
@@ -2400,14 +2400,6 @@ const ProjectDetailsPage = () => {
                         <div className="text-xs text-slate-400 mb-1">Margen</div>
                         <div className="text-lg font-bold text-emerald-400">
                           {((projectVM?.margin || 0) * 100).toFixed(1)}%
-                        </div>
-                      </div>
-                      
-                      {/* Multiplicador */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 mb-1">Multiplicador</div>
-                        <div className="text-lg font-bold text-blue-400">
-                          {(projectVM?.markup || 0).toFixed(1)}x
                         </div>
                       </div>
                       
