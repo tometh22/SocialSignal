@@ -1119,7 +1119,7 @@ const ProjectDetailsPage = () => {
     : (periodFromFilter || periodFromUrl || undefined);
   
   const { data: unifiedData, isLoading: dataLoading, error: dataError } = useCompleteProjectData(
-    projectId ? parseInt(projectId) : 0, 
+    projectId ? parseInt(projectId, 10) : NaN, 
     timeFilterForHook,
     finalPeriod, // 🎯 Use URL period or calculated period from filter
     selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)

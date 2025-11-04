@@ -356,7 +356,7 @@ export const useCompleteProjectData = (
         throw error;
       }
     },
-    enabled: !!projectId,
+    enabled: Number.isFinite(projectId) && projectId > 0,
     retry: (failureCount, error: any) => {
       // No retry for client errors (4xx) or if already tried 2 times
       if (failureCount >= 2) return false;
