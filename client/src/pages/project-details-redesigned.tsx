@@ -2346,7 +2346,7 @@ const ProjectDetailsPage = () => {
                   </h3>
                   
                   <div className="space-y-4">
-                    {/* Revenue & Cost Breakdown */}
+                    {/* Revenue Bar */}
                     <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-slate-300">Ingresos Generados</span>
@@ -2361,27 +2361,29 @@ const ProjectDetailsPage = () => {
                           })()}
                         </span>
                       </div>
-                      <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
+                      <div className="w-full bg-slate-700 rounded-full h-2">
                         <div 
                           className="bg-green-500 h-2 rounded-full" 
                           style={{ width: `${Math.min(100, (projectVM?.budgetUtilization || 0) * 100)}%` }}
                         ></div>
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-slate-400">
+                    </div>
+
+                    {/* Key Metrics Grid - All Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                      {/* Costos */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-1">Costos</div>
+                        <div className="text-lg font-bold text-orange-400">
                           {(() => {
-                            // 🎯 USAR PROJECT VM: Fuente única de verdad
                             if (projectVM) {
-                              const costStr = formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
-                              const marginPercent = projectVM.margin != null ? projectVM.margin.toFixed(1) : '0.0';
-                              return `Costo: ${costStr} • Margen: ${marginPercent}%`;
+                              return formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
                             }
-                            return 'Costo: $0 • Margen: 0%';
+                            return '$0';
                           })()}
                         </div>
                         {unifiedData?.previousPeriod?.hasData && (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-500">vs mes anterior:</span>
+                          <div className="mt-1">
                             <DeltaBadge
                               currentValue={projectVM?.costDisplay || 0}
                               previousValue={unifiedData.previousPeriod.metrics?.teamCostUSD || 0}
@@ -2392,10 +2394,15 @@ const ProjectDetailsPage = () => {
                           </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Key Metrics Grid - Redesigned */}
-                    <div className="grid grid-cols-3 gap-3">
+                      {/* Margen */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                        <div className="text-xs text-slate-400 mb-1">Margen</div>
+                        <div className="text-lg font-bold text-emerald-400">
+                          {((projectVM?.margin || 0) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                      
                       {/* Multiplicador */}
                       <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
                         <div className="text-xs text-slate-400 mb-1">Multiplicador</div>
