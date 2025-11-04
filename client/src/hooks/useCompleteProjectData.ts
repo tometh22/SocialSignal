@@ -313,6 +313,14 @@ export const useCompleteProjectData = (
         
         const data = await response.json();
         
+        // 🚨 DEBUG: Check for previousPeriod in response
+        console.log('🔍 PREVIOUS PERIOD DEBUG:', {
+          hasPreviousPeriod: !!data.previousPeriod,
+          previousPeriod: data.previousPeriod,
+          previousHasData: data.previousPeriod?.hasData,
+          previousMetrics: data.previousPeriod?.metrics
+        });
+        
         // 🛡️ MERGE FUNCIONAL: Preservar summary si el nuevo fetch no lo trae
         // Guard defensivo para evitar spread sobre undefined/null
         const mergedData = {

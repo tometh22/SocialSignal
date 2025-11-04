@@ -1124,6 +1124,16 @@ const ProjectDetailsPage = () => {
     finalPeriod, // 🎯 Use URL period or calculated period from filter
     selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)
   );
+  
+  // 🔧 FORCE REFETCH: Invalidate cache when period or view changes to get fresh previousPeriod data
+  useEffect(() => {
+    if (projectId && finalPeriod) {
+      console.log('🔧 INVALIDATING CACHE for period:', finalPeriod, 'view:', selectedView);
+      queryClient.invalidateQueries({
+        queryKey: ['projects', parseInt(projectId), 'complete-data', finalPeriod, selectedView || 'operativa']
+      });
+    }
+  }, [projectId, finalPeriod, selectedView, queryClient]);
 
   // 📊 Datos de tendencias mensuales para sparklines y gráficos
   const { data: monthlyTrends } = useQuery({
@@ -2198,6 +2208,14 @@ const ProjectDetailsPage = () => {
 
             {/* EXECUTIVE DASHBOARD HEADER */}
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white">
+              {console.log('🔍 DELTA DEBUG:', {
+                hasPreviousPeriod: !!unifiedData?.previousPeriod,
+                hasData: unifiedData?.previousPeriod?.hasData,
+                previousPeriod: unifiedData?.previousPeriod,
+                currentMarkup: projectVM?.markup,
+                currentCost: projectVM?.costDisplay,
+                currentHours: projectVM?.totalHours
+              })}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
                 {/* Project KPI Overview */}
