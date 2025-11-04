@@ -263,6 +263,8 @@ export const useCompleteProjectData = (
   const query = useQuery<CompleteProjectData>({
     queryKey: ['projects', projectId, 'complete-data', period || timeFilter, view || 'operativa'],
     staleTime: 0, // 🔧 TEMPORARY: Force fresh data on every mount for previousPeriod debugging
+    refetchOnMount: 'always', // 🔧 CRITICAL: Always refetch on mount to bypass React Query cache
+    refetchOnWindowFocus: false, // Prevent excessive refetching
     queryFn: async () => {
       // 🛡️ Abortar fetch anterior si existe
       if (abortControllerRef.current) {
