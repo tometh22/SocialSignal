@@ -153,6 +153,30 @@ export function parseTimeLegacyOrNew(q: any): { period: string; range: "month" |
     return { period: `${y}-${m}`, range: "month" };
   }
   
+  // Handle current_quarter - returns current month within the current quarter
+  // For Q4 2025 (Oct-Nov-Dec), if we're in Nov, return 2025-11
+  if (tf === "current_quarter" || tf === "this-quarter" || tf === "este_trimestre") {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const y = d.getFullYear();
+    console.log(`📅 QUARTER FILTER: current_quarter → ${y}-${m} (current month within quarter)`);
+    return { period: `${y}-${m}`, range: "quarter" };
+  }
+  
+  // Handle last_quarter - returns last month of the previous quarter
+  if (tf === "last_quarter" || tf === "last-quarter" || tf === "trimestre_pasado") {
+    const d = new Date();
+    const currentMonth = d.getMonth(); // 0-11
+    const currentQuarter = Math.floor(currentMonth / 3); // 0=Q1, 1=Q2, 2=Q3, 3=Q4
+    const prevQuarter = currentQuarter - 1 < 0 ? 3 : currentQuarter - 1;
+    const prevQuarterYear = currentQuarter - 1 < 0 ? d.getFullYear() - 1 : d.getFullYear();
+    // Last month of previous quarter: Q1=Mar(3), Q2=Jun(6), Q3=Sep(9), Q4=Dec(12)
+    const lastMonthOfPrevQuarter = (prevQuarter + 1) * 3;
+    const period = `${prevQuarterYear}-${String(lastMonthOfPrevQuarter).padStart(2, "0")}`;
+    console.log(`📅 QUARTER FILTER: last_quarter → ${period}`);
+    return { period, range: "quarter" };
+  }
+  
   if (/^[a-z]+_\d{4}$/i.test(tf)) {
     const [name, year] = tf.split("_");
     const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
