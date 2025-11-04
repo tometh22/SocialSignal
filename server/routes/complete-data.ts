@@ -180,10 +180,14 @@ export async function completeDataHandler(req: Request, res: Response) {
           `${year}-${String(firstMonthOfQuarter + 2).padStart(2, '0')}`
         ];
         aggregateMode = true;
-        console.log(`📅 COMPLETE-DATA QUARTER MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → Q${quarterNumber + 1} periods=${periods.join(', ')}, view=${view}, basis=${basis}`);
+        console.log(`🔥🔥🔥 QUARTER MODE ACTIVATED 🔥🔥🔥`);
+        console.log(`📅 Project ${projectId}, timeFilter=${timeFilterQuery}`);
+        console.log(`📅 Current month: ${currentMonth}, Quarter: Q${quarterNumber + 1}`);
+        console.log(`📅 Will sum these 3 months: ${periods[0]}, ${periods[1]}, ${periods[2]}`);
+        console.log(`📅 View=${view}, Basis=${basis}`);
       } else {
         periods = [period];
-        console.log(`📅 COMPLETE-DATA LEGACY MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
+        console.log(`📅 SINGLE PERIOD MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, view=${view}, basis=${basis}`);
       }
     } else {
       return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
@@ -385,15 +389,20 @@ export async function completeDataHandler(req: Request, res: Response) {
       let viewData: any = null;
       
       if (aggregateMode && periods.length > 1) {
-        console.log(`📊 AGGREGATE MODE: Summing ${periods.length} periods: ${periods.join(', ')}`);
+        console.log(`🔥🔥🔥 AGGREGATE MODE ACTIVATED 🔥🔥🔥`);
+        console.log(`📊 Fetching data for ${periods.length} periods: ${periods.join(', ')}`);
         
         // Fetch data for each period
         const periodDataArray = await Promise.all(
           periods.map(p => getProjectPeriodView(resolvedProjectId, p, view))
         );
         
+        console.log(`📊 Fetched ${periodDataArray.length} period results`);
+        
         // Filter out null results
         const validPeriodData = periodDataArray.filter(d => d !== null);
+        
+        console.log(`📊 Valid period data count: ${validPeriodData.length}`);
         
         if (validPeriodData.length > 0) {
           // Aggregate the data
