@@ -139,8 +139,11 @@ export async function completeDataHandler(req: Request, res: Response) {
     
     // 🎯 SoT INTEGRATION: Parse both period=YYYY-MM and legacy timeFilter
     let period: string;
+    let range: "month" | "quarter" | "year" = "month";
+    let periods: string[] = []; // Array of periods to aggregate (for quarters, etc)
     let usingSoT = false;
     let lifetimeMode = false;
+    let aggregateMode = false; // Multi-period aggregation (quarter, semester, etc)
     
     // 🎯 ONE-SHOT LIFETIME: Detect "all periods" request
     if (timeFilterQuery === 'all' || periodQuery === 'all') {
@@ -150,13 +153,38 @@ export async function completeDataHandler(req: Request, res: Response) {
     } else if (periodQuery && /^\d{4}-\d{2}$/.test(periodQuery)) {
       // NEW FORMAT: period=YYYY-MM
       period = periodQuery;
+      periods = [period];
       usingSoT = true;
       console.log(`🎯 COMPLETE-DATA SoT MODE: Project ${projectId}, period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
     } else if (timeFilterQuery) {
       // LEGACY FORMAT: timeFilter=august_2025
       const parsed = parseTimeLegacyOrNew({ timeFilter: timeFilterQuery });
       period = parsed.period;
-      console.log(`📅 COMPLETE-DATA LEGACY MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
+      range = parsed.range;
+      
+      // Calculate periods array based on range
+      if (range === "quarter") {
+        // Calculate the 3 months of the quarter based on current month
+        const [yearStr, monthStr] = period.split('-');
+        const year = parseInt(yearStr);
+        const currentMonth = parseInt(monthStr); // 1-12
+        
+        // Determine which quarter the current month belongs to
+        // Q1: Jan-Mar (1-3), Q2: Apr-Jun (4-6), Q3: Jul-Sep (7-9), Q4: Oct-Dec (10-12)
+        const quarterNumber = Math.floor((currentMonth - 1) / 3); // 0=Q1, 1=Q2, 2=Q3, 3=Q4
+        const firstMonthOfQuarter = quarterNumber * 3 + 1; // Q1=1, Q2=4, Q3=7, Q4=10
+        
+        periods = [
+          `${year}-${String(firstMonthOfQuarter).padStart(2, '0')}`,
+          `${year}-${String(firstMonthOfQuarter + 1).padStart(2, '0')}`,
+          `${year}-${String(firstMonthOfQuarter + 2).padStart(2, '0')}`
+        ];
+        aggregateMode = true;
+        console.log(`📅 COMPLETE-DATA QUARTER MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → Q${quarterNumber + 1} periods=${periods.join(', ')}, view=${view}, basis=${basis}`);
+      } else {
+        periods = [period];
+        console.log(`📅 COMPLETE-DATA LEGACY MODE: Project ${projectId}, timeFilter=${timeFilterQuery} → period=${period}, view=${view}, basis=${basis} (${basisNormalized})`);
+      }
     } else {
       return res.status(400).json({ error: 'Either period (YYYY-MM) or timeFilter is required' });
     }
@@ -352,10 +380,80 @@ export async function completeDataHandler(req: Request, res: Response) {
     // 🎯 NEW: 3-VIEW SYSTEM - ALWAYS try to use view-aggregator for ALL views (including operativa)
     try {
       const { getProjectPeriodView } = await import('../domain/view-aggregator');
-      const viewData = await getProjectPeriodView(resolvedProjectId, period, view);
+      
+      // 🔄 AGGREGATE MODE: Sum data from multiple periods (for quarters, semesters, etc)
+      let viewData: any = null;
+      
+      if (aggregateMode && periods.length > 1) {
+        console.log(`📊 AGGREGATE MODE: Summing ${periods.length} periods: ${periods.join(', ')}`);
+        
+        // Fetch data for each period
+        const periodDataArray = await Promise.all(
+          periods.map(p => getProjectPeriodView(resolvedProjectId, p, view))
+        );
+        
+        // Filter out null results
+        const validPeriodData = periodDataArray.filter(d => d !== null);
+        
+        if (validPeriodData.length > 0) {
+          // Aggregate the data
+          const aggregated: any = {
+            costDisplay: validPeriodData.reduce((sum, d) => sum + (d.costDisplay || 0), 0),
+            revenueDisplay: validPeriodData.reduce((sum, d) => sum + (d.revenueDisplay || 0), 0),
+            totalWorkedHours: validPeriodData.reduce((sum, d) => sum + (d.totalWorkedHours || 0), 0),
+            totalAsanaHours: validPeriodData.reduce((sum, d) => sum + (d.totalAsanaHours || 0), 0),
+            totalBillingHours: validPeriodData.reduce((sum, d) => sum + (d.totalBillingHours || 0), 0),
+            currencyNative: validPeriodData[0].currencyNative,
+            flags: validPeriodData[0].flags || [],
+            markup: 0,
+            margin: 0,
+            // Aggregate team breakdown by person
+            teamBreakdown: (() => {
+              const teamMap = new Map();
+              validPeriodData.forEach(d => {
+                (d.teamBreakdown || []).forEach((member: any) => {
+                  const key = member.personnelId || member.name;
+                  if (teamMap.has(key)) {
+                    const existing = teamMap.get(key);
+                    existing.targetHours += member.targetHours || 0;
+                    existing.hoursAsana += member.hoursAsana || 0;
+                    existing.hoursBilling += member.hoursBilling || 0;
+                    existing.costARS += member.costARS || 0;
+                    existing.costUSD += member.costUSD || 0;
+                  } else {
+                    teamMap.set(key, {
+                      ...member,
+                      targetHours: member.targetHours || 0,
+                      hoursAsana: member.hoursAsana || 0,
+                      hoursBilling: member.hoursBilling || 0,
+                      costARS: member.costARS || 0,
+                      costUSD: member.costUSD || 0
+                    });
+                  }
+                });
+              });
+              return Array.from(teamMap.values());
+            })()
+          };
+          
+          // Calculate aggregate metrics
+          const totalCost = aggregated.costDisplay;
+          const totalRevenue = aggregated.revenueDisplay;
+          aggregated.markup = totalCost > 0 ? totalRevenue / totalCost : 0;
+          aggregated.margin = totalRevenue > 0 ? (totalRevenue - totalCost) / totalRevenue : 0;
+          
+          viewData = aggregated;
+          console.log(`✅ AGGREGATE MODE: Summed ${validPeriodData.length} periods - Revenue: ${totalRevenue}, Cost: ${totalCost}, Hours: ${aggregated.totalWorkedHours}`);
+        } else {
+          console.warn(`⚠️ AGGREGATE MODE: No valid data found for periods ${periods.join(', ')}`);
+        }
+      } else {
+        // Single period mode
+        viewData = await getProjectPeriodView(resolvedProjectId, period, view);
+      }
       
       if (viewData) {
-        console.log(`🎨 VIEW-AGGREGATOR: Using ${view} view for project ${resolvedProjectId}, period ${period}`);
+        console.log(`🎨 VIEW-AGGREGATOR: Using ${view} view for project ${resolvedProjectId}, period(s) ${aggregateMode ? periods.join(', ') : period}`);
         
         // 🎯 Calculate labor vs RC cost mismatch flag (same as legacy mode)
         const detailedLaborCost = viewData.teamBreakdown.reduce((sum: number, m: any) => sum + ((m.costUSD || m.costARS || 0)), 0);
