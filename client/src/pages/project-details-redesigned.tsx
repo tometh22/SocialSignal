@@ -2267,6 +2267,27 @@ const ProjectDetailsPage = () => {
               />
             )}
 
+            {/* EMPTY STATE - No data available */}
+            {(!projectVM || (projectVM.costDisplay === 0 && projectVM.teamBreakdown?.length === 0)) ? (
+              <div className="bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 rounded-xl p-12 text-center border-2 border-dashed border-slate-300 dark:border-slate-700">
+                <div className="max-w-md mx-auto">
+                  <div className="w-20 h-20 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CalendarDays className="h-10 w-10 text-slate-400 dark:text-slate-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-700 dark:text-slate-300 mb-3">
+                    No hay datos disponibles
+                  </h3>
+                  <p className="text-slate-500 dark:text-slate-400 mb-6">
+                    No se encontraron registros de costos o horas para el período seleccionado.
+                  </p>
+                  <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-blue-800 dark:text-blue-300">
+                    <p className="font-medium mb-1">💡 Sugerencia</p>
+                    <p>Prueba seleccionar un período diferente o verifica que se hayan cargado los datos del proyecto.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* EXECUTIVE DASHBOARD HEADER */}
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white">
               {console.log('🔍 DELTA DEBUG:', {
@@ -3597,6 +3618,8 @@ const ProjectDetailsPage = () => {
                 projectId={projectId}
                 currentPeriod={finalPeriod || ''}
               />
+            )}
+              </>
             )}
 
           </TabsContent>
