@@ -52,12 +52,22 @@ export function startDailySoTSync() {
         return obj;
       });
       
-      // 3. Execute ETL for current month only (incremental)
-      const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+      // 3. Execute ETL for current month and last 3 months (for historical data)
+      const now = new Date();
+      const periods: string[] = [];
+      
+      // Generate last 4 months including current month
+      for (let i = 0; i < 4; i++) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const periodKey = date.toISOString().substring(0, 7); // YYYY-MM
+        periods.push(periodKey);
+      }
+      
+      console.log(`📅 [Daily SoT Sync] Procesando períodos: ${periods.join(', ')}`);
       
       const result = await executeSoTETL(costosRows, rcRows, {
         scopes: {
-          periods: [currentMonth]
+          periods: periods
         },
         recomputeAgg: true
       });
@@ -119,11 +129,21 @@ export async function triggerManualSync() {
       return obj;
     });
     
-    const currentMonth = new Date().toISOString().substring(0, 7);
+    // Generate last 4 months including current month
+    const now = new Date();
+    const periods: string[] = [];
+    
+    for (let i = 0; i < 4; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const periodKey = date.toISOString().substring(0, 7); // YYYY-MM
+      periods.push(periodKey);
+    }
+    
+    console.log(`📅 [Manual SoT Sync] Procesando períodos: ${periods.join(', ')}`);
     
     const result = await executeSoTETL(costosRows, rcRows, {
       scopes: {
-        periods: [currentMonth]
+        periods: periods
       },
       recomputeAgg: true
     });
