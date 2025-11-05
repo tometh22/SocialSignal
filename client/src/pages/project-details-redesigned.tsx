@@ -1983,17 +1983,78 @@ const ProjectDetailsPage = () => {
               </h1>
 
               {/* Filtros: Vista y Período */}
-              <div className="flex items-center gap-3">
-                <ViewToggle 
-                  selectedView={selectedView}
-                  onViewChange={setSelectedView}
-                  className="flex-shrink-0"
-                />
-                <TimeRangeFilter 
-                  selectedFilter={dateFilter}
-                  onFilterChange={setDateFilter}
-                  className="flex-shrink-0"
-                />
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex items-center gap-3">
+                  <ViewToggle 
+                    selectedView={selectedView}
+                    onViewChange={setSelectedView}
+                    className="flex-shrink-0"
+                  />
+                  <TimeRangeFilter 
+                    selectedFilter={dateFilter}
+                    onFilterChange={setDateFilter}
+                    className="flex-shrink-0"
+                  />
+                </div>
+                
+                {/* 🔥 QUARTER INFO BADGE */}
+                {(() => {
+                  const filterValue = getTimeFilterForHook(dateFilter);
+                  const quarterMap: Record<string, { quarter: string, months: string }> = {
+                    'this-quarter': (() => {
+                      const now = new Date();
+                      const currentMonth = now.getMonth() + 1; // 1-12
+                      const quarterNum = Math.floor((currentMonth - 1) / 3) + 1; // 1-4
+                      const monthNames = [
+                        ['Enero', 'Febrero', 'Marzo'],
+                        ['Abril', 'Mayo', 'Junio'],
+                        ['Julio', 'Agosto', 'Septiembre'],
+                        ['Octubre', 'Noviembre', 'Diciembre']
+                      ];
+                      return { 
+                        quarter: `Q${quarterNum} ${now.getFullYear()}`, 
+                        months: monthNames[quarterNum - 1].join(', ') 
+                      };
+                    })(),
+                    'last-quarter': (() => {
+                      const now = new Date();
+                      const currentMonth = now.getMonth() + 1; // 1-12
+                      const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1;
+                      const lastQuarter = currentQuarter === 1 ? 4 : currentQuarter - 1;
+                      const year = currentQuarter === 1 ? now.getFullYear() - 1 : now.getFullYear();
+                      const monthNames = [
+                        ['Enero', 'Febrero', 'Marzo'],
+                        ['Abril', 'Mayo', 'Junio'],
+                        ['Julio', 'Agosto', 'Septiembre'],
+                        ['Octubre', 'Noviembre', 'Diciembre']
+                      ];
+                      return { 
+                        quarter: `Q${lastQuarter} ${year}`, 
+                        months: monthNames[lastQuarter - 1].join(', ') 
+                      };
+                    })(),
+                    'q1': { quarter: 'Q1', months: 'Enero, Febrero, Marzo' },
+                    'q2': { quarter: 'Q2', months: 'Abril, Mayo, Junio' },
+                    'q3': { quarter: 'Q3', months: 'Julio, Agosto, Septiembre' },
+                    'q4': { quarter: 'Q4', months: 'Octubre, Noviembre, Diciembre' }
+                  };
+                  
+                  const quarterInfo = quarterMap[filterValue];
+                  if (quarterInfo) {
+                    return (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-md">
+                        <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-900">
+                          {quarterInfo.quarter}
+                        </span>
+                        <span className="text-xs text-blue-700">
+                          ({quarterInfo.months})
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
           </div>
