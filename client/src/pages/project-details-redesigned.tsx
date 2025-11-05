@@ -2001,7 +2001,7 @@ const ProjectDetailsPage = () => {
                 {(() => {
                   const filterValue = getTimeFilterForHook(dateFilter);
                   const quarterMap: Record<string, { quarter: string, months: string }> = {
-                    'this-quarter': (() => {
+                    'current_quarter': (() => {
                       const now = new Date();
                       const currentMonth = now.getMonth() + 1; // 1-12
                       const quarterNum = Math.floor((currentMonth - 1) / 3) + 1; // 1-4
@@ -2016,7 +2016,7 @@ const ProjectDetailsPage = () => {
                         months: monthNames[quarterNum - 1].join(', ') 
                       };
                     })(),
-                    'last-quarter': (() => {
+                    'last_quarter': (() => {
                       const now = new Date();
                       const currentMonth = now.getMonth() + 1; // 1-12
                       const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1;
