@@ -2543,7 +2543,7 @@ const ProjectDetailsPage = () => {
                           {(() => {
                             const team = projectVM?.teamBreakdown || [];
                             const topPerformer = team.reduce((max: any, member: any) => 
-                              (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
+                              (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
                             return topPerformer?.name || 'N/A';
                           })()}
                         </div>
@@ -2551,8 +2551,8 @@ const ProjectDetailsPage = () => {
                           {(() => {
                             const team = projectVM?.teamBreakdown || [];
                             const topPerformer = team.reduce((max: any, member: any) => 
-                              (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
-                            return `${topPerformer?.hours || 0}h trabajadas`;
+                              (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
+                            return `${topPerformer?.hoursAsana || 0}h trabajadas`;
                           })()}
                         </div>
                       </div>
@@ -2696,12 +2696,12 @@ const ProjectDetailsPage = () => {
 
                       // Recomendaciones específicas de equipo con nombres reales
                       const topPerformer = team.reduce((max: any, member: any) => 
-                        (member.hours || 0) > (max.hours || 0) ? member : max, team[0] || {});
-                      const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80);
+                        (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
+                      const overworkedMembers = team.filter((m: any) => (m.hoursAsana || 0) > 80);
                       
                       if (overworkedMembers.length > 0) {
                         const names = overworkedMembers.map((m: any) => m.name).join(', ');
-                        const totalOvertime = overworkedMembers.reduce((sum: number, m: any) => sum + Math.max(0, (m.hours || 0) - 80), 0);
+                        const totalOvertime = overworkedMembers.reduce((sum: number, m: any) => sum + Math.max(0, (m.hoursAsana || 0) - 80), 0);
                         recommendations.push({
                           type: 'team',
                           icon: '👥',
@@ -2710,11 +2710,11 @@ const ProjectDetailsPage = () => {
                           color: 'text-purple-700',
                           bg: 'bg-purple-50'
                         });
-                      } else if (topPerformer.name && topPerformer.hours > 40) {
+                      } else if (topPerformer.name && (topPerformer.hoursAsana || 0) > 40) {
                         recommendations.push({
                           type: 'team',
                           icon: '⭐',
-                          title: `${topPerformer.name} Lidera con ${topPerformer.hours}h`,
+                          title: `${topPerformer.name} Lidera con ${topPerformer.hoursAsana || 0}h`,
                           description: `Top performer del proyecto. Considera asignarle más responsabilidades o rol de mentor.`,
                           color: 'text-green-700',
                           bg: 'bg-green-50'
