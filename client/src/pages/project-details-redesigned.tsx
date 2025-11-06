@@ -2299,7 +2299,7 @@ const ProjectDetailsPage = () => {
                   
                   <div className="space-y-4">
                     {/* Ingresos - Destacado */}
-                    <div className="bg-slate-800 rounded-lg p-5 border border-slate-600">
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="flex items-center gap-2 text-slate-300 text-sm mb-1">
@@ -2315,12 +2315,28 @@ const ProjectDetailsPage = () => {
                               </Tooltip>
                             </TooltipProvider>
                           </div>
-                          <div className="text-3xl font-bold text-green-400">
-                            {projectVM ? formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative) : '$0'}
+                          <div className="flex items-baseline gap-3">
+                            <div className="text-3xl font-bold text-green-400">
+                              {projectVM ? formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative) : '$0'}
+                            </div>
+                            {unifiedData?.previousPeriod?.hasData && (() => {
+                              const current = projectVM?.revenueDisplay || 0;
+                              const previous = unifiedData.previousPeriod.metrics.revenueUSD || 0;
+                              if (previous > 0) {
+                                const change = ((current - previous) / previous) * 100;
+                                const isPositive = change >= 0;
+                                return (
+                                  <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                    {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                    {Math.abs(change).toFixed(0)}%
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                       </div>
-                      <Progress value={Math.min(100, (projectVM?.budgetUtilization || 0) * 100)} className="h-2" />
                     </div>
 
                     {/* Grid de métricas financieras */}
@@ -2340,14 +2356,27 @@ const ProjectDetailsPage = () => {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div className="text-2xl font-bold text-orange-400">
-                          {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
+                        <div className="flex items-baseline gap-2">
+                          <div className="text-2xl font-bold text-red-400">
+                            {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
+                          </div>
+                          {unifiedData?.previousPeriod?.hasData && (() => {
+                            const current = projectVM?.costDisplay || 0;
+                            const previous = unifiedData.previousPeriod.metrics.teamCostUSD || 0;
+                            if (previous > 0) {
+                              const change = ((current - previous) / previous) * 100;
+                              const isPositive = change <= 0; // Lower cost is better
+                              return (
+                                <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                  {change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                  {Math.abs(change).toFixed(0)}%
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
-                        <div className="text-xs text-slate-400 mt-1">
-                          {unifiedData?.previousPeriod?.hasData && (
-                            <>vs período anterior</>
-                          )}
-                        </div>
+                        <div className="text-xs text-slate-400 mt-1">vs período anterior</div>
                       </div>
 
                       {/* Margen */}
@@ -2456,7 +2485,7 @@ const ProjectDetailsPage = () => {
                   
                   <div className="space-y-4">
                     {/* Horas trabajadas - Destacado */}
-                    <div className="bg-slate-800 rounded-lg p-5 border border-slate-600">
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 text-slate-300 text-sm mb-1">
@@ -2472,8 +2501,25 @@ const ProjectDetailsPage = () => {
                               </Tooltip>
                             </TooltipProvider>
                           </div>
-                          <div className="text-3xl font-bold text-purple-400">
-                            {(projectVM?.totalHours || 0).toFixed(1)}h
+                          <div className="flex items-baseline gap-3">
+                            <div className="text-3xl font-bold text-blue-400">
+                              {(projectVM?.totalHours || 0).toFixed(1)}h
+                            </div>
+                            {unifiedData?.previousPeriod?.hasData && (() => {
+                              const current = projectVM?.totalHours || 0;
+                              const previous = unifiedData.previousPeriod.metrics.totalHours || 0;
+                              if (previous > 0) {
+                                const change = ((current - previous) / previous) * 100;
+                                const isPositive = change >= 0;
+                                return (
+                                  <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                    {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                    {Math.abs(change).toFixed(0)}%
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                           <div className="text-sm text-slate-400 mt-1">
                             Promedio: {Math.round((projectVM?.totalHours || 0) / 4)}h por semana
@@ -2529,7 +2575,7 @@ const ProjectDetailsPage = () => {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div className="text-2xl font-bold text-cyan-400">
+                        <div className="text-2xl font-bold text-gray-400">
                           {(() => {
                             const team = projectVM?.teamBreakdown || [];
                             const avg = team.length > 0 
