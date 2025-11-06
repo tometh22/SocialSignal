@@ -2631,7 +2631,7 @@ const ProjectDetailsPage = () => {
             {/* CROSS-TAB INSIGHTS - World Class Analytics */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               
-              {/* Team Performance Summary (from Equipo tab) */}
+              {/* Team Performance Summary - REDISEÑADO CON BARRAS */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -2646,222 +2646,394 @@ const ProjectDetailsPage = () => {
                 </div>
                 
                 <div className="p-6">
-                  <div className="space-y-4">
-                    {/* Top Performers */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-green-50 rounded-lg p-4">
-                        <div className="text-sm text-green-700 mb-1">Mejor Rendimiento</div>
-                        <div className="font-bold text-green-900">
-                          {(() => {
-                            const team = projectVM?.teamBreakdown || [];
-                            const topPerformer = team.reduce((max: any, member: any) => 
-                              (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
-                            return topPerformer?.name || 'N/A';
-                          })()}
-                        </div>
-                        <div className="text-xs text-green-600">
-                          {(() => {
-                            const team = projectVM?.teamBreakdown || [];
-                            const topPerformer = team.reduce((max: any, member: any) => 
-                              (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
-                            return `${topPerformer?.hoursAsana || 0}h trabajadas`;
-                          })()}
-                        </div>
-                      </div>
+                  <div className="space-y-6">
+                    {/* Top Performer Hero Card */}
+                    {(() => {
+                      const team = projectVM?.teamBreakdown || [];
+                      const topPerformer = team.reduce((max: any, member: any) => 
+                        (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
                       
-                      <div className="bg-blue-50 rounded-lg p-4">
-                        <div className="text-sm text-blue-700 mb-1">Velocidad Equipo</div>
-                        <div className="font-bold text-blue-900">
-                          {Math.round((projectVM?.totalAsanaHours || projectVM?.totalHours || 0) / 4)}h
-                        </div>
-                        <div className="text-xs text-blue-600">promedio semanal</div>
-                      </div>
-                    </div>
-                    
-                    {/* Team Efficiency Heatmap */}
-                    <div className="space-y-2">
-                      <div className="text-sm font-medium text-gray-700">Carga de trabajo por miembro</div>
-                      <div className="text-xs text-gray-500 mb-2">Pasa el mouse sobre cada inicial para ver detalles</div>
-                      <div className="grid grid-cols-6 gap-1">
-                        {(projectVM?.teamBreakdown || []).slice(0, 6).map((member: any, index) => (
-                          <div 
-                            key={index}
-                            className={`h-8 rounded text-xs flex items-center justify-center text-white font-medium cursor-help relative group ${
-                              (member.hoursAsana || member.hours || 0) > 80 ? 'bg-red-500' : 
-                              (member.hoursAsana || member.hours || 0) > 50 ? 'bg-yellow-500' : 
-                              (member.hoursAsana || member.hours || 0) > 20 ? 'bg-green-500' : 'bg-gray-300'
-                            }`}
-                            title={`${member.name}: ${member.hoursAsana || member.hours || 0}h trabajadas - $${(member.costUSD || member.cost || 0).toLocaleString()} - Estado: ${
-                              (member.hoursAsana || member.hours || 0) > 80 ? 'Sobrecarga' : 
-                              (member.hoursAsana || member.hours || 0) > 50 ? 'Intenso' : 
-                              (member.hoursAsana || member.hours || 0) > 20 ? 'Normal' : 'Bajo'
-                            }`}
-                          >
-                            {(member.name || '?').charAt(0)}
-                            
-                            {/* Custom Tooltip */}
-                            <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded-lg p-3 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 min-w-max">
-                              <div className="space-y-1">
-                                <p className="font-semibold">{member.name}</p>
-                                <p className="text-xs">🕐 {member.hoursAsana || member.hours || 0} horas trabajadas (Asana)</p>
-                                <p className="text-xs">💰 ${(member.costUSD || member.cost || 0).toLocaleString()} costo total</p>
-                                <p className="text-xs">
-                                  📊 Estado: {
-                                    (member.hoursAsana || member.hours || 0) > 80 ? 'Sobrecarga' : 
-                                    (member.hoursAsana || member.hours || 0) > 50 ? 'Intenso' : 
-                                    (member.hoursAsana || member.hours || 0) > 20 ? 'Normal' : 'Bajo'
-                                  }
-                                </p>
+                      if (!topPerformer?.name) return null;
+                      
+                      const utilization = topPerformer.targetHours > 0 
+                        ? ((topPerformer.hoursAsana || 0) / topPerformer.targetHours) * 100 
+                        : 0;
+                      
+                      return (
+                        <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-5">
+                          <div className="flex items-start gap-4">
+                            <Avatar className="h-14 w-14 border-2 border-green-400">
+                              <AvatarFallback className="bg-green-500 text-white text-lg font-bold">
+                                {topPerformer.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Trophy className="h-4 w-4 text-yellow-600" />
+                                <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Top Performer del Período</span>
                               </div>
-                              {/* Arrow */}
-                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                              <h4 className="text-lg font-bold text-gray-900 mb-1">{topPerformer.name}</h4>
+                              <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                                <span className="flex items-center gap-1">
+                                  <Briefcase className="h-3.5 w-3.5" />
+                                  {topPerformer.roleName || 'Sin rol'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {(topPerformer.hoursAsana || 0).toFixed(1)}h trabajadas
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="h-3.5 w-3.5" />
+                                  {formatCurrency(topPerformer.costUSD || 0, 'USD')}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                  <span>Utilización: {utilization.toFixed(0)}%</span>
+                                  <span>{topPerformer.targetHours || 0}h estimadas</span>
+                                </div>
+                                <Progress 
+                                  value={Math.min(100, utilization)} 
+                                  className="h-2"
+                                />
+                              </div>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* Team Members - Barras Horizontales */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-gray-700">Carga de Trabajo por Miembro</h4>
+                        <span className="text-xs text-gray-500">
+                          Promedio: {(() => {
+                            const team = projectVM?.teamBreakdown || [];
+                            const avg = team.length > 0 ? (projectVM?.totalHours || 0) / team.length : 0;
+                            return avg.toFixed(1);
+                          })()}h/persona
+                        </span>
                       </div>
-                      <div className="text-xs text-gray-500">Verde: Normal • Amarillo: Intenso • Rojo: Sobrecarga</div>
+                      
+                      <div className="space-y-2">
+                        {(projectVM?.teamBreakdown || [])
+                          .sort((a: any, b: any) => (b.hoursAsana || 0) - (a.hoursAsana || 0))
+                          .slice(0, 8)
+                          .map((member: any, index) => {
+                            const hours = member.hoursAsana || 0;
+                            const target = member.targetHours || 0;
+                            const utilization = target > 0 ? (hours / target) * 100 : 0;
+                            const status = hours > 80 ? 'sobrecarga' : hours > 50 ? 'intenso' : hours > 20 ? 'normal' : 'bajo';
+                            
+                            return (
+                              <div key={index} className="group">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                    <AvatarFallback className="bg-slate-200 text-slate-700 text-xs font-semibold">
+                                      {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-sm font-medium text-gray-900 truncate">
+                                          {member.name}
+                                        </span>
+                                        <span className="text-xs text-gray-500 truncate">
+                                          {member.roleName}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-sm font-bold text-gray-900">
+                                          {hours.toFixed(1)}h
+                                        </span>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`text-xs ${
+                                            status === 'sobrecarga' ? 'border-red-500 text-red-700 bg-red-50' :
+                                            status === 'intenso' ? 'border-yellow-500 text-yellow-700 bg-yellow-50' :
+                                            status === 'normal' ? 'border-green-500 text-green-700 bg-green-50' :
+                                            'border-gray-400 text-gray-600 bg-gray-50'
+                                          }`}
+                                        >
+                                          {status === 'sobrecarga' ? '⚠️ Sobrecarga' :
+                                           status === 'intenso' ? '🔥 Intenso' :
+                                           status === 'normal' ? '✓ Normal' : '○ Bajo'}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="relative">
+                                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div 
+                                          className={`h-full transition-all ${
+                                            status === 'sobrecarga' ? 'bg-red-500' :
+                                            status === 'intenso' ? 'bg-yellow-500' :
+                                            status === 'normal' ? 'bg-green-500' : 'bg-gray-400'
+                                          }`}
+                                          style={{ width: `${Math.min(100, utilization)}%` }}
+                                        />
+                                      </div>
+                                      <div className="flex justify-between text-xs text-gray-500 mt-0.5">
+                                        <span>{utilization.toFixed(0)}% utilización</span>
+                                        {target > 0 && <span>Meta: {target}h</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      
+                      {(projectVM?.teamBreakdown || []).length > 8 && (
+                        <div className="text-center pt-2">
+                          <Button variant="ghost" size="sm" className="text-xs text-blue-600">
+                            Ver todos los {(projectVM?.teamBreakdown || []).length} miembros
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Recomendaciones Automáticas */}
+              {/* Recomendaciones Automáticas - REDISEÑADO CON PRIORIZACIÓN */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                      <Target className="h-5 w-5 text-orange-600" />
-                      Recomendaciones Automáticas
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      Recomendaciones Inteligentes
                     </h3>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                      <Rocket className="h-3 w-3" />
                       IA Analytics
                     </Badge>
                   </div>
                 </div>
                 
                 <div className="p-6">
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {(() => {
                       const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
                       const markup = projectVM?.markup || 0;
-                      const recommendations = [];
+                      const recommendations: any[] = [];
 
                       const team = projectVM?.teamBreakdown || [];
                       const totalBudget = quotationData?.totalAmountNative || 1;
                       const actualCost = projectVM?.costDisplay || 0;
                       const remainingBudget = totalBudget - actualCost;
                       
-                      // Recomendación específica basada en budget utilization con datos reales
+                      // CRÍTICO - Prioridad 1
                       if (budgetUsed > 85) {
                         const overspend = actualCost - totalBudget;
                         recommendations.push({
-                          type: 'warning',
-                          icon: '🚨',
-                          title: 'Presupuesto Excedido en ' + formatCurrency(Math.abs(overspend), projectVM?.currencyNative || 'USD'),
-                          description: `Ya gastaste ${formatCurrency(actualCost, projectVM?.currencyNative || 'USD')} de ${formatCurrency(totalBudget, projectVM?.currencyNative || 'USD')}. Renegocia con el cliente o reduce scope.`,
-                          color: 'text-red-700',
-                          bg: 'bg-red-50'
-                        });
-                      } else if (budgetUsed > 75) {
-                        recommendations.push({
-                          type: 'warning',
-                          icon: '⚠️',
-                          title: 'Quedan Solo ' + formatCurrency(remainingBudget, projectVM?.currencyNative || 'USD') + ' de Presupuesto',
-                          description: `Con ${budgetUsed.toFixed(0)}% usado, prioriza tareas críticas. Estima ${Math.ceil(remainingBudget / 100)} horas máximas restantes.`,
-                          color: 'text-orange-700',
-                          bg: 'bg-orange-50'
-                        });
-                      } else if (budgetUsed < 30) {
-                        const monthsElapsed = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
-                        recommendations.push({
-                          type: 'opportunity',
-                          icon: '📈',
-                          title: `Solo ${budgetUsed.toFixed(0)}% Usado en ${monthsElapsed} Mes(es)`,
-                          description: `Puedes acelerar ${Math.floor(remainingBudget / 150)} días adicionales de trabajo. Considera ampliar scope.`,
-                          color: 'text-blue-700',
-                          bg: 'bg-blue-50'
+                          priority: 1,
+                          type: 'critical',
+                          icon: AlertTriangle,
+                          emoji: '🚨',
+                          title: 'Presupuesto Excedido',
+                          value: formatCurrency(Math.abs(overspend), projectVM?.currencyNative || 'USD'),
+                          description: `Ya gastaste ${formatCurrency(actualCost, projectVM?.currencyNative || 'USD')} de ${formatCurrency(totalBudget, projectVM?.currencyNative || 'USD')} presupuestados.`,
+                          action: 'Renegociar con cliente',
+                          color: 'red',
+                          borderColor: 'border-red-500',
+                          bgColor: 'bg-red-50',
+                          textColor: 'text-red-700',
+                          badgeColor: 'bg-red-600'
                         });
                       }
-
-                      // Recomendación específica basada en markup con números reales
-                      if (markup < 1.3) {
-                        const loss = actualCost - (actualCost / markup);
-                        recommendations.push({
-                          type: 'financial',
-                          icon: '💸',
-                          title: `Markup ${markup.toFixed(1)}x = Pérdida de $${loss.toLocaleString()}`,
-                          description: `Para próximos proyectos similares, cotiza mín. $${(actualCost * 1.8).toLocaleString()} (markup 1.8x).`,
-                          color: 'text-red-700',
-                          bg: 'bg-red-50'
-                        });
-                      } else if (markup > 2.5) {
-                        const profit = (actualCost * markup) - actualCost;
-                        recommendations.push({
-                          type: 'success',
-                          icon: '🎯',
-                          title: `Ganancia Excepcional: $${profit.toLocaleString()}`,
-                          description: `Markup ${markup.toFixed(1)}x significa ${((markup-1)*100).toFixed(0)}% ganancia. Aplica esta estrategia a clientes similares.`,
-                          color: 'text-green-700',
-                          bg: 'bg-green-50'
-                        });
-                      }
-
-                      // Recomendaciones específicas de equipo con nombres reales
-                      const topPerformer = team.reduce((max: any, member: any) => 
-                        (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
-                      const overworkedMembers = team.filter((m: any) => (m.hoursAsana || 0) > 80);
                       
+                      // ADVERTENCIA - Prioridad 2
+                      const overworkedMembers = team.filter((m: any) => (m.hoursAsana || 0) > 80);
                       if (overworkedMembers.length > 0) {
                         const names = overworkedMembers.map((m: any) => m.name).join(', ');
                         const totalOvertime = overworkedMembers.reduce((sum: number, m: any) => sum + Math.max(0, (m.hoursAsana || 0) - 80), 0);
                         recommendations.push({
-                          type: 'team',
-                          icon: '👥',
-                          title: `${names} Sobrecargado(s) - ${totalOvertime}h Extra`,
-                          description: `Redistribuir ${Math.ceil(totalOvertime/2)}h a otros miembros o contratar soporte temporal.`,
-                          color: 'text-purple-700',
-                          bg: 'bg-purple-50'
+                          priority: 2,
+                          type: 'warning',
+                          icon: AlertCircle,
+                          emoji: '⚠️',
+                          title: 'Equipo Sobrecargado',
+                          value: `${totalOvertime}h extras`,
+                          description: `${names} trabajó${overworkedMembers.length > 1 ? 'aron' : 'ó'} más de 80h. Riesgo de burnout.`,
+                          action: 'Redistribuir carga',
+                          color: 'orange',
+                          borderColor: 'border-orange-500',
+                          bgColor: 'bg-orange-50',
+                          textColor: 'text-orange-700',
+                          badgeColor: 'bg-orange-600'
                         });
-                      } else if (topPerformer.name && (topPerformer.hoursAsana || 0) > 40) {
+                      } else if (budgetUsed > 75 && budgetUsed <= 85) {
                         recommendations.push({
-                          type: 'team',
-                          icon: '⭐',
-                          title: `${topPerformer.name} Lidera con ${topPerformer.hoursAsana || 0}h`,
-                          description: `Top performer del proyecto. Considera asignarle más responsabilidades o rol de mentor.`,
-                          color: 'text-green-700',
-                          bg: 'bg-green-50'
+                          priority: 2,
+                          type: 'warning',
+                          icon: AlertCircle,
+                          emoji: '⚠️',
+                          title: 'Presupuesto Ajustado',
+                          value: formatCurrency(remainingBudget, projectVM?.currencyNative || 'USD'),
+                          description: `Con ${budgetUsed.toFixed(0)}% usado, quedan aprox. ${Math.ceil(remainingBudget / 100)}h de trabajo.`,
+                          action: 'Priorizar críticos',
+                          color: 'orange',
+                          borderColor: 'border-orange-500',
+                          bgColor: 'bg-orange-50',
+                          textColor: 'text-orange-700',
+                          badgeColor: 'bg-orange-600'
+                        });
+                      }
+                      
+                      // OPORTUNIDAD - Prioridad 3
+                      if (markup < 1.5 && markup > 0) {
+                        const targetMarkup = actualCost * 1.8;
+                        recommendations.push({
+                          priority: 3,
+                          type: 'opportunity',
+                          icon: Lightbulb,
+                          emoji: '💡',
+                          title: 'Markup Bajo',
+                          value: `${markup.toFixed(1)}x actual`,
+                          description: `Para proyectos similares, cotiza mín. ${formatCurrency(targetMarkup, projectVM?.currencyNative || 'USD')} (markup 1.8x).`,
+                          action: 'Ver estrategia',
+                          color: 'blue',
+                          borderColor: 'border-blue-500',
+                          bgColor: 'bg-blue-50',
+                          textColor: 'text-blue-700',
+                          badgeColor: 'bg-blue-600'
+                        });
+                      } else if (budgetUsed < 30) {
+                        const monthsElapsed = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
+                        recommendations.push({
+                          priority: 3,
+                          type: 'opportunity',
+                          icon: Lightbulb,
+                          emoji: '📈',
+                          title: 'Capacidad Disponible',
+                          value: `${budgetUsed.toFixed(0)}% usado`,
+                          description: `En ${monthsElapsed} mes(es), puedes acelerar aprox. ${Math.floor(remainingBudget / 150)} días más de trabajo.`,
+                          action: 'Ampliar scope',
+                          color: 'blue',
+                          borderColor: 'border-blue-500',
+                          bgColor: 'bg-blue-50',
+                          textColor: 'text-blue-700',
+                          badgeColor: 'bg-blue-600'
+                        });
+                      }
+                      
+                      // ÉXITO - Prioridad 4
+                      if (markup >= 2.5) {
+                        const profit = (actualCost * markup) - actualCost;
+                        recommendations.push({
+                          priority: 4,
+                          type: 'success',
+                          icon: CheckCircle2,
+                          emoji: '🎯',
+                          title: 'Excelente Rentabilidad',
+                          value: `${markup.toFixed(1)}x markup`,
+                          description: `Ganancia de ${formatCurrency(profit, projectVM?.currencyNative || 'USD')} (${((markup-1)*100).toFixed(0)}% ROI).`,
+                          action: 'Aplicar a otros',
+                          color: 'green',
+                          borderColor: 'border-green-500',
+                          bgColor: 'bg-green-50',
+                          textColor: 'text-green-700',
+                          badgeColor: 'bg-green-600'
+                        });
+                      }
+                      
+                      const topPerformer = team.reduce((max: any, member: any) => 
+                        (member.hoursAsana || 0) > (max.hoursAsana || 0) ? member : max, team[0] || {});
+                      if (topPerformer.name && (topPerformer.hoursAsana || 0) > 40 && recommendations.length < 3) {
+                        recommendations.push({
+                          priority: 4,
+                          type: 'success',
+                          icon: Star,
+                          emoji: '⭐',
+                          title: 'Top Performer Identificado',
+                          value: `${(topPerformer.hoursAsana || 0).toFixed(0)}h`,
+                          description: `${topPerformer.name} lidera el proyecto. Considerar rol de mentor o lead.`,
+                          action: 'Ver perfil',
+                          color: 'green',
+                          borderColor: 'border-green-500',
+                          bgColor: 'bg-green-50',
+                          textColor: 'text-green-700',
+                          badgeColor: 'bg-green-600'
                         });
                       }
 
-                      // Si muy pocas recomendaciones, agregar recomendación de próximos pasos
+                      // Si pocas recomendaciones, agregar general
                       if (recommendations.length < 2) {
                         const daysActive = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24));
                         recommendations.push({
-                          type: 'general',
-                          icon: '📋',
-                          title: `Proyecto Activo ${daysActive} Días - Revisar Hitos`,
-                          description: `Con ${budgetUsed.toFixed(0)}% progreso, programa check-in semanal y revisa deliverables pendientes.`,
-                          color: 'text-blue-700',
-                          bg: 'bg-blue-50'
+                          priority: 5,
+                          type: 'info',
+                          icon: Info,
+                          emoji: '📋',
+                          title: 'Revisión Programada',
+                          value: `${daysActive} días activo`,
+                          description: `Progreso ${budgetUsed.toFixed(0)}%. Programa check-in semanal y revisa deliverables.`,
+                          action: 'Ver calendario',
+                          color: 'gray',
+                          borderColor: 'border-gray-400',
+                          bgColor: 'bg-gray-50',
+                          textColor: 'text-gray-700',
+                          badgeColor: 'bg-gray-600'
                         });
                       }
 
-                      return recommendations.slice(0, 3).map((rec, index) => (
-                        <div key={index} className={`${rec.bg} rounded-lg p-4 border-l-4 ${rec.color.includes('red') ? 'border-red-400' : rec.color.includes('blue') ? 'border-blue-400' : rec.color.includes('orange') ? 'border-orange-400' : rec.color.includes('purple') ? 'border-purple-400' : 'border-green-400'}`}>
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg">{rec.icon}</span>
-                            <div>
-                              <h4 className={`font-semibold text-sm ${rec.color}`}>
-                                {rec.title}
-                              </h4>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {rec.description}
-                              </p>
+                      // Ordenar por prioridad y mostrar top 3
+                      return recommendations
+                        .sort((a, b) => a.priority - b.priority)
+                        .slice(0, 3)
+                        .map((rec, index) => {
+                          const Icon = rec.icon;
+                          return (
+                            <div 
+                              key={index} 
+                              className={`${rec.bgColor} rounded-lg p-4 border-l-4 ${rec.borderColor} relative group hover:shadow-md transition-shadow`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-3 flex-1">
+                                  <div className={`p-2 rounded-lg ${rec.badgeColor} bg-opacity-10 flex-shrink-0`}>
+                                    <Icon className={`h-4 w-4 ${rec.textColor}`} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <h4 className={`font-bold text-sm ${rec.textColor}`}>
+                                        {rec.emoji} {rec.title}
+                                      </h4>
+                                      <Badge className={`${rec.badgeColor} text-white text-xs flex-shrink-0`}>
+                                        {rec.value}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-xs text-gray-700 leading-relaxed mb-3">
+                                      {rec.description}
+                                    </p>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className={`h-7 text-xs ${rec.textColor} hover:${rec.bgColor} px-3`}
+                                      data-testid={`button-recomendacion-${index}`}
+                                    >
+                                      {rec.action}
+                                      <ChevronDown className="h-3 w-3 ml-1 -rotate-90" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      ));
+                          );
+                        });
                     })()}
+                  </div>
+                  
+                  {/* Mostrar todas las recomendaciones link */}
+                  <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                    <Button variant="link" size="sm" className="text-xs text-gray-600">
+                      Ver todas las recomendaciones
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
                   </div>
                 </div>
               </div>
