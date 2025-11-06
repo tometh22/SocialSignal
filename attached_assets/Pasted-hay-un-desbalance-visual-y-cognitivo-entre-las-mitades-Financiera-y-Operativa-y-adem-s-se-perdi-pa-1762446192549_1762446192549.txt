@@ -1,0 +1,47 @@
+hay un desbalance visual y cognitivo entre las mitades Financiera y Operativa, y además se perdió parte del storytelling comparativo (que es clave para la interpretación).
+Te detallo el diagnóstico y cómo reequilibrarlo sin perder la elegancia actual 👇
+⚖️ 1. Problema de equilibrio visual
+Qué pasa:
+El bloque Financiera tiene más tarjetas y contenido denso (4 métricas + un ROI dentro del markup).
+El bloque Operativa tiene una gran card superior (288.3h) que domina la mitad derecha, pero las inferiores quedan livianas.
+Esto genera una asimetría de masa visual: el ojo se va a la izquierda y arriba, rompiendo el balance.
+Soluciones posibles:
+Opción A (estructural):
+Dividir el layout en 3 columnas con grid 3×2 (cada card del mismo ancho).
+→ Evitás que la columna financiera pese más.
+Opción B (jerárquica):
+Unificar “Horas trabajadas” + “Eficiencia del proyecto” en una card doble tipo “Productividad”, y dejar las otras 3 (Equipo activo, Carga promedio, Presupuesto usado) abajo más pequeñas.
+→ Equilibra el volumen visual sin romper la sección.
+🧭 2. Comparaciones perdidas con el período anterior
+Qué pasa:
+Antes había pequeñas comparaciones (“vs proyección inicial”, “vs período anterior”) que ayudaban al usuario a entender dirección y tendencia, no solo valor absoluto.
+Al desaparecer, el dashboard perdió narrativa temporal (la historia de la evolución).
+Solución UX/UI:
+Reincorporar comparativas en formato mini-trend con flecha + porcentaje, pero discretas:
+↑ +12% vs período anterior en gris claro o con micro tipografía bajo el valor principal.
+O usar pequeños sparkline charts (micrográficos lineales) dentro de las cards de “Ingresos” y “Horas trabajadas”.
+Además, añadir un toggle global arriba del dashboard:
+“Comparar con período anterior” (On/Off)
+Así mantenés flexibilidad visual y control al usuario.
+🎨 3. Jerarquía tipográfica y densidad
+Qué pasa:
+Algunos valores (por ejemplo “288.3h”) compiten en tamaño con los de “$8.450”.
+Esto genera falta de prioridad visual (no está claro qué debe leerse primero).
+Solución:
+Establecer una escala tipográfica jerárquica:
+Nivel 1 → KPI principal (p. ej. Ingresos, Horas trabajadas) → font-size grande + bold
+Nivel 2 → contexto o variación → tamaño 70%, color gris-medio
+Nivel 3 → subtexto o label secundario → 60%, gris-claro
+🧩 4. Integración entre métricas relacionadas
+Idea UX avanzada:
+Podés crear pares visuales que se lean como causa-efecto:
+Ingresos ↔ Costos ↔ Margen → bloque compacto (tres cards juntas).
+Horas trabajadas ↔ Eficiencia ↔ Presupuesto usado → otro bloque.
+Eso crea un patrón cognitivo de lectura “izquierda a derecha = pipeline”.
+✨ 5. Ajustes de diseño recomendados
+Aspecto	Cambio sugerido	Resultado
+Grid general	3×2 o 2×3 balanceado	Distribución equilibrada
+Comparativas	Reaparecer en línea secundaria o con mini sparkline	Storytelling temporal
+Tipografía	Jerarquía clara (KPI > variación > detalle)	Lectura más rápida
+Color	Verde/rojo solo para cambios, no para labels	Menos ruido visual
+Padding	+4 px interno en cards financieras	Mayor aire y armonía

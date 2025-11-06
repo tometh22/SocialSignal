@@ -2400,15 +2400,23 @@ const ProjectDetailsPage = () => {
                           }`}>
                             {((projectVM?.margin || 0) * 100).toFixed(1)}%
                           </div>
+                          {unifiedData?.previousPeriod?.hasData && (() => {
+                            const current = projectVM?.margin || 0;
+                            const previous = unifiedData.previousPeriod.metrics.margin || 0;
+                            if (previous > 0) {
+                              const changePoints = ((current - previous) * 100);
+                              const isPositive = changePoints >= 0;
+                              return (
+                                <div className={`flex items-center gap-1 text-xs ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                  {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                  {Math.abs(changePoints).toFixed(1)}pp
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
-                        <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${
-                              (projectVM?.margin || 0) * 100 >= 50 ? 'bg-green-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${Math.min(100, (projectVM?.margin || 0) * 100)}%` }}
-                          />
-                        </div>
+                        <div className="text-xs text-slate-400 mt-1">vs período anterior</div>
                       </div>
 
                       {/* Markup */}
@@ -2605,7 +2613,7 @@ const ProjectDetailsPage = () => {
                         <div className={`text-2xl font-bold ${(() => {
                           if (!projectVM?.estimatedHours || projectVM.estimatedHours === 0) return 'text-gray-400';
                           const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
-                          return eff >= 100 ? 'text-green-400' : eff >= 80 ? 'text-yellow-400' : 'text-red-400';
+                          return eff >= 90 ? 'text-green-400' : 'text-red-400';
                         })()}`}>
                           {(() => {
                             if (!projectVM?.estimatedHours || projectVM.estimatedHours === 0) return 'N/A';
@@ -2637,10 +2645,13 @@ const ProjectDetailsPage = () => {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div className="text-2xl font-bold text-yellow-400">
+                        <div className={`text-2xl font-bold ${(() => {
+                          const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
+                          return budgetUtil > 80 ? "text-red-400" : "text-green-400";
+                        })()}`}>
                           {((projectVM?.budgetUtilization || 0) * 100).toFixed(0)}%
                         </div>
-                        <div className="text-xs text-slate-400 mt-1">del total</div>
+                        <div className="text-xs text-slate-400 mt-1">del presupuesto</div>
                       </div>
                     </div>
                   </div>
