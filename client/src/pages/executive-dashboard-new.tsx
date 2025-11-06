@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { 
   TrendingUp, TrendingDown, Clock, DollarSign, 
@@ -29,12 +30,20 @@ import { motion } from "framer-motion";
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
 
   // Query principal: métricas agregadas del Star Schema SoT
-  const { data: dashboardMetrics, refetch: refetchMetrics } = useQuery({ 
-    queryKey: ['/api/dashboard/metrics'],
+  const { data: dashboardMetrics, refetch: refetchMetrics, isLoading } = useQuery({ 
+    queryKey: ['/api/dashboard/metrics', selectedPeriod ? { period: selectedPeriod } : undefined],
     staleTime: 3 * 60 * 1000
   });
+  
+  // Inicializar período seleccionado con el defaultPeriod del API
+  useEffect(() => {
+    if (dashboardMetrics && !selectedPeriod && dashboardMetrics.defaultPeriod) {
+      setSelectedPeriod(dashboardMetrics.defaultPeriod);
+    }
+  }, [dashboardMetrics, selectedPeriod]);
   
   const { data: quotations = [] } = useQuery({ 
     queryKey: ['/api/quotations'],
@@ -184,6 +193,28 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Selector de Período */}
+              {dashboardMetrics?.availablePeriods && dashboardMetrics.availablePeriods.length > 0 && (
+                <Select 
+                  value={selectedPeriod || dashboardMetrics.defaultPeriod || ''} 
+                  onValueChange={setSelectedPeriod}
+                >
+                  <SelectTrigger className="w-[140px] bg-white/10 border-white/20 text-white hover:bg-white/20">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dashboardMetrics.availablePeriods
+                      .filter(p => p.hasData)
+                      .map(period => (
+                        <SelectItem key={period.periodKey} value={period.periodKey}>
+                          {format(new Date(period.year, period.month - 1), 'MMMM yyyy', { locale: es })}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
               <Link href="/analytics-consolidated">
                 <Button variant="ghost" className="text-white hover:bg-white/10" size="sm">
                   <BarChart3 className="h-4 w-4 mr-2" />
@@ -193,11 +224,11 @@ export default function ExecutiveDashboard() {
               <Button 
                 variant="secondary"
                 onClick={handleRefresh}
-                disabled={refreshing}
+                disabled={refreshing || isLoading}
                 size="sm"
                 className="bg-white/10 hover:bg-white/20 text-white border-0"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing || isLoading ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
             </div>
