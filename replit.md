@@ -90,3 +90,47 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **cookie-parser**: For handling HTTP cookies.
 - **node-cron**: For scheduled task automation (daily SoT ETL synchronization).
 - **fuse.js**: For fuzzy string matching in project resolver.
+
+## Recent Changes
+
+### November 6, 2025 - UX/UI Color Palette Simplification
+**Objective:** Simplified color palette to green/red/gray across redesigned dashboard sections for better clarity and reduced cognitive load.
+
+**Sections Updated:**
+1. **Dashboard Header** (lines ~2050-2140)
+   - "Always-On" badge: purple → gray
+   - Client avatar gradient: blue/purple → gray
+
+2. **Performance General Block** (lines ~2280-2640)
+   - Unified Financial & Operational metrics
+   - Binary thresholds: Margin >= 50% → green, < 50% → red
+   - Markup >= 2x → green, < 2x → red
+   - Budget <= 80% → green, > 80% → red
+   - getThresholdColor() helper: removed yellow mid-tier values
+
+3. **Team Section - Horizontal Bars** (lines ~2637-2802)
+   - Progress bars: >= 100% → red, > 0% → green, 0% → gray
+   - Status badges: sobrecarga → red, normal → green
+   - Removed yellow/orange intermediate states
+
+4. **Team Tab - ProjectTeamSection** (lines ~615-900)
+   - getCardStyle(): simplified to 3 states (red/green/gray)
+   - Progress badges: >= 100% → red, > 0% → green, 0% → gray
+   - Empty state: purple → gray
+   - "No cotizado" badge: orange → gray
+   - "Parcial" badge: blue → gray
+
+5. **Intelligent Recommendations** (lines ~2806-3031)
+   - Critical/Warning (priority 1-2): red
+   - Success (priority 4): green
+   - Opportunities/Info (priority 3, 5): gray
+   - Removed orange/blue variants
+
+**Design Rationale:** Simplified 7-color palette (green/yellow/orange/red/blue/purple/gray) to 3-color system (green/red/gray) for:
+- Faster visual scanning
+- Clearer status differentiation
+- Reduced cognitive load
+- Improved accessibility
+
+**Files Modified:**
+- `client/src/pages/project-details-redesigned.tsx` - Comprehensive palette simplification across all redesigned sections

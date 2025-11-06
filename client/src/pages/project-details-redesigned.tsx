@@ -628,7 +628,7 @@ function ProjectTeamSection({
 
   if (!completeTeam || completeTeam.length === 0) {
     return (
-      <div className="text-center py-8 text-purple-500">
+      <div className="text-center py-8 text-gray-500">
         <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
         <p className="text-sm mb-3">No hay equipo asignado a este proyecto</p>
         <Button 
@@ -636,11 +636,11 @@ function ProjectTeamSection({
           size="sm"
           onClick={() => copyTeamMutation.mutate()}
           disabled={copyTeamMutation.isPending}
-          className="border-purple-200 hover:bg-purple-50"
+          className="border-gray-200 hover:bg-gray-50"
         >
           {copyTeamMutation.isPending ? (
             <>
-              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-purple-600" />
+              <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
               Copiando...
             </>
           ) : (
@@ -670,7 +670,7 @@ function ProjectTeamSection({
           const toleranceThreshold = referenceHours * 0.15; // 15% de tolerancia
           const isOverBudget = workedHours > (referenceHours + toleranceThreshold);
           
-          // Definir colores y estilos basados en el estado del miembro con umbrales corporativos realistas
+          // Definir colores y estilos basados en el estado del miembro - SIMPLIFICADO A VERDE/ROJO/GRIS
           const getCardStyle = () => {
             if (workedHours === 0) {
               return {
@@ -681,8 +681,8 @@ function ProjectTeamSection({
                 nameColor: "text-gray-700",
                 roleColor: "text-gray-500"
               };
-            } else if (isOverBudget) {
-              // Rojo: Exceso crítico (>15% sobre objetivo)
+            } else if (isOverBudget || progressPercent >= 100) {
+              // Rojo: Exceso crítico o completado
               return {
                 bgGradient: "bg-gradient-to-r from-red-50 to-red-100",
                 borderColor: "border-red-300",
@@ -691,44 +691,25 @@ function ProjectTeamSection({
                 nameColor: "text-red-900",
                 roleColor: "text-red-600"
               };
-            } else if (progressPercent >= 110) {
-              // Naranja: Advertencia (entre 100% y 115% - dentro de tolerancia pero elevado)
-              return {
-                bgGradient: "bg-gradient-to-r from-orange-50 to-orange-100",
-                borderColor: "border-orange-300",
-                textColor: "text-orange-700",
-                avatarBg: "bg-gradient-to-br from-orange-500 to-orange-600",
-                nameColor: "text-orange-900",
-                roleColor: "text-orange-700"
-              };
-            } else if (progressPercent >= 85) {
-              // Amarillo: Cerca del objetivo (85-100%)
-              return {
-                bgGradient: "bg-gradient-to-r from-yellow-50 to-yellow-100",
-                borderColor: "border-yellow-300",
-                textColor: "text-yellow-700",
-                avatarBg: "bg-gradient-to-br from-yellow-500 to-yellow-600",
-                nameColor: "text-yellow-900",
-                roleColor: "text-yellow-700"
-              };
             } else if (progressPercent > 0) {
               // Verde: En progreso normal
               return {
-                bgGradient: "bg-gradient-to-r from-green-50 to-emerald-100",
+                bgGradient: "bg-gradient-to-r from-green-50 to-green-100",
                 borderColor: "border-green-300",
                 textColor: "text-green-700",
-                avatarBg: "bg-gradient-to-br from-green-500 to-emerald-600",
+                avatarBg: "bg-gradient-to-br from-green-500 to-green-600",
                 nameColor: "text-green-900",
                 roleColor: "text-green-700"
               };
             } else {
+              // Gris: Sin progreso
               return {
-                bgGradient: "bg-gradient-to-r from-blue-50 to-blue-100",
-                borderColor: "border-blue-300",
-                textColor: "text-blue-700",
-                avatarBg: "bg-gradient-to-br from-blue-500 to-blue-600",
-                nameColor: "text-blue-900",
-                roleColor: "text-blue-700"
+                bgGradient: "bg-gradient-to-r from-gray-50 to-gray-100",
+                borderColor: "border-gray-300",
+                textColor: "text-gray-600",
+                avatarBg: "bg-gradient-to-br from-gray-400 to-gray-500",
+                nameColor: "text-gray-700",
+                roleColor: "text-gray-500"
               };
             }
           };
@@ -736,7 +717,7 @@ function ProjectTeamSection({
           const cardStyle = getCardStyle();
 
           return (
-            <div key={member.personnelId || member.id} className={`flex items-center justify-between p-3 border-l-4 ${cardStyle.borderColor} bg-white/60 backdrop-blur-sm rounded-lg hover:bg-white/80 transition-all duration-200 border border-gray-100 ${member.isUnquoted ? 'border-orange-300 bg-orange-50/30' : ''}`}>
+            <div key={member.personnelId || member.id} className={`flex items-center justify-between p-3 border-l-4 ${cardStyle.borderColor} bg-white/60 backdrop-blur-sm rounded-lg hover:bg-white/80 transition-all duration-200 border border-gray-100 ${member.isUnquoted ? 'border-gray-400 bg-gray-50/30' : ''}`}>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <div className={`w-10 h-10 ${cardStyle.avatarBg} rounded-full flex items-center justify-center shadow-sm`}>
@@ -744,11 +725,10 @@ function ProjectTeamSection({
                       {(member.actualName || 'MB').split(' ').map((n: string) => n.charAt(0)).join('').toUpperCase()}
                     </span>
                   </div>
-                  {/* Badge de progreso - más discreto pero legible */}
+                  {/* Badge de progreso - simplificado a verde/rojo/gris */}
                   <div className={`absolute -top-0.5 -right-0.5 min-w-[20px] h-[20px] rounded-full flex items-center justify-center text-[10px] font-bold shadow-md border border-white ${
-                    progressPercent >= 100 ? 'bg-green-600 text-white' : 
-                    progressPercent >= 80 ? 'bg-yellow-500 text-white' : 
-                    progressPercent > 0 ? 'bg-blue-600 text-white' :
+                    progressPercent >= 100 ? 'bg-red-600 text-white' : 
+                    progressPercent > 0 ? 'bg-green-600 text-white' :
                     'bg-gray-400 text-white'
                   }`}>
                     {progressPercent}
@@ -758,7 +738,7 @@ function ProjectTeamSection({
                   <div className={`font-medium text-sm ${cardStyle.nameColor} flex items-center gap-2`}>
                     {member.actualName || 'Miembro del Equipo'}
                     {member.isUnquoted && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-300 text-orange-700 bg-orange-50">
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 border-gray-400 text-gray-700 bg-gray-50">
                         No cotizado
                       </Badge>
                     )}
@@ -789,7 +769,7 @@ function ProjectTeamSection({
                     ) : targetHours > 0 ? (
                       <>de {targetHours.toFixed(0)}h estimadas {member.timeMultiplier > 1 ? `(x${member.timeMultiplier})` : ''}</>
                     ) : (
-                      <span className="text-orange-500">Sin horas asignadas</span>
+                      <span className="text-gray-500">Sin horas asignadas</span>
                     )}
                   </div>
                 </div>
@@ -800,8 +780,7 @@ function ProjectTeamSection({
                     <div className="w-24 bg-gray-100 rounded-full h-2 cursor-pointer relative overflow-hidden">
                       <div 
                         className={`h-2 rounded-full transition-all duration-300 ${
-                          isOverBudget ? 'bg-red-500' :
-                          progressPercent >= 80 ? 'bg-yellow-500' :
+                          isOverBudget || progressPercent >= 100 ? 'bg-red-500' :
                           progressPercent > 0 ? 'bg-green-500' :
                           'bg-gray-400'
                         }`}
@@ -814,7 +793,7 @@ function ProjectTeamSection({
                       <div>Trabajadas: {workedHours.toFixed(1)}h</div>
                       {member.targetHours > 0 ? (
                         <>
-                          <div className="text-blue-600 font-medium">
+                          <div className="text-gray-700 font-medium">
                             Objetivo estimado: {member.targetHours}h
                           </div>
                           {targetHours > 0 && (
@@ -823,7 +802,7 @@ function ProjectTeamSection({
                             </div>
                           )}
                           <div>Progreso vs objetivo: {progressPercent}%</div>
-                          <div className="text-orange-600">
+                          <div className="text-gray-700">
                             Eficiencia: {((member.targetHours / Math.max(workedHours, 0.1)) * 100).toFixed(0)}%
                           </div>
                         </>
@@ -833,7 +812,7 @@ function ProjectTeamSection({
                           <div>Progreso: {progressPercent}%</div>
                         </>
                       ) : (
-                        <div className="text-orange-500">
+                        <div className="text-gray-500">
                           ⚠️ Sin horas de referencia asignadas
                         </div>
                       )}
@@ -855,7 +834,7 @@ function ProjectTeamSection({
                     Completado
                   </Badge>
                 ) : (
-                  <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 border-blue-200">
+                  <Badge variant="secondary" className="text-[10px] px-2 py-0.5 bg-gray-50 text-gray-700 border-gray-200">
                     Parcial
                   </Badge>
                 )}
@@ -932,21 +911,18 @@ function Sparkline({ data, color = "white", className = "" }: { data: number[], 
   );
 }
 
-// 🎨 Get threshold color for KPIs
+// 🎨 Get threshold color for KPIs - SIMPLIFICADO A VERDE/ROJO
 function getThresholdColor(value: number, metric: 'margin' | 'markup' | 'roi'): string {
   if (metric === 'margin') {
     if (value >= 30) return 'text-green-400';
-    if (value >= 15) return 'text-yellow-300';
     return 'text-red-400';
   }
   if (metric === 'markup') {
     if (value >= 2.0) return 'text-green-400';
-    if (value >= 1.5) return 'text-yellow-300';
     return 'text-red-400';
   }
   if (metric === 'roi') {
     if (value >= 50) return 'text-green-400';
-    if (value >= 25) return 'text-yellow-300';
     return 'text-red-400';
   }
   return 'text-white';
@@ -2121,7 +2097,7 @@ const ProjectDetailsPage = () => {
                   {metrics[3]?.value}
                 </Badge>
                 {projectData.isAlwaysOnMacro && (
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs py-1">
+                  <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200 text-xs py-1">
                     Always-On
                   </Badge>
                 )}
@@ -2140,7 +2116,7 @@ const ProjectDetailsPage = () => {
                       />
                     </div>
                   ) : (
-                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                    <div className="w-5 h-5 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center">
                       <span className="text-white text-xs font-bold">
                         {clientName.charAt(0).toUpperCase()}
                       </span>
@@ -2391,8 +2367,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className="flex items-baseline gap-2">
                           <div className={`text-2xl font-bold ${
-                            (projectVM?.margin || 0) * 100 >= 60 ? 'text-green-400' :
-                            (projectVM?.margin || 0) * 100 >= 40 ? 'text-yellow-400' : 'text-red-400'
+                            (projectVM?.margin || 0) * 100 >= 50 ? 'text-green-400' : 'text-red-400'
                           }`}>
                             {((projectVM?.margin || 0) * 100).toFixed(1)}%
                           </div>
@@ -2400,8 +2375,7 @@ const ProjectDetailsPage = () => {
                         <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                           <div 
                             className={`h-full ${
-                              (projectVM?.margin || 0) * 100 >= 60 ? 'bg-green-500' :
-                              (projectVM?.margin || 0) * 100 >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                              (projectVM?.margin || 0) * 100 >= 50 ? 'bg-green-500' : 'bg-red-500'
                             }`}
                             style={{ width: `${Math.min(100, (projectVM?.margin || 0) * 100)}%` }}
                           />
@@ -2425,7 +2399,7 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className={`text-2xl font-bold ${(() => {
                           const markup = projectVM?.markup || 0;
-                          return markup >= 3 ? "text-green-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
+                          return markup >= 2 ? "text-green-400" : "text-red-400";
                         })()}`}>
                           {(() => {
                             const markup = projectVM?.markup || 0;
@@ -2458,11 +2432,11 @@ const ProjectDetailsPage = () => {
                         </div>
                         <div className={`text-2xl font-bold ${(() => {
                           const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
-                          return budgetUtil > 85 ? "text-red-400" : budgetUtil > 60 ? "text-yellow-400" : "text-green-400";
+                          return budgetUtil > 80 ? "text-red-400" : "text-green-400";
                         })()}`}>
                           {(() => {
                             const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
-                            return budgetUtil <= 60 ? "Saludable" : budgetUtil <= 85 ? "Atención" : "Crítico";
+                            return budgetUtil <= 80 ? "Saludable" : "Crítico";
                           })()}
                         </div>
                         <div className="text-xs text-slate-400 mt-1">
@@ -2724,7 +2698,7 @@ const ProjectDetailsPage = () => {
                             const hours = member.hoursAsana || 0;
                             const target = member.targetHours || 0;
                             const utilization = target > 0 ? (hours / target) * 100 : 0;
-                            const status = hours > 80 ? 'sobrecarga' : hours > 50 ? 'intenso' : hours > 20 ? 'normal' : 'bajo';
+                            const status = hours > 80 ? 'sobrecarga' : 'normal';
                             
                             return (
                               <div key={index} className="group">
@@ -2753,14 +2727,10 @@ const ProjectDetailsPage = () => {
                                           variant="outline" 
                                           className={`text-xs ${
                                             status === 'sobrecarga' ? 'border-red-500 text-red-700 bg-red-50' :
-                                            status === 'intenso' ? 'border-yellow-500 text-yellow-700 bg-yellow-50' :
-                                            status === 'normal' ? 'border-green-500 text-green-700 bg-green-50' :
-                                            'border-gray-400 text-gray-600 bg-gray-50'
+                                            'border-green-500 text-green-700 bg-green-50'
                                           }`}
                                         >
-                                          {status === 'sobrecarga' ? '⚠️ Sobrecarga' :
-                                           status === 'intenso' ? '🔥 Intenso' :
-                                           status === 'normal' ? '✓ Normal' : '○ Bajo'}
+                                          {status === 'sobrecarga' ? '⚠️ Sobrecarga' : '✓ Normal'}
                                         </Badge>
                                       </div>
                                     </div>
@@ -2769,9 +2739,7 @@ const ProjectDetailsPage = () => {
                                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div 
                                           className={`h-full transition-all ${
-                                            status === 'sobrecarga' ? 'bg-red-500' :
-                                            status === 'intenso' ? 'bg-yellow-500' :
-                                            status === 'normal' ? 'bg-green-500' : 'bg-gray-400'
+                                            status === 'sobrecarga' ? 'bg-red-500' : 'bg-green-500'
                                           }`}
                                           style={{ width: `${Math.min(100, utilization)}%` }}
                                         />
@@ -2861,11 +2829,11 @@ const ProjectDetailsPage = () => {
                           value: `${totalOvertime}h extras`,
                           description: `${names} trabajó${overworkedMembers.length > 1 ? 'aron' : 'ó'} más de 80h. Riesgo de burnout.`,
                           action: 'Redistribuir carga',
-                          color: 'orange',
-                          borderColor: 'border-orange-500',
-                          bgColor: 'bg-orange-50',
-                          textColor: 'text-orange-700',
-                          badgeColor: 'bg-orange-600'
+                          color: 'red',
+                          borderColor: 'border-red-500',
+                          bgColor: 'bg-red-50',
+                          textColor: 'text-red-700',
+                          badgeColor: 'bg-red-600'
                         });
                       } else if (budgetUsed > 75 && budgetUsed <= 85) {
                         recommendations.push({
@@ -2877,11 +2845,11 @@ const ProjectDetailsPage = () => {
                           value: formatCurrency(remainingBudget, projectVM?.currencyNative || 'USD'),
                           description: `Con ${budgetUsed.toFixed(0)}% usado, quedan aprox. ${Math.ceil(remainingBudget / 100)}h de trabajo.`,
                           action: 'Priorizar críticos',
-                          color: 'orange',
-                          borderColor: 'border-orange-500',
-                          bgColor: 'bg-orange-50',
-                          textColor: 'text-orange-700',
-                          badgeColor: 'bg-orange-600'
+                          color: 'red',
+                          borderColor: 'border-red-500',
+                          bgColor: 'bg-red-50',
+                          textColor: 'text-red-700',
+                          badgeColor: 'bg-red-600'
                         });
                       }
                       
@@ -2897,11 +2865,11 @@ const ProjectDetailsPage = () => {
                           value: `${markup.toFixed(1)}x actual`,
                           description: `Para proyectos similares, cotiza mín. ${formatCurrency(targetMarkup, projectVM?.currencyNative || 'USD')} (markup 1.8x).`,
                           action: 'Ver estrategia',
-                          color: 'blue',
-                          borderColor: 'border-blue-500',
-                          bgColor: 'bg-blue-50',
-                          textColor: 'text-blue-700',
-                          badgeColor: 'bg-blue-600'
+                          color: 'gray',
+                          borderColor: 'border-gray-400',
+                          bgColor: 'bg-gray-50',
+                          textColor: 'text-gray-700',
+                          badgeColor: 'bg-gray-600'
                         });
                       } else if (budgetUsed < 30) {
                         const monthsElapsed = Math.ceil((Date.now() - new Date(unifiedData?.project?.startDate || Date.now()).getTime()) / (1000 * 60 * 60 * 24 * 30));
@@ -2914,11 +2882,11 @@ const ProjectDetailsPage = () => {
                           value: `${budgetUsed.toFixed(0)}% usado`,
                           description: `En ${monthsElapsed} mes(es), puedes acelerar aprox. ${Math.floor(remainingBudget / 150)} días más de trabajo.`,
                           action: 'Ampliar scope',
-                          color: 'blue',
-                          borderColor: 'border-blue-500',
-                          bgColor: 'bg-blue-50',
-                          textColor: 'text-blue-700',
-                          badgeColor: 'bg-blue-600'
+                          color: 'gray',
+                          borderColor: 'border-gray-400',
+                          bgColor: 'bg-gray-50',
+                          textColor: 'text-gray-700',
+                          badgeColor: 'bg-gray-600'
                         });
                       }
                       
