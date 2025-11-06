@@ -2288,8 +2288,8 @@ const ProjectDetailsPage = () => {
               </div>
             ) : (
               <>
-            {/* EXECUTIVE DASHBOARD HEADER */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white">
+            {/* EXECUTIVE DASHBOARD HEADER - REDISEÑADO UX/UI */}
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-8 text-white shadow-lg">
               {console.log('🔍 DELTA DEBUG:', {
                 hasPreviousPeriod: !!unifiedData?.previousPeriod,
                 hasData: unifiedData?.previousPeriod?.hasData,
@@ -2298,217 +2298,329 @@ const ProjectDetailsPage = () => {
                 currentCost: projectVM?.costDisplay,
                 currentHours: projectVM?.totalHours
               })}
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              
+              {/* Header with subtitle */}
+              <div className="mb-8">
+                <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <Gauge className="h-7 w-7" />
+                  </div>
+                  Performance General
+                </h2>
+                <p className="text-slate-300 text-sm ml-15">
+                  Indicadores clave del proyecto en el período seleccionado
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
-                {/* Project KPI Overview */}
-                <div className="lg:col-span-2">
-                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Gauge className="h-6 w-6" />
-                    </div>
-                    Resumen Ejecutivo
-                  </h2>
+                {/* SECCIÓN FINANCIERA */}
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <DollarSign className="h-5 w-5 text-green-400" />
+                    <h3 className="text-xl font-semibold">Financiera</h3>
+                  </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Markup Real */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-300">Markup del Proyecto</span>
-                        {unifiedData?.previousPeriod?.hasData && (
-                          <DeltaBadge
-                            currentValue={projectVM?.markup || 0}
-                            previousValue={unifiedData.previousPeriod.metrics?.markup || 0}
-                            format="multiplier"
-                            showValue={false}
+                  <div className="space-y-4">
+                    {/* Ingresos - Destacado */}
+                    <div className="bg-slate-800 rounded-lg p-5 border border-slate-600">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 text-slate-300 text-sm mb-1">
+                            Ingresos Generados
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Info className="h-3.5 w-3.5 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-xs">Total de ingresos facturados al cliente en el período seleccionado</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <div className="text-3xl font-bold text-green-400">
+                            {projectVM ? formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative) : '$0'}
+                          </div>
+                        </div>
+                      </div>
+                      <Progress value={Math.min(100, (projectVM?.budgetUtilization || 0) * 100)} className="h-2" />
+                    </div>
+
+                    {/* Grid de métricas financieras */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Costos */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Costos del Período
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Suma de todos los costos de equipo y recursos en el período</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="text-2xl font-bold text-orange-400">
+                          {projectVM ? formatCurrency(projectVM.costDisplay, projectVM.currencyNative) : '$0'}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          {unifiedData?.previousPeriod?.hasData && (
+                            <>vs período anterior</>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Margen */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Margen de Ganancia
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Porcentaje de ganancia sobre los ingresos: (Ingresos - Costos) / Ingresos</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <div className={`text-2xl font-bold ${
+                            (projectVM?.margin || 0) * 100 >= 60 ? 'text-green-400' :
+                            (projectVM?.margin || 0) * 100 >= 40 ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {((projectVM?.margin || 0) * 100).toFixed(1)}%
+                          </div>
+                        </div>
+                        <div className="mt-2 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${
+                              (projectVM?.margin || 0) * 100 >= 60 ? 'bg-green-500' :
+                              (projectVM?.margin || 0) * 100 >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (projectVM?.margin || 0) * 100)}%` }}
                           />
-                        )}
+                        </div>
                       </div>
-                      <div className={`text-2xl font-bold ${(() => {
-                        const markup = projectVM?.markup || 0;
-                        return markup >= 3 ? "text-green-400" : markup >= 2.5 ? "text-blue-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
-                      })()}`}>
-                        {(() => {
+
+                      {/* Markup */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Factor de Ganancia (Markup)
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Cuántas veces multiplicás tu costo para obtener el precio de venta. Markup = Ingresos / Costos</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className={`text-2xl font-bold ${(() => {
                           const markup = projectVM?.markup || 0;
-                          return markup > 0 ? `${markup.toFixed(1)}x` : "N/A";
-                        })()}
+                          return markup >= 3 ? "text-green-400" : markup >= 2 ? "text-yellow-400" : "text-red-400";
+                        })()}`}>
+                          {(() => {
+                            const markup = projectVM?.markup || 0;
+                            return markup > 0 ? `${markup.toFixed(1)}x` : "N/A";
+                          })()}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          ROI: {(() => {
+                            const markup = projectVM?.markup || 0;
+                            const roi = markup > 0 ? ((markup - 1) * 100).toFixed(0) : '0';
+                            return markup > 0 ? `+${roi}%` : "N/A";
+                          })()}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400">Factor de ganancia real</div>
-                    </div>
 
-                    {/* ROI Indicator */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-300">ROI Performance</span>
-                        {unifiedData?.previousPeriod?.hasData && (() => {
-                          const currentMarkup = projectVM?.markup || 0;
-                          const previousMarkup = unifiedData.previousPeriod.metrics?.markup || 0;
-                          const currentROI = currentMarkup > 0 ? (currentMarkup - 1) * 100 : 0;
-                          const previousROI = previousMarkup > 0 ? (previousMarkup - 1) * 100 : 0;
-                          return (
-                            <DeltaBadge
-                              currentValue={currentROI}
-                              previousValue={previousROI}
-                              format="percentage"
-                              showValue={false}
-                            />
-                          );
-                        })()}
-                      </div>
-                      <div className="text-2xl font-bold text-blue-400">
-                        {(() => {
-                          const markup = projectVM?.markup || 0;
-                          const roi = markup > 0 ? ((markup - 1) * 100).toFixed(0) : '0';
-                          return markup > 0 ? `+${roi}%` : "N/A";
-                        })()}
-                      </div>
-                      <div className="text-xs text-slate-400">vs proyección inicial</div>
-                    </div>
-
-                    {/* Team Performance */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-300">Velocidad del Equipo</span>
-                        {unifiedData?.previousPeriod?.hasData && (
-                          <DeltaBadge
-                            currentValue={projectVM?.totalHours || 0}
-                            previousValue={unifiedData.previousPeriod.metrics?.totalHours || 0}
-                            format="hours"
-                            showValue={false}
-                          />
-                        )}
-                      </div>
-                      <div className="text-2xl font-bold text-purple-400">
-                        {Math.round((projectVM?.totalHours || 0) / 4)} h/sem
-                      </div>
-                      <div className="text-xs text-slate-400">Período actual</div>
-                    </div>
-
-                    {/* Budget Status */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-300">Estado Presupuesto</span>
-                        {unifiedData?.previousPeriod?.hasData && (() => {
-                          const currentBU = (projectVM?.budgetUtilization || 0) * 100;
-                          const previousCost = unifiedData.previousPeriod.metrics?.teamCostUSD || 0;
-                          const currentCost = projectVM?.costDisplay || projectVM?.teamCostUSD || 0;
-                          const cotizacion = (unifiedData as any)?.project?.cotizacion || 1;
-                          const previousBU = cotizacion > 0 ? (previousCost / cotizacion) * 100 : 0;
-                          return (
-                            <DeltaBadge
-                              currentValue={currentBU}
-                              previousValue={previousBU}
-                              format="percentage"
-                              showValue={false}
-                              reverse={true}
-                            />
-                          );
-                        })()}
-                      </div>
-                      <div className={`text-2xl font-bold ${(() => {
-                        const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
-                        return budgetUtil > 85 ? "text-red-400" : budgetUtil > 60 ? "text-yellow-400" : "text-green-400";
-                      })()}`}>
-                        {(() => {
+                      {/* Presupuesto Restante */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Presupuesto Restante
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Porcentaje del presupuesto total que aún no se ha consumido</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className={`text-2xl font-bold ${(() => {
                           const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
-                          return budgetUtil <= 60 ? "Saludable" : budgetUtil <= 85 ? "Atención" : "Crítico";
-                        })()}
-                      </div>
-                      <div className="text-xs text-slate-400">
-                        {Math.max(0, 100 - ((projectVM?.budgetUtilization || 0) * 100)).toFixed(0)}% restante
+                          return budgetUtil > 85 ? "text-red-400" : budgetUtil > 60 ? "text-yellow-400" : "text-green-400";
+                        })()}`}>
+                          {(() => {
+                            const budgetUtil = (projectVM?.budgetUtilization || 0) * 100;
+                            return budgetUtil <= 60 ? "Saludable" : budgetUtil <= 85 ? "Atención" : "Crítico";
+                          })()}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          {Math.max(0, 100 - ((projectVM?.budgetUtilization || 0) * 100)).toFixed(0)}% disponible
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Financial Overview */}
-                <div className="lg:col-span-2">
-                  <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Rendimiento Financiero
-                  </h3>
+                {/* SECCIÓN OPERATIVA */}
+                <div>
+                  <div className="flex items-center gap-2 mb-6">
+                    <Users className="h-5 w-5 text-blue-400" />
+                    <h3 className="text-xl font-semibold">Operativa</h3>
+                  </div>
                   
                   <div className="space-y-4">
-                    {/* Revenue Bar */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-slate-300">Ingresos Generados</span>
-                        <span className="text-2xl font-bold text-green-400">
-                          {(() => {
-                            // 🎯 USAR SUMMARY: Fuente única de verdad desde view-aggregator
-                            if (projectVM) {
-                              return formatCurrency(projectVM.revenueDisplay, projectVM.currencyNative);
-                            }
-                            // Fallback legacy
-                            return `$${(unifiedData?.quotation?.totalAmount || 0).toLocaleString()}`;
-                          })()}
-                        </span>
+                    {/* Horas trabajadas - Destacado */}
+                    <div className="bg-slate-800 rounded-lg p-5 border border-slate-600">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-slate-300 text-sm mb-1">
+                            Horas Trabajadas en el Período
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Info className="h-3.5 w-3.5 cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs">
+                                  <p className="text-xs">Total de horas registradas por el equipo en Asana durante el período seleccionado</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <div className="text-3xl font-bold text-purple-400">
+                            {(projectVM?.totalHours || 0).toFixed(1)}h
+                          </div>
+                          <div className="text-sm text-slate-400 mt-1">
+                            Promedio: {Math.round((projectVM?.totalHours || 0) / 4)}h por semana
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-700 rounded-full h-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (projectVM?.budgetUtilization || 0) * 100)}%` }}
-                        ></div>
+                      <Progress 
+                        value={Math.min(100, ((projectVM?.totalHours || 0) / (projectVM?.estimatedHours || 1)) * 100)} 
+                        className="h-2" 
+                      />
+                      <div className="text-xs text-slate-400 mt-2">
+                        {(projectVM?.estimatedHours || 0) > 0 && (
+                          <>{Math.max(0, (projectVM?.estimatedHours || 0) - (projectVM?.totalHours || 0)).toFixed(1)}h estimadas restantes</>
+                        )}
                       </div>
                     </div>
 
-                    {/* Key Metrics Grid - All Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {/* Costos */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 mb-1">Costos</div>
-                        <div className="text-lg font-bold text-orange-400">
-                          {(() => {
-                            if (projectVM) {
-                              return formatCurrency(projectVM.costDisplay, projectVM.currencyNative);
-                            }
-                            return '$0';
-                          })()}
+                    {/* Grid operativo */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {/* Equipo Activo */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Equipo Activo
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Cantidad de personas que trabajaron en el proyecto durante este período</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
-                        {unifiedData?.previousPeriod?.hasData && (
-                          <div className="mt-1">
-                            <DeltaBadge
-                              currentValue={projectVM?.costDisplay || 0}
-                              previousValue={unifiedData.previousPeriod.metrics?.teamCostUSD || 0}
-                              format="currency"
-                              showValue={false}
-                              reverse={true}
-                            />
-                          </div>
-                        )}
+                        <div className="text-2xl font-bold text-blue-400">
+                          {(projectVM?.teamBreakdown || []).length}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">miembros</div>
                       </div>
 
-                      {/* Margen */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 mb-1">Margen</div>
-                        <div className="text-lg font-bold text-emerald-400">
-                          {((projectVM?.margin || 0) * 100).toFixed(1)}%
+                      {/* Carga Promedio */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Carga Promedio por Persona
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Promedio de horas trabajadas por cada miembro del equipo</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="text-2xl font-bold text-cyan-400">
+                          {(() => {
+                            const team = projectVM?.teamBreakdown || [];
+                            const avg = team.length > 0 
+                              ? (projectVM?.totalHours || 0) / team.length 
+                              : 0;
+                            return avg.toFixed(1);
+                          })()}h
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">por persona</div>
+                      </div>
+
+                      {/* Eficiencia */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Eficiencia del Proyecto
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Relación entre horas estimadas y horas reales trabajadas. Mayor eficiencia = mejor</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className={`text-2xl font-bold ${(() => {
+                          if (!projectVM?.estimatedHours || projectVM.estimatedHours === 0) return 'text-gray-400';
+                          const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                          return eff >= 100 ? 'text-green-400' : eff >= 80 ? 'text-yellow-400' : 'text-red-400';
+                        })()}`}>
+                          {(() => {
+                            if (!projectVM?.estimatedHours || projectVM.estimatedHours === 0) return 'N/A';
+                            const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                            return `${eff.toFixed(0)}%`;
+                          })()}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          {(() => {
+                            if (!projectVM?.estimatedHours || projectVM.estimatedHours === 0) return 'Sin estimación';
+                            const eff = (projectVM.estimatedHours / Math.max(projectVM.totalHours, 0.1)) * 100;
+                            return eff >= 100 ? 'Por debajo de estimado' : 'Por encima de estimado';
+                          })()}
                         </div>
                       </div>
-                      
-                      {/* Total Trabajado */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 mb-1">Total Trabajado</div>
-                        <div className="text-lg font-bold text-purple-400">
-                          {(projectVM?.totalHours || 0).toFixed(1)}h
-                        </div>
-                        {unifiedData?.previousPeriod?.hasData && (
-                          <div className="mt-1">
-                            <DeltaBadge
-                              currentValue={projectVM?.totalHours || 0}
-                              previousValue={unifiedData.previousPeriod.metrics?.totalHours || 0}
-                              format="hours"
-                              showValue={false}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
+
                       {/* Presupuesto Usado */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
-                        <div className="text-xs text-slate-400 mb-1">Presupuesto Usado</div>
-                        <div className="text-lg font-bold text-cyan-400">
+                      <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                          Presupuesto Utilizado
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-3 w-3 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">Porcentaje del presupuesto total que ya se ha consumido</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <div className="text-2xl font-bold text-yellow-400">
                           {((projectVM?.budgetUtilization || 0) * 100).toFixed(0)}%
                         </div>
+                        <div className="text-xs text-slate-400 mt-1">del total</div>
                       </div>
                     </div>
                   </div>
