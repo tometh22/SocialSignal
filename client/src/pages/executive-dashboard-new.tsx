@@ -30,24 +30,14 @@ import { motion } from "framer-motion";
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
 
-  // Queries para datos esenciales
-  const { data: activeProjects = [] } = useQuery({ 
-    queryKey: ['/api/active-projects'],
+  // Query principal: métricas agregadas del Star Schema SoT
+  const { data: dashboardMetrics, refetch: refetchMetrics } = useQuery({ 
+    queryKey: ['/api/dashboard/metrics'],
     staleTime: 3 * 60 * 1000
   });
   
   const { data: quotations = [] } = useQuery({ 
     queryKey: ['/api/quotations'],
-    staleTime: 5 * 60 * 1000
-  });
-  
-  const { data: timeEntries = [] } = useQuery({ 
-    queryKey: ['/api/time-entries'],
-    staleTime: 2 * 60 * 1000
-  });
-
-  const { data: deliverables = [] } = useQuery({ 
-    queryKey: ['/api/deliverables'],
     staleTime: 5 * 60 * 1000
   });
 
@@ -56,190 +46,106 @@ export default function ExecutiveDashboard() {
     staleTime: 10 * 60 * 1000
   });
 
-  // Calcular métricas del día
-  const todayMetrics = useMemo(() => {
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    
-    // Entradas de tiempo de hoy
-    const todayEntries = timeEntries.filter(entry => 
-      entry.date && entry.date.startsWith(todayStr)
-    );
-    
-    const hoursToday = todayEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-    const peopleWorking = new Set(todayEntries.map(entry => entry.personnelId)).size;
-    
-    // Entregables del mes
-    const thisMonth = format(today, 'yyyy-MM');
-    const monthDeliverables = deliverables.filter(d => 
-      d.createdAt && d.createdAt.startsWith(thisMonth)
-    );
+  // Métricas consolidadas del mes actual (Star Schema SoT)
+  const currentMetrics = useMemo(() => {
+    if (!dashboardMetrics) {
+      return {
+        totalHoursMonth: 0,
+        peopleWorking: 0,
+        activeProjects: 0,
+        pendingQuotations: 0,
+        avgMargin: 0,
+        avgMarkup: 0,
+        avgBudgetUtil: 0,
+        totalRevenue: 0,
+        totalCost: 0
+      };
+    }
     
     return {
-      hoursToday,
-      peopleWorking,
-      deliverablesThisMonth: monthDeliverables.length,
-      activeProjectsCount: activeProjects.filter(p => p.status === 'active').length
+      totalHoursMonth: dashboardMetrics.monthMetrics.totalHoursMonth,
+      peopleWorking: dashboardMetrics.monthMetrics.peopleWorking,
+      activeProjects: dashboardMetrics.monthMetrics.activeProjects,
+      pendingQuotations: dashboardMetrics.alerts.pendingQuotationsCount,
+      avgMargin: dashboardMetrics.monthMetrics.avgMargin,
+      avgMarkup: dashboardMetrics.monthMetrics.avgMarkup,
+      avgBudgetUtil: dashboardMetrics.monthMetrics.avgBudgetUtil,
+      totalRevenue: dashboardMetrics.monthMetrics.totalRevenue,
+      totalCost: dashboardMetrics.monthMetrics.totalCostUSD
     };
-  }, [timeEntries, deliverables, activeProjects]);
+  }, [dashboardMetrics]);
 
-  // Actividad reciente (últimas 48 horas)
+  // Actividad reciente: cotizaciones de los últimos 7 días
   const recentActivity = useMemo(() => {
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
-    const activities = [];
-    
-    // Nuevas cotizaciones
-    quotations
-      .filter(q => q.createdAt && new Date(q.createdAt) > twoDaysAgo)
-      .forEach(q => {
-        // Buscar el nombre del cliente usando clientId
+    const activities = quotations
+      .filter(q => q.createdAt && new Date(q.createdAt) > sevenDaysAgo)
+      .map(q => {
         const client = clients.find(c => c.id === q.clientId);
         const clientName = client?.name || 'Cliente desconocido';
         
-        activities.push({
+        return {
           id: `quote-${q.id}`,
-          type: 'quotation',
+          type: 'quotation' as const,
           title: 'Nueva cotización creada',
           description: `${q.projectName} - ${clientName}`,
           time: new Date(q.createdAt),
           icon: FileSignature,
-          color: 'text-blue-600'
-        });
-      });
+          color: 'text-blue-600',
+          status: q.status
+        };
+      })
+      .sort((a, b) => b.time.getTime() - a.time.getTime())
+      .slice(0, 10);
     
-    // Proyectos iniciados
-    activeProjects
-      .filter(p => p.createdAt && new Date(p.createdAt) > twoDaysAgo)
-      .forEach(p => {
-        activities.push({
-          id: `project-${p.id}`,
-          type: 'project',
-          title: 'Proyecto iniciado',
-          description: p.quotation?.projectName || 'Sin nombre',
-          time: new Date(p.createdAt),
-          icon: PlayCircle,
-          color: 'text-green-600'
-        });
-      });
-    
-    // Entregables completados
-    deliverables
-      .filter(d => d.completedDate && new Date(d.completedDate) > twoDaysAgo)
-      .forEach(d => {
-        activities.push({
-          id: `deliverable-${d.id}`,
-          type: 'deliverable',
-          title: 'Entregable completado',
-          description: d.title,
-          time: new Date(d.completedDate),
-          icon: CheckCircle,
-          color: 'text-emerald-600'
-        });
-      });
-    
-    // Ordenar por tiempo descendente
-    return activities.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 10);
-  }, [quotations, activeProjects, deliverables, clients]);
+    return activities;
+  }, [quotations, clients]);
 
-  // Alertas inteligentes
+  // Alertas inteligentes del Star Schema SoT
   const alerts = useMemo(() => {
+    if (!dashboardMetrics) return [];
+    
     const alertList = [];
     
-    // Proyectos sin actividad reciente
-    const inactiveProjects = activeProjects.filter(project => {
-      if (project.status !== 'active') return false;
-      
-      const projectEntries = timeEntries.filter(e => e.projectId === project.id);
-      if (projectEntries.length === 0) return true;
-      
-      const lastEntry = projectEntries
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      
-      const daysSinceLastActivity = (new Date().getTime() - new Date(lastEntry.date).getTime()) / (1000 * 60 * 60 * 24);
-      return daysSinceLastActivity > 7;
-    });
-    
-    if (inactiveProjects.length > 0) {
+    // Proyectos sin actividad reciente (del Star Schema)
+    if (dashboardMetrics.alerts.inactiveProjectsCount > 0) {
       alertList.push({
         id: 'inactive-projects',
         type: 'warning',
-        message: `${inactiveProjects.length} proyectos sin actividad en los últimos 7 días`,
+        message: `${dashboardMetrics.alerts.inactiveProjectsCount} proyectos sin actividad en el último mes`,
         action: '/active-projects'
       });
     }
     
-    // Cotizaciones pendientes antiguas
-    const oldPendingQuotes = quotations.filter(q => {
-      if (q.status !== 'pending') return false;
-      const daysSinceCreation = (new Date().getTime() - new Date(q.createdAt).getTime()) / (1000 * 60 * 60 * 24);
-      return daysSinceCreation > 14;
-    });
-    
-    if (oldPendingQuotes.length > 0) {
+    // Cotizaciones pendientes
+    if (dashboardMetrics.alerts.pendingQuotationsCount > 0) {
       alertList.push({
-        id: 'old-quotes',
+        id: 'pending-quotes',
         type: 'urgent',
-        message: `${oldPendingQuotes.length} cotizaciones pendientes por más de 14 días`,
+        message: `${dashboardMetrics.alerts.pendingQuotationsCount} cotizaciones pendientes requieren atención`,
         action: '/quotations'
       });
     }
     
-    // Proyectos cerca del límite de presupuesto
-    const budgetRiskProjects = activeProjects.filter(project => {
-      if (!project.quotation?.baseCost) return false;
-      
-      const projectEntries = timeEntries.filter(e => e.projectId === project.id);
-      const totalCost = projectEntries.reduce((sum, entry) => {
-        const rate = entry.hourlyRateAtTime || 50;
-        return sum + (entry.hours * rate);
-      }, 0);
-      
-      const budgetUsage = (totalCost / project.quotation.baseCost) * 100;
-      return budgetUsage > 80;
-    });
-    
-    if (budgetRiskProjects.length > 0) {
+    // Alerta de presupuesto promedio alto
+    if (dashboardMetrics.monthMetrics.avgBudgetUtil > 0.8) {
       alertList.push({
         id: 'budget-risk',
         type: 'critical',
-        message: `${budgetRiskProjects.length} proyectos superan el 80% del presupuesto`,
+        message: `Utilización de presupuesto promedio en ${(dashboardMetrics.monthMetrics.avgBudgetUtil * 100).toFixed(0)}% - revisar proyectos`,
         action: '/active-projects'
       });
     }
     
     return alertList;
-  }, [activeProjects, timeEntries, quotations]);
+  }, [dashboardMetrics]);
 
-  // Datos del gráfico de tendencia semanal
-  const weeklyTrend = useMemo(() => {
-    const last7Days = Array.from({length: 7}, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return date;
-    });
-
-    return last7Days.map(date => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayEntries = timeEntries.filter(entry => 
-        entry.date && entry.date.startsWith(dateStr)
-      );
-
-      const hours = dayEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-      const people = new Set(dayEntries.map(e => e.personnelId)).size;
-
-      return {
-        date: format(date, 'EEE', { locale: es }),
-        hours,
-        people
-      };
-    });
-  }, [timeEntries]);
-
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 2000);
+    await refetchMetrics();
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
   const getAlertIcon = (type: string) => {
@@ -368,17 +274,17 @@ export default function ExecutiveDashboard() {
                 </div>
               </div>
               <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Horas Registradas Hoy</p>
+                <p className="text-sm font-medium text-gray-600 mb-2">Horas del Mes</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {todayMetrics.hoursToday.toFixed(1)}
+                  <span className="text-3xl font-bold text-blue-600">
+                    {currentMetrics.totalHoursMonth.toFixed(0)}
                   </span>
                   <span className="text-lg text-gray-500">horas</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <Users className="h-4 w-4 text-gray-400" />
                   <span className="text-sm text-gray-600">
-                    {todayMetrics.peopleWorking} personas activas
+                    {currentMetrics.peopleWorking} personas activas
                   </span>
                 </div>
               </CardContent>
@@ -399,14 +305,17 @@ export default function ExecutiveDashboard() {
               <CardContent className="pt-6">
                 <p className="text-sm font-medium text-gray-600 mb-2">Proyectos Activos</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {todayMetrics.activeProjectsCount}
+                  <span className="text-3xl font-bold text-green-600">
+                    {currentMetrics.activeProjects}
                   </span>
                   <span className="text-lg text-gray-500">proyectos</span>
                 </div>
                 <div className="mt-3">
-                  <Progress value={75} className="h-1.5" />
-                  <span className="text-xs text-gray-500 mt-1">75% capacidad utilizada</span>
+                  <div className="text-sm text-gray-600">
+                    Margen promedio: <span className={`font-semibold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
+                      {(currentMetrics.avgMargin * 100).toFixed(0)}%
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -424,18 +333,19 @@ export default function ExecutiveDashboard() {
                 </div>
               </div>
               <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Entregables del Mes</p>
+                <p className="text-sm font-medium text-gray-600 mb-2">Ingresos del Mes</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {todayMetrics.deliverablesThisMonth}
+                  <span className="text-3xl font-bold text-green-600">
+                    ${(currentMetrics.totalRevenue / 1000).toFixed(0)}k
                   </span>
-                  <span className="text-lg text-gray-500">completados</span>
+                  <span className="text-lg text-gray-500">USD</span>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  <span className="text-sm text-green-600">
-                    +23% vs mes anterior
-                  </span>
+                <div className="mt-3">
+                  <div className="text-sm text-gray-600">
+                    Costos: <span className="font-semibold text-red-600">
+                      ${(currentMetrics.totalCost / 1000).toFixed(0)}k
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -455,15 +365,21 @@ export default function ExecutiveDashboard() {
               <CardContent className="pt-6">
                 <p className="text-sm font-medium text-gray-600 mb-2">Cotizaciones Pendientes</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-gray-900">
-                    {quotations.filter(q => q.status === 'pending').length}
+                  <span className={`text-3xl font-bold ${currentMetrics.pendingQuotations > 5 ? 'text-red-600' : 'text-gray-600'}`}>
+                    {currentMetrics.pendingQuotations}
                   </span>
                   <span className="text-lg text-gray-500">pendientes</span>
                 </div>
                 <div className="mt-3">
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                    Requiere atención
-                  </Badge>
+                  {currentMetrics.pendingQuotations > 0 ? (
+                    <Badge variant="outline" className={currentMetrics.pendingQuotations > 5 ? 'text-red-600 border-red-300' : 'text-gray-600 border-gray-300'}>
+                      {currentMetrics.pendingQuotations > 5 ? 'Alta prioridad' : 'Normal'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-green-600 border-green-300">
+                      Al día
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -551,52 +467,50 @@ export default function ExecutiveDashboard() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Actividad de la Semana</CardTitle>
-                    <CardDescription>Tendencia de horas registradas</CardDescription>
+                    <CardTitle className="text-lg">Resumen del Mes Actual</CardTitle>
+                    <CardDescription>Métricas financieras y operativas</CardDescription>
                   </div>
                   <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    Últimos 7 días
+                    {dashboardMetrics?.currentPeriod || format(new Date(), 'yyyy-MM')}
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={weeklyTrend}>
-                      <defs>
-                        <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="#6b7280"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <YAxis 
-                        stroke="#6b7280"
-                        style={{ fontSize: '12px' }}
-                      />
-                      <Tooltip 
-                        contentStyle={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          border: 'none',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="hours" 
-                        stroke="#3b82f6" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorGradient)" 
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                  {/* Margen Promedio */}
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-2">Margen Promedio</div>
+                    <div className={`text-3xl font-bold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
+                      {(currentMetrics.avgMargin * 100).toFixed(0)}%
+                    </div>
+                  </div>
+
+                  {/* Markup Promedio */}
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-2">Markup Promedio</div>
+                    <div className={`text-3xl font-bold ${currentMetrics.avgMarkup >= 2 ? 'text-green-600' : 'text-red-600'}`}>
+                      {currentMetrics.avgMarkup.toFixed(1)}x
+                    </div>
+                  </div>
+
+                  {/* Utilización de Presupuesto */}
+                  <div className="text-center p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600 mb-2">Presupuesto Utilizado</div>
+                    <div className={`text-3xl font-bold ${currentMetrics.avgBudgetUtil > 0.8 ? 'text-red-600' : 'text-green-600'}`}>
+                      {(currentMetrics.avgBudgetUtil * 100).toFixed(0)}%
+                    </div>
+                  </div>
+
+                  {/* Horas por Persona */}
+                  <div className="text-center p-4 bg-gray-50 rounded-lg col-span-2 md:col-span-3">
+                    <div className="text-sm text-gray-600 mb-2">Promedio de Horas por Persona</div>
+                    <div className="text-3xl font-bold text-blue-600">
+                      {currentMetrics.peopleWorking > 0 
+                        ? (currentMetrics.totalHoursMonth / currentMetrics.peopleWorking).toFixed(0)
+                        : '0'
+                      }h/mes
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
