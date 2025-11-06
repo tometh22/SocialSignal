@@ -4913,6 +4913,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard Ejecutivo - Métricas Agregadas del Star Schema SoT
+  app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
+    try {
+      const today = new Date();
+      const currentPeriodKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      
+      console.log(`📊 DASHBOARD: Fetching metrics for period ${currentPeriodKey}`);
+      
+      // 1. Métricas del mes actual desde agg_project_month
+      const { rows: monthMetrics } = await pool.query(`
+        SELECT 
+          COUNT(DISTINCT project_id) as active_projects_with_data,
+          SUM(total_asana_hours) as total_hours_month,
+          SUM(total_cost_usd) as total_cost_usd,
+          SUM(view_operativa_revenue) as total_revenue,
+          AVG(view_operativa_margin) as avg_margin,
+          AVG(view_operativa_markup) as avg_markup,
+          AVG(view_operativa_budget_util) as avg_budget_util
+        FROM agg_project_month
+        WHERE period_key = $1
+      `, [currentPeriodKey]);
+      
+      // 2. Conteo de proyectos activos totales
+      const { rows: projectCount } = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM active_projects
+        WHERE status = 'active' AND parent_project_id IS NULL
+      `);
+      
+      // 3. Cotizaciones pendientes
+      const { rows: quotationCount } = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM quotations
+        WHERE status = 'pending'
+      `);
+      
+      // 4. Proyectos sin actividad reciente (últimos 30 días del Star Schema)
+      const lastMonthKey = `${today.getFullYear()}-${String(today.getMonth()).padStart(2, '0')}`;
+      const { rows: inactiveProjects } = await pool.query(`
+        SELECT COUNT(DISTINCT ap.id) as count
+        FROM active_projects ap
+        WHERE ap.status = 'active' 
+          AND ap.parent_project_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM agg_project_month apm
+            WHERE apm.project_id = ap.id
+              AND apm.period_key IN ($1, $2)
+          )
+      `, [currentPeriodKey, lastMonthKey]);
+      
+      // 5. Tendencia semanal (aproximación usando datos mensuales)
+      const { rows: peopleWorking } = await pool.query(`
+        SELECT COUNT(DISTINCT person_id) as count
+        FROM fact_labor_month
+        WHERE period_key = $1 AND asana_hours > 0
+      `, [currentPeriodKey]);
+      
+      const metrics = {
+        currentPeriod: currentPeriodKey,
+        monthMetrics: {
+          activeProjects: parseInt(projectCount[0]?.count || '0'),
+          projectsWithData: parseInt(monthMetrics[0]?.active_projects_with_data || '0'),
+          totalHoursMonth: parseFloat(monthMetrics[0]?.total_hours_month || '0'),
+          totalCostUSD: parseFloat(monthMetrics[0]?.total_cost_usd || '0'),
+          totalRevenue: parseFloat(monthMetrics[0]?.total_revenue || '0'),
+          avgMargin: parseFloat(monthMetrics[0]?.avg_margin || '0'),
+          avgMarkup: parseFloat(monthMetrics[0]?.avg_markup || '0'),
+          avgBudgetUtil: parseFloat(monthMetrics[0]?.avg_budget_util || '0'),
+          peopleWorking: parseInt(peopleWorking[0]?.count || '0')
+        },
+        alerts: {
+          inactiveProjectsCount: parseInt(inactiveProjects[0]?.count || '0'),
+          pendingQuotationsCount: parseInt(quotationCount[0]?.count || '0')
+        }
+      };
+      
+      console.log(`📊 DASHBOARD: Metrics calculated successfully`, metrics);
+      res.json(metrics);
+      
+    } catch (error) {
+      console.error("❌ DASHBOARD: Error fetching dashboard metrics:", error);
+      res.status(500).json({ 
+        error: "Failed to fetch dashboard metrics",
+        details: String(error)
+      });
+    }
+  });
+
   // Debug endpoint para verificar datos reales
   app.get("/api/active-projects/debug", requireAuth, async (req, res) => {
     try {
