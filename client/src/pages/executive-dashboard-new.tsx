@@ -168,45 +168,68 @@ export default function ExecutiveDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-      {/* Modern Header with Gradient */}
+      {/* Modern Header with Quick Actions Integrated */}
       <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-white/10 rounded-lg backdrop-blur">
-                  <Sparkles className="h-6 w-6" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold">
-                    Dashboard Ejecutivo
-                  </h1>
-                  <p className="text-gray-300 text-sm">
-                    Epical Digital • {format(new Date(), "EEEE, dd 'de' MMMM yyyy", { locale: es })}
-                  </p>
-                </div>
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Dashboard Ejecutivo</h1>
+                <p className="text-gray-300 text-sm">
+                  {format(new Date(), "EEEE, dd 'de' MMMM yyyy", { locale: es })}
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Link href="/analytics-consolidated">
-                <Button 
-                  variant="ghost" 
-                  className="text-white hover:bg-white/10"
-                >
+                <Button variant="ghost" className="text-white hover:bg-white/10" size="sm">
                   <BarChart3 className="h-4 w-4 mr-2" />
-                  Analytics Completo
+                  Analytics
                 </Button>
               </Link>
               <Button 
                 variant="secondary"
                 onClick={handleRefresh}
                 disabled={refreshing}
+                size="sm"
                 className="bg-white/10 hover:bg-white/20 text-white border-0"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
             </div>
+          </div>
+          
+          {/* Quick Actions Bar */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-gray-400 mr-2">Acciones rápidas:</span>
+            <Link href="/optimized-quote">
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                <FileSignature className="h-4 w-4 mr-2" />
+                Nueva Cotización
+              </Button>
+            </Link>
+            <Link href="/time-entries">
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Timer className="h-4 w-4 mr-2" />
+                Registrar Tiempo
+              </Button>
+            </Link>
+            <Link href="/deliverables">
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Package className="h-4 w-4 mr-2" />
+                Entregables
+              </Button>
+            </Link>
+            <Link href="/active-projects">
+              <Button size="sm" variant="ghost" className="text-white hover:bg-white/10">
+                <Layers className="h-4 w-4 mr-2" />
+                Ver Proyectos
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
@@ -260,340 +283,239 @@ export default function ExecutiveDashboard() {
           </motion.div>
         )}
 
-        {/* Modern KPI Cards with Animations */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute top-0 right-0 p-4">
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <Clock className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Horas del Mes</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-blue-600">
-                    {currentMetrics.totalHoursMonth.toFixed(0)}
-                  </span>
-                  <span className="text-lg text-gray-500">horas</span>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <Users className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-600">
-                    {currentMetrics.peopleWorking} personas activas
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute top-0 right-0 p-4">
-                <div className="p-3 bg-emerald-100 rounded-full">
-                  <Briefcase className="h-6 w-6 text-emerald-600" />
-                </div>
-              </div>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Proyectos Activos</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-green-600">
-                    {currentMetrics.activeProjects}
-                  </span>
-                  <span className="text-lg text-gray-500">proyectos</span>
-                </div>
-                <div className="mt-3">
-                  <div className="text-sm text-gray-600">
-                    Margen promedio: <span className={`font-semibold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(currentMetrics.avgMargin * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute top-0 right-0 p-4">
-                <div className="p-3 bg-purple-100 rounded-full">
-                  <Package className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Ingresos del Mes</p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-green-600">
-                    ${(currentMetrics.totalRevenue / 1000).toFixed(0)}k
-                  </span>
-                  <span className="text-lg text-gray-500">USD</span>
-                </div>
-                <div className="mt-3">
-                  <div className="text-sm text-gray-600">
-                    Costos: <span className="font-semibold text-red-600">
-                      ${(currentMetrics.totalCost / 1000).toFixed(0)}k
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <Card className="relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <div className="absolute top-0 right-0 p-4">
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <FileSignature className="h-6 w-6 text-amber-600" />
-                </div>
-              </div>
-              <CardContent className="pt-6">
-                <p className="text-sm font-medium text-gray-600 mb-2">Cotizaciones Pendientes</p>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-3xl font-bold ${currentMetrics.pendingQuotations > 5 ? 'text-red-600' : 'text-gray-600'}`}>
-                    {currentMetrics.pendingQuotations}
-                  </span>
-                  <span className="text-lg text-gray-500">pendientes</span>
-                </div>
-                <div className="mt-3">
-                  {currentMetrics.pendingQuotations > 0 ? (
-                    <Badge variant="outline" className={currentMetrics.pendingQuotations > 5 ? 'text-red-600 border-red-300' : 'text-gray-600 border-gray-300'}>
-                      {currentMetrics.pendingQuotations > 5 ? 'Alta prioridad' : 'Normal'}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-green-600 border-green-300">
-                      Al día
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Modern Quick Actions Card */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-          >
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
-                    <Zap className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
-                    <CardDescription className="text-xs">Accede a las tareas más frecuentes</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Link href="/optimized-quote">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start h-12 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                  >
-                    <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                      <FileSignature className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <span className="font-medium">Nueva Cotización</span>
-                    <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
-                  </Button>
-                </Link>
-                <Link href="/time-entries">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start h-12 hover:bg-green-50 hover:text-green-700 transition-colors"
-                  >
-                    <div className="p-2 bg-green-100 rounded-lg mr-3">
-                      <Timer className="h-4 w-4 text-green-600" />
-                    </div>
-                    <span className="font-medium">Registrar Tiempo</span>
-                    <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
-                  </Button>
-                </Link>
-                <Link href="/deliverables">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start h-12 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                  >
-                    <div className="p-2 bg-purple-100 rounded-lg mr-3">
-                      <Package className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <span className="font-medium">Gestionar Entregables</span>
-                    <ArrowRight className="h-4 w-4 ml-auto opacity-50" />
-                  </Button>
-                </Link>
-                <Separator className="my-3" />
-                <Link href="/active-projects">
-                  <Button 
-                    variant="ghost" 
-                    className="w-full justify-start h-10 text-sm hover:bg-gray-100"
-                  >
-                    <Layers className="h-4 w-4 mr-2 opacity-60" />
-                    Ver Todos los Proyectos
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Modern Chart Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            className="lg:col-span-2"
-          >
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">Resumen del Mes Actual</CardTitle>
-                    <CardDescription>Métricas financieras y operativas</CardDescription>
-                  </div>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                    {dashboardMetrics?.currentPeriod || format(new Date(), 'yyyy-MM')}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  {/* Margen Promedio */}
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-2">Margen Promedio</div>
-                    <div className={`text-3xl font-bold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(currentMetrics.avgMargin * 100).toFixed(0)}%
-                    </div>
-                  </div>
-
-                  {/* Markup Promedio */}
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-2">Markup Promedio</div>
-                    <div className={`text-3xl font-bold ${currentMetrics.avgMarkup >= 2 ? 'text-green-600' : 'text-red-600'}`}>
-                      {currentMetrics.avgMarkup.toFixed(1)}x
-                    </div>
-                  </div>
-
-                  {/* Utilización de Presupuesto */}
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <div className="text-sm text-gray-600 mb-2">Presupuesto Utilizado</div>
-                    <div className={`text-3xl font-bold ${currentMetrics.avgBudgetUtil > 0.8 ? 'text-red-600' : 'text-green-600'}`}>
-                      {(currentMetrics.avgBudgetUtil * 100).toFixed(0)}%
-                    </div>
-                  </div>
-
-                  {/* Horas por Persona */}
-                  <div className="text-center p-4 bg-gray-50 rounded-lg col-span-2 md:col-span-3">
-                    <div className="text-sm text-gray-600 mb-2">Promedio de Horas por Persona</div>
-                    <div className="text-3xl font-bold text-blue-600">
-                      {currentMetrics.peopleWorking > 0 
-                        ? (currentMetrics.totalHoursMonth / currentMetrics.peopleWorking).toFixed(0)
-                        : '0'
-                      }h/mes
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-
-        {/* Modern Activity Feed */}
+        {/* Resumen Ejecutivo - 2 Columnas (Financiera / Operativa) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-xl font-bold">Resumen Ejecutivo del Mes</CardTitle>
+                  <CardDescription className="text-sm">
+                    Evolución del mes en curso • Última actualización: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                  </CardDescription>
+                </div>
+                <Badge className="bg-blue-600 text-white">
+                  {dashboardMetrics?.currentPeriod || format(new Date(), 'yyyy-MM')}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Columna Financiera - VERDE */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                    <h3 className="text-lg font-semibold text-green-700">Financiera</h3>
+                  </div>
+                  
+                  {/* Ingresos */}
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-600">Ingresos</span>
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-green-700">
+                      ${(currentMetrics.totalRevenue / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+
+                  {/* Costos */}
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-600">Costos directos</span>
+                      <TrendingDown className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-red-600">
+                      ${(currentMetrics.totalCost / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+
+                  {/* Margen y Markup */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-white rounded-lg border border-gray-200">
+                      <span className="text-xs text-gray-500 block mb-1">Margen</span>
+                      <div className={`text-2xl font-bold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(currentMetrics.avgMargin * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                    <div className="p-4 bg-white rounded-lg border border-gray-200">
+                      <span className="text-xs text-gray-500 block mb-1">Markup</span>
+                      <div className={`text-2xl font-bold ${currentMetrics.avgMarkup >= 2 ? 'text-green-600' : 'text-red-600'}`}>
+                        {currentMetrics.avgMarkup.toFixed(1)}x
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Proyectos Activos */}
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <span className="text-xs text-gray-500 block mb-1">Proyectos activos</span>
+                    <div className="text-2xl font-bold text-green-700">
+                      {currentMetrics.activeProjects}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Columna Operativa - AZUL */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity className="h-5 w-5 text-blue-600" />
+                    <h3 className="text-lg font-semibold text-blue-700">Operativa</h3>
+                  </div>
+                  
+                  {/* Horas trabajadas */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-600">Horas trabajadas</span>
+                      <Clock className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-700">
+                      {currentMetrics.totalHoursMonth.toFixed(0)}h
+                    </div>
+                  </div>
+
+                  {/* Personas activas */}
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-600">Personas activas</span>
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-3xl font-bold text-blue-700">
+                      {currentMetrics.peopleWorking}
+                    </div>
+                  </div>
+
+                  {/* Utilización de presupuesto */}
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <span className="text-xs text-gray-500 block mb-1">Presupuesto utilizado</span>
+                    <div className={`text-2xl font-bold mb-2 ${currentMetrics.avgBudgetUtil > 0.8 ? 'text-red-600' : 'text-green-600'}`}>
+                      {(currentMetrics.avgBudgetUtil * 100).toFixed(0)}%
+                    </div>
+                    <Progress 
+                      value={currentMetrics.avgBudgetUtil * 100} 
+                      className="h-2"
+                    />
+                  </div>
+
+                  {/* Cotizaciones pendientes - AMARILLO */}
+                  <div className={`p-4 rounded-lg border ${
+                    currentMetrics.pendingQuotations > 5 
+                      ? 'bg-yellow-50 border-yellow-300' 
+                      : 'bg-white border-gray-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-600">Cotizaciones pendientes</span>
+                      <FileSignature className={`h-4 w-4 ${currentMetrics.pendingQuotations > 5 ? 'text-yellow-600' : 'text-gray-400'}`} />
+                    </div>
+                    <div className={`text-3xl font-bold ${
+                      currentMetrics.pendingQuotations > 5 ? 'text-yellow-700' : 
+                      currentMetrics.pendingQuotations > 0 ? 'text-gray-700' : 
+                      'text-green-600'
+                    }`}>
+                      {currentMetrics.pendingQuotations}
+                    </div>
+                    {currentMetrics.pendingQuotations > 0 && (
+                      <Link href="/quotations">
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className={`mt-2 w-full ${currentMetrics.pendingQuotations > 5 ? 'text-yellow-700 hover:bg-yellow-100' : 'hover:bg-gray-100'}`}
+                        >
+                          Revisar →
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+
+        {/* Actividad Reciente - Integrada al flujo principal */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
         >
           <Card className="border-0 shadow-lg">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
-                    <Activity className="h-5 w-5 text-white" />
-                  </div>
+                  <Activity className="h-5 w-5 text-gray-700" />
                   <div>
-                    <CardTitle className="text-lg">Actividad Reciente</CardTitle>
-                    <CardDescription className="text-xs">Últimas 48 horas</CardDescription>
+                    <CardTitle className="text-lg font-bold">Actividad Reciente</CardTitle>
+                    <CardDescription className="text-xs">Últimas acciones en el sistema</CardDescription>
                   </div>
                 </div>
-                <Link href="/time-entries">
-                  <Button variant="ghost" size="sm">
+                <Link href="/quotations">
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100">
                     Ver todo
-                    <ArrowRight className="h-4 w-4 ml-1" />
+                    <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </Link>
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-80">
-                <div className="space-y-4 pr-4">
-                  {recentActivity.length > 0 ? (
-                    recentActivity.map((activity, index) => {
-                      const Icon = activity.icon;
-                      return (
-                        <motion.div
-                          key={activity.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="flex items-start gap-3 group"
-                        >
-                          <div className="relative">
-                            <div className={`p-2 rounded-lg bg-white shadow-sm border ${
-                              activity.type === 'quotation' ? 'border-blue-200' :
-                              activity.type === 'project' ? 'border-green-200' :
-                              'border-purple-200'
-                            }`}>
-                              <Icon className={`h-4 w-4 ${activity.color}`} />
-                            </div>
-                            {index < recentActivity.length - 1 && (
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 w-px h-8 bg-gray-200" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
+              <div className="space-y-3">
+                {recentActivity.length > 0 ? (
+                  recentActivity.slice(0, 5).map((activity, index) => {
+                    const Icon = activity.icon;
+                    return (
+                      <motion.div
+                        key={activity.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className={`p-2 rounded-lg ${
+                          activity.type === 'quotation' ? 'bg-blue-100' :
+                          activity.type === 'project' ? 'bg-green-100' :
+                          'bg-purple-100'
+                        }`}>
+                          <Icon className={`h-4 w-4 ${
+                            activity.type === 'quotation' ? 'text-blue-600' :
+                            activity.type === 'project' ? 'text-green-600' :
+                            'text-purple-600'
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                               {activity.title}
                             </p>
-                            <p className="text-sm text-gray-600 truncate">
-                              {activity.description}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-1">
-                              {format(activity.time, "dd/MM 'a las' HH:mm", { locale: es })}
-                            </p>
+                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                              {format(activity.time, "dd/MM HH:mm", { locale: es })}
+                            </span>
                           </div>
-                        </motion.div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-12">
-                      <div className="p-4 bg-gray-100 rounded-full inline-block mb-3">
-                        <Activity className="h-8 w-8 text-gray-400" />
-                      </div>
-                      <p className="text-gray-500 font-medium">No hay actividad reciente</p>
-                      <p className="text-sm text-gray-400 mt-1">Las acciones aparecerán aquí</p>
+                          <p className="text-sm text-gray-600 truncate mt-0.5">
+                            {activity.description}
+                          </p>
+                        </div>
+                      </motion.div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-16 bg-gray-50 rounded-lg">
+                    <div className="p-4 bg-white rounded-full inline-block mb-3 shadow-sm">
+                      <FileSignature className="h-8 w-8 text-gray-300" />
                     </div>
-                  )}
-                </div>
-              </ScrollArea>
+                    <p className="text-gray-600 font-medium mb-1">Todavía no hay actividad este mes</p>
+                    <p className="text-sm text-gray-400 mb-4">Comenzá creando tu primera cotización</p>
+                    <Link href="/optimized-quote">
+                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nueva Cotización
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
