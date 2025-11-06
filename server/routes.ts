@@ -4913,15 +4913,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard Ejecutivo - Métricas Agregadas del Star Schema SoT
+  // Dashboard Ejecutivo - Métricas Agregadas del Star Schema SoT con filtrado temporal robusto
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
-      const today = new Date();
-      const currentPeriodKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      // Import period resolver dynamically
+      const { getDefaultPeriod, resolveAvailablePeriods } = await import('./services/period-resolver.js');
       
-      console.log(`📊 DASHBOARD: Fetching metrics for period ${currentPeriodKey}`);
+      // Get period from query or use default (last with data)
+      let periodKey: string | null;
+      if (req.query.period && typeof req.query.period === 'string') {
+        periodKey = req.query.period;
+        console.log(`📊 DASHBOARD: Using requested period ${periodKey}`);
+      } else {
+        periodKey = await getDefaultPeriod();
+        console.log(`📊 DASHBOARD: Using default period (last with data): ${periodKey}`);
+      }
       
-      // 1. Métricas del mes actual desde agg_project_month
+      // If no period found at all, return empty state
+      if (!periodKey) {
+        console.log(`⚠️ DASHBOARD: No periods with data found, returning empty state`);
+        const periodsInfo = await resolveAvailablePeriods();
+        return res.json({
+          currentPeriod: null,
+          defaultPeriod: null,
+          availablePeriods: periodsInfo.availablePeriods,
+          monthMetrics: {
+            activeProjects: 0,
+            projectsWithData: 0,
+            totalHoursMonth: 0,
+            totalCostUSD: 0,
+            totalRevenue: 0,
+            avgMargin: 0,
+            avgMarkup: 0,
+            avgBudgetUtil: 0,
+            peopleWorking: 0
+          },
+          alerts: {
+            inactiveProjectsCount: 0,
+            pendingQuotationsCount: 0
+          }
+        });
+      }
+      
+      console.log(`📊 DASHBOARD: Fetching metrics for period ${periodKey}`);
+      
+      // 1. Métricas del período seleccionado desde agg_project_month
       const { rows: monthMetrics } = await pool.query(`
         SELECT 
           COUNT(DISTINCT project_id) as active_projects_with_data,
@@ -4933,7 +4969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AVG(view_operativa_budget_util) as avg_budget_util
         FROM agg_project_month
         WHERE period_key = $1
-      `, [currentPeriodKey]);
+      `, [periodKey]);
       
       // 2. Conteo de proyectos activos totales
       const { rows: projectCount } = await pool.query(`
@@ -4949,8 +4985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE status = 'pending'
       `);
       
-      // 4. Proyectos sin actividad reciente (últimos 30 días del Star Schema)
-      const lastMonthKey = `${today.getFullYear()}-${String(today.getMonth()).padStart(2, '0')}`;
+      // 4. Proyectos sin actividad en el período seleccionado
       const { rows: inactiveProjects } = await pool.query(`
         SELECT COUNT(DISTINCT ap.id) as count
         FROM active_projects ap
@@ -4959,19 +4994,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND NOT EXISTS (
             SELECT 1 FROM agg_project_month apm
             WHERE apm.project_id = ap.id
-              AND apm.period_key IN ($1, $2)
+              AND apm.period_key = $1
           )
-      `, [currentPeriodKey, lastMonthKey]);
+      `, [periodKey]);
       
-      // 5. Tendencia semanal (aproximación usando datos mensuales)
+      // 5. Personas trabajando en el período
       const { rows: peopleWorking } = await pool.query(`
         SELECT COUNT(DISTINCT person_id) as count
         FROM fact_labor_month
         WHERE period_key = $1 AND asana_hours > 0
-      `, [currentPeriodKey]);
+      `, [periodKey]);
+      
+      // 6. Obtener períodos disponibles
+      const periodsInfo = await resolveAvailablePeriods();
       
       const metrics = {
-        currentPeriod: currentPeriodKey,
+        currentPeriod: periodKey,
+        defaultPeriod: periodsInfo.defaultPeriod,
+        availablePeriods: periodsInfo.availablePeriods,
         monthMetrics: {
           activeProjects: parseInt(projectCount[0]?.count || '0'),
           projectsWithData: parseInt(monthMetrics[0]?.active_projects_with_data || '0'),
@@ -4989,7 +5029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      console.log(`📊 DASHBOARD: Metrics calculated successfully`, metrics);
+      console.log(`📊 DASHBOARD: Metrics calculated successfully for ${periodKey}`, metrics);
       res.json(metrics);
       
     } catch (error) {
