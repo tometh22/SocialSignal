@@ -1,0 +1,74 @@
+La Columna R ("Monto Total USD") tiene un valor por persona y cliente, no un total único del mes.
+Por eso el ETL tiene que sumar todas esas filas filtrando por mes (columna C o donde figure el período), no tomar una sola fila ni depender de “totales”.
+
+Te resumo exactamente qué tenés que hacer para que el dashboard refleje bien los $34.5K (la suma de todas las filas de septiembre):
+
+🧩 Qué hay en el Excel
+
+Cada fila = una persona + cliente + mes.
+
+Col C (o similar) = Mes (ej. “sep 2025”)
+
+Col R = Monto Total USD (numérico, con símbolo).
+
+Hay muchas filas con montos distintos → el ETL debe agrupar por mes (period_key).
+
+✅ Qué debe hacer el ETL
+
+En la parte donde hoy crea el fact_labor_month o fact_cost_month, asegurate de que:
+
+No se agrupe por persona (si tu ETL lo hace).
+
+Se sume el monto_total_usd de todas las filas del mes seleccionado.
+
+Código tipo (pseudocódigo seguro para vos):
+
+// Dataset con todas las filas de la hoja “Costos directos e indirectos”
+const data = rows.slice(1); // sin headers
+
+const cleanNumber = (v) => {
+  if (!v) return 0;
+  return Number(String(v).replace(/[^\d.-]/g, '')) || 0;
+};
+
+const periodMap = {};
+
+for (const r of data) {
+  const mes = r[idxMes];        // Col C o donde figure el mes
+  const anio = r[idxAnio] || 2025; 
+  const montoUsd = cleanNumber(r[idxMontoTotalUsd]); // Col R
+
+  if (!mes || montoUsd <= 0) continue;
+
+  const periodKey = toPeriodKey(mes, anio); // ej. "2025-09"
+
+  if (!periodMap[periodKey]) periodMap[periodKey] = 0;
+  periodMap[periodKey] += montoUsd;
+}
+
+// 🔹 Guardar una fila por mes
+for (const [periodKey, totalUsd] of Object.entries(periodMap)) {
+  await db
+    .insert(factCostMonth)
+    .values({ orgId, periodKey, amountUsd: totalUsd })
+    .onConflictDoUpdate({
+      target: [factCostMonth.orgId, factCostMonth.periodKey],
+      set: { amountUsd: totalUsd, etlTs: sql`now()` },
+    });
+}
+
+🧾 Resultado esperado
+SELECT period_key, SUM(amount_usd)
+FROM fact_cost_month
+GROUP BY 1;
+
+
+Para 2025-09, el total debe darte ≈ 34.533 USD
+(es la suma de todas las filas de Col R filtradas por mes).
+
+🧠 En resumen
+Etapa	Qué debe pasar	Qué evitar
+Lectura	Traer todas las filas (no solo con horas)	No cortar en la primera
+Parseo	Limpiar símbolos $ y ,	No convertir vacío en 0 si hay texto
+Agrupación	Sumar por period_key	No filtrar por detalle, cliente o persona
+Carga final	Insertar una fila por mes con la suma total	No calcular costo = ARS / FX si ya existe Col R

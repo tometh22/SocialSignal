@@ -1,0 +1,122 @@
+Tenés razón: con la hoja a la vista, en septiembre 2025 la Col R (“Monto Total USD”) sí tiene valores (~34.533 USD), así que el pipeline no los está tomando. No necesitamos más “teoría”; hay que fijar la ingestión y validar con números.
+
+Te dejo un plan corto y quirúrgico para cerrar esto hoy:
+
+1) Regla de negocio (simple y definitiva)
+
+Para cada fila de “Costos directos e indirectos”:
+
+Si Monto Total USD (Col R) > 0 → usarlo tal cual.
+
+Si está vacío/0 → fallback a cost_ars / fx.
+
+Nunca filtrar por horas.
+
+2) Patch en el ETL (donde se llena fact_labor_month)
+
+En la función que procesa la hoja de costos (la que hoy termina haciendo el insert/upsert a fact_labor_month):
+
+// Sup: ya tenés row y header mapeados
+const monthStr   = row[idxMes];       // Col C
+const yearNum    = Number(row[idxAnio]); // si hay columna Año
+const fx         = toNumber(row[idxFx]) ?? 0;          // tu columna de FX del mes
+const arsAmount  = toNumber(row[idxARS]) ?? 0;         // "Moneda Original AR$" (Col O)
+const usdSheet   = toNumber(row[idxMontoUSD]) ?? 0;    // **Col R "Monto Total USD"**
+
+const periodKey  = toPeriodKey(monthStr, yearNum);
+
+// REGLA NUEVA (priorizar USD de Col R)
+const costUsd = usdSheet > 0
+  ? usdSheet
+  : (fx > 0 ? arsAmount / fx : 0);
+
+// Guardas mínimos
+if (!periodKey) return;                 // sin período no inserto
+if (costUsd <= 0) return;               // si no hay costo, no meto fila
+
+await db.insert(factLaborMonth).values({
+  periodKey,
+  // …otras claves…
+  costUsd,            // ← ahora refleja Col R si existe
+  costArs: arsAmount, // guardalo también si te sirve
+  fx,
+  flags: sql`array_remove(array_cat(coalesce(flags,'{}'::text[]), '{usd_from_sheet}'), NULL)`
+}).onConflictDoUpdate({
+  target: [factLaborMonth.periodKey, /* tus keys */],
+  set: { costUsd, costArs: arsAmount, fx, updatedAt: sql`now()` }
+});
+
+
+Helpers robustos (evitando que “cero” y “vacío” se confundan):
+
+const toNumber = (v:any) => {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return v;
+  const s = String(v).replace(/[^\d.-]/g,'');
+  if (s === '' || s === '-' || s === '.' || s === '-.') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+function toPeriodKey(m: string, y: number) {
+  const map:any = { ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12 };
+  const m3 = m.slice(0,3).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+  const mm = map[m3]; 
+  return mm ? `${y}-${String(mm).padStart(2,'0')}` : null;
+}
+
+
+Nota: no dependemos de “dual currency” ni de horas. Con esto, si la Col R existe y tiene valor, gana.
+
+3) Instrumentación (para no adivinar más)
+
+Antes del insert, logueá por período:
+
+metrics.add(periodKey, {
+  filas: +1,
+  usd_sheet: usdSheet || 0,
+  usd_final: costUsd,
+  ars: arsAmount || 0,
+  fx: fx || 0
+});
+
+
+Al final:
+
+ETL COSTOS 2025-09 → filas: 42 | usd_sheet_sum: 34533.25 | usd_final_sum: 34533.25
+
+4) Validación post-ETL (SQL)
+-- Lo que debe matchear al Excel (Col R) para 2025-09:
+SELECT round(sum(cost_usd),2) 
+FROM fact_labor_month 
+WHERE period_key='2025-09';
+
+
+Esperado: ≈ 34533.25.
+
+5) Posibles trampas (ya cubiertas arriba)
+
+Header mismatch: “Monto Total USD” vs “Monto Total US$”. Tu mapeo debe buscar por regex /monto.*usd/i.
+
+Formato: si usás FORMATTED_VALUE, limpias símbolos y comas; si usás UNFORMATTED_VALUE, ya viene número.
+
+Mes: mapear “sep” y “septiembre” (usamos 3 letras).
+
+Filtro oculto por horas: eliminado.
+
+Guard DUAL CURRENCY: irrelevante aquí; priorizamos R y chau.
+
+6) Hotfix temporal (si necesitás que el dashboard refleje YA)
+
+Mientras deployeás el ETL, podés corregir septiembre con un update único:
+
+-- Carga directa (one-off) desde staging/direct_costs si ahí ya tenés Col R
+UPDATE fact_labor_month f
+SET cost_usd = s.monto_total_usd
+FROM (
+  SELECT period_key, sum(monto_total_usd) AS monto_total_usd
+  FROM direct_costs
+  WHERE period_key = '2025-09'
+  GROUP BY period_key
+) s
+WHERE f.period_key='2025-09';

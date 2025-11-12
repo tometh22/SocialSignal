@@ -263,7 +263,9 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       const projectId = resolution.projectId;
       
       if (!projectId) {
-        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey} [${resolution.diagnostics.motivo}]`);
+        // 🔍 INSTRUMENTACIÓN: Log detallado de filas perdidas con su valor USD
+        const lostUSD = parseNum(row['Monto Total USD']);
+        console.log(`⚠️ [${periodKey}] Proyecto no encontrado: "${clientRaw}" :: "${projectRaw}" - USD perdido: $${lostUSD.toFixed(2)} [${resolution.diagnostics.motivo}]`);
         skipped++;
         continue;
       }
@@ -543,7 +545,9 @@ export async function processRendimientoClienteToFactRC(rows: RendimientoCliente
       const projectId = resolution.projectId;
       
       if (!projectId) {
-        console.log(`⚠️ Proyecto no encontrado: ${clientKey} :: ${projectKey} [${resolution.diagnostics.motivo}]`);
+        // 🔍 INSTRUMENTACIÓN: Log detallado de proyectos no encontrados en RC
+        const lostRevenue = parseNum(row['Facturación [USD]']) || parseNum(row['Facturación [ARS]']);
+        console.log(`⚠️ [${periodKey}] RC - Proyecto no encontrado: "${clientRaw}" :: "${projectRaw}" - Revenue perdido: $${lostRevenue.toFixed(2)} [${resolution.diagnostics.motivo}]`);
         skipped++;
         continue;
       }
