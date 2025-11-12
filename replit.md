@@ -1,7 +1,7 @@
 # Project Management & Social Listening Platform
 
 ## Overview
-This platform is an internal project management system for Epical Digital, designed to streamline project workflows from quotation to execution and social listening analysis. It aims to enhance efficiency, transparency, and profitability by providing tools for quotation management, project tracking, time entry, deliverable management, and robust financial and operational analytics. The system features a comprehensive business intelligence dashboard, detailed financial analysis, and prediction/recommendation capabilities, focusing on integrating with existing Google Sheets workflows.
+This platform is an internal project management system for Epical Digital, designed to streamline project workflows from quotation to execution and social listening analysis. It aims to enhance efficiency, transparency, and profitability by providing tools for quotation management, project tracking, time entry, deliverable management, and robust financial and operational analytics. The system features a comprehensive business intelligence dashboard, detailed financial analysis, and prediction/recommendation capabilities, focusing on integrating with existing Google Sheets workflows. The business vision is to provide a unified platform for project, financial, and operational management, offering clear insights into profitability and team performance.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -16,7 +16,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **UI Components**: Radix UI with Tailwind CSS
 - **Forms**: React Hook Form with Zod validation
 - **Build Tool**: Vite
-- **UI/UX Decisions**: Emphasizes clean, professional interfaces with consistent color schemes, intuitive layouts, responsive design, dynamic color indicators, clear typography, and enhanced visual hierarchies.
+- **UI/UX Decisions**: Clean, professional interfaces with consistent color schemes (simplified to green/red/gray for status), intuitive layouts, responsive design, dynamic color indicators, clear typography, and enhanced visual hierarchies.
 
 ### Backend
 - **Runtime**: Node.js with Express.js
@@ -39,28 +39,22 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Financial Management System**: Dual-purpose analysis (operational sales vs. financial transactions) with project-level financial management.
 - **Time & Deliverable Tracking**: Hourly and cost-based time entry, MODO-style deliverable tracking with quality metrics.
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), and predictive insights.
-- **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization service, including automatic imports from "Ventas Tomi" and "Rendimiento Cliente" sheets.
+- **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization, including automatic imports from "Ventas Tomi" and "Rendimiento Cliente" sheets.
 - **Universal ETL System "Líneas Generales"**: Flexible data processing with ARS/USD currency handling, intelligent field preferences, automatic format detection, and anti-×100 pattern correction, synchronizing every 30 minutes.
-- **Temporal Consistency Guard (TCG)**: Anomaly detection and autocorrection system for costs, preventing data corruption using configurable thresholds and temporal baselines.
+- **Temporal Consistency Guard (TCG)**: Anomaly detection and autocorrection system for costs using configurable thresholds and temporal baselines.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow Automation**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
 - **Dual-Cost System**: Differentiates between real costs (cash outflow) and operational costs (team productivity analysis).
 - **Advanced Temporal Filtering**: Supports standard periods, custom date ranges, and relative periods.
-- **Architectural Redesign of "Proyectos Activos"**: Single source of truth architecture with a unified backend aggregator and rewritten frontend for mathematical invariants in portfolio summaries.
-- **Single Source of Truth (SoT) Architecture**: Unified `financial_sot` table sourcing project data exclusively from "Rendimiento Cliente" Google Sheets, with native currency display logic and normalized USD values for KPIs via a robust ETL pipeline.
-- **Intelligent Project Visibility System**: Advanced logic for Active Projects page with smart filtering, per-card view toggles, and "Mark as finished" functionality.
-- **Multi-Currency 3-View System Architecture**: Provides "Original", "Operativa" (native currency), and "USD Consolidada" (USD for company-wide analysis) perspectives, with data pre-computed in `project_aggregates`.
-- **Team Breakdown System (3-Hours Architecture)**: ETL processes Excel MAESTRO "Costos directos e indirectos" for `targetHours`, `hoursAsana` (actual tracked hours with ANTI_×100 normalization), and `hoursBilling` (hours for billing with intelligent fallback). Data exposed via `projectVM.teamBreakdown`.
-- **Star Schema SoT ETL Pipeline**: Data warehouse architecture with `dim_period`, `dim_person_rate`, `fact_labor_month`, `fact_rc_month`, and `agg_project_month` tables for robust analytics and KPIs. Includes automated validation and daily synchronization.
-- **Time Tracking SoT Migration**: Critical data visibility fix where `/api/projects/:id/time-tracking` endpoint now queries `fact_labor_month` (Star Schema SoT) directly with intelligent fallback.
-- **Operational Metrics SoT Migration (Oct 2025)**: Migrated `/api/projects/:id/operational-metrics` endpoint from legacy `time_entries` table (empty) to Star Schema `fact_labor_month` as single source of truth. All WIP/Lead Time/Throughput calculations now use `asana_hours` from Star Schema with proper Drizzle ORM query builder.
-- **SoT ETL Enhancements**: Corrected budget utilization, 6-level rate fallback logic, relational ANTI×100 guard for costs, and FX fallback. Semantic separation of FX rate vs Project Quotation for accurate `quote_native` and `fx_rate` values.
-- **Deterministic + Fuzzy Project Resolver V2**: 3-stage cascade resolution for project matching using `dim_client_alias` and `dim_project_alias`, with `rc_unmatched_staging` for auditing unmatched rows. System learns from Excel data automatically.
-- **Foreign Key Constraint Fix (Oct 2025)**: Corrected `dim_client_alias` and `dim_project_alias` foreign key constraints to reference `clients.id` instead of `activeProjects.id`, enabling proper RC ETL processing for all periods without violations.
-- **One-Shot Project Visualization System (Oct 2025)**: Dual-view system for one-shot projects with single revenue entry but multi-month cost distribution. Features intelligent period visibility where projects appear in any period with costs, automatically showing lifetime revenue aggregated from all periods. Core logic uses revenue-only guard in `addOneShotProjectsLifetime()` to prevent double-counting when period revenue exists. Includes contextual alerts via `OneShotBanner` when viewing periods without revenue, lifetime metrics aggregation via `/api/projects/:id/lifetime-metrics` endpoint, and visual badges in project lists. Detects one-shot projects using `quotations.quotationType` field ('one-time' | 'recurring' | 'fee').
+- **Single Source of Truth (SoT) Architecture**: Unified `financial_sot` table sourcing project data exclusively from "Rendimiento Cliente" Google Sheets, with native currency display and normalized USD values via a robust ETL pipeline. Star Schema for analytics (`dim_period`, `dim_person_rate`, `fact_labor_month`, `fact_rc_month`, `agg_project_month`).
+- **Multi-Currency 3-View System Architecture**: Provides "Original", "Operativa" (native currency), and "USD Consolidada" (USD for company-wide analysis) perspectives, with pre-computed data in `project_aggregates`.
+- **Team Breakdown System**: ETL processes Excel MAESTRO "Costos directos e indirectos" for `targetHours`, `hoursAsana`, and `hoursBilling`.
+- **Deterministic + Fuzzy Project Resolver V2**: 3-stage cascade resolution for project matching using `dim_client_alias` and `dim_project_alias`.
+- **One-Shot Project Visualization System**: Dual-view system for one-shot projects with single revenue entry but multi-month cost distribution, featuring intelligent period visibility and lifetime metrics aggregation.
+- **Executive Dashboard Enhancements**: Separation of billed revenue and Work-In-Progress (WIP), showing both actual and projected margins, and integration of intelligent, context-aware business intelligence alerts (e.g., `NO_BILLING_WITH_COSTS`, `BILLABLE_DROP`, `FX_SHIFT`, `OVER_BURN`).
 
 ### System Design Choices
-- **Unified Data Source**: Centralized data fetching with temporal filtering.
+- **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.
 - **Modular Design**: Separation of concerns for scalable development.
 - **Optimistic UI Updates**: Instant feedback for user actions.
 - **Robust Validation**: Extensive use of Zod for data integrity.
@@ -90,47 +84,3 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **cookie-parser**: For handling HTTP cookies.
 - **node-cron**: For scheduled task automation (daily SoT ETL synchronization).
 - **fuse.js**: For fuzzy string matching in project resolver.
-
-## Recent Changes
-
-### November 6, 2025 - UX/UI Color Palette Simplification
-**Objective:** Simplified color palette to green/red/gray across redesigned dashboard sections for better clarity and reduced cognitive load.
-
-**Sections Updated:**
-1. **Dashboard Header** (lines ~2050-2140)
-   - "Always-On" badge: purple → gray
-   - Client avatar gradient: blue/purple → gray
-
-2. **Performance General Block** (lines ~2280-2640)
-   - Unified Financial & Operational metrics
-   - Binary thresholds: Margin >= 50% → green, < 50% → red
-   - Markup >= 2x → green, < 2x → red
-   - Budget <= 80% → green, > 80% → red
-   - getThresholdColor() helper: removed yellow mid-tier values
-
-3. **Team Section - Horizontal Bars** (lines ~2637-2802)
-   - Progress bars: >= 100% → red, > 0% → green, 0% → gray
-   - Status badges: sobrecarga → red, normal → green
-   - Removed yellow/orange intermediate states
-
-4. **Team Tab - ProjectTeamSection** (lines ~615-900)
-   - getCardStyle(): simplified to 3 states (red/green/gray)
-   - Progress badges: >= 100% → red, > 0% → green, 0% → gray
-   - Empty state: purple → gray
-   - "No cotizado" badge: orange → gray
-   - "Parcial" badge: blue → gray
-
-5. **Intelligent Recommendations** (lines ~2806-3031)
-   - Critical/Warning (priority 1-2): red
-   - Success (priority 4): green
-   - Opportunities/Info (priority 3, 5): gray
-   - Removed orange/blue variants
-
-**Design Rationale:** Simplified 7-color palette (green/yellow/orange/red/blue/purple/gray) to 3-color system (green/red/gray) for:
-- Faster visual scanning
-- Clearer status differentiation
-- Reduced cognitive load
-- Improved accessibility
-
-**Files Modified:**
-- `client/src/pages/project-details-redesigned.tsx` - Comprehensive palette simplification across all redesigned sections
