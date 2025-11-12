@@ -907,6 +907,25 @@ export async function executeSoTETL(
       console.log(`📊 [SoT ETL] Filtrado: ${filteredCostos.length}/${costosDirectosRows.length} costos, ${filteredRC.length}/${rendimientoClienteRows.length} RC`);
     }
     
+    // Filtrar para fact_cost_month: solo Directo + Equipo
+    // Acepta SOLO "Directo" y "Directos e indirectos" (rechaza "Indirecto")
+    const filteredCostosEquipo = filteredCostos.filter(row => {
+      const tipoCosto = normKey(row['Tipo de Costo'] ?? row['Tipo de Coste'] ?? row['Tipo Costo'] ?? '');
+      const subtipoCosto = normKey(row['Subtipo de costo'] ?? row['Subtipo de Coste'] ?? '');
+      
+      // Primero verificar que Subtipo sea "Equipo"
+      if (!subtipoCosto.includes('equipo')) return false;
+      
+      // Verificar que Tipo sea exactamente "directo" o "directos e indirectos"
+      // IMPORTANTE: No usar .includes() porque "indirecto".includes("directo") es true
+      const isDirecto = tipoCosto === 'directo' || tipoCosto === 'directos e indirectos' || tipoCosto === 'costos directos e indirectos';
+      if (!isDirecto) return false;
+      
+      return true;
+    });
+    
+    console.log(`🎯 [SoT ETL] Filtrado Directo+Equipo: ${filteredCostosEquipo.length}/${filteredCostos.length} costos para fact_cost_month`);
+    
     if (options.dryRun) {
       console.log('🔍 [SoT ETL] DRY RUN - No se guardarán cambios');
       return {
@@ -923,8 +942,8 @@ export async function executeSoTETL(
     // 1. Procesar labor (costos directos con horas - fact_labor_month)
     await processDirectCostsToFactLabor(filteredCostos);
     
-    // 1b. Procesar costos agregados por período (TODOS los costos - fact_cost_month)
-    await processCostsByPeriod(filteredCostos);
+    // 1b. Procesar costos agregados por período (solo Directo+Equipo - fact_cost_month)
+    await processCostsByPeriod(filteredCostosEquipo);
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);
