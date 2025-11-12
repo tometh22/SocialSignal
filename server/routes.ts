@@ -4971,11 +4971,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 2. Costos laborales (desde fact_labor_month - fuente: "Costos directos e indirectos")
-      const { rows: [laborCosts] } = await pool.query(`
+      // 2. Costos directos totales (desde fact_cost_month - suma directa Col R del Excel sin filtros)
+      const { rows: [directCosts] } = await pool.query(`
         SELECT 
-          COALESCE(SUM(cost_usd), 0) as labor_cost_usd
-        FROM fact_labor_month
+          COALESCE(SUM(amount_usd), 0) as total_cost_usd
+        FROM fact_cost_month
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
@@ -5003,9 +5003,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. WIP simple (horas billables * rate promedio - facturado)
       // Para calcular rate promedio usamos: costos / horas billables como proxy
       const billableHours = parseFloat(hoursData?.billable_hours || '0');
-      const laborCostUsd = parseFloat(laborCosts?.labor_cost_usd || '0');
+      const costUsd = parseFloat(directCosts?.total_cost_usd || '0');
       const billedUsd = parseFloat(billingData?.billed_usd || '0');
-      const avgHourlyRate = billableHours > 0 ? (laborCostUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
+      const avgHourlyRate = billableHours > 0 ? (costUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
       const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
       
       // ===== OPERATIONAL METRICS =====
@@ -5054,14 +5054,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AVG(billable_pct) as avg_billable_pct_3m
         FROM (
           SELECT 
-            period_key,
-            SUM(cost_usd) as costs,
-            SUM(asana_hours) as hours,
-            SUM(billing_hours) * 100.0 / NULLIF(SUM(asana_hours), 0) as billable_pct,
+            fc.period_key,
+            fc.amount_usd as costs,
+            COALESCE(SUM(fl.asana_hours), 0) as hours,
+            COALESCE(SUM(fl.billing_hours), 0) * 100.0 / NULLIF(COALESCE(SUM(fl.asana_hours), 0), 0) as billable_pct,
             0 as fx_w
-          FROM fact_labor_month
-          WHERE period_key = ANY($1)
-          GROUP BY period_key
+          FROM fact_cost_month fc
+          LEFT JOIN fact_labor_month fl ON fc.period_key = fl.period_key
+          WHERE fc.period_key = ANY($1)
+          GROUP BY fc.period_key, fc.amount_usd
         ) sub
       `, [last3Months.length > 0 ? last3Months : ['1900-01']]);
       
@@ -5070,7 +5071,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const totalHours = parseFloat(hoursData?.total_hours || '0');
       const billablePct = billableHours > 0 ? (billableHours / totalHours) : 0;
-      const costUsd = laborCostUsd;
       const fxWeighted = parseFloat(fxData?.fx_weighted || '0');
       const avgCost3m = parseFloat(avgData?.avg_cost_3m || '0');
       const avgFx3m = parseFloat(avgData?.avg_fx_3m || '0');
