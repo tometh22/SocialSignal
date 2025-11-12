@@ -45,7 +45,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Business Logic**: Cost calculation engine, template system, quality metrics, and inflation management.
 - **Workflow Automation**: Automated quotation-to-project conversion, time tracking integration with budgets, and quality management.
 - **Dual-Cost System**: Differentiates between real costs (cash outflow) and operational costs (team productivity analysis).
-- **Advanced Temporal Filtering**: Supports standard periods, custom date ranges, and relative periods.
+- **Advanced Temporal Filtering**: Comprehensive multi-period temporal filtering system with support for month, bimonth, quarter, semester, year, and custom date ranges (via `server/services/temporal-filter.ts`). Executive Dashboard supports flexible time-range analytics via `PeriodSelector` component with automatic period resolution and indexed database queries using `WHERE period_key = ANY($1)`.
 - **Single Source of Truth (SoT) Architecture**: Unified `financial_sot` table sourcing project data exclusively from "Rendimiento Cliente" Google Sheets, with native currency display and normalized USD values via a robust ETL pipeline. Star Schema for analytics (`dim_period`, `dim_person_rate`, `fact_labor_month`, `fact_rc_month`, `agg_project_month`).
 - **Multi-Currency 3-View System Architecture**: Provides "Original", "Operativa" (native currency), and "USD Consolidada" (USD for company-wide analysis) perspectives, with pre-computed data in `project_aggregates`.
 - **Team Breakdown System**: ETL processes Excel MAESTRO "Costos directos e indirectos" for `targetHours`, `hoursAsana`, and `hoursBilling`.

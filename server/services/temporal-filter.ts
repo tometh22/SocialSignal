@@ -69,7 +69,7 @@ export function resolvePeriod(input: TimeFilterInput): ResolvedPeriod {
     }
     const m0 = (q - 1) * 3 + 1;
     start = new Date(y, m0 - 1, 1);
-    end = clampEnd(new Date(y, m0 + 2));
+    end = new Date(y, m0 + 2, 0);
     label = `Q${q} · ${y}`;
     periodKey = `${ym(y, m0)}..${ym(y, m0 + 2)}`;
   }
@@ -81,7 +81,7 @@ export function resolvePeriod(input: TimeFilterInput): ResolvedPeriod {
     }
     const m0 = s === 1 ? 1 : 7;
     start = new Date(y, m0 - 1, 1);
-    end = clampEnd(new Date(y, m0 + 5));
+    end = new Date(y, m0 + 5, 0);
     label = `Semestre ${s} · ${y}`;
     periodKey = `${ym(y, m0)}..${ym(y, m0 + 5)}`;
   }

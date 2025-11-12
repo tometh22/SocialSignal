@@ -4983,8 +4983,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { rows: [hoursData] } = await pool.query(`
         SELECT 
           COALESCE(SUM(asana_hours), 0) as total_hours,
-          COALESCE(SUM(CASE WHEN is_billable THEN asana_hours ELSE 0 END), 0) as billable_hours,
-          COALESCE(SUM(CASE WHEN NOT is_billable THEN asana_hours ELSE 0 END), 0) as non_billable_hours
+          COALESCE(SUM(billing_hours), 0) as billable_hours,
+          COALESCE(SUM(asana_hours - billing_hours), 0) as non_billable_hours
         FROM fact_labor_month
         WHERE period_key = ANY($1)
       `, [periodKeys]);
@@ -5057,7 +5057,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             period_key,
             SUM(cost_usd) as costs,
             SUM(asana_hours) as hours,
-            SUM(asana_hours) FILTER (WHERE is_billable) * 100.0 / NULLIF(SUM(asana_hours), 0) as billable_pct,
+            SUM(billing_hours) * 100.0 / NULLIF(SUM(asana_hours), 0) as billable_pct,
             0 as fx_w
           FROM fact_labor_month
           WHERE period_key = ANY($1)
