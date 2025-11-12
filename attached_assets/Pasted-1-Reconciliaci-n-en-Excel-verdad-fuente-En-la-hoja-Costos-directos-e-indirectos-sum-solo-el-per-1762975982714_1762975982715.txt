@@ -1,0 +1,138 @@
+1) Reconciliación en Excel (verdad fuente)
+
+En la hoja Costos directos e indirectos sumá solo el período:
+
+Si el mes está como texto (“sep”, “oct”)
+
+=SUMAR.SI.CONJUNTO(R:R; C:C; "sep"; D:D; 2025)
+
+
+Si el mes es número (9, 10)
+
+=SUMAR.SI.CONJUNTO(R:R; C:C; 9; D:D; 2025)
+
+
+Ese total es el número que la card “Costos directos del período (USD)” debe mostrar.
+
+2) Reconciliación en DB (lo que ve el dashboard)
+
+Comprobá qué está usando la card. Ideal: fact_cost_month (suma de Col R por período). Si hoy lee de fact_labor_month, también corré esto:
+
+-- A. Lo que usa el dashboard hoy (probable)
+SELECT 'fact_labor_month' AS fuente,
+       period_key,
+       ROUND(SUM(cost_usd)::numeric,2) AS total
+FROM fact_labor_month
+WHERE period_key IN ('2025-09','2025-10')
+GROUP BY 1,2
+ORDER BY 2;
+
+-- B. Si ya tenés tabla de costos por período desde Col R
+SELECT 'fact_cost_month' AS fuente,
+       period_key,
+       ROUND(SUM(amount_usd)::numeric,2) AS total
+FROM fact_cost_month
+WHERE period_key IN ('2025-09','2025-10')
+GROUP BY 1,2
+ORDER BY 2;
+
+-- C. Conteo de filas por período (para detectar faltantes)
+SELECT period_key,
+       COUNT(*) AS filas,
+       SUM(CASE WHEN cost_usd > 0 THEN 1 ELSE 0 END) AS filas_con_usd
+FROM fact_labor_month
+WHERE period_key IN ('2025-09','2025-10')
+GROUP BY 1
+ORDER BY 1;
+
+
+Si DB ≠ Excel, seguí al punto 3.
+
+3) Los 6 motivos más comunes del desvío (+ chequeos puntuales)
+
+Filtrado por horas
+Filas con R>0 pero horas=0 fueron excluidas.
+
+SELECT COUNT(*) AS excluidas_horas0, SUM(cost_usd) 
+FROM fact_labor_month
+WHERE period_key='2025-09' AND (billing_hours=0 OR billing_hours IS NULL);
+
+
+Tipo de costo excluido (Indirecto/Admin/Proveedor)
+El ETL puede estar filtrando “Directo” únicamente.
+→ Validá si debés incluir Indirec/Proveedores en “Costos directos del período” o crear otra card separada.
+
+Parseo de mes en español
+“sep”, “oct”, “nov” a veces llegan con espacios o mayúsculas y no matchean.
+En ETL, normalizá:
+
+const MES = String(x).trim().toLowerCase(); // "sep", "oct"
+const m = { ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12 }[MES];
+const periodKey = `${anio}-${String(m).padStart(2,'0')}`;
+
+
+Números como texto con símbolos
+$, . y , dejan NULL o 0.
+
+const toNumber = (v:string|number|null) =>
+  v==null ? 0 : Number(String(v).replace(/[^\d.-]/g,'')) || 0;
+
+
+Doble moneda mal resuelta (USD vs ARS)
+Si Col R está en USD pero también hay ARS, asegura prioridad Col R USD y NO recalcules desde ARS/FX cuando R>0:
+
+const amountUsd = toNumber(colR);
+const costoFinalUsd = amountUsd > 0
+  ? amountUsd
+  : (fx>0 ? costArs/fx : 0);
+
+
+Rango cortado u hojas “filtradas”
+Asegurá valueRenderOption=UNFORMATTED_VALUE y rangos completos (A:Z), sin depender de filas visibles (los filtros de Sheets no deben afectar el fetch).
+
+4) Fix mínimo del ETL (orientativo)
+
+Dejá de alimentar la card desde fact_labor_month.
+Creá/usa fact_cost_month con la SUMA de todas las filas Col R por period_key (sin mirar horas).
+
+Pseudocódigo:
+
+const sumByPeriod: Record<string, number> = {};
+
+for (const row of sheetRows) {
+  const mes  = normMes(row[idxMes]);   // sep/oct → 09/10
+  const anio = Number(row[idxAnio]);
+  const rUsd = toNumber(row[idxMontoTotalUsd]); // Col R
+  if (!mes || !anio || rUsd <= 0) continue;
+
+  const periodKey = `${anio}-${mes}`;
+  sumByPeriod[periodKey] = (sumByPeriod[periodKey] || 0) + rUsd;
+}
+
+// upsert fact_cost_month
+for (const [periodKey, amountUsd] of Object.entries(sumByPeriod)) {
+  await db.insert(fact_cost_month)
+    .values({ period_key: periodKey, amount_usd: amountUsd })
+    .onConflictDoUpdate({
+      target: ['period_key'],
+      set: { amount_usd: amountUsd, etl_ts: sql`now()` },
+    });
+}
+
+
+Y en el API del dashboard:
+
+-- Costos directos del período
+SELECT ROUND(SUM(amount_usd)::numeric,2)
+FROM fact_cost_month
+WHERE period_key = $1;
+
+5) UX para que no vuelva a confundir
+
+En cada card, un tooltip con Fuente y query (p.ej., “Fuente: Col R (Excel) agregado → fact_cost_month”).
+
+Badge de período visible y selector consistente (mes/trim/sem/annual/personalizado).
+
+Si Facturado=0 y WIP>0, mostrá pill “Reconocimiento pendiente”.
+
+Agregá un widget de Reconciliación (Excel vs DB por período; OK/Desvío).

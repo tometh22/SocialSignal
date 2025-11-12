@@ -2598,6 +2598,29 @@ export const insertFactLaborMonthSchema = createInsertSchema(factLaborMonth).omi
 export type FactLaborMonth = typeof factLaborMonth.$inferSelect;
 export type InsertFactLaborMonth = z.infer<typeof insertFactLaborMonthSchema>;
 
+// Hechos: Costos totales por período (suma directa Col R del Excel, sin filtros)
+export const factCostMonth = pgTable("fact_cost_month", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
+  
+  // Montos agregados por período (suma directa de columna R del Excel)
+  amountUSD: numeric("amount_usd", { precision: 14, scale: 2 }).notNull().default('0'),
+  amountARS: numeric("amount_ars", { precision: 14, scale: 2 }).default('0'),
+  
+  // Auditoría
+  sourceRowsCount: integer("source_rows_count").default(0),
+  etlTimestamp: timestamp("etl_timestamp").notNull().defaultNow(),
+}, (table) => ({
+  uniquePeriod: unique().on(table.periodKey)
+}));
+
+export const insertFactCostMonthSchema = createInsertSchema(factCostMonth).omit({ 
+  id: true, 
+  etlTimestamp: true 
+});
+export type FactCostMonth = typeof factCostMonth.$inferSelect;
+export type InsertFactCostMonth = z.infer<typeof insertFactCostMonthSchema>;
+
 // Agregado: Proyecto/Mes precalculado (SSOT para dashboards)
 export const aggProjectMonth = pgTable("agg_project_month", {
   id: serial("id").primaryKey(),
