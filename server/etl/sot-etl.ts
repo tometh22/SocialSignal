@@ -476,6 +476,94 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
   console.log(`✅ [SoT ETL] Costos directos: ${processed} procesados, ${skipped} saltados`);
 }
 
+// ==================== HECHOS: COSTOS AGREGADOS POR PERÍODO ====================
+
+/**
+ * ETL: Costos directos e indirectos → fact_cost_month
+ * Agrega TODOS los costos por período SIN FILTROS (incluye filas sin horas, indirectos, etc.)
+ * Lee directamente columna R "Monto Total USD" y suma por período
+ */
+export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
+  console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
+  
+  // Importar tabla y tipos
+  const { factCostMonth } = await import('@shared/schema');
+  
+  // Mapa para acumular costos por período
+  const periodCosts = new Map<string, {
+    amountUSD: number;
+    amountARS: number;
+    rowCount: number;
+  }>();
+  
+  let processed = 0;
+  let skipped = 0;
+  
+  for (const row of rows) {
+    try {
+      // 1) Extraer período
+      const periodKey = toPeriodKey(row.Mes, row.Año);
+      if (!periodKey) {
+        skipped++;
+        continue;
+      }
+      
+      // 2) Leer montos USD y ARS directamente de columna R (sin recalcular, sin filtros)
+      const montoUSD = parseNum(row['Monto Total USD']);
+      const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
+      
+      // 3) Acumular por período (NO filtrar por tipo, horas, o persona)
+      if (!periodCosts.has(periodKey)) {
+        periodCosts.set(periodKey, {
+          amountUSD: 0,
+          amountARS: 0,
+          rowCount: 0
+        });
+      }
+      
+      const acc = periodCosts.get(periodKey)!;
+      acc.amountUSD += montoUSD;
+      acc.amountARS += montoARS;
+      acc.rowCount++;
+      
+      processed++;
+      
+    } catch (error) {
+      console.error(`❌ Error procesando fila para costos agregados:`, error);
+      skipped++;
+    }
+  }
+  
+  // 4) Upsert agregados en fact_cost_month
+  console.log(`💾 [SoT ETL] Guardando ${periodCosts.size} períodos en fact_cost_month...`);
+  
+  for (const [periodKey, costs] of periodCosts) {
+    // Asegurar que el período existe en dim_period
+    await ensurePeriod(periodKey);
+    
+    await db.insert(factCostMonth)
+      .values({
+        periodKey,
+        amountUSD: costs.amountUSD.toString(),
+        amountARS: costs.amountARS.toString(),
+        sourceRowsCount: costs.rowCount
+      })
+      .onConflictDoUpdate({
+        target: [factCostMonth.periodKey],
+        set: {
+          amountUSD: costs.amountUSD.toString(),
+          amountARS: costs.amountARS.toString(),
+          sourceRowsCount: costs.rowCount,
+          etlTimestamp: sql`now()`
+        }
+      });
+    
+    console.log(`  ✅ ${periodKey}: $${costs.amountUSD.toFixed(2)} USD (${costs.rowCount} filas)`);
+  }
+  
+  console.log(`✅ [SoT ETL] Costos agregados: ${processed} filas procesadas, ${skipped} saltadas, ${periodCosts.size} períodos actualizados`);
+}
+
 // ==================== HECHOS: RC (RENDIMIENTO CLIENTE) ====================
 
 export interface RendimientoClienteRow {
@@ -832,8 +920,11 @@ export async function executeSoTETL(
       };
     }
     
-    // 1. Procesar labor (costos directos)
+    // 1. Procesar labor (costos directos con horas - fact_labor_month)
     await processDirectCostsToFactLabor(filteredCostos);
+    
+    // 1b. Procesar costos agregados por período (TODOS los costos - fact_cost_month)
+    await processCostsByPeriod(filteredCostos);
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);
