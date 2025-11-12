@@ -27,23 +27,34 @@ import {
 } from 'recharts';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
+import PeriodSelector, { type TimeFilter } from "@/components/PeriodSelector";
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>({ timeMode: 'month' });
+
+  // Build query params from time filter
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('timeMode', timeFilter.timeMode);
+    if (timeFilter.period) params.set('period', timeFilter.period);
+    if (timeFilter.year) params.set('year', timeFilter.year.toString());
+    if (timeFilter.index) params.set('index', timeFilter.index.toString());
+    if (timeFilter.from) params.set('from', timeFilter.from);
+    if (timeFilter.to) params.set('to', timeFilter.to);
+    return params.toString();
+  }, [timeFilter]);
 
   // Query principal: métricas agregadas del Star Schema SoT
   const { data: dashboardMetrics, refetch: refetchMetrics, isLoading } = useQuery({ 
-    queryKey: ['/api/dashboard/metrics', selectedPeriod ? { period: selectedPeriod } : undefined],
+    queryKey: ['/api/dashboard/metrics', timeFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard/metrics?${queryParams}`);
+      if (!res.ok) throw new Error('Failed to fetch dashboard metrics');
+      return res.json();
+    },
     staleTime: 3 * 60 * 1000
   });
-  
-  // Inicializar período seleccionado con el defaultPeriod del API
-  useEffect(() => {
-    if (dashboardMetrics && !selectedPeriod && dashboardMetrics.defaultPeriod) {
-      setSelectedPeriod(dashboardMetrics.defaultPeriod);
-    }
-  }, [dashboardMetrics, selectedPeriod]);
   
   const { data: quotations = [] } = useQuery({ 
     queryKey: ['/api/quotations'],
@@ -176,28 +187,6 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Selector de Período */}
-              {dashboardMetrics?.availablePeriods && dashboardMetrics.availablePeriods.length > 0 && (
-                <Select 
-                  value={selectedPeriod || dashboardMetrics.defaultPeriod || ''} 
-                  onValueChange={setSelectedPeriod}
-                >
-                  <SelectTrigger className="w-[140px] bg-white/10 border-white/20 text-white hover:bg-white/20">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {dashboardMetrics.availablePeriods
-                      .filter(p => p.hasData)
-                      .map(period => (
-                        <SelectItem key={period.periodKey} value={period.periodKey}>
-                          {format(new Date(period.year, period.month - 1), 'MMMM yyyy', { locale: es })}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              )}
-              
               <Link href="/analytics-consolidated">
                 <Button variant="ghost" className="text-white hover:bg-white/10" size="sm">
                   <BarChart3 className="h-4 w-4 mr-2" />
@@ -217,7 +206,70 @@ export default function ExecutiveDashboard() {
             </div>
           </div>
           
-          {/* Quick Actions Bar */}
+          {/* Period Selector */}
+          <div className="mt-6 bg-white/5 backdrop-blur rounded-lg p-4">
+            {dashboardMetrics?.resolved && (
+              <div className="mb-4 flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-300">Período: </span>
+                <span className="font-semibold">{dashboardMetrics.resolved.label}</span>
+                {dashboardMetrics.resolved.start && dashboardMetrics.resolved.end && (
+                  <span className="text-gray-400">
+                    ({dashboardMetrics.resolved.start} - {dashboardMetrics.resolved.end})
+                  </span>
+                )}
+              </div>
+            )}
+            <PeriodSelector
+              availablePeriods={dashboardMetrics?.availablePeriods?.filter(p => p.hasData).map(p => ({
+                key: p.periodKey,
+                label: format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })
+              })) || []}
+              defaultPeriod={dashboardMetrics?.defaultPeriod}
+              value={timeFilter}
+              onChange={setTimeFilter}
+            />
+          </div>
+        </div>
+      </div>
+      
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        {/* Intelligent Alerts Section */}
+        {alerts.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+              <Zap className="h-5 w-5 text-yellow-500" />
+              Alertas Inteligentes
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {alerts.map((alert, idx) => (
+                <Alert key={idx} className={getAlertColor(alert.severity)}>
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 ${alert.severity === 'critical' ? 'text-red-600' : alert.severity === 'urgent' ? 'text-orange-600' : alert.severity === 'warning' ? 'text-yellow-600' : 'text-blue-600'}`}>
+                      {getAlertIcon(alert.severity)}
+                    </div>
+                    <div className="flex-1">
+                      <AlertDescription className="text-sm text-gray-700">
+                        {alert.msg}
+                      </AlertDescription>
+                      {alert.action && (
+                        <Link href={alert.action}>
+                          <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-gray-900">
+                            Ver detalles <ChevronRight className="h-3 w-3 ml-1" />
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </Alert>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {/* Quick Actions Section */}
+        <div className="mb-6">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm text-gray-400 mr-2">Acciones rápidas:</span>
             <Link href="/optimized-quote">

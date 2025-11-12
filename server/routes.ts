@@ -5035,10 +5035,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ===== HISTORICAL DATA FOR ALERTS (3 months BEFORE the range end) =====
       // Get the last period key from the resolved range
       const lastPeriodKey = periodKeys[periodKeys.length - 1];
-      const [year, month] = lastPeriodKey.split('-').map(Number);
+      const [endYear, endMonth] = lastPeriodKey.split('-').map(Number);
       const last3Months: string[] = [];
       for (let i = 1; i <= 3; i++) {
-        const d = new Date(year, month - 1 - i, 1);
+        const d = new Date(endYear, endMonth - 1 - i, 1);
         const pk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         // Don't include periods already in the selection
         if (!periodKeys.includes(pk)) {
