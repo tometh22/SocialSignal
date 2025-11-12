@@ -260,14 +260,15 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
       
       // 4) Buscar projectId usando nuevo resolver V2 con logging automático
       const resolution = await resolveRCRow(periodKey, clientRaw, projectRaw);
-      const projectId = resolution.projectId;
+      let projectId = resolution.projectId;
       
+      // 🎯 FALLBACK: Si no se resuelve el proyecto, usar proyecto comodín "Costos no asignados"
+      const FALLBACK_PROJECT_ID = 50; // ID del proyecto comodín
       if (!projectId) {
-        // 🔍 INSTRUMENTACIÓN: Log detallado de filas perdidas con su valor USD
         const lostUSD = parseNum(row['Monto Total USD']);
-        console.log(`⚠️ [${periodKey}] Proyecto no encontrado: "${clientRaw}" :: "${projectRaw}" - USD perdido: $${lostUSD.toFixed(2)} [${resolution.diagnostics.motivo}]`);
-        skipped++;
-        continue;
+        console.log(`⚠️ [${periodKey}] Proyecto no encontrado: "${clientRaw}" :: "${projectRaw}" - USD: $${lostUSD.toFixed(2)} → ROUTING TO FALLBACK PROJECT [${resolution.diagnostics.motivo}]`);
+        projectId = FALLBACK_PROJECT_ID;
+        // No hacer continue - procesar la fila con el fallback project
       }
       
       // Log nuevos alias auto-creados
