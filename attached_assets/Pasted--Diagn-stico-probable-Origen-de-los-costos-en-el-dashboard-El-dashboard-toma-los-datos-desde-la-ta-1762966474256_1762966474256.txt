@@ -1,0 +1,64 @@
+🧩 Diagnóstico probable
+Origen de los costos en el dashboard
+El dashboard toma los datos desde la tabla fact_labor_month, que se llena en el ETL a partir de la hoja “Costos directos e indirectos”.
+En esa hoja:
+Columna R (“Monto Total USD”) contiene los costos individuales.
+El total (filas visibles) = 34.533 USD → tu referencia real.
+Pero en fact_labor_month, el ETL puede estar:
+✅ Cargando solo las filas con “Horas Asana > 0”,
+❌ Ignorando las filas con 0 horas o celdas vacías, aunque tengan costo asignado.
+Esto deja fuera roles administrativos, dirección, o correcciones manuales que suman varios miles.
+➤ Resultado: el ETL solo suma a los analistas activos → sube 12K en vez de 34K.
+🔍 Confirmá en SQL o Drizzle
+Ejecutá:
+SELECT 
+  count(*) as filas,
+  sum(amount_usd) as total_cost_usd,
+  sum(hours_asana) as total_hours
+FROM fact_labor_month
+WHERE period_key = '2025-09';
+Si total_cost_usd ≈ 12,300, confirma el error de origen.
+Si total_hours < 1544 o difiere del dashboard, también.
+🧮 Cómo debería calcularse
+La fórmula correcta (como está en el Excel) es:
+Monto Total USD = (Moneda Original ARS / Cotización)
+No depende de horas ni de si hubo actividad Asana.
+Cada fila es un costo directo del mes (asignado o no facturable).
+Por lo tanto, la extracción ETL debería:
+✅ Tomar todas las filas donde “Tipo de Costo” = Directo o Indirecto,
+⚠️ Sin filtrar por horas.
+⚙️ Corrección del ETL
+En tu script ETL actual (pseudocódigo)
+Probablemente tenés algo como:
+if (row["Cantidad de horas reales Asana"] > 0) {
+  insertFactLaborMonth(...)
+}
+Debés cambiarlo a:
+if (row["Monto Total USD"] > 0) {
+  insertFactLaborMonth(...)
+}
+Y mapear directamente:
+amount_usd = row["Monto Total USD"];
+period_key = resolvePeriodKey(row["Mes"], row["Año"]);
+Así garantizás que todos los costos —aunque sin horas— entren al cálculo mensual.
+✅ Después del fix
+Reprocesar ETL (solo fact_labor_month) para septiembre 2025.
+Verificar en SQL:
+SELECT sum(amount_usd) FROM fact_labor_month WHERE period_key='2025-09';
+➤ Debería dar ≈ 34,533 USD
+El dashboard financiero debería actualizar automáticamente:
+Costos directos: 34.5K
+Margen del mes: bajará acorde (de 29.6K a ≈7.4K)
+Markup: recalculado
+🧠 Bonus UX/UI
+Para evitar confusión, podés agregar una subetiqueta en esa card:
+Costos directos
+$34.53K
+fact_labor_month • incluye roles sin horas Asana
+O en tooltip:
+Calculado a partir del “Monto Total USD” de Costos Directos e Indirectos del ETL Maestro.
+🚀 Resumen
+Causa	Acción
+ETL filtra solo filas con horas > 0	Remover ese filtro
+“Monto Total USD” no mapeado	Mapearlo directo como amount_usd
+Dashboard muestra 12K	Se corregirá a 34K tras nuevo ETL
