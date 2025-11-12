@@ -323,6 +323,12 @@ export function parseCostRecord(
   const currencyDetection = detectNativeCurrency(usdAmount, arsAmount);
   if (currencyDetection.warning) {
     console.log(`⚠️ DUAL CURRENCY: ${currencyDetection.warning}`);
+    // 🔍 FIX: Cuando USD == ARS, forzar nativeCurrency='USD' y anular ARS
+    // Esto evita que sanitizeUSD descarte el USD por el guard "USD==ARS"
+    if (currencyDetection.native === 'USD') {
+      arsAmount = null;
+      console.log(`🔧 DUAL CURRENCY FIX: Anulando arsAmount para preservar USD ${usdAmount}`);
+    }
   }
   
   // 🔍 COST KIND - FILTRO DIRECTO
