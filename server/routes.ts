@@ -4913,57 +4913,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard Ejecutivo - Métricas Mejoradas con separación Facturado/WIP y alertas inteligentes
+  // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
-      // Import period resolver dynamically
+      // Import services
       const { getDefaultPeriod, resolveAvailablePeriods } = await import('./services/period-resolver.js');
+      const { resolvePeriod } = await import('./services/temporal-filter.js');
       
-      // Get period from query or use default (last with data)
-      let periodKey: string | null;
-      if (req.query.period && typeof req.query.period === 'string') {
-        periodKey = req.query.period;
-        console.log(`📊 DASHBOARD: Using requested period ${periodKey}`);
+      // Parse time filter parameters
+      const timeMode = (req.query.timeMode as string) || 'month';
+      const period = req.query.period as string;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const index = req.query.index ? parseInt(req.query.index as string) : undefined;
+      const from = req.query.from as string;
+      const to = req.query.to as string;
+      
+      let resolved: any;
+      let periodKeys: string[];
+      
+      // If no filter specified, use default (last month with data)
+      if (!period && !year && !from && !to) {
+        const defaultPeriod = await getDefaultPeriod();
+        if (!defaultPeriod) {
+          console.log(`⚠️ DASHBOARD: No periods with data found, returning empty state`);
+          const periodsInfo = await resolveAvailablePeriods();
+          return res.json({
+            resolved: { mode: 'month', start: null, end: null, label: 'Sin datos', periodKey: null },
+            currentPeriod: null,
+            defaultPeriod: null,
+            availablePeriods: periodsInfo.availablePeriods,
+            financial: { billedUsd: 0, wipUsd: 0, costUsd: 0, marginUsd: 0, projectedMarginPct: 0, fxWeighted: 0 },
+            operational: { hours: { total: 0, billable: 0, nonBillable: 0, billablePct: 0 }, peopleActive: 0, projects: { active: 0, total: 0 } },
+            alerts: [],
+            dataFreshness: { lastSuccessAt: null }
+          });
+        }
+        resolved = resolvePeriod({ timeMode: 'month', period: defaultPeriod });
+        periodKeys = [defaultPeriod];
+        console.log(`📊 DASHBOARD: Using default period (last with data): ${defaultPeriod}`);
       } else {
-        periodKey = await getDefaultPeriod();
-        console.log(`📊 DASHBOARD: Using default period (last with data): ${periodKey}`);
+        // Resolve custom time filter
+        resolved = resolvePeriod({ timeMode: timeMode as any, period, year, index, from, to });
+        periodKeys = resolved.periodKeys;
+        console.log(`📊 DASHBOARD: Using ${timeMode} filter: ${resolved.label} (${periodKeys.length} months)`);
       }
       
-      // If no period found at all, return empty state
-      if (!periodKey) {
-        console.log(`⚠️ DASHBOARD: No periods with data found, returning empty state`);
-        const periodsInfo = await resolveAvailablePeriods();
-        return res.json({
-          currentPeriod: null,
-          defaultPeriod: null,
-          availablePeriods: periodsInfo.availablePeriods,
-          financial: { billedUsd: 0, wipUsd: 0, costUsd: 0, marginUsd: 0, projectedMarginPct: 0, fxWeighted: 0 },
-          operational: { hours: { total: 0, billable: 0, nonBillable: 0, billablePct: 0 }, peopleActive: 0, projects: { active: 0, total: 0 } },
-          alerts: [],
-          dataFreshness: { lastSuccessAt: null }
-        });
-      }
+      console.log(`📊 DASHBOARD: Fetching metrics for periods: ${periodKeys.join(', ')}`);
       
-      console.log(`📊 DASHBOARD: Fetching enhanced metrics for period ${periodKey}`);
+      // ===== FINANCIAL METRICS (aggregated over all periods) =====
       
-      // ===== FINANCIAL METRICS =====
-      
-      // 1. Facturado del mes (desde fact_rc_month - fuente: "Rendimiento Cliente")
+      // 1. Facturado (desde fact_rc_month - fuente: "Rendimiento Cliente")
       const { rows: [billingData] } = await pool.query(`
         SELECT 
           COALESCE(SUM(revenue_usd), 0) as billed_usd,
           COALESCE(SUM(cost_usd), 0) as cost_from_rc_usd
         FROM fact_rc_month
-        WHERE period_key = $1
-      `, [periodKey]);
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
       
-      // 2. Costos laborales del mes (desde fact_labor_month - fuente: "Costos directos e indirectos")
+      // 2. Costos laborales (desde fact_labor_month - fuente: "Costos directos e indirectos")
       const { rows: [laborCosts] } = await pool.query(`
         SELECT 
           COALESCE(SUM(cost_usd), 0) as labor_cost_usd
         FROM fact_labor_month
-        WHERE period_key = $1
-      `, [periodKey]);
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
       
       // 3. Horas billable/non-billable
       const { rows: [hoursData] } = await pool.query(`
@@ -4972,8 +4986,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN is_billable THEN asana_hours ELSE 0 END), 0) as billable_hours,
           COALESCE(SUM(CASE WHEN NOT is_billable THEN asana_hours ELSE 0 END), 0) as non_billable_hours
         FROM fact_labor_month
-        WHERE period_key = $1
-      `, [periodKey]);
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
       
       // 4. FX ponderado (para referencia)
       const { rows: [fxData] } = await pool.query(`
@@ -4983,8 +4997,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             0
           ) as fx_weighted
         FROM fact_rc_month
-        WHERE period_key = $1
-      `, [periodKey]);
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
       
       // 5. WIP simple (horas billables * rate promedio - facturado)
       // Para calcular rate promedio usamos: costos / horas billables como proxy
@@ -4996,14 +5010,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // ===== OPERATIONAL METRICS =====
       
-      // 6. Personas activas
+      // 6. Personas activas (en cualquier mes del rango)
       const { rows: [peopleData] } = await pool.query(`
         SELECT COUNT(DISTINCT person_id) as people_active
         FROM fact_labor_month
-        WHERE period_key = $1 AND asana_hours > 0
-      `, [periodKey]);
+        WHERE period_key = ANY($1) AND asana_hours > 0
+      `, [periodKeys]);
       
-      // 7. Proyectos activos
+      // 7. Proyectos activos (snapshot actual, no depende del filtro temporal)
       const { rows: [projectsData] } = await pool.query(`
         SELECT 
           COUNT(*) FILTER (WHERE status = 'active' AND parent_project_id IS NULL) as active,
@@ -5011,19 +5025,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM active_projects
       `);
       
-      // 8. Cotizaciones pendientes
+      // 8. Cotizaciones pendientes (snapshot actual)
       const { rows: [quotationsData] } = await pool.query(`
         SELECT COUNT(*) as pending_quotations
         FROM quotations
         WHERE status = 'pending'
       `);
       
-      // ===== HISTORICAL DATA FOR ALERTS (3-month average) =====
-      const [year, month] = periodKey.split('-').map(Number);
+      // ===== HISTORICAL DATA FOR ALERTS (3 months BEFORE the range end) =====
+      // Get the last period key from the resolved range
+      const lastPeriodKey = periodKeys[periodKeys.length - 1];
+      const [year, month] = lastPeriodKey.split('-').map(Number);
       const last3Months: string[] = [];
       for (let i = 1; i <= 3; i++) {
         const d = new Date(year, month - 1 - i, 1);
-        last3Months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        const pk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        // Don't include periods already in the selection
+        if (!periodKeys.includes(pk)) {
+          last3Months.push(pk);
+        }
       }
       
       const { rows: [avgData] } = await pool.query(`
@@ -5043,7 +5063,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE period_key = ANY($1)
           GROUP BY period_key
         ) sub
-      `, [last3Months]);
+      `, [last3Months.length > 0 ? last3Months : ['1900-01']]);
       
       // ===== INTELLIGENT ALERTS =====
       const alerts: Array<{code: string, severity: string, msg: string, action?: string}> = [];
@@ -5097,22 +5117,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Alert: Proyectos inactivos
+      // Alert: Proyectos inactivos (en cualquier mes del rango)
       const { rows: [inactiveData] } = await pool.query(`
         SELECT COUNT(DISTINCT ap.id) as inactive_projects
         FROM active_projects ap
         WHERE ap.status = 'active' AND ap.parent_project_id IS NULL
           AND NOT EXISTS (
             SELECT 1 FROM agg_project_month apm
-            WHERE apm.project_id = ap.id AND apm.period_key = $1
+            WHERE apm.project_id = ap.id AND apm.period_key = ANY($1)
           )
-      `, [periodKey]);
+      `, [periodKeys]);
       
       if (parseInt(inactiveData?.inactive_projects || '0') > 0) {
         alerts.push({
           code: 'INACTIVE_PROJECTS',
           severity: 'info',
-          msg: `${inactiveData.inactive_projects} proyectos sin actividad en este período.`,
+          msg: `${inactiveData.inactive_projects} proyectos sin actividad en el período seleccionado.`,
           action: '/active-projects'
         });
       }
@@ -5127,19 +5147,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // ===== DATA FRESHNESS =====
+      // ===== DATA FRESHNESS (most recent ETL run across all periods) =====
       const { rows: [freshnessData] } = await pool.query(`
         SELECT MAX(computed_at) as last_etl
         FROM agg_project_month
-        WHERE period_key = $1
-      `, [periodKey]);
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
       
       // ===== PERÍODOS DISPONIBLES =====
       const periodsInfo = await resolveAvailablePeriods();
       
       // ===== BUILD RESPONSE =====
       const metrics = {
-        currentPeriod: periodKey,
+        resolved: {
+          mode: resolved.mode,
+          start: resolved.start,
+          end: resolved.end,
+          label: resolved.label,
+          periodKey: resolved.periodKey,
+          periodKeys: periodKeys
+        },
+        currentPeriod: lastPeriodKey,
         defaultPeriod: periodsInfo.defaultPeriod,
         availablePeriods: periodsInfo.availablePeriods,
         
@@ -5173,7 +5201,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      console.log(`📊 DASHBOARD: Enhanced metrics calculated for ${periodKey}:`, {
+      console.log(`📊 DASHBOARD: Enhanced metrics calculated for ${resolved.label} (${periodKeys.length} months):`, {
+        periodKeys: periodKeys.join(', '),
         billedUsd,
         wipUsd,
         costUsd,
