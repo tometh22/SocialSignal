@@ -1,0 +1,93 @@
+Buenísimo: ya está claro el bug → la Col R (“Monto Total USD”) no está entrando al ETL, por eso direct_costs y luego fact_labor_month no tienen esos montos (y el dashboard muestra ~12K en vez de ~34.5K).
+Te dejo el fix paso a paso para que entre exactamente lo que ves en el Excel:
+1) Lectura correcta de la Columna R desde Google Sheets
+Problemas típicos:
+El range no incluye la col R.
+Se usa valueRenderOption=FORMATTED_VALUE → llega texto con $, puntos y comas.
+Fórmulas en R no se evalúan si no pedís el valor calculado.
+Solución (Google Sheets API):
+// googleSheetsWorking.ts
+const range = `'Costos directos e indirectos'!A:R`; // asegurar hasta R
+
+const resp = await sheets.spreadsheets.values.get({
+  spreadsheetId,
+  range,
+  valueRenderOption: 'UNFORMATTED_VALUE',   // ← trae números crudos
+  dateTimeRenderOption: 'FORMATTED_STRING',
+});
+
+const rows = resp.data.values ?? [];
+// La cabecera debe tener "Monto Total USD" en index 17 (col R, base 0)
+const header = rows[0].map(String);
+const idxMontoUsd = header.findIndex(h => /monto\s*total\s*usd/i.test(h));
+const idxMes      = header.findIndex(h => /^mes$/i.test(h));
+const idxAnio     = header.findIndex(h => /^a(ñ|n)o$/i.test(h));
+Si por alguna razón tenés que usar FORMATTED_VALUE, normalizá con:
+Number(String(v).replace(/[^\d.-]/g,'')).
+2) Parseo y mapeo robusto (sin filtrar por horas)
+function toPeriodKey(mesStr: string, anioNum: number) {
+  const map: Record<string,number> = {
+    ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12
+  };
+  const m3 = mesStr.slice(0,3).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
+  const mm = map[m3];  // ej "sep" -> 9
+  return `${anioNum}-${String(mm).padStart(2,'0')}`;
+}
+
+for (let i=1; i<rows.length; i++) {
+  const r = rows[i];
+  const mes    = r[idxMes];         // ej "sep"
+  const anio   = Number(r[idxAnio]); 
+  const monto  = r[idxMontoUsd];    // con UNFORMATTED_VALUE llega Number | undefined
+
+  const amountUsd = typeof monto === 'number' ? monto :
+                    monto ? Number(String(monto).replace(/[^\d.-]/g,'')) : 0;
+
+  if (!mes || !anio) continue;
+  if (!amountUsd || amountUsd <= 0) continue;       // sólo descartá montos cero
+  const periodKey = toPeriodKey(String(mes), anio);
+
+  // upsert a una tabla dedicada de costos mensuales (recomendado)
+  await db.insert(factCostMonth).values({
+    orgId, periodKey, amountUsd, sourceRow: i, etlBatchId
+  }).onConflictDoUpdate({
+    target: [factCostMonth.orgId, factCostMonth.periodKey, factCostMonth.sourceRow],
+    set: { amountUsd, etlBatchId, etlTs: sql`now()` }
+  });
+}
+Clave: no uses ninguna condición de horas (Horas Asana > 0).
+Esta tabla representa costos del mes tal cual Excel (Col R), independientemente de horas.
+3) Agregación para el dashboard
+Cambiá la card “Costos directos” para que sume fact_cost_month (o direct_costs si preferís, pero yo haría fact_cost_month):
+const [{ costUsd }] = await db
+  .select({ costUsd: sql<number>`coalesce(sum(${fcm.amountUsd}),0)`.mapWith(Number) })
+  .from(fcm)
+  .where(and(eq(fcm.orgId, orgId), eq(fcm.periodKey, periodKey)));
+Tooltip en la card:
+Fuente: Col R “Monto Total USD” · Hoja Costos directos e indirectos · Periodo {YYYY-MM}
+4) Checks rápidos para septiembre (deben matchear 34,533)
+-- Verifica que el ETL cargó bien montos de Col R
+SELECT sum(amount_usd)
+FROM fact_cost_month
+WHERE org_id = :org AND period_key = '2025-09';
+
+-- Si seguís usando direct_costs:
+SELECT sum(monto_total_usd)
+FROM direct_costs
+WHERE año = 2025 AND mes IN ('09','sep','septiembre');  -- según cómo lo guardes
+5) Logging útil (solo hasta estabilizar)
+Loggear cuántas filas con monto > 0 se importan por mes:
+ETL COSTS: 2025-09 -> filas: 42 | suma_usd: 34533.25
+Si idxMontoUsd === -1, log de error con el header leído (posible renombre de columna).
+Si UNFORMATTED_VALUE devuelve undefined, forzá FORMATTED_VALUE + parseo.
+6) Motivos por los que septiembre te daba 0 en Col R (en DB)
+El range no incluía la columna R (se cortaba en Q).
+valueRenderOption=FORMATTED_VALUE y el parser no limpiaba $ 1.445/separadores → NaN.
+La columna R tenía fórmulas y el script no pedía el valor evaluado.
+Diferencia de mes (la Col C venía “sep” pero el mapeo esperaba “septiembre”).
+Con el ajuste anterior quedás cubierto ante todos esos casos.
+Resultado esperado
+fact_cost_month (o direct_costs) tendrá ≈ 34.533 USD en 2025-09.
+La card Costos directos pasará de $12.3K → $34.5K.
+El Margen del mes bajará acorde (o negativo si corresponde), reflejando la realidad.
+Si querés, te paso un diff listo para pegar en tu googleSheetsWorking.ts y el endpoint que suma fact_cost_month para que el dev no tenga que tocar nada más en el FE.

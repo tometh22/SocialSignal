@@ -127,6 +127,7 @@ class GoogleSheetsWorkingService {
   /**
    * 🛡️ GUARD ETL: Sanitizar USD corrupto antes de guardar en DB
    * Previene: astronómicos, USD=ARS cuando nativeCurrency='ARS', desviaciones FX extremas
+   * 🔍 FIX: Permite USD-only rows (cuando costoARS es null o nativeCurrency='USD')
    */
   private sanitizeUSD(input: {
     nativeCurrency: 'ARS' | 'USD';
@@ -138,8 +139,12 @@ class GoogleSheetsWorkingService {
     
     if (!montoUSD || montoUSD === 0) return null;
 
-    // 1) Prohibir USD == ARS cuando moneda nativa es ARS
-    if (nativeCurrency === 'ARS' && costoARS && costoARS > 0) {
+    // 🔍 FIX: Permitir USD-only rows (cuando no hay costoARS o nativeCurrency='USD')
+    // Solo aplicar guards USD==ARS y coherencia FX cuando hay costoARS válido
+    const hasValidARS = costoARS && costoARS > 0;
+
+    // 1) Prohibir USD == ARS SOLO cuando moneda nativa es ARS Y hay costoARS válido
+    if (nativeCurrency === 'ARS' && hasValidARS) {
       const diff = Math.abs(montoUSD - costoARS);
       const tolerance = 0.01 * Math.max(1, costoARS);
       if (diff <= tolerance) {
@@ -154,8 +159,8 @@ class GoogleSheetsWorkingService {
       return null;
     }
 
-    // 3) Si hay ARS y FX, verificar coherencia (tolerancia 200% por volatilidad FX)
-    if (costoARS && costoARS > 0 && fx && fx > 0) {
+    // 3) Verificar coherencia FX SOLO cuando hay ARS válido
+    if (hasValidARS && fx && fx > 0) {
       const impliedUSD = costoARS / fx;
       const diffPct = Math.abs(montoUSD - impliedUSD) / Math.max(1, impliedUSD) * 100;
       if (diffPct > 200) {
@@ -1578,10 +1583,19 @@ class GoogleSheetsWorkingService {
           continue;
         }
         
-        // Aceptar cualquier fila que tenga al menos UN valor numérico válido
-        if (horasRealesAsana <= 0 && horasParaFacturacion <= 0 && horasObjetivo <= 0 && montoUSDValue <= 0) {
+        // 🔍 FIX: Aceptar filas con montoUSD > 0 INCLUSO si no tienen horas (roles administrativos)
+        // Solo filtrar si NO hay horas Y NO hay monto USD
+        const hasHours = horasRealesAsana > 0 || horasParaFacturacion > 0 || horasObjetivo > 0;
+        const hasUSDCost = montoUSDValue > 0;
+        
+        if (!hasHours && !hasUSDCost) {
           console.log(`⏭️ Fila ${i}: Filtrado por sin datos numéricos:`, debugInfo);
           continue;
+        }
+        
+        // Log específico para filas con USD pero sin horas
+        if (hasUSDCost && !hasHours) {
+          console.log(`💰 Fila ${i}: Costo USD sin horas (admin/directivo): ${montoUSDValue} USD`);
         }
         
         // Log filas que SÍ pasan los filtros
