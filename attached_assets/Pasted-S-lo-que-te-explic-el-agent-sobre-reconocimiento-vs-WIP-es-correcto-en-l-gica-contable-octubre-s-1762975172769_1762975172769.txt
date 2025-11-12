@@ -1,0 +1,101 @@
+Sí: lo que te explicó el agent sobre reconocimiento vs WIP es correcto en lógica contable (octubre sin facturas → $0 facturado + WIP alto).
+No: tu card de “Costos directos” está subreportando porque sigue sin sumar todas las filas persona-mes de la Col R (Monto Total USD). Ahí está la brecha entre ~$12.3k y lo que ves en el Excel cuando filtrás por mes.
+
+Te dejo el plan corto para cerrar ambas cosas y que el Executive quede claro y consistente.
+
+1) Datos: qué validar en 5 minutos
+
+Para SEPT-2025
+
+Facturación (ya viene bien):
+
+SELECT ROUND(SUM(revenue_usd),2)
+FROM fact_rc_month WHERE period_key='2025-09';
+
+
+Costos directos (deben salir del Excel Col R, sumando todas las filas del mes):
+
+-- si cargás Col R a fact_cost_month (recomendado)
+SELECT ROUND(SUM(amount_usd),2)
+FROM fact_cost_month WHERE period_key='2025-09';
+
+
+Este total debe matchear el filtro por mes del Excel (suma Col R por persona).
+
+Para OCT-2025
+
+Facturado: debería ser 0 (si no emitiste).
+
+WIP: confirma con la fórmula que usa el backend:
+
+WIP ≈ (Horas trabajadas del mes × tarifa prom. × markup target) − Facturado
+
+
+Verificá los 3 inputs:
+
+SELECT SUM(asana_hours) FROM fact_labor_month WHERE period_key='2025-10';
+SELECT AVG(hourly_rate_usd) FROM fact_labor_month WHERE period_key='2025-10';
+-- markup target / política: ¿2.5x? guardalo en config para no “hardcodear”
+
+2) Fix técnico (ETL) — una sola regla
+
+Prioridad Col R; sin filtrar por horas.
+
+// dentro del ETL de “Costos directos e indirectos”
+const amountUsd = toNumber(row[idxMontoTotalUsd]); // Col R por persona
+if (amountUsd > 0) {
+  const periodKey = toPeriodKey(row[idxMes], row[idxAnio]); // “2025-09”
+  upsert(fact_cost_month, { periodKey, amountUsd }); // acumular por periodo
+}
+
+
+NO dependas de horas.
+
+NO recalcules con ARS/FX si Col R tiene valor.
+
+SÍ agregá por period_key (todas las filas persona-mes).
+
+Después, la card de “Costos directos” debe leer fact_cost_month, no fact_labor_month.
+
+3) Cambios de UI/UX (para que no confunda)
+
+Renombrar cards:
+
+Facturado del mes (USD) – fuente: fact_rc_month.
+
+Costos directos del mes (USD) – fuente: Excel Col R agregado.
+
+WIP del mes (USD) – “Trabajo realizado no facturado”.
+
+Tooltips con fuente y query (one-liner):
+
+“Fuente: Excel ‘Costos directos e indirectos’ Col R (sumado por mes)”.
+
+“WIP = Horas × Tarifa prom. × Markup − Facturado”.
+
+Badges de periodo visibles (ej.: 2025-10) y selector temporal consistente (mes / trim / semestre / año).
+
+Si Facturado = 0 y WIP > 0 → mostrar pill “Reconocimiento pendiente”.
+
+4) Test de reconciliación (evita que vuelva a romperse)
+
+Test 1 (ETL): comparar suma Col R de Google Sheets vs fact_cost_month por período.
+
+Test 2 (Dashboard): endpoint /executive/summary debe retornar:
+
+costs_usd = SELECT SUM(amount_usd) FROM fact_cost_month WHERE period_key=?
+revenue_usd = SELECT SUM(revenue_usd) FROM fact_rc_month WHERE period_key=?
+
+
+Health widget en el panel (solo dev):
+“Excel Col R (sheet) vs DB (fact_cost_month) → OK / MISMATCH”.
+
+5) Qué vas a ver después del fix
+
+Sept-2025:
+Facturado ≈ $41.9k · Costos directos ≈ suma Col R (~$34.5k si esa es la suma real) · Margen = Facturado − Costos.
+
+Oct-2025:
+Facturado = $0 · Costos directos ≈ suma Col R del mes · WIP ≈ $35.4k (si se mantiene la política).
+
+Si querés, te armo el diff exacto para el ETL (lectura de Col R → fact_cost_month) y el SQL del endpoint del dashboard para que la card de costos ya no consulte fact_labor_month. Con eso, el número deja de “clavarse” en ~12.3k y refleja lo mismo que ves en el Excel filtrado por mes.
