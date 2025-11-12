@@ -55,32 +55,40 @@ export default function ExecutiveDashboard() {
     staleTime: 10 * 60 * 1000
   });
 
-  // Métricas consolidadas del mes actual (Star Schema SoT)
+  // Métricas consolidadas del mes actual (Star Schema SoT) - Mejoradas con Facturado/WIP
   const currentMetrics = useMemo(() => {
     if (!dashboardMetrics) {
       return {
-        totalHoursMonth: 0,
-        peopleWorking: 0,
-        activeProjects: 0,
-        pendingQuotations: 0,
-        avgMargin: 0,
-        avgMarkup: 0,
-        avgBudgetUtil: 0,
-        totalRevenue: 0,
-        totalCost: 0
+        billedUsd: 0,
+        wipUsd: 0,
+        costUsd: 0,
+        marginUsd: 0,
+        projectedMarginPct: 0,
+        fxWeighted: 0,
+        totalHours: 0,
+        billableHours: 0,
+        nonBillableHours: 0,
+        billablePct: 0,
+        peopleActive: 0,
+        projectsActive: 0,
+        projectsTotal: 0
       };
     }
     
     return {
-      totalHoursMonth: dashboardMetrics.monthMetrics.totalHoursMonth,
-      peopleWorking: dashboardMetrics.monthMetrics.peopleWorking,
-      activeProjects: dashboardMetrics.monthMetrics.activeProjects,
-      pendingQuotations: dashboardMetrics.alerts.pendingQuotationsCount,
-      avgMargin: dashboardMetrics.monthMetrics.avgMargin,
-      avgMarkup: dashboardMetrics.monthMetrics.avgMarkup,
-      avgBudgetUtil: dashboardMetrics.monthMetrics.avgBudgetUtil,
-      totalRevenue: dashboardMetrics.monthMetrics.totalRevenue,
-      totalCost: dashboardMetrics.monthMetrics.totalCostUSD
+      billedUsd: dashboardMetrics.financial?.billedUsd || 0,
+      wipUsd: dashboardMetrics.financial?.wipUsd || 0,
+      costUsd: dashboardMetrics.financial?.costUsd || 0,
+      marginUsd: dashboardMetrics.financial?.marginUsd || 0,
+      projectedMarginPct: dashboardMetrics.financial?.projectedMarginPct || 0,
+      fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
+      totalHours: dashboardMetrics.operational?.hours?.total || 0,
+      billableHours: dashboardMetrics.operational?.hours?.billable || 0,
+      nonBillableHours: dashboardMetrics.operational?.hours?.nonBillable || 0,
+      billablePct: dashboardMetrics.operational?.hours?.billablePct || 0,
+      peopleActive: dashboardMetrics.operational?.peopleActive || 0,
+      projectsActive: dashboardMetrics.operational?.projects?.active || 0,
+      projectsTotal: dashboardMetrics.operational?.projects?.total || 0
     };
   }, [dashboardMetrics]);
 
@@ -112,43 +120,18 @@ export default function ExecutiveDashboard() {
     return activities;
   }, [quotations, clients]);
 
-  // Alertas inteligentes del Star Schema SoT
+  // Alertas inteligentes del backend (NO_BILLING_WITH_COSTS, BILLABLE_DROP, etc.)
   const alerts = useMemo(() => {
-    if (!dashboardMetrics) return [];
+    if (!dashboardMetrics || !dashboardMetrics.alerts) return [];
     
-    const alertList = [];
-    
-    // Proyectos sin actividad reciente (del Star Schema)
-    if (dashboardMetrics.alerts.inactiveProjectsCount > 0) {
-      alertList.push({
-        id: 'inactive-projects',
-        type: 'warning',
-        message: `${dashboardMetrics.alerts.inactiveProjectsCount} proyectos sin actividad en el último mes`,
-        action: '/active-projects'
-      });
-    }
-    
-    // Cotizaciones pendientes
-    if (dashboardMetrics.alerts.pendingQuotationsCount > 0) {
-      alertList.push({
-        id: 'pending-quotes',
-        type: 'urgent',
-        message: `${dashboardMetrics.alerts.pendingQuotationsCount} cotizaciones pendientes requieren atención`,
-        action: '/quotations'
-      });
-    }
-    
-    // Alerta de presupuesto promedio alto
-    if (dashboardMetrics.monthMetrics.avgBudgetUtil > 0.8) {
-      alertList.push({
-        id: 'budget-risk',
-        type: 'critical',
-        message: `Utilización de presupuesto promedio en ${(dashboardMetrics.monthMetrics.avgBudgetUtil * 100).toFixed(0)}% - revisar proyectos`,
-        action: '/active-projects'
-      });
-    }
-    
-    return alertList;
+    // Mapear alertas del backend a formato UI
+    return dashboardMetrics.alerts.map((alert: any, index: number) => ({
+      id: `${alert.code}-${index}`,
+      type: alert.severity === 'warning' || alert.severity === 'urgent' ? alert.severity : 'info',
+      message: alert.msg,
+      action: alert.action || '/active-projects',
+      code: alert.code
+    }));
   }, [dashboardMetrics]);
 
   const handleRefresh = async () => {
@@ -325,13 +308,26 @@ export default function ExecutiveDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-xl font-bold">Resumen Ejecutivo del Mes</CardTitle>
-                  <CardDescription className="text-sm">
-                    Evolución del mes en curso • Última actualización: {format(new Date(), 'dd/MM/yyyy HH:mm')}
+                  <CardDescription className="text-sm flex items-center gap-2">
+                    <span>Evolución del mes en curso</span>
+                    {dashboardMetrics?.dataFreshness?.lastSuccessAt && (
+                      <span className="text-xs text-gray-400" title={`Último ETL: ${format(new Date(dashboardMetrics.dataFreshness.lastSuccessAt), 'dd/MM/yyyy HH:mm')}`}>
+                        • ETL: {format(new Date(dashboardMetrics.dataFreshness.lastSuccessAt), 'dd/MM HH:mm')}
+                      </span>
+                    )}
                   </CardDescription>
                 </div>
-                <Badge className="bg-blue-600 text-white">
-                  {dashboardMetrics?.currentPeriod || format(new Date(), 'yyyy-MM')}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {dashboardMetrics?.dataFreshness?.lastSuccessAt && (
+                    <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
+                      <span className="h-2 w-2 bg-green-500 rounded-full mr-2 inline-block"></span>
+                      Datos actualizados
+                    </Badge>
+                  )}
+                  <Badge className="bg-blue-600 text-white">
+                    {dashboardMetrics?.currentPeriod || format(new Date(), 'yyyy-MM')}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -343,51 +339,71 @@ export default function ExecutiveDashboard() {
                     <h3 className="text-lg font-semibold text-green-700">Financiera</h3>
                   </div>
                   
-                  {/* Ingresos */}
+                  {/* Facturado del mes */}
                   <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Ingresos</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Facturado del mes</span>
+                        <span className="text-xs text-gray-400" title="Fuente: Rendimiento Cliente (Star Schema)">●</span>
+                      </div>
                       <TrendingUp className="h-4 w-4 text-green-600" />
                     </div>
                     <div className="text-3xl font-bold text-green-700">
-                      ${(currentMetrics.totalRevenue / 1000).toFixed(1)}k
+                      ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
                     </div>
+                    <span className="text-xs text-gray-500">fact_rc_month • USD</span>
                   </div>
 
-                  {/* Costos */}
+                  {/* WIP (Trabajo devengado no facturado) */}
+                  {currentMetrics.wipUsd > 0 && (
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-600">WIP (Devengado no facturado)</span>
+                          <span className="text-xs text-gray-400" title="Horas billables × markup promedio - facturado">ⓘ</span>
+                        </div>
+                        <Clock className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="text-3xl font-bold text-blue-700">
+                        ${(currentMetrics.wipUsd / 1000).toFixed(1)}k
+                      </div>
+                      <span className="text-xs text-gray-500">Estimado • USD</span>
+                    </div>
+                  )}
+
+                  {/* Costos directos */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Costos directos</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Costos directos</span>
+                        <span className="text-xs text-gray-400" title="Fuente: Costos directos e indirectos (Star Schema)">●</span>
+                      </div>
                       <TrendingDown className="h-4 w-4 text-red-600" />
                     </div>
                     <div className="text-3xl font-bold text-red-600">
-                      ${(currentMetrics.totalCost / 1000).toFixed(1)}k
+                      ${(currentMetrics.costUsd / 1000).toFixed(1)}k
                     </div>
+                    <span className="text-xs text-gray-500">fact_labor_month • USD</span>
                   </div>
 
-                  {/* Margen y Markup */}
+                  {/* Margen del mes y proyectado */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-xs text-gray-500 block mb-1">Margen</span>
-                      <div className={`text-2xl font-bold ${currentMetrics.avgMargin >= 0.5 ? 'text-green-600' : 'text-red-600'}`}>
-                        {(currentMetrics.avgMargin * 100).toFixed(0)}%
+                      <span className="text-xs text-gray-500 block mb-1">Margen del mes</span>
+                      <div className={`text-2xl font-bold ${currentMetrics.marginUsd >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ${(currentMetrics.marginUsd / 1000).toFixed(1)}k
                       </div>
+                      <span className="text-xs text-gray-400">Facturado - Costos</span>
                     </div>
                     <div className="p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-xs text-gray-500 block mb-1">Markup</span>
-                      <div className={`text-2xl font-bold ${currentMetrics.avgMarkup >= 2 ? 'text-green-600' : 'text-red-600'}`}>
-                        {currentMetrics.avgMarkup.toFixed(1)}x
+                      <span className="text-xs text-gray-500 block mb-1">Margen proyectado</span>
+                      <div className={`text-2xl font-bold ${currentMetrics.projectedMarginPct >= 0.3 ? 'text-green-600' : 'text-red-600'}`}>
+                        {(currentMetrics.projectedMarginPct * 100).toFixed(0)}%
                       </div>
+                      <span className="text-xs text-gray-400">(WIP + Fact) - Costos</span>
                     </div>
                   </div>
 
-                  {/* Proyectos Activos */}
-                  <div className="p-4 bg-white rounded-lg border border-gray-200">
-                    <span className="text-xs text-gray-500 block mb-1">Proyectos activos</span>
-                    <div className="text-2xl font-bold text-green-700">
-                      {currentMetrics.activeProjects}
-                    </div>
-                  </div>
                 </div>
 
                 {/* Columna Operativa - AZUL */}
@@ -397,15 +413,42 @@ export default function ExecutiveDashboard() {
                     <h3 className="text-lg font-semibold text-blue-700">Operativa</h3>
                   </div>
                   
-                  {/* Horas trabajadas */}
+                  {/* Horas trabajadas (Total con desglose) */}
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Horas trabajadas</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Horas trabajadas</span>
+                        <span className="text-xs text-gray-400" title="Fuente: Costos directos e indirectos (Star Schema)">●</span>
+                      </div>
                       <Clock className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="text-3xl font-bold text-blue-700">
-                      {currentMetrics.totalHoursMonth.toFixed(0)}h
+                      {currentMetrics.totalHours.toFixed(0)}h
                     </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-600" />
+                        <span className="text-gray-600">Billable: {currentMetrics.billableHours.toFixed(0)}h</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3 text-gray-400" />
+                        <span className="text-gray-600">Non-bill: {currentMetrics.nonBillableHours.toFixed(0)}h</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500 block mt-1">fact_labor_month • USD</span>
+                  </div>
+
+                  {/* Porcentaje de horas facturables */}
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <span className="text-xs text-gray-500 block mb-1">Horas facturables</span>
+                    <div className={`text-2xl font-bold mb-2 ${currentMetrics.billablePct >= 0.6 ? 'text-green-600' : 'text-red-600'}`}>
+                      {(currentMetrics.billablePct * 100).toFixed(0)}%
+                    </div>
+                    <Progress 
+                      value={currentMetrics.billablePct * 100} 
+                      className={`h-2 ${currentMetrics.billablePct >= 0.6 ? '[&>div]:bg-green-600' : '[&>div]:bg-red-600'}`}
+                    />
+                    <span className="text-xs text-gray-400 mt-1 block">Recomendado: ≥60%</span>
                   </div>
 
                   {/* Personas activas */}
@@ -415,50 +458,21 @@ export default function ExecutiveDashboard() {
                       <Users className="h-4 w-4 text-blue-600" />
                     </div>
                     <div className="text-3xl font-bold text-blue-700">
-                      {currentMetrics.peopleWorking}
+                      {currentMetrics.peopleActive}
                     </div>
+                    <span className="text-xs text-gray-500">fact_labor_month • período actual</span>
                   </div>
 
-                  {/* Utilización de presupuesto */}
+                  {/* Proyectos con actividad */}
                   <div className="p-4 bg-white rounded-lg border border-gray-200">
-                    <span className="text-xs text-gray-500 block mb-1">Presupuesto utilizado</span>
-                    <div className={`text-2xl font-bold mb-2 ${currentMetrics.avgBudgetUtil > 0.8 ? 'text-red-600' : 'text-green-600'}`}>
-                      {(currentMetrics.avgBudgetUtil * 100).toFixed(0)}%
-                    </div>
-                    <Progress 
-                      value={currentMetrics.avgBudgetUtil * 100} 
-                      className="h-2"
-                    />
-                  </div>
-
-                  {/* Cotizaciones pendientes - AMARILLO */}
-                  <div className={`p-4 rounded-lg border ${
-                    currentMetrics.pendingQuotations > 5 
-                      ? 'bg-yellow-50 border-yellow-300' 
-                      : 'bg-white border-gray-200'
-                  }`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Cotizaciones pendientes</span>
-                      <FileSignature className={`h-4 w-4 ${currentMetrics.pendingQuotations > 5 ? 'text-yellow-600' : 'text-gray-400'}`} />
+                      <span className="text-sm font-medium text-gray-600">Proyectos con actividad</span>
+                      <Briefcase className="h-4 w-4 text-blue-600" />
                     </div>
-                    <div className={`text-3xl font-bold ${
-                      currentMetrics.pendingQuotations > 5 ? 'text-yellow-700' : 
-                      currentMetrics.pendingQuotations > 0 ? 'text-gray-700' : 
-                      'text-green-600'
-                    }`}>
-                      {currentMetrics.pendingQuotations}
+                    <div className="text-3xl font-bold text-blue-700">
+                      {currentMetrics.projectsActive}
                     </div>
-                    {currentMetrics.pendingQuotations > 0 && (
-                      <Link href="/quotations">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className={`mt-2 w-full ${currentMetrics.pendingQuotations > 5 ? 'text-yellow-700 hover:bg-yellow-100' : 'hover:bg-gray-100'}`}
-                        >
-                          Revisar →
-                        </Button>
-                      </Link>
-                    )}
+                    <span className="text-xs text-gray-500">de {currentMetrics.projectsTotal} totales</span>
                   </div>
                 </div>
               </div>
