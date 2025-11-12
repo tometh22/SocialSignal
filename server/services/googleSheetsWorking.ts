@@ -1364,16 +1364,18 @@ class GoogleSheetsWorkingService {
           // Obtener valor hora de la persona para el mes/año
           const valorHora = await this.getPersonnelHourlyRate(storage, costo.persona, costo.mes, costo.año);
           
-          // Calcular costo total - NUEVO: usar monto USD si no hay valor hora
-          let costoTotal: number;
+          // 🔧 FIX: Separar costoTotalARS y montoTotalUSD para evitar guard "USD==ARS"
+          let costoTotalARS: number | null = null;
+          let montoTotalUSD: number | null = costo.montoTotalUSD || null;
           
           if (valorHora && costo.horasRealesAsana > 0) {
-            // Cálculo tradicional por horas x tarifa
-            costoTotal = costo.horasRealesAsana * valorHora;
-          } else if (costo.montoTotalUSD && costo.montoTotalUSD > 0) {
+            // Cálculo tradicional por horas x tarifa (en ARS)
+            costoTotalARS = costo.horasRealesAsana * valorHora;
+            console.log(`💰 Costo calculado por horas: ${costo.persona} - ${costo.proyecto}: ${costoTotalARS} ARS`);
+          } else if (montoTotalUSD && montoTotalUSD > 0) {
             // Usar monto USD directo del Excel cuando no hay tarifa horaria
-            costoTotal = costo.montoTotalUSD;
-            console.log(`💰 Usando monto USD directo para ${costo.persona} - ${costo.proyecto}: $${costoTotal}`);
+            // NO calcular costoTotalARS para evitar confusión con el guard
+            console.log(`💰 Usando monto USD directo para ${costo.persona} - ${costo.proyecto}: $${montoTotalUSD} USD`);
           } else {
             // No hay datos suficientes, saltar
             console.log(`⚠️ No se encontró valor hora ni monto USD para ${costo.persona} en ${costo.mes} ${costo.año}`);
@@ -1391,19 +1393,23 @@ class GoogleSheetsWorkingService {
           const monthNumber = this.parseMonthFromSpanish(costo.mes);
           const monthKey = `${costo.año}-${String(monthNumber).padStart(2, '0')}`;
           
-          // 🛡️ APLICAR GUARD ETL: Sanitizar USD antes de guardar
+          // 🛡️ APLICAR GUARD ETL: Sanitizar USD solo si hay datos para comparar
           const sanitizedUSD = this.sanitizeUSD({
-            nativeCurrency: 'ARS', // Los costos son siempre en ARS
-            costoARS: costoTotal,
-            montoUSD: costo.montoTotalUSD,
+            nativeCurrency: costoTotalARS ? 'ARS' : 'USD', // Si no hay ARS, es USD nativo
+            costoARS: costoTotalARS, // null cuando solo hay USD
+            montoUSD: montoTotalUSD,
             fx: costo.tipoCambio
           });
           
-          // 🛡️ PREVENIR OVERFLOW: Limitar costoTotal a valores razonables
+          // 🛡️ PREVENIR OVERFLOW: Limitar costos a valores razonables
           const MAX_COST = 100_000_000; // 100M máximo razonable para un costo mensual
-          if (!Number.isFinite(costoTotal) || costoTotal > MAX_COST) {
-            console.log(`🛡️ GUARD OVERFLOW: Costo astronómico detectado (${costoTotal}), saltando registro`);
-            continue; // Saltar este registro
+          if (costoTotalARS && (!Number.isFinite(costoTotalARS) || costoTotalARS > MAX_COST)) {
+            console.log(`🛡️ GUARD OVERFLOW: Costo ARS astronómico detectado (${costoTotalARS}), saltando registro`);
+            continue;
+          }
+          if (sanitizedUSD && (!Number.isFinite(sanitizedUSD) || sanitizedUSD > MAX_COST)) {
+            console.log(`🛡️ GUARD OVERFLOW: Costo USD astronómico detectado (${sanitizedUSD}), saltando registro`);
+            continue;
           }
           
           const directCostData = {
@@ -1422,7 +1428,7 @@ class GoogleSheetsWorkingService {
             horasParaFacturacion: costo.horasParaFacturacion || 0, // NUEVO: Columna M
             valorHoraPersona: valorHora || 0,
             valorHoraLocalCurrency: valorHora ? valorHora.toString() : '0', // 🆕 Valor hora en moneda local (ARS)
-            costoTotal: costoTotal,
+            costoTotal: costoTotalARS || 0, // ARS calculado por horas, o 0 si solo hay USD
             tipoCambio: costo.tipoCambio,
             montoTotalUSD: sanitizedUSD, // 🛡️ USD sanitizado
             projectId: projectId,
@@ -1445,15 +1451,17 @@ class GoogleSheetsWorkingService {
           if (existingCost) {
             await storage.updateDirectCost(existingCost.id, directCostData);
             costsUpdated++;
-            console.log(`🔄 Actualizado: ${costo.persona} - ${costo.proyecto} - $${costoTotal.toFixed(2)}`);
+            const displayValue = costoTotalARS || montoTotalUSD || 0;
+            console.log(`🔄 Actualizado: ${costo.persona} - ${costo.proyecto} - $${displayValue.toFixed(2)}`);
           } else {
             await storage.createDirectCost(directCostData);
             costsImported++;
-            console.log(`➕ Creado: ${costo.persona} - ${costo.proyecto} - $${costoTotal.toFixed(2)}`);
+            const displayValue = costoTotalARS || montoTotalUSD || 0;
+            console.log(`➕ Creado: ${costo.persona} - ${costo.proyecto} - $${displayValue.toFixed(2)}`);
           }
 
-        } catch (error) {
-          const errorMsg = `Error procesando costo de ${costo.persona}: ${error.message}`;
+        } catch (error: any) {
+          const errorMsg = `Error procesando costo de ${costo.persona}: ${error?.message || error}`;
           errors.push(errorMsg);
           console.error('❌', errorMsg);
         }
@@ -1468,9 +1476,9 @@ class GoogleSheetsWorkingService {
         errors
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error importando costos directos:', error);
-      return { success: false, costsImported: 0, costsUpdated: 0, errors: [error.message] };
+      return { success: false, costsImported: 0, costsUpdated: 0, errors: [error?.message || 'Unknown error'] };
     }
   }
 

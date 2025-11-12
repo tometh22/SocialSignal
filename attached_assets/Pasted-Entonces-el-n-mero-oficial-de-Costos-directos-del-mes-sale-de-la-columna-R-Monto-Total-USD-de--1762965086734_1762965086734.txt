@@ -1,0 +1,71 @@
+Entonces el número oficial de “Costos directos del mes” sale de la columna R = “Monto Total USD” de la hoja “Costos directos e indirectos”, y el mes se filtra por columna C (Mes).
+Te dejo el ajuste mínimo y seguro para que el dashboard refleje exactamente eso.
+Qué cambiar (resumen rápido)
+ETL: dejar de depender de fact_labor_month para “Costos del mes”.
+Cargar (o actualizar) una tabla fact_cost_month con:
+period_key (YYYY-MM) ← de Col C + Año
+project_id / client / detalle (si los tenés)
+amount_usd ← Col R (“Monto Total USD”)
+(opcional) source_row_id, etl_batch_id
+Backend: la card “Costos directos” debe sumar fact_cost_month.amount_usd por period_key (no horas).
+ETL (pseudocódigo exacto)
+// Row = una fila de la hoja "Costos directos e indirectos"
+const monthName = row['Mes'];            // Col C (ej: 'sep' o 'septiembre')
+const year      = row['Año'];            // si existe columna, si no toma el año del período seleccionado
+const montoStr  = row['Monto Total USD']; // Col R (con $ y separadores)
+const detalle   = row['Detalle'];        // Col A (opcional)
+
+const periodKey = toPeriodKey(monthName, year);   // '2025-09'
+const amountUsd = parseMoney(montoStr);           // 1250.45 (Number)
+
+if (!isNaN(amountUsd) && amountUsd > 0) {
+  upsertFactCostMonth({
+    org_id,
+    period_key: periodKey,
+    detalle,
+    amount_usd: amountUsd,
+    source_row_id: row.__rowNumber__,  // o el ID de la fila
+    etl_batch_id
+  });
+}
+Helpers
+function toPeriodKey(m: string, y: number) {
+  const map = { ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12 };
+  const mm = map[m.slice(0,3).toLowerCase()];
+  return `${y}-${String(mm).padStart(2,'0')}`;
+}
+function parseMoney(s: string) {
+  if (!s) return 0;
+  return Number(String(s).replace(/[^\d.-]/g,''));
+}
+Esquema sugerido
+// fact_cost_month
+org_id        text
+project_id    text NULL
+period_key    text  -- 'YYYY-MM'
+amount_usd    numeric
+detalle       text NULL
+etl_batch_id  int
+etl_ts        timestamptz default now()
+Backend (Drizzle/SQL) para la card
+const [{ costUsd }] = await db
+  .select({ costUsd: sql<number>`coalesce(sum(${fcm.amountUsd}),0)`.mapWith(Number) })
+  .from(fcm)
+  .where(and(eq(fcm.orgId, orgId), eq(fcm.periodKey, periodKey)));
+Importante: ya no sumar desde fact_labor_month.
+fact_labor_month queda para horas y % billable; los costos van por fact_cost_month (columna R).
+Verificación rápida (debe matchear al Excel)
+-- Total de costos del mes (lo que espera tu card)
+SELECT sum(amount_usd)
+FROM fact_cost_month
+WHERE org_id = :org AND period_key = '2025-09';
+El resultado debería ser ~34,533 USD (tu total de la Columna R con el filtro del mes en Col C).
+UI (microcopy)
+En la card:
+Costos directos
+Fuente: Costos directos e indirectos · Col R “Monto Total USD” · 2025-09
+Errores típicos que generan 12K en lugar de 34K
+Filtrar filas por “Horas Asana > 0” → descarta dirección/QA/roles sin horas.
+Sumar desde fact_labor_month → ese fact refleja actividad, no el Monto Total USD.
+Parseo de dinero sin limpiar $, . y ,.
+Si querés, te paso el bloque de upsert a Postgres (ON CONFLICT por org_id + period_key + source_row_id) para que quede idempotente y auditable.
