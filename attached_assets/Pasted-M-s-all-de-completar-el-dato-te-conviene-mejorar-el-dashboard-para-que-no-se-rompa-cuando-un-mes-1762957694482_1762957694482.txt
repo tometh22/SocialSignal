@@ -1,0 +1,109 @@
+Más allá de completar el dato, te conviene mejorar el dashboard para que no se “rompa” cuando un mes tiene trabajo sin facturación. Te dejo un plan corto, práctico y de alto valor.
+Qué cambiar (UX/UI)
+Separar “Ingresos” en dos líneas
+Facturado del mes (USD)
+Trabajo devengado no facturado (WIP) (USD) ← evita ver $0 cuando el mes es de ejecución previa a la factura.
+Tarjeta de Margen
+Margen del mes (sobre facturado)
+Margen proyectado al cierre (sobre WIP+Facturado)
+Alertas de salud (arriba, visibles)
+“Mes sin facturación con costos altos” (si costos_mes > umbral y ingresos_mes = 0)
+“Horas ↑ 20% vs promedio 3M” sin ingresos correspondientes
+“FX operativo cambió >10% vs 3M”
+Panel Operativo
+Horas del mes (Billable / Non-billable / % billable)
+Personas activas y carga/rol
+Proyectos con actividad (N) y lista compacta top-5 por horas
+Panel Financiero
+Facturado del mes • WIP • Costos del mes
+CPI/SPI (opcional) si tenés milestones (EV/PV/AC)
+Curva S (PV/EV/AC) si el proyecto lo amerita (One-Shot)
+Microcopys
+Sub-label bajo cada KPI: “Fuente: Star Schema · 2025-10”
+Tooltip con fórmula (2 líneas máximo)
+Lógica de datos (fórmulas)
+Facturado del mes (USD)
+Σ fact_rc_month.revenue_usd WHERE period_key = mes
+Costos del mes (USD)
+Σ fact_rc_month.cost_usd WHERE period_key = mes
+(+ si tenés costos en ARS, convértilos con el fx ponderado del período)
+FX ponderado (ref.)
+Σ(revenue_ars + cost_ars) / NULLIF(Σ(revenue_usd + cost_usd),0)
+Horas del mes
+Σ fact_labor_month.asana_hours WHERE period_key = mes
+(ideal: breakdown Billable/Non-billable con is_billable)
+WIP (devengado no facturado)
+Opción simple (sin milestones): horas_billables_mes * precio_hora_proyecto - facturado_mes_relacionado
+Opción pro (con EV): EV_mes * tarifa_estimada - facturado_del_mes
+Si no hay precio hora, usar % avance planificado de “Rendimiento Cliente” para prorratear el valor de contrato.
+Margen del mes
+max(facturado_mes - costos_mes, 0)
+Margen proyectado al cierre (MAC%)
+MAC = (ValorContrato - EAC) / ValorContrato, con
+EAC = AC + (Presupuesto - EV) / (CPI || 1) (si usás EVM)
+Comportamiento cuando “no hay ingresos”
+Mostrar Facturado del mes = $0 (verde/gris)
+Calcular WIP del mes (si hay horas/costos)
+Levantar alerta: “Trabajo sin factura”
+Margen del mes = 0; Margen proyectado se calcula con WIP + costos
+Endpoints sugeridos (contrato)
+GET /api/executive/summary?orgId=...&period=YYYY-MM
+{
+  "periodKey": "2025-10",
+  "financial": {
+    "billedUsd": 0,
+    "wipUsd": 12250.0,
+    "costUsd": 14150.91,
+    "marginUsd": 0,
+    "projectedMarginPct": 0.16,
+    "fxWeighted": 460.12
+  },
+  "operational": {
+    "hours": { "total": 1544, "billable": 1180, "nonBillable": 364, "billablePct": 0.77 },
+    "peopleActive": 11,
+    "projects": { "active": 13, "total": 13 }
+  },
+  "alerts": [
+    { "code": "NO_BILLING_WITH_COSTS", "severity": "warning",
+      "msg": "Hay costos y horas en el mes, pero no hay facturación registrada." }
+  ],
+  "dataFreshness": { "etlBatchId": 402, "lastSuccessAt": "2025-11-12T11:22:00-03:00" }
+}
+SQL/Drizzle (snippets clave)
+Billed (USD)
+const [{ billedUsd }] = await db
+  .select({ billedUsd: sql<number>`coalesce(sum(${fr.revenueUsd}),0)`.mapWith(Number) })
+  .from(fr).where(and(eq(fr.orgId, orgId), eq(fr.periodKey, periodKey)));
+Costs (USD)
+const [{ costUsd }] = await db
+  .select({ costUsd: sql<number>`coalesce(sum(${fr.costUsd}),0)`.mapWith(Number) })
+  .from(fr).where(and(eq(fr.orgId, orgId), eq(fr.periodKey, periodKey)));
+FX ponderado
+const [{ fxWeighted }] = await db
+  .select({ fxWeighted: sql<number>`
+    coalesce(
+      sum(${fr.revenueArs} + ${fr.costArs})
+      / nullif(sum(${fr.revenueUsd} + ${fr.costUsd}),0), 0
+    )`.mapWith(Number) })
+  .from(fr).where(and(eq(fr.orgId, orgId), eq(fr.periodKey, periodKey)));
+Horas (billable / non-billable)
+const [{ total, billable, nonBillable }] = await db
+  .select({
+    total:       sql<number>`coalesce(sum(${fl.asanaHours}),0)`.mapWith(Number),
+    billable:    sql<number>`coalesce(sum(${fl.asanaHours}) filter (where ${fl.isBillable}=true),0)`.mapWith(Number),
+    nonBillable: sql<number>`coalesce(sum(${fl.asanaHours}) filter (where ${fl.isBillable}=false),0)`.mapWith(Number),
+  })
+  .from(fl).where(and(eq(fl.orgId, orgId), eq(fl.periodKey, periodKey)));
+WIP simple (si hay rate)
+const wipUsd = Math.max((billable || 0) * (projectHourlyRate || 0) - (billedUsd || 0), 0);
+Reglas de alerta (rápidas)
+NO_BILLING_WITH_COSTS: billedUsd==0 && (costUsd>umbral || totalHours>umbralHoras)
+BILLABLE_DROP: billablePct < 0.6
+FX_SHIFT: abs(fxWeighted - fxAvg3m) / fxAvg3m > 0.1
+OVER_BURN: costUsd_mes > promedio_3m * 1.3 sin aumento proporcional de horas
+Check-list de implementación
+ Agregar campos en /executive/summary (billedUsd, wipUsd, projectedMarginPct)
+ Cambiar cards en UI y tooltips (mostrar fuente y periodo)
+ Mostrar badge de frescura (último ETL)
+ Agregar alertas con CTA: “Abrir hoja Rendimiento Cliente” o “Forzar ETL”
+ (Opc) Guardar hourlyRate por proyecto para WIP simple

@@ -4913,7 +4913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard Ejecutivo - Métricas Agregadas del Star Schema SoT con filtrado temporal robusto
+  // Dashboard Ejecutivo - Métricas Mejoradas con separación Facturado/WIP y alertas inteligentes
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
       // Import period resolver dynamically
@@ -4937,103 +4937,255 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentPeriod: null,
           defaultPeriod: null,
           availablePeriods: periodsInfo.availablePeriods,
-          monthMetrics: {
-            activeProjects: 0,
-            projectsWithData: 0,
-            totalHoursMonth: 0,
-            totalCostUSD: 0,
-            totalRevenue: 0,
-            avgMargin: 0,
-            avgMarkup: 0,
-            avgBudgetUtil: 0,
-            peopleWorking: 0
-          },
-          alerts: {
-            inactiveProjectsCount: 0,
-            pendingQuotationsCount: 0
-          }
+          financial: { billedUsd: 0, wipUsd: 0, costUsd: 0, marginUsd: 0, projectedMarginPct: 0, fxWeighted: 0 },
+          operational: { hours: { total: 0, billable: 0, nonBillable: 0, billablePct: 0 }, peopleActive: 0, projects: { active: 0, total: 0 } },
+          alerts: [],
+          dataFreshness: { lastSuccessAt: null }
         });
       }
       
-      console.log(`📊 DASHBOARD: Fetching metrics for period ${periodKey}`);
+      console.log(`📊 DASHBOARD: Fetching enhanced metrics for period ${periodKey}`);
       
-      // 1. Métricas del período seleccionado desde agg_project_month
-      const { rows: monthMetrics } = await pool.query(`
+      // ===== FINANCIAL METRICS =====
+      
+      // 1. Facturado del mes (desde fact_rc_month - fuente: "Rendimiento Cliente")
+      const { rows: [billingData] } = await pool.query(`
         SELECT 
-          COUNT(DISTINCT project_id) as active_projects_with_data,
-          SUM(total_asana_hours) as total_hours_month,
-          SUM(total_cost_usd) as total_cost_usd,
-          SUM(view_operativa_revenue) as total_revenue,
-          AVG(view_operativa_margin) as avg_margin,
-          AVG(view_operativa_markup) as avg_markup,
-          AVG(view_operativa_budget_util) as avg_budget_util
-        FROM agg_project_month
+          COALESCE(SUM(revenue_usd), 0) as billed_usd,
+          COALESCE(SUM(cost_usd), 0) as cost_from_rc_usd
+        FROM fact_rc_month
         WHERE period_key = $1
       `, [periodKey]);
       
-      // 2. Conteo de proyectos activos totales
-      const { rows: projectCount } = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM active_projects
-        WHERE status = 'active' AND parent_project_id IS NULL
-      `);
-      
-      // 3. Cotizaciones pendientes
-      const { rows: quotationCount } = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM quotations
-        WHERE status = 'pending'
-      `);
-      
-      // 4. Proyectos sin actividad en el período seleccionado
-      const { rows: inactiveProjects } = await pool.query(`
-        SELECT COUNT(DISTINCT ap.id) as count
-        FROM active_projects ap
-        WHERE ap.status = 'active' 
-          AND ap.parent_project_id IS NULL
-          AND NOT EXISTS (
-            SELECT 1 FROM agg_project_month apm
-            WHERE apm.project_id = ap.id
-              AND apm.period_key = $1
-          )
+      // 2. Costos laborales del mes (desde fact_labor_month - fuente: "Costos directos e indirectos")
+      const { rows: [laborCosts] } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(cost_usd), 0) as labor_cost_usd
+        FROM fact_labor_month
+        WHERE period_key = $1
       `, [periodKey]);
       
-      // 5. Personas trabajando en el período
-      const { rows: peopleWorking } = await pool.query(`
-        SELECT COUNT(DISTINCT person_id) as count
+      // 3. Horas billable/non-billable
+      const { rows: [hoursData] } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(asana_hours), 0) as total_hours,
+          COALESCE(SUM(CASE WHEN is_billable THEN asana_hours ELSE 0 END), 0) as billable_hours,
+          COALESCE(SUM(CASE WHEN NOT is_billable THEN asana_hours ELSE 0 END), 0) as non_billable_hours
+        FROM fact_labor_month
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // 4. FX ponderado (para referencia)
+      const { rows: [fxData] } = await pool.query(`
+        SELECT 
+          COALESCE(
+            SUM(revenue_ars + cost_ars) / NULLIF(SUM(revenue_usd + cost_usd), 0),
+            0
+          ) as fx_weighted
+        FROM fact_rc_month
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // 5. WIP simple (horas billables * rate promedio - facturado)
+      // Para calcular rate promedio usamos: costos / horas billables como proxy
+      const billableHours = parseFloat(hoursData?.billable_hours || '0');
+      const laborCostUsd = parseFloat(laborCosts?.labor_cost_usd || '0');
+      const billedUsd = parseFloat(billingData?.billed_usd || '0');
+      const avgHourlyRate = billableHours > 0 ? (laborCostUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
+      const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
+      
+      // ===== OPERATIONAL METRICS =====
+      
+      // 6. Personas activas
+      const { rows: [peopleData] } = await pool.query(`
+        SELECT COUNT(DISTINCT person_id) as people_active
         FROM fact_labor_month
         WHERE period_key = $1 AND asana_hours > 0
       `, [periodKey]);
       
-      // 6. Obtener períodos disponibles
+      // 7. Proyectos activos
+      const { rows: [projectsData] } = await pool.query(`
+        SELECT 
+          COUNT(*) FILTER (WHERE status = 'active' AND parent_project_id IS NULL) as active,
+          COUNT(*) as total
+        FROM active_projects
+      `);
+      
+      // 8. Cotizaciones pendientes
+      const { rows: [quotationsData] } = await pool.query(`
+        SELECT COUNT(*) as pending_quotations
+        FROM quotations
+        WHERE status = 'pending'
+      `);
+      
+      // ===== HISTORICAL DATA FOR ALERTS (3-month average) =====
+      const [year, month] = periodKey.split('-').map(Number);
+      const last3Months: string[] = [];
+      for (let i = 1; i <= 3; i++) {
+        const d = new Date(year, month - 1 - i, 1);
+        last3Months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+      
+      const { rows: [avgData] } = await pool.query(`
+        SELECT 
+          AVG(costs) as avg_cost_3m,
+          AVG(hours) as avg_hours_3m,
+          AVG(fx_w) as avg_fx_3m,
+          AVG(billable_pct) as avg_billable_pct_3m
+        FROM (
+          SELECT 
+            period_key,
+            SUM(cost_usd) as costs,
+            SUM(asana_hours) as hours,
+            SUM(asana_hours) FILTER (WHERE is_billable) * 100.0 / NULLIF(SUM(asana_hours), 0) as billable_pct,
+            0 as fx_w
+          FROM fact_labor_month
+          WHERE period_key = ANY($1)
+          GROUP BY period_key
+        ) sub
+      `, [last3Months]);
+      
+      // ===== INTELLIGENT ALERTS =====
+      const alerts: Array<{code: string, severity: string, msg: string, action?: string}> = [];
+      
+      const totalHours = parseFloat(hoursData?.total_hours || '0');
+      const billablePct = billableHours > 0 ? (billableHours / totalHours) : 0;
+      const costUsd = laborCostUsd;
+      const fxWeighted = parseFloat(fxData?.fx_weighted || '0');
+      const avgCost3m = parseFloat(avgData?.avg_cost_3m || '0');
+      const avgFx3m = parseFloat(avgData?.avg_fx_3m || '0');
+      const avgBillablePct3m = parseFloat(avgData?.avg_billable_pct_3m || '0') / 100;
+      
+      // Alert: NO_BILLING_WITH_COSTS
+      if (billedUsd === 0 && (costUsd > 5000 || totalHours > 100)) {
+        alerts.push({
+          code: 'NO_BILLING_WITH_COSTS',
+          severity: 'warning',
+          msg: `Hay ${totalHours.toFixed(0)} horas y $${costUsd.toFixed(0)} en costos, pero no hay facturación registrada para este mes.`,
+          action: '/tools/excel-maestro'
+        });
+      }
+      
+      // Alert: BILLABLE_DROP
+      if (billablePct < 0.6 && totalHours > 50) {
+        alerts.push({
+          code: 'BILLABLE_DROP',
+          severity: 'warning',
+          msg: `Solo ${(billablePct * 100).toFixed(0)}% de las horas son facturables (recomendado >60%).`,
+          action: '/active-projects'
+        });
+      }
+      
+      // Alert: FX_SHIFT
+      if (avgFx3m > 0 && fxWeighted > 0 && Math.abs(fxWeighted - avgFx3m) / avgFx3m > 0.1) {
+        const change = ((fxWeighted - avgFx3m) / avgFx3m * 100).toFixed(1);
+        alerts.push({
+          code: 'FX_SHIFT',
+          severity: 'info',
+          msg: `El tipo de cambio operativo cambió ${change}% vs. promedio 3M (${avgFx3m.toFixed(0)} → ${fxWeighted.toFixed(0)}).`
+        });
+      }
+      
+      // Alert: OVER_BURN
+      if (avgCost3m > 0 && costUsd > avgCost3m * 1.3) {
+        const increase = ((costUsd / avgCost3m - 1) * 100).toFixed(0);
+        alerts.push({
+          code: 'OVER_BURN',
+          severity: 'warning',
+          msg: `Costos del mes ${increase}% más altos que el promedio de 3 meses ($${avgCost3m.toFixed(0)}).`,
+          action: '/active-projects'
+        });
+      }
+      
+      // Alert: Proyectos inactivos
+      const { rows: [inactiveData] } = await pool.query(`
+        SELECT COUNT(DISTINCT ap.id) as inactive_projects
+        FROM active_projects ap
+        WHERE ap.status = 'active' AND ap.parent_project_id IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM agg_project_month apm
+            WHERE apm.project_id = ap.id AND apm.period_key = $1
+          )
+      `, [periodKey]);
+      
+      if (parseInt(inactiveData?.inactive_projects || '0') > 0) {
+        alerts.push({
+          code: 'INACTIVE_PROJECTS',
+          severity: 'info',
+          msg: `${inactiveData.inactive_projects} proyectos sin actividad en este período.`,
+          action: '/active-projects'
+        });
+      }
+      
+      // Alert: Cotizaciones pendientes
+      if (parseInt(quotationsData?.pending_quotations || '0') > 0) {
+        alerts.push({
+          code: 'PENDING_QUOTATIONS',
+          severity: 'urgent',
+          msg: `${quotationsData.pending_quotations} cotizaciones pendientes requieren atención.`,
+          action: '/quotations'
+        });
+      }
+      
+      // ===== DATA FRESHNESS =====
+      const { rows: [freshnessData] } = await pool.query(`
+        SELECT MAX(computed_at) as last_etl
+        FROM agg_project_month
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // ===== PERÍODOS DISPONIBLES =====
       const periodsInfo = await resolveAvailablePeriods();
       
+      // ===== BUILD RESPONSE =====
       const metrics = {
         currentPeriod: periodKey,
         defaultPeriod: periodsInfo.defaultPeriod,
         availablePeriods: periodsInfo.availablePeriods,
-        monthMetrics: {
-          activeProjects: parseInt(projectCount[0]?.count || '0'),
-          projectsWithData: parseInt(monthMetrics[0]?.active_projects_with_data || '0'),
-          totalHoursMonth: parseFloat(monthMetrics[0]?.total_hours_month || '0'),
-          totalCostUSD: parseFloat(monthMetrics[0]?.total_cost_usd || '0'),
-          totalRevenue: parseFloat(monthMetrics[0]?.total_revenue || '0'),
-          avgMargin: parseFloat(monthMetrics[0]?.avg_margin || '0'),
-          avgMarkup: parseFloat(monthMetrics[0]?.avg_markup || '0'),
-          avgBudgetUtil: parseFloat(monthMetrics[0]?.avg_budget_util || '0'),
-          peopleWorking: parseInt(peopleWorking[0]?.count || '0')
+        
+        financial: {
+          billedUsd: billedUsd,
+          wipUsd: wipUsd,
+          costUsd: costUsd,
+          marginUsd: billedUsd - costUsd,
+          projectedMarginPct: (billedUsd + wipUsd) > 0 ? ((billedUsd + wipUsd - costUsd) / (billedUsd + wipUsd)) : 0,
+          fxWeighted: fxWeighted
         },
-        alerts: {
-          inactiveProjectsCount: parseInt(inactiveProjects[0]?.count || '0'),
-          pendingQuotationsCount: parseInt(quotationCount[0]?.count || '0')
+        
+        operational: {
+          hours: {
+            total: totalHours,
+            billable: billableHours,
+            nonBillable: parseFloat(hoursData?.non_billable_hours || '0'),
+            billablePct: billablePct
+          },
+          peopleActive: parseInt(peopleData?.people_active || '0'),
+          projects: {
+            active: parseInt(projectsData?.active || '0'),
+            total: parseInt(projectsData?.total || '0')
+          }
+        },
+        
+        alerts: alerts,
+        
+        dataFreshness: {
+          lastSuccessAt: freshnessData?.last_etl || null
         }
       };
       
-      console.log(`📊 DASHBOARD: Metrics calculated successfully for ${periodKey}`, metrics);
+      console.log(`📊 DASHBOARD: Enhanced metrics calculated for ${periodKey}:`, {
+        billedUsd,
+        wipUsd,
+        costUsd,
+        totalHours,
+        billablePct: (billablePct * 100).toFixed(1) + '%',
+        alertsCount: alerts.length
+      });
+      
       res.json(metrics);
       
     } catch (error) {
-      console.error("❌ DASHBOARD: Error fetching dashboard metrics:", error);
+      console.error("❌ DASHBOARD: Error fetching enhanced dashboard metrics:", error);
       res.status(500).json({ 
         error: "Failed to fetch dashboard metrics",
         details: String(error)
