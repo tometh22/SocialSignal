@@ -268,13 +268,15 @@ class GoogleSheetsWorkingService {
 
   /**
    * Obtener datos de costos directos e indirectos del Excel MAESTRO
+   * NUEVO: Devuelve RawCostRecord[] directamente con nombres de columnas del Excel
+   * para que el parser pueda procesarlos correctamente
    */
-  async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
+  async getCostosDirectosIndirectos(): Promise<any[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
       const range = 'Costos directos e indirectos!A:Z';
       
-      console.log('🔄 Obteniendo datos del Excel MAESTRO...');
+      console.log('🔄 Obteniendo datos RAW del Excel MAESTRO (FORMATTED_VALUE)...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
       
@@ -294,15 +296,86 @@ class GoogleSheetsWorkingService {
 
       console.log(`📊 Procesando ${rows.length} filas del Excel MAESTRO`);
       
-      return this.processCostosData(rows);
+      // ✅ NUEVO: Devolver raw records con nombres de columnas exactos del Excel
+      // El parser los procesará usando COLUMN_MAPPINGS
+      return this.convertToRawRecords(rows);
       
     } catch (error) {
       console.error('❌ Error obteniendo datos de costos:', error);
-      
-      // Si hay error de conexión, devolver datos simulados temporalmente
-      console.log('⚠️ Usando datos simulados debido al error de conexión');
-      return this.getMockCostosData();
+      throw error; // No usar mock data en producción
     }
+  }
+
+  /**
+   * NUEVO: Convertir filas raw del Excel a objetos RawCostRecord con nombres de columnas exactos
+   * ✅ FIX: Normalizar headers para eliminar espacios trailing y caracteres Unicode no visibles
+   * Esto permite que el parser use COLUMN_MAPPINGS para mapear flexiblemente
+   */
+  private convertToRawRecords(rows: any[][]): any[] {
+    if (rows.length === 0) return [];
+
+    // La primera fila contiene los headers (nombres exactos del Excel)
+    const rawHeaders = rows[0];
+    
+    // 🔍 DEBUG CRÍTICO: Inspeccionar headers raw para identificar caracteres invisibles
+    console.log(`🔍 DEBUG: Total headers RAW: ${rawHeaders.length}`);
+    rawHeaders.forEach((h: string, idx: number) => {
+      if (h && (h.includes('Tipo') || h.includes('Gasto') || h.includes('Costo'))) {
+        const charCodes = Array.from(h).map(char => `${char}(${char.charCodeAt(0)})`).join(' ');
+        console.log(`🔍 DEBUG Header[${idx}] RAW: "${h}"`);
+        console.log(`🔍 DEBUG Header[${idx}] CHARS: ${charCodes}`);
+        console.log(`🔍 DEBUG Header[${idx}] JSON: ${JSON.stringify(h)}`);
+      }
+    });
+    
+    // ✅ CRÍTICO: Normalizar headers - eliminar espacios trailing y normalizar Unicode
+    // Esto previene fallos de mapeo causados por espacios/non-breaking spaces invisibles
+    const headers = rawHeaders.map((h: string) => 
+      h ? h.normalize('NFKC').trim() : ''
+    );
+    
+    // 🔍 DEBUG: Verificar headers normalizados
+    headers.forEach((h: string, idx: number) => {
+      if (h && (h.includes('Tipo') || h.includes('Gasto') || h.includes('Costo'))) {
+        console.log(`✅ Header[${idx}] NORMALIZED: "${h}"`);
+      }
+    });
+    
+    const result: any[] = [];
+
+    console.log(`📋 Headers normalizados (primeros 15): ${headers.slice(0, 15).join(' | ')}...`);
+    console.log(`🔍 Total headers encontrados: ${headers.length}`);
+
+    // Procesar cada fila de datos (omitir la primera que son headers)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (!row || row.length === 0) continue;
+
+      // Crear objeto con nombres de columnas normalizados del Excel
+      const record: any = {};
+      
+      headers.forEach((header, index) => {
+        if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+          record[header] = row[index];
+        }
+      });
+
+      // Solo agregar si tiene al menos un campo (no fila vacía)
+      if (Object.keys(record).length > 0) {
+        result.push(record);
+      }
+    }
+
+    console.log(`✅ Convertidos ${result.length} registros raw con headers normalizados`);
+    
+    // Debug: mostrar headers de un registro de muestra para verificar mapeo
+    if (result.length > 0) {
+      const sampleKeys = Object.keys(result[0]);
+      console.log(`🔍 Headers en primer registro (total ${sampleKeys.length}): ${sampleKeys.slice(0, 15).join(' | ')}...`);
+    }
+    
+    return result;
   }
 
   /**

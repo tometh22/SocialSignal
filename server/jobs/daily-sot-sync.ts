@@ -94,33 +94,60 @@ export function startDailySoTSync() {
 
 // Manual trigger function for testing
 export async function triggerManualSync() {
-  console.log('🔧 [Manual SoT Sync] Ejecutando sincronización manual...');
+  console.log('🔧 [Manual SoT Sync] Ejecutando sincronización manual con PARSER SANITIZADO...');
   
   try {
     const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { executeSoTETL } = await import('../etl/sot-etl');
+    const { getCostData } = await import('../domain/costs/data-access');
     
-    const costosRaw = await googleSheetsWorkingService.getSheetValues(
-      '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
-      'Costos directos e indirectos'
-    );
+    // ✅ NEW: Use sanitized parser data instead of raw Google Sheets
+    console.log('📊 [Manual SoT Sync] Fetching PARSED costs data (directo only, FORMATTED_VALUE)...');
+    const parsedCosts = await getCostData('sheets');
     
+    console.log(`✅ [Manual SoT Sync] Retrieved ${parsedCosts.length} PARSED direct cost records`);
+    
+    // Convert ParsedCostRecord[] to legacy format expected by ETL
+    const costosRows = parsedCosts.map((cost, idx) => {
+      // Extract month/year from period (format: YYYY-MM)
+      const [year, month] = cost.period.split('-');
+      const monthNameMap: Record<string, string> = {
+        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
+        '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
+        '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
+      };
+      
+      // Extract additional fields from rawRecord
+      const personName = cost.rawRecord.persona || '';
+      const asanaHours = parseFloat(cost.rawRecord['cantidad_de_horas_asana'] as string || '0') || 0;
+      const fx = parseFloat(cost.rawRecord['tipo_cambio'] as string || '0') || 0;
+      
+      return {
+        __rowId: `cost_${idx}`,
+        'Cliente': cost.clientName,
+        'Proyecto': cost.projectName,
+        'Mes': monthNameMap[month] || month,
+        'Año': parseInt(year),
+        'Detalle': personName,
+        'Tipo de Costo': 'Directo', // Already filtered by parser
+        'Cantidad de horas objetivo': 0, // Not available in ParsedCostRecord
+        'Cantidad de horas reales Asana': asanaHours,
+        'Cantidad de horas para facturación': asanaHours, // Use same value
+        'Monto Total ARS': cost.arsAmount || 0,
+        'Monto Total USD': cost.usdAmount || 0,
+        'Cotización': fx
+      };
+    });
+    
+    console.log(`🔄 [Manual SoT Sync] Converted to ${costosRows.length} ETL-compatible rows`);
+    
+    // Get RC data (unchanged)
     const rcRaw = await googleSheetsWorkingService.getSheetValues(
       '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
       'Rendimiento Cliente'
     );
     
-    const costosHeaders = costosRaw[0] || [];
     const rcHeaders = rcRaw[0] || [];
-    
-    const costosRows = costosRaw.slice(1).map((row, idx) => {
-      const obj: any = { __rowId: `costos_${idx}` };
-      costosHeaders.forEach((header, i) => {
-        obj[header] = row[i];
-      });
-      return obj;
-    });
-    
     const rcRows = rcRaw.slice(1).map((row, idx) => {
       const obj: any = { __rowId: `rc_${idx}` };
       rcHeaders.forEach((header, i) => {

@@ -4916,6 +4916,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔧 MANUAL TRIGGER: ETL SoT Sync (temporary endpoint for testing)
+  app.post("/api/trigger-etl-sync", requireAuth, async (req, res) => {
+    try {
+      const { triggerManualSync } = await import('./jobs/daily-sot-sync.js');
+      console.log('🚀 [API] Triggering manual ETL sync...');
+      const result = await triggerManualSync();
+      res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('❌ [API] ETL sync failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
@@ -11964,6 +11977,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Golden status check error:', error);
       res.status(500).json({ error: 'Failed to check golden status', details: error.message });
+    }
+  });
+
+  // GET /api/debug/cost-headers - NUEVO: Inspect Excel MAESTRO headers RAW  
+  app.get('/api/debug/cost-headers', async (req, res) => {
+    try {
+      console.log(`🔍 EXCEL HEADERS: Fetching raw headers from Google Sheets...`);
+      
+      const sheetData = await googleSheetsWorkingService.getSheetValues(
+        googleSheetsWorkingService['spreadsheetId'],
+        'Costos directos e indirectos',
+        { valueRenderOption: 'FORMATTED_VALUE' }
+      );
+      
+      if (!sheetData || sheetData.length === 0) {
+        return res.json({ error: 'No data found in sheet', headers: [] });
+      }
+      
+      const headers = sheetData[0];
+      
+      // Return detailed header information
+      const headerDetails = headers.map((h: string, idx: number) => ({
+        index: idx,
+        raw: h,
+        length: h?.length || 0,
+        charCodes: h ? Array.from(h).map(char => `${char}(${char.charCodeAt(0)})`).join(' ') : '',
+        normalized: h ? h.normalize('NFKC').trim() : '',
+        containsTipo: h ? h.includes('Tipo') : false,
+        containsCosto: h ? h.includes('Costo') : false
+      }));
+      
+      console.log(`✅ EXCEL HEADERS: Found ${headers.length} headers`);
+      
+      // ✅ SAMPLE ROWS: Inspect rows 3130-3150 (the ones being skipped)
+      const sampleRows = sheetData.slice(3130, 3151).map((row: any[], idx: number) => ({
+        rowIndex: 3130 + idx,
+        detalle: row[0] || '',
+        subtipoCosto: row[1] || '',
+        mes: row[2] || '',
+        año: row[3] || '',
+        tipoCosto: row[4] || '',
+        especificacion: row[5] || '',
+        nroProyecto: row[6] || '',
+        tipoProyecto: row[7] || '',
+        proyecto: row[8] || '',
+        cliente: row[9] || '',
+        cantidadHoras: row[10] || '',
+        montoTotalARS: row[16] || '',
+        montoTotalUSD: row[17] || ''
+      }));
+      
+      // ✅ FILTER: Rows where "Tipo de Costo" is empty
+      const rowsWithoutTipoCosto = sampleRows.filter(r => !r.tipoCosto || r.tipoCosto.trim() === '');
+      
+      res.json({
+        totalHeaders: headers.length,
+        headers: headerDetails.slice(0, 30), // First 30 headers
+        allHeaders: headers, // All headers as simple array
+        tipoRelatedHeaders: headerDetails.filter(h => h.containsTipo || h.containsCosto),
+        sampleRows: sampleRows.slice(0, 10),
+        rowsWithoutTipoCosto: rowsWithoutTipoCosto.slice(0, 10),
+        stats: {
+          sampleSize: sampleRows.length,
+          emptyTipoCosto: rowsWithoutTipoCosto.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Excel headers inspection error:', error);
+      res.status(500).json({ error: 'Failed to fetch Excel headers', details: error.message });
     }
   });
 

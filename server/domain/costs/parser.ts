@@ -28,40 +28,45 @@ export function canonicalizeString(s: string): string {
 
 // ==================== COLUMN MAPPING ====================
 
-// 🎯 MAPEO CANÓNICO - Adaptado a la estructura real de la base de datos
+// 🎯 MAPEO CANÓNICO - Nombres EXACTOS del Excel MAESTRO + variantes DB/legacy
 const COLUMN_MAPPINGS = {
-  // Cliente: usar estructura real de DB
-  clientName: ['cliente', 'Cliente', 'client', 'clientName'],
+  // Cliente: EXCEL: "Cliente"
+  clientName: ['Cliente', 'cliente', 'client', 'clientName'],
   
-  // Proyecto: usar estructura real de DB  
-  projectName: ['proyecto', 'Proyecto', 'project', 'projectName'],
+  // Proyecto: EXCEL: "Proyecto"
+  projectName: ['Proyecto', 'proyecto', 'project', 'projectName'],
   
-  // 🚨 CORRECCIÓN CRÍTICA: Usar month_key (correcto) en lugar de mes+año (corrupto)
-  // Mes: usar estructura real de DB (DEPRECADO - datos corruptos)
-  month: ['mes', 'Mes', 'month'],
+  // Mes: EXCEL: "Mes"
+  month: ['Mes', 'mes', 'month'],
   
-  // Año: usar estructura real de DB (DEPRECADO - datos corruptos)
-  year: ['año', 'Año', 'anio', 'year'],
+  // Año: EXCEL: "Año"
+  year: ['Año', 'año', 'anio', 'year'],
   
   // 🎯 NUEVO: Month Key - campo correcto para período (formato YYYY-MM)
   monthKey: ['month_key', 'monthKey', 'period'],
   
-  // Tipo de gasto: priorizar tipoCosto (directo/indirecto) sobre categoria (Equipo/Tarjeta)
-  kind: ['kind', 'tipoCosto', 'tipo_costo', 'tipo', 'tipoGasto', 'Tipo_Gasto', 'categoria', 'Categoria'],
+  // Tipo de gasto: EXCEL: "Tipo de Costo" (Directo/Indirecto)
+  // ✅ FALLBACK: "Subtipo de costo" cuando "Tipo de Costo" está vacío
+  kind: ['Tipo de Costo', 'Subtipo de costo', 'Tipo de Coste', 'Tipo Costo', 'tipo_costo', 'tipoCosto', 'tipoGasto', 'Tipo_Gasto', 'categoria', 'Categoria', 'kind'],
   
   // Confirmado: no parece estar en la DB actual - omitir validación
   confirmed: ['confirmado', 'Confirmado', 'confirmed'],
   
-  // Total ARS: estructura real de DB con variantes snake_case
-  arsAmount: ['costoTotal', 'costo_total', 'Total ARS', 'Monto_ARS', 'costoTotalARS'],
+  // Total ARS: EXCEL: "Moneda Original ARS"
+  arsAmount: ['Moneda Original ARS', 'montoARS', 'Monto Total ARS', 'costoTotal', 'costo_total', 'Total ARS', 'Monto_ARS', 'costoTotalARS'],
   
-  // Total USD: estructura real de DB con variantes snake_case y camelCase
-  usdAmount: ['montoTotalUSD', 'montoTotalUsd', 'monto_total_usd', 'Total USD', 'Monto_USD', 'costoTotalUSD'],
+  // Total USD: EXCEL: "Monto Total USD"
+  usdAmount: ['Monto Total USD', 'Moneda Original USD', 'montoTotalUSD', 'montoTotalUsd', 'monto_total_usd', 'Total USD', 'Monto_USD', 'costoTotalUSD'],
   
   // 🎯 ANTI-×100: Campos para detectar costos calculados por horas
-  hoursReal: ['horas_reales_asana', 'horasRealesAsana', 'horas_reales', 'hoursReal'],
-  hourlyRate: ['valor_hora_persona', 'valorHoraPersona', 'hourlyRate', 'valor_hora'],
-  persona: ['persona', 'Persona', 'person', 'nombre']
+  // EXCEL: "Cantidad de horas reales Asana"
+  hoursReal: ['Cantidad de horas reales Asana', 'horas_reales_asana', 'horasRealesAsana', 'horas_reales', 'hoursReal'],
+  
+  // EXCEL: "Valor Hora"
+  hourlyRate: ['Valor Hora', 'valor_hora_persona', 'valorHoraPersona', 'hourlyRate', 'valor_hora'],
+  
+  // EXCEL: "Detalle" (nombre de persona)
+  persona: ['Detalle', 'persona', 'Persona', 'person', 'nombre']
 };
 
 // ==================== CURRENCY DETECTION ====================
@@ -377,18 +382,83 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
   }
   
   const results: ParsedCostRecord[] = [];
-  let skipped = 0;
+  
+  // 📊 INSTRUMENTATION: Track skip reasons and amounts
+  const skipReasons: Record<string, number> = {};
+  const skipAmountsByReason: Record<string, { ars: number; usd: number }> = {};
+  const validAmountsByPeriod: Record<string, { ars: number; usd: number; count: number }> = {};
   
   for (let i = 0; i < records.length; i++) {
-    const parsed = parseCostRecord(records[i], i);
+    const record = records[i];
+    
+    // Extract key fields for skip tracking
+    const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
+    const clientName = extractField(record, COLUMN_MAPPINGS.clientName);
+    const monthKeyRaw = extractField(record, COLUMN_MAPPINGS.monthKey);
+    const monthRaw = extractField(record, COLUMN_MAPPINGS.month);
+    const yearRaw = extractField(record, COLUMN_MAPPINGS.year);
+    const arsAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.arsAmount);
+    const usdAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.usdAmount);
+    
+    // Determine period for tracking
+    const periodKey = monthKeyRaw || buildFromMesAnio(monthRaw, yearRaw);
+    
+    const parsed = parseCostRecord(record, i);
+    
     if (parsed) {
       results.push(parsed);
+      
+      // Track valid amounts by period
+      if (!validAmountsByPeriod[parsed.period]) {
+        validAmountsByPeriod[parsed.period] = { ars: 0, usd: 0, count: 0 };
+      }
+      validAmountsByPeriod[parsed.period].ars += parsed.arsAmount || 0;
+      validAmountsByPeriod[parsed.period].usd += parsed.usdAmount || 0;
+      validAmountsByPeriod[parsed.period].count++;
+      
     } else {
-      skipped++;
+      // Determine skip reason
+      let reason = 'unknown';
+      if (!kindRaw) {
+        reason = 'no_tipo_de_gasto';
+      } else if (!['directo', 'directos'].includes(kindRaw.toLowerCase().trim())) {
+        reason = 'not_directo';
+      } else if (!clientName) {
+        reason = 'missing_clientName';
+      } else if (!/^\d{4}-\d{2}$/.test(periodKey)) {
+        reason = 'bad_periodKey';
+      } else if (!arsAmountRaw && !usdAmountRaw) {
+        reason = 'no_valid_amounts';
+      }
+      
+      skipReasons[reason] = (skipReasons[reason] || 0) + 1;
+      
+      // Track skipped amounts by reason
+      if (!skipAmountsByReason[reason]) {
+        skipAmountsByReason[reason] = { ars: 0, usd: 0 };
+      }
+      skipAmountsByReason[reason].ars += arsAmountRaw || 0;
+      skipAmountsByReason[reason].usd += usdAmountRaw || 0;
     }
   }
   
-  console.log(`✅ COST PARSER: Completed batch parse - ${results.length} valid, ${skipped} skipped`);
+  // 📊 LOG SKIP SUMMARY
+  console.log(`\n📊 SKIP REASONS SUMMARY:`);
+  Object.entries(skipReasons).forEach(([reason, count]) => {
+    const amounts = skipAmountsByReason[reason];
+    console.log(`  ❌ ${reason}: ${count} rows (ARS: ${amounts.ars.toFixed(2)}, USD: ${amounts.usd.toFixed(2)})`);
+  });
+  
+  // 📊 LOG VALID AMOUNTS BY PERIOD
+  console.log(`\n📊 VALID AMOUNTS BY PERIOD:`);
+  Object.entries(validAmountsByPeriod)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([period, amounts]) => {
+      console.log(`  ✅ ${period}: ${amounts.count} rows (ARS: ${amounts.ars.toFixed(2)}, USD: ${amounts.usd.toFixed(2)})`);
+    });
+  
+  const totalSkipped = Object.values(skipReasons).reduce((sum, count) => sum + count, 0);
+  console.log(`\n✅ COST PARSER: Completed batch parse - ${results.length} valid, ${totalSkipped} skipped`);
   
   return results;
 }
