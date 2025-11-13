@@ -281,7 +281,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -474,7 +474,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -1079,7 +1079,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -1360,7 +1360,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
