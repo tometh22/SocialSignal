@@ -907,24 +907,30 @@ export async function executeSoTETL(
       console.log(`📊 [SoT ETL] Filtrado: ${filteredCostos.length}/${costosDirectosRows.length} costos, ${filteredRC.length}/${rendimientoClienteRows.length} RC`);
     }
     
-    // Filtrar para fact_cost_month: solo Directo + Equipo
+    // Filtrar para fact_cost_month: TODOS los costos directos (Equipo, Coordinación, QA, Admin, etc.)
     // Acepta SOLO "Directo" y "Directos e indirectos" (rechaza "Indirecto")
-    const filteredCostosEquipo = filteredCostos.filter(row => {
+    // Fuente: Columna R del Excel MAESTRO (1:1 match sin filtros adicionales)
+    const filteredCostosDirectos = filteredCostos.filter(row => {
       const tipoCosto = normKey(row['Tipo de Costo'] ?? row['Tipo de Coste'] ?? row['Tipo Costo'] ?? '');
-      const subtipoCosto = normKey(row['Subtipo de costo'] ?? row['Subtipo de Coste'] ?? '');
-      
-      // Primero verificar que Subtipo sea "Equipo"
-      if (!subtipoCosto.includes('equipo')) return false;
       
       // Verificar que Tipo sea exactamente "directo" o "directos e indirectos"
       // IMPORTANTE: No usar .includes() porque "indirecto".includes("directo") es true
       const isDirecto = tipoCosto === 'directo' || tipoCosto === 'directos e indirectos' || tipoCosto === 'costos directos e indirectos';
       if (!isDirecto) return false;
       
+      // NO filtrar por Subtipo, persona, o horas - incluye TODOS los costos directos
+      // (Equipo con horas, Coordinación, QA, Admin, Provisions sin horas, etc.)
       return true;
     });
     
-    console.log(`🎯 [SoT ETL] Filtrado Directo+Equipo: ${filteredCostosEquipo.length}/${filteredCostos.length} costos para fact_cost_month`);
+    console.log(`🎯 [SoT ETL] Filtrado Costos Directos: ${filteredCostosDirectos.length}/${filteredCostos.length} costos para fact_cost_month`);
+    
+    // Debug: sumar columna R para verificar el total
+    const totalR = filteredCostosDirectos.reduce((sum, row) => {
+      const montoUSD = parseNum(row['Monto Total USD']);
+      return sum + montoUSD;
+    }, 0);
+    console.log(`💰 [SoT ETL DEBUG] Total columna R para ${filteredCostosDirectos.length} filas: $${totalR.toFixed(2)} USD`);
     
     if (options.dryRun) {
       console.log('🔍 [SoT ETL] DRY RUN - No se guardarán cambios');
@@ -942,8 +948,9 @@ export async function executeSoTETL(
     // 1. Procesar labor (costos directos con horas - fact_labor_month)
     await processDirectCostsToFactLabor(filteredCostos);
     
-    // 1b. Procesar costos agregados por período (solo Directo+Equipo - fact_cost_month)
-    await processCostsByPeriod(filteredCostosEquipo);
+    // 1b. Procesar costos agregados por período (TODOS los costos directos - fact_cost_month)
+    // Incluye Equipo, Coordinación, QA, Admin, etc. - Match 1:1 con Columna R del Excel
+    await processCostsByPeriod(filteredCostosDirectos);
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);

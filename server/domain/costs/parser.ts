@@ -46,8 +46,8 @@ const COLUMN_MAPPINGS = {
   // 🎯 NUEVO: Month Key - campo correcto para período (formato YYYY-MM)
   monthKey: ['month_key', 'monthKey', 'period'],
   
-  // Tipo de gasto: usar estructura real de DB
-  kind: ['tipoGasto', 'Tipo', 'tipo', 'Tipo_Gasto'],
+  // Tipo de gasto: priorizar tipoCosto (directo/indirecto) sobre categoria (Equipo/Tarjeta)
+  kind: ['kind', 'tipoCosto', 'tipo_costo', 'tipo', 'tipoGasto', 'Tipo_Gasto', 'categoria', 'Categoria'],
   
   // Confirmado: no parece estar en la DB actual - omitir validación
   confirmed: ['confirmado', 'Confirmado', 'confirmed'],
@@ -244,11 +244,29 @@ export function parseCostRecord(
   const confirmedRaw = extractField(record, COLUMN_MAPPINGS.confirmed);
   const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
-  // ⚠️ REQUIRED FIELDS - clientName es obligatorio
+  // 🔍 COST KIND - FILTRO DIRECTO (validate FIRST to skip indirect costs)
+  // 🎯 CHECKLIST: Sólo Directo: Tipo in {"Directo","Directos"}
+  // IMPORTANTE: Igualdad estricta para evitar que "indirecto" pase (contiene "directo")
+  if (!kindRaw) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - no tipo de gasto`);
+    return null;
+  }
+  
+  const kindLower = kindRaw.toLowerCase().trim();
+  // Accept multiple direct cost labels: "directo", "directos", "costos directos e indirectos"
+  const isDirect = kindLower === 'directo' || 
+                   kindLower === 'directos' ||
+                   kindLower.includes('costos directos e indirectos');
+  if (!isDirect) {
+    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not directo (got "${kindRaw}")`);
+    return null;
+  }
+  
+  const kind: CostKind = 'Directo';
+  
+  // ⚠️ REQUIRED FIELDS - clientName es obligatorio SOLO para costos directos
   if (!clientName) {
     console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - missing clientName`);
-    console.log(`🔍 COST PARSER DEBUG: Available keys in record:`, Object.keys(record));
-    console.log(`🔍 COST PARSER DEBUG: Record sample:`, record);
     return null;
   }
   
@@ -266,8 +284,6 @@ export function parseCostRecord(
       yearRaw,
       expectedFormat: 'YYYY-MM'
     });
-    console.log(`🔍 COST PARSER DEBUG: clientName="${clientName}", projectName="${projectName}"`);
-    console.log(`🔍 COST PARSER DEBUG: Full record sample:`, record);
     return null;
   }
   
@@ -331,22 +347,7 @@ export function parseCostRecord(
     }
   }
   
-  // 🔍 COST KIND - FILTRO DIRECTO
-  // 🎯 CHECKLIST: Sólo Directo: Tipo in {"Directo","Directos"}
-  // IMPORTANTE: Igualdad estricta para evitar que "indirecto" pase (contiene "directo")
-  if (!kindRaw) {
-    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - no tipo de gasto`);
-    return null;
-  }
-  
-  const kindLower = kindRaw.toLowerCase().trim();
-  const isDirect = kindLower === 'directo' || kindLower === 'directos';
-  if (!isDirect) {
-    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - not directo (got "${kindRaw}")`);
-    return null;
-  }
-  
-  const kind: CostKind = 'Directo';
+  // Kind validation already done above (before clientName validation)
   
   console.log(`✅ COST PARSED: ${clientName} | ${projectName || 'overhead'} | ${period} | ARS:${arsAmount} USD:${usdAmount} | ${kind}`);
   

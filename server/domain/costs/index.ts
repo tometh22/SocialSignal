@@ -125,13 +125,16 @@ function applyPeriodReconciler(
 /**
  * Obtiene costos agregados por proyecto para un período
  */
-export async function getCostsForPeriod(period: PeriodKey): Promise<CostsResult> {
-  console.log(`🚀 COSTS SoT: Getting costs for period ${period}`);
+export async function getCostsForPeriod(
+  period: PeriodKey,
+  source: 'auto' | 'database' | 'sheets' = 'auto'
+): Promise<CostsResult> {
+  console.log(`🚀 COSTS SoT: Getting costs for period ${period} from source=${source}`);
   
   try {
     // 1. Fetch all cost data
-    console.log(`🔍 COSTS SoT DEBUG: About to call getCostData()`);
-    const allCostRecords = await getCostData();
+    console.log(`🔍 COSTS SoT DEBUG: About to call getCostData('${source}')`);
+    const allCostRecords = await getCostData(source);
     console.log(`🔍 COSTS SoT DEBUG: getCostData() returned ${allCostRecords.length} records`);
     
     if (allCostRecords.length > 0) {

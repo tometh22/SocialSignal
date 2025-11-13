@@ -14,6 +14,8 @@ interface CostoDirectoIndirecto {
   costoTotal: number;
   valorHora: number;
   categoria: string;
+  tipoCosto?: string; // directo/indirecto flag
+  cliente?: string; // client name for direct costs
   proyecto?: string;
 }
 
@@ -291,6 +293,7 @@ class GoogleSheetsWorkingService {
       }
 
       console.log(`📊 Procesando ${rows.length} filas del Excel MAESTRO`);
+      
       return this.processCostosData(rows);
       
     } catch (error) {
@@ -303,6 +306,38 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Normalizar registro de costo antes de devolver al parser
+   * - Garantiza campos canónicos: cliente, proyecto, tipoCosto
+   * - Aplica fallback de categoria→tipoCosto para datos legacy
+   */
+  private normalizeCostRow(row: CostoDirectoIndirecto): CostoDirectoIndirecto {
+    const normalized = { ...row };
+    
+    // 1. Fallback categoria→tipoCosto para datos legacy sin "Tipo de Costo"
+    if (!normalized.tipoCosto || normalized.tipoCosto.trim() === '') {
+      const categoria = (normalized.categoria || '').toLowerCase().trim();
+      
+      // Mapeo determinístico: categorías directas vs indirectas
+      const directCategories = ['equipo', 'honorarios', 'servicios', 'fee'];
+      const indirectCategories = ['tarjeta', 'gastos generales', 'gastos varios', 'subscripciones'];
+      
+      if (directCategories.some(cat => categoria.includes(cat))) {
+        normalized.tipoCosto = 'directo';
+      } else if (indirectCategories.some(cat => categoria.includes(cat))) {
+        normalized.tipoCosto = 'indirecto';
+      } else {
+        // Default conservador: tratar como indirecto si no sabemos
+        normalized.tipoCosto = 'indirecto';
+      }
+    }
+    
+    // 2. Normalizar campos cliente/proyecto (ya están en formato correcto desde createColumnMap)
+    // No se necesita transformación adicional - ya mapeamos las columnas correctas
+    
+    return normalized;
+  }
+
+  /**
    * Procesar los datos del Excel y convertirlos a nuestro formato
    */
   private processCostosData(rows: any[][]): CostoDirectoIndirecto[] {
@@ -312,11 +347,9 @@ class GoogleSheetsWorkingService {
 
     // La primera fila contiene los headers
     const headers = rows[0];
-    console.log('📋 Headers encontrados:', headers);
 
     // Mapear las columnas según los headers
     const columnMap = this.createColumnMap(headers);
-    console.log('🗺️ Mapeo de columnas:', columnMap);
 
     // Procesar cada fila de datos (omitir la primera que son headers)
     for (let i = 1; i < rows.length; i++) {
@@ -329,25 +362,9 @@ class GoogleSheetsWorkingService {
         const montoTotal = this.parseMoneyValue(this.getCellValue(row, columnMap.costoTotal)) || 0;
         const persona = this.getCellValue(row, columnMap.persona);
         
-        // Debug primera fila para entender la estructura
-        if (i <= 10 && persona && tipoCosto) {
-          console.log(`🔍 Fila ${i} debug:`, {
-            persona: persona,
-            tipoCosto: tipoCosto,
-            montoTotal: montoTotal,
-            valorHora: this.getCellValue(row, columnMap.valorHora),
-            mes: this.getCellValue(row, columnMap.mes),
-            año: this.getCellValue(row, columnMap.año),
-            proyecto: this.getCellValue(row, columnMap.proyecto),
-            categoria: this.getCellValue(row, columnMap.categoria)
-          });
-        }
-        
         // Solo procesar filas que tengan persona válida (no header ni vacía)
-        if (!persona || persona.toLowerCase().includes('detalle') || !tipoCosto) continue;
+        if (!persona || persona.toLowerCase().includes('detalle')) continue;
         
-        // Procesar todos los registros con persona válida, incluso si monto es 0
-
         // Limpiar y parsear valor hora que viene con formato de moneda
         const valorHoraStr = this.getCellValue(row, columnMap.valorHora);
         const valorHora = this.parseMoneyValue(valorHoraStr);
@@ -364,16 +381,19 @@ class GoogleSheetsWorkingService {
           costoTotal: costoEfectivo,
           valorHora: valorHora,
           categoria: this.getCellValue(row, columnMap.categoria) || tipoCosto,
+          tipoCosto: tipoCosto,
+          cliente: this.getCellValue(row, columnMap.cliente) || undefined,
           proyecto: this.getCellValue(row, columnMap.proyecto) || undefined
         };
 
-        result.push(costoData);
+        // Normalizar registro antes de agregar (aplica fallbacks para datos legacy)
+        const normalized = this.normalizeCostRow(costoData);
+        result.push(normalized);
       } catch (error) {
         console.warn(`⚠️ Error procesando fila ${i}:`, error);
       }
     }
 
-    console.log(`✅ Procesados ${result.length} registros válidos de ${rows.length - 1} filas`);
     return result;
   }
 
@@ -418,7 +438,6 @@ class GoogleSheetsWorkingService {
       }
     });
 
-    console.log('🗺️ Mapeo de columnas costos directos:', map);
     return map;
   }
 

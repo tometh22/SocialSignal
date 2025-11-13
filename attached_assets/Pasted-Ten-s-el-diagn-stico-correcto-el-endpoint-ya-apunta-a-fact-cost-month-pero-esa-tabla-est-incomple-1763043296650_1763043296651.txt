@@ -1,0 +1,126 @@
+Tenés el diagnóstico correcto: el endpoint ya apunta a fact_cost_month, pero esa tabla está incompleta porque el ETL filtra por Subtipo = “Equipo” y deja afuera Coordinación, QA, Admin, etc.
+Abajo tenés el diff listo para que fact_cost_month tome todos los costos directos (1:1 con la columna R del Excel), más un checklist de verificación.
+
+Cambio en el ETL (TypeScript • Drizzle)
+
+Archivo (ej.): server/etl/sot-etl.ts — bloque que procesa “Costos directos e indirectos”.
+
+1) Reemplazá el filtro
+// ANTES — demasiado restrictivo (solo "Equipo")
+const rows = rawRows.filter((r) => {
+  const tipo = (r.tipoCosto || "").toLowerCase().trim();          // Columna E
+  const subtipo = (r.subtipoCosto || "").toLowerCase().trim();    // Columna B
+  // ❌ Esto excluye coordinación, QA, admin, etc.
+  const isDirecto = tipo === "directo" || tipo === "directos e indirectos" || tipo === "costos directos e indirectos";
+  const isEquipo = subtipo.includes("equipo");
+  return isDirecto && isEquipo;
+});
+
+// DESPUÉS — incluye TODOS los costos directos (sin mirar Subtipo)
+const rows = rawRows.filter((r) => {
+  const tipo = (r.tipoCosto || "").toLowerCase().trim();          // Columna E
+  // ✅ Si el tipo “contiene” ‘directo’, lo tomo (directo / directos e indirectos)
+  return tipo.includes("directo");
+});
+
+
+Si necesitás excluir algo puntual (p.ej. “Gastos Varios” que no querés como costo directo), hacé el guard opcional:
+
+// Exclusión opcional
+const subtipo = (r.subtipoCosto || "").toLowerCase().trim();
+if (subtipo.includes("gastos varios")) return false;
+
+2) Asegurá la lectura correcta de montos
+// Helper robusto
+const toNumber = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  const s = String(v).replace(/[\s$,]/g, "").replace(",", "."); // UNFORMATTED_VALUE igual viene limpio, esto es por las dudas
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+// Map de columnas
+const montoUsd = toNumber(r.montoTotalUsd);  // Columna R
+const montoArs = toNumber(r.monedasArs);     // Columna O (si la usás de respaldo)
+const fx       = toNumber(r.cotizacion);     // Columna Q
+
+// Regla: priorizar USD de la col. R; si está vacío, derivar de ARS/fx
+const amountUsd = montoUsd ?? (fx && montoArs ? montoArs / fx : null);
+
+// Ignorar filas sin importe (>0) o sin período válido
+if (!amountUsd || amountUsd <= 0) return false;
+if (!periodKey /* YYYY-MM derivado de columnas C (Mes) + D (Año) */) return false;
+
+3) Insert/Upsert en fact_cost_month
+await db
+  .insert(fact_cost_month)
+  .values({
+    period_key: periodKey,         // "2025-09"
+    project_key: projectKey ?? null,
+    client_key: clientKey ?? null,
+    amount_usd: amountUsd,         // 👈 total col. R (o derivado ARS/fx)
+    source: "excel_costos_directos", // trazabilidad
+  })
+  .onConflictDoUpdate({
+    target: [fact_cost_month.period_key, fact_cost_month.project_key, fact_cost_month.client_key],
+    set: { amount_usd: amountUsd, source: sql`'excel_costos_directos'` },
+  });
+
+Re-cálculo de agregados (si usás vistas/tablas de agregados)
+
+Si tu dashboard lee de project_aggregates, asegurate que ahí total_cost_usd use fact_cost_month:
+
+const agg = await db
+  .select({
+    periodKey: fact_rc_month.period_key,
+    revenueUsd: sql<number>`COALESCE(SUM(${fact_rc_month.revenue_usd}),0)`.mapWith(Number),
+    costUsd:    sql<number>`COALESCE(SUM(${fact_cost_month.amount_usd}),0)`.mapWith(Number), // 👈
+  })
+  .from(fact_rc_month)
+  .leftJoin(fact_cost_month, eq(fact_cost_month.period_key, fact_rc_month.period_key))
+  .where(eq(fact_rc_month.period_key, period))
+  .groupBy(fact_rc_month.period_key);
+
+
+Si usás VIEW, actualizala para sumar fact_cost_month.amount_usd.
+
+Checklist de verificación (rápido y objetivo)
+
+Reprocesá solo el período en duda (ej. septiembre):
+
+POST /api/etl/sot/run
+{
+  "scopes": { "periods": ["2025-09"] },
+  "dryRun": false,
+  "recomputeAgg": true
+}
+
+
+Validá contra DB:
+
+-- Debe MATCHEAR la suma manual de col. R del Excel para 2025-09
+SELECT ROUND(SUM(amount_usd)::numeric, 2) AS fact_cost_month_total
+FROM fact_cost_month
+WHERE period_key = '2025-09';
+
+-- Comparación (solo informativa, debería ser menor):
+SELECT ROUND(SUM(cost_usd)::numeric, 2) AS fact_labor_month_total
+FROM fact_labor_month
+WHERE period_key = '2025-09';
+
+
+Smoke test del endpoint del dashboard:
+
+GET /api/dashboard/executive-summary?period=2025-09
+# costosDirectosUsd debe = fact_cost_month_total
+
+
+UI: en la card “Costos directos” agregá un tooltip:
+
+“Fuente: Excel Maestro · ‘Costos directos e indirectos’ (Columna R). No depende de horas.”
+
+Por qué esto lo corrige de raíz
+
+Antes: fact_cost_month traía solo Subtipo = Equipo → subreporte (~$12.9k).
+
+Ahora: fact_cost_month trae todo lo que sea ‘directo’ (Equipo, Coordinación, QA, Admin, etc.) → match 1:1 con Excel (columna R) para el período → ~$34.5k esperado.
