@@ -1,0 +1,107 @@
+Lo que se fue a cero es todo lo que depende de fact_labor_month / horas: horas trabajadas, equipo activo, eficiencia, etc.
+
+Eso acota el problema:
+
+Revenue y costos del período → vienen del SoT financiero (fact_rc_month + fact_cost_month / agg_project_month). Eso está bien.
+
+Horas trabajadas, equipo activo, carga promedio → vienen del SoT de horas (fact_labor_month o tabla equivalente). Eso hoy está devolviendo 0 para project=Fee Huggies, period=2025-08.
+
+Es un bug en la ruta “operativa”, no en la ruta “financiera”.
+
+Qué hacer ahora, en orden
+1. Verificar que en la fuente haya horas para agosto
+
+En el Excel MAESTRO, hoja “Costos directos e indirectos”:
+
+Filtrá:
+
+Cliente = Kimberly Clark
+
+Proyecto = Fee Huggies (o el nombre exacto que uses)
+
+Mes = 08 ago
+
+Año = 2025
+
+Revisá las columnas:
+
+Cantidad de horas reales Asana
+
+Cantidad de horas para facturar
+
+Monto Total USD (columna R)
+
+Si ahí ya ves 0 horas o no hay filas, entonces el dashboard está reflejando exactamente eso.
+Si ves horas cargadas, el problema es del ETL / consultas.
+
+2. Comprobar si las horas llegaron a la base
+
+Esto es lo que tiene que chequear el dev o el Replit Agent (solo lectura, sin tocar más lógica):
+
+Consultar fact_labor_month (o la tabla que use el proyecto para horas) con algo equivalente a:
+
+WHERE period_key = '2025-08' AND project_name ILIKE '%Huggies%'
+
+Posibles resultados:
+
+Hay filas con horas > 0
+Entonces el problema está en el endpoint que arma la vista de proyecto (/api/projects/:id/complete-data):
+
+O no está usando fact_labor_month para la vista operativa.
+
+O está haciendo un JOIN o un filtro (por ejemplo hours > 0 AND tipo_costo = 'directo') que termina dejando en 0.
+
+No hay filas
+Entonces rompimos la parte del ETL que manda horas a fact_labor_month para agosto:
+
+Al tocar toda la lógica de costos, probablemente se modificó algo en processDirectCostsToFactLabor o en el rango de lectura y ahora solo sube costos pero no horas para ciertos períodos.
+
+3. No seguir tuneando costs: estabilizar la parte de horas
+
+Mientras esto no esté resuelto, no tiene sentido seguir moviendo nada más:
+
+La parte de costos ya está en un estado razonable (dashboard ejecutivo tiene sentido, el SoT de costos existe, y hay tabla de rechazos).
+
+El problema visible ahora es que el pipeline de horas y/o el endpoint de vista de proyecto quedó desalineado.
+
+Concretamente, el dev/agent tiene que hacer:
+
+Confirmar que fact_labor_month tiene datos de Fee Huggies en mayo (donde antes veías todo bien) y compararlo con agosto.
+
+Mirar el código de complete-data:
+
+Ver de dónde toma Horas trabajadas en el período, Equipo activo, Carga promedio por persona.
+
+Ver si hay algún INNER JOIN nuevo con la tabla de costos o con el SoT que pueda estar filtrando las horas.
+
+Si fact_labor_month está vacío para agosto:
+
+Revisar el ETL de labor y volverlo al estado en que solo:
+
+lee las mismas columnas de siempre
+
+no filtra por tipoCosto
+
+y escribe period_key, project, person, hours_* igual que antes.
+
+4. Cómo saber que lo arreglaste
+
+Para Fee Huggies, Agosto 2025, el estado correcto debería ser:
+
+Financiera:
+
+Números parecidos a los que ya ves (ingresos, costos, margen).
+
+Operativa:
+
+Horas > 0
+
+Equipo activo > 0
+
+Carga promedio razonable
+
+Eficiencia distinta de −1000 %
+
+Hasta que no veas algo distinto de 0 en horas, el bug sigue en la capa horas/complete-data, no en costos.
+
+Si querés, en el próximo mensaje podés copiar literal cómo aparece una fila de Fee Huggies agosto en el Excel (cliente, proyecto, tipo de costo, horas, monto), y te digo exactamente por qué, con las reglas actuales, esa fila entraría o no a fact_labor_month y al SoT.
