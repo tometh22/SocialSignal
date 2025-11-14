@@ -95,6 +95,7 @@ export class AutoSyncService {
   /**
    * NUEVA FUNCIÓN UNIFICADA: Sincronizar ventas + costos desde Excel MAESTRO
    * Ahora incluye detección automática de formato "líneas generales"
+   * ✅ AUTO-ETL: Ejecuta ETL de Star Schema automáticamente después de sincronizar
    */
   private async syncUnifiedExcelData(): Promise<{ 
     salesImported: number; 
@@ -102,7 +103,9 @@ export class AutoSyncService {
     costsImported: number; 
     costsUpdated: number; 
     errors: string[];
-    lineasGeneralesProcessed?: number; 
+    lineasGeneralesProcessed?: number;
+    etlExecuted?: boolean;
+    etlResult?: any;
   }> {
     try {
       console.log('📊 UNIFICADO: Sincronizando ventas + costos desde Excel MAESTRO...');
@@ -133,7 +136,79 @@ export class AutoSyncService {
         console.log('⚠️ Error sincronizando costos:', costsResult.errors);
       }
 
-      // 3. Combinar resultados
+      // 🌟 3. AUTO-ETL: Ejecutar Star Schema ETL después de sincronizar staging
+      let etlResult: any = null;
+      let etlExecuted = false;
+      
+      if (costsResult.success && (costsResult.costsImported > 0 || costsResult.costsUpdated > 0)) {
+        try {
+          console.log('🌟 AUTO-ETL: Ejecutando Star Schema ETL después de sincronización...');
+          
+          // Importar ETL dinámicamente
+          const { executeSoTETL } = await import('../etl/sot-etl');
+          
+          // Leer datos frescos desde Excel MAESTRO
+          const costosRaw = await googleSheetsWorkingService.getSheetValues(
+            '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+            'Costos directos e indirectos',
+            {
+              valueRenderOption: 'UNFORMATTED_VALUE',
+              dateTimeRenderOption: 'SERIAL_NUMBER'
+            }
+          );
+          
+          const rcRaw = await googleSheetsWorkingService.getSheetValues(
+            '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+            'Rendimiento Cliente',
+            {
+              valueRenderOption: 'UNFORMATTED_VALUE',
+              dateTimeRenderOption: 'SERIAL_NUMBER'
+            }
+          );
+          
+          // Parse headers
+          const costosHeaders = costosRaw[0] || [];
+          const rcHeaders = rcRaw[0] || [];
+          
+          const costosRows = costosRaw.slice(1).map((row: any, idx: number) => {
+            const obj: any = { __rowId: `costos_${idx}` };
+            costosHeaders.forEach((header: any, i: number) => {
+              obj[header] = row[i];
+            });
+            return obj;
+          });
+          
+          const rcRows = rcRaw.slice(1).map((row: any, idx: number) => {
+            const obj: any = { __rowId: `rc_${idx}` };
+            rcHeaders.forEach((header: any, i: number) => {
+              obj[header] = row[i];
+            });
+            return obj;
+          });
+          
+          // Ejecutar ETL completo (todos los períodos)
+          etlResult = await executeSoTETL(costosRows, rcRows, {
+            dryRun: false,
+            recomputeAgg: true
+          });
+          
+          etlExecuted = true;
+          
+          if (etlResult.success) {
+            console.log(`✅ AUTO-ETL completado: ${etlResult.periodsProcessed.length} períodos procesados, ${etlResult.laborRowsProcessed} labor rows, ${etlResult.rcRowsProcessed} RC rows`);
+          } else {
+            console.error('⚠️ AUTO-ETL completado con errores:', etlResult.errors);
+          }
+          
+        } catch (etlError: any) {
+          console.error('❌ Error ejecutando AUTO-ETL:', etlError);
+          // No fallar la sincronización completa si el ETL falla
+        }
+      } else {
+        console.log('⏭️ Saltando AUTO-ETL: No hubo cambios en costos directos');
+      }
+
+      // 4. Combinar resultados
       const combinedErrors = [
         ...salesResult.errors,
         ...lineasGeneralesResult.errors,
@@ -146,7 +221,9 @@ export class AutoSyncService {
         costsImported: costsResult.success ? costsResult.costsImported : 0,
         costsUpdated: costsResult.success ? costsResult.costsUpdated : 0,
         errors: combinedErrors,
-        lineasGeneralesProcessed: lineasGeneralesResult.processed
+        lineasGeneralesProcessed: lineasGeneralesResult.processed,
+        etlExecuted,
+        etlResult
       };
 
     } catch (error: any) {
