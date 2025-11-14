@@ -334,10 +334,13 @@ function setupIncomeSOTEndpoints(app: Express, requireAuth: any) {
 // 🚀 COSTS SOT ENDPOINTS - Nueva fuente única de verdad para costos
 function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
   
-  // GET /api/costs?period=YYYY-MM → CostsResult
+  // GET /api/costs?period=YYYY-MM&source=sheets → CostsResult
+  // TEMPORARY: Auth disabled for debugging parser logs
+  // TEMPORARY: source=sheets query param to force Google Sheets data
   app.get("/api/costs", requireAuth, async (req, res) => {
     try {
       const period = req.query.period as string;
+      const source = req.query.source as string || 'auto';
       
       if (!period || !/^\d{4}-\d{2}$/.test(period)) {
         return res.status(400).json({ 
@@ -345,9 +348,9 @@ function setupCostsSOTEndpoints(app: Express, requireAuth: any) {
         });
       }
 
-      console.log(`🚀 COSTS SOT: GET /api/costs called with period=${period}`);
+      console.log(`🚀 COSTS SOT: GET /api/costs called with period=${period}, source=${source}`);
       
-      const result = await costs.getCostsForPeriod(period as any);
+      const result = await costs.getCostsForPeriod(period as any, source as any);
       
       console.log(`🎯 COSTS SOT: Costs result: ${result.projects.length} projects, $${result.portfolioCostUSD.toFixed(2)} USD total`);
       
@@ -4913,6 +4916,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔧 MANUAL TRIGGER: ETL SoT Sync (temporary endpoint for testing)
+  app.post("/api/trigger-etl-sync", requireAuth, async (req, res) => {
+    try {
+      const { triggerManualSync } = await import('./jobs/daily-sot-sync.js');
+      console.log('🚀 [API] Triggering manual ETL sync...');
+      const result = await triggerManualSync();
+      res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('❌ [API] ETL sync failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
@@ -4971,11 +4987,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 2. Costos laborales (desde fact_labor_month - fuente: "Costos directos e indirectos")
-      const { rows: [laborCosts] } = await pool.query(`
+      // 2. Costos directos totales (desde fact_cost_month - suma directa Col R del Excel sin filtros)
+      const { rows: [directCosts] } = await pool.query(`
         SELECT 
-          COALESCE(SUM(cost_usd), 0) as labor_cost_usd
-        FROM fact_labor_month
+          COALESCE(SUM(amount_usd), 0) as total_cost_usd
+        FROM fact_cost_month
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
@@ -5003,9 +5019,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. WIP simple (horas billables * rate promedio - facturado)
       // Para calcular rate promedio usamos: costos / horas billables como proxy
       const billableHours = parseFloat(hoursData?.billable_hours || '0');
-      const laborCostUsd = parseFloat(laborCosts?.labor_cost_usd || '0');
+      const costUsd = parseFloat(directCosts?.total_cost_usd || '0');
       const billedUsd = parseFloat(billingData?.billed_usd || '0');
-      const avgHourlyRate = billableHours > 0 ? (laborCostUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
+      const avgHourlyRate = billableHours > 0 ? (costUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
       const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
       
       // ===== OPERATIONAL METRICS =====
@@ -5054,14 +5070,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AVG(billable_pct) as avg_billable_pct_3m
         FROM (
           SELECT 
-            period_key,
-            SUM(cost_usd) as costs,
-            SUM(asana_hours) as hours,
-            SUM(billing_hours) * 100.0 / NULLIF(SUM(asana_hours), 0) as billable_pct,
+            fc.period_key,
+            fc.amount_usd as costs,
+            COALESCE(SUM(fl.asana_hours), 0) as hours,
+            COALESCE(SUM(fl.billing_hours), 0) * 100.0 / NULLIF(COALESCE(SUM(fl.asana_hours), 0), 0) as billable_pct,
             0 as fx_w
-          FROM fact_labor_month
-          WHERE period_key = ANY($1)
-          GROUP BY period_key
+          FROM fact_cost_month fc
+          LEFT JOIN fact_labor_month fl ON fc.period_key = fl.period_key
+          WHERE fc.period_key = ANY($1)
+          GROUP BY fc.period_key, fc.amount_usd
         ) sub
       `, [last3Months.length > 0 ? last3Months : ['1900-01']]);
       
@@ -5070,7 +5087,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const totalHours = parseFloat(hoursData?.total_hours || '0');
       const billablePct = billableHours > 0 ? (billableHours / totalHours) : 0;
-      const costUsd = laborCostUsd;
       const fxWeighted = parseFloat(fxData?.fx_weighted || '0');
       const avgCost3m = parseFloat(avgData?.avg_cost_3m || '0');
       const avgFx3m = parseFloat(avgData?.avg_fx_3m || '0');
@@ -11961,6 +11977,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Golden status check error:', error);
       res.status(500).json({ error: 'Failed to check golden status', details: error.message });
+    }
+  });
+
+  // GET /api/debug/cost-headers - NUEVO: Inspect Excel MAESTRO headers RAW  
+  app.get('/api/debug/cost-headers', async (req, res) => {
+    try {
+      console.log(`🔍 EXCEL HEADERS: Fetching raw headers from Google Sheets...`);
+      
+      const sheetData = await googleSheetsWorkingService.getSheetValues(
+        googleSheetsWorkingService['spreadsheetId'],
+        'Costos directos e indirectos',
+        { valueRenderOption: 'FORMATTED_VALUE' }
+      );
+      
+      if (!sheetData || sheetData.length === 0) {
+        return res.json({ error: 'No data found in sheet', headers: [] });
+      }
+      
+      const headers = sheetData[0];
+      
+      // Return detailed header information
+      const headerDetails = headers.map((h: string, idx: number) => ({
+        index: idx,
+        raw: h,
+        length: h?.length || 0,
+        charCodes: h ? Array.from(h).map(char => `${char}(${char.charCodeAt(0)})`).join(' ') : '',
+        normalized: h ? h.normalize('NFKC').trim() : '',
+        containsTipo: h ? h.includes('Tipo') : false,
+        containsCosto: h ? h.includes('Costo') : false
+      }));
+      
+      console.log(`✅ EXCEL HEADERS: Found ${headers.length} headers`);
+      
+      // ✅ SAMPLE ROWS: Inspect rows 3130-3150 (the ones being skipped)
+      const sampleRows = sheetData.slice(3130, 3151).map((row: any[], idx: number) => ({
+        rowIndex: 3130 + idx,
+        detalle: row[0] || '',
+        subtipoCosto: row[1] || '',
+        mes: row[2] || '',
+        año: row[3] || '',
+        tipoCosto: row[4] || '',
+        especificacion: row[5] || '',
+        nroProyecto: row[6] || '',
+        tipoProyecto: row[7] || '',
+        proyecto: row[8] || '',
+        cliente: row[9] || '',
+        cantidadHoras: row[10] || '',
+        montoTotalARS: row[16] || '',
+        montoTotalUSD: row[17] || ''
+      }));
+      
+      // ✅ FILTER: Rows where "Tipo de Costo" is empty
+      const rowsWithoutTipoCosto = sampleRows.filter(r => !r.tipoCosto || r.tipoCosto.trim() === '');
+      
+      res.json({
+        totalHeaders: headers.length,
+        headers: headerDetails.slice(0, 30), // First 30 headers
+        allHeaders: headers, // All headers as simple array
+        tipoRelatedHeaders: headerDetails.filter(h => h.containsTipo || h.containsCosto),
+        sampleRows: sampleRows.slice(0, 10),
+        rowsWithoutTipoCosto: rowsWithoutTipoCosto.slice(0, 10),
+        stats: {
+          sampleSize: sampleRows.length,
+          emptyTipoCosto: rowsWithoutTipoCosto.length
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Excel headers inspection error:', error);
+      res.status(500).json({ error: 'Failed to fetch Excel headers', details: error.message });
     }
   });
 

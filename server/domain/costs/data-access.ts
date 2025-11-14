@@ -8,11 +8,12 @@
  */
 
 import type { RawCostRecord, ParsedCostRecord } from './types';
-import { parseCostRecords } from './parser';
+import { parseCostRecords, parseCostRecordsWithRejections } from './parser';
 
 // Reutilizar infraestructura de income
 import { storage } from '../../storage';
-import { directCosts } from '@shared/schema';
+import { directCosts, costosRechazados } from '@shared/schema';
+import { googleSheetsWorkingService } from '../../services/googleSheetsWorking';
 
 // ==================== CACHE MANAGEMENT ====================
 
@@ -52,28 +53,21 @@ async function fetchCostsFromSheets(): Promise<RawCostRecord[]> {
   console.log('🔍 COSTS: Fetching from Google Sheets...');
   
   try {
-    // 🔧 CORRECCIÓN CRÍTICA: Usar servicio para "Costos directos e indirectos", NO "Ventas Tomi"
-    // 🚨 FALLBACK TEMPORAL: Usar storage.getAllDirectCosts() mientras se resuelve Google Sheets auth
-    console.log('🔄 COSTS: Using storage fallback due to Google Sheets auth issue');
-    const sheetData = await storage.getAllDirectCosts();
+    const sheetData = await googleSheetsWorkingService.getCostosDirectosIndirectos();
     
     if (!sheetData || !Array.isArray(sheetData)) {
-      console.warn('⚠️ COSTS: No data from storage fallback');
+      console.warn('⚠️ COSTS: No data from Google Sheets');
       return [];
     }
     
-    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from storage fallback`);
+    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from Google Sheets`);
     
-    // 🔍 DEBUG: Log first record to see exact structure
-    if (sheetData.length > 0) {
-      console.log(`🔍 COSTS DEBUG: First record keys:`, Object.keys(sheetData[0]));
-      console.log(`🔍 COSTS DEBUG: First record sample:`, sheetData[0]);
-    }
-    
-    return sheetData as RawCostRecord[];
+    // Return sheet data as-is; parser will handle field mapping via COLUMN_MAPPINGS
+    // Cast to RawCostRecord to satisfy type system
+    return sheetData as unknown as RawCostRecord[];
     
   } catch (error) {
-    console.error('❌ COSTS: Error fetching from fallback storage:', error);
+    console.error('❌ COSTS: Error fetching from Google Sheets:', error);
     return [];
   }
 }
@@ -106,7 +100,7 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
       'horas_reales_asana': row.horasRealesAsana?.toString() || '0',
       'valor_hora_persona': row.valorHoraPersona?.toString() || '0',
       'costo_total': row.costoTotal?.toString() || '0',
-      'monto_total_usd': row.montoTotalUsd?.toString() || '',
+      'monto_total_usd': row.montoTotalUSD?.toString() || '',
       'tipo_cambio': row.tipoCambio?.toString() || '',
       'cantidad_de_horas_asana': row.horasRealesAsana?.toString() || '0'
     }));
@@ -125,10 +119,6 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
 
 export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fresh' = 'auto'): Promise<ParsedCostRecord[]> {
   console.log(`🚀 COSTS DATA ACCESS: Fetching from source "${source}"`);
-  
-  // 🚨 FORCE CACHE CLEAR: Clear all cache to test new parser
-  console.log('🗑️ COSTS DEBUG: Forcibly clearing ALL cache to test new parser');
-  costCache.clear();
   
   // 🗑️ FRESH: Invalidate cache if fresh requested
   if (source === 'fresh') {
@@ -170,14 +160,14 @@ export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fres
       
       // Add sheets records first (priority)
       for (const record of sheetsRecords) {
-        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
+        const key = `${record.cliente || ''}_${record.proyecto || ''}_${record.mes || ''}_${record.año || ''}`.toLowerCase();
         seen.add(key);
         rawRecords.push(record);
       }
       
       // Add DB records that aren't already in sheets
       for (const record of dbRecords) {
-        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
+        const key = `${record.cliente || ''}_${record.proyecto || ''}_${record.mes || ''}_${record.año || ''}`.toLowerCase();
         if (!seen.has(key)) {
           rawRecords.push(record);
         }
@@ -187,21 +177,47 @@ export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fres
       break;
   }
   
-  // Parse the raw records
-  const parsedRecords = parseCostRecords(rawRecords);
+  // Parse the raw records with rejection tracking
+  const { valid, rejected } = parseCostRecordsWithRejections(rawRecords);
   
-  // Update cache
+  // 🔧 IDEMPOTENCY: Always clear previous rejections to ensure table reflects current ETL run
+  // This executes even when rejected.length === 0 to handle the case where all data is now valid
+  try {
+    await storage.db.delete(costosRechazados);
+    console.log(`🗑️ COSTS: Cleared previous rejected records (preparing for ${rejected.length} new rejections)`);
+    
+    // Persist rejected records for audit trail (only if any exist)
+    if (rejected.length > 0) {
+      // Convert rejected records to DB format (numeric fields need to be strings for Drizzle)
+      const rejectedForDB = rejected.map(r => ({
+        ...r,
+        amountARS: r.amountARS !== null ? String(r.amountARS) : null,
+        amountUSD: r.amountUSD !== null ? String(r.amountUSD) : null
+      }));
+      
+      // Insert rejected records in batch
+      await storage.db.insert(costosRechazados).values(rejectedForDB);
+      console.log(`💾 COSTS: Persisted ${rejected.length} rejected records to audit table`);
+    } else {
+      console.log(`✅ COSTS: No rejections in current ETL run - audit table is empty`);
+    }
+  } catch (error) {
+    console.error('❌ COSTS: Error managing rejected records:', error);
+    // Continue with valid records even if rejection persistence fails (lenient mode)
+  }
+  
+  // Update cache with valid records only
   const cacheData: CostDataCache = {
     lastUpdated: new Date(),
     rawRecords,
-    parsedRecords
+    parsedRecords: valid
   };
   
   costCache.set(cacheKey, cacheData);
   
-  console.log(`✅ COSTS DATA ACCESS: Retrieved and cached ${parsedRecords.length} parsed records`);
+  console.log(`✅ COSTS DATA ACCESS: Retrieved and cached ${valid.length} parsed records (${rejected.length} rejected)`);
   
-  return parsedRecords;
+  return valid;
 }
 
 // ==================== PROJECT-SPECIFIC ACCESS ====================

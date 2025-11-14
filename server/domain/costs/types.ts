@@ -64,10 +64,12 @@ export interface RawCostRecord {
   // Identificación
   cliente?: string;
   project?: string;
+  proyecto?: string; // Google Sheets field
   clientName?: string;
   projectName?: string;
   client_name?: string;
   project_name?: string;
+  persona?: string; // Google Sheets field (maps to cliente for costs)
   
   // Temporal
   mes?: string;
@@ -80,7 +82,10 @@ export interface RawCostRecord {
   confirmed?: string;
   
   // Tipo de costo
+  tipoCosto?: string; // Google Sheets field (directo/indirecto)
   tipo_costo?: string;
+  tipoGasto?: string; // DB/Parser field
+  categoria?: string; // Google Sheets field (Equipo/Tarjeta/etc)
   kind?: string;
   
   // Montos
@@ -111,6 +116,33 @@ export interface ParsedCostRecord {
   kind: CostKind;
   sourceRow: number;
   rawRecord: RawCostRecord;
+}
+
+// ==================== REJECTED COST RECORD ====================
+
+export interface RejectedCostRecord {
+  // Rejection metadata
+  rejectReason: string; // no_tipo_no_subtipo, bad_periodKey, etc
+  
+  // Extracted fields (may be invalid)
+  periodKey: string | null;
+  clientName: string | null;
+  projectName: string | null;
+  
+  // Classification (usually empty if rejected)
+  tipoCosto: string | null;
+  subtipoCosto: string | null;
+  
+  // Amounts (if present)
+  amountARS: number | null;
+  amountUSD: number | null;
+  
+  // Raw fields for debugging
+  monthRaw: string | null;
+  yearRaw: string | null;
+  
+  // Complete original data
+  rawData: RawCostRecord;
 }
 
 // ==================== BUSINESS RULES CONFIG ====================

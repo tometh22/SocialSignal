@@ -1,0 +1,67 @@
+Ahí está el bug:
+fact_labor_month contiene solo costos asociados a horas (por persona/proyecto), mientras que la columna R del Excel tiene todos los costos directos, incluyendo los que no tienen horas Asana (por ejemplo administrativos, coordinación, QA, etc.).
+Por eso el dashboard nunca va a mostrar los mismos totales aunque el ETL esté correcto.
+
+🧩 Qué hay que cambiar
+
+Tenés dos opciones posibles:
+
+Opción 1 (ideal) → usar fact_cost_month como fuente
+
+Modificar la query que alimenta el dashboard financiero:
+
+// server/routes/dashboard/executive-summary.ts (o similar)
+const [finance] = await db
+  .select({
+    revenue: sql<number>`SUM(${fact_rc_month.revenue_usd})`.mapWith(Number),
+    cost: sql<number>`SUM(${fact_cost_month.amount_usd})`.mapWith(Number), // 👈 CAMBIAR ESTA LÍNEA
+    margin: sql<number>`SUM(${fact_rc_month.revenue_usd}) - SUM(${fact_cost_month.amount_usd})`.mapWith(Number),
+  })
+  .from(fact_rc_month)
+  .leftJoin(fact_cost_month, eq(fact_cost_month.period_key, fact_rc_month.period_key))
+  .where(eq(fact_rc_month.period_key, selectedPeriod));
+
+
+Esto haría que la card “Costos directos del período (USD)” refleje la suma exacta de la columna R del Excel.
+El fact_labor_month se sigue usando solo en la parte operativa (horas, personas, proyectos activos).
+
+Opción 2 (parche temporal) → inyectar costos totales al aggregation
+
+Si el dashboard sí o sí depende de project_aggregates, entonces necesitás que el ETL que llena esa tabla cambie esta parte:
+
+// en server/etl/sot-etl.ts o en aggregateProjects()
+total_cost_usd = SUM(fact_cost_month.amount_usd)
+
+
+Y no:
+
+total_cost_usd = SUM(fact_labor_month.cost_usd)
+
+✅ Resultado esperado tras el fix
+Fuente	Periodo	Qué debería mostrar
+Excel MAESTRO (col R)	2025-09	USD 34 533,25
+Dashboard (post-fix)	2025-09	USD ≈ 34 533,25
+Dashboard actual (bug)	2025-09	USD 12–13 k
+🔍 Cómo confirmar rápido antes de tocar código
+
+Pedile al dev que ejecute en SQL:
+
+SELECT 
+  'fact_cost_month' AS fuente,
+  period_key,
+  ROUND(SUM(amount_usd)::numeric,2) AS usd_cost
+FROM fact_cost_month
+WHERE period_key = '2025-09'
+GROUP BY 1,2;
+
+SELECT 
+  'fact_labor_month' AS fuente,
+  period_key,
+  ROUND(SUM(cost_usd)::numeric,2) AS usd_cost
+FROM fact_labor_month
+WHERE period_key = '2025-09'
+GROUP BY 1,2;
+
+
+Si el primero da ≈ 34 533 y el segundo ≈ 12 900,
+ya está clarísimo: solo hay que cambiar la fuente en la query del dashboard.

@@ -1,0 +1,203 @@
+Ahora mismo tenés DOS problemas distintos:
+
+Huggies no aparece con datos en la vista de proyecto.
+
+El endpoint complete-data sigue colgado de la arquitectura vieja, no del SoT nuevo de costos.
+
+Voy a darte un plan en tres bloques. Seguí el orden, sin tocar más el ETL hasta terminar el bloque 1.
+
+1) Verificar que Huggies EXISTE en el SoT de costos
+
+Primero asegurate de que el problema no es simplemente “no hay datos” en el sistema.
+
+1.1. Revisar Excel MAESTRO (fuente)
+
+En la hoja “Costos directos e indirectos”:
+
+Filtrá:
+
+Mes = 8
+
+Año = 2025
+
+Cliente que contenga algo tipo:
+
+Huggies
+
+o el nombre que uses realmente para esa cuenta.
+
+En esas filas verificá:
+
+Tipo de Costo está lleno como:
+
+directo
+
+o costos directos e indirectos
+(si está vacío → caen en no_tipo_no_subtipo).
+
+Monto Total USD (columna R) tiene valores numéricos.
+
+Cliente no está vacío.
+
+Si acá agosto no tiene filas válidas, no hay nada que el sistema pueda mostrar.
+
+Si hay filas, seguí.
+
+1.2. Verificar que el ETL las tomó
+
+Con el ETL actual (que ya genera fact_cost_month y costos_rechazados):
+
+Ejecutaste algo tipo:
+
+period = 2025-08
+
+recomputeAgg = true
+para refrescar agosto.
+
+Luego, en términos lógicos, deberías poder chequear:
+
+En costos_rechazados:
+
+¿Hay filas para agosto 2025 cuyo cliente sea Huggies?
+
+¿Con qué motivo?
+
+no_tipo_no_subtipo
+
+missing_clientName
+
+no_valid_amounts
+
+Si las filas de Huggies aparecen ahí, el sistema las está rechazando por falta de datos clave.
+
+En fact_cost_month / SoT de costos:
+
+¿Hay alguna fila donde el proyecto/cliente sea Huggies para period_key = '2025-08'?
+
+Conclusión de este bloque:
+
+Si Huggies no aparece en fact_cost_month pero sí en costos_rechazados → el problema es de calidad de datos en el Excel (o mapping de tipo/cliente), NO de código.
+
+Si no aparece ni en uno ni en otro → algo en el ETL no está leyendo esas filas (rango, pestaña, columnas).
+
+Hasta que no confirmes que Huggies está correctamente en fact_cost_month, la vista de proyecto nunca va a poder mostrar nada, aunque reescribas todos los endpoints.
+
+2) Entender por qué el proyecto “Fee Huggies” hoy se ve vacío
+
+Por lo que describió el Agent / architect:
+
+El endpoint /api/costs y el SoT de costos NUEVO están bien (funcionan para el portfolio, septiembre, etc.).
+
+El endpoint /api/projects/:id/complete-data (la “vista única del proyecto”) sigue tirando de:
+
+fact_labor_month, period_ledger o tablas viejas
+
+y no está cableado a fact_cost_month / Costs SoT.
+
+Por eso te pasa:
+
+En el dashboard ejecutivo ves que el sistema ya “entiende” los costos totales.
+
+Pero en la vista del proyecto (Fee Huggies) no aparece nada o aparece solo horas.
+
+Esto es un problema de consumo de datos (capa API/UI), no de ETL.
+
+3) Qué hay que hacer ahora (sin romper más nada)
+
+Te dejo un plan concreto de siguientes pasos:
+
+Paso 1 – Congelar cambios de ETL
+
+No metas más “fall-back”, reglas, ni fixes en el ETL hasta que:
+
+Confirmes que Huggies está bien en el Excel (tipo de costo y cliente).
+
+Verifiques que aparece en fact_cost_month o en costos_rechazados.
+
+Si está en costos_rechazados con no_tipo_no_subtipo, la solución NO es meter más código, es clasificar bien esas filas en el Excel.
+
+Paso 2 – Asegurar que Huggies vive en el SoT
+
+Objetivo: tener algo equivalente a:
+
+“Para period_key = 2025-08, cliente X / proyecto Huggies tiene total_cost_usd = Y”.
+
+Si hoy solo tenés datos de Huggies en mayo, vas a ver:
+
+proyecto con costo en mayo
+
+y vacío en julio/agosto
+
+Eso puede ser correcto si realmente en el Excel no cargaste costos en esos meses.
+
+Paso 3 – Integrar Costs SoT en complete-data para la vista de proyecto
+
+Una vez que estés seguro de que el SoT tiene datos correctos, recién ahí vale la pena hacer lo que el Agent proponía:
+
+En server/routes/complete-data.ts:
+
+Cuando view=operativa o view=financiera y usingSoT=true:
+
+traer los costos desde el Costs SoT, no desde fact_labor_month.
+
+usar el mismo agregador que usa /api/costs para un proyecto específico.
+
+Conceptualmente, algo así:
+
+Tenés un projectId (p.ej. 39 = Fee Huggies).
+
+Tenés en SoT alguna estructura tipo agg_project_month o función getCostData(projectKey, periodKey) que devuelve:
+
+totalCostUSD
+
+breakdown por mes
+
+En complete-data haces:
+
+resolver el “canonical name” del proyecto (client + project_name)
+
+buscar en SoT por esa key
+
+y llenar:
+
+costDisplay
+
+lifetimeCost
+
+serie temporal para gráficos
+
+Hasta que esa integración no esté hecha, la vista de proyecto va a seguir mirando al mundo viejo.
+
+Qué haría yo, en orden
+
+Excel:
+
+Filtrar agosto 2025 + Huggies y verificar:
+
+Tipo de Costo
+
+Cliente
+
+Monto Total USD.
+
+SoT:
+
+Revisar que esas filas no estén en costos_rechazados.
+
+Confirmar que hay al menos 1 row para Huggies en fact_cost_month agosto.
+
+Recién ahí:
+
+Re-cablear complete-data para que lea costos desde SoT.
+
+Testear Fee Huggies en mayo y agosto:
+
+si en Excel solo hay mayo, verás solo mayo. Eso estaría bien.
+
+Si querés, en el próximo mensaje podés pegarme:
+
+el nombre exacto de “Cliente” y “Proyecto” de una fila de Huggies en agosto del Excel
+
+y qué Tipo de Costo tiene
+
+y te digo exactamente por qué está entrando o no en el SoT según las reglas que ya tenés implementadas.

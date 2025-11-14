@@ -14,6 +14,8 @@ interface CostoDirectoIndirecto {
   costoTotal: number;
   valorHora: number;
   categoria: string;
+  tipoCosto?: string; // directo/indirecto flag
+  cliente?: string; // client name for direct costs
   proyecto?: string;
 }
 
@@ -266,20 +268,22 @@ class GoogleSheetsWorkingService {
 
   /**
    * Obtener datos de costos directos e indirectos del Excel MAESTRO
+   * NUEVO: Devuelve RawCostRecord[] directamente con nombres de columnas del Excel
+   * para que el parser pueda procesarlos correctamente
    */
-  async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
+  async getCostosDirectosIndirectos(): Promise<any[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
       const range = 'Costos directos e indirectos!A:Z';
       
-      console.log('🔄 Obteniendo datos del Excel MAESTRO...');
+      console.log('🔄 Obteniendo datos RAW del Excel MAESTRO (FORMATTED_VALUE)...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
       
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -291,15 +295,119 @@ class GoogleSheetsWorkingService {
       }
 
       console.log(`📊 Procesando ${rows.length} filas del Excel MAESTRO`);
-      return this.processCostosData(rows);
+      
+      // ✅ NUEVO: Devolver raw records con nombres de columnas exactos del Excel
+      // El parser los procesará usando COLUMN_MAPPINGS
+      return this.convertToRawRecords(rows);
       
     } catch (error) {
       console.error('❌ Error obteniendo datos de costos:', error);
-      
-      // Si hay error de conexión, devolver datos simulados temporalmente
-      console.log('⚠️ Usando datos simulados debido al error de conexión');
-      return this.getMockCostosData();
+      throw error; // No usar mock data en producción
     }
+  }
+
+  /**
+   * NUEVO: Convertir filas raw del Excel a objetos RawCostRecord con nombres de columnas exactos
+   * ✅ FIX: Normalizar headers para eliminar espacios trailing y caracteres Unicode no visibles
+   * Esto permite que el parser use COLUMN_MAPPINGS para mapear flexiblemente
+   */
+  private convertToRawRecords(rows: any[][]): any[] {
+    if (rows.length === 0) return [];
+
+    // La primera fila contiene los headers (nombres exactos del Excel)
+    const rawHeaders = rows[0];
+    
+    // 🔍 DEBUG CRÍTICO: Inspeccionar headers raw para identificar caracteres invisibles
+    console.log(`🔍 DEBUG: Total headers RAW: ${rawHeaders.length}`);
+    rawHeaders.forEach((h: string, idx: number) => {
+      if (h && (h.includes('Tipo') || h.includes('Gasto') || h.includes('Costo'))) {
+        const charCodes = Array.from(h).map(char => `${char}(${char.charCodeAt(0)})`).join(' ');
+        console.log(`🔍 DEBUG Header[${idx}] RAW: "${h}"`);
+        console.log(`🔍 DEBUG Header[${idx}] CHARS: ${charCodes}`);
+        console.log(`🔍 DEBUG Header[${idx}] JSON: ${JSON.stringify(h)}`);
+      }
+    });
+    
+    // ✅ CRÍTICO: Normalizar headers - eliminar espacios trailing y normalizar Unicode
+    // Esto previene fallos de mapeo causados por espacios/non-breaking spaces invisibles
+    const headers = rawHeaders.map((h: string) => 
+      h ? h.normalize('NFKC').trim() : ''
+    );
+    
+    // 🔍 DEBUG: Verificar headers normalizados
+    headers.forEach((h: string, idx: number) => {
+      if (h && (h.includes('Tipo') || h.includes('Gasto') || h.includes('Costo'))) {
+        console.log(`✅ Header[${idx}] NORMALIZED: "${h}"`);
+      }
+    });
+    
+    const result: any[] = [];
+
+    console.log(`📋 Headers normalizados (primeros 15): ${headers.slice(0, 15).join(' | ')}...`);
+    console.log(`🔍 Total headers encontrados: ${headers.length}`);
+
+    // Procesar cada fila de datos (omitir la primera que son headers)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      
+      if (!row || row.length === 0) continue;
+
+      // Crear objeto con nombres de columnas normalizados del Excel
+      const record: any = {};
+      
+      headers.forEach((header, index) => {
+        if (header && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+          record[header] = row[index];
+        }
+      });
+
+      // Solo agregar si tiene al menos un campo (no fila vacía)
+      if (Object.keys(record).length > 0) {
+        result.push(record);
+      }
+    }
+
+    console.log(`✅ Convertidos ${result.length} registros raw con headers normalizados`);
+    
+    // Debug: mostrar headers de un registro de muestra para verificar mapeo
+    if (result.length > 0) {
+      const sampleKeys = Object.keys(result[0]);
+      console.log(`🔍 Headers en primer registro (total ${sampleKeys.length}): ${sampleKeys.slice(0, 15).join(' | ')}...`);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Normalizar registro de costo antes de devolver al parser
+   * - Garantiza campos canónicos: cliente, proyecto, tipoCosto
+   * - Aplica fallback de categoria→tipoCosto para datos legacy
+   */
+  private normalizeCostRow(row: CostoDirectoIndirecto): CostoDirectoIndirecto {
+    const normalized = { ...row };
+    
+    // 1. Fallback categoria→tipoCosto para datos legacy sin "Tipo de Costo"
+    if (!normalized.tipoCosto || normalized.tipoCosto.trim() === '') {
+      const categoria = (normalized.categoria || '').toLowerCase().trim();
+      
+      // Mapeo determinístico: categorías directas vs indirectas
+      const directCategories = ['equipo', 'honorarios', 'servicios', 'fee'];
+      const indirectCategories = ['tarjeta', 'gastos generales', 'gastos varios', 'subscripciones'];
+      
+      if (directCategories.some(cat => categoria.includes(cat))) {
+        normalized.tipoCosto = 'directo';
+      } else if (indirectCategories.some(cat => categoria.includes(cat))) {
+        normalized.tipoCosto = 'indirecto';
+      } else {
+        // Default conservador: tratar como indirecto si no sabemos
+        normalized.tipoCosto = 'indirecto';
+      }
+    }
+    
+    // 2. Normalizar campos cliente/proyecto (ya están en formato correcto desde createColumnMap)
+    // No se necesita transformación adicional - ya mapeamos las columnas correctas
+    
+    return normalized;
   }
 
   /**
@@ -312,11 +420,9 @@ class GoogleSheetsWorkingService {
 
     // La primera fila contiene los headers
     const headers = rows[0];
-    console.log('📋 Headers encontrados:', headers);
 
     // Mapear las columnas según los headers
     const columnMap = this.createColumnMap(headers);
-    console.log('🗺️ Mapeo de columnas:', columnMap);
 
     // Procesar cada fila de datos (omitir la primera que son headers)
     for (let i = 1; i < rows.length; i++) {
@@ -329,25 +435,9 @@ class GoogleSheetsWorkingService {
         const montoTotal = this.parseMoneyValue(this.getCellValue(row, columnMap.costoTotal)) || 0;
         const persona = this.getCellValue(row, columnMap.persona);
         
-        // Debug primera fila para entender la estructura
-        if (i <= 10 && persona && tipoCosto) {
-          console.log(`🔍 Fila ${i} debug:`, {
-            persona: persona,
-            tipoCosto: tipoCosto,
-            montoTotal: montoTotal,
-            valorHora: this.getCellValue(row, columnMap.valorHora),
-            mes: this.getCellValue(row, columnMap.mes),
-            año: this.getCellValue(row, columnMap.año),
-            proyecto: this.getCellValue(row, columnMap.proyecto),
-            categoria: this.getCellValue(row, columnMap.categoria)
-          });
-        }
-        
         // Solo procesar filas que tengan persona válida (no header ni vacía)
-        if (!persona || persona.toLowerCase().includes('detalle') || !tipoCosto) continue;
+        if (!persona || persona.toLowerCase().includes('detalle')) continue;
         
-        // Procesar todos los registros con persona válida, incluso si monto es 0
-
         // Limpiar y parsear valor hora que viene con formato de moneda
         const valorHoraStr = this.getCellValue(row, columnMap.valorHora);
         const valorHora = this.parseMoneyValue(valorHoraStr);
@@ -364,16 +454,19 @@ class GoogleSheetsWorkingService {
           costoTotal: costoEfectivo,
           valorHora: valorHora,
           categoria: this.getCellValue(row, columnMap.categoria) || tipoCosto,
+          tipoCosto: tipoCosto,
+          cliente: this.getCellValue(row, columnMap.cliente) || undefined,
           proyecto: this.getCellValue(row, columnMap.proyecto) || undefined
         };
 
-        result.push(costoData);
+        // Normalizar registro antes de agregar (aplica fallbacks para datos legacy)
+        const normalized = this.normalizeCostRow(costoData);
+        result.push(normalized);
       } catch (error) {
         console.warn(`⚠️ Error procesando fila ${i}:`, error);
       }
     }
 
-    console.log(`✅ Procesados ${result.length} registros válidos de ${rows.length - 1} filas`);
     return result;
   }
 
@@ -418,7 +511,6 @@ class GoogleSheetsWorkingService {
       }
     });
 
-    console.log('🗺️ Mapeo de columnas costos directos:', map);
     return map;
   }
 
@@ -455,7 +547,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -1060,7 +1152,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
@@ -1341,7 +1433,7 @@ class GoogleSheetsWorkingService {
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
-        valueRenderOption: 'UNFORMATTED_VALUE', // 🎯 Anti ×100 bug
+        valueRenderOption: 'FORMATTED_VALUE', // ✅ Fix: Prevents ARS inflation (10^14-10^16)
         dateTimeRenderOption: 'SERIAL_NUMBER',
       });
 
