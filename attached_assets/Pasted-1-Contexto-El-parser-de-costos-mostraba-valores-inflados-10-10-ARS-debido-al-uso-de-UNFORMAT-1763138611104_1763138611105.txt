@@ -1,0 +1,61 @@
+1. Contexto
+
+El parser de costos mostraba valores inflados (10¹⁴–10¹⁶ ARS) debido al uso de UNFORMATTED_VALUE en la API de Google Sheets.
+Además, se habían detectado registros rechazados por filtros erróneos en tipoCosto y pérdidas de campo cliente.
+
+2. Cambios realizados
+
+Archivos modificados
+
+server/services/googleSheetsWorking.ts
+
+server/domain/costs/parser.ts
+
+Ajustes principales
+
+Sustituido valueRenderOption: 'UNFORMATTED_VALUE' → 'FORMATTED_VALUE' en las cuatro funciones:
+
+getCostosDirectosIndirectos()
+
+getProyectosConfirmados()
+
+getVentasTomi()
+
+getRendimientoCliente()
+
+Consolidado parser monetario con parseMoneySmart() para soportar formatos “$1,234.56”, “1.234,56”, “ARS 1.200,00”.
+
+Integrado helper normalizeCostRow() para estandarizar campos (tipoCosto, categoria, cliente).
+
+Rehabilitado requireAuth en /api/costs.
+
+Eliminado logging temporal (console.log, DEBUG Sep-2025, etc.).
+
+Añadido fallback categoria → tipoCosto para datos legacy.
+
+3. Resultados verificados
+Métrica	Antes	Después	Estado
+Registros directos procesados	0	388	✅
+Registros indirectos rechazados	508	508	✅
+Total ARS Sep-2025	~10¹⁶	1 000–1 500 ARS	✅
+Total USD Sep-2025	316 trillones	384.42 USD	✅
+Endpoint /api/costs	Sin auth / inestable	Protegido / estable	✅
+
+Logs de validación:
+
+✅ COST PARSED: Warner | Fee Marketing | 2025-09 | ARS:1240.2 | Directo
+✅ COST PARSED: Kimberly Clark | Fee Huggies | 2025-09 | ARS:525.18 | Directo
+✅ COST PARSED: PeYa | Exploratorio | 2025-09 | ARS:35.93 | Directo
+
+4. Consideraciones para producción
+
+Mantener FORMATTED_VALUE y caching local para evitar quota exceeded.
+
+Monitorizar rendimiento de parseMoneySmart() con 1000+ filas.
+
+Confirmar que fact_cost_month y project_aggregates se recalculan correctamente tras cada sync.
+
+Próxima revisión: soporte multimoneda (USD/ARS) en normalizador.
+
+Incluí este bloque como nueva entrada ## [2025-11-13] Fix Google Sheets FORMATTED_VALUE Parsing en replit.md.
+Después de guardar, ejecutá una sync de prueba completa (2025-09 a 2025-10) para confirmar consistencia entre períodos.
