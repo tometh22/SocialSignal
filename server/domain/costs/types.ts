@@ -64,12 +64,10 @@ export interface RawCostRecord {
   // Identificación
   cliente?: string;
   project?: string;
-  proyecto?: string; // Google Sheets field
   clientName?: string;
   projectName?: string;
   client_name?: string;
   project_name?: string;
-  persona?: string; // Google Sheets field (maps to cliente for costs)
   
   // Temporal
   mes?: string;
@@ -82,10 +80,7 @@ export interface RawCostRecord {
   confirmed?: string;
   
   // Tipo de costo
-  tipoCosto?: string; // Google Sheets field (directo/indirecto)
   tipo_costo?: string;
-  tipoGasto?: string; // DB/Parser field
-  categoria?: string; // Google Sheets field (Equipo/Tarjeta/etc)
   kind?: string;
   
   // Montos

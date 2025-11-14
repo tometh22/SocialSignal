@@ -13,7 +13,6 @@ import { parseCostRecords } from './parser';
 // Reutilizar infraestructura de income
 import { storage } from '../../storage';
 import { directCosts } from '@shared/schema';
-import { googleSheetsWorkingService } from '../../services/googleSheetsWorking';
 
 // ==================== CACHE MANAGEMENT ====================
 
@@ -53,21 +52,28 @@ async function fetchCostsFromSheets(): Promise<RawCostRecord[]> {
   console.log('🔍 COSTS: Fetching from Google Sheets...');
   
   try {
-    const sheetData = await googleSheetsWorkingService.getCostosDirectosIndirectos();
+    // 🔧 CORRECCIÓN CRÍTICA: Usar servicio para "Costos directos e indirectos", NO "Ventas Tomi"
+    // 🚨 FALLBACK TEMPORAL: Usar storage.getAllDirectCosts() mientras se resuelve Google Sheets auth
+    console.log('🔄 COSTS: Using storage fallback due to Google Sheets auth issue');
+    const sheetData = await storage.getAllDirectCosts();
     
     if (!sheetData || !Array.isArray(sheetData)) {
-      console.warn('⚠️ COSTS: No data from Google Sheets');
+      console.warn('⚠️ COSTS: No data from storage fallback');
       return [];
     }
     
-    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from Google Sheets`);
+    console.log(`✅ COSTS: Retrieved ${sheetData.length} rows from storage fallback`);
     
-    // Return sheet data as-is; parser will handle field mapping via COLUMN_MAPPINGS
-    // Cast to RawCostRecord to satisfy type system
-    return sheetData as unknown as RawCostRecord[];
+    // 🔍 DEBUG: Log first record to see exact structure
+    if (sheetData.length > 0) {
+      console.log(`🔍 COSTS DEBUG: First record keys:`, Object.keys(sheetData[0]));
+      console.log(`🔍 COSTS DEBUG: First record sample:`, sheetData[0]);
+    }
+    
+    return sheetData as RawCostRecord[];
     
   } catch (error) {
-    console.error('❌ COSTS: Error fetching from Google Sheets:', error);
+    console.error('❌ COSTS: Error fetching from fallback storage:', error);
     return [];
   }
 }
@@ -100,7 +106,7 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
       'horas_reales_asana': row.horasRealesAsana?.toString() || '0',
       'valor_hora_persona': row.valorHoraPersona?.toString() || '0',
       'costo_total': row.costoTotal?.toString() || '0',
-      'monto_total_usd': row.montoTotalUSD?.toString() || '',
+      'monto_total_usd': row.montoTotalUsd?.toString() || '',
       'tipo_cambio': row.tipoCambio?.toString() || '',
       'cantidad_de_horas_asana': row.horasRealesAsana?.toString() || '0'
     }));
@@ -164,14 +170,14 @@ export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fres
       
       // Add sheets records first (priority)
       for (const record of sheetsRecords) {
-        const key = `${record.cliente || ''}_${record.proyecto || ''}_${record.mes || ''}_${record.año || ''}`.toLowerCase();
+        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
         seen.add(key);
         rawRecords.push(record);
       }
       
       // Add DB records that aren't already in sheets
       for (const record of dbRecords) {
-        const key = `${record.cliente || ''}_${record.proyecto || ''}_${record.mes || ''}_${record.año || ''}`.toLowerCase();
+        const key = `${record.persona}_${record.cliente}_${record.proyecto}_${record.mes}_${record['año']}`.toLowerCase();
         if (!seen.has(key)) {
           rawRecords.push(record);
         }
