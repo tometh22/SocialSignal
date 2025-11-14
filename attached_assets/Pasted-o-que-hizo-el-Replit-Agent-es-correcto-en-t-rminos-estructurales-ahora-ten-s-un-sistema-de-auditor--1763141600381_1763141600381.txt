@@ -1,0 +1,76 @@
+o que hizo el Replit Agent es correcto en términos estructurales —ahora tenés un sistema de auditoría completo para los rechazos—, pero el efecto colateral en agosto se debe a que el ETL, al introducir los nuevos filtros y limpiar la tabla antes de insertar, no encontró registros válidos (todo entró como “rechazado”).
+
+Esto no es un error del sistema sino una consecuencia esperable del endurecimiento del parser.
+
+Diagnóstico preciso
+
+Resultado actual en base:
+
+3 145 registros rechazados
+
+no_tipo_no_subtipo: 2 634 → sin clasificación
+
+not_directo: 492 → indirectos
+
+missing_clientName: 15
+
+no_valid_amounts: 4
+
+0 válidos en Agosto 2025 → por eso el dashboard quedó vacío.
+
+Qué hacer ahora
+1. Validar si Agosto tiene filas válidas en el Excel
+
+En la hoja “Costos directos e indirectos” filtrá:
+
+Mes = 8
+Año = 2025
+Tipo de Costo ≠ (vacío)
+
+
+Si el resultado es 0 filas, el dashboard está correcto: no hay costos directos declarados.
+Si hay filas pero sin “Tipo de Costo”, entonces cayeron todas en no_tipo_no_subtipo.
+
+2. Backfill en Sheets
+
+Usá el mismo criterio que para septiembre:
+
+Completar “Tipo de Costo” en esas filas de agosto.
+
+Asegurarte de que “Cliente” y “Monto Total USD” no estén vacíos.
+
+3. Re-ejecutar ETL
+
+Después del backfill, ejecutá:
+
+POST /api/etl/sot/run {"scopes":{"periods":["2025-08"]},"recomputeAgg":true}
+
+
+y verificá:
+
+SELECT period_key, COUNT(*), SUM(monto_total_usd)
+FROM fact_cost_month
+WHERE period_key='2025-08'
+GROUP BY 1;
+
+4. Confirmar con el dashboard de calidad de datos (opcional Task #4)
+
+El sistema de rechazos ya guarda todo lo necesario.
+Podés crear una vista o un panel simple:
+
+Motivo	Filas	USD	%
+no_tipo_no_subtipo	2634	452 470	86 %
+not_directo	492	277 966	13 %
+missing_clientName	15	8 196	<1 %
+
+Así podés mostrar al equipo de operaciones cuánto dinero queda fuera de los costos totales por falta de clasificación.
+
+Conclusión
+
+El pipeline y el tracking están correctos.
+
+Agosto aparece vacío porque todas sus filas carecen de clasificación.
+
+Solución: completar Tipo de Costo en el Excel MAESTRO y re-sincronizar.
+
+No toques el código: el comportamiento actual es el esperado.

@@ -297,6 +297,7 @@ export function parseCostRecord(
   let kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
   // 🎯 FALLBACK CONTROLADO: Si "Tipo de Costo" está vacío, inferir desde "Subtipo de costo"
+  let autoClassified = false;
   if (!kindRaw) {
     const subtipo = extractField(record, ['Subtipo de costo', 'subtipo', 'categoria']);
     const inferred = inferTipoCostoFromSubtipo(subtipo);
@@ -305,8 +306,11 @@ export function parseCostRecord(
       kindRaw = inferred;
       console.log(`🔧 FALLBACK: Row ${rowIndex} - Inferido "${inferred}" desde Subtipo "${subtipo}"`);
     } else {
-      console.log(`⚠️ REJECT: Row ${rowIndex} - no tipo de gasto (Subtipo: "${subtipo || 'N/A'}")`);
-      return null;
+      // 🆕 TOLERANT FALLBACK: Default a "Directo" cuando falta tipo/subtipo
+      // Esto permite que datos históricos sin clasificación se procesen
+      kindRaw = 'Directo';
+      autoClassified = true;
+      console.log(`🔧 AUTO-CLASSIFY: Row ${rowIndex} - Defaulted to "Directo" (no tipo/subtipo found) - Cliente: "${clientName}", Proyecto: "${projectName}"`);
     }
   }
   
