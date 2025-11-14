@@ -139,7 +139,12 @@ async function getProjectPeriodViewFromSoT(
     costUSD: rcResultRaw.reduce((sum, r) => sum + Number(r.costUSD || 0), 0).toString()
   }] : rcResultRaw;
 
-  // Extract totals early for Costs SoT check
+  // Validar si hay datos SoT
+  if (teamRows.length === 0 && rcResult.length === 0) {
+    console.log(`  ℹ️ [SoT Reader] No data found in SoT tables for project=${projectId}, period=${periodKey}`);
+    return null;
+  }
+
   const totals = totalsResult[0] || {
     targetHours: '0',
     asanaHours: '0',
@@ -147,53 +152,6 @@ async function getProjectPeriodViewFromSoT(
     costARS: '0',
     costUSD: '0'
   };
-
-  // 🎯 NEW: Try Costs SoT if fact_labor_month is empty
-  let costsSotData = null;
-  if (Number(totals.costUSD || 0) === 0 && Number(totals.costARS || 0) === 0) {
-    try {
-      console.log(`💰 [SoT Reader] fact_labor_month empty, checking Costs SoT...`);
-      
-      // Get project info to build the projectKey
-      const { activeProjects, quotations, clients } = await import('@shared/schema');
-      const project = await db.query.activeProjects.findFirst({
-        where: eq(activeProjects.id, projectId)
-      });
-      
-      if (project) {
-        const quotation = await db.query.quotations.findFirst({
-          where: eq(quotations.id, project.quotationId!)
-        });
-        
-        const client = await db.query.clients.findFirst({
-          where: eq(clients.id, project.clientId)
-        });
-        
-        if (quotation && client) {
-          const { getCostsForProject } = await import('./costs');
-          const clientName = client.name || '';
-          const projectName = quotation.projectName || '';
-          
-          console.log(`💰 [SoT Reader] Looking up Costs SoT: "${clientName}" - "${projectName}" in ${periodKey}`);
-          costsSotData = await getCostsForProject(clientName, projectName, periodKey as any);
-          
-          if (costsSotData) {
-            console.log(`✅ [SoT Reader] Found Costs SoT data - ${costsSotData.costDisplay.currency} ${costsSotData.costDisplay.amount}, USD ${costsSotData.costUSDNormalized}`);
-          } else {
-            console.log(`⚠️ [SoT Reader] No data in Costs SoT for this project/period`);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn(`⚠️ [SoT Reader] Could not fetch Costs SoT:`, error);
-    }
-  }
-  
-  // Validar si hay datos SoT (ahora incluye Costs SoT)
-  if (teamRows.length === 0 && rcResult.length === 0 && !costsSotData) {
-    console.log(`  ℹ️ [SoT Reader] No data found in SoT tables for project=${projectId}, period=${periodKey}`);
-    return null;
-  }
 
   const rc = rcResult[0] || {
     quoteNative: '0',
@@ -208,20 +166,8 @@ async function getProjectPeriodViewFromSoT(
   // 4) Determinar moneda y valores de display según la vista seleccionada
   const revenueUSDVal = Number(rc.revenueUSD || 0);
   const revenueARSVal = Number(rc.revenueARS || 0);
-  let totalCostARS = Number(totals.costARS);
-  let totalCostUSD = Number(totals.costUSD);
-  
-  // 🎯 NEW: Override costs with Costs SoT data if available
-  if (costsSotData) {
-    console.log(`🔧 [SoT Reader] Overriding costs with Costs SoT data`);
-    if (costsSotData.costDisplay.currency === 'USD') {
-      totalCostUSD = costsSotData.costUSDNormalized;
-      totalCostARS = 0; // No ARS data
-    } else {
-      totalCostARS = costsSotData.costDisplay.amount;
-      totalCostUSD = costsSotData.costUSDNormalized;
-    }
-  }
+  const totalCostARS = Number(totals.costARS);
+  const totalCostUSD = Number(totals.costUSD);
   
   // 🎯 LÓGICA DE 3 VISTAS
   let currencyNative: string;
@@ -235,18 +181,11 @@ async function getProjectPeriodViewFromSoT(
     revenueDisplay = revenueUSDVal;
   } else if (view === 'operativa') {
     // Vista Operativa: Usar moneda nativa del cliente
-    // 🎯 NEW: If using Costs SoT, use its currency
-    if (costsSotData) {
-      currencyNative = costsSotData.costDisplay.currency as string;
-      costDisplay = costsSotData.costDisplay.amount;
-      revenueDisplay = currencyNative === 'USD' ? revenueUSDVal : revenueARSVal;
-    } else {
-      // Si hay datos significativos en ARS, es cliente argentino
-      const hasARSData = revenueARSVal > revenueUSDVal * 100; // ARS significativamente mayor
-      currencyNative = hasARSData ? 'ARS' : 'USD';
-      costDisplay = hasARSData ? totalCostARS : totalCostUSD;
-      revenueDisplay = hasARSData ? revenueARSVal : revenueUSDVal;
-    }
+    // Si hay datos significativos en ARS, es cliente argentino
+    const hasARSData = revenueARSVal > revenueUSDVal * 100; // ARS significativamente mayor
+    currencyNative = hasARSData ? 'ARS' : 'USD';
+    costDisplay = hasARSData ? totalCostARS : totalCostUSD;
+    revenueDisplay = hasARSData ? revenueARSVal : revenueUSDVal;
   } else {
     // Vista Original: Datos crudos (priorizar USD por simplicidad)
     currencyNative = 'USD';

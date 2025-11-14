@@ -8,7 +8,7 @@
  * - Validación y normalización
  */
 
-import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind, RejectedCostRecord } from './types';
+import type { RawCostRecord, ParsedCostRecord, PeriodKey, CostKind } from './types';
 import { parseNumberRobust } from '../../utils/number';
 
 // ==================== CANONICALIZATION ====================
@@ -297,7 +297,6 @@ export function parseCostRecord(
   let kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
   // 🎯 FALLBACK CONTROLADO: Si "Tipo de Costo" está vacío, inferir desde "Subtipo de costo"
-  let autoClassified = false;
   if (!kindRaw) {
     const subtipo = extractField(record, ['Subtipo de costo', 'subtipo', 'categoria']);
     const inferred = inferTipoCostoFromSubtipo(subtipo);
@@ -306,11 +305,8 @@ export function parseCostRecord(
       kindRaw = inferred;
       console.log(`🔧 FALLBACK: Row ${rowIndex} - Inferido "${inferred}" desde Subtipo "${subtipo}"`);
     } else {
-      // 🆕 TOLERANT FALLBACK: Default a "Directo" cuando falta tipo/subtipo
-      // Esto permite que datos históricos sin clasificación se procesen
-      kindRaw = 'Directo';
-      autoClassified = true;
-      console.log(`🔧 AUTO-CLASSIFY: Row ${rowIndex} - Defaulted to "Directo" (no tipo/subtipo found) - Cliente: "${clientName}", Proyecto: "${projectName}"`);
+      console.log(`⚠️ REJECT: Row ${rowIndex} - no tipo de gasto (Subtipo: "${subtipo || 'N/A'}")`);
+      return null;
     }
   }
   
@@ -561,92 +557,6 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
   console.log(`⚠️ DATA QUALITY: ${percentWithoutTipo}% rows without classifiable Tipo de Costo`);
   
   return results;
-}
-
-// ==================== BATCH PARSER WITH REJECTIONS ====================
-
-export function parseCostRecordsWithRejections(records: RawCostRecord[]): {
-  valid: ParsedCostRecord[];
-  rejected: RejectedCostRecord[];
-} {
-  console.log(`🔍 COST PARSER (WITH REJECTIONS): Starting batch parse of ${records.length} records`);
-  
-  const valid: ParsedCostRecord[] = [];
-  const rejected: RejectedCostRecord[] = [];
-  
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-    
-    // Extract key fields for rejection tracking
-    const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
-    const subtipo = extractField(record, ['Subtipo de costo', 'subtipo', 'categoria']);
-    const clientName = extractField(record, COLUMN_MAPPINGS.clientName);
-    const projectName = extractField(record, COLUMN_MAPPINGS.projectName);
-    const monthKeyRaw = extractField(record, COLUMN_MAPPINGS.monthKey);
-    const monthRaw = extractField(record, COLUMN_MAPPINGS.month);
-    const yearRaw = extractField(record, COLUMN_MAPPINGS.year);
-    const arsAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.arsAmount);
-    const usdAmountRaw = extractNumericField(record, COLUMN_MAPPINGS.usdAmount);
-    
-    // Determine period for tracking
-    const periodKey = monthKeyRaw || buildFromMesAnio(monthRaw, yearRaw);
-    
-    const parsed = parseCostRecord(record, i);
-    
-    if (parsed) {
-      valid.push(parsed);
-    } else {
-      // Determine rejection reason
-      let reason = 'unknown';
-      
-      if (!kindRaw && !subtipo) {
-        reason = 'no_tipo_no_subtipo';
-      } else if (!kindRaw && subtipo) {
-        const inferred = inferTipoCostoFromSubtipo(subtipo);
-        if (!inferred) {
-          reason = 'subtipo_not_mappable';
-        } else {
-          // Must have failed another validation - determine which
-          if (!clientName) {
-            reason = 'missing_clientName';
-          } else if (!/^\d{4}-\d{2}$/.test(periodKey)) {
-            reason = 'bad_periodKey';
-          } else if (!arsAmountRaw && !usdAmountRaw) {
-            reason = 'no_valid_amounts';
-          }
-        }
-      } else if (kindRaw && !['directo', 'directos'].includes(kindRaw.toLowerCase().trim()) && !kindRaw.toLowerCase().includes('costos directos e indirectos')) {
-        reason = 'not_directo';
-      } else if (kindRaw && !clientName) {
-        reason = 'missing_clientName';
-      } else if (!/^\d{4}-\d{2}$/.test(periodKey)) {
-        reason = 'bad_periodKey';
-      } else if (!arsAmountRaw && !usdAmountRaw) {
-        reason = 'no_valid_amounts';
-      }
-      
-      // Create rejected record
-      // 🔧 FIX: Use ?? instead of || to preserve legitimate zero values
-      // 🔧 FIX: Normalize empty periodKey to null (not empty string)
-      rejected.push({
-        rejectReason: reason,
-        periodKey: periodKey && periodKey.trim() !== '' ? periodKey : null,
-        clientName: clientName ?? null,
-        projectName: projectName ?? null,
-        tipoCosto: kindRaw ?? null,
-        subtipoCosto: subtipo ?? null,
-        amountARS: arsAmountRaw ?? null,
-        amountUSD: usdAmountRaw ?? null,
-        monthRaw: monthRaw ?? null,
-        yearRaw: yearRaw !== undefined && yearRaw !== null ? String(yearRaw) : null,
-        rawData: record
-      });
-    }
-  }
-  
-  console.log(`✅ COST PARSER (WITH REJECTIONS): Completed - ${valid.length} valid, ${rejected.length} rejected`);
-  
-  return { valid, rejected };
 }
 
 // ==================== DEBUGGING UTILS ====================

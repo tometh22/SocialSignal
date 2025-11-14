@@ -49,18 +49,8 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ChatProvider } from "@/hooks/use-chat";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ImageRefreshProvider } from "@/contexts/ImageRefreshContext";
-import { ProjectDataProvider } from "@/contexts/ProjectDataProvider";
 
 import { useEffect } from "react";
-
-// Wrapper para envolver ProjectDetailsRedesigned con ProjectDataProvider
-function ProjectDetailsWithProvider({ params }: { params: { id: string } }) {
-  return (
-    <ProjectDataProvider initialProjectId={parseInt(params.id)}>
-      <ProjectDetailsRedesigned params={params} />
-    </ProjectDataProvider>
-  );
-}
 
 // Wrapper para procesar parámetros de consulta para OptimizedQuote
 function OptimizedQuoteWrapper() {
@@ -146,7 +136,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} />
                   <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
                   <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsWithProvider} />
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsRedesigned} />
                   <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} />
                   <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} />
                   <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />

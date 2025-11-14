@@ -118,33 +118,6 @@ export interface ParsedCostRecord {
   rawRecord: RawCostRecord;
 }
 
-// ==================== REJECTED COST RECORD ====================
-
-export interface RejectedCostRecord {
-  // Rejection metadata
-  rejectReason: string; // no_tipo_no_subtipo, bad_periodKey, etc
-  
-  // Extracted fields (may be invalid)
-  periodKey: string | null;
-  clientName: string | null;
-  projectName: string | null;
-  
-  // Classification (usually empty if rejected)
-  tipoCosto: string | null;
-  subtipoCosto: string | null;
-  
-  // Amounts (if present)
-  amountARS: number | null;
-  amountUSD: number | null;
-  
-  // Raw fields for debugging
-  monthRaw: string | null;
-  yearRaw: string | null;
-  
-  // Complete original data
-  rawData: RawCostRecord;
-}
-
 // ==================== BUSINESS RULES CONFIG ====================
 
 export interface CostBusinessRules {

@@ -8,11 +8,11 @@
  */
 
 import type { RawCostRecord, ParsedCostRecord } from './types';
-import { parseCostRecords, parseCostRecordsWithRejections } from './parser';
+import { parseCostRecords } from './parser';
 
 // Reutilizar infraestructura de income
 import { storage } from '../../storage';
-import { directCosts, costosRechazados } from '@shared/schema';
+import { directCosts } from '@shared/schema';
 import { googleSheetsWorkingService } from '../../services/googleSheetsWorking';
 
 // ==================== CACHE MANAGEMENT ====================
@@ -120,6 +120,10 @@ async function fetchCostsFromDatabase(): Promise<RawCostRecord[]> {
 export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fresh' = 'auto'): Promise<ParsedCostRecord[]> {
   console.log(`🚀 COSTS DATA ACCESS: Fetching from source "${source}"`);
   
+  // 🚨 FORCE CACHE CLEAR: Clear all cache to test new parser
+  console.log('🗑️ COSTS DEBUG: Forcibly clearing ALL cache to test new parser');
+  costCache.clear();
+  
   // 🗑️ FRESH: Invalidate cache if fresh requested
   if (source === 'fresh') {
     invalidateCache();
@@ -177,47 +181,21 @@ export async function getCostData(source: 'sheets' | 'database' | 'auto' | 'fres
       break;
   }
   
-  // Parse the raw records with rejection tracking
-  const { valid, rejected } = parseCostRecordsWithRejections(rawRecords);
+  // Parse the raw records
+  const parsedRecords = parseCostRecords(rawRecords);
   
-  // 🔧 IDEMPOTENCY: Always clear previous rejections to ensure table reflects current ETL run
-  // This executes even when rejected.length === 0 to handle the case where all data is now valid
-  try {
-    await storage.db.delete(costosRechazados);
-    console.log(`🗑️ COSTS: Cleared previous rejected records (preparing for ${rejected.length} new rejections)`);
-    
-    // Persist rejected records for audit trail (only if any exist)
-    if (rejected.length > 0) {
-      // Convert rejected records to DB format (numeric fields need to be strings for Drizzle)
-      const rejectedForDB = rejected.map(r => ({
-        ...r,
-        amountARS: r.amountARS !== null ? String(r.amountARS) : null,
-        amountUSD: r.amountUSD !== null ? String(r.amountUSD) : null
-      }));
-      
-      // Insert rejected records in batch
-      await storage.db.insert(costosRechazados).values(rejectedForDB);
-      console.log(`💾 COSTS: Persisted ${rejected.length} rejected records to audit table`);
-    } else {
-      console.log(`✅ COSTS: No rejections in current ETL run - audit table is empty`);
-    }
-  } catch (error) {
-    console.error('❌ COSTS: Error managing rejected records:', error);
-    // Continue with valid records even if rejection persistence fails (lenient mode)
-  }
-  
-  // Update cache with valid records only
+  // Update cache
   const cacheData: CostDataCache = {
     lastUpdated: new Date(),
     rawRecords,
-    parsedRecords: valid
+    parsedRecords
   };
   
   costCache.set(cacheKey, cacheData);
   
-  console.log(`✅ COSTS DATA ACCESS: Retrieved and cached ${valid.length} parsed records (${rejected.length} rejected)`);
+  console.log(`✅ COSTS DATA ACCESS: Retrieved and cached ${parsedRecords.length} parsed records`);
   
-  return valid;
+  return parsedRecords;
 }
 
 // ==================== PROJECT-SPECIFIC ACCESS ====================

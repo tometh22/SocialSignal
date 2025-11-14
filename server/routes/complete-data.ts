@@ -603,8 +603,6 @@ export async function completeDataHandler(req: Request, res: Response) {
     
     // 🚀 SoT INTEGRATION: Get metrics from SoT if using period format
     let sotSummary = null;
-    let costsSotData = null;
-    
     if (usingSoT && quotationData?.projectName) {
       try {
         // Get client data to generate projectKey
@@ -614,60 +612,15 @@ export async function completeDataHandler(req: Request, res: Response) {
         
         const clientName = clientData?.name || '';
         const projectName = quotationData.projectName || '';
-        
-        // 🎯 NEW: Try to get costs from Costs SoT first
-        console.log(`💰 COSTS SoT INTEGRATION: Fetching costs for "${clientName}" - "${projectName}" in ${period}`);
-        const { getCostsForProject } = await import('../domain/costs');
-        costsSotData = await getCostsForProject(clientName, projectName, period as any);
-        
-        if (costsSotData) {
-          console.log(`✅ COSTS SoT: Found cost data - ${costsSotData.costDisplay.currency} ${costsSotData.costDisplay.amount}, USD ${costsSotData.costUSDNormalized}`);
-        } else {
-          console.log(`⚠️ COSTS SoT: No cost data found for this project/period`);
-        }
-        
-        // Get revenue from period_ledger (for now)
         const projectKey = canonicalizeKey(`${clientName}|${projectName}`);
-        console.log(`🎯 REVENUE FETCH: Calling getProjectSummary('${projectKey}', '${period}')`);
+        
+        console.log(`🎯 SoT FETCH: Calling getProjectSummary('${projectKey}', '${period}')`);
         sotSummary = await getProjectSummary(projectKey, period);
-        console.log(`🎯 REVENUE SUMMARY for ${projectKey}:`, JSON.stringify(sotSummary, null, 2));
+        console.log(`🎯 SoT SUMMARY for ${projectKey}:`, JSON.stringify(sotSummary, null, 2));
         
-        // 🔧 INTEGRATE COSTS SoT: Override cost fields if Costs SoT has data
-        if (costsSotData && sotSummary) {
-          console.log(`🔧 COST OVERRIDE: Replacing period_ledger costs with Costs SoT data`);
-          sotSummary.costUSD = costsSotData.costUSDNormalized;
-          sotSummary.costDisplay = costsSotData.costDisplay.amount;
-          sotSummary.currencyNative = costsSotData.costDisplay.currency;
-          
-          // Recalculate derived metrics
-          sotSummary.profitUSD = sotSummary.revenueUSD - sotSummary.costUSD;
-          sotSummary.markup = sotSummary.costUSD > 0 ? sotSummary.revenueUSD / sotSummary.costUSD : 0;
-          sotSummary.margin = sotSummary.revenueUSD > 0 ? (sotSummary.revenueUSD - sotSummary.costUSD) / sotSummary.revenueUSD : 0;
-          
-          if (!sotSummary.flags) sotSummary.flags = [];
-          sotSummary.flags.push('COSTS_FROM_SOT');
-          
-          console.log(`✅ COST INTEGRATION: Updated summary with Costs SoT - Cost: ${sotSummary.currencyNative} ${sotSummary.costDisplay}, Profit: $${sotSummary.profitUSD}, Markup: ${sotSummary.markup?.toFixed(2)}x`);
-        } else if (costsSotData && !sotSummary) {
-          // Only costs available, no revenue yet
-          console.log(`🔧 COSTS-ONLY MODE: Creating summary from Costs SoT data only`);
-          sotSummary = {
-            revenueUSD: 0,
-            costUSD: costsSotData.costUSDNormalized,
-            profitUSD: -costsSotData.costUSDNormalized,
-            markup: null,
-            margin: -1,
-            revenueDisplay: 0,
-            costDisplay: costsSotData.costDisplay.amount,
-            currencyNative: costsSotData.costDisplay.currency,
-            flags: ['COSTS_FROM_SOT', 'NO_REVENUE_DATA']
-          };
-          console.log(`✅ COSTS-ONLY: Created summary - Cost: ${sotSummary.currencyNative} ${sotSummary.costDisplay}`);
-        }
-        
-        // 🛡️ AGGREGATOR FALLBACK: If no SoT data at all, use Excel directly
-        if (!sotSummary && !costsSotData) {
-          console.warn(`⚠️ SoT FALLBACK: No data in SoT tables for ${projectKey} ${period}, using ActiveProjectsAggregator`);
+        // 🛡️ AGGREGATOR FALLBACK: If SoT tables are empty, use Excel directly
+        if (!sotSummary) {
+          console.warn(`⚠️ SoT FALLBACK: Tables empty for ${projectKey} ${period}, using ActiveProjectsAggregator`);
           const aggregator = new ActiveProjectsAggregator(storage);
           
           // Convert period to timeFilter format (YYYY-MM → monthname_yyyy)
