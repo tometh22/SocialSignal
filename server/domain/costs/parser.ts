@@ -228,6 +228,53 @@ function extractNumericField(record: RawCostRecord, mappings: string[]): number 
 }
 
 
+// ==================== TIPO DE COSTO FALLBACK ====================
+
+/**
+ * 🎯 FALLBACK CONTROLADO: Mapear Subtipo de costo → Tipo de Costo
+ * Reglas de negocio para completar clasificación cuando "Tipo de Costo" está vacío
+ */
+function inferTipoCostoFromSubtipo(subtipo: string | undefined): string | null {
+  if (!subtipo) return null;
+  
+  const subtipoNorm = subtipo.toLowerCase().trim();
+  
+  // ✅ DIRECTOS: Roles y recursos asignables a proyectos
+  const directoKeywords = [
+    'equipo', 'coordinación', 'coordinacion', 'qa', 'freelance', 
+    'diseño', 'diseno', 'analista', 'pm', 'data', 'cuenta',
+    'developer', 'desarrollador', 'programador'
+  ];
+  
+  // ✅ INDIRECTOS: Gastos generales no asignables
+  const indirectoKeywords = [
+    'tarjeta', 'herramientas', 'licencias generales', 
+    'administración', 'administracion', 'marketing interno', 
+    'viajes internos', 'overhead', 'office'
+  ];
+  
+  // Buscar match en directos
+  for (const keyword of directoKeywords) {
+    if (subtipoNorm.includes(keyword)) {
+      return 'Directo';
+    }
+  }
+  
+  // Buscar match en indirectos
+  for (const keyword of indirectoKeywords) {
+    if (subtipoNorm.includes(keyword)) {
+      return 'Indirecto';
+    }
+  }
+  
+  // Caso especial: "Costos directos e indirectos" 
+  if (subtipoNorm.includes('costos directos e indirectos')) {
+    return 'costos directos e indirectos';
+  }
+  
+  return null; // No se pudo inferir
+}
+
 // ==================== MAIN PARSER ====================
 
 export function parseCostRecord(
@@ -247,14 +294,20 @@ export function parseCostRecord(
   const yearRaw = extractField(record, COLUMN_MAPPINGS.year);
   
   const confirmedRaw = extractField(record, COLUMN_MAPPINGS.confirmed);
-  const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
+  let kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
   
-  // 🔍 COST KIND - FILTRO DIRECTO (validate FIRST to skip indirect costs)
-  // 🎯 CHECKLIST: Sólo Directo: Tipo in {"Directo","Directos"}
-  // IMPORTANTE: Igualdad estricta para evitar que "indirecto" pase (contiene "directo")
+  // 🎯 FALLBACK CONTROLADO: Si "Tipo de Costo" está vacío, inferir desde "Subtipo de costo"
   if (!kindRaw) {
-    console.log(`🔍 COST PARSER: Skipping row ${rowIndex} - no tipo de gasto`);
-    return null;
+    const subtipo = extractField(record, ['Subtipo de costo', 'subtipo', 'categoria']);
+    const inferred = inferTipoCostoFromSubtipo(subtipo);
+    
+    if (inferred) {
+      kindRaw = inferred;
+      console.log(`🔧 FALLBACK: Row ${rowIndex} - Inferido "${inferred}" desde Subtipo "${subtipo}"`);
+    } else {
+      console.log(`⚠️ REJECT: Row ${rowIndex} - no tipo de gasto (Subtipo: "${subtipo || 'N/A'}")`);
+      return null;
+    }
   }
   
   const kindLower = kindRaw.toLowerCase().trim();
@@ -383,16 +436,22 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
   
   const results: ParsedCostRecord[] = [];
   
-  // 📊 INSTRUMENTATION: Track skip reasons and amounts
+  // 📊 INSTRUMENTATION: Track skip reasons, fallbacks, and amounts
   const skipReasons: Record<string, number> = {};
   const skipAmountsByReason: Record<string, { ars: number; usd: number }> = {};
   const validAmountsByPeriod: Record<string, { ars: number; usd: number; count: number }> = {};
+  const fallbackStats = {
+    applied: 0,
+    failed: 0,
+    totalInferred: 0
+  };
   
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
     
     // Extract key fields for skip tracking
-    const kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
+    let kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
+    const subtipo = extractField(record, ['Subtipo de costo', 'subtipo', 'categoria']);
     const clientName = extractField(record, COLUMN_MAPPINGS.clientName);
     const monthKeyRaw = extractField(record, COLUMN_MAPPINGS.monthKey);
     const monthRaw = extractField(record, COLUMN_MAPPINGS.month);
@@ -402,6 +461,18 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
     
     // Determine period for tracking
     const periodKey = monthKeyRaw || buildFromMesAnio(monthRaw, yearRaw);
+    
+    // Track fallback attempts
+    const hadTipoCosto = !!kindRaw;
+    if (!hadTipoCosto && subtipo) {
+      const inferred = inferTipoCostoFromSubtipo(subtipo);
+      if (inferred) {
+        fallbackStats.applied++;
+        fallbackStats.totalInferred++;
+      } else {
+        fallbackStats.failed++;
+      }
+    }
     
     const parsed = parseCostRecord(record, i);
     
@@ -417,13 +488,27 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
       validAmountsByPeriod[parsed.period].count++;
       
     } else {
-      // Determine skip reason
+      // Determine skip reason with more granularity
       let reason = 'unknown';
-      if (!kindRaw) {
-        reason = 'no_tipo_de_gasto';
-      } else if (!['directo', 'directos'].includes(kindRaw.toLowerCase().trim())) {
+      
+      // Re-extract kindRaw for accurate classification
+      kindRaw = extractField(record, COLUMN_MAPPINGS.kind);
+      
+      if (!kindRaw && !subtipo) {
+        reason = 'no_tipo_no_subtipo';
+      } else if (!kindRaw && subtipo) {
+        const inferred = inferTipoCostoFromSubtipo(subtipo);
+        if (!inferred) {
+          reason = 'subtipo_not_mappable';
+        } else {
+          // Must have failed another validation
+          kindRaw = inferred;
+        }
+      }
+      
+      if (kindRaw && !['directo', 'directos'].includes(kindRaw.toLowerCase().trim()) && !kindRaw.toLowerCase().includes('costos directos e indirectos')) {
         reason = 'not_directo';
-      } else if (!clientName) {
+      } else if (kindRaw && !clientName) {
         reason = 'missing_clientName';
       } else if (!/^\d{4}-\d{2}$/.test(periodKey)) {
         reason = 'bad_periodKey';
@@ -442,12 +527,20 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
     }
   }
   
+  // 📊 LOG FALLBACK STATS
+  console.log(`\n🔧 FALLBACK STATS:`);
+  console.log(`  ✅ Applied: ${fallbackStats.applied} rows (inferred from Subtipo)`);
+  console.log(`  ❌ Failed: ${fallbackStats.failed} rows (Subtipo not mappable)`);
+  console.log(`  📊 Total inferred: ${fallbackStats.totalInferred}`);
+  
   // 📊 LOG SKIP SUMMARY
   console.log(`\n📊 SKIP REASONS SUMMARY:`);
-  Object.entries(skipReasons).forEach(([reason, count]) => {
-    const amounts = skipAmountsByReason[reason];
-    console.log(`  ❌ ${reason}: ${count} rows (ARS: ${amounts.ars.toFixed(2)}, USD: ${amounts.usd.toFixed(2)})`);
-  });
+  Object.entries(skipReasons)
+    .sort(([, countA], [, countB]) => countB - countA)
+    .forEach(([reason, count]) => {
+      const amounts = skipAmountsByReason[reason];
+      console.log(`  ❌ ${reason}: ${count} rows (ARS: ${amounts.ars.toFixed(2)}, USD: ${amounts.usd.toFixed(2)})`);
+    });
   
   // 📊 LOG VALID AMOUNTS BY PERIOD
   console.log(`\n📊 VALID AMOUNTS BY PERIOD:`);
@@ -458,7 +551,10 @@ export function parseCostRecords(records: RawCostRecord[]): ParsedCostRecord[] {
     });
   
   const totalSkipped = Object.values(skipReasons).reduce((sum, count) => sum + count, 0);
+  const percentWithoutTipo = ((fallbackStats.failed / records.length) * 100).toFixed(1);
+  
   console.log(`\n✅ COST PARSER: Completed batch parse - ${results.length} valid, ${totalSkipped} skipped`);
+  console.log(`⚠️ DATA QUALITY: ${percentWithoutTipo}% rows without classifiable Tipo de Costo`);
   
   return results;
 }

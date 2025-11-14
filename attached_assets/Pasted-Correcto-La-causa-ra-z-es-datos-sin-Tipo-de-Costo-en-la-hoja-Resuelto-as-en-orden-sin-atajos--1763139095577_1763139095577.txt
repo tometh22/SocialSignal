@@ -1,0 +1,83 @@
+Correcto. La causa raíz es datos sin “Tipo de Costo” en la hoja. Resuelto así, en orden, sin atajos.
+
+Corrección en origen (recomendada)
+
+Data validation en Sheets
+
+En “Costos directos e indirectos”, columna “Tipo de Costo”: validar lista fija {"directo","indirecto","costos directos e indirectos"}.
+
+Bloquear edición libre y resaltar vacíos con formato condicional.
+
+Backfill masivo inmediato
+
+Filtrar mes=Sep-2025 y completar “Tipo de Costo” para las 2.634 filas vacías.
+
+Regla rápida de negocio para completar:
+
+Si Subtipo ∈ {Equipo, Coordinación, QA, Freelance, Diseño, Analista, PM, Data, Cuenta} → directo.
+
+Si Subtipo ∈ {Tarjeta, Herramientas, Licencias generales, Administración, Marketing interno, Viajes internos} → indirecto.
+
+Si Subtipo = “Costos directos e indirectos” → costos directos e indirectos (lo acepta el parser y cae en directo por normalización).
+
+Revisar 15 filas sin cliente: completar Cliente y Proyecto o excluir explícitamente.
+
+Re-sync ETL con recomputeAgg=true para recalcular fact_cost_month y project_aggregates.
+
+Salvaguarda en ETL (para no volver a caer)
+
+Normalización y fallback controlado
+
+En el normalizador, si tipoCosto está vacío: mapear desde categoria con la tabla anterior.
+
+Si sigue vacío → rechazar, pero persistir en tabla de “rechazos” con motivo.
+
+Reporte de calidad de datos (obligatorio en cada corrida)
+
+KPI “% filas sin tipoCosto por periodo”.
+
+Breakdown: sin_tipoCosto, indirecto, sin_cliente, ok.
+
+Export CSV con las filas rechazadas (periodo, cliente, proyecto, categoria, monto).
+
+Guardas duras
+
+No sumar filas sin tipoCosto.
+
+No sumar filas sin cliente o proyecto.
+
+Log en WARN con conteos y montos por motivo de exclusión.
+
+Consultas de control (copiar/pegar)
+-- 1) Vacíos por periodo
+SELECT period_key, COUNT(*) AS filas, SUM(monto_total_usd) AS usd
+FROM costos_raw
+WHERE period_key='2025-09' AND (tipo_costo IS NULL OR tipo_costo='')
+GROUP BY 1;
+
+-- 2) Distribución por tipo
+SELECT COALESCE(tipo_costo,'__VACIO__') AS tipo, COUNT(*) AS filas, SUM(monto_total_usd) AS usd
+FROM costos_raw
+WHERE period_key='2025-09'
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- 3) Rechazos (tras normalización)
+SELECT motivo, COUNT(*) AS filas, SUM(monto_total_usd) AS usd
+FROM costos_rechazados
+WHERE period_key='2025-09'
+GROUP BY 1;
+
+Impacto esperado
+
+Con el backfill en Sheets + fallback por categoría el dashboard Ejecutivo debe subir de ~12.9k a la cifra real del mes (tu referencia ~34.5k) si esas filas efectivamente son directas.
+
+Si parte relevante de las 2.634 filas son indirectas, el target de 34.5k debe ajustarse.
+
+Endurecer el front
+
+Mostrar badge “Calidad de datos” con: % sin tipoCosto, % sin cliente.
+
+Si % sin tipoCosto > 5% para el periodo, banner amarillo “Clasificá tipo de costo para ver totales confiables”.
+
+Implementá los tres bloques: backfill en Sheets, fallback controlado en ETL, reporte de calidad. Luego re-ejecutá recomputeAgg y verificá los KPIs de control antes de validar el total del mes.
