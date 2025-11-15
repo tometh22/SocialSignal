@@ -474,10 +474,10 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter, teamB
           <div className="text-2xl font-bold text-purple-600">
             {deviationData.deviations.filter(d => 
               (d.actualHours > 0 || d.actualCost > 0) && 
-              Math.abs((d.actualHours / Math.max(d.budgetedHours, 1)) - 1) <= 0.15
+              Math.abs((d.actualHours / Math.max(d.budgetedHours, 1)) - 1) <= 0.05
             ).length}
           </div>
-          <div className="text-xs text-purple-600">±15% del objetivo</div>
+          <div className="text-xs text-purple-600">±5% del objetivo</div>
         </div>
       </div>
 
@@ -604,8 +604,8 @@ export function TeamDeviationAnalysis({ projectId, dateFilter, timeFilter, teamB
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div 
                               className={`h-2 rounded-full transition-all ${
-                                progressPercentage > 100 ? 'bg-red-500' :
-                                progressPercentage > 80 ? 'bg-orange-500' : 'bg-green-500'
+                                progressPercentage >= 105 ? 'bg-orange-500' :
+                                progressPercentage <= 95 ? 'bg-blue-500' : 'bg-green-500'
                               }`}
                               style={{ width: `${Math.min(100, progressPercentage)}%` }}
                             />

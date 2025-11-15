@@ -92,13 +92,15 @@ export function getUtilizationStatus(
 /**
  * Get overworked team members based on utilization thresholds
  * 
- * @param team - Array of team members with hoursAsana and targetHours
+ * @param team - Array of team members with hours/hoursAsana and targetHours
  * @returns Array of members with ≥105% utilization
  */
-export function getOverworkedMembers(team: Array<{ hoursAsana?: number; targetHours?: number; name: string }>): Array<{ name: string; utilization: number }> {
+export function getOverworkedMembers(team: Array<{ hours?: number; hoursAsana?: number; targetHours?: number; name: string }>): Array<{ name: string; utilization: number }> {
   return team
     .map(member => {
-      const result = getUtilizationStatus(member.hoursAsana || 0, member.targetHours || 0);
+      // 🎯 Support both 'hours' and 'hoursAsana' fields
+      const workedHours = member.hoursAsana ?? member.hours ?? 0;
+      const result = getUtilizationStatus(workedHours, member.targetHours || 0);
       return {
         name: member.name,
         utilization: result.utilization
@@ -110,13 +112,15 @@ export function getOverworkedMembers(team: Array<{ hoursAsana?: number; targetHo
 /**
  * Get underutilized team members based on utilization thresholds
  * 
- * @param team - Array of team members with hoursAsana and targetHours
+ * @param team - Array of team members with hours/hoursAsana and targetHours
  * @returns Array of members with ≤95% utilization
  */
-export function getUnderutilizedMembers(team: Array<{ hoursAsana?: number; targetHours?: number; name: string }>): Array<{ name: string; utilization: number }> {
+export function getUnderutilizedMembers(team: Array<{ hours?: number; hoursAsana?: number; targetHours?: number; name: string }>): Array<{ name: string; utilization: number }> {
   return team
     .map(member => {
-      const result = getUtilizationStatus(member.hoursAsana || 0, member.targetHours || 0);
+      // 🎯 Support both 'hours' and 'hoursAsana' fields
+      const workedHours = member.hoursAsana ?? member.hours ?? 0;
+      const result = getUtilizationStatus(workedHours, member.targetHours || 0);
       return {
         name: member.name,
         utilization: result.utilization
