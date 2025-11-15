@@ -136,7 +136,7 @@ function useTeamData({
         severity = 'medium';
         alertType = 'efficiency_review';
         deviationType = 'eficiencia_alta';
-      } else if (absDeviation <= 15) {
+      } else if (absDeviation <= 5) {
         severity = 'low';
         alertType = 'on_target';
         deviationType = 'ejecucion_optima';
