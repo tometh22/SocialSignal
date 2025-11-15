@@ -137,12 +137,15 @@ export class AutoSyncService {
       }
 
       // 🌟 3. AUTO-ETL: Ejecutar Star Schema ETL después de sincronizar staging
+      // NOTA: Lee directamente desde Google Sheets para garantizar datos frescos
+      // AutoSync tiene flag isRunning que previene overlaps (ejecuta cada 30 min)
       let etlResult: any = null;
       let etlExecuted = false;
+      const syncId = `sync_${Date.now()}`;
       
       if (costsResult.success && (costsResult.costsImported > 0 || costsResult.costsUpdated > 0)) {
         try {
-          console.log('🌟 AUTO-ETL: Ejecutando Star Schema ETL después de sincronización...');
+          console.log(`🌟 [${syncId}] AUTO-ETL: Ejecutando Star Schema ETL después de sincronización...`);
           
           // Importar ETL dinámicamente
           const { executeSoTETL } = await import('../etl/sot-etl');
@@ -195,17 +198,17 @@ export class AutoSyncService {
           etlExecuted = true;
           
           if (etlResult.success) {
-            console.log(`✅ AUTO-ETL completado: ${etlResult.periodsProcessed.length} períodos procesados, ${etlResult.laborRowsProcessed} labor rows, ${etlResult.rcRowsProcessed} RC rows`);
+            console.log(`✅ [${syncId}] AUTO-ETL completado: ${etlResult.periodsProcessed.length} períodos procesados, ${etlResult.laborRowsProcessed} labor rows, ${etlResult.rcRowsProcessed} RC rows`);
           } else {
-            console.error('⚠️ AUTO-ETL completado con errores:', etlResult.errors);
+            console.error(`⚠️ [${syncId}] AUTO-ETL completado con errores:`, etlResult.errors);
           }
           
         } catch (etlError: any) {
-          console.error('❌ Error ejecutando AUTO-ETL:', etlError);
+          console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
           // No fallar la sincronización completa si el ETL falla
         }
       } else {
-        console.log('⏭️ Saltando AUTO-ETL: No hubo cambios en costos directos');
+        console.log(`⏭️ [${syncId}] Saltando AUTO-ETL: No hubo cambios en costos directos`);
       }
 
       // 4. Combinar resultados
