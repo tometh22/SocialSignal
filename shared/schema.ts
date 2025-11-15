@@ -2707,3 +2707,88 @@ export const insertCostosRechazadosSchema = createInsertSchema(costosRechazados)
 });
 export type CostosRechazados = typeof costosRechazados.$inferSelect;
 export type InsertCostosRechazados = z.infer<typeof insertCostosRechazadosSchema>;
+
+// ==================== PROJECT DETAILS VIEW MODEL ====================
+// Tipo dedicado para el payload completo de /api/projects/:id/complete-data
+// Refleja la estructura real que el backend genera para project-details-redesigned.tsx
+
+export interface ProjectDetailsVM {
+  view: ViewType;
+  project: {
+    id: number;
+    name: string;
+    status: string;
+    startDate: string;
+    expectedEndDate: string;
+    clientId: number;
+    quotationId: number;
+    revenueDisplay?: number;
+    costDisplay?: number;
+    cotizacion?: number;
+    currencyNative: 'USD' | 'ARS';
+    budgetUtilization?: number;
+    // One-shot project flags
+    isOneShot?: boolean;
+    hasRevenueInPeriod?: boolean;
+    periodWithRevenue?: string | null;
+  };
+  quotation: {
+    id: number;
+    projectName: string;
+    baseCost: number;
+    totalAmount: number;
+    totalAmountNative: number;
+    estimatedHours: number;
+    markupAmount: number;
+    marginFactor: number;
+  } | null;
+  actuals: ActualsData;
+  metrics: {
+    efficiency: number;
+    markup: number;
+    margin: number;
+    budgetUtilization: number;
+    hoursDeviation: number;
+    costDeviation: number;
+  };
+  summary: {
+    costDisplay: number;
+    currencyNative: 'USD' | 'ARS';
+    revenueDisplay?: number;
+    teamCostUSD?: number;
+    revenueUSD?: number;
+    efficiencyPct?: number;
+    totalHours?: number;
+    flags?: string[];
+  };
+  teamBreakdown: TeamBreakdownMember[];
+  ingresos: any[];
+  costos: any[];
+  estimatedHours?: number;
+  workedHours?: number;
+  totalCost?: number;
+  totalRealRevenue?: number;
+  // Period comparison data
+  previousPeriod?: {
+    period: string;
+    hasData: boolean;
+    metrics: {
+      revenueUSD: number;
+      teamCostUSD: number;
+      totalHours: number;
+      efficiencyPct: number;
+      teamMembers: number;
+      markup: number;
+      margin: number;
+    } | null;
+  } | null;
+  // Advanced analytics objects (optional, may be added by frontend)
+  analytics?: {
+    rows?: any[];
+    kpis?: any;
+    workload?: any;
+    bottlenecks?: any;
+    riskBreakdown?: any;
+    recommendations?: any;
+  };
+}

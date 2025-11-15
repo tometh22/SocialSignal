@@ -1112,14 +1112,40 @@ const ProjectDetailsPage = () => {
     }
   }, [projectId, finalPeriod, selectedView, queryClient]);
 
+  // 📊 Tipos para queries analytics (evitar errores LSP con tipo vacío {})
+  interface MonthlyTrendsData {
+    rows?: Array<{
+      period: string;
+      markup?: number;
+      margin_pct?: number;
+      hours_asana?: number;
+      cost_usd?: number;
+      [key: string]: any;
+    }>;
+  }
+
+  interface OperationalMetricsData {
+    kpis?: any;
+    workload?: any;
+    bottlenecks?: any;
+    riskBreakdown?: {
+      total?: number;
+      wipScore?: number;
+      overloadScore?: number;
+      dependencyScore?: number;
+      [key: string]: any;
+    };
+    recommendations?: any[];
+  }
+
   // 📊 Datos de tendencias mensuales para sparklines y gráficos
-  const { data: monthlyTrends } = useQuery({
+  const { data: monthlyTrends } = useQuery<MonthlyTrendsData>({
     queryKey: [`/api/projects/${projectId}/monthly-trends`, selectedView],
     enabled: !!projectId,
   });
 
   // 🔧 Operational Metrics (WIP, Lead Time, Throughput, Workload, Risk)
-  const { data: operationalMetrics, isLoading: operationalLoading } = useQuery({
+  const { data: operationalMetrics, isLoading: operationalLoading } = useQuery<OperationalMetricsData>({
     queryKey: [`/api/projects/${projectId}/operational-metrics?timeFilter=${timeFilterForHook}`, timeFilterForHook],
     enabled: !!projectId,
   });
@@ -1416,8 +1442,8 @@ const ProjectDetailsPage = () => {
         '🚨 [ASSERT FAILED] estimatedHours faltante o negativo', vm.estimatedHours);
       
       const tb = vm.teamBreakdown ?? [];
-      console.assert(tb.every(p => p.roleName || p.role), 
-        '🚨 [ASSERT FAILED] roleName faltante en teamBreakdown', tb.filter(p => !p.roleName && !p.role));
+      console.assert(tb.every(p => p.roleName), 
+        '🚨 [ASSERT FAILED] roleName faltante en teamBreakdown', tb.filter(p => !p.roleName));
       
       const sumAsana = tb.reduce((a, p) => a + (p.hoursAsana || 0), 0);
       console.assert(Math.abs(sumAsana - vm.totalAsanaHours) < 1e-6, 
@@ -2322,7 +2348,7 @@ const ProjectDetailsPage = () => {
                             </div>
                             {unifiedData?.previousPeriod?.hasData && (() => {
                               const current = projectVM?.revenueDisplay || 0;
-                              const previous = unifiedData.previousPeriod.metrics.revenueUSD || 0;
+                              const previous = unifiedData.previousPeriod.metrics?.revenueUSD || 0;
                               if (previous > 0) {
                                 const change = ((current - previous) / previous) * 100;
                                 const isPositive = change >= 0;
@@ -2363,7 +2389,7 @@ const ProjectDetailsPage = () => {
                           </div>
                           {unifiedData?.previousPeriod?.hasData && (() => {
                             const current = projectVM?.costDisplay || 0;
-                            const previous = unifiedData.previousPeriod.metrics.teamCostUSD || 0;
+                            const previous = unifiedData.previousPeriod.metrics?.teamCostUSD || 0;
                             if (previous > 0) {
                               const change = ((current - previous) / previous) * 100;
                               const isPositive = change <= 0; // Lower cost is better
@@ -2403,7 +2429,7 @@ const ProjectDetailsPage = () => {
                           </div>
                           {unifiedData?.previousPeriod?.hasData && (() => {
                             const current = projectVM?.margin || 0;
-                            const previous = unifiedData.previousPeriod.metrics.margin || 0;
+                            const previous = unifiedData.previousPeriod.metrics?.margin || 0;
                             if (previous > 0) {
                               const changePoints = ((current - previous) * 100);
                               const isPositive = changePoints >= 0;
@@ -2516,7 +2542,7 @@ const ProjectDetailsPage = () => {
                             </div>
                             {unifiedData?.previousPeriod?.hasData && (() => {
                               const current = projectVM?.totalHours || 0;
-                              const previous = unifiedData.previousPeriod.metrics.totalHours || 0;
+                              const previous = unifiedData.previousPeriod.metrics?.totalHours || 0;
                               if (previous > 0) {
                                 const change = ((current - previous) / previous) * 100;
                                 const isPositive = change >= 0;

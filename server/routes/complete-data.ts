@@ -776,10 +776,9 @@ export async function completeDataHandler(req: Request, res: Response) {
       const costUSD = Number(m.costUSD ?? (fxMes ? costARS / fxMes : 0));
       
       return {
-        personnelId: m.personnelId ?? m.name,
+        personnelId: String(m.personnelId ?? m.name ?? 'unknown'), // 🎯 Always string for type safety
         name: m.name,
-        role: m.role,
-        roleName: m.roleName ?? m.role ?? 'N/A',
+        roleName: m.roleName ?? m.role ?? 'N/A', // 🎯 Use roleName only (remove role field)
         // 3-hours architecture
         targetHours,
         hoursAsana,
