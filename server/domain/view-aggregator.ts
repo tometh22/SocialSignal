@@ -29,6 +29,18 @@ interface ViewModelOutput {
 }
 
 /**
+ * Helper: Convert person_key to Title Case
+ * Example: "aylu tamer" → "Aylu Tamer"
+ */
+function toTitleCase(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+/**
  * 🎯 SINGLE SOURCE OF TRUTH (SoT) READER
  * 
  * Lee directamente de fact_labor_month + fact_rc_month (Star Schema)
@@ -56,6 +68,7 @@ async function getProjectPeriodViewFromSoT(
   const teamRowsRaw = await db
     .select({
       personId: factLaborMonth.personId,
+      personKey: factLaborMonth.personKey,
       personName: personnel.name,
       roleName: factLaborMonth.roleName,
       targetHours: factLaborMonth.targetHours,
@@ -80,6 +93,7 @@ async function getProjectPeriodViewFromSoT(
       if (!personMap.has(key)) {
         personMap.set(key, {
           personId: row.personId,
+          personKey: row.personKey,
           personName: row.personName,
           roleName: row.roleName,
           targetHours: 0,
@@ -273,9 +287,9 @@ async function getProjectPeriodViewFromSoT(
     ? (costDisplay / cotizacion)
     : null;
 
-  // 6) Mapear team breakdown
+  // 6) Mapear team breakdown con COALESCE para nombres
   const teamBreakdown = teamRows.map(row => ({
-    name: row.personName || `Person ${row.personId}`,
+    name: row.personName || toTitleCase(row.personKey) || `Person ${row.personId}`,
     roleName: row.roleName || 'N/A',
     targetHours: Number(row.targetHours || 0),
     hoursAsana: Number(row.asanaHours || 0),

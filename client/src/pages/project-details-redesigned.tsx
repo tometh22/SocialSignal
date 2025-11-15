@@ -2755,7 +2755,11 @@ const ProjectDetailsPage = () => {
                             const hours = member.hoursAsana || 0;
                             const target = member.targetHours || 0;
                             const utilization = target > 0 ? (hours / target) * 100 : 0;
-                            const status = hours > 80 ? 'sobrecarga' : 'normal';
+                            
+                            // 🎯 NEW: Badge logic basado en utilization vs target (±5% thresholds)
+                            const status = target > 0 
+                              ? (utilization >= 105 ? 'alto' : utilization <= 95 ? 'bajo' : 'normal')
+                              : 'normal';
                             
                             return (
                               <div key={index} className="group">
@@ -2783,11 +2787,12 @@ const ProjectDetailsPage = () => {
                                         <Badge 
                                           variant="outline" 
                                           className={`text-xs ${
-                                            status === 'sobrecarga' ? 'border-red-500 text-red-700 bg-red-50' :
+                                            status === 'alto' ? 'border-orange-500 text-orange-700 bg-orange-50' :
+                                            status === 'bajo' ? 'border-blue-500 text-blue-700 bg-blue-50' :
                                             'border-green-500 text-green-700 bg-green-50'
                                           }`}
                                         >
-                                          {status === 'sobrecarga' ? '⚠️ Sobrecarga' : '✓ Normal'}
+                                          {status === 'alto' ? '📈 Alto' : status === 'bajo' ? '📉 Bajo' : '✓ Normal'}
                                         </Badge>
                                       </div>
                                     </div>
@@ -2796,7 +2801,9 @@ const ProjectDetailsPage = () => {
                                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div 
                                           className={`h-full transition-all ${
-                                            status === 'sobrecarga' ? 'bg-red-500' : 'bg-green-500'
+                                            status === 'alto' ? 'bg-orange-500' : 
+                                            status === 'bajo' ? 'bg-blue-500' : 
+                                            'bg-green-500'
                                           }`}
                                           style={{ width: `${Math.min(100, utilization)}%` }}
                                         />
