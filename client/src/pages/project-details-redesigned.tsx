@@ -4,6 +4,7 @@ import { useLocation, useParams } from "wouter";
 import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
 import { toProjectVM, formatCurrency, useWhichCost } from "@/selectors/projectVM";
 import { formatCurrencyFull } from "@/lib/utils";
+import { getUtilizationStatus, getOverworkedMembers, getUnderutilizedMembers } from "@/utils/performance";
 import {
   ArrowLeft,
   Calendar,
@@ -2754,12 +2755,9 @@ const ProjectDetailsPage = () => {
                           .map((member: any, index) => {
                             const hours = member.hoursAsana || 0;
                             const target = member.targetHours || 0;
-                            const utilization = target > 0 ? (hours / target) * 100 : 0;
                             
-                            // 🎯 NEW: Badge logic basado en utilization vs target (±5% thresholds)
-                            const status = target > 0 
-                              ? (utilization >= 105 ? 'alto' : utilization <= 95 ? 'bajo' : 'normal')
-                              : 'normal';
+                            // 🎯 Use unified performance helper
+                            const perfStatus = getUtilizationStatus(hours, target);
                             
                             return (
                               <div key={index} className="group">
@@ -2786,13 +2784,9 @@ const ProjectDetailsPage = () => {
                                         </span>
                                         <Badge 
                                           variant="outline" 
-                                          className={`text-xs ${
-                                            status === 'alto' ? 'border-orange-500 text-orange-700 bg-orange-50' :
-                                            status === 'bajo' ? 'border-blue-500 text-blue-700 bg-blue-50' :
-                                            'border-green-500 text-green-700 bg-green-50'
-                                          }`}
+                                          className={`text-xs ${perfStatus.borderColorClass} ${perfStatus.colorClass} ${perfStatus.bgColorClass}`}
                                         >
-                                          {status === 'alto' ? '📈 Alto' : status === 'bajo' ? '📉 Bajo' : '✓ Normal'}
+                                          {perfStatus.emoji} {perfStatus.label}
                                         </Badge>
                                       </div>
                                     </div>
@@ -2800,16 +2794,12 @@ const ProjectDetailsPage = () => {
                                     <div className="relative">
                                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div 
-                                          className={`h-full transition-all ${
-                                            status === 'alto' ? 'bg-orange-500' : 
-                                            status === 'bajo' ? 'bg-blue-500' : 
-                                            'bg-green-500'
-                                          }`}
-                                          style={{ width: `${Math.min(100, utilization)}%` }}
+                                          className={`h-full transition-all ${perfStatus.progressBarClass}`}
+                                          style={{ width: `${Math.min(100, perfStatus.utilization)}%` }}
                                         />
                                       </div>
                                       <div className="flex justify-between text-xs text-gray-500 mt-0.5">
-                                        <span>{utilization.toFixed(0)}% utilización</span>
+                                        <span>{perfStatus.utilization.toFixed(0)}% utilización</span>
                                         {target > 0 && <span>Meta: {target}h</span>}
                                       </div>
                                     </div>
@@ -2879,19 +2869,19 @@ const ProjectDetailsPage = () => {
                         });
                       }
                       
-                      // ADVERTENCIA - Prioridad 2
-                      const overworkedMembers = team.filter((m: any) => (m.hoursAsana || 0) > 80);
+                      // ADVERTENCIA - Prioridad 2: Team overutilization (≥105%)
+                      const overworkedMembers = getOverworkedMembers(team);
                       if (overworkedMembers.length > 0) {
-                        const names = overworkedMembers.map((m: any) => m.name).join(', ');
-                        const totalOvertime = overworkedMembers.reduce((sum: number, m: any) => sum + Math.max(0, (m.hoursAsana || 0) - 80), 0);
+                        const names = overworkedMembers.map(m => m.name).join(', ');
+                        const avgUtilization = overworkedMembers.reduce((sum, m) => sum + m.utilization, 0) / overworkedMembers.length;
                         recommendations.push({
                           priority: 2,
                           type: 'warning',
                           icon: AlertCircle,
                           emoji: '⚠️',
                           title: 'Equipo Sobrecargado',
-                          value: `${totalOvertime}h extras`,
-                          description: `${names} trabajó${overworkedMembers.length > 1 ? 'aron' : 'ó'} más de 80h. Riesgo de burnout.`,
+                          value: `${avgUtilization.toFixed(0)}% prom.`,
+                          description: `${names} ${overworkedMembers.length > 1 ? 'superaron' : 'superó'} su capacidad estimada (≥105% utilización). Riesgo de burnout.`,
                           action: 'Redistribuir carga',
                           color: 'red',
                           borderColor: 'border-red-500',
@@ -3208,74 +3198,54 @@ const ProjectDetailsPage = () => {
                   </div>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-900">
-                      {(() => {
-                        const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
-                        const markup = projectVM?.markup || 0;
-                        const team = projectVM?.teamBreakdown || [];
-                        
-                        // Factor de distribución del equipo (penaliza sobrecarga)
-                        const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
-                        const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
-                        
-                        // Fórmula mejorada y documentada
-                        const budgetScore = (100 - budgetUsed) * 0.4; // Mejor si usa menos presupuesto
-                        const profitabilityScore = Math.min(100, (markup - 1) * 35); // Mejor markup = mejor score
-                        const teamScore = teamFactor * 0.25; // Penaliza equipo sobrecargado
-                        
-                        const totalScore = budgetScore + profitabilityScore + teamScore;
-                        return Math.max(0, Math.min(100, totalScore)).toFixed(0);
-                      })()}
-                    </div>
-                    <div className="text-xs text-gray-500">de 100 puntos</div>
-                  </div>
-                  <div className="flex justify-center">
-                    <div className="flex gap-1">
-                      {[1,2,3,4,5].map(star => {
-                        const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
-                        const markup = projectVM?.markup || 0;
-                        const team = projectVM?.teamBreakdown || [];
-                        const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
-                        const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
-                        const budgetScore = (100 - budgetUsed) * 0.4;
-                        const profitabilityScore = Math.min(100, (markup - 1) * 35);
-                        const teamScore = teamFactor * 0.25;
-                        const totalScore = budgetScore + profitabilityScore + teamScore;
-                        const finalScore = Math.max(0, Math.min(100, totalScore));
-                        
-                        return (
-                          <Star 
-                            key={star} 
-                            className={`h-4 w-4 ${
-                              star <= Math.ceil(finalScore / 20) 
-                                ? 'text-yellow-400 fill-current' 
-                                : 'text-gray-300'
-                            }`} 
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="text-xs text-center text-gray-500">
-                    {(() => {
-                      const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
-                      const markup = projectVM?.markup || 0;
-                      const team = projectVM?.teamBreakdown || [];
-                      const overworkedMembers = team.filter((m: any) => (m.hours || 0) > 80).length;
-                      const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
-                      const budgetScore = (100 - budgetUsed) * 0.4;
-                      const profitabilityScore = Math.min(100, (markup - 1) * 35);
-                      const teamScore = teamFactor * 0.25;
-                      const totalScore = budgetScore + profitabilityScore + teamScore;
-                      const finalScore = Math.max(0, Math.min(100, totalScore));
-                      
-                      if (finalScore >= 80) return 'Excelente calidad del proyecto';
-                      if (finalScore >= 60) return 'Buena calidad del proyecto';
-                      if (finalScore >= 40) return 'Calidad aceptable';
-                      return 'Necesita mejoras';
-                    })()}
-                  </div>
+                  {(() => {
+                    // 🎯 Calculate health score once (using unified performance helper)
+                    const budgetUsed = (projectVM?.budgetUtilization || 0) * 100;
+                    const markup = projectVM?.markup || 0;
+                    const team = projectVM?.teamBreakdown || [];
+                    
+                    // Use unified performance helper for overworked members (≥105% utilization)
+                    const overworkedMembers = getOverworkedMembers(team).length;
+                    const teamFactor = Math.max(0, 100 - (overworkedMembers * 20));
+                    
+                    // Health score formula
+                    const budgetScore = (100 - budgetUsed) * 0.4;
+                    const profitabilityScore = Math.min(100, (markup - 1) * 35);
+                    const teamScore = teamFactor * 0.25;
+                    const totalScore = budgetScore + profitabilityScore + teamScore;
+                    const finalScore = Math.max(0, Math.min(100, totalScore));
+                    
+                    return (
+                      <>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-yellow-900">
+                            {finalScore.toFixed(0)}
+                          </div>
+                          <div className="text-xs text-gray-500">de 100 puntos</div>
+                        </div>
+                        <div className="flex justify-center">
+                          <div className="flex gap-1">
+                            {[1,2,3,4,5].map(star => (
+                              <Star 
+                                key={star} 
+                                className={`h-4 w-4 ${
+                                  star <= Math.ceil(finalScore / 20) 
+                                    ? 'text-yellow-400 fill-current' 
+                                    : 'text-gray-300'
+                                }`} 
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-xs text-center text-gray-500">
+                          {finalScore >= 80 ? 'Excelente calidad del proyecto' :
+                           finalScore >= 60 ? 'Buena calidad del proyecto' :
+                           finalScore >= 40 ? 'Calidad aceptable' :
+                           'Necesita mejoras'}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
