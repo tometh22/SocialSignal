@@ -667,9 +667,9 @@ function ProjectTeamSection({
           const referenceHours = (member.targetHours && member.targetHours > 0) ? member.targetHours : targetHours;
           const remainingHours = Math.max(0, referenceHours - workedHours);
           
-          // Umbral más realista para "excedido": 15% de tolerancia corporativa
-          const toleranceThreshold = referenceHours * 0.15; // 15% de tolerancia
-          const isOverBudget = workedHours > (referenceHours + toleranceThreshold);
+          // 🎯 Use unified performance helper for consistent ±5% thresholds
+          const perfStatus = getUtilizationStatus(workedHours, referenceHours);
+          const isOverBudget = perfStatus.status === 'alto'; // ≥105% utilization
           
           // Definir colores y estilos basados en el estado del miembro - SIMPLIFICADO A VERDE/ROJO/GRIS
           const getCardStyle = () => {
