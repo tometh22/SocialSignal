@@ -1,0 +1,103 @@
+Entonces el síntoma ahora es:
+
+Agosto 2025 → datos OK.
+
+Cualquier otro mes con datos en el Excel → el dashboard del proyecto queda vacío.
+
+Eso casi seguro significa una de estas dos cosas (o ambas):
+
+El SoT nuevo solo tiene datos para agosto
+
+El endpoint ahora solo lee del SoT nuevo y dejó de usar el camino viejo
+
+Antes funcionaba “para cualquier mes” porque leías siempre de las tablas viejas; con la migración, agosto quedó migrado al SoT y el resto no.
+
+Paso 1. Verificar si el problema es de datos o de API
+
+Que lo haga el dev / Agent, pero la lógica es:
+
+En la tabla de horas que ahora alimenta la vista (por ejemplo fact_labor_month o la nueva tabla SoT):
+
+Contar filas para Fee Huggies:
+
+Agosto 2025
+
+Julio 2025
+
+Junio 2025
+
+Si solo hay filas para 2025-08 y 0 para el resto → el ETL nuevo solo corrió para agosto.
+
+En la tabla de costos SoT (fact_cost_month / income_sot / la que estén usando):
+
+Repetir el mismo check por project = Fee Huggies y period_key distintos.
+
+Si el patrón es “solo agosto tiene registros en las tablas nuevas”, el bug está en el scope del ETL, no en el front.
+
+Paso 2. Backfill de todos los períodos al SoT
+
+Lo que hay que hacer a nivel ETL:
+
+Ejecutar el ETL de SoT para todos los períodos históricos, no solo para '2025-08'.
+Ejemplo de intención (pseudocódigo, adaptalo a tu CLI):
+
+# en vez de algo así:
+runSoTETL(periods=['2025-08'])
+
+# correr algo de este estilo:
+runSoTETL(periods=['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06','2025-07','2025-08','2025-09','2025-10'])
+
+
+o directamente sin filtro de períodos si la función lo permite.
+
+Volver a chequear las tablas SoT: que haya filas para Fee Huggies en cada mes donde el Excel tiene datos.
+
+Mientras no hagas este backfill, cualquier endpoint que solo lea del SoT va a mostrar datos para agosto y nada para el resto.
+
+Paso 3. Asegurar fallback cuando el SoT no tiene datos
+
+Para no volver a quedar atrapado en este estado:
+
+En el endpoint que arma el “complete-data” del proyecto:
+
+Primero consultar el SoT (nuevo camino).
+
+Si el SoT devuelve 0 filas para ese proyecto+período:
+
+Hacer fallback al camino viejo (tablas fact_labor_month, fact_rc_month, etc.), que “sabés” que funciona mientras haya datos.
+
+En pseudocódigo:
+
+const sotData = await getCostsAndHoursFromSoT(projectId, periodKey);
+
+if (sotData.hasData) {
+  return buildResponseFromSoT(sotData);
+} else {
+  const legacyData = await getProjectDataFromLegacyTables(projectId, periodKey);
+  return buildResponseFromLegacy(legacyData);
+}
+
+
+Eso garantiza:
+
+Meses ya migrados al SoT → usan la arquitectura nueva.
+
+Meses todavía no migrados o con algún problema → al menos siguen mostrando algo usando el pipeline viejo.
+
+Paso 4. Validación rápida
+
+Después del backfill + fallback:
+
+Para Fee Huggies:
+
+Mayo (donde sabés que había datos) → debería volver a mostrar horas y costos.
+
+Agosto → se mantiene como hasta ahora.
+
+Para otro proyecto cualquiera con datos en distintos meses → probás 2-3 períodos y verificás que no hay “agosto mágico”.
+
+Resumiendo:
+
+Hoy solo ves agosto porque el SoT nuevo solo está poblado para ese período y el endpoint dejó de mirar las tablas viejas.
+
+Solución: backfill SoT para
