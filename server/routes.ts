@@ -12325,6 +12325,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 TEMP DEBUG ENDPOINT - Inspect raw Excel structure
+  app.get("/api/etl/sot/debug/raw-excel", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      const costosRaw = await googleSheetsWorkingService.getSheetValues(
+        '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+        'Costos directos e indirectos',
+        {
+          valueRenderOption: 'UNFORMATTED_VALUE',
+          dateTimeRenderOption: 'SERIAL_NUMBER'
+        }
+      );
+      
+      res.json({
+        total_rows: costosRaw.length,
+        sample_rows: costosRaw.slice(0, 5).map((row, idx) => ({
+          row_index: idx,
+          length: row.length,
+          data: row
+        }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // 🌟 SOT ETL ENDPOINT - Star Schema Data Pipeline
   app.post("/api/etl/sot/run", requireAuth, async (req, res) => {
     try {
@@ -12368,33 +12395,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📋 Read ${costosRaw.length} rows from Costos directos, ${rcRaw.length} rows from RC`);
       
-      // 🔍 DEBUG: Log first row headers and a sample numeric value to verify UNFORMATTED_VALUE
-      if (costosRaw.length > 1) {
-        const headers = costosRaw[0];
-        const sampleRow = costosRaw[1]; // First data row
-        console.log('🔍 DEBUG COSTOS Headers:', headers);
-        console.log('🔍 DEBUG Sample row (row 1):', sampleRow);
-        const valorHoraIndex = headers.findIndex((h: string) => h && (h.includes('Valor') || h.includes('Hora')));
-        if (valorHoraIndex >= 0) {
-          console.log(`🔍 DEBUG Column "${headers[valorHoraIndex]}" sample value:`, typeof sampleRow[valorHoraIndex], sampleRow[valorHoraIndex]);
-        }
-      }
+      // 2. Parse usando parser basado en índice (Excel SIN headers)
+      // IMPORTANTE: costosRaw NO tiene fila de headers, todas las filas son datos
+      const { parseCostosDirectos } = await import('./etl/sot-excel-parser');
       
-      // 2. Parse headers and convert to objects
-      const costosHeaders = costosRaw[0] || [];
+      // Parsear TODAS las filas (incluyendo fila 0) con parser basado en índice
+      const costosRows = parseCostosDirectos(costosRaw);
+      
+      // RC sigue usando headers (asumiendo que RC SÍ tiene headers)
       const rcHeaders = rcRaw[0] || [];
-      
-      // 🔍 DEBUG: Log primeros 5 headers de costos para debugging
-      console.log('📋 [DEBUG] Primeros headers de costos:', costosHeaders.slice(0, 20));
-      
-      const costosRows = costosRaw.slice(1).map((row, idx) => {
-        const obj: any = { __rowId: `costos_${idx}` };
-        costosHeaders.forEach((header, i) => {
-          obj[header] = row[i];
-        });
-        return obj;
-      });
-      
       const rcRows = rcRaw.slice(1).map((row, idx) => {
         const obj: any = { __rowId: `rc_${idx}` };
         rcHeaders.forEach((header, i) => {

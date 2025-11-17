@@ -965,8 +965,25 @@ export async function executeSoTETL(
     // Filtrar para fact_cost_month: TODOS los costos directos (Equipo, Coordinación, QA, Admin, etc.)
     // Acepta SOLO "Directo" y "Directos e indirectos" (rechaza "Indirecto")
     // Fuente: Columna R del Excel MAESTRO (1:1 match sin filtros adicionales)
+    
+    // 🔍 DEBUG: Log first row keys to see what columns are available
+    if (filteredCostos.length > 0) {
+      const firstRowKeys = Object.keys(filteredCostos[0]);
+      const tipoKeys = firstRowKeys.filter(k => k.toLowerCase().includes('tipo'));
+      console.log(`🔍 [SoT ETL DEBUG] Columnas con 'tipo' en primera fila:`, tipoKeys);
+      console.log(`🔍 [SoT ETL DEBUG] Valor de primera columna tipo:`, filteredCostos[0][tipoKeys[0]]);
+    }
+    
     const filteredCostosDirectos = filteredCostos.filter(row => {
-      const tipoCosto = normKey(row['Tipo de Costo'] ?? row['Tipo de Coste'] ?? row['Tipo Costo'] ?? '');
+      // Probar múltiples variantes de la columna "Tipo"
+      const tipoCosto = normKey(
+        row['Tipo de Costo'] ?? 
+        row['Tipo de Coste'] ?? 
+        row['Tipo Costo'] ?? 
+        row['Tipo de Gasto'] ??  // ← AÑADIDO
+        row['Tipo Gasto'] ??     // ← AÑADIDO
+        ''
+      );
       
       // Verificar que Tipo sea exactamente "directo" o "directos e indirectos"
       // IMPORTANTE: No usar .includes() porque "indirecto".includes("directo") es true
