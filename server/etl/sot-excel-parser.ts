@@ -7,6 +7,8 @@
  * Estructura de columnas por índice:
  */
 
+import type { CostoDirectoRow } from './sot-etl.js';
+
 export const COSTO_COLUMN_LAYOUT = {
   persona: 0,           // "Lola Camara"
   rol: 1,               // "Equipo", "Coordinación", etc.
@@ -88,6 +90,23 @@ export function parseCostoRow(row: any[], rowIndex: number): CostoDirectoRowPars
       return isNaN(num) ? 0 : num;
     };
     
+    // Parsear valores monetarios y horas
+    const costoTotal = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.costoTotal]);
+    const montoTotalUSD = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.montoTotalUSD]);
+    const horasObjetivo = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasObjetivo]);
+    const valorHora = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.valorHora]);
+    const tipoCambio = parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.tipoCambio]);
+    
+    // Validar que haya datos válidos para computar costos:
+    // Aceptar si: (a) USD>0, (b) ARS>0, o (c) horas>0 con rate/FX válidos
+    const hasValidMonetary = costoTotal > 0 || montoTotalUSD > 0;
+    const hasValidHourly = horasObjetivo > 0 && (valorHora > 0 || tipoCambio > 0);
+    
+    if (!hasValidMonetary && !hasValidHourly) {
+      console.warn(`⚠️ Fila ${rowIndex}: Sin datos válidos para computar costos. Saltando.`);
+      return null;
+    }
+    
     return {
       persona,
       rol: String(extendedRow[COSTO_COLUMN_LAYOUT.rol] || '').trim(),
@@ -99,13 +118,13 @@ export function parseCostoRow(row: any[], rowIndex: number): CostoDirectoRowPars
       tipoProyecto: String(extendedRow[COSTO_COLUMN_LAYOUT.tipoProyecto] || '').trim(),
       proyecto: String(extendedRow[COSTO_COLUMN_LAYOUT.proyecto] || '').trim(),
       cliente: String(extendedRow[COSTO_COLUMN_LAYOUT.cliente] || '').trim(),
-      horasObjetivo: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasObjetivo]),
+      horasObjetivo,  // Ya parseado arriba con validación
       horasAsana: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasAsana]),
       horasFact: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.horasFact]),
-      valorHora: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.valorHora]),
-      costoTotal: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.costoTotal]),
-      tipoCambio: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.tipoCambio]),
-      montoTotalUSD: parseNumber(extendedRow[COSTO_COLUMN_LAYOUT.montoTotalUSD])
+      valorHora,  // Ya parseado arriba con validación
+      costoTotal,  // Ya parseado arriba con validación
+      tipoCambio,  // Ya parseado arriba con validación
+      montoTotalUSD  // Ya parseado arriba con validación
     };
     
   } catch (error) {
@@ -118,10 +137,10 @@ export function parseCostoRow(row: any[], rowIndex: number): CostoDirectoRowPars
  * Convierte un array de filas del Excel a objetos parseados con nombres estándar
  * Compatible con la interfaz existente `CostoDirectoRow` de sot-etl.ts
  */
-export function parseCostosDirectos(rawRows: any[][]): Record<string, any>[] {
+export function parseCostosDirectos(rawRows: any[][]): CostoDirectoRow[] {
   console.log(`📊 [Excel Parser] Parseando ${rawRows.length} filas de costos directos...`);
   
-  const parsed: Record<string, any>[] = [];
+  const parsed: CostoDirectoRow[] = [];
   let skipped = 0;
   
   for (let i = 0; i < rawRows.length; i++) {
@@ -134,24 +153,43 @@ export function parseCostosDirectos(rawRows: any[][]): Record<string, any>[] {
     }
     
     // Mapear a interfaz compatible con CostoDirectoRow existente
-    // Usar nombres de columna que coincidan con lo que espera el ETL
+    // Usar nombres exactos que espera el ETL (ver server/etl/sot-etl.ts:181-203)
     parsed.push({
-      'Persona': parsedRow.persona,
+      // Campos básicos de identificación
+      'Detalle': parsedRow.persona,  // ETL espera "Detalle", no "Persona"
       'Rol': parsedRow.rol,
       'Mes': parsedRow.mes,
       'Año': parsedRow.año,
-      'Tipo de Costo': parsedRow.tipoGasto,  // ← CLAVE: Debe ser "Tipo de Costo" para el ETL
+      'Tipo de Costo': parsedRow.tipoGasto,
+      'Tipo de Coste': parsedRow.tipoGasto,  // Variante header
+      'Tipo Costo': parsedRow.tipoGasto,  // Variante header
       'Especificación': parsedRow.especificacion,
+      'Especificacion': parsedRow.especificacion,  // Variante sin tilde
+      
+      // Identificadores de cliente y proyecto - INCLUIR TODAS LAS VARIANTES
       'Cliente ID': parsedRow.clienteId,
-      'Tipo de Proyecto': parsedRow.tipoProyecto,
-      'Proyecto': parsedRow.proyecto,
+      'ID Cliente': parsedRow.clienteId,  // Variante invertida
       'Cliente': parsedRow.cliente,
-      'Horas Objetivo': parsedRow.horasObjetivo,
-      'Horas Reales Asana': parsedRow.horasAsana,
-      'Horas para Facturación': parsedRow.horasFact,
-      'Valor Hora': parsedRow.valorHora,
-      'Costo Total ARS': parsedRow.costoTotal,
-      'Tipo de Cambio': parsedRow.tipoCambio,
+      'Tipo de Proyecto': parsedRow.tipoProyecto,
+      'Tipo Proyecto': parsedRow.tipoProyecto,  // Variante sin "de"
+      'TipoProyecto': parsedRow.tipoProyecto,  // Variante sin espacios
+      'Proyecto': parsedRow.proyecto,
+      
+      // Horas - usar nombres exactos del ETL
+      'Cantidad de horas objetivo': parsedRow.horasObjetivo,
+      'Cantidad de horas reales Asana': parsedRow.horasAsana,
+      'Cantidad de horas para facturación': parsedRow.horasFact,
+      
+      // Valores monetarios - incluir TODAS las variantes que el ETL busca
+      'Valor hora ARS': parsedRow.valorHora,
+      'Valor Hora': parsedRow.valorHora,  // Variante alternativa
+      'Total ARS': parsedRow.costoTotal,  // Variante antigua
+      'Monto Total ARS': parsedRow.costoTotal,  // Nombre real del Excel
+      'Monto Original ARS': parsedRow.costoTotal,  // Columna adicional
+      
+      // FX y USD - incluir TODAS las variantes
+      'Cotización': parsedRow.tipoCambio,
+      'Tipo de cambio': parsedRow.tipoCambio,  // Variante alternativa
       'Monto Total USD': parsedRow.montoTotalUSD
     });
   }
