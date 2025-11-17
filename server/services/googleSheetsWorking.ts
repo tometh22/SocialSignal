@@ -1657,9 +1657,10 @@ class GoogleSheetsWorkingService {
           montoUSD: montoUSDValue
         };
         
-        // 🚨 FILTRO CRÍTICO: Solo procesar costos DIRECTOS (más tolerante)
-        if (!tipoGasto || tipoGasto.toLowerCase().trim() !== 'directo') {
-          if (tipoGasto) console.log(`⏭️ Fila ${i}: Filtrado por tipo '${tipoGasto}' != 'directo'`);
+        // 🚨 FILTRO: Procesar costos DIRECTOS e INDIRECTOS
+        const tipoGastoNorm = tipoGasto ? tipoGasto.toLowerCase().trim() : '';
+        if (tipoGastoNorm !== 'directo' && tipoGastoNorm !== 'indirecto') {
+          if (tipoGasto) console.log(`⏭️ Fila ${i}: Filtrado por tipo '${tipoGasto}' no es directo ni indirecto`);
           continue;
         }
         
