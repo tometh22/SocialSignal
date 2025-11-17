@@ -35,7 +35,7 @@ const DEFAULT_COST_RULES: CostBusinessRules = {
     ars: 100,
     usd: 100
   },
-  indirectCostStrategy: 'exclude' // Por defecto, no incluir overhead en cards
+  indirectCostStrategy: 'portfolio-only' // Incluir costos indirectos en total del portfolio
 };
 
 // ==================== TEMPORAL FILTERING ====================

@@ -4987,12 +4987,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 2. Costos directos totales (desde fact_cost_month - suma directa Col R del Excel sin filtros)
-      const { rows: [directCosts] } = await pool.query(`
+      // 2. Costos separados por tipo (directos e indirectos) desde direct_costs
+      const { rows: [costsData] } = await pool.query(`
         SELECT 
-          COALESCE(SUM(amount_usd), 0) as total_cost_usd
-        FROM fact_cost_month
-        WHERE period_key = ANY($1)
+          COALESCE(SUM(CASE WHEN tipo_gasto = 'Directo' THEN monto_total_usd ELSE 0 END), 0) as direct_costs_usd,
+          COALESCE(SUM(CASE WHEN tipo_gasto = 'Indirecto' THEN monto_total_usd ELSE 0 END), 0) as indirect_costs_usd,
+          COALESCE(SUM(monto_total_usd), 0) as total_cost_usd
+        FROM direct_costs
+        WHERE month_key = ANY($1)
       `, [periodKeys]);
       
       // 3. Horas billable/non-billable
@@ -5019,7 +5021,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. WIP simple (horas billables * rate promedio - facturado)
       // Para calcular rate promedio usamos: costos / horas billables como proxy
       const billableHours = parseFloat(hoursData?.billable_hours || '0');
-      const costUsd = parseFloat(directCosts?.total_cost_usd || '0');
+      const directCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
+      const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
+      const costUsd = parseFloat(costsData?.total_cost_usd || '0');
       const billedUsd = parseFloat(billingData?.billed_usd || '0');
       const avgHourlyRate = billableHours > 0 ? (costUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
       const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
@@ -5191,6 +5195,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           billedUsd: billedUsd,
           wipUsd: wipUsd,
           costUsd: costUsd,
+          directCostsUsd: directCostsUsd,
+          indirectCostsUsd: indirectCostsUsd,
           marginUsd: billedUsd - costUsd,
           projectedMarginPct: (billedUsd + wipUsd) > 0 ? ((billedUsd + wipUsd - costUsd) / (billedUsd + wipUsd)) : 0,
           fxWeighted: fxWeighted

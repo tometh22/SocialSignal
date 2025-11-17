@@ -73,6 +73,8 @@ export default function ExecutiveDashboard() {
         billedUsd: 0,
         wipUsd: 0,
         costUsd: 0,
+        directCostsUsd: 0,
+        indirectCostsUsd: 0,
         marginUsd: 0,
         projectedMarginPct: 0,
         fxWeighted: 0,
@@ -90,6 +92,8 @@ export default function ExecutiveDashboard() {
       billedUsd: dashboardMetrics.financial?.billedUsd || 0,
       wipUsd: dashboardMetrics.financial?.wipUsd || 0,
       costUsd: dashboardMetrics.financial?.costUsd || 0,
+      directCostsUsd: dashboardMetrics.financial?.directCostsUsd || 0,
+      indirectCostsUsd: dashboardMetrics.financial?.indirectCostsUsd || 0,
       marginUsd: dashboardMetrics.financial?.marginUsd || 0,
       projectedMarginPct: dashboardMetrics.financial?.projectedMarginPct || 0,
       fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
@@ -423,19 +427,48 @@ export default function ExecutiveDashboard() {
                     </div>
                   )}
 
-                  {/* Costos directos */}
+                  {/* Costos directos e indirectos */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-600">Costos directos</span>
+                        <span className="text-sm font-medium text-gray-600">Costos del período</span>
                         <span className="text-xs text-gray-400" title="Fuente: Costos directos e indirectos (Star Schema)">●</span>
                       </div>
                       <TrendingDown className="h-4 w-4 text-red-600" />
                     </div>
-                    <div className="text-3xl font-bold text-red-600">
-                      ${(currentMetrics.costUsd / 1000).toFixed(1)}k
+                    
+                    {/* Costos directos */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-600">Costos directos</span>
+                        <span className="text-xs font-medium text-gray-700">${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k</span>
+                      </div>
+                      <Progress 
+                        value={currentMetrics.costUsd > 0 ? (currentMetrics.directCostsUsd / currentMetrics.costUsd) * 100 : 0} 
+                        className="h-1 [&>div]:bg-red-500"
+                      />
                     </div>
-                    <span className="text-xs text-gray-500">fact_labor_month • USD</span>
+                    
+                    {/* Costos indirectos */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-600">Costos indirectos</span>
+                        <span className="text-xs font-medium text-gray-700">${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k</span>
+                      </div>
+                      <Progress 
+                        value={currentMetrics.costUsd > 0 ? (currentMetrics.indirectCostsUsd / currentMetrics.costUsd) * 100 : 0} 
+                        className="h-1 [&>div]:bg-orange-500"
+                      />
+                    </div>
+                    
+                    {/* Total */}
+                    <div className="pt-2 border-t border-gray-300">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Total</span>
+                        <span className="text-2xl font-bold text-red-600">${(currentMetrics.costUsd / 1000).toFixed(1)}k</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500 block mt-1">direct_costs • USD</span>
                   </div>
 
                   {/* Margen del mes y proyectado */}
