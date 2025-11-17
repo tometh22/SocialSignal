@@ -480,7 +480,7 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 
 /**
  * ETL: Costos directos e indirectos → fact_cost_month
- * Agrega TODOS los costos por período SIN FILTROS (incluye filas sin horas, indirectos, etc.)
+ * Separa DIRECTOS e INDIRECTOS según columna "Tipo de Costo"
  * Lee directamente columna R "Monto Total USD" y suma por período
  */
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
@@ -489,14 +489,18 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
   // Importar tabla y tipos
   const { factCostMonth } = await import('@shared/schema');
   
-  // Mapa para acumular costos por período
+  // Mapas para acumular costos DIRECTOS e INDIRECTOS por período
   const periodCosts = new Map<string, {
-    amountUSD: number;
-    amountARS: number;
-    rowCount: number;
+    directUSD: number;
+    directARS: number;
+    indirectUSD: number;
+    indirectARS: number;
+    directRows: number;
+    indirectRows: number;
   }>();
   
-  let processed = 0;
+  let processedDirect = 0;
+  let processedIndirect = 0;
   let skipped = 0;
   
   for (const row of rows) {
@@ -508,25 +512,58 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         continue;
       }
       
-      // 2) Leer montos USD y ARS directamente de columna R (sin recalcular, sin filtros)
+      // 2) Clasificar tipo de costo EXACTAMENTE como se especificó
+      const tipoCostoRaw = row['Tipo de Costo'] || row['Tipo de Coste'] || row['Tipo Costo'] || '';
+      const tipoCostoNorm = tipoCostoRaw.trim().toLowerCase();
+      
+      // DIRECTOS: "directo" o "costos directos e indirectos"
+      const isDirect = tipoCostoNorm === 'directo' || tipoCostoNorm === 'costos directos e indirectos';
+      
+      // INDIRECTOS: "indirecto"
+      const isIndirect = tipoCostoNorm === 'indirecto';
+      
+      // Si no es ni directo ni indirecto, saltar
+      if (!isDirect && !isIndirect) {
+        skipped++;
+        continue;
+      }
+      
+      // 3) Leer montos USD y ARS directamente de columna R
       const montoUSD = parseNum(row['Monto Total USD']);
       const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
       
-      // 3) Acumular por período (NO filtrar por tipo, horas, o persona)
+      // Validar que haya monto válido
+      if (montoUSD === 0 && montoARS === 0) {
+        skipped++;
+        continue;
+      }
+      
+      // 4) Inicializar acumulador del período si no existe
       if (!periodCosts.has(periodKey)) {
         periodCosts.set(periodKey, {
-          amountUSD: 0,
-          amountARS: 0,
-          rowCount: 0
+          directUSD: 0,
+          directARS: 0,
+          indirectUSD: 0,
+          indirectARS: 0,
+          directRows: 0,
+          indirectRows: 0
         });
       }
       
+      // 5) Acumular en el track correspondiente (DIRECTOS o INDIRECTOS)
       const acc = periodCosts.get(periodKey)!;
-      acc.amountUSD += montoUSD;
-      acc.amountARS += montoARS;
-      acc.rowCount++;
       
-      processed++;
+      if (isDirect) {
+        acc.directUSD += montoUSD;
+        acc.directARS += montoARS;
+        acc.directRows++;
+        processedDirect++;
+      } else if (isIndirect) {
+        acc.indirectUSD += montoUSD;
+        acc.indirectARS += montoARS;
+        acc.indirectRows++;
+        processedIndirect++;
+      }
       
     } catch (error) {
       console.error(`❌ Error procesando fila para costos agregados:`, error);
@@ -534,34 +571,52 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
     }
   }
   
-  // 4) Upsert agregados en fact_cost_month
+  // 6) Upsert agregados en fact_cost_month con DIRECTOS e INDIRECTOS separados
   console.log(`💾 [SoT ETL] Guardando ${periodCosts.size} períodos en fact_cost_month...`);
+  console.log(`   📊 Directos: ${processedDirect} filas | Indirectos: ${processedIndirect} filas | Saltados: ${skipped}`);
   
   for (const [periodKey, costs] of periodCosts) {
     // Asegurar que el período existe en dim_period
     await ensurePeriod(periodKey);
     
+    // Total para compatibilidad (amountUSD = directUSD + indirectUSD)
+    const totalUSD = costs.directUSD + costs.indirectUSD;
+    const totalARS = costs.directARS + costs.indirectARS;
+    const totalRows = costs.directRows + costs.indirectRows;
+    
     await db.insert(factCostMonth)
       .values({
         periodKey,
-        amountUSD: costs.amountUSD.toString(),
-        amountARS: costs.amountARS.toString(),
-        sourceRowsCount: costs.rowCount
+        directUSD: costs.directUSD.toString(),
+        directARS: costs.directARS.toString(),
+        indirectUSD: costs.indirectUSD.toString(),
+        indirectARS: costs.indirectARS.toString(),
+        amountUSD: totalUSD.toString(),
+        amountARS: totalARS.toString(),
+        sourceRowsCount: totalRows,
+        directRowsCount: costs.directRows,
+        indirectRowsCount: costs.indirectRows
       })
       .onConflictDoUpdate({
         target: [factCostMonth.periodKey],
         set: {
-          amountUSD: costs.amountUSD.toString(),
-          amountARS: costs.amountARS.toString(),
-          sourceRowsCount: costs.rowCount,
+          directUSD: costs.directUSD.toString(),
+          directARS: costs.directARS.toString(),
+          indirectUSD: costs.indirectUSD.toString(),
+          indirectARS: costs.indirectARS.toString(),
+          amountUSD: totalUSD.toString(),
+          amountARS: totalARS.toString(),
+          sourceRowsCount: totalRows,
+          directRowsCount: costs.directRows,
+          indirectRowsCount: costs.indirectRows,
           etlTimestamp: sql`now()`
         }
       });
     
-    console.log(`  ✅ ${periodKey}: $${costs.amountUSD.toFixed(2)} USD (${costs.rowCount} filas)`);
+    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos=$${costs.indirectUSD.toFixed(2)}, Total=$${totalUSD.toFixed(2)} USD`);
   }
   
-  console.log(`✅ [SoT ETL] Costos agregados: ${processed} filas procesadas, ${skipped} saltadas, ${periodCosts.size} períodos actualizados`);
+  console.log(`✅ [SoT ETL] Costos agregados: ${processedDirect} directos, ${processedIndirect} indirectos, ${skipped} saltados, ${periodCosts.size} períodos actualizados`);
 }
 
 // ==================== HECHOS: RC (RENDIMIENTO CLIENTE) ====================

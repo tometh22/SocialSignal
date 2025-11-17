@@ -1,0 +1,166 @@
+1) Restaurar DIRECTOS exactamente como antes
+
+En el ETL de costos (donde se procesa la hoja “Costos directos e indirectos”):
+
+Asegurarse de que la clasificación de tipo de costo sea SOLO por la columna "Tipo de Costo" del Excel (no por subtipo, ni categoría, ni nada raro):
+
+const tipoCostoRaw = row.tipoCosto ?? '';      // viene de columna "Tipo de Costo"
+const tipoCostoNorm = tipoCostoRaw.trim().toLowerCase();
+
+
+Definir DIRECTO con la misma lógica sencilla que tenías cuando funcionaba:
+
+const isDirect =
+  tipoCostoNorm === 'directo' ||
+  tipoCostoNorm === 'costos directos e indirectos';
+
+
+Solo esas filas DIRECTAS entran a la agregación de fact_cost_month (o la tabla/estructura que alimenta el dashboard ejecutivo). Nada de fallback, nada de magia:
+
+if (!isDirect) {
+  // NO tocar: estas filas NO son directas
+  rejected.push({ reason: 'not_directo', ...row });
+  return;
+}
+
+// Monto viene de "Monto Total USD" (columna R)
+const montoUsd = parseMoneySmart(row.montoTotalUsd); // misma función que antes
+
+if (montoUsd == null || montoUsd === 0) {
+  rejected.push({ reason: 'no_valid_amounts', ...row });
+  return;
+}
+
+// period_key tipo "2025-09"
+const periodKey = buildPeriodKey(row.año, row.mes);
+
+// Acumulás EXACTAMENTE como antes:
+const key = `${periodKey}|${row.cliente}|${row.proyecto}`;
+
+if (!directAgg[key]) {
+  directAgg[key] = {
+    periodKey,
+    clientName: row.cliente,
+    projectName: row.proyecto,
+    costUsdDirect: 0,
+  };
+}
+
+directAgg[key].costUsdDirect += montoUsd;
+
+
+Volver a escribir fact_cost_month SOLO con estos directAgg:
+
+// Antes de insertar, borrar período
+await db.delete(factCostMonth)
+  .where(eq(factCostMonth.periodKey, periodKey));
+
+// Insert masivo
+await db.insert(factCostMonth).values(
+  Object.values(directAgg).map(row => ({
+    periodKey: row.periodKey,
+    clientName: row.clientName,
+    projectName: row.projectName,
+    costUsdDirect: row.costUsdDirect,
+  }))
+);
+
+
+Con esto, los costos directos vuelven a ser idénticos a la suma de la columna R filtrada por Tipo de Costo = Directo / Costos directos e indirectos, tal como cuando coincidía con tu Excel.
+
+2) Sumar INDIRECTOS sin tocar los DIRECTOS
+
+Sobre esa misma lectura de filas:
+
+Definir INDIRECTO explícitamente:
+
+const isIndirect = tipoCostoNorm === 'indirecto';
+
+
+Agregar una segunda agregación independiente para indirectos, sin tocar la de directos:
+
+if (isIndirect) {
+  const montoUsd = parseMoneySmart(row.montoTotalUsd);
+
+  if (montoUsd == null || montoUsd === 0) {
+    rejected.push({ reason: 'no_valid_amounts', ...row });
+    return;
+  }
+
+  const periodKey = buildPeriodKey(row.año, row.mes);
+  const keyIndirect = `${periodKey}|${row.cliente}|${row.proyecto}`;
+
+  if (!indirectAgg[keyIndirect]) {
+    indirectAgg[keyIndirect] = {
+      periodKey,
+      clientName: row.cliente,
+      projectName: row.proyecto,
+      costUsdIndirect: 0,
+    };
+  }
+
+  indirectAgg[keyIndirect].costUsdIndirect += montoUsd;
+  return;
+}
+
+
+Persistir INDIRECTOS en una estructura separada, sin mezclar:
+
+Opción A: tabla aparte fact_cost_indirect_month.
+
+Opción B: mismas filas en fact_cost_month, pero con columnas separadas.
+
+Ejemplo con tabla aparte:
+
+await db.delete(factCostIndirectMonth)
+  .where(eq(factCostIndirectMonth.periodKey, periodKey));
+
+await db.insert(factCostIndirectMonth).values(
+  Object.values(indirectAgg).map(row => ({
+    periodKey: row.periodKey,
+    clientName: row.clientName,
+    projectName: row.projectName,
+    costUsdIndirect: row.costUsdIndirect,
+  }))
+);
+
+3) API / Dashboard: combinar directos + indirectos
+
+En el endpoint que alimenta el dashboard ejecutivo (por período):
+
+// 1) Leer directos
+const directRows = await db.select({
+  periodKey: factCostMonth.periodKey,
+  costDirectUSD: factCostMonth.costUsdDirect,
+})
+.where(eq(factCostMonth.periodKey, periodKey));
+
+// 2) Leer indirectos (si usás tabla aparte)
+const indirectRows = await db.select({
+  periodKey: factCostIndirectMonth.periodKey,
+  costIndirectUSD: factCostIndirectMonth.costUsdIndirect,
+})
+.where(eq(factCostIndirectMonth.periodKey, periodKey));
+
+// 3) Agregar totales
+const totalDirect = directRows.reduce((acc, r) => acc + (r.costDirectUSD ?? 0), 0);
+const totalIndirect = indirectRows.reduce((acc, r) => acc + (r.costIndirectUSD ?? 0), 0);
+
+return {
+  period: periodKey,
+  costs: {
+    directUSD: totalDirect,
+    indirectUSD: totalIndirect,
+    totalUSD: totalDirect + totalIndirect,
+  },
+  // resto de métricas…
+};
+
+
+Resumen:
+
+Paso 1: Restaurar EXACTAMENTE la lógica de directos (solo Tipo de Costo = Directo / Costos directos e indirectos + columna R).
+
+Paso 2: Agregar un segundo “track” para indirectos, totalmente separado.
+
+Paso 3: En el dashboard, mostrar directos, indirectos y total, pero sin volver a tocar la regla de selección de directos.

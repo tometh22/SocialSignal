@@ -2598,17 +2598,27 @@ export const insertFactLaborMonthSchema = createInsertSchema(factLaborMonth).omi
 export type FactLaborMonth = typeof factLaborMonth.$inferSelect;
 export type InsertFactLaborMonth = z.infer<typeof insertFactLaborMonthSchema>;
 
-// Hechos: Costos totales por período (suma directa Col R del Excel, sin filtros)
+// Hechos: Costos totales por período (suma directa Col R del Excel, separado por tipo)
 export const factCostMonth = pgTable("fact_cost_month", {
   id: serial("id").primaryKey(),
   periodKey: varchar("period_key", { length: 7 }).notNull().references(() => dimPeriod.periodKey),
   
-  // Montos agregados por período (suma directa de columna R del Excel)
+  // Costos DIRECTOS (Tipo de Costo = "Directo" o "Costos directos e indirectos")
+  directUSD: numeric("direct_usd", { precision: 14, scale: 2 }).notNull().default('0'),
+  directARS: numeric("direct_ars", { precision: 14, scale: 2 }).notNull().default('0'),
+  
+  // Costos INDIRECTOS (Tipo de Costo = "Indirecto")
+  indirectUSD: numeric("indirect_usd", { precision: 14, scale: 2 }).notNull().default('0'),
+  indirectARS: numeric("indirect_ars", { precision: 14, scale: 2 }).notNull().default('0'),
+  
+  // Montos totales (deprecated - usar directUSD + indirectUSD)
   amountUSD: numeric("amount_usd", { precision: 14, scale: 2 }).notNull().default('0'),
   amountARS: numeric("amount_ars", { precision: 14, scale: 2 }).default('0'),
   
   // Auditoría
   sourceRowsCount: integer("source_rows_count").default(0),
+  directRowsCount: integer("direct_rows_count").default(0),
+  indirectRowsCount: integer("indirect_rows_count").default(0),
   etlTimestamp: timestamp("etl_timestamp").notNull().defaultNow(),
 }, (table) => ({
   uniquePeriod: unique().on(table.periodKey)

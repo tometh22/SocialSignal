@@ -4987,14 +4987,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 2. Costos separados por tipo (directos e indirectos) desde direct_costs
+      // 2. Costos separados por tipo (directos e indirectos) desde fact_cost_month
       const { rows: [costsData] } = await pool.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN tipo_gasto = 'Directo' THEN monto_total_usd ELSE 0 END), 0) as direct_costs_usd,
-          COALESCE(SUM(CASE WHEN tipo_gasto = 'Indirecto' THEN monto_total_usd ELSE 0 END), 0) as indirect_costs_usd,
-          COALESCE(SUM(monto_total_usd), 0) as total_cost_usd
-        FROM direct_costs
-        WHERE month_key = ANY($1)
+          COALESCE(SUM(direct_usd), 0) as direct_costs_usd,
+          COALESCE(SUM(indirect_usd), 0) as indirect_costs_usd,
+          COALESCE(SUM(direct_usd + indirect_usd), 0) as total_cost_usd
+        FROM fact_cost_month
+        WHERE period_key = ANY($1)
       `, [periodKeys]);
       
       // 3. Horas billable/non-billable
