@@ -1,0 +1,289 @@
+Checklist robusto para validar que TODO quedó bien
+(en costos directos + indirectos, ETL, API y dashboards)
+
+Úsalo en este orden. No saltees pasos.
+
+1. Verificación rápida en Excel (fuente de verdad)
+
+Abrí el Excel MAESTRO.
+
+Hoja “Costos directos e indirectos”:
+
+Filtrá por:
+
+Año = 2025
+
+Mes = por ejemplo: 05 may, 08 ago, 09 sep (meses que sabés que tienen actividad)
+
+Para cada mes elegido:
+
+Filtrá “Tipo de Costo”:
+
+Directo
+
+Costos directos e indirectos
+
+Sumá columna R “Monto Total USD” y anotá:
+
+directos_Excel_[mes] = TOTAL USD
+
+Si ya tenés indirectos cargados:
+
+Filtrá “Tipo de Costo” = Indirecto
+
+Sumá columna R y anotá:
+
+indirectos_Excel_[mes] = TOTAL USD
+
+Esos números son el patrón oro. Todo lo demás tiene que converger a eso.
+
+2. Verificar que el ETL corrió y no falló
+
+Ejecutá el ETL de SoT (el que llena fact_cost_month y/o fact_cost_indirect_month) para un set de meses, por ejemplo:
+
+2025-05 (Huggies)
+
+2025-08
+
+2025-09
+
+Revisá logs:
+
+Sin errores de:
+
+Google Sheets
+
+parser de costos
+
+inserciones en DB (Drizzle / SQL)
+
+Verificá que aparezcan líneas tipo:
+
+COST PARSER: Completed batch parse - XXX valid, YYY skipped
+
+fact_cost_month: upsert for period 2025-09 completed
+
+Si el ETL falla acá, no sigas al resto. Se corrige primero.
+
+3. Chequeo en base de datos: costos directos
+
+Para cada mes de prueba:
+
+En DB, consultá fact_cost_month (o como se llame tu tabla agregada de directos):
+
+SELECT
+  period_key,
+  ROUND(SUM(cost_usd_direct), 2) AS total_direct_usd
+FROM fact_cost_month
+WHERE period_key IN ('2025-05', '2025-08', '2025-09')
+GROUP BY period_key
+ORDER BY period_key;
+
+
+Compará:
+
+total_direct_usd vs directos_Excel_[mes] del paso 1.
+
+Debe ser igual (o con diferencia mínima de redondeo centavos).
+
+Si no coincide:
+
+Revisá:
+
+¿estás sumando la columna correcta? (cost_usd_direct y no otra).
+
+¿el filtro de Tipo de Costo en el parser/ETL es exactamente:
+
+'directo'
+
+'costos directos e indirectos'
+y nada más.
+
+4. Chequeo en base de datos: costos indirectos (si los estás usando)
+
+En DB, consultá la tabla de indirectos (según el diseño que hayas adoptado):
+
+SELECT
+  period_key,
+  ROUND(SUM(cost_usd_indirect), 2) AS total_indirect_usd
+FROM fact_cost_indirect_month
+WHERE period_key IN ('2025-05', '2025-08', '2025-09')
+GROUP BY period_key
+ORDER BY period_key;
+
+
+Compará:
+
+total_indirect_usd vs indirectos_Excel_[mes] del Excel (si los tenés).
+
+Si no usás aún indirectos en Excel, el total debería ser 0 para esos meses.
+
+5. Chequeo por proyecto clave (Huggies, Warner, etc.)
+
+Para cada cliente/proyecto importante:
+
+En Excel:
+
+Filtrá por Año, Mes, Cliente, Proyecto.
+
+Sumá columna R “Monto Total USD”.
+
+Ejemplo:
+
+Cliente: Kimberly Clark
+
+Proyecto: Fee Huggies
+
+Mes: 05 may 2025
+
+Guardá: huggies_may_Excel = …
+
+En DB (directos):
+
+SELECT
+  period_key,
+  client_name,
+  project_name,
+  ROUND(SUM(cost_usd_direct), 2) AS cost_direct_usd
+FROM fact_cost_month
+WHERE period_key = '2025-05'
+  AND client_name ILIKE '%huggies%' -- o nombre canonizado
+GROUP BY period_key, client_name, project_name;
+
+
+Compará cost_direct_usd con huggies_may_Excel.
+
+Hacé lo mismo con un proyecto de Warner, PeYa, etc., para chequear que la lógica general está bien, no solo Huggies.
+
+6. Chequeo del endpoint de costos (API)
+
+Endpoint global de costos por período (ejemplo /api/costs?period=2025-09):
+
+Verificá que el JSON incluya algo como:
+
+{
+  "portfolioCostUSD": 34533.12,
+  "projects": [
+    {
+      "client": "Kimberly Clark",
+      "project": "Fee Huggies",
+      "costUSDNormalized": 394.87
+    }
+  ]
+}
+
+
+portfolioCostUSD debe ser:
+
+total_direct_usd [+ total_indirect_usd si ya los sumás]
+del query de DB del paso 3 y 4.
+
+Elegí un proyecto y verificá:
+
+costUSDNormalized vs suma de cost_usd_direct (y indirect si aplica) en DB.
+
+7. Chequeo del endpoint del dashboard ejecutivo
+
+Llamá al endpoint que alimenta el dashboard ejecutivo, por ejemplo:
+
+/api/dashboard/executive-summary?period=2025-09
+
+o la variante que uses.
+
+Verificá en la respuesta:
+
+Campo de costos directos:
+
+Debe coincidir con total_direct_usd.
+
+Campo de costos indirectos (si ya está implementado):
+
+Debe coincidir con total_indirect_usd.
+
+Campo de total costos:
+
+direct + indirect.
+
+Revisá que no haya campos en null cuando sepas que hay data en DB.
+
+8. Chequeo visual en el dashboard (frontend)
+
+En la UI del dashboard ejecutivo:
+
+Elegí un mes con datos fuertes (ej. 2025-05, 2025-09).
+
+Verificá:
+
+Card de costos totales.
+
+Si tenés cards separadas:
+
+“Costos directos” = total_direct_usd
+
+“Costos indirectos” = total_indirect_usd
+
+“Costo total” = suma.
+
+Comprobá que los números matchean el API (paso 7) y el Excel (paso 1).
+
+Probá varios períodos:
+
+Un mes con data (debe mostrar valores).
+
+Un mes sin data (debe mostrar 0 de forma limpia, sin NaN ni errores).
+
+9. Chequeo de tabla de rechazos (si la estás usando)
+
+En DB, consultá costos_rechazados:
+
+SELECT reason, COUNT(*) AS rows, ROUND(SUM(amount_usd), 2) AS total_usd
+FROM costos_rechazados
+GROUP BY reason
+ORDER BY rows DESC;
+
+
+Confirmá:
+
+no_tipo_no_subtipo son realmente filas sin “Tipo de Costo” (y sabés que falta clasificar en Excel).
+
+not_directo coincide con filas de Excel marcadas como Indirecto o similares.
+
+missing_clientName coincide con filas sin Cliente en el Excel.
+
+Importante:
+
+Asegurate de que no haya filas rechazadas con motivo raro tipo parser_bug, overflow, etc.
+
+Si aparecen, ahí sí hay código mal.
+
+10. Test de regresión: volver a un estado viejo conocido
+
+Usá un mes donde ANTES de todo esto sabés que:
+
+El dashboard mostraba el número correcto.
+
+Podés replicar el valor desde Excel.
+
+Ejemplo: si mayo 2025 Huggies era un caso que ya confiabas:
+
+Repetí pasos 1–9 solo para mayo 2025.
+
+Confirmá:
+
+Excel = DB = API = Dashboard.
+
+Si ese mes “histórico bueno” vuelve a cerrar, sabés que no rompiste nada hacia atrás.
+
+Con este checklist:
+
+Validás fuente de verdad (Excel).
+
+Validás ETL (tablas agregadas).
+
+Validás API (costs + executive).
+
+Validás UI.
+
+Y tenés un radar de calidad de datos vía costos_rechazados.
+
+Si querés, después te armo queries concretas y payloads ejemplo para cada paso usando nombres exactos de tus tablas y endpoints.
