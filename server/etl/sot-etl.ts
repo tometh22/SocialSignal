@@ -1020,9 +1020,10 @@ export async function executeSoTETL(
     // 1. Procesar labor (costos directos con horas - fact_labor_month)
     await processDirectCostsToFactLabor(filteredCostos);
     
-    // 1b. Procesar costos agregados por período (TODOS los costos directos - fact_cost_month)
+    // 1b. Procesar costos agregados por período (TODOS los costos: directos E indirectos - fact_cost_month)
+    // La función processCostsByPeriod() separa internamente directos vs indirectos
     // Incluye Equipo, Coordinación, QA, Admin, etc. - Match 1:1 con Columna R del Excel
-    await processCostsByPeriod(filteredCostosDirectos);
+    await processCostsByPeriod(filteredCostos); // ← CAMBIADO: pasar filteredCostos (todos) en vez de filteredCostosDirectos
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);
