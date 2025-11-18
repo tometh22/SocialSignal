@@ -980,8 +980,6 @@ export async function executeSoTETL(
         row['Tipo de Costo'] ?? 
         row['Tipo de Coste'] ?? 
         row['Tipo Costo'] ?? 
-        row['Tipo de Gasto'] ??  // ← AÑADIDO
-        row['Tipo Gasto'] ??     // ← AÑADIDO
         ''
       );
       
