@@ -5018,20 +5018,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 5. WIP simple (horas billables * rate promedio - facturado)
-      // Para calcular rate promedio usamos: costos / horas billables como proxy
-      const billableHours = parseFloat(hoursData?.billable_hours || '0');
+      // ===== NUEVO MODELO: INGRESOS OPERATIVOS (Fees + One-Shot devengado) =====
+      // Obtener data de income_sot para separar Fees de One-Shots
+      const { rows: incomeRows } = await pool.query(`
+        SELECT 
+          project_id,
+          contract_value_usd,
+          estimated_hours,
+          type as project_type
+        FROM income_sot
+        WHERE project_id IS NOT NULL
+      `);
+      
+      // Construir mapa de proyectos: tipo y contrato
+      const projectMap = new Map<number, { type: string, contractUsd: number, estimatedHours: number }>();
+      for (const row of incomeRows) {
+        projectMap.set(row.project_id, {
+          type: row.project_type || 'fee',
+          contractUsd: parseFloat(row.contract_value_usd || '0'),
+          estimatedHours: parseFloat(row.estimated_hours || '0')
+        });
+      }
+      
+      // Obtener horas por proyecto del período
+      const { rows: hoursByProject } = await pool.query(`
+        SELECT 
+          project_id,
+          COALESCE(SUM(asana_hours), 0) as hours_asana
+        FROM fact_labor_month
+        WHERE period_key = ANY($1)
+        GROUP BY project_id
+      `, [periodKeys]);
+      
+      // Calcular ingreso operativo: Fees (tal cual) + One-Shot (devengado)
+      let operativeIncomeUsd = 0;
+      for (const hourRow of hoursByProject) {
+        const projectData = projectMap.get(hourRow.project_id);
+        if (!projectData) continue;
+        
+        if (projectData.type.toLowerCase() === 'fee') {
+          // FEES: contract_value_usd tal cual (mensual)
+          operativeIncomeUsd += projectData.contractUsd;
+        } else if (projectData.type.toLowerCase() === 'one-shot' && projectData.estimatedHours > 0) {
+          // ONE-SHOT: contrato × (horas_mes / horas_estimadas)
+          const progressRatio = Math.min(hourRow.hours_asana / projectData.estimatedHours, 1.0);
+          operativeIncomeUsd += projectData.contractUsd * progressRatio;
+        }
+      }
+      
+      // ===== COSTOS (directos e indirectos de fact_cost_month) =====
       const directCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
       const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
       const costUsd = parseFloat(costsData?.total_cost_usd || '0');
-      const billedUsd = parseFloat(billingData?.billed_usd || '0');
-      const avgHourlyRate = billableHours > 0 ? (costUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
-      const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
       
-      // NUEVO: Devengado = facturado + WIP (revenue recognition)
-      const devengadoUsd = billedUsd + wipUsd;
-      const marginContableUsd = billedUsd - costUsd;    // Margen contable: facturado - costos
-      const marginEconomicoUsd = devengadoUsd - costUsd; // Margen económico: devengado - costos
+      // ===== EBIT Y MÁRGENES OPERATIVOS =====
+      const ebitUsd = operativeIncomeUsd - directCostsUsd - indirectCostsUsd;
+      const marginOperativoUsd = ebitUsd; // EBIT is the operational margin
+      const operativeMarginPct = operativeIncomeUsd > 0 ? (ebitUsd / operativeIncomeUsd) * 100 : 0;
+      const markupOperativoUsd = directCostsUsd > 0 ? (operativeIncomeUsd / directCostsUsd) : 0;
+      
+      // ===== FACTURADO (desde fact_rc_month - solo para referencia) =====
+      const billedUsd = parseFloat(billingData?.billed_usd || '0');
       
       // ===== OPERATIONAL METRICS =====
       
@@ -5197,16 +5244,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availablePeriods: periodsInfo.availablePeriods,
         
         financial: {
-          billedUsd: billedUsd,
-          devengadoUsd: devengadoUsd,
-          wipUsd: wipUsd,
-          costUsd: costUsd,
-          directCostsUsd: directCostsUsd,
-          indirectCostsUsd: indirectCostsUsd,
-          marginContableUsd: marginContableUsd,        // facturado - costos
-          marginEconomicoUsd: marginEconomicoUsd,      // devengado - costos
-          marginUsd: marginContableUsd,                // mantener compatibilidad
-          projectedMarginPct: (billedUsd + wipUsd) > 0 ? ((billedUsd + wipUsd - costUsd) / (billedUsd + wipUsd)) : 0,
+          operativeIncomeUsd: operativeIncomeUsd,      // Ingresos operativos (Fees + One-Shot devengado)
+          billedUsd: billedUsd,                         // Facturado real (referencia)
+          directCostsUsd: directCostsUsd,              // Costos directos
+          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos
+          costUsd: costUsd,                            // Total costos
+          ebitUsd: ebitUsd,                            // EBIT = Ingreso Operativo - Costos
+          marginOperativoUsd: marginOperativoUsd,      // Margen operativo (EBIT)
+          operativeMarginPct: operativeMarginPct,      // % Margen operativo
+          markupOperativoUsd: markupOperativoUsd,      // Markup operativo = Ingreso / Costos Directos
           fxWeighted: fxWeighted
         },
         

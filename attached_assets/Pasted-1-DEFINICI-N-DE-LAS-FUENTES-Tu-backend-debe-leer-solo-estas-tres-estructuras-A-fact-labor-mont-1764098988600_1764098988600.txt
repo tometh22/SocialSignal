@@ -1,0 +1,188 @@
+1. DEFINICIÓN DE LAS FUENTES
+
+Tu backend debe leer solo estas tres estructuras:
+
+(A) fact_labor_month
+
+Horas × rates × persona × proyecto × mes
+Esto te da costos directos reales del mes.
+
+(B) fact_rc_month
+
+Ingresos reales facturados (“Rendimiento Cliente”).
+Se usa SOLO para mostrar lo facturado, NO para medir operación.
+
+(C) income_sot (cotizaciones)
+
+contract_value_usd
+
+estimated_hours
+
+tipo (“fee”, “one-shot”)
+
+project_id
+
+2. QUÉ CALCULA LA APP (NUEVO DISEÑO CORRECTO)
+2.1 INGRESO OPERATIVO DEL MES
+
+Debe ser:
+
+ingreso_operativo_mes =
+    SUM(fee_mensuales) +
+    SUM(devengado_one_shot_mes)
+
+(A) Fees
+fee_mensual = contract_value_usd (si es fee)
+
+
+(no se prorratea, ya es mensual)
+
+(B) One Shot (devengado)
+avance_mes = horas_mes / horas_estimadas_totales
+devengado_mes = contract_value_usd * avance_mes
+
+3. COSTOS DEL MES
+3.1 Costos Directos
+
+Vienen de fact_labor_month.
+
+costos_directos_mes = SUM(cost_usd_labor)
+
+3.2 Costos Indirectos
+
+De la hoja “Costos directos e indirectos” (Excel), columna “Tipo de Costo = Indirecto”.
+
+El sistema debe:
+
+cargar indirectos en una tabla indirect_cost_month
+
+agrupar por mes
+
+sumar:
+
+costos_indirectos_mes = SUM(costos_indirectos_usd)
+
+4. EBIT DEL MES
+
+La app debe mostrar:
+
+ebit = ingreso_operativo_mes
+       - costos_directos_mes
+       - costos_indirectos_mes
+
+5. MARGEN OPERATIVO
+margen_operativo = ebit / ingreso_operativo_mes
+
+6. UTILIDAD NETA (si querés hacerla igual al admin)
+
+Solo si querés igualar su informe:
+
+utilidad_neta = ebit
+                - provisiones
+                - impuestos (si los cargás)
+
+
+Pero NO es necesaria para tu dashboard operativo.
+
+7. MAR­K­UP PROMEDIO (EL QUE IMPORTA)
+
+El markup operativo REAL del mes debe ser:
+
+markup = ingreso_operativo_mes / costos_directos_mes
+
+
+No uses facturado. No uses one-shot enteros.
+Solo operación real del mes.
+
+8. LISTA EXACTA DE CAMPOS QUE EL ETL DEBE PRODUCIR
+
+Para cada proyecto/mes, la app necesita:
+
+Desde fact_labor_month:
+
+hours_asana
+
+hours_billing
+
+cost_usd_labor
+
+person_id
+
+project_id
+
+Desde income_sot:
+
+contract_value_usd
+
+estimated_hours
+
+project_type (“fee”, “one-shot”)
+
+Desde costos_indirectos_month:
+
+cost_usd_indirecto
+
+Desde fact_rc_month:
+
+revenue_usd (solo para “Facturado del mes”)
+
+9. PIPELINE EXACTO DEL BACKEND (PSEUDOCÓDIGO)
+for each project in period:
+    read labor = fact_labor_month
+    read contract = income_sot
+    read indirectos_mes = indirect_cost_month
+
+    if contract.type == "fee":
+        ingreso_mes = contract.contract_value_usd
+    else if contract.type == "one-shot":
+        avance_mes = labor.hours_this_month / contract.estimated_hours
+        ingreso_mes = contract.contract_value_usd * avance_mes
+
+    costos_directos = SUM(labor.cost_usd_labor)
+    costos_indirectos = indirectos_mes
+
+    ebit = ingreso_mes - costos_directos - costos_indirectos
+
+
+Luego sumar:
+
+ingreso_operativo_total = SUM(ingreso_mes)
+costos_directos_total = SUM(costos_directos)
+costos_indirectos_total = SUM(costos_indirectos)
+ebit_total = ingreso_operativo_total - costos_directos_total - costos_indirectos_total
+margen_total = ebit_total / ingreso_operativo_total
+markup_total = ingreso_operativo_total / costos_directos_total
+facturado_total = SUM(fact_rc_month.revenue_usd)
+
+10. CHECKLIST FINAL (OBLIGATORIO)
+A. Fees
+
+[ ] ¿Cada fee mensual entra tal cual?
+[ ] ¿No se está usando facturado para fees?
+
+B. One Shot
+
+[ ] ¿Se calcula avance_mes = horas_mes / horas_estimadas_totales?
+[ ] ¿Devengado_mes = contrato × avance?
+[ ] ¿Los meses sin horas → ingreso 0?
+
+C. Costos directos
+
+[ ] ¿fact_labor_month entrega todos los costos?
+[ ] ¿No se mezclan costos indirectos acá?
+
+D. Costos indirectos
+
+[ ] ¿Se cargan de Excel?
+[ ] ¿Se agrupan por mes?
+[ ] ¿Se suman por fuera de los directos?
+
+E. EBIT
+
+[ ] ¿EBIT = ingresos – directos – indirectos?
+
+F. Dashboards
+
+[ ] ¿Facturado viene de fact_rc_month?
+[ ] ¿Operación viene del modelo económico?
+[ ] ¿No estás usando el pipeline de “Proyectos confirmados y estimados”?
