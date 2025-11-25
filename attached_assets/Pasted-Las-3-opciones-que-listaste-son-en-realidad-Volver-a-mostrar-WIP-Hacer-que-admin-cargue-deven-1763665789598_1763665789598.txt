@@ -1,0 +1,226 @@
+Las 3 “opciones” que listaste son, en realidad:
+
+Volver a mostrar WIP.
+
+Hacer que admin cargue devengado.
+
+Aceptar que el margen se vea mal.
+
+Las opciones 2 y 3 son malas prácticas de gestión para una empresa de servicios seria. La 1 es el camino, pero bien hecho, no solo “reponer la card”.
+
+2. Modelo correcto para tu app: dos columnas de ingreso, un puente
+
+Definí dos métricas distintas y convivientes:
+
+ingreso_facturado → lo que viene del Excel (billedUsd).
+
+ingreso_económico (devengado) → lo que tu motor estima como valor del trabajo realizado.
+
+Relación entre ambas vía WIP:
+
+A nivel proyecto, acumulado:
+
+devengado_acum = costo_acum × markup (hoy usás 2.5 como factor)
+
+facturado_acum = suma de facturas
+
+WIP = devengado_acum − facturado_acum
+(positivo → valor generado y no facturado; negativo → facturaste de más vs avance).
+
+A nivel mes:
+
+Llamá WIP_t al WIP al cierre del mes t y WIP_{t−1} al del mes previo.
+
+Fórmula estándar de revenue recognition por WIP:
+
+devengado_mes = facturado_mes + (WIP_t − WIP_{t−1})
+
+Después:
+
+margen_económico_mes = devengado_mes − costo_mes
+margen_contable_mes = facturado_mes − costo_mes
+
+Con esta lógica:
+
+No le pedís al admin que cargue “devengado”.
+
+Usás horas × costo × factor de contribución como proxy sistemático del valor creado.
+
+El socio sigue viendo solo facturado.
+
+Vos ves la película económica real, limpia del timing de facturas.
+
+3. Cómo aterrizarlo en tu app con lo que ya tenés
+3.1. A nivel código / datos
+
+Ya tenés:
+
+const billedUsd = parseFloat(billingData?.billed_usd || '0');  // facturado
+// WIP ya calculado internamente con horas * rate * 2.5 - facturado
+
+
+Necesitás tres capas por proyecto y por mes:
+
+Costos
+
+costMonthUsd = suma de costos directos + indirectos del proyecto en ese mes.
+
+Ya lo tenés en tu módulo de costos.
+
+Facturado
+
+billedMonthUsd = suma de facturas de ese proyecto en ese mes (lo que hoy llamás billedUsd a nivel agregado).
+
+WIP
+
+wip_acum_mes = fórmula actual (horas_billables_acum × rate_prom × 2.5 − facturado_acum).
+
+Guardar también wip_acum_mes_anterior (mes t−1) para el cálculo de delta.
+
+Entonces:
+
+const revenueFacturadoMes = billedMonthUsd;
+
+const wipAcumMes = ... // ya lo tenés
+const wipAcumMesAnterior = ... // calcular igual, pero cortando al final del mes anterior
+
+const revenueDevengadoMes = revenueFacturadoMes + (wipAcumMes - wipAcumMesAnterior);
+
+const marginContableMes  = revenueFacturadoMes - costMonthUsd;
+const marginEconomicoMes = revenueDevengadoMes - costMonthUsd;
+
+
+Con esto alimentás el dashboard ejecutivo.
+
+3.2. One-shot
+
+No usés más p.lifetimeRevenueUSD como “truco” para que no se vea vacío.
+
+Usalo así:
+
+En la vista de proyecto:
+
+Mostrar:
+
+valor_contrato_total (lifetime)
+
+devengado_acum
+
+facturado_acum
+
+WIP_actual = devengado_acum − facturado_acum
+
+En la vista mensual:
+
+El proyecto aporta:
+
+revenueFacturadoMes
+
+revenueDevengadoMes
+
+costMonthUsd
+
+márgenes correspondientes.
+
+Para calcular devengado_acum de un one-shot, tenés dos caminos:
+
+Usar tu proxy actual (horas × rate × 2.5).
+
+Si tenés valor_contrato_total y horas_estimadas_totales, definir:
+
+avance_% = min(horas_acum / horas_estimadas_totales, 1)
+
+devengado_acum = valor_contrato_total × avance_%
+
+Ambos enfoques evitan input manual del admin y se basan en horas reales de la operación.
+
+4. Cómo se ve en el dashboard sin mezclar peras con manzanas
+4.1. Dashboard Ejecutivo
+
+Bloques separados, no mezclados.
+
+Bloque “Visión Contable (Facturado)”
+
+Ingresos facturados mes
+
+Costos mes
+
+Margen contable
+
+Gráfico barras por mes (ingresos facturados vs costos).
+
+Bloque “Visión Económica (Devengado)”
+
+Ingresos devengados mes
+
+Costos mes
+
+Margen económico
+
+Gráfico barras por mes (devengado vs costos).
+
+Ranking de proyectos por margen económico del mes.
+
+Bloque “Puente Facturado ↔ Devengado (WIP)”
+
+KPIs:
+
+WIP total activo (valor en curso no facturado)
+
+Ingresos diferidos (si facturaste por adelantado; WIP negativo)
+
+Fórmula visible en un tooltip o glosario:
+
+Devengado mes = Facturado mes + ΔWIP
+
+Gráfico de líneas del WIP acumulado en el tiempo.
+
+4.2. Vista por Proyecto
+
+Para cada proyecto:
+
+Datos clave:
+
+Tipo: Fee / One Shot.
+
+Valor contrato (o fee mensual).
+
+Fecha inicio / fin.
+
+Métricas actuales:
+
+Costo_mes, Costo_acum.
+
+Facturado_mes, Facturado_acum.
+
+Devengado_mes, Devengado_acum.
+
+WIP_actual.
+
+Derivados:
+
+% avance económico = devengado_acum / valor_contrato_total.
+
+% facturado = facturado_acum / valor_contrato_total.
+
+Esta vista explica al socio por qué el proyecto A “parece” en pérdida contable en agosto, pero está sano en términos económicos.
+
+5. Evaluación de tus 3 opciones originales
+
+Restaurar WIP sin más
+Insuficiente si seguís mostrando solo margen contable.
+Correcto solo si lo integrás en la fórmula de devengado_mes = facturado_mes + ΔWIP.
+
+Pedir que carguen devengados en Excel
+Malo. Duplica trabajo, introduce subjetividad mensual, va contra el pedido del socio.
+
+Dejar todo como está
+Inútil para gestión. Te impide saber si el negocio gana o pierde de verdad.
+
+La solución correcta es:
+
+Mantener Excel como fuente exclusiva de facturación/cobros (socio tranquilo).
+
+Usar horas y costos ya existentes para calcular devengado y WIP de forma automática.
+
+Exponer en el dashboard dos márgenes (contable y económico) y el puente por WIP.

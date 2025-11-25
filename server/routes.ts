@@ -5028,6 +5028,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const avgHourlyRate = billableHours > 0 ? (costUsd / billableHours) * 2.5 : 0; // markup 2.5x como estimado
       const wipUsd = Math.max((billableHours * avgHourlyRate) - billedUsd, 0);
       
+      // NUEVO: Devengado = facturado + WIP (revenue recognition)
+      const devengadoUsd = billedUsd + wipUsd;
+      const marginContableUsd = billedUsd - costUsd;    // Margen contable: facturado - costos
+      const marginEconomicoUsd = devengadoUsd - costUsd; // Margen económico: devengado - costos
+      
       // ===== OPERATIONAL METRICS =====
       
       // 6. Personas activas (en cualquier mes del rango)
@@ -5193,11 +5198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         financial: {
           billedUsd: billedUsd,
+          devengadoUsd: devengadoUsd,
           wipUsd: wipUsd,
           costUsd: costUsd,
           directCostsUsd: directCostsUsd,
           indirectCostsUsd: indirectCostsUsd,
-          marginUsd: billedUsd - costUsd,
+          marginContableUsd: marginContableUsd,        // facturado - costos
+          marginEconomicoUsd: marginEconomicoUsd,      // devengado - costos
+          marginUsd: marginContableUsd,                // mantener compatibilidad
           projectedMarginPct: (billedUsd + wipUsd) > 0 ? ((billedUsd + wipUsd - costUsd) / (billedUsd + wipUsd)) : 0,
           fxWeighted: fxWeighted
         },

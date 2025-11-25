@@ -66,15 +66,18 @@ export default function ExecutiveDashboard() {
     staleTime: 10 * 60 * 1000
   });
 
-  // Métricas consolidadas del mes actual (Star Schema SoT) - Mejoradas con Facturado/WIP
+  // Métricas consolidadas del mes actual (Star Schema SoT) - Modelo híbrido contable + económico
   const currentMetrics = useMemo(() => {
     if (!dashboardMetrics) {
       return {
         billedUsd: 0,
+        devengadoUsd: 0,
         wipUsd: 0,
         costUsd: 0,
         directCostsUsd: 0,
         indirectCostsUsd: 0,
+        marginContableUsd: 0,
+        marginEconomicoUsd: 0,
         marginUsd: 0,
         projectedMarginPct: 0,
         fxWeighted: 0,
@@ -90,10 +93,13 @@ export default function ExecutiveDashboard() {
     
     return {
       billedUsd: dashboardMetrics.financial?.billedUsd || 0,
+      devengadoUsd: dashboardMetrics.financial?.devengadoUsd || 0,
       wipUsd: dashboardMetrics.financial?.wipUsd || 0,
       costUsd: dashboardMetrics.financial?.costUsd || 0,
       directCostsUsd: dashboardMetrics.financial?.directCostsUsd || 0,
       indirectCostsUsd: dashboardMetrics.financial?.indirectCostsUsd || 0,
+      marginContableUsd: dashboardMetrics.financial?.marginContableUsd || 0,
+      marginEconomicoUsd: dashboardMetrics.financial?.marginEconomicoUsd || 0,
       marginUsd: dashboardMetrics.financial?.marginUsd || 0,
       projectedMarginPct: dashboardMetrics.financial?.projectedMarginPct || 0,
       fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
@@ -455,28 +461,60 @@ export default function ExecutiveDashboard() {
                     <span className="text-xs text-gray-500 block mt-1">direct_costs • USD</span>
                   </div>
 
-                  {/* Margen del mes */}
-                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                  {/* Visión Contable - Margen Real */}
+                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Margen del mes</span>
-                      {currentMetrics.marginUsd >= 0 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Margen Contable</span>
+                        <span className="text-xs text-gray-400" title="Facturado real - Costos">ⓘ</span>
+                      </div>
+                      {currentMetrics.marginContableUsd >= 0 ? (
                         <TrendingUp className="h-4 w-4 text-green-600" />
                       ) : (
                         <TrendingDown className="h-4 w-4 text-red-600" />
                       )}
                     </div>
-                    <div className={`text-3xl font-bold ${currentMetrics.marginUsd >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.marginUsd / 1000).toFixed(1)}k
+                    <div className={`text-3xl font-bold ${currentMetrics.marginContableUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.marginContableUsd / 1000).toFixed(1)}k
                     </div>
-                    <div className="mt-2 space-y-1">
-                      <span className="text-xs text-gray-500 block">Facturado - Costos totales</span>
-                      {currentMetrics.billedUsd > 0 && (
-                        <div className="text-xs text-gray-400">
-                          Margen: {((currentMetrics.marginUsd / currentMetrics.billedUsd) * 100).toFixed(1)}%
-                        </div>
+                    <span className="text-xs text-gray-500 block mt-1">Facturado - Costos totales</span>
+                  </div>
+                  
+                  {/* Visión Económica - Margen Devengado */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Margen Económico</span>
+                        <span className="text-xs text-gray-400" title="Devengado (facturado + WIP) - Costos">ⓘ</span>
+                      </div>
+                      {currentMetrics.marginEconomicoUsd >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
                       )}
                     </div>
+                    <div className={`text-3xl font-bold ${currentMetrics.marginEconomicoUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.marginEconomicoUsd / 1000).toFixed(1)}k
+                    </div>
+                    <span className="text-xs text-gray-500 block mt-1">Devengado - Costos totales</span>
                   </div>
+                  
+                  {/* Puente: WIP */}
+                  {currentMetrics.wipUsd > 0 && (
+                    <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-600">Valor Pendiente (WIP)</span>
+                          <span className="text-xs text-gray-400" title="Trabajo realizado no facturado aún">ⓘ</span>
+                        </div>
+                        <Clock className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        ${(currentMetrics.wipUsd / 1000).toFixed(1)}k
+                      </div>
+                      <span className="text-xs text-gray-500 block mt-1">Devengado = Facturado + WIP</span>
+                    </div>
+                  )}
 
                 </div>
 
