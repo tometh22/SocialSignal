@@ -60,26 +60,37 @@ export default function ExecutiveDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, [temporalFilter]);
 
-  // Build query params from temporal filter
+  // Build query params from temporal filter - ALWAYS send month and year as numbers
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     
     if (temporalFilter.mode === 'month' && temporalFilter.period) {
-      params.set('period', temporalFilter.period);
+      const [year, month] = temporalFilter.period.split('-').map(Number);
+      params.set('month', String(month));
+      params.set('year', String(year));
     } else if (temporalFilter.mode === 'quarter' && temporalFilter.year && temporalFilter.quarter) {
+      const startMonth = (temporalFilter.quarter - 1) * 3 + 1;
+      params.set('month', String(startMonth));
       params.set('year', String(temporalFilter.year));
       params.set('quarter', String(temporalFilter.quarter));
     } else if (temporalFilter.mode === 'year' && temporalFilter.year) {
       params.set('year', String(temporalFilter.year));
+      params.set('month', '1');
     } else if (temporalFilter.mode === 'custom' && temporalFilter.from && temporalFilter.to) {
-      params.set('from', temporalFilter.from);
-      params.set('to', temporalFilter.to);
-    } else if (selectedMonth) {
-      params.set('period', selectedMonth);
+      const [fromYear, fromMonth] = temporalFilter.from.split('-').map(Number);
+      const [toYear, toMonth] = temporalFilter.to.split('-').map(Number);
+      params.set('fromMonth', String(fromMonth));
+      params.set('fromYear', String(fromYear));
+      params.set('toMonth', String(toMonth));
+      params.set('toYear', String(toYear));
+    } else {
+      const now = new Date();
+      params.set('month', String(now.getMonth() + 1));
+      params.set('year', String(now.getFullYear()));
     }
     
     return params.toString();
-  }, [temporalFilter, selectedMonth]);
+  }, [temporalFilter]);
 
   // Query principal: métricas agregadas del Star Schema SoT
   const { data: dashboardMetrics, refetch: refetchMetrics, isLoading, isFetching } = useQuery({ 

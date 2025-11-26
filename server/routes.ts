@@ -4936,19 +4936,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getDefaultPeriod, resolveAvailablePeriods } = await import('./services/period-resolver.js');
       const { resolvePeriod } = await import('./services/temporal-filter.js');
       
-      // Parse time filter parameters
-      const timeMode = (req.query.timeMode as string) || 'month';
-      const period = req.query.period as string;
+      // Parse time filter parameters - SUPPORT BOTH month/year AND period formats
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
-      const index = req.query.index ? parseInt(req.query.index as string) : undefined;
+      const quarter = req.query.quarter ? parseInt(req.query.quarter as string) : undefined;
+      const fromMonth = req.query.fromMonth ? parseInt(req.query.fromMonth as string) : undefined;
+      const fromYear = req.query.fromYear ? parseInt(req.query.fromYear as string) : undefined;
+      const toMonth = req.query.toMonth ? parseInt(req.query.toMonth as string) : undefined;
+      const toYear = req.query.toYear ? parseInt(req.query.toYear as string) : undefined;
+      
+      // Legacy support
+      const periodLegacy = req.query.period as string;
       const from = req.query.from as string;
       const to = req.query.to as string;
+      
+      // Construct period from month/year if provided
+      let period: string | undefined;
+      if (month && year) {
+        period = `${year}-${String(month).padStart(2, '0')}`;
+        console.log(`📊 DASHBOARD: Received month=${month}, year=${year} → period=${period}`);
+      } else if (periodLegacy) {
+        period = periodLegacy;
+      }
+      
+      const timeMode = quarter ? 'quarter' : (fromMonth && toMonth) ? 'custom' : 'month';
+      const index = quarter;
       
       let resolved: any;
       let periodKeys: string[];
       
       // If no filter specified, use default (last month with data)
-      if (!period && !year && !from && !to) {
+      if (!period && !year && !from && !to && !fromMonth) {
         const defaultPeriod = await getDefaultPeriod();
         if (!defaultPeriod) {
           console.log(`⚠️ DASHBOARD: No periods with data found, returning empty state`);
@@ -4968,8 +4986,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKeys = [defaultPeriod];
         console.log(`📊 DASHBOARD: Using default period (last with data): ${defaultPeriod}`);
       } else {
+        // Handle custom range with fromMonth/toMonth
+        let fromPeriod = from;
+        let toPeriod = to;
+        
+        if (fromMonth && fromYear && toMonth && toYear) {
+          fromPeriod = `${fromYear}-${String(fromMonth).padStart(2, '0')}`;
+          toPeriod = `${toYear}-${String(toMonth).padStart(2, '0')}`;
+        }
+        
         // Resolve custom time filter
-        resolved = resolvePeriod({ timeMode: timeMode as any, period, year, index, from, to });
+        resolved = resolvePeriod({ 
+          timeMode: timeMode as any, 
+          period, 
+          year, 
+          index, 
+          from: fromPeriod, 
+          to: toPeriod 
+        });
         periodKeys = resolved.periodKeys;
         console.log(`📊 DASHBOARD: Using ${timeMode} filter: ${resolved.label} (${periodKeys.length} months)`);
       }

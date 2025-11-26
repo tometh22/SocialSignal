@@ -1,0 +1,152 @@
+A partir del rediseño del dashboard financiero, el filtro mensual dejó de funcionar porque el backend ya no reconoce el formato que el UI está enviando. Hoy, el UI envía:
+
+2025-10
+
+
+Pero el backend ya no usa period_key como string. Ahora trabaja así:
+
+Para horas → fact_labor_month usa:
+month = 10 y year = 2025
+
+Para facturación → fact_rc_month usa:
+period_key autogenerado desde el ETL (yyyy-mm)
+
+Para costos → direct_costs y indirect_costs usan:
+month = 10 y year = 2025
+
+Por eso nunca coincide todo, y por eso el dashboard queda en cero.
+
+A continuación tenés el plan obligatorio para reparar el filtro. Si hacés exactamente esto, el dashboard vuelve a funcionar.
+
+1. Qué debe enviar el UI (frontend)
+
+El filtro mensual tiene que enviar SIEMPRE un JSON unificado:
+
+{
+  "month": 10,
+  "year": 2025
+}
+
+
+No enviar textos como 2025-10.
+No enviar fechas completas como "2025-10-01".
+
+2. Qué debe hacer el backend (server)
+
+El backend tiene que traducir esto a cada tabla según corresponda.
+
+2.1. Para facturación (fact_rc_month)
+
+Query:
+
+SELECT *
+FROM fact_rc_month
+WHERE period_month = $1
+  AND period_year = $2;
+
+
+O bien, si siguen usando period_key:
+
+SELECT *
+FROM fact_rc_month
+WHERE period_key = CONCAT($1, '-', LPAD($2::text, 2, '0'));
+
+
+Pero mantener una sola fuente, no mezclar.
+
+2.2. Para costos (directos e indirectos)
+SELECT *
+FROM direct_costs
+WHERE month = $1 AND year = $2;
+
+SELECT *
+FROM indirect_costs
+WHERE month = $1 AND year = $2;
+
+2.3. Para horas (fact_labor_month)
+SELECT *
+FROM fact_labor_month
+WHERE month = $1 AND year = $2;
+
+3. Qué rompería si no lo corregís
+
+Si UI sigue mandando 2025-10, pasa esto:
+
+No matchea ninguna tabla que trabaja por month/year → datos en cero.
+
+No matchea facturación real → facturado = 0.
+
+No matchea costos → costos = 0.
+
+Devengado no se puede calcular → 0.
+
+WIP mal → 0.
+
+Dashboard completo bloqueado.
+
+Es exactamente lo que estás viendo en la captura.
+
+4. Cambios concretos en frontend
+
+Modificar el componente de filtro temporal:
+
+Antes (lo que no sirve)
+selectedPeriod = '2025-10'
+
+Ahora (lo correcto)
+selectedPeriod = {
+  month: 10,
+  year: 2025
+}
+
+
+Y enviar eso en el request:
+
+axios.post('/api/dashboard', {
+  month: selectedPeriod.month,
+  year: selectedPeriod.year
+});
+
+5. Cambios concretos en backend
+Antes
+const period = req.body.period; // string '2025-10'
+
+Ahora
+const { month, year } = req.body; // números
+
+
+Los queries deben unificarse para usar month/year en todo el sistema.
+
+6. Validación final que evita errores
+
+Before computing anything:
+
+if (!month || !year)
+  throw new Error("Month and year are required");
+
+
+Y validar que sean enteros:
+
+if (month < 1 || month > 12)
+  throw new Error("Invalid month");
+
+7. Resultado final cuando lo arreglás
+
+Para octubre 2025 la app va a mostrar exactamente esto:
+
+Facturado real: USD 81.838,86
+
+Costos directos: USD 17.400 aprox
+
+Costos indirectos: USD 46.900 aprox
+
+EBIT: USD 42.300
+
+Beneficio neto: USD 21.666
+
+Markup: 4.75
+(corregir fórmula según proyectos cerrados)
+
+Cash Flow: USD 66.802
+
+Todo vuelve a coincidir con el Excel y el reporte de administración.
