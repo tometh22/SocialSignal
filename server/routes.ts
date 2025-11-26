@@ -4974,6 +4974,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📊 DASHBOARD: Using ${timeMode} filter: ${resolved.label} (${periodKeys.length} months)`);
       }
       
+      // CRITICAL: Define lastPeriodKey here (used in all income/devengo calculations below)
+      const lastPeriodKey = periodKeys[periodKeys.length - 1];
+      
       console.log(`📊 DASHBOARD: Fetching metrics for periods: ${periodKeys.join(', ')}`);
       
       // ===== FINANCIAL METRICS (aggregated over all periods) =====
@@ -5211,8 +5214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       // ===== HISTORICAL DATA FOR ALERTS (3 months BEFORE the range end) =====
-      // Get the last period key from the resolved range
-      const lastPeriodKey = periodKeys[periodKeys.length - 1];
+      // Get the last period key from the resolved range (already defined above)
       const [endYear, endMonth] = lastPeriodKey.split('-').map(Number);
       const last3Months: string[] = [];
       for (let i = 1; i <= 3; i++) {
