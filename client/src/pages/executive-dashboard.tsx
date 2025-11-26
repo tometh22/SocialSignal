@@ -501,17 +501,17 @@ export default function ExecutiveDashboard() {
                 <Calendar className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-600">Mes:</span>
                 <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-[180px]" data-testid="select-month-filter">
+                  <SelectTrigger className="w-[180px] bg-white cursor-pointer" data-testid="select-month-filter">
                     <SelectValue placeholder="Seleccionar mes..." />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999] bg-white shadow-lg border">
                     {Array.from({ length: 12 }, (_, i) => {
                       const date = new Date();
                       date.setMonth(date.getMonth() - i);
                       const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                       const label = format(date, "MMMM yyyy", { locale: es });
                       return (
-                        <SelectItem key={value} value={value} data-testid={`month-option-${value}`}>
+                        <SelectItem key={value} value={value} data-testid={`month-option-${value}`} className="cursor-pointer hover:bg-gray-100">
                           {label.charAt(0).toUpperCase() + label.slice(1)}
                         </SelectItem>
                       );
