@@ -233,7 +233,7 @@ export default function ExecutiveDashboard() {
               </div>
             )}
             <PeriodSelector
-              availablePeriods={dashboardMetrics?.availablePeriods?.filter(p => p.hasData).map(p => ({
+              availablePeriods={dashboardMetrics?.availablePeriods?.map(p => ({
                 key: p.periodKey,
                 label: format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })
               })) || []}
