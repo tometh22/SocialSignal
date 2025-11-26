@@ -29,7 +29,23 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  
+  // Generate last 6 months for selector
+  const availableMonths = useMemo(() => {
+    const months = [];
+    for (let i = 0; i < 6; i++) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      months.push({
+        periodKey: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        year: date.getFullYear(),
+        month: date.getMonth() + 1
+      });
+    }
+    return months;
+  }, []);
+  
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => availableMonths[0]?.periodKey || '');
 
   // Build query params from selected month
   const queryParams = useMemo(() => {
@@ -218,7 +234,7 @@ export default function ExecutiveDashboard() {
               <span className="text-sm font-medium">Período:</span>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {dashboardMetrics?.availablePeriods?.slice(0, 6).map((p: { periodKey: string; year: number; month: number }) => {
+              {availableMonths.map((p) => {
                 const isSelected = selectedMonth === p.periodKey;
                 const monthLabel = format(new Date(p.year, p.month - 1), 'MMM yy', { locale: es });
                 return (
