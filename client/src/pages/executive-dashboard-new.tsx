@@ -27,25 +27,38 @@ import {
 } from 'recharts';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
+import NativeTemporalFilter, { TemporalFilterValue } from "@/components/NativeTemporalFilter";
+
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   
-  // Generate last 6 months for selector
-  const availableMonths = useMemo(() => {
-    const months = [];
-    for (let i = 0; i < 6; i++) {
-      const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      months.push({
-        periodKey: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
-        year: date.getFullYear(),
-        month: date.getMonth() + 1
-      });
-    }
-    return months;
-  }, []);
+  // Initialize with current month
+  const [temporalFilter, setTemporalFilter] = useState<TemporalFilterValue>(() => {
+    const now = new Date();
+    return {
+      mode: 'month',
+      period: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    };
+  });
   
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => availableMonths[0]?.periodKey || '');
+  // Derive selectedMonth from temporalFilter for API compatibility
+  const selectedMonth = useMemo(() => {
+    if (temporalFilter.mode === 'month' && temporalFilter.period) {
+      return temporalFilter.period;
+    }
+    if (temporalFilter.mode === 'quarter' && temporalFilter.year && temporalFilter.quarter) {
+      const startMonth = (temporalFilter.quarter - 1) * 3 + 1;
+      return `${temporalFilter.year}-${String(startMonth).padStart(2, '0')}`;
+    }
+    if (temporalFilter.mode === 'year' && temporalFilter.year) {
+      return `${temporalFilter.year}-01`;
+    }
+    if (temporalFilter.mode === 'custom' && temporalFilter.from) {
+      return temporalFilter.from;
+    }
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, [temporalFilter]);
 
   // Build query params from selected month
   const queryParams = useMemo(() => {
@@ -227,34 +240,15 @@ export default function ExecutiveDashboard() {
             </div>
           </div>
           
-          {/* Month Filter with Buttons */}
-          <div className="mt-4 flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-gray-300">
-              <Calendar className="h-4 w-4" />
-              <span className="text-sm font-medium">Período:</span>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              {availableMonths.map((p) => {
-                const isSelected = selectedMonth === p.periodKey;
-                const monthLabel = format(new Date(p.year, p.month - 1), 'MMM yy', { locale: es });
-                return (
-                  <button
-                    key={p.periodKey}
-                    onClick={() => setSelectedMonth(p.periodKey)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      isSelected 
-                        ? 'bg-white text-gray-900 shadow-lg' 
-                        : 'bg-white/10 text-white hover:bg-white/20'
-                    }`}
-                    data-testid={`month-btn-${p.periodKey}`}
-                  >
-                    {monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
+      </div>
+      
+      {/* Temporal Filter - Outside dark header for better visibility */}
+      <div className="max-w-7xl mx-auto px-6 -mt-6 mb-6 relative z-50">
+        <NativeTemporalFilter
+          value={temporalFilter}
+          onChange={setTemporalFilter}
+        />
       </div>
       
       {/* Main Content */}
