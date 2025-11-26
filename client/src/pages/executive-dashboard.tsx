@@ -265,13 +265,6 @@ export default function ExecutiveDashboard() {
       };
     }
 
-    // Revenue total de cotizaciones aprobadas
-    const totalRevenue = quotationsArray.length > 0 
-      ? quotationsArray
-          .filter(q => q.status === 'approved')
-          .reduce((sum, q) => sum + (q.totalAmount || 0), 0)
-      : 0;
-
     // Parsear el mes seleccionado
     const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
     const filterDate = new Date(selectedYear, selectedMonthNum - 1, 1);
@@ -283,6 +276,21 @@ export default function ExecutiveDashboard() {
       return entryDate.getMonth() === filterDate.getMonth() && 
              entryDate.getFullYear() === filterDate.getFullYear();
     });
+
+    // Revenue del mes: calculado a partir de las horas facturables del mes
+    // Usamos una tarifa de facturación estimada (2x costo) para estimar el revenue
+    const monthRevenue = monthFilteredEntries.reduce((sum, entry) => {
+      const costRate = entry.hourlyRateAtTime || 50;
+      const billingRate = costRate * 2; // Tarifa de facturación estimada (markup 2x)
+      return sum + ((entry.hours || 0) * billingRate);
+    }, 0);
+
+    // Revenue total de cotizaciones aprobadas (global, para referencia)
+    const totalRevenue = quotationsArray.length > 0 
+      ? quotationsArray
+          .filter(q => q.status === 'approved')
+          .reduce((sum, q) => sum + (q.totalAmount || 0), 0)
+      : 0;
 
     // Utilización del equipo
     let teamUtilization = 0;
@@ -303,17 +311,19 @@ export default function ExecutiveDashboard() {
       ? pendingQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0)
       : 0;
 
-    // Rentabilidad (basada en el mes seleccionado)
+    // Costos del mes
+    const monthCosts = monthFilteredEntries.reduce((sum, entry) => {
+      const rate = entry.hourlyRateAtTime || 50;
+      return sum + ((entry.hours || 0) * rate);
+    }, 0);
+
+    // Rentabilidad del mes (usando datos consistentes del mismo mes)
     let profitMargin = 0;
-    if (monthFilteredEntries.length > 0 && totalRevenue > 0) {
-      const totalCosts = monthFilteredEntries.reduce((sum, entry) => {
-        const rate = entry.hourlyRateAtTime || 50;
-        return sum + ((entry.hours || 0) * rate);
-      }, 0);
-      profitMargin = ((totalRevenue - totalCosts) / totalRevenue) * 100;
+    if (monthRevenue > 0) {
+      profitMargin = ((monthRevenue - monthCosts) / monthRevenue) * 100;
     }
 
-    // Satisfacción del cliente (basado en entregables)
+    // Satisfacción del cliente (global - no se puede filtrar por mes sin fecha)
     let avgClientSatisfaction = 0;
     const deliverablesArray = Array.isArray(allDeliverables) ? allDeliverables : [];
     if (deliverablesArray.length > 0) {
@@ -326,15 +336,15 @@ export default function ExecutiveDashboard() {
         : 0;
     }
 
-    // Eficiencia operacional (basada en el mes seleccionado)
+    // Eficiencia operacional del mes (revenue del mes / horas del mes)
     let operationalEfficiency = 0;
-    if (monthFilteredEntries.length > 0 && totalRevenue > 0) {
-      const totalLoggedHours = monthFilteredEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-      operationalEfficiency = totalLoggedHours > 0 ? (totalRevenue / totalLoggedHours) : 0;
+    const totalLoggedHours = monthFilteredEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+    if (totalLoggedHours > 0) {
+      operationalEfficiency = monthRevenue / totalLoggedHours;
     }
 
     return {
-      totalRevenue,
+      totalRevenue: monthRevenue, // Ahora muestra el revenue del mes seleccionado
       teamUtilization: Math.min(Math.max(teamUtilization, 0), 100), // Entre 0 y 100%
       pipelineValue,
       profitMargin: Math.max(profitMargin, 0), // No menor a 0
@@ -591,7 +601,7 @@ export default function ExecutiveDashboard() {
                 <p className="text-sm text-gray-500">Evolución del mes en curso</p>
               </div>
               <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                {selectedMonth}
+                {format(new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]) - 1), "MMMM yyyy", { locale: es }).charAt(0).toUpperCase() + format(new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]) - 1), "MMMM yyyy", { locale: es }).slice(1)}
               </Badge>
             </div>
 
