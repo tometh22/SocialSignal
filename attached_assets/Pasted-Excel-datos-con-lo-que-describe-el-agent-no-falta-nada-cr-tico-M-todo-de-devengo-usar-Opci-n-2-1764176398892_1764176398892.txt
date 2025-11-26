@@ -1,0 +1,227 @@
+Excel / datos: con lo que describe el agent, no falta nada crítico
+
+Método de devengo: usar Opción 2 como base para one-shot y fee, y Opción 1 solo como check interno de margen, no como “ingreso”
+
+Qué implica, paso a paso
+
+1. ¿Falta algo en Excel?
+
+Con lo que ya tienen:
+
+Excel:
+
+Horas por proyecto/mes/persona
+
+Rate por persona
+
+Costos totales por proyecto/mes
+
+Facturado real por proyecto/mes
+
+Sistema interno de cotizaciones:
+
+quotationAmount (valor total contrato)
+
+estimatedHours (horas estimadas totales)
+
+quotationType (one-time | recurring | fee)
+
+Para implementar devengado serio:
+
+No hace falta agregar columnas nuevas en Excel.
+
+Sí es indispensable que en el ETL hacia la app:
+
+Para cada project_id venga: quotationAmount, estimatedHours, quotationType.
+
+Se trate a estas tres como “fuente de verdad” de la cotización.
+
+Excel se queda como repositorio operativo de horas, costos y facturado.
+El modelo de devengo se arma arriba, en backend.
+
+2. Elección de método: qué conviene usar
+
+Tienen dos fórmulas propuestas:
+
+Opción 1 – Costos × markup (lo que ya usan implícito con factor 2.5):
+
+devengado_acum = (horas_billables_acum × rate_promedio) × 2.5
+
+
+Opción 2 – % avance vs. contrato:
+
+avance_% = horas_reales_acum / horas_estimadas_totales
+devengado_acum = valor_contrato × avance_%
+
+
+Recomendación:
+
+One-shot (proyectos cerrados en alcance y monto):
+Usar Opción 2 como método oficial de devengo.
+Razón:
+
+Se ata al valor de contrato, que es la realidad económica que importa.
+
+No se distorsiona si el costo interno sube o baja.
+
+Es exactamente el criterio que usan las empresas de servicios serias para revenue recognition por % completado.
+
+Fee / recurrente (retainer):
+No usar ni Opción 1 ni 2 para el “valor del contrato total” (porque a veces no hay fin definido).
+Para fee mensual, lo correcto es:
+
+devengado_mes = fee_mensual_pactado mientras el contrato esté activo.
+
+Se mira margen comparando ese devengado contra el costo real del mes.
+
+Opción 1 (costos × markup):
+
+Mantenerla como métrica de control de margen, no como “ingreso”.
+
+Ejemplo:
+
+ingreso_teórico_por_markup_mes = costo_mes × 2.5
+
+Comparás:
+
+ingreso_devengado_mes_real (Opción 2 o fee) vs ingreso_teórico_por_markup_mes.
+
+Si sistemáticamente ingreso_devengado_mes_real < ingreso_teórico_por_markup_mes, tenés:
+
+fee mal cotizado, o
+
+scope creep.
+
+En síntesis:
+
+Devengo oficial → Opción 2 (one-shot) + fee mensual (retainers).
+
+Costos×2.5 → indicador de salud del pricing, no revenue.
+
+3. Lógica concreta por tipo de proyecto
+3.1. One-shot
+
+Datos necesarios (ya los tienen vía sistema de cotización):
+
+valor_contrato = quotationAmount
+
+horas_estimadas_totales = estimatedHours
+
+Backend por proyecto:
+
+horas_reales_acum = Σ horas hasta fin de mes t
+avance_% = MIN(horas_reales_acum / horas_estimadas_totales, 1)
+
+devengado_acum_t = valor_contrato × avance_%
+devengado_acum_t-1 = valor_contrato × avance_%_(t-1)
+
+devengado_mes = devengado_acum_t - devengado_acum_t-1
+
+facturado_mes = Σ facturas del mes
+costo_mes = Σ costos directos + indirectos del mes
+
+margen_económico_mes = devengado_mes - costo_mes
+margen_contable_mes = facturado_mes - costo_mes
+
+WIP_t = devengado_acum_t - facturado_acum_t
+
+
+Opcional (control de pricing):
+
+ingreso_teórico_markup_mes = costo_mes × 2.5
+gap_pricing_mes = devengado_mes - ingreso_teórico_markup_mes
+
+3.2. Fee mensual / recurring
+
+Datos necesarios:
+
+fee_mensual desde la cotización.
+
+Backend por proyecto:
+
+si contrato_activo_en_mes_t:
+    devengado_mes = fee_mensual
+sino:
+    devengado_mes = 0
+
+facturado_mes = Σ facturas del mes
+costo_mes = Σ costos del mes
+
+margen_económico_mes = devengado_mes - costo_mes
+margen_contable_mes = facturado_mes - costo_mes
+
+devengado_acum_t = Σ devengado_mes hasta t
+facturado_acum_t = Σ facturado_mes hasta t
+WIP_t = devengado_acum_t - facturado_acum_t
+
+
+De nuevo, podés usar:
+
+ingreso_teórico_markup_mes = costo_mes × 2.5
+gap_pricing_mes = devengado_mes - ingreso_teórico_markup_mes
+
+
+para ver si el fee está mal negociado.
+
+4. Cómo impacta esto en los bloques del dashboard
+
+Con el plan del agent, llenás los bloques así:
+
+Bloque 1 – Visión Contable (facturado)
+
+Por mes:
+
+ingresos_facturados_mes = Σ facturado_mes
+
+costos_mes = Σ costo_mes
+
+margen_contable_mes = ingresos_facturados_mes - costos_mes
+
+Bloque 2 – Visión Económica (devengado)
+
+Por mes:
+
+ingresos_devengados_mes = Σ devengado_mes
+
+costos_mes = Σ costo_mes (mismo costo)
+
+margen_económico_mes = ingresos_devengados_mes - costos_mes
+
+Bloque 3 – Puente WIP
+
+Por mes:
+
+WIP_t = Σ WIP_t_proyecto
+WIP_t-1 = Σ WIP_t-1_proyecto
+
+ΔWIP = WIP_t - WIP_t-1
+
+Check de consistencia:
+ingresos_devengados_mes = ingresos_facturados_mes + ΔWIP
+
+
+KPIs:
+
+WIP_total_activo = Σ MAX(WIP_t_proyecto, 0)
+
+ingresos_diferidos = Σ MAX(-WIP_t_proyecto, 0) (casos donde facturaste por adelantado)
+
+5. Resumen operativo
+
+Excel: no tocar.
+
+ETL: asegurar que para cada proyecto en el warehouse entren quotationAmount, estimatedHours, quotationType, fee_mensual si aplica.
+
+Backend:
+
+Implementar devengo por tipo de proyecto (como arriba).
+
+Formalizar WIP_t y ΔWIP.
+
+Separar margen_contable y margen_económico en la API.
+
+Dashboard:
+
+Tres bloques: contable, económico, puente WIP.
+
+Vista proyecto: contrato, % avance, devengado vs facturado, WIP, margen económico vs contable, y opcional gap vs markup.

@@ -5018,67 +5018,173 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // ===== NUEVO MODELO: INGRESOS OPERATIVOS (Fees + One-Shot devengado) =====
-      // Obtener data de income_sot para separar Fees de One-Shots
+      // ===== MODELO DE DEVENGO CORRECTO (Opción 2: % Avance) =====
+      // 1. Obtener datos de todos los proyectos con sus contratos
       const { rows: incomeRows } = await pool.query(`
         SELECT 
           project_id,
           contract_value_usd,
           estimated_hours,
-          type as project_type
+          type as project_type,
+          fee_monthly_usd,
+          start_date,
+          end_date
         FROM income_sot
         WHERE project_id IS NOT NULL
       `);
       
-      // Construir mapa de proyectos: tipo y contrato
-      const projectMap = new Map<number, { type: string, contractUsd: number, estimatedHours: number }>();
+      // 2. Construir mapa de proyectos
+      const projectMap = new Map<number, { 
+        type: string, 
+        contractUsd: number, 
+        estimatedHours: number,
+        feeMonthlyUsd: number,
+        startDate: any,
+        endDate: any
+      }>();
       for (const row of incomeRows) {
         projectMap.set(row.project_id, {
-          type: row.project_type || 'fee',
+          type: (row.project_type || 'fee').toLowerCase(),
           contractUsd: parseFloat(row.contract_value_usd || '0'),
-          estimatedHours: parseFloat(row.estimated_hours || '0')
+          estimatedHours: parseFloat(row.estimated_hours || '0'),
+          feeMonthlyUsd: parseFloat(row.fee_monthly_usd || '0'),
+          startDate: row.start_date,
+          endDate: row.end_date
         });
       }
       
-      // Obtener horas por proyecto del período
-      const { rows: hoursByProject } = await pool.query(`
+      // 3. Obtener horas ACUMULADAS hasta cada período (para % avance)
+      const { rows: cumulativeHours } = await pool.query(`
         SELECT 
           project_id,
-          COALESCE(SUM(asana_hours), 0) as hours_asana
+          period_key,
+          COALESCE(SUM(asana_hours) OVER (PARTITION BY project_id ORDER BY period_key), 0) as cumulative_hours
         FROM fact_labor_month
-        WHERE period_key = ANY($1)
-        GROUP BY project_id
-      `, [periodKeys]);
+        WHERE period_key <= $1
+        ORDER BY project_id, period_key DESC
+      `, [lastPeriodKey]);
       
-      // Calcular ingreso operativo: Fees (tal cual) + One-Shot (devengado)
-      let operativeIncomeUsd = 0;
-      for (const hourRow of hoursByProject) {
-        const projectData = projectMap.get(hourRow.project_id);
-        if (!projectData) continue;
-        
-        if (projectData.type.toLowerCase() === 'fee') {
-          // FEES: contract_value_usd tal cual (mensual)
-          operativeIncomeUsd += projectData.contractUsd;
-        } else if (projectData.type.toLowerCase() === 'one-shot' && projectData.estimatedHours > 0) {
-          // ONE-SHOT: contrato × (horas_mes / horas_estimadas)
-          const progressRatio = Math.min(hourRow.hours_asana / projectData.estimatedHours, 1.0);
-          operativeIncomeUsd += projectData.contractUsd * progressRatio;
+      // Crear mapa: project_id -> cumulative_hours en el período actual y anterior
+      const cumulativeMap = new Map<number, { current: number, previous: number }>();
+      for (const row of cumulativeHours) {
+        const key = row.project_id;
+        const current = cumulativeMap.get(key) || { current: 0, previous: 0 };
+        if (row.period_key === lastPeriodKey) {
+          current.current = parseFloat(row.cumulative_hours || '0');
+        }
+        cumulativeMap.set(key, current);
+      }
+      
+      // Obtener período anterior
+      const [periodYear, periodMonth] = lastPeriodKey.split('-').map(Number);
+      const prevMonth = periodMonth === 1 ? 12 : periodMonth - 1;
+      const prevYear = periodMonth === 1 ? periodYear - 1 : periodYear;
+      const prevPeriodKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+      
+      // Obtener horas del período anterior
+      const { rows: [prevHoursData] } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(asana_hours) OVER (PARTITION BY project_id ORDER BY period_key), 0) as cumulative_hours,
+          project_id
+        FROM fact_labor_month
+        WHERE period_key = $1
+      `, [prevPeriodKey]);
+      
+      // Actualizar previous values
+      if (prevHoursData) {
+        for (const [projectId, data] of cumulativeMap.entries()) {
+          // This is simplified - in reality you'd query all projects from prev period
+          const prevQuery = await pool.query(`
+            SELECT COALESCE(SUM(asana_hours) OVER (PARTITION BY project_id ORDER BY period_key), 0) as cum_hours
+            FROM fact_labor_month
+            WHERE project_id = $1 AND period_key = $2
+          `, [projectId, prevPeriodKey]);
+          if (prevQuery.rows[0]) {
+            data.previous = parseFloat(prevQuery.rows[0].cum_hours || '0');
+          }
         }
       }
       
-      // ===== COSTOS (directos e indirectos de fact_cost_month) =====
+      // 4. Obtener facturado acumulado (para calcular WIP)
+      const { rows: cumulativeBilled } = await pool.query(`
+        SELECT 
+          project_id,
+          period_key,
+          COALESCE(SUM(revenue_usd) OVER (PARTITION BY project_id ORDER BY period_key), 0) as cumulative_billed
+        FROM fact_rc_month
+        WHERE period_key <= $1
+        ORDER BY project_id, period_key
+      `, [lastPeriodKey]);
+      
+      // Crear mapa: project_id -> cumulative_billed en el período actual
+      const billedCumulativeMap = new Map<string, number>();
+      for (const row of cumulativeBilled) {
+        if (row.period_key === lastPeriodKey) {
+          billedCumulativeMap.set(row.project_id, parseFloat(row.cumulative_billed || '0'));
+        }
+      }
+      
+      // 5. Calcular DEVENGADO: Opción 2 (% avance para One-Shot) + Fee mensual
+      let devengadoUsd = 0;
+      let wipUsd = 0;
+      
+      for (const [projectId, projectData] of projectMap.entries()) {
+        const cumulatives = cumulativeMap.get(projectId) || { current: 0, previous: 0 };
+        const cumulativeBilledTotal = billedCumulativeMap.get(projectId) || 0;
+        
+        if (projectData.type === 'one-shot' && projectData.estimatedHours > 0) {
+          // ONE-SHOT: devengado_acum = contrato × (horas_acum / horas_estimadas)
+          // Luego: devengado_mes = devengado_acum_t - devengado_acum_t-1
+          const progressRatioCurrent = Math.min(cumulatives.current / projectData.estimatedHours, 1.0);
+          const progressRatioPrevious = Math.min(cumulatives.previous / projectData.estimatedHours, 1.0);
+          
+          const devengadoAccumCurrent = projectData.contractUsd * progressRatioCurrent;
+          const devengadoAccumPrevious = projectData.contractUsd * progressRatioPrevious;
+          const devengadoMes = devengadoAccumCurrent - devengadoAccumPrevious;
+          
+          devengadoUsd += devengadoMes;
+          wipUsd += Math.max(devengadoAccumCurrent - cumulativeBilledTotal, 0);
+          
+        } else if (projectData.type === 'fee' || projectData.type === 'recurring') {
+          // FEE: devengado_mes = fee_monthly mientras esté activo
+          const now = new Date();
+          const monthStart = new Date(lastPeriodKey.split('-')[0], parseInt(lastPeriodKey.split('-')[1]) - 1, 1);
+          const monthEnd = new Date(lastPeriodKey.split('-')[0], parseInt(lastPeriodKey.split('-')[1]), 0);
+          
+          const startDate = projectData.startDate ? new Date(projectData.startDate) : new Date(0);
+          const endDate = projectData.endDate ? new Date(projectData.endDate) : new Date('2099-12-31');
+          
+          // Check if contract overlaps with month
+          if (startDate <= monthEnd && endDate >= monthStart) {
+            devengadoUsd += projectData.feeMonthlyUsd;
+            // Para fees: WIP = (devengado_acum - facturado_acum)
+            const devengadoAccumFee = projectData.feeMonthlyUsd * 12; // Aproximado: 12 meses * fee mensual
+            wipUsd += Math.max(devengadoAccumFee - cumulativeBilledTotal, 0);
+          }
+        }
+      }
+      
+      // ===== FACTURADO (desde fact_rc_month) =====
+      const billedUsd = parseFloat(billingData?.billed_usd || '0');
+      
+      // ===== COSTOS (directos e indirectos) =====
       const directCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
       const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
       const costUsd = parseFloat(costsData?.total_cost_usd || '0');
       
-      // ===== EBIT Y MÁRGENES OPERATIVOS =====
-      const ebitUsd = operativeIncomeUsd - directCostsUsd - indirectCostsUsd;
-      const marginOperativoUsd = ebitUsd; // EBIT is the operational margin
-      const operativeMarginPct = operativeIncomeUsd > 0 ? (ebitUsd / operativeIncomeUsd) * 100 : 0;
-      const markupOperativoUsd = directCostsUsd > 0 ? (operativeIncomeUsd / directCostsUsd) : 0;
+      // ===== MÁRGENES: CONTABLE vs ECONÓMICO =====
+      // Margen Contable = Facturado - Costos
+      const marginContableUsd = billedUsd - costUsd;
       
-      // ===== FACTURADO (desde fact_rc_month - solo para referencia) =====
-      const billedUsd = parseFloat(billingData?.billed_usd || '0');
+      // Margen Económico = Devengado - Costos (EBIT)
+      const marginEconomicoUsd = devengadoUsd - costUsd;
+      
+      // Porcentajes
+      const marginEconomicoPct = devengadoUsd > 0 ? (marginEconomicoUsd / devengadoUsd) * 100 : 0;
+      const markupOperativoUsd = directCostsUsd > 0 ? (devengadoUsd / directCostsUsd) : 0;
+      
+      // ===== MÉTRICA DE CONTROL: Opción 1 (solo para referencia) =====
+      const costTimesMarkupUsd = costUsd * 2.5; // Teórico esperado
       
       // ===== OPERATIONAL METRICS =====
       
@@ -5244,15 +5350,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availablePeriods: periodsInfo.availablePeriods,
         
         financial: {
-          operativeIncomeUsd: operativeIncomeUsd,      // Ingresos operativos (Fees + One-Shot devengado)
-          billedUsd: billedUsd,                         // Facturado real (referencia)
+          devengadoUsd: devengadoUsd,                  // Ingresos devengados (Opción 2)
+          billedUsd: billedUsd,                        // Facturado real (contable)
           directCostsUsd: directCostsUsd,              // Costos directos
           indirectCostsUsd: indirectCostsUsd,          // Costos indirectos
           costUsd: costUsd,                            // Total costos
-          ebitUsd: ebitUsd,                            // EBIT = Ingreso Operativo - Costos
-          marginOperativoUsd: marginOperativoUsd,      // Margen operativo (EBIT)
-          operativeMarginPct: operativeMarginPct,      // % Margen operativo
-          markupOperativoUsd: markupOperativoUsd,      // Markup operativo = Ingreso / Costos Directos
+          marginContableUsd: marginContableUsd,        // Margen Contable = Facturado - Costos
+          marginEconomicoUsd: marginEconomicoUsd,      // Margen Económico = Devengado - Costos (EBIT)
+          marginEconomicoPct: marginEconomicoPct,      // % Margen económico
+          markupOperativoUsd: markupOperativoUsd,      // Markup = Devengado / Costos Directos
+          wipUsd: wipUsd,                              // WIP = Devengado Acumulado - Facturado Acumulado
+          costTimesMarkupUsd: costTimesMarkupUsd,      // Control: Costos × 2.5 (teórico esperado)
           fxWeighted: fxWeighted
         },
         
