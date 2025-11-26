@@ -27,27 +27,20 @@ import {
 } from 'recharts';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { motion } from "framer-motion";
-import PeriodSelector, { type TimeFilter } from "@/components/PeriodSelector";
-
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>({ timeMode: 'month' });
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
-  // Build query params from time filter
+  // Build query params from selected month
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('timeMode', timeFilter.timeMode);
-    if (timeFilter.period) params.set('period', timeFilter.period);
-    if (timeFilter.year) params.set('year', timeFilter.year.toString());
-    if (timeFilter.index) params.set('index', timeFilter.index.toString());
-    if (timeFilter.from) params.set('from', timeFilter.from);
-    if (timeFilter.to) params.set('to', timeFilter.to);
+    if (selectedMonth) params.set('period', selectedMonth);
     return params.toString();
-  }, [timeFilter]);
+  }, [selectedMonth]);
 
   // Query principal: métricas agregadas del Star Schema SoT
   const { data: dashboardMetrics, refetch: refetchMetrics, isLoading } = useQuery({ 
-    queryKey: ['/api/dashboard/metrics', timeFilter],
+    queryKey: ['/api/dashboard/metrics', selectedMonth],
     queryFn: async () => {
       const res = await fetch(`/api/dashboard/metrics?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch dashboard metrics');
@@ -218,29 +211,31 @@ export default function ExecutiveDashboard() {
             </div>
           </div>
           
-          {/* Period Selector */}
+          {/* Simple Month Filter */}
           <div className="mt-6 bg-white/5 backdrop-blur rounded-lg p-4">
-            {dashboardMetrics?.resolved && (
-              <div className="mb-4 flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-300">Período: </span>
-                <span className="font-semibold">{dashboardMetrics.resolved.label}</span>
-                {dashboardMetrics.resolved.start && dashboardMetrics.resolved.end && (
-                  <span className="text-gray-400">
-                    ({dashboardMetrics.resolved.start} - {dashboardMetrics.resolved.end})
-                  </span>
-                )}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-300" />
+                <span className="text-gray-300 text-sm font-medium">Mes:</span>
               </div>
-            )}
-            <PeriodSelector
-              availablePeriods={dashboardMetrics?.availablePeriods?.map(p => ({
-                key: p.periodKey,
-                label: format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })
-              })) || []}
-              defaultPeriod={dashboardMetrics?.defaultPeriod}
-              value={timeFilter}
-              onChange={setTimeFilter}
-            />
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="w-64 bg-white/10 border-white/20 text-white">
+                  <SelectValue placeholder="Seleccionar mes..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {dashboardMetrics?.availablePeriods?.map(p => (
+                    <SelectItem key={p.periodKey} value={p.periodKey}>
+                      {format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {dashboardMetrics?.resolved && (
+                <span className="text-gray-400 text-sm">
+                  ({dashboardMetrics.resolved.label})
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
