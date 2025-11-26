@@ -66,19 +66,21 @@ export default function ExecutiveDashboard() {
     staleTime: 10 * 60 * 1000
   });
 
-  // Métricas consolidadas del mes actual (Star Schema SoT) - Modelo operativo correcto
+  // Métricas consolidadas del mes actual (Star Schema SoT) - Modelo devengo Opción 2
   const currentMetrics = useMemo(() => {
     if (!dashboardMetrics) {
       return {
-        operativeIncomeUsd: 0,
+        devengadoUsd: 0,
         billedUsd: 0,
         costUsd: 0,
         directCostsUsd: 0,
         indirectCostsUsd: 0,
-        ebitUsd: 0,
-        marginOperativoUsd: 0,
-        operativeMarginPct: 0,
+        marginContableUsd: 0,
+        marginEconomicoUsd: 0,
+        marginEconomicoPct: 0,
         markupOperativoUsd: 0,
+        wipUsd: 0,
+        costTimesMarkupUsd: 0,
         fxWeighted: 0,
         totalHours: 0,
         billableHours: 0,
@@ -91,15 +93,17 @@ export default function ExecutiveDashboard() {
     }
     
     return {
-      operativeIncomeUsd: dashboardMetrics.financial?.operativeIncomeUsd || 0,
+      devengadoUsd: dashboardMetrics.financial?.devengadoUsd || 0,
       billedUsd: dashboardMetrics.financial?.billedUsd || 0,
       costUsd: dashboardMetrics.financial?.costUsd || 0,
       directCostsUsd: dashboardMetrics.financial?.directCostsUsd || 0,
       indirectCostsUsd: dashboardMetrics.financial?.indirectCostsUsd || 0,
-      ebitUsd: dashboardMetrics.financial?.ebitUsd || 0,
-      marginOperativoUsd: dashboardMetrics.financial?.marginOperativoUsd || 0,
-      operativeMarginPct: dashboardMetrics.financial?.operativeMarginPct || 0,
+      marginContableUsd: dashboardMetrics.financial?.marginContableUsd || 0,
+      marginEconomicoUsd: dashboardMetrics.financial?.marginEconomicoUsd || 0,
+      marginEconomicoPct: dashboardMetrics.financial?.marginEconomicoPct || 0,
       markupOperativoUsd: dashboardMetrics.financial?.markupOperativoUsd || 0,
+      wipUsd: dashboardMetrics.financial?.wipUsd || 0,
+      costTimesMarkupUsd: dashboardMetrics.financial?.costTimesMarkupUsd || 0,
       fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
       totalHours: dashboardMetrics.operational?.hours?.total || 0,
       billableHours: dashboardMetrics.operational?.hours?.billable || 0,
@@ -399,19 +403,34 @@ export default function ExecutiveDashboard() {
                     <h3 className="text-lg font-semibold text-green-700">Financiera</h3>
                   </div>
                   
-                  {/* Ingreso Operativo (Fees + One-Shot devengado) */}
+                  {/* Devengado (Opción 2: % Avance para One-Shot + Fee para recurrentes) */}
                   <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-600">Ingreso Operativo</span>
-                        <span className="text-xs text-gray-400" title="Fees (mensual) + One-Shot (devengado)">ⓘ</span>
+                        <span className="text-sm font-medium text-gray-600">Devengado (Ingresos)</span>
+                        <span className="text-xs text-gray-400" title="Opción 2: One-Shot % avance + Fees">ⓘ</span>
                       </div>
                       <TrendingUp className="h-4 w-4 text-green-600" />
                     </div>
                     <div className="text-3xl font-bold text-green-700">
-                      ${(currentMetrics.operativeIncomeUsd / 1000).toFixed(1)}k
+                      ${(currentMetrics.devengadoUsd / 1000).toFixed(1)}k
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">income_sot • Modelo operativo</span>
+                    <span className="text-xs text-gray-500 block mt-1">Ingresos por devengo (Opción 2)</span>
+                  </div>
+
+                  {/* Facturado (Contable) */}
+                  <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Facturado</span>
+                        <span className="text-xs text-gray-400" title="Ingresos contables reales">●</span>
+                      </div>
+                      <TrendingUp className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div className="text-2xl font-bold text-amber-700">
+                      ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
+                    </div>
+                    <span className="text-xs text-gray-500 block mt-1">fact_rc_month • Contable</span>
                   </div>
 
                   {/* Costos directos e indirectos */}
@@ -427,7 +446,7 @@ export default function ExecutiveDashboard() {
                     {/* Costos directos */}
                     <div className="mb-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-600">Costos directos</span>
+                        <span className="text-xs text-gray-600">Directos</span>
                         <span className="text-xs font-medium text-gray-700">${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k</span>
                       </div>
                       <Progress 
@@ -439,7 +458,7 @@ export default function ExecutiveDashboard() {
                     {/* Costos indirectos */}
                     <div className="mb-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-600">Costos indirectos</span>
+                        <span className="text-xs text-gray-600">Indirectos</span>
                         <span className="text-xs font-medium text-gray-700">${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k</span>
                       </div>
                       <Progress 
@@ -455,59 +474,78 @@ export default function ExecutiveDashboard() {
                         <span className="text-2xl font-bold text-red-600">${(currentMetrics.costUsd / 1000).toFixed(1)}k</span>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">fact_cost_month • USD</span>
+                    <span className="text-xs text-gray-500 block mt-1">fact_cost_month</span>
                   </div>
 
-                  {/* EBIT */}
+                  {/* Margen Contable (Facturado - Costos) */}
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-600">EBIT</span>
-                        <span className="text-xs text-gray-400" title="Ingreso Operativo - Costos">ⓘ</span>
+                        <span className="text-sm font-medium text-gray-600">Margen Contable</span>
+                        <span className="text-xs text-gray-400" title="Facturado - Costos">ⓘ</span>
                       </div>
-                      {currentMetrics.ebitUsd >= 0 ? (
+                      {currentMetrics.marginContableUsd >= 0 ? (
                         <TrendingUp className="h-4 w-4 text-green-600" />
                       ) : (
                         <TrendingDown className="h-4 w-4 text-red-600" />
                       )}
                     </div>
-                    <div className={`text-3xl font-bold ${currentMetrics.ebitUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.ebitUsd / 1000).toFixed(1)}k
+                    <div className={`text-3xl font-bold ${currentMetrics.marginContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.marginContableUsd / 1000).toFixed(1)}k
                     </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Margen: {currentMetrics.operativeMarginPct?.toFixed(1)}%
-                    </div>
-                    <span className="text-xs text-gray-500 block mt-1">Ingreso - Costos (Directos + Indirectos)</span>
+                    <span className="text-xs text-gray-500 block mt-1">Facturado - Costos totales</span>
                   </div>
                   
-                  {/* Markup Operativo */}
+                  {/* Margen Económico / EBIT (Devengado - Costos) */}
+                  <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-600">Margen Económico (EBIT)</span>
+                        <span className="text-xs text-gray-400" title="Devengado - Costos">ⓘ</span>
+                      </div>
+                      {currentMetrics.marginEconomicoUsd >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600" />
+                      )}
+                    </div>
+                    <div className={`text-3xl font-bold ${currentMetrics.marginEconomicoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.marginEconomicoUsd / 1000).toFixed(1)}k
+                    </div>
+                    <div className="mt-2 text-xs text-gray-600">
+                      % Margen: {currentMetrics.marginEconomicoPct?.toFixed(1)}%
+                    </div>
+                    <span className="text-xs text-gray-500 block mt-1">Devengado - Costos (Real)</span>
+                  </div>
+                  
+                  {/* WIP (Trabajo en Progreso) */}
                   <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-600">Markup Operativo</span>
-                        <span className="text-xs text-gray-400" title="Ingreso / Costos Directos">ⓘ</span>
+                        <span className="text-sm font-medium text-gray-600">WIP (Trabajo Pendiente)</span>
+                        <span className="text-xs text-gray-400" title="Devengado Acum - Facturado Acum">ⓘ</span>
                       </div>
-                      <TrendingUp className="h-4 w-4 text-purple-600" />
+                      <Clock className="h-4 w-4 text-purple-600" />
                     </div>
                     <div className="text-3xl font-bold text-purple-600">
-                      {currentMetrics.markupOperativoUsd?.toFixed(2)}x
+                      ${(currentMetrics.wipUsd / 1000).toFixed(1)}k
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">Ingreso Operativo / Costos Directos</span>
+                    <span className="text-xs text-gray-500 block mt-1">Ingresos no facturados aún</span>
                   </div>
                   
-                  {/* Facturado (referencia) */}
-                  <div className="p-4 bg-gray-100 rounded-lg border border-gray-300">
+                  {/* Markup Operativo */}
+                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-600">Facturado (Referencia)</span>
-                        <span className="text-xs text-gray-400" title="Datos reales de fact_rc_month">●</span>
+                        <span className="text-sm font-medium text-gray-600">Markup Operativo</span>
+                        <span className="text-xs text-gray-400" title="Devengado / Costos Directos">ⓘ</span>
                       </div>
-                      <TrendingUp className="h-4 w-4 text-gray-600" />
+                      <TrendingUp className="h-4 w-4 text-emerald-600" />
                     </div>
-                    <div className="text-2xl font-bold text-gray-700">
-                      ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
+                    <div className="text-3xl font-bold text-emerald-600">
+                      {currentMetrics.markupOperativoUsd?.toFixed(2)}x
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">fact_rc_month • USD</span>
+                    <span className="text-xs text-gray-500 block mt-1">Devengado / Costos Directos</span>
                   </div>
 
                 </div>
