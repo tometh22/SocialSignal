@@ -272,22 +272,26 @@ export default function ExecutiveDashboard() {
           .reduce((sum, q) => sum + (q.totalAmount || 0), 0)
       : 0;
 
+    // Parsear el mes seleccionado
+    const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+    const filterDate = new Date(selectedYear, selectedMonthNum - 1, 1);
+    
+    // Filtrar entries por el mes seleccionado
+    const monthFilteredEntries = timeEntriesArray.filter(entry => {
+      if (!entry.date) return false;
+      const entryDate = new Date(entry.date);
+      return entryDate.getMonth() === filterDate.getMonth() && 
+             entryDate.getFullYear() === filterDate.getFullYear();
+    });
+
     // Utilización del equipo
     let teamUtilization = 0;
-    if (personnelArray.length > 0 && timeEntriesArray.length > 0) {
-      const currentMonth = new Date();
-      const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+    if (personnelArray.length > 0 && monthFilteredEntries.length > 0) {
+      const daysInMonth = new Date(selectedYear, selectedMonthNum, 0).getDate();
       const workingDaysInMonth = Math.floor(daysInMonth * (5/7)); // Aproximación días laborables
       const totalAvailableHours = personnelArray.length * 8 * workingDaysInMonth;
       
-      const currentMonthEntries = timeEntriesArray.filter(entry => {
-        if (!entry.date) return false;
-        const entryDate = new Date(entry.date);
-        return entryDate.getMonth() === currentMonth.getMonth() && 
-               entryDate.getFullYear() === currentMonth.getFullYear();
-      });
-      
-      const totalLoggedHours = currentMonthEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+      const totalLoggedHours = monthFilteredEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
       teamUtilization = totalAvailableHours > 0 ? (totalLoggedHours / totalAvailableHours) * 100 : 0;
     }
 
@@ -299,10 +303,10 @@ export default function ExecutiveDashboard() {
       ? pendingQuotations.reduce((sum, q) => sum + (q.totalAmount || 0), 0)
       : 0;
 
-    // Rentabilidad
+    // Rentabilidad (basada en el mes seleccionado)
     let profitMargin = 0;
-    if (timeEntriesArray.length > 0 && totalRevenue > 0) {
-      const totalCosts = timeEntriesArray.reduce((sum, entry) => {
+    if (monthFilteredEntries.length > 0 && totalRevenue > 0) {
+      const totalCosts = monthFilteredEntries.reduce((sum, entry) => {
         const rate = entry.hourlyRateAtTime || 50;
         return sum + ((entry.hours || 0) * rate);
       }, 0);
@@ -322,10 +326,10 @@ export default function ExecutiveDashboard() {
         : 0;
     }
 
-    // Eficiencia operacional
+    // Eficiencia operacional (basada en el mes seleccionado)
     let operationalEfficiency = 0;
-    if (timeEntriesArray.length > 0 && totalRevenue > 0) {
-      const totalLoggedHours = timeEntriesArray.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+    if (monthFilteredEntries.length > 0 && totalRevenue > 0) {
+      const totalLoggedHours = monthFilteredEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
       operationalEfficiency = totalLoggedHours > 0 ? (totalRevenue / totalLoggedHours) : 0;
     }
 
@@ -341,9 +345,9 @@ export default function ExecutiveDashboard() {
       totalClients: clientsArray.length,
       teamSize: personnelArray.length
     };
-  }, [allTimeEntries, activeProjects, quotations, personnel, clients, allDeliverables, isLoading]);
+  }, [allTimeEntries, activeProjects, quotations, personnel, clients, allDeliverables, isLoading, selectedMonth]);
 
-  // Datos para gráficos con datos reales
+  // Datos para gráficos con datos reales - filtrando por el mes seleccionado
   const chartData = useMemo(() => {
     if (isLoading) return [];
 
@@ -354,34 +358,43 @@ export default function ExecutiveDashboard() {
       return [];
     }
 
-    const last7Days = Array.from({length: 7}, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return date;
-    });
+    // Parsear el mes seleccionado
+    const [selectedYear, selectedMonthNum] = selectedMonth.split('-').map(Number);
+    const daysInSelectedMonth = new Date(selectedYear, selectedMonthNum, 0).getDate();
+    
+    // Generar los días del mes seleccionado (mostramos cada semana para no saturar)
+    const weeklyData: { date: string; hours: number; revenue: number; efficiency: number }[] = [];
+    
+    for (let week = 0; week < Math.ceil(daysInSelectedMonth / 7); week++) {
+      const weekStart = week * 7 + 1;
+      const weekEnd = Math.min((week + 1) * 7, daysInSelectedMonth);
+      
+      let weekHours = 0;
+      let weekRevenue = 0;
+      
+      for (let day = weekStart; day <= weekEnd; day++) {
+        const dateStr = `${selectedYear}-${String(selectedMonthNum).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayEntries = timeEntriesArray.filter(entry => 
+          entry.date && entry.date.startsWith(dateStr)
+        );
 
-    const dailyData = last7Days.map(date => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const dayEntries = timeEntriesArray.filter(entry => 
-        entry.date && entry.date.startsWith(dateStr)
-      );
+        weekHours += dayEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
+        weekRevenue += dayEntries.reduce((sum, entry) => {
+          const rate = entry.hourlyRateAtTime || 50;
+          return sum + ((entry.hours || 0) * rate);
+        }, 0);
+      }
+      
+      weeklyData.push({
+        date: `Sem ${week + 1}`,
+        hours: weekHours,
+        revenue: weekRevenue,
+        efficiency: weekHours > 0 ? weekRevenue / weekHours : 0
+      });
+    }
 
-      const dayHours = dayEntries.reduce((sum, entry) => sum + (entry.hours || 0), 0);
-      const dayRevenue = dayEntries.reduce((sum, entry) => {
-        const rate = entry.hourlyRateAtTime || 50;
-        return sum + ((entry.hours || 0) * rate);
-      }, 0);
-
-      return {
-        date: format(date, 'dd/MM'),
-        hours: dayHours,
-        revenue: dayRevenue,
-        efficiency: dayHours > 0 ? dayRevenue / dayHours : 0
-      };
-    });
-
-    return dailyData;
-  }, [allTimeEntries, isLoading]);
+    return weeklyData;
+  }, [allTimeEntries, isLoading, selectedMonth]);
 
   // Datos para gráfico de distribución de proyectos con datos reales
   const projectDistribution = useMemo(() => {
@@ -473,6 +486,31 @@ export default function ExecutiveDashboard() {
               </p>
             </div>
 
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-600">Mes:</span>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-month-filter">
+                    <SelectValue placeholder="Seleccionar mes..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date();
+                      date.setMonth(date.getMonth() - i);
+                      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                      const label = format(date, "MMMM yyyy", { locale: es });
+                      return (
+                        <SelectItem key={value} value={value} data-testid={`month-option-${value}`}>
+                          {label.charAt(0).toUpperCase() + label.slice(1)}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
@@ -546,6 +584,17 @@ export default function ExecutiveDashboard() {
 
           {/* Pestaña: Resumen Ejecutivo */}
           <TabsContent value="overview" className="space-y-6">
+            {/* Indicador del mes seleccionado */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Resumen Ejecutivo del Mes</h2>
+                <p className="text-sm text-gray-500">Evolución del mes en curso</p>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                {selectedMonth}
+              </Badge>
+            </div>
+
             {/* KPIs principales con datos reales */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="border-l-4 border-l-green-500">
@@ -700,7 +749,7 @@ export default function ExecutiveDashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="h-5 w-5" />
-                    Tendencias de los Últimos 7 Días
+                    Tendencias del Mes ({format(new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]) - 1), "MMMM yyyy", { locale: es })})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
