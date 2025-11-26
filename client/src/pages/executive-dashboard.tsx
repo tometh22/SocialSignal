@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { 
   TrendingUp, TrendingDown, Clock, DollarSign, 
@@ -31,6 +32,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   // Queries para datos reales
   const { data: clients = [], isLoading: clientsLoading } = useQuery({ 
@@ -399,7 +405,7 @@ export default function ExecutiveDashboard() {
       return [];
     }
 
-    const statusColors = {
+    const statusColors: Record<string, string> = {
       'active': '#10b981',
       'pending': '#f59e0b',
       'completed': '#3b82f6',
@@ -414,8 +420,8 @@ export default function ExecutiveDashboard() {
             status === 'completed' ? 'Completados' : 
             status === 'paused' ? 'Pausados' : 
             status === 'cancelled' ? 'Cancelados' : 'Desconocido',
-      value: count,
-      color: statusColors[status] || statusColors.unknown
+      value: count as number,
+      color: statusColors[status] || statusColors['unknown']
     }));
   }, [activeProjects, isLoading]);
 
@@ -434,19 +440,13 @@ export default function ExecutiveDashboard() {
     setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const getAlertColor = (type) => {
+  const getAlertColor = (type: string) => {
     switch(type) {
       case 'critical': return 'border-l-red-500 bg-red-50';
       case 'urgent': return 'border-l-orange-500 bg-orange-50';
       case 'warning': return 'border-l-yellow-500 bg-yellow-50';
       default: return 'border-l-blue-500 bg-blue-50';
     }
-  };
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    // Invalidar todas las queries
-    setTimeout(() => setRefreshing(false), 2000);
   };
 
   const getAlertIcon = (type: string) => {
@@ -469,8 +469,8 @@ export default function ExecutiveDashboard() {
                 Dashboard Ejecutivo
               </h1>
               <p className="text-sm text-gray-500">
-                {format(new Date(), "EEEE, dd 'de' MMMM", { locale: es })}
-              </p> </p>
+                {format(new Date(), "EEEE, dd 'de' MMMM yyyy", { locale: es })}
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -684,7 +684,7 @@ export default function ExecutiveDashboard() {
                     <CheckCircle className="h-8 w-8 text-green-500 mb-3" />
                     <p className="text-green-700 font-medium mb-1">No se detectaron alertas críticas</p>
                     <p className="text-green-600 text-sm">
-                      {(activeProjects?.length || 0) === 0 ? 
+                      {(Array.isArray(activeProjects) && activeProjects.length === 0) ? 
                         "No hay proyectos activos que monitorear" : 
                         "Todos los proyectos están operando dentro de los parámetros normales"
                       }
