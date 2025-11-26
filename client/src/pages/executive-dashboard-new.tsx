@@ -60,22 +60,40 @@ export default function ExecutiveDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, [temporalFilter]);
 
-  // Build query params from selected month
+  // Build query params from temporal filter
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    if (selectedMonth) params.set('period', selectedMonth);
+    
+    if (temporalFilter.mode === 'month' && temporalFilter.period) {
+      params.set('period', temporalFilter.period);
+    } else if (temporalFilter.mode === 'quarter' && temporalFilter.year && temporalFilter.quarter) {
+      params.set('year', String(temporalFilter.year));
+      params.set('quarter', String(temporalFilter.quarter));
+    } else if (temporalFilter.mode === 'year' && temporalFilter.year) {
+      params.set('year', String(temporalFilter.year));
+    } else if (temporalFilter.mode === 'custom' && temporalFilter.from && temporalFilter.to) {
+      params.set('from', temporalFilter.from);
+      params.set('to', temporalFilter.to);
+    } else if (selectedMonth) {
+      params.set('period', selectedMonth);
+    }
+    
     return params.toString();
-  }, [selectedMonth]);
+  }, [temporalFilter, selectedMonth]);
 
   // Query principal: métricas agregadas del Star Schema SoT
-  const { data: dashboardMetrics, refetch: refetchMetrics, isLoading } = useQuery({ 
-    queryKey: ['/api/dashboard/metrics', selectedMonth],
+  const { data: dashboardMetrics, refetch: refetchMetrics, isLoading, isFetching } = useQuery({ 
+    queryKey: ['/api/dashboard/metrics', queryParams],
     queryFn: async () => {
+      console.log('Fetching dashboard metrics with params:', queryParams);
       const res = await fetch(`/api/dashboard/metrics?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch dashboard metrics');
-      return res.json();
+      const data = await res.json();
+      console.log('Dashboard metrics received:', data);
+      return data;
     },
-    staleTime: 3 * 60 * 1000
+    staleTime: 1 * 60 * 1000,
+    refetchOnWindowFocus: false
   });
   
   const { data: quotations = [] } = useQuery({ 
@@ -245,10 +263,20 @@ export default function ExecutiveDashboard() {
       
       {/* Temporal Filter - Outside dark header for better visibility */}
       <div className="max-w-7xl mx-auto px-6 -mt-6 mb-6 relative z-50">
-        <NativeTemporalFilter
-          value={temporalFilter}
-          onChange={setTemporalFilter}
-        />
+        <div className="relative">
+          <NativeTemporalFilter
+            value={temporalFilter}
+            onChange={setTemporalFilter}
+          />
+          {(isLoading || isFetching) && (
+            <div className="absolute inset-0 bg-white/50 rounded-xl flex items-center justify-center">
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow">
+                <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                <span className="text-sm text-gray-600">Cargando datos...</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Main Content */}
