@@ -218,18 +218,20 @@ export default function ExecutiveDashboard() {
                 <Calendar className="h-4 w-4 text-gray-300" />
                 <span className="text-gray-300 text-sm font-medium">Mes:</span>
               </div>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="w-64 bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="Seleccionar mes..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {dashboardMetrics?.availablePeriods?.map(p => (
-                    <SelectItem key={p.periodKey} value={p.periodKey}>
-                      {format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="w-64 h-10 px-3 py-2 text-sm bg-white/10 border border-white/20 text-white rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-white/30 appearance-none"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', backgroundSize: '16px' }}
+                data-testid="select-month-filter"
+              >
+                <option value="" disabled className="bg-gray-800 text-white">Seleccionar mes...</option>
+                {dashboardMetrics?.availablePeriods?.map(p => (
+                  <option key={p.periodKey} value={p.periodKey} className="bg-gray-800 text-white">
+                    {format(new Date(p.year, p.month - 1), 'MMMM yyyy', { locale: es })}
+                  </option>
+                ))}
+              </select>
               {dashboardMetrics?.resolved && (
                 <span className="text-gray-400 text-sm">
                   ({dashboardMetrics.resolved.label})
