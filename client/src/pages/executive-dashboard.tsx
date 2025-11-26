@@ -496,29 +496,30 @@ export default function ExecutiveDashboard() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">Mes:</span>
-                <select 
-                  value={selectedMonth} 
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-[180px] h-10 px-3 py-2 text-sm bg-white border border-gray-200 rounded-md cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  data-testid="select-month-filter"
-                >
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const date = new Date();
-                    date.setMonth(date.getMonth() - i);
-                    const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                    const label = format(date, "MMMM yyyy", { locale: es });
-                    return (
-                      <option key={value} value={value} data-testid={`month-option-${value}`}>
-                        {label.charAt(0).toUpperCase() + label.slice(1)}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+            <div className="flex items-center gap-3 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">Filtrar por mes:</span>
+              <select 
+                value={selectedMonth} 
+                onChange={(e) => {
+                  console.log('Mes seleccionado:', e.target.value);
+                  setSelectedMonth(e.target.value);
+                }}
+                className="w-[200px] h-10 px-3 py-2 text-sm font-medium bg-white border-2 border-blue-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm hover:border-blue-400 transition-colors"
+                data-testid="select-month-filter"
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const date = new Date();
+                  date.setMonth(date.getMonth() - i);
+                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  const label = format(date, "MMMM yyyy", { locale: es });
+                  return (
+                    <option key={value} value={value} data-testid={`month-option-${value}`}>
+                      {label.charAt(0).toUpperCase() + label.slice(1)}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
 
             <div className="flex items-center gap-2">
