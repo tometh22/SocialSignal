@@ -55,18 +55,14 @@ export async function getDevengadoByPeriod(periodKeys: string[]): Promise<Deveng
         FROM fact_labor_month flm
         WHERE flm.project_id = frm.project_id
       ) as hours_worked_total,
-      (
-        SELECT SUM(qi.estimated_hours)
-        FROM quotation_items qi
-        WHERE qi.quotation_id = q.id
-      ) as hours_estimated
+      NULL::numeric as hours_estimated
     FROM fact_rc_month frm
     JOIN active_projects ap ON frm.project_id = ap.id
-    JOIN quotations q ON ap.quotation_id = q.id
-    JOIN clients c ON ap.client_id = c.id
+    LEFT JOIN quotations q ON ap.quotation_id = q.id
+    LEFT JOIN clients c ON ap.client_id = c.id
     WHERE frm.period_key = ANY($1)
     GROUP BY frm.project_id, ap.id, q.project_name, ap.subproject_name, c.name, 
-             q.quotation_type, q.total_amount, q.quotation_currency, q.project_type, q.id
+             q.quotation_type, q.total_amount, q.quotation_currency, q.project_type
   `, [periodKeys]);
   
   const { rows: [costsData] } = await pool.query(`
@@ -78,19 +74,7 @@ export async function getDevengadoByPeriod(periodKeys: string[]): Promise<Deveng
   
   const totalDirectCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
   
-  const { rows: projectCostsData } = await pool.query(`
-    SELECT 
-      project_id,
-      COALESCE(SUM(direct_usd), 0) as project_direct_costs_usd
-    FROM fact_cost_month
-    WHERE period_key = ANY($1) AND project_id IS NOT NULL
-    GROUP BY project_id
-  `, [periodKeys]);
-  
   const projectCostsMap = new Map<number, number>();
-  for (const row of projectCostsData) {
-    projectCostsMap.set(row.project_id, parseFloat(row.project_direct_costs_usd || '0'));
-  }
   
   for (const project of projectsData) {
     const projectId = project.project_id;
