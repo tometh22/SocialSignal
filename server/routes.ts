@@ -5290,7 +5290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ===== PERÍODOS DISPONIBLES =====
       const periodsInfo = await resolveAvailablePeriods();
       
-      // ===== BUILD RESPONSE =====
+      // ===== BUILD RESPONSE (Restructured per spec: financial vs operational separation) =====
       const metrics = {
         resolved: {
           mode: resolved.mode,
@@ -5304,57 +5304,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         defaultPeriod: periodsInfo.defaultPeriod,
         availablePeriods: periodsInfo.availablePeriods,
         
+        // ===== FINANCIAL (Visión Socios: usa Facturado y Costos Totales) =====
         financial: {
-          // === INGRESOS (Financiero) ===
-          incomeUsd: incomeUsd,                        // Facturado del mes (from Rendimiento Cliente)
-          billedUsd: billedUsd,                        // = Facturado (legacy compatibility)
-          
-          // === INGRESOS (Operativo) ===
-          devengadoUsd: devengadoUsd,                  // Ingreso Ganado (Fee=facturado, OneShot=por avance)
-          
-          // === COSTOS ===
-          directCostsUsd: directCostsUsd,              // Costos directos del mes
-          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos del mes (overhead)
-          costUsd: costUsd,                            // Total costos (Directos + Indirectos)
-          burnRateUsd: burnRateUsd,                    // Burn Rate = Total costos del mes
-          
-          // === EBIT CONTABLE (Financiero: usa Facturado) ===
-          ebitContableUsd: ebitContableUsd,            // EBIT Contable = Facturado - Costos Totales
-          ebitContablePct: ebitContablePct,            // % sobre Facturado
-          marginContableUsd: marginContableUsd,        // = EBIT Contable (legacy)
-          marginContablePct: marginContablePct,        // % (legacy)
-          margenAdminPct: margenAdminPct,              // % Margen administrativo
-          
-          // === EBIT OPERATIVO (Operativo: usa Devengado) ===
-          ebitOperativoUsd: ebitOperativoUsd,          // EBIT Operativo = Devengado - Directos
-          ebitOperativoPct: ebitOperativoPct,          // % sobre Devengado
-          markupOperativoUsd: markupOperativoUsd,      // Markup = Devengado / Costos Directos
-          tarifaEfectivaUsd: tarifaEfectivaUsd,        // Tarifa Efectiva = Devengado / Horas
-          
-          // === PROVISIONES Y BENEFICIO NETO ===
-          adjustmentsUsd: totalAdjustmentsUsd,         // Provisiones e impuestos del mes
-          beneficioNetoUsd: beneficioNetoUsd,          // Beneficio Neto = EBIT Contable - Provisiones
-          
-          // === CASH FLOW ===
-          cashFlowOperativoUsd: cashFlowOperativoUsd,  // Entradas - Salidas del mes
-          
-          // === OTROS ===
-          wipUsd: wipUsd,                              // WIP = 0 (disabled)
-          fxWeighted: fxWeighted
+          billedUsd: incomeUsd,                        // Facturado del mes
+          totalCostsUsd: totalCostsUsd,                // Directos + Indirectos
+          directCostsUsd: directCostsUsd,              // Costos directos
+          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos (overhead)
+          ebitAccountingUsd: ebitContableUsd,          // Facturado - Costos Totales
+          ebitAccountingPct: ebitContablePct,          // % sobre Facturado
+          burnRateUsd: burnRateUsd                     // = Costos Totales
         },
         
+        // ===== OPERATIONAL (Visión Management: usa Devengado y Costos Directos) =====
         operational: {
-          hours: {
-            total: totalHours,
-            billable: billableHours,
-            nonBillable: parseFloat(hoursData?.non_billable_hours || '0'),
-            billablePct: billablePct
-          },
-          peopleActive: parseInt(peopleData?.people_active || '0'),
-          projects: {
-            active: parseInt(projectsData?.active || '0'),
-            total: parseInt(projectsData?.total || '0')
-          }
+          earnedUsd: devengadoUsd,                     // Devengado (ingreso ganado)
+          directCostsUsd: directCostsUsd,              // Solo costos directos
+          ebitOperationalUsd: ebitOperativoUsd,        // Devengado - Directos
+          ebitOperationalPct: ebitOperativoPct,        // % sobre Devengado
+          markup: markupOperativoUsd,                  // Devengado / Costos Directos
+          effectiveRateUsd: tarifaEfectivaUsd,         // Devengado / Horas facturables
+          
+          hoursTotal: totalHours,
+          hoursBillable: billableHours,
+          hoursNonBillable: parseFloat(hoursData?.non_billable_hours || '0'),
+          billableRatio: billablePct,                  // 0-1
+          
+          activePeople: parseInt(peopleData?.people_active || '0'),
+          activeProjects: parseInt(projectsData?.active || '0')
+        },
+        
+        // ===== LEGACY (for backward compatibility with existing components) =====
+        legacy: {
+          incomeUsd,
+          billedUsd,
+          devengadoUsd,
+          directCostsUsd,
+          indirectCostsUsd,
+          costUsd,
+          burnRateUsd,
+          ebitContableUsd,
+          ebitContablePct,
+          ebitOperativoUsd,
+          ebitOperativoPct,
+          markupOperativoUsd,
+          tarifaEfectivaUsd,
+          totalHours,
+          billableHours,
+          billablePct,
+          fxWeighted
         },
         
         alerts: alerts,

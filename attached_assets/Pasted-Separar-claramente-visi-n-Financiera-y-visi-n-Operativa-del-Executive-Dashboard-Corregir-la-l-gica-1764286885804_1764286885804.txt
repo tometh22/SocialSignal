@@ -1,0 +1,355 @@
+Separar claramente visión Financiera y visión Operativa del Executive Dashboard.
+
+Corregir la lógica de KPIs para que:
+
+Financiero use Facturado y Costos Totales (visión socios).
+
+Operativo use Devengado y Costos Directos (visión management).
+
+Limpiar la UI/UX: menos ruido visual, jerarquía clara de KPIs, sin “arcoíris”.
+
+1) Backend – Endpoint de Executive Dashboard
+
+Buscar el endpoint que alimenta el “Resumen Ejecutivo del Mes” (Executive Dashboard).
+En versiones anteriores estaba en server/routes.ts o archivo similar.
+
+1.1. Localizar y revisar
+
+Buscar en el código:
+
+"Resumen Ejecutivo del Mes"
+
+"executive"
+
+fact_rc_month
+
+/api/dashboard/executive o similar.
+
+Identificar:
+
+Cómo se reciben los parámetros de tiempo (period_key, periodKeys, etc.).
+
+De qué tablas salen hoy los datos:
+
+fact_rc_month (facturado).
+
+tablas de costos directos/indirectos.
+
+tablas de horas (fact_labor_month o similar).
+
+1.2. Estructura de respuesta unificada
+
+Modificar el endpoint para que devuelva un solo objeto con dos bloques anidados:
+
+{
+  periodKey: string,          // ej: "2025-10"
+  periodLabel: string,        // ej: "Octubre 2025"
+
+  financial: {
+    billedUsd: number,        // Facturado total
+    totalCostsUsd: number,    // Directos + Indirectos
+    directCostsUsd: number,
+    indirectCostsUsd: number,
+    ebitAccountingUsd: number, // Facturado - TotalCosts
+    burnRateUsd: number        // Alias de totalCostsUsd
+  },
+
+  operational: {
+    earnedUsd: number,          // Devengado (Ingreso ganando este mes)
+    directCostsUsd: number,     // Solo costos directos
+    ebitOperationalUsd: number, // earnedUsd - directCostsUsd
+    markup: number,             // earnedUsd / directCostsUsd (proteger div/0 → 0)
+    effectiveRateUsd: number,   // earnedUsd / billableHours (proteger div/0 → 0)
+
+    hoursTotal: number,
+    hoursBillable: number,
+    hoursNonBillable: number,
+    billableRatio: number,      // hoursBillable / hoursTotal (0–1)
+
+    activePeople: number,       // Personas con horas en el período
+    activeProjects: number      // Proyectos con horas o ingresos > 0 en el período
+  }
+}
+
+1.3. Cálculos (financieros)
+
+En el backend, asegurar:
+
+billedUsd        = SUM(revenue_usd de fact_rc_month para periodKey)
+directCostsUsd   = SUM(costos directos USD para periodKey)
+indirectCostsUsd = SUM(costos indirectos USD para periodKey)
+totalCostsUsd    = directCostsUsd + indirectCostsUsd
+ebitAccountingUsd = billedUsd - totalCostsUsd
+burnRateUsd       = totalCostsUsd
+
+
+Mantener 100% parametrizado por periodKey / periodKeys.
+
+Nada hardcodeado a Octubre; debe funcionar para cualquier mes.
+
+1.4. Cálculos (operativos)
+
+Suponer que ya existe algún campo o tabla de devengado (earned revenue).
+Si ya está:
+
+earnedUsd = SUM(earned_revenue_usd para periodKey)
+
+
+Si NO existiera devengado explícito, hacer:
+
+Para fees mensuales: devengado del mes = facturado del mes (mismo período).
+
+Para one shot con valor total y distribución por meses: usar la lógica que ya tengan de % avance o horas consumidas. (Si ya hay ETL de devengado, no tocar esa lógica; solo consumirla.)
+
+Luego:
+
+ebitOperationalUsd = earnedUsd - directCostsUsd
+
+markup = directCostsUsd > 0
+  ? earnedUsd / directCostsUsd
+  : 0
+
+hoursTotal      = SUM(horas totales período)
+hoursBillable   = SUM(horas con proyecto cliente)
+hoursNonBillable = hoursTotal - hoursBillable
+
+billableRatio = hoursTotal > 0
+  ? hoursBillable / hoursTotal
+  : 0
+
+effectiveRateUsd = hoursBillable > 0
+  ? earnedUsd / hoursBillable
+  : 0
+
+
+activePeople = count(distinct persona) con horas > 0 en el período.
+activeProjects = count(distinct proyecto) con horas > 0 o ingresos > 0 en el período.
+
+1.5. Invariantes / tests rápidos (log + consola)
+
+Agregar logs de debug (temporales) tipo:
+
+EXEC DASH [period=${periodKey}] financial=... operational=...
+
+Verificar para 2025-10 que:
+
+billedUsd ≈ 42.1k (lo que veíamos en la app).
+
+directCostsUsd + indirectCostsUsd ≈ 64.2k.
+
+hoursTotal ≈ 1659h.
+
+2) Frontend – Dos vistas: Financiero vs Operativo
+
+Asumir frontend en React/TS. Ajustar nombres al stack real.
+
+2.1. Localizar componente
+
+Buscar el componente del Executive Dashboard:
+
+"Resumen Ejecutivo del Mes"
+
+"ExecutiveDashboard"
+
+"Métricas Clave".
+
+Identificar:
+
+Cómo consume hoy el endpoint.
+
+Cómo construye las tarjetas superiores y la composición de costos.
+
+2.2. Agregar switch de contexto
+
+En la cabecera del dashboard, agregar un toggle o tabs:
+
+Opciones: "Financiero" | "Operativo".
+
+Estado local: viewMode = "financial" | "operational" (default "operational").
+
+Ejemplo conceptual:
+
+const [viewMode, setViewMode] = useState<"financial" | "operational">("operational");
+
+
+UI simple: dos botones o tabs, donde el activo cambia de estilo.
+
+2.3. Layout para vista OPERATIVA
+
+Cuando viewMode === "operational" mostrar:
+
+Fila 1 – KPIs héroe
+
+Devengado (Ingreso ganado)
+
+Valor: operational.earnedUsd
+
+Subtexto pequeño: Facturado: financial.billedUsd
+(para contexto, en gris).
+
+EBIT Operativo
+
+Valor: operational.ebitOperationalUsd
+
+Subtexto: % respecto al Devengado
+operational.ebitOperationalUsd / operational.earnedUsd.
+
+Tarjetas grandes, anchas, mismas alturas.
+
+Fila 2 – Eficiencia
+
+Tres tarjetas medianas:
+
+Tarifa Efectiva
+
+effectiveRateUsd
+
+Subtexto: USD / hora facturable.
+
+Markup Operativo
+
+markup con sufijo x.
+
+% Horas Facturables
+
+billableRatio en %
+
+Pequeña barrita horizontal o mini gauge; sin ocupar una fila entera.
+
+Fila 3 – Capacidad
+
+Tres tarjetas chicas:
+
+Horas trabajadas (hoursTotal)
+
+Personas activas (activePeople)
+
+Proyectos activos (activeProjects)
+
+Fila 4 – Costos directos vs overhead
+
+Componente único de “Composición de costos”:
+
+Barra apilada:
+
+Directos (verde suave).
+
+Indirectos (rojo suave).
+
+Textos:
+
+Directos (equipo): $X
+
+Indirectos (overhead): $Y
+
+Total: $Z.
+
+2.4. Layout para vista FINANCIERA
+
+Cuando viewMode === "financial" mostrar:
+
+Fila 1 – KPIs héroe
+
+Facturado – financial.billedUsd
+
+EBIT Contable – financial.ebitAccountingUsd
+
+Fila 2 – Costos
+
+Tres tarjetas medianas:
+
+Costos directos – financial.directCostsUsd
+
+Overhead – financial.indirectCostsUsd
+
+Burn rate (total) – financial.burnRateUsd
+
+Fila 3 – Contexto
+
+Personas activas.
+
+Proyectos activos.
+(Solo como info, sin horas ni devengado.)
+
+3) UI / UX – Reglas de diseño
+3.1. Jerarquía visual
+
+Implementar tres tamaños de tarjeta:
+
+size="xl" → héroes (Devengado / Facturado, EBIT).
+
+size="md" → métricas de eficiencia / costos.
+
+size="sm" → contadores (personas, proyectos, horas).
+
+Si ya existe un sistema de Card / MetricCard, reusarlo con props.
+
+3.2. Colores semánticos
+
+Definir paleta clara:
+
+Verde suave: OK / ingresos positivos / márgenes > 0.
+
+Rojo suave: costos, pérdidas, burn rate.
+
+Azul/gris: datos neutros (horas, personas, proyectos).
+
+Amarillo/naranja: warnings (ej: margen < threshold, overhead > 40%).
+
+Eliminar:
+
+Lavanda, celeste pastel, lila o fondo multicolor.
+
+Múltiples tonos sin semántica.
+
+3.3. Texto y tooltips
+
+Sacar el bloque de “Fórmulas” del cuerpo del dashboard.
+
+Para cada tarjeta importante, usar un icono (i) o ? con tooltip que muestre la fórmula:
+
+EBIT Operativo: Devengado – Costos Directos.
+
+EBIT Contable: Facturado – Costos Totales.
+
+Markup: Devengado / Costos Directos.
+
+Tarifa efectiva: Devengado / Horas facturables.
+
+4) Comprobaciones y sanity checks
+
+Una vez implementado:
+
+Probar para Octubre 2025 (periodKey 2025-10):
+
+Facturado ~ 42.1k.
+
+Total costos ~ 64.2k.
+
+Directos ~ 17.4k, Indirectos ~ 46.9k.
+
+Horas totales ~ 1659h, 100% facturables.
+
+Cambiar a otro mes con datos (ej. Septiembre) y verificar:
+
+Que todas las tarjetas se actualizan coherentemente.
+
+Que no hay nada hardcodeado a octubre.
+
+Verificar que:
+
+En vista Operativa NUNCA se use billedUsd para fórmulas (solo para el subtexto de contexto).
+
+En vista Financiera NUNCA se use earnedUsd para fórmulas (solo si se quiere mostrarlo como contexto pequeño, opcional).
+
+TL;DR para el Agent
+
+Extender endpoint del Executive Dashboard para devolver { financial, operational } con los campos y fórmulas indicadas.
+
+Implementar switch Financiero | Operativo.
+
+Reorganizar las tarjetas según las filas descritas (héroes, eficiencia/costos, capacidad).
+
+Aplicar paleta de colores semántica y eliminar el bloque de fórmulas visibles, reemplazándolo por tooltips.
+
+Asegurar que la lógica de cada vista use las fuentes correctas (Facturado / Devengado, Directos / Totales) y funcione para cualquier mes.
