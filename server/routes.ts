@@ -5059,8 +5059,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Income = SUM(revenue_usd) for Real/Facturado rows in the selected month
       const incomeUsd = parseFloat(billingData?.billed_usd || '0');
       
-      // Devengado = same as Income for now (temporary rule per business definition)
-      const devengadoUsd = incomeUsd;
+      // ===== DEVENGADO (from devengado module - calculates accrued revenue by project type) =====
+      const { getDevengadoSimple } = await import('./services/devengado.js');
+      const devengadoResult = await getDevengadoSimple(periodKeys);
+      const devengadoUsd = devengadoResult.devengadoUsd;
       
       // WIP = 0 (disabled per business definition)
       const wipUsd = 0;
@@ -5070,9 +5072,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
       const totalCostsUsd = directCostsUsd + indirectCostsUsd;
       
-      // ===== EBIT OPERATIVO (new business definition) =====
-      // EBIT_operativo = Income - Costos_directos (do NOT subtract indirect costs)
-      const ebitOperativoUsd = incomeUsd - directCostsUsd;
+      // ===== EBIT OPERATIVO (business definition: uses DEVENGADO, not Facturado) =====
+      // EBIT_operativo = Devengado - Costos_directos (do NOT subtract indirect costs)
+      const ebitOperativoUsd = devengadoUsd - directCostsUsd;
       
       // ===== EBIT CONTABLE (administrative definition) =====
       // EBIT Contable = Facturado - Costos Totales (directos + indirectos)
@@ -5105,24 +5107,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const burnRateUsd = totalCostsUsd;
       
       // ===== PORCENTAJES Y MARKUP =====
-      const ebitOperativoPct = incomeUsd > 0 ? (ebitOperativoUsd / incomeUsd) * 100 : 0;
+      // EBIT Operativo uses devengado as base (operational view)
+      const ebitOperativoPct = devengadoUsd > 0 ? (ebitOperativoUsd / devengadoUsd) * 100 : 0;
+      // EBIT Contable uses facturado as base (financial/accounting view)
       const ebitContablePct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0;
       const marginContablePct = incomeUsd > 0 ? (marginContableUsd / incomeUsd) * 100 : 0;
       const margenAdminPct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0; // Same as ebitContablePct
-      const markupOperativoUsd = directCostsUsd > 0 ? (incomeUsd / directCostsUsd) : 0;
+      // Markup Operativo = Devengado / Costos Directos (operational markup)
+      const markupOperativoUsd = directCostsUsd > 0 ? (devengadoUsd / directCostsUsd) : 0;
+      
+      // ===== TARIFA EFECTIVA (Effective Rate) =====
+      const totalHours = parseFloat(hoursData?.total_hours || '0');
+      const billableHoursForTarifa = parseFloat(hoursData?.billable_hours || '0');
+      // Tarifa Efectiva = Devengado / Billable Hours (rate per productive hour)
+      const tarifaEfectivaUsd = billableHoursForTarifa > 0 ? (devengadoUsd / billableHoursForTarifa) : 0;
       
       // ===== VERIFICATION LOGS =====
       console.log(`📊 DASHBOARD VERIFICATION [${lastPeriodKey}]:`);
-      console.log(`   Income (Facturado): USD ${incomeUsd.toFixed(2)}`);
-      console.log(`   Costos Directos: USD ${directCostsUsd.toFixed(2)}`);
-      console.log(`   Costos Indirectos: USD ${indirectCostsUsd.toFixed(2)}`);
-      console.log(`   Burn Rate (Total Costs): USD ${burnRateUsd.toFixed(2)}`);
-      console.log(`   EBIT Operativo (Income - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
-      console.log(`   EBIT Contable (Income - Total Costs): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
-      console.log(`   Provisiones/Ajustes: USD ${totalAdjustmentsUsd.toFixed(2)}`);
-      console.log(`   Beneficio Neto: USD ${beneficioNetoUsd.toFixed(2)}`);
-      console.log(`   Cash Flow Operativo: USD ${cashFlowOperativoUsd.toFixed(2)}`);
-      console.log(`   Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
+      console.log(`   💵 FINANCIERO:`);
+      console.log(`      Facturado: USD ${incomeUsd.toFixed(2)}`);
+      console.log(`      EBIT Contable (Facturado - Costs): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
+      console.log(`      Burn Rate (Total Costs): USD ${burnRateUsd.toFixed(2)}`);
+      console.log(`   📈 OPERATIVO:`);
+      console.log(`      Devengado: USD ${devengadoUsd.toFixed(2)}`);
+      console.log(`      EBIT Operativo (Devengado - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
+      console.log(`      Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
+      console.log(`      Tarifa Efectiva: USD ${tarifaEfectivaUsd.toFixed(2)}/h`);
+      console.log(`   📦 COSTOS:`);
+      console.log(`      Directos: USD ${directCostsUsd.toFixed(2)}`);
+      console.log(`      Indirectos: USD ${indirectCostsUsd.toFixed(2)}`);
       
       // Legacy compatibility
       const billedUsd = incomeUsd;
@@ -5188,7 +5201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ===== INTELLIGENT ALERTS =====
       const alerts: Array<{code: string, severity: string, msg: string, action?: string}> = [];
       
-      const totalHours = parseFloat(hoursData?.total_hours || '0');
+      // totalHours already defined above (line ~5120)
       const billableHours = parseFloat(hoursData?.billable_hours || '0');
       const billablePct = totalHours > 0 ? (billableHours / totalHours) : 0;
       const fxWeighted = parseFloat(fxData?.fx_weighted || '0');
@@ -5292,10 +5305,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availablePeriods: periodsInfo.availablePeriods,
         
         financial: {
-          // === INGRESOS ===
+          // === INGRESOS (Financiero) ===
           incomeUsd: incomeUsd,                        // Facturado del mes (from Rendimiento Cliente)
-          devengadoUsd: devengadoUsd,                  // = Income (temporary rule)
-          billedUsd: billedUsd,                        // = Income (legacy compatibility)
+          billedUsd: billedUsd,                        // = Facturado (legacy compatibility)
+          
+          // === INGRESOS (Operativo) ===
+          devengadoUsd: devengadoUsd,                  // Ingreso Ganado (Fee=facturado, OneShot=por avance)
           
           // === COSTOS ===
           directCostsUsd: directCostsUsd,              // Costos directos del mes
@@ -5303,15 +5318,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           costUsd: costUsd,                            // Total costos (Directos + Indirectos)
           burnRateUsd: burnRateUsd,                    // Burn Rate = Total costos del mes
           
-          // === EBIT Y MÁRGENES ===
-          ebitOperativoUsd: ebitOperativoUsd,          // EBIT Operativo = Income - Directos
-          ebitOperativoPct: ebitOperativoPct,          // % EBIT operativo
-          ebitContableUsd: ebitContableUsd,            // EBIT Contable = Income - (Directos + Indirectos)
-          ebitContablePct: ebitContablePct,            // % EBIT contable
-          marginContableUsd: marginContableUsd,        // Margen Contable = EBIT Contable (legacy)
-          marginContablePct: marginContablePct,        // % Margen contable
-          margenAdminPct: margenAdminPct,              // % Margen administrativo = EBIT Contable / Facturado
-          markupOperativoUsd: markupOperativoUsd,      // Markup = Income / Costos Directos
+          // === EBIT CONTABLE (Financiero: usa Facturado) ===
+          ebitContableUsd: ebitContableUsd,            // EBIT Contable = Facturado - Costos Totales
+          ebitContablePct: ebitContablePct,            // % sobre Facturado
+          marginContableUsd: marginContableUsd,        // = EBIT Contable (legacy)
+          marginContablePct: marginContablePct,        // % (legacy)
+          margenAdminPct: margenAdminPct,              // % Margen administrativo
+          
+          // === EBIT OPERATIVO (Operativo: usa Devengado) ===
+          ebitOperativoUsd: ebitOperativoUsd,          // EBIT Operativo = Devengado - Directos
+          ebitOperativoPct: ebitOperativoPct,          // % sobre Devengado
+          markupOperativoUsd: markupOperativoUsd,      // Markup = Devengado / Costos Directos
+          tarifaEfectivaUsd: tarifaEfectivaUsd,        // Tarifa Efectiva = Devengado / Horas
           
           // === PROVISIONES Y BENEFICIO NETO ===
           adjustmentsUsd: totalAdjustmentsUsd,         // Provisiones e impuestos del mes

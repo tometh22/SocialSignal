@@ -136,6 +136,7 @@ export default function ExecutiveDashboard() {
         ebitContablePct: 0,
         margenAdminPct: 0,
         markupOperativoUsd: 0,
+        tarifaEfectivaUsd: 0,
         adjustmentsUsd: 0,
         beneficioNetoUsd: 0,
         cashFlowOperativoUsd: 0,
@@ -167,6 +168,7 @@ export default function ExecutiveDashboard() {
       ebitContablePct: dashboardMetrics.financial?.ebitContablePct || 0,
       margenAdminPct: dashboardMetrics.financial?.margenAdminPct || 0,
       markupOperativoUsd: dashboardMetrics.financial?.markupOperativoUsd || 0,
+      tarifaEfectivaUsd: dashboardMetrics.financial?.tarifaEfectivaUsd || 0,
       adjustmentsUsd: dashboardMetrics.financial?.adjustmentsUsd || 0,
       beneficioNetoUsd: dashboardMetrics.financial?.beneficioNetoUsd || 0,
       cashFlowOperativoUsd: dashboardMetrics.financial?.cashFlowOperativoUsd || 0,
@@ -380,28 +382,23 @@ export default function ExecutiveDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* BLOQUE 1: MÉTRICAS EJECUTIVAS - Snapshot inmediato de salud */}
-              <div className="mb-8">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* BLOQUE FINANCIERO: Facturado, EBIT Contable, Burn Rate */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-blue-600" />
+                  Financiero (Contable)
+                </h3>
+                <div className="grid grid-cols-3 gap-4">
                   {/* Facturado */}
-                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm" data-testid="metric-facturado">
                     <span className="text-xs font-medium text-green-700 uppercase tracking-wide">Facturado</span>
                     <div className="text-3xl font-bold text-green-800 mt-2">
                       ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
                   
-                  {/* EBIT Operativo */}
-                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`}>
-                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>EBIT Operativo</span>
-                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
-                      ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k
-                    </div>
-                    <span className={`text-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{currentMetrics.ebitOperativoPct?.toFixed(0)}%</span>
-                  </div>
-
                   {/* EBIT Contable */}
-                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitContableUsd >= 0 ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`}>
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitContableUsd >= 0 ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`} data-testid="metric-ebit-contable">
                     <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-700' : 'text-red-700'}`}>EBIT Contable</span>
                     <div className={`text-3xl font-bold mt-2 ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-800' : 'text-red-700'}`}>
                       ${(currentMetrics.ebitContableUsd / 1000).toFixed(1)}k
@@ -410,27 +407,76 @@ export default function ExecutiveDashboard() {
                   </div>
 
                   {/* Burn Rate */}
-                  <div className="p-4 bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl border border-rose-200 shadow-sm">
+                  <div className="p-4 bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl border border-rose-200 shadow-sm" data-testid="metric-burn-rate">
                     <span className="text-xs font-medium text-rose-700 uppercase tracking-wide">Burn Rate</span>
                     <div className="text-3xl font-bold text-rose-800 mt-2">
                       ${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* BLOQUE OPERATIVO: Devengado, EBIT Operativo, Markup, Tarifa Efectiva */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-emerald-600" />
+                  Operativo (Management)
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Devengado */}
+                  <div className="p-4 bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl border border-cyan-200 shadow-sm" data-testid="metric-devengado">
+                    <span className="text-xs font-medium text-cyan-700 uppercase tracking-wide">Devengado</span>
+                    <div className="text-3xl font-bold text-cyan-800 mt-2">
+                      ${(currentMetrics.devengadoUsd / 1000).toFixed(1)}k
+                    </div>
+                    <span className="text-xs text-cyan-600">Ingreso ganado</span>
+                  </div>
+                  
+                  {/* EBIT Operativo */}
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`} data-testid="metric-ebit-operativo">
+                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>EBIT Operativo</span>
+                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                      ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k
+                    </div>
+                    <span className={`text-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{currentMetrics.ebitOperativoPct?.toFixed(0)}%</span>
+                  </div>
 
                   {/* Markup */}
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm">
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm" data-testid="metric-markup">
                     <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">Markup</span>
                     <div className="text-3xl font-bold text-purple-800 mt-2">
                       {currentMetrics.markupOperativoUsd?.toFixed(2)}x
                     </div>
                   </div>
 
-                  {/* % Horas Facturables */}
-                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.billablePct >= 0.6 ? 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200' : 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200'}`}>
-                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.billablePct >= 0.6 ? 'text-teal-700' : 'text-amber-700'}`}>% Facturables</span>
-                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.billablePct >= 0.6 ? 'text-teal-800' : 'text-amber-700'}`}>
-                      {(currentMetrics.billablePct * 100).toFixed(0)}%
+                  {/* Tarifa Efectiva */}
+                  <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm" data-testid="metric-tarifa-efectiva">
+                    <span className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Tarifa Efectiva</span>
+                    <div className="text-3xl font-bold text-indigo-800 mt-2">
+                      ${currentMetrics.tarifaEfectivaUsd?.toFixed(0)}
                     </div>
+                    <span className="text-xs text-indigo-600">/h facturable</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOQUE UTILIZACIÓN: % Facturables */}
+              <div className="mb-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.billablePct >= 0.6 ? 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200' : 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200'}`} data-testid="metric-billable-pct">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.billablePct >= 0.6 ? 'text-teal-700' : 'text-amber-700'}`}>% Horas Facturables</span>
+                        <div className={`text-3xl font-bold mt-1 ${currentMetrics.billablePct >= 0.6 ? 'text-teal-800' : 'text-amber-700'}`}>
+                          {(currentMetrics.billablePct * 100).toFixed(0)}%
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-gray-600">
+                        <div>{currentMetrics.billableHours.toFixed(0)}h facturables</div>
+                        <div>{currentMetrics.totalHours.toFixed(0)}h totales</div>
+                      </div>
+                    </div>
+                    <Progress value={currentMetrics.billablePct * 100} className={`h-2 mt-3 ${currentMetrics.billablePct >= 0.6 ? '[&>div]:bg-teal-500' : '[&>div]:bg-amber-500'}`} />
                   </div>
                 </div>
               </div>
@@ -477,11 +523,14 @@ export default function ExecutiveDashboard() {
                     </div>
                   </div>
 
-                  {/* Definiciones de márgenes */}
+                  {/* Definiciones de fórmulas */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600">
-                    <div className="space-y-1">
-                      <p><strong className="text-emerald-700">EBIT Operativo</strong> = Facturado - Directos</p>
-                      <p><strong className="text-blue-700">EBIT Contable</strong> = Facturado - Directos - Indirectos</p>
+                    <div className="space-y-1.5">
+                      <p className="font-medium text-gray-700 mb-2">Fórmulas:</p>
+                      <p><strong className="text-blue-700">EBIT Contable</strong> = Facturado - Costos Totales</p>
+                      <p><strong className="text-emerald-700">EBIT Operativo</strong> = Devengado - Costos Directos</p>
+                      <p><strong className="text-purple-700">Markup</strong> = Devengado / Costos Directos</p>
+                      <p><strong className="text-indigo-700">Tarifa Efectiva</strong> = Devengado / Horas Facturables</p>
                     </div>
                   </div>
                 </div>
