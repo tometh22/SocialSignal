@@ -306,121 +306,45 @@ export default function ExecutiveDashboard() {
         </div>
       </div>
       
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Intelligent Alerts Section */}
-        {alerts.length > 0 && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-yellow-500" />
-              Alertas Inteligentes
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {alerts.map((alert, idx) => (
-                <Alert key={idx} className={getAlertColor(alert.severity)}>
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 ${alert.severity === 'critical' ? 'text-red-600' : alert.severity === 'urgent' ? 'text-orange-600' : alert.severity === 'warning' ? 'text-yellow-600' : 'text-blue-600'}`}>
-                      {getAlertIcon(alert.severity)}
-                    </div>
-                    <div className="flex-1">
-                      <AlertDescription className="text-sm text-gray-700">
-                        {alert.msg}
-                      </AlertDescription>
-                      {alert.action && (
-                        <Link href={alert.action}>
-                          <Button variant="link" size="sm" className="h-auto p-0 mt-1 text-gray-900">
-                            Ver detalles <ChevronRight className="h-3 w-3 ml-1" />
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                </Alert>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Quick Actions Section */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-gray-400 mr-2">Acciones rápidas:</span>
+      {/* Main Content - Compact toolbar */}
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          {/* Quick Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
             <Link href="/optimized-quote">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                <FileSignature className="h-4 w-4 mr-2" />
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8">
+                <FileSignature className="h-3.5 w-3.5 mr-1.5" />
                 Nueva Cotización
               </Button>
             </Link>
             <Link href="/time-entries">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Timer className="h-4 w-4 mr-2" />
-                Registrar Tiempo
+              <Button size="sm" variant="outline" className="h-8">
+                <Timer className="h-3.5 w-3.5 mr-1.5" />
+                Tiempo
               </Button>
             </Link>
             <Link href="/deliverables">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Package className="h-4 w-4 mr-2" />
+              <Button size="sm" variant="outline" className="h-8">
+                <Package className="h-3.5 w-3.5 mr-1.5" />
                 Entregables
               </Button>
             </Link>
-            <Link href="/active-projects">
-              <Button size="sm" variant="ghost" className="text-white hover:bg-white/10">
-                <Layers className="h-4 w-4 mr-2" />
-                Ver Proyectos
-              </Button>
-            </Link>
           </div>
+          
+          {/* Compact Alert Badge */}
+          {alerts.length > 0 && (
+            <Link href="/active-projects">
+              <Badge variant="outline" className="bg-amber-50 border-amber-300 text-amber-700 cursor-pointer hover:bg-amber-100 px-3 py-1">
+                <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
+                {alerts.length} {alerts.length === 1 ? 'alerta' : 'alertas'} pendiente{alerts.length > 1 ? 's' : ''}
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Badge>
+            </Link>
+          )}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 -mt-6 space-y-6">
-        {/* Modern Alert Section */}
-        {alerts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-red-500/20 rounded-2xl blur-xl" />
-            <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-white/80 to-white/40 backdrop-blur">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                  <CardTitle className="text-lg">Alertas del Sistema</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {alerts.map((alert, index) => (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    className="flex items-center justify-between p-4 rounded-lg bg-white/60 backdrop-blur border border-gray-200/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${
-                        alert.type === 'critical' ? 'bg-red-100 text-red-600' :
-                        alert.type === 'urgent' ? 'bg-orange-100 text-orange-600' :
-                        'bg-yellow-100 text-yellow-600'
-                      }`}>
-                        {getAlertIcon(alert.type)}
-                      </div>
-                      <span className="font-medium text-gray-900">{alert.message}</span>
-                    </div>
-                    <Link href={alert.action}>
-                      <Button variant="ghost" size="sm" className="hover:bg-white/80">
-                        Resolver
-                        <ArrowRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </Link>
-                  </motion.div>
-                ))}
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+      <div className="max-w-7xl mx-auto px-6 space-y-6">
 
         {/* Resumen Ejecutivo - 2 Columnas (Financiera / Operativa) */}
         <motion.div
