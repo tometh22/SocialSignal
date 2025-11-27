@@ -1,0 +1,323 @@
+Objetivo general
+
+Corregir el Dashboard Ejecutivo mensual para separar claramente:
+
+Finanzas (FACTURADO, EBIT Contable, Burn Rate),
+
+Operación (DEVENGADO / Ingreso Ganado, EBIT Operativo, Markup Operativo, Tarifa Efectiva),
+usando la data ya existente (Rendimiento Cliente, Costos, Horas, WIP si está disponible) y que funcione para todos los meses.
+
+1. Relevamiento rápido de la situación actual
+
+1.1. Localizá el endpoint que alimenta el Dashboard Ejecutivo mensual (el que muestra las cards: Facturado, EBIT operativo, EBIT contable, Burn Rate, Markup, % facturables, etc.).
+Probablemente está en server/routes.ts o en algún módulo tipo server/routes/dashboard.ts.
+Confirmá qué ruta HTTP está usando el front (por ejemplo /api/dashboard/executive o similar).
+
+1.2. Identificá, en ese endpoint:
+
+De dónde sale hoy el facturado del mes (normalmente fact_rc_month con data de la pestaña “Rendimiento Cliente”).
+
+De dónde salen los costos directos e indirectos (SoT de costos, algo como direct_costs, indirect_costs o un agregador en costs.getSummaryByPeriod()).
+
+De dónde salen las horas trabajadas (algo tipo fact_labor_month).
+
+Qué fórmula se usa hoy para:
+
+EBIT operativo,
+
+EBIT contable,
+
+Markup,
+
+% facturables.
+
+Documentá mentalmente estas fórmulas, pero no cambies nada todavía.
+
+2. Implementar “Ingreso Devengado” (Ingreso Operativo Ganado)
+2.1. Concepto
+
+Vamos a introducir un nuevo KPI: DEVENGADO (Ingreso Operativo Ganado en el período), que se basa en el trabajo efectivamente realizado y no solo en lo facturado.
+
+Regla de negocio:
+
+Para proyectos Fee mensuales (tipo Fee / Retainer):
+
+El ingreso devengado del mes = facturado del mes (porque el fee corresponde exactamente al trabajo del mes).
+
+Para proyectos One Shot / Exploratorios / Tracking con duración definida:
+
+Se debe distribuir el valor del contrato según el avance del proyecto.
+
+Si hay información de horas estimadas, usamos:
+
+%_avance_acumulado = horas_reales_acum / horas_estimadas_totales, capado entre 0 y 1.
+
+devengado_acumulado = contract_value * %_avance_acumulado.
+
+devengado_mes = devengado_acumulado(periodo_t) - devengado_acumulado(periodo_t-1).
+
+Si para algún proyecto no hubiera información de contrato/horas estimadas, se puede usar un fallback ya discutido:
+
+devengado_mes ≈ costos_directos_mes * markup_base (2.5) y ajustar luego cuando haya datos mejores.
+
+2.2. Ubicación de la lógica
+
+2.2.1. Buscá si ya existe algo relacionado con WIP o devengado en el proyecto (palabras clave: WIP, devengado, earned, revenue_recognition, fact_devengado, etc.).
+
+Si ya existe un módulo de devengado/WIP, reutilizalo y extendelo.
+
+Si no existe nada, creá un módulo nuevo, por ejemplo:
+
+// server/domain/finance/devengado.ts
+export async function getDevengadoByPeriod(periodKeys: string[]): Promise<{
+  totalDevengadoUsd: number;
+  byProject: DevengadoProjectBreakdown[];
+}> { ... }
+
+
+2.2.2. Sea cual sea el enfoque, el resultado debe ser, como mínimo:
+
+totalDevengadoUsd por período (sumado a nivel mes),
+
+opcionalmente un breakdown por proyecto para futuro drilldown.
+
+2.3. Data sources que el módulo puede usar
+
+El módulo getDevengadoByPeriod puede combinar:
+
+Ingresos / contratos:
+
+income_sot, quotations, projects, o tablas equivalentes donde esté:
+
+tipo de proyecto (Fee / One Shot / etc.),
+
+valor total del contrato en USD,
+
+fechas de inicio/fin,
+
+horas estimadas si existen.
+
+Horas trabajadas:
+
+fact_labor_month o equivalente (horas por proyecto/mes).
+
+WIP ya existente, si hay tablas con WIP acumulado.
+
+Usá la arquitectura actual (no inventes tablas si ya existen equivalentes).
+Si ves que ya hay lógica de WIP con fórmula devengado_mes = facturado_mes + ΔWIP, podés reutilizarla sin reescribir todo.
+
+2.4. Reglas de cálculo resumidas
+
+Implementá la lógica de forma robusta:
+
+Para proyectos Fee → devengado_mes = facturado_mes.
+
+Para One Shot / Exploratorios, si hay contrato + horas estimadas:
+
+Calculá horas acumuladas vs estimadas → % avance.
+
+Calculá devengado acumulado y devengado mensual como diferencia.
+
+Si faltan datos para un proyecto, loggealo y usá una aproximación:
+
+devengado_mes ≈ costos_directos_mes * markup_base (2.5)
+pero marcando en logs que se está usando fallback.
+
+El módulo debe funcionar para cualquier período que se le pase (no hardcodear 2025-10).
+
+3. Redefinir KPIs del Dashboard Ejecutivo
+
+Ahora modificá el endpoint del Dashboard Ejecutivo para usar el nuevo devengado.
+
+3.1. Variables base a obtener en el endpoint
+
+Para el período seleccionado (periodKeys):
+
+Facturado (financiero):
+
+Sumar revenue_usd desde fact_rc_month (Rendimiento Cliente), como ya se hace.
+
+Devengado (operativo, nuevo):
+
+Llamar a getDevengadoByPeriod(periodKeys) y tomar totalDevengadoUsd.
+
+Costos directos:
+
+Sumar costos directos en USD para el período, usando el SoT de costos (direct_costs o equivalente).
+
+Costos indirectos:
+
+Sumar costos indirectos en USD para el período (indirect_costs o equivalente).
+
+Horas trabajadas:
+
+Obtener total de horas (idealmente billable_hours, non_billable_hours y su suma) desde fact_labor_month o similar.
+
+3.2. Nuevas fórmulas de los KPIs
+
+Reemplazá la lógica actual de cards por:
+
+Card FACTURADO (se mantiene igual):
+
+Valor: facturadoUsd.
+
+Fuente: fact_rc_month.
+
+Card EBIT OPERATIVO (corregido):
+
+Fórmula:
+ebitOperativoUsd = devengadoUsd - directCostsUsd.
+
+Porcentaje para mostrar como sublabel (si lo usás):
+% = (ebitOperativoUsd / devengadoUsd) si devengadoUsd > 0.
+
+Card EBIT CONTABLE:
+
+Fórmula:
+ebitContableUsd = facturadoUsd - directCostsUsd - indirectCostsUsd.
+
+Porcentaje:
+% = (ebitContableUsd / facturadoUsd) si facturadoUsd > 0.
+
+Card BURN RATE:
+
+Fórmula:
+burnRateUsd = directCostsUsd + indirectCostsUsd.
+
+Card MARKUP:
+
+Fórmula:
+markup = devengadoUsd / directCostsUsd
+(solo si directCostsUsd > 0, sino null o 0).
+
+Tarifa Efectiva (si decidís mostrarla en alguna card o tooltip):
+
+Fórmula:
+tarifaEfectiva = devengadoUsd / totalHours
+(solo si totalHours > 0).
+
+3.3. Mantener KPIs financieros que ya existen
+
+Si el dashboard muestra cosas como:
+
+Cash Flow del mes,
+
+Balance,
+
+% de margen contable,
+
+dejá la lógica actual (basada en fact_rc_month + costos totales) sin tocar, porque eso es lo que usa administración para el Excel.
+
+La diferencia es:
+
+Capa financiera → usa facturado.
+
+Capa operativa → usa devengado.
+
+4. Ajustes en el JSON de respuesta y en el front
+
+4.1. En la respuesta del endpoint, asegurate de exponer explícitamente:
+
+{
+  "period": "2025-10",
+  "facturado_usd": ...,
+  "devengado_usd": ...,
+  "costos_directos_usd": ...,
+  "costos_indirectos_usd": ...,
+  "ebit_operativo_usd": ...,
+  "ebit_contable_usd": ...,
+  "burn_rate_usd": ...,
+  "markup_operativo": ...,
+  "tarifa_efectiva_usd_per_hour": ...,
+  "horas_totales": ...,
+  "horas_billables": ...,
+  "horas_non_billables": ...
+}
+
+
+(Adaptá los nombres a la convención actual del código, pero mantené esta información).
+
+4.2. Revisá el componente de front-end del Dashboard Ejecutivo (React/Next/lo que uses):
+
+Mapear la card EBIT Operativo al nuevo campo calculado.
+
+Mapear la card EBIT Contable al campo contable.
+
+Mapear Burn Rate al total de costos.
+
+Mapear Markup al markup_operativo.
+
+Si decidís mostrar Tarifa Efectiva:
+
+Agregar una card o un subtítulo tipo: "Tarifa efectiva: $XX/h" extraído de tarifa_efectiva_usd_per_hour.
+
+4.3. Verificá que el filtro temporal siga funcionando:
+
+El endpoint debe aceptar periodKeys para cualquier mes/año.
+
+No debe haber hardcode de 2025-10.
+
+Asegurate de que, si se selecciona otro mes, se recalcula todo con la nueva lógica (facturado, devengado, costos y EBITs).
+
+5. Validaciones y pruebas que debés ejecutar
+
+5.1. Smoke test para Octubre 2025 (el mes que ya sé que tiene data):
+
+Facturado (frontend) ≈ 42.1k USD (debe coincidir con lo que venía dando).
+
+Costos directos ≈ 17.4k USD.
+
+Costos indirectos ≈ 46.9k USD.
+
+Burn Rate ≈ 64.2k USD (directos + indirectos).
+
+EBIT Contable ≈ 42.1k - 17.4k - 46.9k ≈ -22.2k (debe coincidir con lo que había antes).
+
+EBIT Operativo ahora debe ser devengadoUsd - directCostsUsd, NO facturadoUsd - directCostsUsd.
+Si en la primera versión tenés que usar devengado = facturado como aproximación, documentalo en comentarios y logs para luego mejorar el cálculo de devengado con contratos y WIP.
+
+5.2. Test multi-mes:
+
+Probá otro mes que tenga datos (ej. 2025-09 o 2025-08).
+
+Verificá que:
+
+Facturado cambia correctamente,
+
+Costos directos/indirectos cambian,
+
+EBITs y Markup se recalculan sin errores,
+
+No hay queries hardcodeadas a un período específico.
+
+5.3. Logs y manejo de errores:
+
+Si el módulo de devengado no puede calcular un proyecto por falta de datos (contrato o horas estimadas), loggearlo claramente (WARN) indicando que se usó fallback.
+
+Asegurate de que, aun con fallbacks, el endpoint jamás crashea; siempre devuelve números (aunque aproximados).
+
+6. Resumen de entregables
+
+Al finalizar, verificá que:
+
+Existe un módulo o función clara para obtener Devengado por período (getDevengadoByPeriod o equivalente).
+
+El Dashboard Ejecutivo expone y usa:
+
+Facturado (financiero),
+
+Devengado (operativo),
+
+EBIT Operativo = Devengado – Directos,
+
+EBIT Contable = Facturado – Directos – Indirectos,
+
+Burn Rate = Directos + Indirectos,
+
+Markup Operativo = Devengado / Directos,
+
+Tarifa efectiva = Devengado / Horas totales (si se incluye).
+
+Los valores para Octubre 2025 coinciden con los de Excel en Facturado y Costos, y la lógica nueva está aplicada.
+
+El sistema funciona para cualquier mes con datos, respetando el filtro temporal del dashboard.
