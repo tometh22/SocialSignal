@@ -456,204 +456,154 @@ export default function ExecutiveDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* KPI GRID - INGRESOS Y COSTOS */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">Ingresos y Costos</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {/* BLOQUE 1: MÉTRICAS EJECUTIVAS - Snapshot inmediato de salud */}
+              <div className="mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                   {/* Facturado */}
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-xs text-gray-600">Facturado</span>
-                    <div className="text-2xl font-bold text-green-700 mt-1">
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+                    <span className="text-xs font-medium text-green-700 uppercase tracking-wide">Facturado</span>
+                    <div className="text-3xl font-bold text-green-800 mt-2">
                       ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
                   
-                  {/* Costos Directos */}
-                  <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                    <span className="text-xs text-gray-600">Costos Directos</span>
-                    <div className="text-2xl font-bold text-red-600 mt-1">
-                      ${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k
-                    </div>
-                  </div>
-
-                  {/* Costos Indirectos */}
-                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
-                    <span className="text-xs text-gray-600">Costos Indirectos</span>
-                    <div className="text-2xl font-bold text-orange-600 mt-1">
-                      ${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k
-                    </div>
-                  </div>
-
-                  {/* Burn Rate */}
-                  <div className="p-3 bg-rose-50 rounded-lg border border-rose-200">
-                    <span className="text-xs text-gray-600">Burn Rate</span>
-                    <div className="text-2xl font-bold text-rose-600 mt-1">
-                      ${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* KPI GRID - MÁRGENES Y EBIT */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">Márgenes y Resultados</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                   {/* EBIT Operativo */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">EBIT Operativo</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`}>
+                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>EBIT Operativo</span>
+                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
                       ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k
                     </div>
-                    <span className="text-xs text-gray-500">{currentMetrics.ebitOperativoPct?.toFixed(1)}%</span>
+                    <span className={`text-sm ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{currentMetrics.ebitOperativoPct?.toFixed(0)}%</span>
                   </div>
 
                   {/* EBIT Contable */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitContableUsd >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">EBIT Contable</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.ebitContableUsd >= 0 ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200' : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'}`}>
+                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-700' : 'text-red-700'}`}>EBIT Contable</span>
+                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-800' : 'text-red-700'}`}>
                       ${(currentMetrics.ebitContableUsd / 1000).toFixed(1)}k
                     </div>
-                    <span className="text-xs text-gray-500">{currentMetrics.ebitContablePct?.toFixed(1)}%</span>
+                    <span className={`text-sm ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{currentMetrics.ebitContablePct?.toFixed(0)}%</span>
                   </div>
 
-                  {/* Beneficio Neto */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.beneficioNetoUsd >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">Beneficio Neto</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.beneficioNetoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.beneficioNetoUsd / 1000).toFixed(1)}k
-                    </div>
-                  </div>
-
-                  {/* Cash Flow Operativo */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.cashFlowOperativoUsd >= 0 ? 'bg-cyan-50 border-cyan-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">Cash Flow</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.cashFlowOperativoUsd >= 0 ? 'text-cyan-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.cashFlowOperativoUsd / 1000).toFixed(1)}k
+                  {/* Burn Rate */}
+                  <div className="p-4 bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl border border-rose-200 shadow-sm">
+                    <span className="text-xs font-medium text-rose-700 uppercase tracking-wide">Burn Rate</span>
+                    <div className="text-3xl font-bold text-rose-800 mt-2">
+                      ${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
 
                   {/* Markup */}
-                  <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                    <span className="text-xs text-gray-600">Markup</span>
-                    <div className="text-2xl font-bold text-purple-600 mt-1">
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm">
+                    <span className="text-xs font-medium text-purple-700 uppercase tracking-wide">Markup</span>
+                    <div className="text-3xl font-bold text-purple-800 mt-2">
                       {currentMetrics.markupOperativoUsd?.toFixed(2)}x
+                    </div>
+                  </div>
+
+                  {/* % Horas Facturables */}
+                  <div className={`p-4 rounded-xl border shadow-sm ${currentMetrics.billablePct >= 0.6 ? 'bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200' : 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200'}`}>
+                    <span className={`text-xs font-medium uppercase tracking-wide ${currentMetrics.billablePct >= 0.6 ? 'text-teal-700' : 'text-amber-700'}`}>% Facturables</span>
+                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.billablePct >= 0.6 ? 'text-teal-800' : 'text-amber-700'}`}>
+                      {(currentMetrics.billablePct * 100).toFixed(0)}%
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* DETALLE FINANCIERO Y OPERATIVO */}
+              {/* BLOQUE 2 Y 3: COSTOS + OPERATIVA */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* Columna Financiera */}
+                {/* BLOQUE 2: Composición de Costos */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-green-600" />
-                    Detalles Financieros
+                    <DollarSign className="h-4 w-4 text-rose-600" />
+                    Composición de Costos
                   </h4>
 
-                  {/* Composición de Costos */}
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                    <span className="text-xs font-medium text-gray-600 block mb-3">Composición de Costos</span>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Directos (equipo)</span>
-                        <span className="font-medium text-gray-700">${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k</span>
+                  <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                    <div className="space-y-4">
+                      {/* Directos */}
+                      <div>
+                        <div className="flex justify-between items-center text-sm mb-1">
+                          <span className="text-gray-600">Directos (equipo)</span>
+                          <span className="font-semibold text-gray-800">${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k</span>
+                        </div>
+                        <Progress value={currentMetrics.burnRateUsd > 0 ? (currentMetrics.directCostsUsd / currentMetrics.burnRateUsd) * 100 : 0} className="h-2 [&>div]:bg-red-500" />
+                        <span className="text-xs text-gray-500">{currentMetrics.burnRateUsd > 0 ? ((currentMetrics.directCostsUsd / currentMetrics.burnRateUsd) * 100).toFixed(0) : 0}% del total</span>
                       </div>
-                      <Progress value={currentMetrics.costUsd > 0 ? (currentMetrics.directCostsUsd / currentMetrics.costUsd) * 100 : 0} className="h-1.5 [&>div]:bg-red-500" />
                       
-                      <div className="flex justify-between items-center text-sm mt-3">
-                        <span className="text-gray-600">Indirectos (overhead)</span>
-                        <span className="font-medium text-gray-700">${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k</span>
+                      {/* Indirectos */}
+                      <div>
+                        <div className="flex justify-between items-center text-sm mb-1">
+                          <span className="text-gray-600">Indirectos (overhead)</span>
+                          <span className="font-semibold text-gray-800">${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k</span>
+                        </div>
+                        <Progress value={currentMetrics.burnRateUsd > 0 ? (currentMetrics.indirectCostsUsd / currentMetrics.burnRateUsd) * 100 : 0} className="h-2 [&>div]:bg-orange-500" />
+                        <span className="text-xs text-gray-500">{currentMetrics.burnRateUsd > 0 ? ((currentMetrics.indirectCostsUsd / currentMetrics.burnRateUsd) * 100).toFixed(0) : 0}% del total</span>
                       </div>
-                      <Progress value={currentMetrics.costUsd > 0 ? (currentMetrics.indirectCostsUsd / currentMetrics.costUsd) * 100 : 0} className="h-1.5 [&>div]:bg-orange-500" />
                       
-                      <div className="flex justify-between items-center text-sm mt-3 pt-2 border-t">
-                        <span className="text-gray-700 font-medium">Total (Burn Rate)</span>
-                        <span className="font-bold text-gray-800">${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k</span>
+                      {/* Total */}
+                      <div className="pt-3 border-t border-gray-200">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 font-medium">Total Costos</span>
+                          <span className="text-xl font-bold text-gray-900">${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Comparación de Márgenes */}
-                  <div className="p-4 bg-white rounded-lg border border-gray-200">
-                    <span className="text-xs font-medium text-gray-600 block mb-3">Comparación de Márgenes</span>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">EBIT Operativo</span>
-                        <span className={`font-bold ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                          ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k ({currentMetrics.ebitOperativoPct?.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 -mt-2">Facturado - Directos (margin before overhead)</div>
-                      
-                      <div className="flex justify-between items-center text-sm pt-2">
-                        <span className="text-gray-600">EBIT Contable</span>
-                        <span className={`font-bold ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                          ${(currentMetrics.ebitContableUsd / 1000).toFixed(1)}k ({currentMetrics.ebitContablePct?.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 -mt-2">Facturado - Total Costos (profit/loss)</div>
+                  {/* Definiciones de márgenes */}
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-xs text-gray-600">
+                    <div className="space-y-1">
+                      <p><strong className="text-emerald-700">EBIT Operativo</strong> = Facturado - Directos</p>
+                      <p><strong className="text-blue-700">EBIT Contable</strong> = Facturado - Directos - Indirectos</p>
                     </div>
                   </div>
-
-                  {/* Provisiones y Beneficio Neto */}
-                  {currentMetrics.adjustmentsUsd > 0 && (
-                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                      <span className="text-xs font-medium text-amber-700 block mb-2">Provisiones del Mes</span>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-amber-600">Impuestos y Provisiones</span>
-                        <span className="font-medium text-amber-700">${(currentMetrics.adjustmentsUsd / 1000).toFixed(1)}k</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Columna Operativa */}
+                {/* BLOQUE 3: Operativa */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                     <Activity className="h-4 w-4 text-blue-600" />
                     Operativa
                   </h4>
 
-                  {/* Horas y % */}
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="text-xs text-gray-600 block mb-2">Horas Trabajadas</span>
-                    <div className="text-2xl font-bold text-blue-700">
-                      {currentMetrics.totalHours.toFixed(0)}h
+                  {/* Horas Trabajadas */}
+                  <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-sm font-medium text-gray-700">Horas Trabajadas</span>
+                      <span className="text-2xl font-bold text-blue-700">{currentMetrics.totalHours.toFixed(0)}h</span>
                     </div>
-                    <div className="mt-3 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Facturables</span>
-                        <span className="font-medium">{currentMetrics.billableHours.toFixed(0)}h</span>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between items-center text-sm mb-1">
+                          <span className="text-gray-600">Facturables</span>
+                          <span className="font-semibold text-gray-800">{currentMetrics.billableHours.toFixed(0)}h</span>
+                        </div>
+                        <Progress value={currentMetrics.totalHours > 0 ? (currentMetrics.billableHours / currentMetrics.totalHours) * 100 : 0} className="h-2 [&>div]:bg-blue-500" />
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">No facturables</span>
-                        <span className="font-medium">{currentMetrics.nonBillableHours.toFixed(0)}h</span>
+                      <div>
+                        <div className="flex justify-between items-center text-sm mb-1">
+                          <span className="text-gray-600">No facturables</span>
+                          <span className="font-semibold text-gray-800">{currentMetrics.nonBillableHours.toFixed(0)}h</span>
+                        </div>
+                        <Progress value={currentMetrics.totalHours > 0 ? (currentMetrics.nonBillableHours / currentMetrics.totalHours) * 100 : 0} className="h-2 [&>div]:bg-gray-400" />
                       </div>
                     </div>
-                  </div>
-
-                  {/* % Facturación */}
-                  <div className={`p-4 rounded-lg border ${currentMetrics.billablePct >= 0.6 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">% Horas Facturables</span>
-                    <div className={`text-3xl font-bold mt-2 ${currentMetrics.billablePct >= 0.6 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(currentMetrics.billablePct * 100).toFixed(0)}%
-                    </div>
-                    <span className="text-xs text-gray-500 block mt-1">Recomendado: ≥60%</span>
                   </div>
 
                   {/* Personas y Proyectos */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-xs text-gray-600">Personas</span>
-                      <div className="text-2xl font-bold text-blue-700 mt-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm text-center">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Personas Activas</span>
+                      <div className="text-3xl font-bold text-blue-700 mt-2">
                         {currentMetrics.peopleActive}
                       </div>
                     </div>
-                    <div className="p-4 bg-white rounded-lg border border-gray-200">
-                      <span className="text-xs text-gray-600">Proyectos</span>
-                      <div className="text-2xl font-bold text-blue-700 mt-2">
+                    <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm text-center">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Proyectos Activos</span>
+                      <div className="text-3xl font-bold text-blue-700 mt-2">
                         {currentMetrics.projectsActive}
                       </div>
                     </div>

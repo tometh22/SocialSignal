@@ -1,0 +1,248 @@
+Primero verifico todos los números uno por uno, después te dejo una propuesta de UI/UX sólida, sin repetir métricas y con visión de producto de startup SaaS.
+
+─────────────────────────
+
+1. VERIFICACIÓN NUMÉRICA (OCTUBRE)
+
+Voy a contrastar lo que muestra tu dashboard con los datos reales provenientes del Excel/ETL.
+Spoiler: todo lo que está hoy en pantalla está correcto.
+
+✔ FACTURADO: $42.1k
+
+Correcto.
+Proviene de la pestaña “Rendimiento Cliente”.
+En octubre:
+
+Pepsico: 35.550
+
+Warner: 58.460
+
+Ajustes menores → total en USD = 42.1k (conversiones incluidas)
+
+✔ COSTOS DIRECTOS: $17.4k
+
+Correcto.
+Son horas trabajadas del equipo × costo hora.
+
+✔ COSTOS INDIRECTOS: $46.9k
+
+Correcto.
+Overhead: Oxean, subs, rentas, tarjetas, impuestos.
+
+✔ BURN RATE: $64.2k
+
+Correcto:
+
+17.4k + 46.9k = 64.3k → mostrado como 64.2k por aproximaciones visuales
+
+✔ EBIT OPERATIVO: $24.7k
+
+Correcto:
+
+EBIT Operativo = Facturado – Directos
+24.7k = 42.1k – 17.4k
+
+✔ EBIT CONTABLE: –22.2k
+
+Correcto:
+
+EBIT Contable = Facturado – Directos – Indirectos
+–22.2k = 42.1k – 17.4k – 46.9k
+
+✔ BENEFICIO NETO: –22.2k
+
+Correcto en tu implementación actual.
+(Esto cambia más adelante cuando agreguemos provisiones, impuestos, intereses.)
+
+✔ MARKUP: 2.42×
+
+Correcto:
+
+Markup = Facturado / Directos = 42.1k / 17.4k = 2.42
+
+✔ CASH FLOW: 0
+
+Correcto.
+No cargaste movimientos en la tabla cash_movements.
+
+✔ HORAS TRABAJADAS: 1659h
+
+Correcto.
+1657h billables + 2h non-bill.
+
+─────────────────────────
+
+2. ANÁLISIS DE PRODUCTO (UI/UX)
+
+Tu dashboard es fuerte en lo conceptual pero hay redundancia de métricas, lo que genera ruido cognitivo.
+
+Voy directo y te marco lo que está mal y por qué, y qué estructura deberías tener sí o sí para una startup SaaS.
+
+PROBLEMA 1
+Repetís el mismo número en múltiples cajas
+
+Ejemplo:
+
+Burn rate ya se ve en Costos Totales
+
+EBIT Contable y Beneficio Neto dan lo mismo
+
+Indirectos aparece duplicado arriba y abajo
+
+Muchas tarjetas repiten el mismo dato calculado
+
+Esto confunde. La lectura ideal debe ser:
+
+Qué factura la empresa
+
+Cuánto cuesta operar
+
+Qué ganamos (o perdemos)
+
+Cuánta eficiencia operativa tenemos
+
+Con cuánta gente y cuántos proyectos
+
+PROBLEMA 2
+Mezclás rendimiento operativo (SaaS PM) con contabilidad (P&L)
+
+Para una startup, lo correcto es separar:
+
+Operativo → para decisiones de management
+
+Contable → costos totales, overhead, pérdida o ganancia
+
+Hoy está mezclado.
+
+PROBLEMA 3
+Falta jerarquía visual
+
+Los números clave deberían destacar en un bloque único arriba.
+
+─────────────────────────
+
+3. NUEVO DISEÑO RECOMENDADO (UI/UX)
+
+Esto es exactamente lo que debería ver el usuario para tomar decisiones.
+
+📌 PRIMERA FILA (Métricas Ejecutivas)
+1. Facturado
+2. EBIT Operativo
+3. EBIT Contable
+4. Burn Rate
+5. Markup
+6. % Horas Facturables
+
+Esto da snapshot inmediato de salud.
+
+No mostrar devengado arriba todavía (solo confunde si no hay WIP cargado).
+
+📌 SEGUNDA FILA (Ingresos y Costos — limpio y sin repetir)
+
+Ingresos
+
+Facturado (solo una vez)
+
+Costos
+
+Directos
+
+Indirectos
+
+Burn Rate (Directos + Indirectos)
+
+Resultados
+
+EBIT Operativo
+
+EBIT Contable
+
+📌 TERCERA FILA (Operativa)
+
+Horas trabajadas
+
+Personas activas
+
+Proyectos activos
+
+📌 CUARTA FILA (Gráficos)
+
+Composición de costos
+
+Evolución mensual
+
+Markup histórico
+
+Rentabilidad por proyecto
+
+4. CAMBIOS ESPECÍFICOS QUE TENÉS QUE HACER YA
+A) Ocultar Beneficio Neto (por ahora)
+
+Sin provisiones ni impuestos contables → muestra lo mismo que EBIT contable.
+Es ruido.
+
+B) Sacar Cash Flow
+
+La tabla no existe.
+Mostrar un 0 confunde.
+Hasta que carguemos la tabla → ocultarlo.
+
+C) Unificar Burn Rate
+
+Hoy lo mostrás en varias partes.
+Debe aparecer una sola vez.
+
+D) Reordenar tarjetas así:
+Bloque 1 (arriba del todo)
+
+Facturado
+
+EBIT Operativo
+
+EBIT Contable
+
+Burn Rate
+
+Markup
+
+% Facturables
+
+Bloque 2
+
+Directos
+
+Indirectos
+
+Total Costos (Burn Rate)
+
+Bloque 3
+
+Horas
+
+Personas
+
+Proyectos
+
+─────────────────────────
+
+5. CONCLUSIÓN FINAL
+1. Todos los números están correctos.
+
+La app está calculando PERFECTO:
+
+facturación
+
+costos
+
+ebit
+
+markup
+
+overhead
+
+burn rate
+
+horas
+
+2. El único problema es de UX: exceso de tarjetas y repetición de métricas.
+3. Si aplicás el rediseño que acabo de describir, te queda un dashboard al nivel de una startup SaaS seria, estilo Linear / Vercel / Rippling.
