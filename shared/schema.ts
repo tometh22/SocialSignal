@@ -126,6 +126,47 @@ export type InsertIndirectCost = z.infer<typeof insertIndirectCostSchema>;
 export type NonBillableHours = typeof nonBillableHours.$inferSelect;
 export type InsertNonBillableHours = z.infer<typeof insertNonBillableHoursSchema>;
 
+// ==================== AJUSTES P&L (PROVISIONES, IMPUESTOS, OTROS) ====================
+export const plAdjustments = pgTable("pl_adjustments", {
+  id: serial("id").primaryKey(),
+  periodKey: varchar("period_key", { length: 10 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // 'anticipada', 'impuesto', 'interes', 'otro'
+  concept: varchar("concept", { length: 200 }),
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPlAdjustmentSchema = createInsertSchema(plAdjustments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PlAdjustment = typeof plAdjustments.$inferSelect;
+export type InsertPlAdjustment = z.infer<typeof insertPlAdjustmentSchema>;
+
+// ==================== MOVIMIENTOS DE CAJA (CASH FLOW REAL) ====================
+export const cashMovements = pgTable("cash_movements", {
+  id: serial("id").primaryKey(),
+  date: timestamp("date").notNull(),
+  periodKey: varchar("period_key", { length: 10 }).notNull(),
+  concept: varchar("concept", { length: 300 }).notNull(),
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(), // positivo = entrada, negativo = salida
+  type: varchar("type", { length: 50 }).notNull(), // 'ingreso', 'egreso'
+  category: varchar("category", { length: 100 }), // 'pago_cliente', 'salario', 'proveedor', 'impuesto', etc.
+  reference: varchar("reference", { length: 200 }), // invoice number, payment reference
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCashMovementSchema = createInsertSchema(cashMovements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CashMovement = typeof cashMovements.$inferSelect;
+export type InsertCashMovement = z.infer<typeof insertCashMovementSchema>;
+
 // ==================== CLIENTES ====================
 // Clients table
 export const clients = pgTable("clients", {

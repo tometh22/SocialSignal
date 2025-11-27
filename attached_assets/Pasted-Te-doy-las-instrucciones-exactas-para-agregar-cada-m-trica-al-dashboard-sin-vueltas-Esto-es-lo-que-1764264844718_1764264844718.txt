@@ -1,0 +1,215 @@
+Te doy las instrucciones exactas para agregar cada métrica al dashboard, sin vueltas. Esto es lo que tenés que implementar en la app, backend y frontend.
+
+1. EBIT CONTABLE (definición administrativa)
+
+Qué muestra:
+EBIT = Facturado – Costos Totales (directos + indirectos)
+
+Backend (server/routes.ts)
+Agregar este cálculo dentro del bloque del período seleccionado:
+
+const ebitContable = billedUSD - totalCostsUSD;
+
+
+Exponerlo en la respuesta JSON del endpoint:
+
+ebitContable: ebitContable,
+
+
+Frontend (Dashboard Ejecutivo – card nueva):
+
+<Card
+  title="EBIT Contable"
+  value={`$${formatUSD(data.ebitContable)}`}
+  color="blue"
+/>
+
+2. BENEFICIO NETO (con provisiones + impuestos)
+
+Esto replica exactamente lo que hace Administración.
+
+Fórmula:
+
+Beneficio Neto = EBIT Contable
+                 – Provisión facturación anticipada
+                 – Provisión Impuestos
+                 – Otros ajustes del mes (opcional)
+
+
+Backend:
+
+Si necesitás provisiones cargadas en una tabla, usar:
+
+pl_announced_revenue
+pl_tax_provision
+pl_other_adjustments
+
+
+Si aún no existen, crear una tabla nueva:
+
+CREATE TABLE pl_adjustments (
+  id SERIAL PRIMARY KEY,
+  period_key TEXT,
+  type TEXT,   -- 'anticipada', 'impuesto', 'otro'
+  amount_usd NUMERIC
+);
+
+
+Luego, al resolver el período:
+
+const resAdj = await pool.query(`
+  SELECT SUM(amount_usd) total 
+  FROM pl_adjustments
+  WHERE period_key = $1
+`, [periodKey]);
+
+const totalAdjustments = Number(resAdj.rows[0].total ?? 0);
+
+const beneficioNeto = ebitContable - totalAdjustments;
+
+
+Agregar al endpoint:
+
+beneficioNeto: beneficioNeto,
+
+
+Frontend:
+
+<Card
+  title="Beneficio Neto"
+  value={`$${formatUSD(data.beneficioNeto)}`}
+  color="green"
+/>
+
+3. CASH FLOW OPERATIVO DEL MES
+
+Qué muestra Administración:
+Entradas (pagos cobrados) – Salidas (costos pagados)
+
+Esto no es contable, es “flujo real del mes”.
+
+Necesitás:
+Tabla cash_movements:
+
+CREATE TABLE cash_movements (
+  id SERIAL PRIMARY KEY,
+  date DATE,
+  concept TEXT,
+  amount_usd NUMERIC,  -- positivo = entra, negativo = sale
+  period_key TEXT
+);
+
+
+Backend:
+
+const cashRes = await pool.query(`
+  SELECT COALESCE(SUM(amount_usd),0) as cashflow
+  FROM cash_movements
+  WHERE period_key = $1
+`, [periodKey]);
+
+const cashFlowOperativo = Number(cashRes.rows[0].cashflow);
+
+
+Expose:
+
+cashFlowOperativo: cashFlowOperativo,
+
+
+Frontend:
+
+<Card
+  title="Cash Flow Operativo"
+  value={`$${formatUSD(data.cashFlowOperativo)}`}
+  color="green"
+/>
+
+4. MARKUP PROMEDIO (solo proyectos cerrados en el mes)
+
+Fórmula admin:
+
+Markup promedio = promedio( FacturadoProyecto / CostosProyecto )
+solo proyectos cerrados en ese mes
+
+
+Backend:
+
+Debe filtrar proyectos cuyo estado = “cerrado” AND fecha cierre = período.
+
+const markupRes = await pool.query(`
+  SELECT AVG(facturado_usd / costo_usd) AS avg_markup
+  FROM project_metrics
+  WHERE period_key = $1
+  AND status = 'closed'
+`, [periodKey]);
+
+const markupPromedio = Number(markupRes.rows[0].avg_markup ?? 0);
+
+
+Expose:
+
+markupPromedio: markupPromedio,
+
+
+Frontend:
+
+<Card
+  title="Markup Promedio"
+  value={`${data.markupPromedio.toFixed(2)}x`}
+  color="green"
+/>
+
+5. BURN RATE (costos totales del mes)
+
+Fórmula:
+
+Burn = Costos Directos + Costos Indirectos
+
+
+Ya lo tenés, solo sumarlo:
+
+Backend:
+
+burnRate: totalCostsUSD,
+
+
+Frontend:
+
+<Card
+  title="Burn Rate"
+  value={`$${formatUSD(data.burnRate)}`}
+  color="red"
+/>
+
+6. % MARGEN OPERATIVO (versión admin)
+
+Administración usa:
+
+Margen = EBIT Contable / Facturado
+
+
+Implementación:
+
+const margenOperativoAdmin = facturadoUSD === 0
+  ? 0
+  : ebitContable / facturadoUSD;
+
+
+Expose:
+
+margenAdmin: margenOperativoAdmin,
+
+
+Frontend:
+
+<Card
+  title="% Margen Operativo"
+  value={`${(data.margenAdmin * 100).toFixed(1)}%`}
+  color="blue"
+/>
+
+7. EBITDA (si querés versión más pro)
+EBITDA = EBIT Contable + Depreciaciones + Amortizaciones
+
+
+Si inician después, agregar tabla de depreciación.

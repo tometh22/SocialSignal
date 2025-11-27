@@ -1,0 +1,324 @@
+A continuación tenés la guía completa, precisa y sin ambigüedades, para que tu APP pueda obtener cada indicador directamente del Excel MAESTRO o de las tablas métricas ya construidas por el ETL.
+
+Esto reemplaza toda intuición o interpretación.
+Es la fuente de verdad oficial que tu app debe usar.
+
+🔵 PARTE 1 — FUENTES DISPONIBLES EN TU SISTEMA
+
+Tu app hoy tiene tres fuentes:
+
+1. Rendimiento Cliente (Excel MAESTRO)
+
+Se usa para obtener:
+
+facturación real por proyecto / por mes
+
+costos reales por proyecto / por mes (columna Costos USD)
+
+markup por proyecto (facturación / costo)
+
+Esta pestaña alimenta automáticamente:
+
+fact_rc_month
+
+fact_cost_month (directos) si el costo viene cargado ahí
+
+La app la usa actualmente y funciona perfecto.
+
+2. Costos directos e indirectos (Excel MAESTRO)
+
+Se usa para:
+
+Costos directos por persona / proyecto / día
+
+Costos indirectos (rent, oxean, comisiones, tarjetas, subscripciones, impuestos, etc.)
+
+Cualquier gasto real en USD o a convertir desde ARS
+
+Tu ETL ya separa:
+
+direct_costs → costos directos
+
+indirect_costs → costos indirectos
+
+3. Proyectos Confirmados y Estimados (Excel MAESTRO)
+
+Se usa para:
+
+ingresos comprometidos (no reales)
+
+pipeline
+
+control de contratos
+
+NO se usa para facturación real. NO debe alimentar indicadores contables.
+
+🔵 PARTE 2 — INDICADOR POR INDICADOR
+Y DE DÓNDE SE SACA (EXCEL → ETL → MÉTRICA)
+1. FACTURADO DEL MES
+Qué es:
+
+Todo lo facturado real del mes seleccionado.
+
+Fuente VERDADERA:
+
+Pestaña “Rendimiento Cliente” → columnas Facturación [USD]
+
+Cómo lo obtiene la app:
+
+Tu ETL ya genera:
+
+fact_rc_month(revenue_usd)
+
+Backend:
+SELECT SUM(revenue_usd)
+FROM fact_rc_month
+WHERE period_key = '2025-10';
+
+
+✔ Resultado octubre: $42.1k
+
+2. COSTOS DIRECTOS DEL MES
+Qué incluye:
+
+horas trabajadas × costo hora
+
+equipo operativo
+
+analistas, PM, QA, etc.
+
+Fuente VERDADERA:
+
+Pestaña “Costos directos e indirectos” → registros donde “Tipo de costo” = Directo
+
+Cómo lo obtiene la app:
+
+ETL genera:
+
+direct_costs(amount_usd)
+
+Backend:
+SELECT SUM(amount_usd)
+FROM direct_costs
+WHERE period_key = '2025-10';
+
+
+✔ Resultado octubre: $17.4k
+
+3. COSTOS INDIRECTOS DEL MES
+Qué incluye:
+
+Oxean
+
+Suscripciones
+
+Impuestos
+
+Comisiones
+
+Tarjetas
+
+Administración
+
+Rent
+
+Otros gastos fijos u overheads
+
+Fuente VERDADERA:
+
+Pestaña “Costos directos e indirectos” → registros donde “Tipo de costo” = Indirecto
+
+Tu ETL ya clasifica esto.
+
+Backend:
+SELECT SUM(amount_usd)
+FROM indirect_costs
+WHERE period_key = '2025-10';
+
+
+✔ Resultado octubre: $46.9k
+
+4. COSTOS TOTALES DEL MES
+Fórmula:
+Costos Totales = Directos + Indirectos
+
+
+✔ Octubre:
+
+17.4k + 46.9k = 64.3k
+
+
+La app ya lo muestra.
+
+5. MARGEN CONTABLE
+Fórmula:
+Margen Contable = Facturado – Costos Totales
+
+
+✔ Octubre:
+
+42.1k – 64.3k = –22.2k
+
+
+➡ Igual al dashboard.
+
+6. EBIT / EBIT OPERATIVO
+
+Tu app ahora calcula:
+
+EBIT Operativo = Facturado – Costos Directos
+
+
+Esto es correcto como métrica operativa, pero no es contable.
+
+Fuente:
+
+Las dos métricas anteriores.
+
+✔ Octubre:
+
+42.1k – 17.4k = 24.7k
+
+
+➡ Coincide con lo que ves en la app.
+
+7. DEVENGADO
+
+Tu app calcula devengado con:
+
+devengado = facturado mensual + ΔWIP
+
+Fuente:
+
+Facturado real (fact_rc_month)
+
+WIP (fact_labor_month → horas acumuladas × rate × markup vs facturación)
+
+✔ Octubre = $42.1k
+Porque no hubo ΔWIP.
+
+8. WIP
+Qué es:
+
+Fórmula:
+
+WIP = Devengado – Facturado
+
+
+✔ Octubre:
+Como devengado = facturado → $0
+
+9. MARKUP OPERATIVO
+Fórmula:
+Markup = Devengado / Costos Directos
+
+
+✔ Octubre:
+
+42.1k / 17.4k = 2.42x
+
+
+Perfecto.
+
+10. % EBIT OPERATIVO
+Fórmula:
+% EBIT Op = (Facturado – Directos) / Facturado
+
+
+✔ Octubre:
+
+(42.1 – 17.4) / 42.1 = 58.7%
+
+
+La app calcula bien.
+
+🔵 PARTE 3 — LO QUE FALTA AGREGAR (ADMINISTRACIÓN)
+
+Ellos usan contabilidad + provisiones.
+
+Para replicar su Excel EXACTO necesitás:
+1. Ventas del mes cerrado
+=Suma(Facturación USD) → Rendimiento Cliente
+
+
+Ya lo tenés.
+
+2. EBIT Administrativo
+
+Ellos incluyen:
+
+✔ Directos
+✔ Indirectos
+✔ Provisiones
+✔ Impuestos
+
+Fórmula:
+
+EBIT_Admin = Facturado – Directos – Indirectos – Provisiones
+
+
+Para replicarlo necesitás una tabla:
+
+provisiones(period_key, concepto, amount_usd)
+
+3. Beneficio Neto
+Beneficio Neto = EBIT_Admin – Intereses – Impuestos – Otros
+
+
+Necesitás una tabla:
+
+pnl_items(period_key, tipo, amount_usd)
+
+4. Cash Flow del mes
+
+No se calcula del Excel contable sino:
+
+registros de pagos recibidos (ingresos)
+
+egresos (costos realmente pagados)
+
+Necesitás tabla:
+
+cash_movements(date, concept, usd_amount, period_key)
+
+🔴 CONCLUSIÓN FINAL (CLAVE)
+Tu app YA CALCULA PERFECTO:
+
+Facturado
+
+Costos directos
+
+Costos indirectos
+
+Margen contable
+
+EBIT operativo
+
+% EBIT operativo
+
+Markup operativo
+
+WIP
+
+Devengado
+
+LO QUE FALTA PARA REPLICAR EXACTAMENTE A ADMINISTRACIÓN:
+
+Tabla de provisiones
+
+Tabla de impuestos
+
+Tabla de intereses
+
+Tabla de cash flow real
+
+Sin esas 4 tablas, nunca vas a obtener Beneficio Neto ni Cash Flow administrativo porque el Excel usa datos que hoy no existen en tu app.
+
+Si querés, te armo ahora mismo:
+
+✔ las 4 tablas
+✔ el ETL
+✔ el endpoint
+✔ y los bloques del Dashboard
+
+para que tu app replique al 100% el Excel de administración.
