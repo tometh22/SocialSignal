@@ -52,6 +52,8 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Deterministic + Fuzzy Project Resolver V2**: 3-stage cascade resolution for project matching using `dim_client_alias` and `dim_project_alias`.
 - **One-Shot Project Visualization System**: Dual-view system for one-shot projects with single revenue entry but multi-month cost distribution, featuring intelligent period visibility and lifetime metrics aggregation.
 - **Executive Dashboard Enhancements**: Separation of billed revenue and Work-In-Progress (WIP), showing both actual and projected margins, and integration of intelligent, context-aware business intelligence alerts (e.g., `NO_BILLING_WITH_COSTS`, `BILLABLE_DROP`, `FX_SHIFT`, `OVER_BURN`).
+- **Comprehensive Financial Metrics**: EBIT Operativo (Income - Direct Costs), EBIT Contable (Billed - Total Costs), Beneficio Neto (EBIT Contable - Provisions), Cash Flow Operativo (from `cash_movements` table), Burn Rate (total costs), and Margen Admin % (EBIT Contable / Billed).
+- **Financial P&L Tables**: `pl_adjustments` for tracking provisions and taxes, `cash_movements` for cash flow tracking with inflows/outflows classification.
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.

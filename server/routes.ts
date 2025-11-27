@@ -5074,13 +5074,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // EBIT_operativo = Income - Costos_directos (do NOT subtract indirect costs)
       const ebitOperativoUsd = incomeUsd - directCostsUsd;
       
-      // ===== MARGEN CONTABLE =====
-      // Margen Contable = Income - (Directos + Indirectos)
-      const marginContableUsd = incomeUsd - totalCostsUsd;
+      // ===== EBIT CONTABLE (administrative definition) =====
+      // EBIT Contable = Facturado - Costos Totales (directos + indirectos)
+      const ebitContableUsd = incomeUsd - totalCostsUsd;
+      
+      // ===== MARGEN CONTABLE (same as EBIT Contable for legacy compatibility) =====
+      const marginContableUsd = ebitContableUsd;
+      
+      // ===== PROVISIONES Y AJUSTES PnL =====
+      const { rows: [adjustmentsData] } = await pool.query(`
+        SELECT COALESCE(SUM(amount_usd), 0) as total_adjustments
+        FROM pl_adjustments
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
+      const totalAdjustmentsUsd = parseFloat(adjustmentsData?.total_adjustments || '0');
+      
+      // ===== BENEFICIO NETO =====
+      // Beneficio Neto = EBIT Contable - Provisiones/Ajustes
+      const beneficioNetoUsd = ebitContableUsd - totalAdjustmentsUsd;
+      
+      // ===== CASH FLOW OPERATIVO =====
+      const { rows: [cashFlowData] } = await pool.query(`
+        SELECT COALESCE(SUM(amount_usd), 0) as cash_flow
+        FROM cash_movements
+        WHERE period_key = ANY($1)
+      `, [periodKeys]);
+      const cashFlowOperativoUsd = parseFloat(cashFlowData?.cash_flow || '0');
+      
+      // ===== BURN RATE (costos totales del mes) =====
+      const burnRateUsd = totalCostsUsd;
       
       // ===== PORCENTAJES Y MARKUP =====
       const ebitOperativoPct = incomeUsd > 0 ? (ebitOperativoUsd / incomeUsd) * 100 : 0;
+      const ebitContablePct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0;
       const marginContablePct = incomeUsd > 0 ? (marginContableUsd / incomeUsd) * 100 : 0;
+      const margenAdminPct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0; // Same as ebitContablePct
       const markupOperativoUsd = directCostsUsd > 0 ? (incomeUsd / directCostsUsd) : 0;
       
       // ===== VERIFICATION LOGS =====
@@ -5088,8 +5116,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`   Income (Facturado): USD ${incomeUsd.toFixed(2)}`);
       console.log(`   Costos Directos: USD ${directCostsUsd.toFixed(2)}`);
       console.log(`   Costos Indirectos: USD ${indirectCostsUsd.toFixed(2)}`);
-      console.log(`   EBIT Operativo (Income - Directos): USD ${ebitOperativoUsd.toFixed(2)}`);
-      console.log(`   Margen Contable (Income - Total Costs): USD ${marginContableUsd.toFixed(2)}`);
+      console.log(`   Burn Rate (Total Costs): USD ${burnRateUsd.toFixed(2)}`);
+      console.log(`   EBIT Operativo (Income - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
+      console.log(`   EBIT Contable (Income - Total Costs): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
+      console.log(`   Provisiones/Ajustes: USD ${totalAdjustmentsUsd.toFixed(2)}`);
+      console.log(`   Beneficio Neto: USD ${beneficioNetoUsd.toFixed(2)}`);
+      console.log(`   Cash Flow Operativo: USD ${cashFlowOperativoUsd.toFixed(2)}`);
+      console.log(`   Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
       
       // Legacy compatibility
       const billedUsd = incomeUsd;
@@ -5259,17 +5292,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availablePeriods: periodsInfo.availablePeriods,
         
         financial: {
+          // === INGRESOS ===
           incomeUsd: incomeUsd,                        // Facturado del mes (from Rendimiento Cliente)
           devengadoUsd: devengadoUsd,                  // = Income (temporary rule)
           billedUsd: billedUsd,                        // = Income (legacy compatibility)
+          
+          // === COSTOS ===
           directCostsUsd: directCostsUsd,              // Costos directos del mes
           indirectCostsUsd: indirectCostsUsd,          // Costos indirectos del mes (overhead)
           costUsd: costUsd,                            // Total costos (Directos + Indirectos)
+          burnRateUsd: burnRateUsd,                    // Burn Rate = Total costos del mes
+          
+          // === EBIT Y MÁRGENES ===
           ebitOperativoUsd: ebitOperativoUsd,          // EBIT Operativo = Income - Directos
           ebitOperativoPct: ebitOperativoPct,          // % EBIT operativo
-          marginContableUsd: marginContableUsd,        // Margen Contable = Income - (Directos + Indirectos)
+          ebitContableUsd: ebitContableUsd,            // EBIT Contable = Income - (Directos + Indirectos)
+          ebitContablePct: ebitContablePct,            // % EBIT contable
+          marginContableUsd: marginContableUsd,        // Margen Contable = EBIT Contable (legacy)
           marginContablePct: marginContablePct,        // % Margen contable
+          margenAdminPct: margenAdminPct,              // % Margen administrativo = EBIT Contable / Facturado
           markupOperativoUsd: markupOperativoUsd,      // Markup = Income / Costos Directos
+          
+          // === PROVISIONES Y BENEFICIO NETO ===
+          adjustmentsUsd: totalAdjustmentsUsd,         // Provisiones e impuestos del mes
+          beneficioNetoUsd: beneficioNetoUsd,          // Beneficio Neto = EBIT Contable - Provisiones
+          
+          // === CASH FLOW ===
+          cashFlowOperativoUsd: cashFlowOperativoUsd,  // Entradas - Salidas del mes
+          
+          // === OTROS ===
           wipUsd: wipUsd,                              // WIP = 0 (disabled)
           fxWeighted: fxWeighted
         },

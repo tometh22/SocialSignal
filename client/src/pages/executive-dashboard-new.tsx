@@ -127,11 +127,18 @@ export default function ExecutiveDashboard() {
         costUsd: 0,
         directCostsUsd: 0,
         indirectCostsUsd: 0,
+        burnRateUsd: 0,
         marginContableUsd: 0,
         marginContablePct: 0,
         ebitOperativoUsd: 0,
         ebitOperativoPct: 0,
+        ebitContableUsd: 0,
+        ebitContablePct: 0,
+        margenAdminPct: 0,
         markupOperativoUsd: 0,
+        adjustmentsUsd: 0,
+        beneficioNetoUsd: 0,
+        cashFlowOperativoUsd: 0,
         wipUsd: 0,
         fxWeighted: 0,
         totalHours: 0,
@@ -151,11 +158,18 @@ export default function ExecutiveDashboard() {
       costUsd: dashboardMetrics.financial?.costUsd || 0,
       directCostsUsd: dashboardMetrics.financial?.directCostsUsd || 0,
       indirectCostsUsd: dashboardMetrics.financial?.indirectCostsUsd || 0,
+      burnRateUsd: dashboardMetrics.financial?.burnRateUsd || 0,
       marginContableUsd: dashboardMetrics.financial?.marginContableUsd || 0,
       marginContablePct: dashboardMetrics.financial?.marginContablePct || 0,
       ebitOperativoUsd: dashboardMetrics.financial?.ebitOperativoUsd || 0,
       ebitOperativoPct: dashboardMetrics.financial?.ebitOperativoPct || 0,
+      ebitContableUsd: dashboardMetrics.financial?.ebitContableUsd || 0,
+      ebitContablePct: dashboardMetrics.financial?.ebitContablePct || 0,
+      margenAdminPct: dashboardMetrics.financial?.margenAdminPct || 0,
       markupOperativoUsd: dashboardMetrics.financial?.markupOperativoUsd || 0,
+      adjustmentsUsd: dashboardMetrics.financial?.adjustmentsUsd || 0,
+      beneficioNetoUsd: dashboardMetrics.financial?.beneficioNetoUsd || 0,
+      cashFlowOperativoUsd: dashboardMetrics.financial?.cashFlowOperativoUsd || 0,
       wipUsd: dashboardMetrics.financial?.wipUsd || 0,
       fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
       totalHours: dashboardMetrics.operational?.hours?.total || 0,
@@ -442,55 +456,87 @@ export default function ExecutiveDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* KPI GRID - Compacto y organizado */}
+              {/* KPI GRID - INGRESOS Y COSTOS */}
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-4">Métricas Clave</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                  {/* Devengado */}
-                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                    <span className="text-xs text-gray-600">Devengado</span>
-                    <div className="text-2xl font-bold text-green-700 mt-1">
-                      ${(currentMetrics.devengadoUsd / 1000).toFixed(1)}k
-                    </div>
-                  </div>
-                  
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Ingresos y Costos</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {/* Facturado */}
-                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                     <span className="text-xs text-gray-600">Facturado</span>
-                    <div className="text-2xl font-bold text-amber-700 mt-1">
+                    <div className="text-2xl font-bold text-green-700 mt-1">
                       ${(currentMetrics.billedUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
-
-                  {/* Costos */}
+                  
+                  {/* Costos Directos */}
                   <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                    <span className="text-xs text-gray-600">Costos</span>
+                    <span className="text-xs text-gray-600">Costos Directos</span>
                     <div className="text-2xl font-bold text-red-600 mt-1">
-                      ${(currentMetrics.costUsd / 1000).toFixed(1)}k
+                      ${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
 
-                  {/* Margen Contable */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.marginContableUsd >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">Margen Contable</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.marginContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.marginContableUsd / 1000).toFixed(1)}k
+                  {/* Costos Indirectos */}
+                  <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                    <span className="text-xs text-gray-600">Costos Indirectos</span>
+                    <div className="text-2xl font-bold text-orange-600 mt-1">
+                      ${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
 
-                  {/* EBIT Operativo = Income - Costos Directos */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'}`}>
+                  {/* Burn Rate */}
+                  <div className="p-3 bg-rose-50 rounded-lg border border-rose-200">
+                    <span className="text-xs text-gray-600">Burn Rate</span>
+                    <div className="text-2xl font-bold text-rose-600 mt-1">
+                      ${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI GRID - MÁRGENES Y EBIT */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-4">Márgenes y Resultados</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {/* EBIT Operativo */}
+                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                     <span className="text-xs text-gray-600">EBIT Operativo</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k
                     </div>
+                    <span className="text-xs text-gray-500">{currentMetrics.ebitOperativoPct?.toFixed(1)}%</span>
                   </div>
 
-                  {/* WIP */}
+                  {/* EBIT Contable */}
+                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitContableUsd >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                    <span className="text-xs text-gray-600">EBIT Contable</span>
+                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.ebitContableUsd / 1000).toFixed(1)}k
+                    </div>
+                    <span className="text-xs text-gray-500">{currentMetrics.ebitContablePct?.toFixed(1)}%</span>
+                  </div>
+
+                  {/* Beneficio Neto */}
+                  <div className={`p-3 rounded-lg border ${currentMetrics.beneficioNetoUsd >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'}`}>
+                    <span className="text-xs text-gray-600">Beneficio Neto</span>
+                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.beneficioNetoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.beneficioNetoUsd / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+
+                  {/* Cash Flow Operativo */}
+                  <div className={`p-3 rounded-lg border ${currentMetrics.cashFlowOperativoUsd >= 0 ? 'bg-cyan-50 border-cyan-200' : 'bg-red-50 border-red-200'}`}>
+                    <span className="text-xs text-gray-600">Cash Flow</span>
+                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.cashFlowOperativoUsd >= 0 ? 'text-cyan-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.cashFlowOperativoUsd / 1000).toFixed(1)}k
+                    </div>
+                  </div>
+
+                  {/* Markup */}
                   <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                    <span className="text-xs text-gray-600">WIP</span>
+                    <span className="text-xs text-gray-600">Markup</span>
                     <div className="text-2xl font-bold text-purple-600 mt-1">
-                      ${(currentMetrics.wipUsd / 1000).toFixed(1)}k
+                      {currentMetrics.markupOperativoUsd?.toFixed(2)}x
                     </div>
                   </div>
                 </div>
@@ -506,41 +552,61 @@ export default function ExecutiveDashboard() {
                     Detalles Financieros
                   </h4>
 
-                  {/* Costos Desglosados */}
+                  {/* Composición de Costos */}
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <span className="text-xs font-medium text-gray-600 block mb-3">Composición de Costos</span>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">Directos</span>
+                        <span className="text-gray-600">Directos (equipo)</span>
                         <span className="font-medium text-gray-700">${(currentMetrics.directCostsUsd / 1000).toFixed(1)}k</span>
                       </div>
                       <Progress value={currentMetrics.costUsd > 0 ? (currentMetrics.directCostsUsd / currentMetrics.costUsd) * 100 : 0} className="h-1.5 [&>div]:bg-red-500" />
                       
                       <div className="flex justify-between items-center text-sm mt-3">
-                        <span className="text-gray-600">Indirectos</span>
+                        <span className="text-gray-600">Indirectos (overhead)</span>
                         <span className="font-medium text-gray-700">${(currentMetrics.indirectCostsUsd / 1000).toFixed(1)}k</span>
                       </div>
                       <Progress value={currentMetrics.costUsd > 0 ? (currentMetrics.indirectCostsUsd / currentMetrics.costUsd) * 100 : 0} className="h-1.5 [&>div]:bg-orange-500" />
+                      
+                      <div className="flex justify-between items-center text-sm mt-3 pt-2 border-t">
+                        <span className="text-gray-700 font-medium">Total (Burn Rate)</span>
+                        <span className="font-bold text-gray-800">${(currentMetrics.burnRateUsd / 1000).toFixed(1)}k</span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Markup */}
-                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <span className="text-xs text-gray-600">Markup Operativo</span>
-                    <div className="text-3xl font-bold text-emerald-600 mt-2">
-                      {currentMetrics.markupOperativoUsd?.toFixed(2)}x
+                  {/* Comparación de Márgenes */}
+                  <div className="p-4 bg-white rounded-lg border border-gray-200">
+                    <span className="text-xs font-medium text-gray-600 block mb-3">Comparación de Márgenes</span>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">EBIT Operativo</span>
+                        <span className={`font-bold ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k ({currentMetrics.ebitOperativoPct?.toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 -mt-2">Facturado - Directos (margin before overhead)</div>
+                      
+                      <div className="flex justify-between items-center text-sm pt-2">
+                        <span className="text-gray-600">EBIT Contable</span>
+                        <span className={`font-bold ${currentMetrics.ebitContableUsd >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                          ${(currentMetrics.ebitContableUsd / 1000).toFixed(1)}k ({currentMetrics.ebitContablePct?.toFixed(1)}%)
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 -mt-2">Facturado - Total Costos (profit/loss)</div>
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">Devengado / Costos Directos</span>
                   </div>
 
-                  {/* % EBIT Operativo */}
-                  <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                    <span className="text-xs text-gray-600">% EBIT Operativo</span>
-                    <div className="text-3xl font-bold text-indigo-600 mt-2">
-                      {currentMetrics.ebitOperativoPct?.toFixed(1)}%
+                  {/* Provisiones y Beneficio Neto */}
+                  {currentMetrics.adjustmentsUsd > 0 && (
+                    <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+                      <span className="text-xs font-medium text-amber-700 block mb-2">Provisiones del Mes</span>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-amber-600">Impuestos y Provisiones</span>
+                        <span className="font-medium text-amber-700">${(currentMetrics.adjustmentsUsd / 1000).toFixed(1)}k</span>
+                      </div>
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">Income - Directos / Income</span>
-                  </div>
+                  )}
                 </div>
 
                 {/* Columna Operativa */}
