@@ -5055,30 +5055,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // ===== FINANCIAL METRICS - SIMPLIFIED (income_sot uses client_name/project_name, not project_id) =====
-      // For now, use billed as devengado (simplified - can be enhanced later with proper income_sot mapping)
-      const billedUsd = parseFloat(billingData?.billed_usd || '0');
-      let devengadoUsd = billedUsd; // Simplified: use billed as proxy for devengado
-      let wipUsd = 0; // Simplified: WIP calculation requires project mapping
+      // ===== INCOME (from fact_rc_month - source: "Rendimiento Cliente" TOTAL CONVERTIDO A USD) =====
+      // Income = SUM(revenue_usd) for Real/Facturado rows in the selected month
+      const incomeUsd = parseFloat(billingData?.billed_usd || '0');
       
-      // ===== COSTOS (directos e indirectos) =====
+      // Devengado = same as Income for now (temporary rule per business definition)
+      const devengadoUsd = incomeUsd;
+      
+      // WIP = 0 (disabled per business definition)
+      const wipUsd = 0;
+      
+      // ===== COSTOS (directos e indirectos from "Costos directos e indirectos") =====
       const directCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
       const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
-      const costUsd = parseFloat(costsData?.total_cost_usd || '0');
+      const totalCostsUsd = directCostsUsd + indirectCostsUsd;
       
-      // ===== MÁRGENES: CONTABLE vs ECONÓMICO =====
-      // Margen Contable = Facturado - Costos
-      const marginContableUsd = billedUsd - costUsd;
+      // ===== EBIT OPERATIVO (new business definition) =====
+      // EBIT_operativo = Income - Costos_directos (do NOT subtract indirect costs)
+      const ebitOperativoUsd = incomeUsd - directCostsUsd;
       
-      // Margen Económico = Devengado - Costos (EBIT)
-      const marginEconomicoUsd = devengadoUsd - costUsd;
+      // ===== MARGEN CONTABLE =====
+      // Margen Contable = Income - (Directos + Indirectos)
+      const marginContableUsd = incomeUsd - totalCostsUsd;
       
-      // Porcentajes
-      const marginEconomicoPct = devengadoUsd > 0 ? (marginEconomicoUsd / devengadoUsd) * 100 : 0;
-      const markupOperativoUsd = directCostsUsd > 0 ? (devengadoUsd / directCostsUsd) : 0;
+      // ===== PORCENTAJES Y MARKUP =====
+      const ebitOperativoPct = incomeUsd > 0 ? (ebitOperativoUsd / incomeUsd) * 100 : 0;
+      const marginContablePct = incomeUsd > 0 ? (marginContableUsd / incomeUsd) * 100 : 0;
+      const markupOperativoUsd = directCostsUsd > 0 ? (incomeUsd / directCostsUsd) : 0;
       
-      // ===== MÉTRICA DE CONTROL: Opción 1 (solo para referencia) =====
-      const costTimesMarkupUsd = costUsd * 2.5; // Teórico esperado
+      // ===== VERIFICATION LOGS =====
+      console.log(`📊 DASHBOARD VERIFICATION [${lastPeriodKey}]:`);
+      console.log(`   Income (Facturado): USD ${incomeUsd.toFixed(2)}`);
+      console.log(`   Costos Directos: USD ${directCostsUsd.toFixed(2)}`);
+      console.log(`   Costos Indirectos: USD ${indirectCostsUsd.toFixed(2)}`);
+      console.log(`   EBIT Operativo (Income - Directos): USD ${ebitOperativoUsd.toFixed(2)}`);
+      console.log(`   Margen Contable (Income - Total Costs): USD ${marginContableUsd.toFixed(2)}`);
+      
+      // Legacy compatibility
+      const billedUsd = incomeUsd;
+      const costUsd = totalCostsUsd;
       
       // ===== OPERATIONAL METRICS =====
       
@@ -5244,17 +5259,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         availablePeriods: periodsInfo.availablePeriods,
         
         financial: {
-          devengadoUsd: devengadoUsd,                  // Ingresos devengados (Opción 2)
-          billedUsd: billedUsd,                        // Facturado real (contable)
-          directCostsUsd: directCostsUsd,              // Costos directos
-          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos
-          costUsd: costUsd,                            // Total costos
-          marginContableUsd: marginContableUsd,        // Margen Contable = Facturado - Costos
-          marginEconomicoUsd: marginEconomicoUsd,      // Margen Económico = Devengado - Costos (EBIT)
-          marginEconomicoPct: marginEconomicoPct,      // % Margen económico
-          markupOperativoUsd: markupOperativoUsd,      // Markup = Devengado / Costos Directos
-          wipUsd: wipUsd,                              // WIP = Devengado Acumulado - Facturado Acumulado
-          costTimesMarkupUsd: costTimesMarkupUsd,      // Control: Costos × 2.5 (teórico esperado)
+          incomeUsd: incomeUsd,                        // Facturado del mes (from Rendimiento Cliente)
+          devengadoUsd: devengadoUsd,                  // = Income (temporary rule)
+          billedUsd: billedUsd,                        // = Income (legacy compatibility)
+          directCostsUsd: directCostsUsd,              // Costos directos del mes
+          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos del mes (overhead)
+          costUsd: costUsd,                            // Total costos (Directos + Indirectos)
+          ebitOperativoUsd: ebitOperativoUsd,          // EBIT Operativo = Income - Directos
+          ebitOperativoPct: ebitOperativoPct,          // % EBIT operativo
+          marginContableUsd: marginContableUsd,        // Margen Contable = Income - (Directos + Indirectos)
+          marginContablePct: marginContablePct,        // % Margen contable
+          markupOperativoUsd: markupOperativoUsd,      // Markup = Income / Costos Directos
+          wipUsd: wipUsd,                              // WIP = 0 (disabled)
           fxWeighted: fxWeighted
         },
         

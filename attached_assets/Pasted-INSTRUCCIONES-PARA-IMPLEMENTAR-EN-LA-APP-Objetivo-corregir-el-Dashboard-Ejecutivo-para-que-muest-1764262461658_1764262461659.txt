@@ -1,0 +1,122 @@
+INSTRUCCIONES PARA IMPLEMENTAR EN LA APP
+
+**Objetivo: corregir el Dashboard Ejecutivo para que muestre:
+
+rendimiento operativo
+
+EBIT operativo
+
+costos directos/indirectos correctos
+
+ingresos correctos del mes.**
+
+Copiá y pegá ESTE BLOQUE en Replit Agent:
+
+▶️ BLOQUE PARA REPLIT AGENT (COPIAR / PEGAR EXACTO)
+
+TASK: Fix Executive Dashboard metrics (income, costs, EBIT) to use the correct business definitions.
+
+1. Income (facturado / devengado)
+
+Replace every place where the app reads fact_rc_month.revenue_usd from the old logic with the following rule:
+
+Income must be loaded from the Excel sheet “Rendimiento Cliente” using the column TOTAL CONVERTIDO A USD.
+
+Ensure ETL for “Rendimiento Cliente” maps exactly:
+
+month (period_key)
+
+project_id
+
+revenue_usd = total_converted_usd
+
+Remove any fallback, estimate, or alternative revenue columns.
+
+Revenue of the month = SUM(revenue_usd) only for:
+
+rows marked as Real / Facturado,
+
+for the selected month.
+
+This number MUST match the Excel “Ventas del mes cerrado”.
+
+2. Costs: directos e indirectos
+
+Keep reading from “Costos directos e indirectos”.
+
+Mapping rules:
+
+If Tipo de Costo = "Directo" → direct_costs table.
+
+If Tipo de Costo = "Indirecto" → indirect_costs table.
+
+Normalized USD = “Costo USD” of the sheet.
+
+Costs of the month = SUM for the selected month, no filters.
+
+3. EBIT operativo (nuevo cálculo)
+
+Replace the current EBIT formula with:
+
+EBIT_operativo = Income_del_mes – Costos_directos_del_mes
+
+
+Important:
+
+Do NOT subtract indirect costs in this EBIT tile.
+
+Indirect costs must go to a separate block (“Overhead / costos fijos”).
+
+4. WIP
+
+For now: set WIP = 0 in this dashboard.
+
+Disable any devengado or contract-based WIP logic here.
+
+5. Tiles to update
+
+Update these tiles to use the new definitions:
+
+Devengado ⇒ same value as Income for now (temporary rule).
+
+Facturado ⇒ Income_del_mes.
+
+Costos ⇒ Costos_directos + Costos_indirectos (still displayed separately).
+
+Margen Contable ⇒ Income_del_mes – (Directos + Indirectos).
+
+EBIT ⇒ EBIT_operativo = Income_del_mes – Directos.
+
+WIP ⇒ 0.
+
+6. Verification logic to implement
+
+After updating, add the following check inside logs:
+
+Print: income, direct_costs, indirect_costs, EBIT_operativo for the month.
+
+Ensure income matches EXACTLY the value in “Ventas del mes” in Excel for the same month.
+
+Ensure direct & indirect costs equal the values in the “Costos Directos e Indirectos Reales” dashboard.
+
+7. DON’T TOUCH
+
+Do NOT use “Proyectos confirmados y estimados”.
+
+Do NOT use old income_sot logic.
+
+Do NOT infer revenue from contracts, markup, or estimated hours.
+
+8. Output expected
+
+After fix, for OCT-2025, numbers must match:
+
+Income ≈ 42.1k (until verification against the exact Excel column).
+
+Direct costs ≈ 17.3k.
+
+Indirect costs ≈ 45.6k.
+
+EBIT operativo ≈ 42.1k – 17.3k = ~24.8k.
+
+Margen contable = Income – (Direct + Indirect).

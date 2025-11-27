@@ -117,21 +117,22 @@ export default function ExecutiveDashboard() {
     staleTime: 10 * 60 * 1000
   });
 
-  // Métricas consolidadas del mes actual (Star Schema SoT) - Modelo devengo Opción 2
+  // Métricas consolidadas del mes actual (Star Schema SoT) - Business definitions
   const currentMetrics = useMemo(() => {
     if (!dashboardMetrics) {
       return {
+        incomeUsd: 0,
         devengadoUsd: 0,
         billedUsd: 0,
         costUsd: 0,
         directCostsUsd: 0,
         indirectCostsUsd: 0,
         marginContableUsd: 0,
-        marginEconomicoUsd: 0,
-        marginEconomicoPct: 0,
+        marginContablePct: 0,
+        ebitOperativoUsd: 0,
+        ebitOperativoPct: 0,
         markupOperativoUsd: 0,
         wipUsd: 0,
-        costTimesMarkupUsd: 0,
         fxWeighted: 0,
         totalHours: 0,
         billableHours: 0,
@@ -144,17 +145,18 @@ export default function ExecutiveDashboard() {
     }
     
     return {
+      incomeUsd: dashboardMetrics.financial?.incomeUsd || dashboardMetrics.financial?.billedUsd || 0,
       devengadoUsd: dashboardMetrics.financial?.devengadoUsd || 0,
       billedUsd: dashboardMetrics.financial?.billedUsd || 0,
       costUsd: dashboardMetrics.financial?.costUsd || 0,
       directCostsUsd: dashboardMetrics.financial?.directCostsUsd || 0,
       indirectCostsUsd: dashboardMetrics.financial?.indirectCostsUsd || 0,
       marginContableUsd: dashboardMetrics.financial?.marginContableUsd || 0,
-      marginEconomicoUsd: dashboardMetrics.financial?.marginEconomicoUsd || 0,
-      marginEconomicoPct: dashboardMetrics.financial?.marginEconomicoPct || 0,
+      marginContablePct: dashboardMetrics.financial?.marginContablePct || 0,
+      ebitOperativoUsd: dashboardMetrics.financial?.ebitOperativoUsd || 0,
+      ebitOperativoPct: dashboardMetrics.financial?.ebitOperativoPct || 0,
       markupOperativoUsd: dashboardMetrics.financial?.markupOperativoUsd || 0,
       wipUsd: dashboardMetrics.financial?.wipUsd || 0,
-      costTimesMarkupUsd: dashboardMetrics.financial?.costTimesMarkupUsd || 0,
       fxWeighted: dashboardMetrics.financial?.fxWeighted || 0,
       totalHours: dashboardMetrics.operational?.hours?.total || 0,
       billableHours: dashboardMetrics.operational?.hours?.billable || 0,
@@ -476,11 +478,11 @@ export default function ExecutiveDashboard() {
                     </div>
                   </div>
 
-                  {/* Margen Económico */}
-                  <div className={`p-3 rounded-lg border ${currentMetrics.marginEconomicoUsd >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'}`}>
-                    <span className="text-xs text-gray-600">EBIT</span>
-                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.marginEconomicoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
-                      ${(currentMetrics.marginEconomicoUsd / 1000).toFixed(1)}k
+                  {/* EBIT Operativo = Income - Costos Directos */}
+                  <div className={`p-3 rounded-lg border ${currentMetrics.ebitOperativoUsd >= 0 ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'}`}>
+                    <span className="text-xs text-gray-600">EBIT Operativo</span>
+                    <div className={`text-2xl font-bold mt-1 ${currentMetrics.ebitOperativoUsd >= 0 ? 'text-indigo-600' : 'text-red-600'}`}>
+                      ${(currentMetrics.ebitOperativoUsd / 1000).toFixed(1)}k
                     </div>
                   </div>
 
@@ -531,13 +533,13 @@ export default function ExecutiveDashboard() {
                     <span className="text-xs text-gray-500 block mt-1">Devengado / Costos Directos</span>
                   </div>
 
-                  {/* Margen % */}
+                  {/* % EBIT Operativo */}
                   <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                    <span className="text-xs text-gray-600">% Margen Económico</span>
+                    <span className="text-xs text-gray-600">% EBIT Operativo</span>
                     <div className="text-3xl font-bold text-indigo-600 mt-2">
-                      {currentMetrics.marginEconomicoPct?.toFixed(1)}%
+                      {currentMetrics.ebitOperativoPct?.toFixed(1)}%
                     </div>
-                    <span className="text-xs text-gray-500 block mt-1">Del Devengado</span>
+                    <span className="text-xs text-gray-500 block mt-1">Income - Directos / Income</span>
                   </div>
                 </div>
 
