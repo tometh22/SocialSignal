@@ -1,0 +1,330 @@
+1) Ajustes de layout (lo raro del filtro y el botón)
+Problema actual
+
+El Filtro Temporal está flotando arriba a la derecha, separado del título y del toggle Operativo/Financiero.
+
+El botón “Actualizar” parece suelto, sin relación visual clara con el filtro.
+
+El ojo tiene que recorrer demasiado: título a la izquierda, filtros arriba a la derecha, KPIs abajo.
+
+Propuesta de layout
+
+Piensalo en 3 bandas horizontales:
+
+Header del dashboard
+
+Izquierda: título + fecha.
+
+Derecha: toggle Operativo/Financiero + filtro temporal.
+
+Fila de KPIs principales
+
+Devengado (hero)
+
+EBIT Operativo (hero)
+
+Resto de métricas + composición de costos
+
+1.1. Header
+
+Contenedor: flex items-center justify-between w-full mb-4
+
+Izquierda:
+
+Dashboard Ejecutivo
+
+noviembre de 2025 en tipografía pequeña gris (text-sm text-gray-500).
+
+Derecha (todo en una sola línea):
+
+[ Operativo | Financiero ]   [ Selector Mes/Año ]
+
+
+Sacá el card gigante del filtro. Convertí el filtro en algo tipo input compacto:
+
+Label: Período
+
+Valor: Nov 2025
+
+Al hacer clic abre el modal/selector actual.
+
+¿Y el botón “Actualizar”?
+
+Opciones:
+
+Mejor: eliminar botón y refrescar automáticamente cuando cambia el período.
+
+Si necesitás mantenerlo:
+
+Integrarlo dentro del control del filtro como icono:
+
+Botón pequeño con icono de refresh (⟳) sin label enorme.
+
+Tooltip: “Actualizar datos del período”.
+
+2) Microcopys y labels (pasada fina)
+2.1. Toggle de vista
+
+Botones:
+
+Operativo
+
+Financiero
+
+Tooltip para cada uno:
+
+Operativo:
+
+“Ver rendimiento de la operación según lo producido (devengado).”
+
+Financiero:
+
+“Ver visión contable según facturación y costos totales.”
+
+2.2. Tarjetas Operativas
+Devengado
+
+Título: Devengado
+
+Subtítulo pequeño: Ingreso ganado en el período
+
+Línea secundaria: Facturado: $0 (en gris text-xs text-gray-500)
+
+Tooltip (i):
+
+“Devengado = ingreso correspondiente al trabajo realizado en el período, independientemente de cuándo se facture.”
+
+EBIT Operativo
+
+Título: EBIT Operativo
+
+Subtítulo: 0% del devengado → cuando haya datos: xx% del devengado
+
+Tooltip:
+
+“EBIT Operativo = Devengado – Costos directos (equipo). Mide la rentabilidad de la operación antes de overhead e impuestos.”
+
+Tarifa Efectiva
+
+Título: Tarifa efectiva
+
+Valor: $0
+
+Subtítulo: USD por hora facturable
+
+Tooltip:
+
+“Tarifa efectiva = Devengado / Horas facturables. Indica cuánto ingreso genera en promedio cada hora de trabajo facturable.”
+
+Markup Operativo
+
+Título: Markup operativo
+
+Valor: 0.00x
+
+Subtítulo: Múltiplo sobre costos directos
+
+Tooltip:
+
+“Markup operativo = Devengado / Costos directos. Mide cuántas veces recuperás el costo del equipo con lo producido.”
+
+% Facturables
+
+Título: % Horas facturables
+
+Valor: 0%
+
+Subtítulo: Sobre el total de horas trabajadas
+
+Tooltip:
+
+“Horas facturables / Horas totales. Idealmente ≥ 70% en empresas de servicios.”
+
+Horas / Personas / Proyectos
+
+Títulos:
+
+Horas trabajadas
+
+Personas activas
+
+Proyectos activos
+
+Subtítulos:
+
+Horas: En el período seleccionado
+
+Personas: Con al menos 1h registrada
+
+Proyectos: Con horas o devengado > 0
+
+2.3. Composición de Costos
+
+Encabezado: Composición de costos
+
+Leyenda:
+
+Directos (equipo)
+
+Indirectos (overhead)
+
+Total
+
+Subtexto bajo el gráfico:
+
+Directos: 0% del total
+
+Indirectos: 0% del total
+
+Tooltip global del módulo:
+
+“Incluye solo costos reales del período. Directos = equipo. Indirectos = overhead (alquileres, herramientas, management, etc.).”
+
+3) Ajustes de tamaños y grid
+
+Para mantener todo ordenado:
+
+Contenedor principal de KPIs: grid grid-cols-12 gap-4.
+
+Fila 1 (KPIs héroe)
+
+Devengado: col-span-6
+
+EBIT Operativo: col-span-6
+→ Misma altura. Cards con padding grande (p-6), tipografía grande para el número (text-3xl font-semibold).
+
+Fila 2 (eficiencia)
+
+Tarifa efectiva: col-span-4
+
+Markup operativo: col-span-4
+
+% Horas facturables: col-span-4
+→ Cards medianas, p-4, número text-2xl.
+
+Dentro de % Horas facturables una barrita horizontal fina (tipo h-1.5 rounded-full) en lugar de una tarjeta nueva gigante.
+
+Fila 3 (capacidad)
+
+Horas trabajadas: col-span-4
+
+Personas activas: col-span-4
+
+Proyectos activos: col-span-4
+→ Cards chicas, p-4, número text-xl.
+
+Fila 4 (Composición de costos)
+
+Una sola card col-span-12.
+
+4) Checklist técnico backend + front
+
+Usalo para revisar rápido que todo esté bien armado.
+
+4.1. Backend – Datos y lógica
+
+Contrato de respuesta
+
+El endpoint del Executive Dashboard devuelve:
+
+financial y operational como bloques separados.
+
+Nombres exactamente iguales a los que usa el front.
+
+No se devuelven null donde el front espera número (usar 0).
+
+Período
+
+El filtro envía periodKey tipo YYYY-MM.
+
+El backend usa SOLO ese período para agrupar y sumar.
+
+No hay hardcode de 2025-10 en ningún lado.
+
+Fuentes
+
+financial.billedUsd sale de fact_rc_month (pestaña Rendimiento Cliente).
+
+directCostsUsd e indirectCostsUsd salen de Costos SoT (no de tablas legacy).
+
+earnedUsd (devengado) sale del SoT de devengado (o de la lógica que definimos, pero no se iguala ciegamente a facturado).
+
+Fórmulas
+
+ebitAccountingUsd = billedUsd - (direct + indirect).
+
+ebitOperationalUsd = earnedUsd - directCosts.
+
+markup = directCosts > 0 ? earnedUsd / directCosts : 0.
+
+effectiveRate = billableHours > 0 ? earnedUsd / billableHours : 0.
+
+billableRatio = totalHours > 0 ? billableHours / totalHours : 0.
+
+Sanity checks con Excel
+
+Para un mes con datos (ej. Octubre):
+
+Facturado back = facturado Excel.
+
+Costos directos/indirectos back = pestaña Costos Directos e Indirectos.
+
+Horas totales = dashboard legacy de horas (Asana).
+
+Para un mes sin datos: todos los KPIs = 0, sin errores.
+
+Manejo de errores
+
+Si el query a DB falla → responde 500 con mensaje claro.
+
+El front muestra un estado “Error al cargar datos” en lugar de 0 falsos.
+
+4.2. Frontend – Conexión y render
+
+Consumo del endpoint
+
+Hook o service centralizado, p.ej. useExecutiveDashboard(periodKey).
+
+Maneja loading / error / success.
+
+Mapping de datos
+
+Vista Operativa usa solo campos de operational en cálculos.
+
+Vista Financiera usa solo campos de financial.
+
+Ningún cálculo de UI usa directamente billedUsd para métricas operativas.
+
+Formateo
+
+Números en formato LATAM:
+
+Moneda: $42.100 / $64.2k según el diseño que quieras, pero consistente.
+
+Porcentajes: siempre con %, 1 decimales max (58.7%).
+
+Markup: 2.42x.
+
+Redondeo centralizado (helper de formato, no repetido en cada card).
+
+Filtro Temporal
+
+Cada cambio de mes dispara:
+
+actualización del estado periodKey.
+
+nueva llamada al endpoint.
+
+El estado visual del mes seleccionado siempre coincide con el período que se está usando en el request.
+
+Toggle Operativo/Financiero
+
+Cambia solo lo que se muestra.
+
+No dispara nuevas llamadas al backend (los datos vienen juntos en una sola respuesta).
+
+Si querés, siguiente paso podemos:
+
+Definir exactamente los textos de tooltips (title + contenido) para cada (i).
+
+Ajustar un sistema de colores en Tailwind (o el que usen) con tokens claros: --color-income, --color-cost, etc., para que no dependa de elegir colores “a mano” en cada card.
