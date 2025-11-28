@@ -4942,6 +4942,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Ver estructura de hoja Resumen Ejecutivo
+  app.get("/api/debug/resumen-ejecutivo-headers", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking.js');
+      const sheets = (googleSheetsWorkingService as any).createSheetsClientFromJSON();
+      const spreadsheetId = (googleSheetsWorkingService as any).spreadsheetId;
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "'Resumen Ejecutivo'!A1:Z5",
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      res.json({
+        success: true,
+        spreadsheetId,
+        rowCount: rows.length,
+        headers: rows[0] || [],
+        firstDataRow: rows[1] || [],
+        allRows: rows,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {

@@ -1943,107 +1943,95 @@ class GoogleSheetsWorkingService {
 
   /**
    * Parsear filas del Resumen Ejecutivo
-   * La hoja tiene estructura de tabla con meses como columnas (layout horizontal)
-   * Cada fila es un KPI diferente, cada columna un mes diferente
+   * ESTRUCTURA REAL DE LA HOJA:
+   * - FILAS = Meses (ej: "01 ene", "02 feb", etc.)
+   * - COLUMNAS = KPIs (Activo Líquido, Activo Total, Pasivo Total, etc.)
+   * 
+   * Headers: ["Mes", "Año", "Cierre", "Activo Líquido", "Activo Mediano Plazo Crypto", ...]
+   * Data:    ["01 ene", "2025", "31-1-2025", "$4.125,75", "$9.200,00", ...]
    */
   private parseResumenEjecutivo(rows: any[][]): ResumenEjecutivoRow[] {
     if (rows.length < 2) return [];
     
     const result: ResumenEjecutivoRow[] = [];
-    
-    // La primera fila contiene los meses (ej: "10 oct", "09 sep", etc.)
     const headerRow = rows[0];
     
-    // Encontrar columnas de meses (formato "NN mmm" como "10 oct", "09 sep")
-    const monthColumns: { col: number; label: string; year: number; month: number }[] = [];
+    console.log(`📊 [Resumen Ejecutivo] Procesando ${rows.length - 1} filas de datos...`);
+    console.log(`📊 [Resumen Ejecutivo] Headers: ${headerRow.slice(0, 10).join(', ')}...`);
     
-    for (let col = 1; col < headerRow.length; col++) {
-      const cell = headerRow[col];
-      if (!cell) continue;
-      
-      const monthMatch = this.parseMonthLabel(cell.toString().trim());
-      if (monthMatch) {
-        monthColumns.push({ col, ...monthMatch });
+    // Mapeo de nombres de columna → propiedad de ResumenEjecutivoRow
+    const columnMapping: Record<string, keyof ResumenEjecutivoRow> = {
+      'activo líquido': 'cajaTotal',
+      'activo total': 'totalActivo',
+      'pasivo total': 'totalPasivo',
+      'balance neto (activo-pasivo)': 'balanceNeto',
+      'balance neto': 'balanceNeto',
+      'ventas del mes': 'facturacionTotal',
+      'ebit utilidad operativa': 'ebitOperativo',
+      'ebit operativo': 'ebitOperativo',
+      'beneficio neto': 'beneficioNeto',
+      'markup': 'markupPromedio',
+      'chasflow': 'cashflowNeto',
+      'cashflow': 'cashflowNeto',
+      'pasivo provisión impuesto usa': 'impuestosUsa',
+      'activo mediano plazo crypto': 'inversiones',
+      'activo mediano plazo clientes a cobrar': 'cuentasCobrarUsd',
+      'pasivo proveedores a pagar': 'cuentasPagarUsd',
+    };
+    
+    // Encontrar índices de columnas para cada KPI
+    const columnIndices: Record<string, number> = {};
+    for (let col = 0; col < headerRow.length; col++) {
+      const header = (headerRow[col] || '').toString().toLowerCase().trim();
+      const field = columnMapping[header];
+      if (field) {
+        columnIndices[field] = col;
+        console.log(`  ✅ Columna "${headerRow[col]}" → ${field} (col ${col})`);
       }
     }
     
-    console.log(`📊 [Resumen Ejecutivo] Encontradas ${monthColumns.length} columnas de meses`);
+    // Índices especiales para Mes y Año
+    const mesColIdx = headerRow.findIndex((h: any) => (h || '').toString().toLowerCase() === 'mes');
+    const yearColIdx = headerRow.findIndex((h: any) => (h || '').toString().toLowerCase() === 'año');
     
-    // Mapa de filas KPI -> nombre de propiedad
-    const kpiRowMapping: Record<string, keyof ResumenEjecutivoRow> = {
-      'total activo': 'totalActivo',
-      'total pasivo': 'totalPasivo',
-      'balance': 'balanceNeto',
-      'caja total': 'cajaTotal',
-      'inversiones': 'inversiones',
-      'crypto': 'inversiones',
-      'cash flow ingresos': 'cashflowIngresos',
-      'ingresos': 'cashflowIngresos',
-      'cash flow egresos': 'cashflowEgresos',
-      'egresos': 'cashflowEgresos',
-      'cash flow neto': 'cashflowNeto',
-      'cash flow': 'cashflowNeto',
-      'cuentas a cobrar usd': 'cuentasCobrarUsd',
-      'cuentas por cobrar': 'cuentasCobrarUsd',
-      'cuentas a pagar usd': 'cuentasPagarUsd',
-      'cuentas por pagar': 'cuentasPagarUsd',
-      'ventas facturadas': 'facturacionTotal',
-      'facturación': 'facturacionTotal',
-      'facturacion': 'facturacionTotal',
-      'costos directos': 'costosDirectos',
-      'costos indirectos': 'costosIndirectos',
-      'iva compras': 'ivaCompras',
-      'impuestos usa': 'impuestosUsa',
-      'ebit': 'ebitOperativo',
-      'ebit operativo': 'ebitOperativo',
-      'beneficio neto': 'beneficioNeto',
-      'resultado neto': 'beneficioNeto',
-      'markup': 'markupPromedio',
-    };
+    console.log(`📊 [Resumen Ejecutivo] Columna Mes: ${mesColIdx}, Año: ${yearColIdx}`);
     
-    // Inicializar registros por mes
-    const monthRecords: Map<string, ResumenEjecutivoRow> = new Map();
-    
-    for (const mc of monthColumns) {
-      const periodKey = `${mc.year}-${String(mc.month).padStart(2, '0')}`;
-      monthRecords.set(periodKey, {
-        periodKey,
-        year: mc.year,
-        monthNumber: mc.month,
-        monthLabel: mc.label,
-      });
-    }
-    
-    // Procesar filas de datos
+    // Procesar cada fila de datos (empezando desde fila 1)
     for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
       if (!row || row.length === 0) continue;
       
-      const kpiName = (row[0] || '').toString().toLowerCase().trim();
-      const kpiField = kpiRowMapping[kpiName];
+      // Obtener mes y año
+      const mesLabel = (row[mesColIdx] || '').toString().trim();
+      const yearValue = parseInt((row[yearColIdx] || '').toString()) || new Date().getFullYear();
       
-      if (!kpiField) continue;
+      // Parsear el mes desde "01 ene", "02 feb", etc.
+      const monthMatch = this.parseMonthLabel(mesLabel);
+      if (!monthMatch) {
+        console.log(`  ⚠️ No se pudo parsear mes: "${mesLabel}"`);
+        continue;
+      }
       
-      // Extraer valores para cada mes
-      for (const mc of monthColumns) {
-        const value = row[mc.col];
+      const periodKey = `${yearValue}-${String(monthMatch.month).padStart(2, '0')}`;
+      
+      const record: Partial<ResumenEjecutivoRow> = {
+        periodKey,
+        year: yearValue,
+        monthNumber: monthMatch.month,
+        monthLabel: mesLabel,
+      };
+      
+      // Extraer valores de cada columna mapeada
+      for (const [field, colIdx] of Object.entries(columnIndices)) {
+        const value = row[colIdx];
         if (value === undefined || value === null || value === '') continue;
         
-        const periodKey = `${mc.year}-${String(mc.month).padStart(2, '0')}`;
-        const record = monthRecords.get(periodKey);
-        
-        if (record) {
-          const numValue = this.parseMoneyValue(value.toString());
-          if (numValue !== 0) {
-            (record as any)[kpiField] = numValue;
-          }
-        }
+        const numValue = this.parseMoneyValue(value.toString());
+        (record as any)[field] = numValue;
       }
-    }
-    
-    // Convertir mapa a array
-    for (const record of monthRecords.values()) {
-      result.push(record);
+      
+      result.push(record as ResumenEjecutivoRow);
+      console.log(`  ✅ ${periodKey} (${mesLabel}) - Ventas: ${record.facturacionTotal || 0}, EBIT: ${record.ebitOperativo || 0}`);
     }
     
     console.log(`✅ [Resumen Ejecutivo] Procesados ${result.length} registros mensuales`);
@@ -2052,41 +2040,95 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Parsear etiqueta de mes del Excel (ej: "10 oct" -> { label, year, month })
+   * Parsear etiqueta de mes del Excel - múltiples formatos soportados
+   * Formatos: "10 oct", "Oct 2024", "Octubre 2024", "oct-24", "10/2024", etc.
    */
   private parseMonthLabel(label: string): { label: string; year: number; month: number } | null {
-    // Formato esperado: "DD mmm" como "10 oct", "09 sep"
-    const match = label.match(/^(\d{1,2})\s*([a-záéíóú]+)$/i);
-    if (!match) return null;
-    
-    const monthNames: Record<string, number> = {
-      'ene': 1, 'enero': 1,
-      'feb': 2, 'febrero': 2,
-      'mar': 3, 'marzo': 3,
-      'abr': 4, 'abril': 4,
-      'may': 5, 'mayo': 5,
-      'jun': 6, 'junio': 6,
-      'jul': 7, 'julio': 7,
-      'ago': 8, 'agosto': 8,
-      'sep': 9, 'sept': 9, 'septiembre': 9,
-      'oct': 10, 'octubre': 10,
-      'nov': 11, 'noviembre': 11,
-      'dic': 12, 'diciembre': 12,
-    };
-    
-    const monthStr = match[2].toLowerCase();
-    const month = monthNames[monthStr];
-    
-    if (!month) return null;
-    
-    // El número antes del mes indica el mes, asumimos año actual o anterior
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
     
-    // Si el mes es mayor al actual, asumimos año anterior
-    const year = month > currentMonth ? currentYear - 1 : currentYear;
+    const monthNames: Record<string, number> = {
+      'ene': 1, 'enero': 1, 'jan': 1, 'january': 1,
+      'feb': 2, 'febrero': 2, 'february': 2,
+      'mar': 3, 'marzo': 3, 'march': 3,
+      'abr': 4, 'abril': 4, 'apr': 4, 'april': 4,
+      'may': 5, 'mayo': 5,
+      'jun': 6, 'junio': 6, 'june': 6,
+      'jul': 7, 'julio': 7, 'july': 7,
+      'ago': 8, 'agosto': 8, 'aug': 8, 'august': 8,
+      'sep': 9, 'sept': 9, 'septiembre': 9, 'september': 9,
+      'oct': 10, 'octubre': 10, 'october': 10,
+      'nov': 11, 'noviembre': 11, 'november': 11,
+      'dic': 12, 'diciembre': 12, 'dec': 12, 'december': 12,
+    };
     
-    return { label, year, month };
+    // Formato 1: "DD mmm" como "10 oct", "09 sep"
+    let match = label.match(/^(\d{1,2})\s*([a-záéíóú]+)$/i);
+    if (match) {
+      const monthStr = match[2].toLowerCase();
+      const month = monthNames[monthStr];
+      if (month) {
+        const year = month > currentMonth ? currentYear - 1 : currentYear;
+        return { label, year, month };
+      }
+    }
+    
+    // Formato 2: "mmm YYYY" o "mmm YY" como "Oct 2024", "Oct 24"
+    match = label.match(/^([a-záéíóú]+)\s*(\d{2,4})$/i);
+    if (match) {
+      const monthStr = match[1].toLowerCase();
+      const month = monthNames[monthStr];
+      if (month) {
+        let year = parseInt(match[2]);
+        if (year < 100) year += 2000; // Convertir "24" a "2024"
+        return { label, year, month };
+      }
+    }
+    
+    // Formato 3: "mmm-YY" o "mmm-YYYY" como "oct-24", "oct-2024"
+    match = label.match(/^([a-záéíóú]+)[/-](\d{2,4})$/i);
+    if (match) {
+      const monthStr = match[1].toLowerCase();
+      const month = monthNames[monthStr];
+      if (month) {
+        let year = parseInt(match[2]);
+        if (year < 100) year += 2000;
+        return { label, year, month };
+      }
+    }
+    
+    // Formato 4: "MM/YYYY" o "MM-YYYY" como "10/2024"
+    match = label.match(/^(\d{1,2})[/-](\d{4})$/);
+    if (match) {
+      const month = parseInt(match[1]);
+      const year = parseInt(match[2]);
+      if (month >= 1 && month <= 12) {
+        return { label, year, month };
+      }
+    }
+    
+    // Formato 5: "YYYY-MM" ISO format como "2024-10"
+    match = label.match(/^(\d{4})[/-](\d{1,2})$/);
+    if (match) {
+      const year = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      if (month >= 1 && month <= 12) {
+        return { label, year, month };
+      }
+    }
+    
+    // Formato 6: Solo nombre de mes "Octubre", "Oct" - asumir año actual
+    match = label.match(/^([a-záéíóú]+)$/i);
+    if (match) {
+      const monthStr = match[1].toLowerCase();
+      const month = monthNames[monthStr];
+      if (month) {
+        const year = month > currentMonth ? currentYear - 1 : currentYear;
+        return { label, year, month };
+      }
+    }
+    
+    return null;
   }
 }
 
