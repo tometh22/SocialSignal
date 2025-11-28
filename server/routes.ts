@@ -5053,6 +5053,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`📊 DASHBOARD: Fetching metrics for periods: ${periodKeys.join(', ')}`);
       
+      // ===== DATOS DE RESUMEN EJECUTIVO (Excel MAESTRO - Fuente oficial para vista Financiero) =====
+      const { rows: excelMaestroData } = await pool.query(`
+        SELECT 
+          period_key,
+          facturacion_total,
+          ebit_operativo,
+          beneficio_neto,
+          total_activo,
+          total_pasivo,
+          balance_neto,
+          caja_total,
+          inversiones,
+          cuentas_cobrar_usd,
+          cuentas_pagar_usd,
+          markup_promedio,
+          cashflow_neto
+        FROM monthly_financial_summary
+        WHERE period_key = ANY($1)
+        ORDER BY period_key
+      `, [periodKeys]);
+      
+      // Aggregate Excel MAESTRO data if available
+      const hasExcelMaestroData = excelMaestroData.length > 0;
+      const excelMaestroSummary = {
+        facturacionTotal: 0,
+        ebitOperativo: 0,
+        beneficioNeto: 0,
+        totalActivo: 0,
+        totalPasivo: 0,
+        balanceNeto: 0,
+        cajaTotal: 0,
+        inversiones: 0,
+        cuentasCobrarUsd: 0,
+        cuentasPagarUsd: 0,
+        markupPromedio: 0,
+        cashflowNeto: 0
+      };
+      
+      if (hasExcelMaestroData) {
+        // Use the last period's balance sheet values (snapshot)
+        const lastPeriodData = excelMaestroData.find((r: any) => r.period_key === lastPeriodKey) || excelMaestroData[excelMaestroData.length - 1];
+        excelMaestroSummary.totalActivo = parseFloat(lastPeriodData?.total_activo || '0');
+        excelMaestroSummary.totalPasivo = parseFloat(lastPeriodData?.total_pasivo || '0');
+        excelMaestroSummary.balanceNeto = parseFloat(lastPeriodData?.balance_neto || '0');
+        excelMaestroSummary.cajaTotal = parseFloat(lastPeriodData?.caja_total || '0');
+        excelMaestroSummary.inversiones = parseFloat(lastPeriodData?.inversiones || '0');
+        excelMaestroSummary.cuentasCobrarUsd = parseFloat(lastPeriodData?.cuentas_cobrar_usd || '0');
+        excelMaestroSummary.cuentasPagarUsd = parseFloat(lastPeriodData?.cuentas_pagar_usd || '0');
+        
+        // Aggregate flow values over selected periods
+        for (const row of excelMaestroData) {
+          excelMaestroSummary.facturacionTotal += parseFloat(row.facturacion_total || '0');
+          excelMaestroSummary.ebitOperativo += parseFloat(row.ebit_operativo || '0');
+          excelMaestroSummary.beneficioNeto += parseFloat(row.beneficio_neto || '0');
+          excelMaestroSummary.cashflowNeto += parseFloat(row.cashflow_neto || '0');
+        }
+        
+        // Calculate average markup
+        const markups = excelMaestroData.map((r: any) => parseFloat(r.markup_promedio || '0')).filter((m: number) => m > 0);
+        excelMaestroSummary.markupPromedio = markups.length > 0 
+          ? markups.reduce((a: number, b: number) => a + b, 0) / markups.length 
+          : 0;
+        
+        console.log(`📊 DASHBOARD: Excel MAESTRO data found for ${excelMaestroData.length} periods:`);
+        console.log(`   Ventas: $${excelMaestroSummary.facturacionTotal.toFixed(2)}, EBIT: $${excelMaestroSummary.ebitOperativo.toFixed(2)}`);
+        console.log(`   Balance: Activo=$${excelMaestroSummary.totalActivo.toFixed(2)}, Pasivo=$${excelMaestroSummary.totalPasivo.toFixed(2)}`);
+      } else {
+        console.log(`⚠️ DASHBOARD: No Excel MAESTRO data for periods ${periodKeys.join(', ')}`);
+      }
+      
       // ===== FINANCIAL METRICS (aggregated over all periods) =====
       
       // 1. Facturado (desde fact_rc_month - fuente: "Rendimiento Cliente")
@@ -5344,15 +5414,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         defaultPeriod: periodsInfo.defaultPeriod,
         availablePeriods: periodsInfo.availablePeriods,
         
-        // ===== FINANCIAL (Visión Socios: usa Facturado y Costos Totales) =====
+        // ===== FINANCIAL (Visión Socios: usa datos de Excel MAESTRO cuando están disponibles) =====
         financial: {
-          billedUsd: incomeUsd,                        // Facturado del mes
-          totalCostsUsd: totalCostsUsd,                // Directos + Indirectos
-          directCostsUsd: directCostsUsd,              // Costos directos
-          indirectCostsUsd: indirectCostsUsd,          // Costos indirectos (overhead)
-          ebitAccountingUsd: ebitContableUsd,          // Facturado - Costos Totales
-          ebitAccountingPct: ebitContablePct,          // % sobre Facturado
-          burnRateUsd: burnRateUsd                     // = Costos Totales
+          billedUsd: hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd,
+          totalCostsUsd: totalCostsUsd,
+          directCostsUsd: directCostsUsd,
+          indirectCostsUsd: indirectCostsUsd,
+          ebitAccountingUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd,
+          ebitAccountingPct: hasExcelMaestroData 
+            ? (excelMaestroSummary.facturacionTotal > 0 
+                ? (excelMaestroSummary.ebitOperativo / excelMaestroSummary.facturacionTotal) * 100 
+                : 0)
+            : ebitContablePct,
+          burnRateUsd: burnRateUsd,
+          beneficioNetoUsd: hasExcelMaestroData ? excelMaestroSummary.beneficioNeto : beneficioNetoUsd,
+          
+          totalActivoUsd: excelMaestroSummary.totalActivo,
+          totalPasivoUsd: excelMaestroSummary.totalPasivo,
+          balanceNetoUsd: excelMaestroSummary.balanceNeto,
+          cajaTotalUsd: excelMaestroSummary.cajaTotal,
+          inversionesUsd: excelMaestroSummary.inversiones,
+          cuentasCobrarUsd: excelMaestroSummary.cuentasCobrarUsd,
+          cuentasPagarUsd: excelMaestroSummary.cuentasPagarUsd,
+          cashflowNetoUsd: excelMaestroSummary.cashflowNeto,
+          
+          dataSource: hasExcelMaestroData ? 'excel_maestro' : 'calculated'
         },
         
         // ===== OPERATIONAL (Visión Management: usa Devengado y Costos Directos) =====
