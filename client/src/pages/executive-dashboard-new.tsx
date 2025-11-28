@@ -271,24 +271,24 @@ export default function ExecutiveDashboard() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-emerald-700 uppercase tracking-wide">
-                        Devengado
+                        Ingreso devengado
                       </span>
                       <Tooltip>
                         <TooltipTrigger>
                           <Info className="h-4 w-4 text-emerald-400" />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">Devengado</p>
+                          <p className="text-xs font-medium mb-1">Ingreso devengado</p>
                           <p className="text-xs text-gray-300">Ingreso correspondiente al trabajo realizado en el período, independientemente de cuándo se facture.</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">Ingreso ganado en el período</p>
+                    <p className="text-xs text-gray-500 mb-3">Trabajo realizado en el período</p>
                     <div className="text-3xl font-semibold text-emerald-800" data-testid="metric-devengado">
                       {formatCurrency(operational.earnedUsd || 0)}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Facturado: {formatCurrency(financial.billedUsd || 0)}
+                      Facturado en el período: {formatCurrency(financial.billedUsd || 0)}
                     </p>
                   </div>
                   <div className="p-3 bg-emerald-100 rounded-full">
@@ -311,7 +311,7 @@ export default function ExecutiveDashboard() {
                       <span className={`text-sm font-medium uppercase tracking-wide ${
                         (operational.ebitOperationalUsd || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'
                       }`}>
-                        EBIT Operativo
+                        EBIT operativo
                       </span>
                       <Tooltip>
                         <TooltipTrigger>
@@ -320,19 +320,21 @@ export default function ExecutiveDashboard() {
                           }`} />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">EBIT Operativo</p>
+                          <p className="text-xs font-medium mb-1">EBIT operativo</p>
                           <p className="text-xs text-gray-300">Devengado – Costos directos (equipo). Mide la rentabilidad de la operación antes de overhead e impuestos.</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">
-                      {formatPct(operational.ebitOperationalPct || 0)} del devengado
-                    </p>
+                    <p className="text-xs text-gray-500 mb-3">Después de costos de equipo</p>
                     <div className={`text-3xl font-semibold ${
                       (operational.ebitOperationalUsd || 0) >= 0 ? 'text-emerald-800' : 'text-red-700'
                     }`} data-testid="metric-ebit-operativo">
                       {formatCurrency(operational.ebitOperationalUsd || 0)}
+                      <span className="text-lg font-normal ml-2">
+                        ({formatPct(operational.ebitOperationalPct || 0)})
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-400 mt-2">= Devengado – Costos directos</p>
                   </div>
                   <div className={`p-3 rounded-full ${
                     (operational.ebitOperationalUsd || 0) >= 0 ? 'bg-emerald-100' : 'bg-red-100'
@@ -359,15 +361,15 @@ export default function ExecutiveDashboard() {
                       <Info className="h-4 w-4 text-gray-400" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[250px]">
-                      <p className="text-xs font-medium mb-1">Tarifa Efectiva</p>
+                      <p className="text-xs font-medium mb-1">Tarifa efectiva</p>
                       <p className="text-xs text-gray-300">Devengado / Horas facturables. Indica cuánto ingreso genera en promedio cada hora de trabajo facturable.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
                 <div className="text-2xl font-bold text-gray-800" data-testid="metric-tarifa-efectiva">
-                  ${(operational.effectiveRateUsd || 0).toFixed(0)}
+                  ${(operational.effectiveRateUsd || 0).toFixed(0)}/h
                 </div>
-                <p className="text-xs text-gray-500 mt-1">USD por hora facturable</p>
+                <p className="text-xs text-gray-500 mt-1">USD por hora devengada</p>
               </CardContent>
             </Card>
 
@@ -618,7 +620,7 @@ export default function ExecutiveDashboard() {
                       <span className={`text-sm font-medium uppercase tracking-wide ${
                         (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-700' : 'text-red-700'
                       }`}>
-                        EBIT Contable
+                        EBIT contable
                       </span>
                       <Tooltip>
                         <TooltipTrigger>
@@ -627,19 +629,21 @@ export default function ExecutiveDashboard() {
                           }`} />
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">EBIT Contable</p>
-                          <p className="text-xs text-gray-300">Facturado – Costos totales (directos + indirectos). Visión contable de la rentabilidad.</p>
+                          <p className="text-xs font-medium mb-1">EBIT contable</p>
+                          <p className="text-xs text-gray-300">Facturado – Costos contables. Visión contable de la rentabilidad según el informe de administración.</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">
-                      {formatPct(financial.ebitAccountingPct || 0)} del facturado
-                    </p>
+                    <p className="text-xs text-gray-500 mb-3">Resultado operativo contable</p>
                     <div className={`text-3xl font-semibold ${
                       (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-800' : 'text-red-700'
                     }`} data-testid="metric-ebit-contable">
                       {formatCurrency(financial.ebitAccountingUsd || 0)}
+                      <span className="text-lg font-normal ml-2">
+                        ({formatPct(financial.ebitAccountingPct || 0)})
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-400 mt-2">= Facturado – Costos contables</p>
                   </div>
                   <div className={`p-3 rounded-full ${
                     (financial.ebitAccountingUsd || 0) >= 0 ? 'bg-blue-100' : 'bg-red-100'
@@ -686,7 +690,7 @@ export default function ExecutiveDashboard() {
                     <p className="text-xl font-bold text-orange-700" data-testid="metric-overhead">
                       {formatCurrency(financial.indirectCostsUsd || 0)}
                     </p>
-                    <p className="text-xs text-orange-400">Costos indirectos</p>
+                    <p className="text-xs text-orange-400">Costos indirectos (estructura)</p>
                   </div>
                 </div>
               </CardContent>

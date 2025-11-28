@@ -1,0 +1,145 @@
+1. Validación rápida de números y fórmulas
+
+Vista Operativa
+Lo que muestra la captura:
+	•	Devengado: USD 42.1k
+Subtítulo: “Facturado: 81.8k”
+	•	EBIT operativo: USD 24.7k (59% del devengado)
+	•	Tarifa efectiva: USD 25/h
+	•	Markup operativo: 2.42x
+	•	Horas trabajadas: 1659h
+	•	Costos directos: 17.4k
+	•	Indirectos (overhead): 46.9k
+	•	Total costos: 64.2k
+	•	Personas activas: 11
+	•	Proyectos activos: 13
+
+Chequeos:
+	1.	EBIT operativo = Devengado – Costos directos
+	•	42.1 – 17.4 = 24.7k → ✔ coincide.
+	2.	% mostrado en la tarjeta de EBIT operativo
+	•	24.7 / 42.1 ≈ 0.587 → 59 % → ✔ correcto.
+	3.	Markup operativo
+	•	42.1 / 17.4 ≈ 2.42 → ✔ correcto.
+	4.	Tarifa efectiva
+	•	42.1k / 1659h ≈ 25.4 USD/h → redondeado a 25 → ✔ consistente.
+	5.	Composición de costos
+	•	17.4k + 46.9k = 64.3k → el Burn muestra 64.2k (redondeo) → ✔ ok.
+
+Conclusión: la Vista Operativa está coherente internamente y refleja bien la lógica que definimos:
+	•	Devengado = ingreso producido.
+	•	EBIT operativo = Devengado – Costos directos.
+	•	Markup y tarifa efectiva calculados sobre Devengado, no sobre Facturado.
+
+Vista Financiera
+En la captura:
+	•	Facturado: 81.8k
+	•	EBIT contable: 42.3k
+	•	Costos directos: 17.4k
+	•	Overhead: 46.9k
+	•	Burn Rate: 64.2k
+	•	Personas activas: 11
+	•	Proyectos activos: 13
+
+Cruce con el informe de administración de octubre:
+	•	Ventas del mes: 81.838 → 81.8k ✔
+	•	Total costos contables: ~39.5k
+	•	EBIT contable: 42.3k = 81.8 – 39.5 ✔
+	•	Burn rate: 64.2k = costos directos + overhead (visión “run-rate” de estructura) ✔
+
+Es decir:
+	•	La tarjeta Facturado y EBIT contable reflejan el informe económico.
+	•	Las tarjetas de Costos directos / Overhead / Burn Rate reflejan la estructura de costos completa (no solo la parte que entra en el EBIT contable).
+
+Mientras esto esté documentado en tu spec de métricas, está bien: son dos capas distintas de lectura.
+
+2. Lectura conceptual: qué te dice hoy el dashboard
+
+Mes octubre (foto actual):
+
+Operativo (management)
+	•	Produjiste USD 42.1k de valor (Devengado), con un margen operativo del 59 % y un markup de 2.42x sobre el costo directo de equipo.
+	•	El equipo trabajó 1659h a una tarifa efectiva ~USD 25/h.
+	•	Tenés 13 proyectos activos y 11 personas con al menos 1h asignada.
+
+Financiero (socios)
+	•	Facturaste 81.8k, pero solo 42.1k corresponden a trabajo producido en el mes; el resto son anticipos/créditos futuros.
+	•	El EBIT contable es 42.3k según el informe.
+	•	El Burn rate estructural es 64.2k (17.4k directos + 46.9k overhead), que es lo que te “cuesta existir” un mes con esta estructura.
+
+La brecha Facturado 81.8k vs Devengado 42.1k queda clara en la vista Operativa, así que ya evitás el autoengaño que tenías al inicio.
+
+3. Ajustes finos de UI / microcopy
+
+Yo haría solo pequeños pulidos:
+
+Operativo
+	1.	Tarjeta Devengado
+	•	Título: Ingreso devengado
+	•	Subtítulo: Trabajo realizado en el periodo
+	•	Línea secundaria (la que hoy dice “Facturado: 81.8k”):
+Facturado en el periodo: USD 81.8k
+	2.	Tarjeta EBIT Operativo
+	•	Título: EBIT operativo
+	•	Subtítulo: Después de costos de equipo
+	•	Pie pequeño (texto gris):
+= Devengado – Costos directos
+	3.	Tarifa efectiva
+	•	Título: Tarifa efectiva
+	•	Subtítulo: USD por hora devengada
+	4.	Markup operativo
+	•	Subtítulo: Múltiplo sobre costos directos
+	5.	% Horas facturables
+	•	Subtítulo: Sobre el total de horas trabajadas
+
+Financiero
+	1.	Facturado
+	•	Subtítulo: Ingresos facturados en el periodo
+	2.	EBIT contable
+	•	Subtítulo: Resultado operativo contable
+	•	Pie en gris: = Facturado – Costos contables
+	3.	Burn rate
+	•	Subtítulo: Costos totales / mes
+	4.	Overhead
+	•	Subtítulo: Costos indirectos (estructura)
+
+Todos los títulos en mayúscula seguida de minúscula (no full caps) para legibilidad.
+
+4. Checklist rápido backend ↔ frontend
+
+Solo para estar seguro de que esto generaliza bien a cualquier mes:
+	1.	Parámetro de periodo
+	•	period_key o equivalente (YYYY-MM) debe usarse en todas las queries de:
+	•	fact_rc_month (facturado real)
+	•	tabla de devengado
+	•	costos directos
+	•	costos indirectos
+	•	horas (fact_labor_month / lo que uses)
+	2.	Devengado
+	•	Fuente: Seguimiento Markup General + Costos / horas del mes.
+	•	Cálculo mensual idempotente (sin acumular meses anteriores).
+	•	Guardar en tabla propia (ej. fact_income_operational_month) con columnas:
+	•	period_key
+	•	devengado_usd
+	•	markup
+	•	tarifa_efectiva_usd_hour
+	3.	EBIT Operativo
+	•	ebit_operativo_usd = devengado_usd – direct_costs_usd
+	•	ebit_operativo_pct = ebit_operativo_usd / devengado_usd.
+	4.	EBIT Contable
+	•	Fuente: pestaña / hoja donde hoy se calcula en el Excel (Total ventas – Total costos contables).
+	•	Persistir a fact_financial_month:
+	•	facturado_usd
+	•	ebit_contable_usd
+	•	total_costs_contables_usd
+	•	burn_rate_usd si viene de ahí o de costos estructurales.
+	5.	Consistencia de moneda
+	•	Todo lo que ves en este dashboard debe estar en USD ya convertido en el ETL.
+	•	En el front solo formateás a $xx.xk.
+	6.	Redondeo y k-notation
+	•	Backend: guarda valores exactos.
+	•	Front: formatea a:
+	•	< 1000: valor entero.
+	•	>= 1000: Math.round(valor/100)/10 y sufijo k (ej. 42123 → 42.1k).
+
+Si esto está respetado, lo que ves para octubre es correcto y debería replicarse bien para cualquier mes con datos en el Excel maestro.
