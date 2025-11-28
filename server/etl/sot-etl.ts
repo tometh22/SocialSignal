@@ -1086,3 +1086,130 @@ export async function executeSoTETL(
     };
   }
 }
+
+// ==================== ETL: RESUMEN EJECUTIVO → MONTHLY FINANCIAL SUMMARY ====================
+
+/**
+ * ETL: Sincronizar datos de "Resumen Ejecutivo" del Excel MAESTRO a monthly_financial_summary
+ * Upsert por period_key para permitir actualizaciones incrementales
+ */
+export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
+  success: boolean;
+  recordsProcessed: number;
+  recordsInserted: number;
+  recordsUpdated: number;
+  errors: string[];
+  executionTimeMs: number;
+}> {
+  const startTime = Date.now();
+  console.log('📊 [Resumen Ejecutivo ETL] Iniciando sincronización...');
+  
+  try {
+    const { googleSheetsWorkingService, ResumenEjecutivoRow } = await import('../services/googleSheetsWorking');
+    const { monthlyFinancialSummary } = await import('@shared/schema');
+    const { sql } = await import('drizzle-orm');
+    
+    // 1. Obtener datos del Excel
+    const rows = await googleSheetsWorkingService.getResumenEjecutivo();
+    
+    if (rows.length === 0) {
+      console.log('⚠️ [Resumen Ejecutivo ETL] No hay datos para procesar');
+      return {
+        success: true,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        recordsUpdated: 0,
+        errors: [],
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+    
+    console.log(`📊 [Resumen Ejecutivo ETL] Procesando ${rows.length} registros mensuales...`);
+    
+    let recordsInserted = 0;
+    let recordsUpdated = 0;
+    const errors: string[] = [];
+    
+    // 2. Upsert cada registro
+    for (const row of rows) {
+      try {
+        // Verificar si existe
+        const existing = await db.select({ id: monthlyFinancialSummary.id })
+          .from(monthlyFinancialSummary)
+          .where(sql`${monthlyFinancialSummary.periodKey} = ${row.periodKey}`)
+          .limit(1);
+        
+        const values = {
+          periodKey: row.periodKey,
+          year: row.year,
+          monthNumber: row.monthNumber,
+          monthLabel: row.monthLabel || null,
+          totalActivo: row.totalActivo?.toString() || null,
+          totalPasivo: row.totalPasivo?.toString() || null,
+          balanceNeto: row.balanceNeto?.toString() || null,
+          cajaTotal: row.cajaTotal?.toString() || null,
+          inversiones: row.inversiones?.toString() || null,
+          cashflowIngresos: row.cashflowIngresos?.toString() || null,
+          cashflowEgresos: row.cashflowEgresos?.toString() || null,
+          cashflowNeto: row.cashflowNeto?.toString() || null,
+          cuentasCobrarUsd: row.cuentasCobrarUsd?.toString() || null,
+          cuentasPagarUsd: row.cuentasPagarUsd?.toString() || null,
+          facturacionTotal: row.facturacionTotal?.toString() || null,
+          costosDirectos: row.costosDirectos?.toString() || null,
+          costosIndirectos: row.costosIndirectos?.toString() || null,
+          ivaCompras: row.ivaCompras?.toString() || null,
+          impuestosUsa: row.impuestosUsa?.toString() || null,
+          ebitOperativo: row.ebitOperativo?.toString() || null,
+          beneficioNeto: row.beneficioNeto?.toString() || null,
+          markupPromedio: row.markupPromedio?.toString() || null,
+        };
+        
+        if (existing.length > 0) {
+          // UPDATE
+          await db.update(monthlyFinancialSummary)
+            .set({
+              ...values,
+              updatedAt: new Date()
+            })
+            .where(sql`${monthlyFinancialSummary.periodKey} = ${row.periodKey}`);
+          recordsUpdated++;
+        } else {
+          // INSERT
+          await db.insert(monthlyFinancialSummary).values(values);
+          recordsInserted++;
+        }
+        
+      } catch (error) {
+        const msg = `Error procesando período ${row.periodKey}: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`❌ ${msg}`);
+        errors.push(msg);
+      }
+    }
+    
+    const executionTimeMs = Date.now() - startTime;
+    
+    console.log(`✅ [Resumen Ejecutivo ETL] Completado en ${executionTimeMs}ms`);
+    console.log(`📊 Resumen: ${recordsInserted} insertados, ${recordsUpdated} actualizados, ${errors.length} errores`);
+    
+    return {
+      success: errors.length === 0,
+      recordsProcessed: rows.length,
+      recordsInserted,
+      recordsUpdated,
+      errors,
+      executionTimeMs
+    };
+    
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ [Resumen Ejecutivo ETL] Error:', error);
+    return {
+      success: false,
+      recordsProcessed: 0,
+      recordsInserted: 0,
+      recordsUpdated: 0,
+      errors: [errorMessage],
+      executionTimeMs: Date.now() - startTime
+    };
+  }
+}
