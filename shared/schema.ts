@@ -2715,6 +2715,63 @@ export const insertAggProjectMonthSchema = createInsertSchema(aggProjectMonth).o
 export type AggProjectMonth = typeof aggProjectMonth.$inferSelect;
 export type InsertAggProjectMonth = z.infer<typeof insertAggProjectMonthSchema>;
 
+// ==================== RESUMEN FINANCIERO MENSUAL ====================
+// Tabla para almacenar KPIs financieros mensuales desde hoja "Resumen Ejecutivo" del Excel MAESTRO
+// Single Source of Truth para visión CFO/Administración
+export const monthlyFinancialSummary = pgTable("monthly_financial_summary", {
+  id: serial("id").primaryKey(),
+  
+  // Período
+  periodKey: varchar("period_key", { length: 7 }).notNull().unique(), // YYYY-MM
+  year: integer("year").notNull(),
+  monthNumber: integer("month_number").notNull(), // 1-12
+  monthLabel: varchar("month_label", { length: 20 }), // "10 oct" como viene en el Excel
+  cierreDate: timestamp("cierre_date"), // Fecha de cierre si está disponible
+  
+  // Balance y Activos/Pasivos
+  totalActivo: numeric("total_activo", { precision: 14, scale: 2 }),
+  totalPasivo: numeric("total_pasivo", { precision: 14, scale: 2 }),
+  balanceNeto: numeric("balance_neto", { precision: 14, scale: 2 }), // Activo - Pasivo
+  cajaTotal: numeric("caja_total", { precision: 14, scale: 2 }),
+  inversiones: numeric("inversiones", { precision: 14, scale: 2 }), // Inversiones / Crypto
+  
+  // Cashflow
+  cashflowIngresos: numeric("cashflow_ingresos", { precision: 14, scale: 2 }),
+  cashflowEgresos: numeric("cashflow_egresos", { precision: 14, scale: 2 }),
+  cashflowNeto: numeric("cashflow_neto", { precision: 14, scale: 2 }), // Cash Flow neto del mes
+  
+  // Cuentas por cobrar/pagar
+  cuentasCobrarUsd: numeric("cuentas_cobrar_usd", { precision: 12, scale: 2 }),
+  cuentasPagarUsd: numeric("cuentas_pagar_usd", { precision: 12, scale: 2 }),
+  
+  // Facturación y costos (visión contable)
+  facturacionTotal: numeric("facturacion_total", { precision: 14, scale: 2 }), // Ventas facturadas del mes
+  costosDirectos: numeric("costos_directos", { precision: 14, scale: 2 }), // Costos directos contables
+  costosIndirectos: numeric("costos_indirectos", { precision: 14, scale: 2 }), // Costos indirectos contables
+  ivaCompras: numeric("iva_compras", { precision: 12, scale: 2 }),
+  impuestosUsa: numeric("impuestos_usa", { precision: 12, scale: 2 }),
+  
+  // Resultados
+  ebitOperativo: numeric("ebit_operativo", { precision: 14, scale: 2 }), // EBIT (Utilidad operativa)
+  beneficioNeto: numeric("beneficio_neto", { precision: 14, scale: 2 }), // Beneficio neto (con provisiones)
+  markupPromedio: numeric("markup_promedio", { precision: 10, scale: 4 }), // Markup promedio global
+  
+  // Metadatos
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  periodIdx: index("mfs_period_idx").on(table.periodKey),
+  yearMonthIdx: index("mfs_year_month_idx").on(table.year, table.monthNumber),
+}));
+
+export const insertMonthlyFinancialSummarySchema = createInsertSchema(monthlyFinancialSummary).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type MonthlyFinancialSummary = typeof monthlyFinancialSummary.$inferSelect;
+export type InsertMonthlyFinancialSummary = z.infer<typeof insertMonthlyFinancialSummarySchema>;
+
 // ==================== COSTOS RECHAZADOS (AUDITORÍA) ====================
 // Tabla para almacenar costos que fueron rechazados durante el ETL
 // Permite auditabilidad y reporte de calidad de datos

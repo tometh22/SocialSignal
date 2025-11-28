@@ -1,0 +1,308 @@
+Quiero que implementes, end-to-end, la ingesta del Excel maestro “Seguimiento Financiero_Economico Para Tablero” (hoja “Resumen Ejecutivo”) a una tabla de BD de resumen mensual, y que el dashboard de la app use ESO como fuente para los KPIs financieros tipo informe de Administración.
+
+0. Contexto
+
+El Excel ya existe y se usa para otras cosas.
+
+Administración me manda un informe mensual con estos KPIs (ejemplo Octubre):
+
+Balance neto ≈ 68.210
+
+EBIT operativo ≈ 42.300
+
+Beneficio Neto ≈ 21.666 (incluye provisiones, ej. Pepsico)
+
+Cash Flow neto ≈ 66.802
+
+Markup promedio (hoy no nos importa el 4,75 exacto, eso puede seguir en el Excel).
+
+Mi app debe poder mostrar estos KPIs para cualquier mes, no sólo octubre.
+
+Todo lo que hagas debe ser genérico por mes (period_key YYYY-MM), usando la hoja “Resumen Ejecutivo” como single source of truth para KPIs financieros mensuales.
+
+1. Crear tabla monthly_financial_summary en el schema
+
+Abre shared/schema.ts.
+
+Crea una nueva tabla Drizzle monthly_financial_summary con estas columnas (usa tipos razonables; numéricos como numeric/double precision, fechas como date, strings como text):
+
+id (serial, PK)
+
+period_key (text, YYYY-MM, UNIQUE)
+
+year (integer)
+
+month_number (integer, 1–12)
+
+month_label (text, por ejemplo “10 oct” tal como viene en el Excel)
+
+cierre_date (date; la fecha “Cierre” si está disponible en la hoja, si no puede ser null)
+
+KPI financieros clave (todos numéricos):
+
+total_activo // TOTAL ACTIVO
+
+total_pasivo // TOTAL PASIVO
+
+balance_neto // BALANCE NETO (Activo – Pasivo)
+
+caja_total // CAJA TOTAL
+
+inversiones // Inversiones / Crypto (activo mediano plazo / inversiones)
+
+Cashflow:
+
+cashflow_ingresos // Ingresos reales del mes
+
+cashflow_egresos // Egresos reales del mes
+
+cashflow_neto // Cash Flow neto del mes (coincide con “Cash Flow: 66.802”)
+
+Cuentas:
+
+cuentas_cobrar_usd // Cuentas a cobrar (USD)
+
+cuentas_pagar_usd // Cuentas a pagar (USD)
+
+Facturación y costos (visión contable/financiera):
+
+facturacion_total // Ventas del mes facturadas (ARS+USD)
+
+costos_directos // Costos directos contables del mes
+
+costos_indirectos // Costos indirectos contables del mes
+
+iva_compras // IVA compras
+
+impuestos_usa // Impuestos USA (del mes)
+
+Resultados:
+
+ebit_operativo // EBIT (Utilidad operativa)
+
+beneficio_neto // Beneficio neto (ya con provisiones)
+
+markup_promedio // Markup promedio global del mes (el que hoy está en el Resumen)
+
+Metadatos:
+
+created_at (timestamp con default now())
+
+updated_at (timestamp con default now(), on update)
+
+Ejecuta la migración o db:push para crear la tabla en la BD.
+
+2. Leer la hoja “Resumen Ejecutivo” desde el servicio de Google Sheets
+
+Abre server/services/googleSheetsWorking.ts.
+
+Implementa una función nueva, por ejemplo:
+
+export async function getResumenEjecutivo(): Promise<ResumenEjecutivoRow[]> { ... }
+
+
+Define un tipo ResumenEjecutivoRow en este mismo archivo o en types:
+
+mesLabel: string // valor de la columna “Mes” (ej. "10 oct")
+
+year: number // columna “Año”
+
+cierre: string | Date // fecha de cierre (si existe)
+
+y todos los campos numéricos mapeados tal cual vienen en columnas de la hoja.
+
+Dentro de getResumenEjecutivo():
+
+Usa el mismo mecanismo ya existente para leer el spreadsheet maestro.
+
+Apunta explícitamente a la hoja “Resumen Ejecutivo”.
+
+Usa FORMATTED_VALUE (no UNFORMATTED) como valueRenderOption, como ya definimos antes para evitar inflar números.
+
+Trae todas las filas relevantes (todas las filas de meses históricos; ignora totales generales o filas vacías).
+
+Implementa un pequeño createColumnMap como en otras funciones:
+
+mapea por nombre de encabezado, no por índice fijo, algo así:
+
+“Mes” → mesLabel
+
+“Año” → year
+
+“Cierre” → cierre
+
+“Activo Total” → total_activo
+
+“Pasivo Total” → total_pasivo
+
+“Balance Neto (Activo-Pasivo)” → balance_neto
+
+“Caja Total” → caja_total
+
+“Inversiones” / “Inversiones / Crypto” → inversiones
+
+“Cash Flow Neto sin CRYPTO” (o equivalente) → cashflow_neto
+
+“Cuentas por Cobrar USD” → cuentas_cobrar_usd
+
+“Cuentas por Pagar USD” → cuentas_pagar_usd
+
+“Facturación Total” (o “Ventas del mes facturadas”) → facturacion_total
+
+“Costos Directos” → costos_directos
+
+“Costos Indirectos” → costos_indirectos
+
+“IVA Compras” → iva_compras
+
+“Impuestos USA” → impuestos_usa
+
+“EBIT (Utilidad Operativa)” → ebit_operativo
+
+“Beneficio Neto” → beneficio_neto
+
+“MarkUp” → markup_promedio
+
+Implementa un parser robusto tipo parseMoneySmart (puedes reutilizar el que ya tenemos) para convertir strings con formato LATAM a number:
+
+Aceptar “68.210,92”, “66.801,58”, etc.
+
+Manejar celdas vacías como null.
+
+Devuelve un array de objetos con esos campos crudos (todavía sin period_key).
+
+3. ETL: poblar monthly_financial_summary desde “Resumen Ejecutivo”
+
+Abre server/etl/sot-etl.ts (o el ETL principal que ya procesa el Excel maestro).
+
+Agrega un nuevo paso en el pipeline, por ejemplo syncResumenEjecutivoToMonthlyFinancialSummary().
+
+Implementa la función así:
+
+Llama a getResumenEjecutivo() para traer todas las filas.
+
+Para cada fila:
+
+Construye month_number a partir de mesLabel y/o de la fecha de cierre:
+
+Ejemplo robusto:
+
+Si tienes cierre con una fecha → usa esa fecha:
+
+year = cierre.getFullYear()
+
+month_number = cierre.getMonth() + 1
+
+Si no, parsea mesLabel ("10 oct") + year.
+
+Construye period_key como YYYY-MM (mes con 2 dígitos).
+
+Mapea todos los campos numéricos a las columnas de monthly_financial_summary con conversión segura (NaN → null).
+
+Implementa un upsert por period_key:
+
+Si ya existe monthly_financial_summary.period_key = X → UPDATE.
+
+Si no existe → INSERT.
+
+Deja created_at/updated_at correctos.
+
+Integra esta función al flujo del ETL general:
+
+En el lugar donde ya sincronizas otras tablas (fact_rc_month, fact_cost_month, etc.), añade:
+
+await syncResumenEjecutivoToMonthlyFinancialSummary();
+
+Ejecuta el ETL una vez (por consola o vía endpoint ya existente) y verifica en la BD que tengas registros para todos los meses históricos (SELECT * FROM monthly_financial_summary LIMIT 20).
+
+4. Usar monthly_financial_summary en el endpoint del dashboard
+
+Abre server/routes.ts y localiza el endpoint del Executive Dashboard (algo como /api/dashboard/executive-summary o equivalente).
+
+Actualmente el facturado y algunos KPIs los toma de fact_rc_month, CashFlow derivado, etc.
+
+Quiero esto:
+
+Mantener la parte OPERATIVA (devengado, costos directos operativos, horas, etc.) tal como la tenemos.
+
+Cambiar la parte FINANCIERA (Balance, EBIT contable, Beneficio Neto, Cashflow, Ctas a cobrar/pagar, Facturación contable) para que lea de monthly_financial_summary.
+
+Dentro del handler:
+
+A partir del período solicitado (period_key o period query YYYY-MM que ya usas), haz algo así:
+
+const [summary] = await db.select().from(monthlyFinancialSummary)
+  .where(eq(monthlyFinancialSummary.periodKey, periodKey));
+
+if (!summary) {
+  // fallback: devolver nulls o 0 para la capa financiera, pero NO romper el endpoint
+}
+
+
+Usa esos campos para construir un bloque financialSummary en la respuesta JSON, por ejemplo:
+
+financialSummary: {
+  totalActivo: summary?.total_activo ?? 0,
+  totalPasivo: summary?.total_pasivo ?? 0,
+  balanceNeto: summary?.balance_neto ?? 0,
+  cajaTotal: summary?.caja_total ?? 0,
+  inversiones: summary?.inversiones ?? 0,
+  cashflowIngresos: summary?.cashflow_ingresos ?? null,
+  cashflowEgresos: summary?.cashflow_egresos ?? null,
+  cashflowNeto: summary?.cashflow_neto ?? 0,
+  cuentasCobrarUSD: summary?.cuentas_cobrar_usd ?? 0,
+  cuentasPagarUSD: summary?.cuentas_pagar_usd ?? 0,
+  facturacionTotal: summary?.facturacion_total ?? 0,
+  costosDirectosContables: summary?.costos_directos ?? 0,
+  costosIndirectosContables: summary?.costos_indirectos ?? 0,
+  ivaCompras: summary?.iva_compras ?? 0,
+  impuestosUSA: summary?.impuestos_usa ?? 0,
+  ebitOperativo: summary?.ebit_operativo ?? 0,
+  beneficioNeto: summary?.beneficio_neto ?? 0,
+  markupPromedio: summary?.markup_promedio ?? null,
+}
+
+
+No rompas los campos que ya consume el frontend para la parte operativa (devengado, costos directos operativos, etc.). Solo añade/reescribe el bloque financiero.
+
+5. Checklist de verificación (muy importante)
+
+Después de implementar todo:
+
+Corre el ETL y asegúrate en BD:
+
+SELECT period_key, facturacion_total, ebit_operativo, beneficio_neto, cashflow_neto FROM monthly_financial_summary ORDER BY period_key DESC LIMIT 3;
+
+Para el mes de octubre, los valores deben matchear con el Excel y el informe de Administración:
+
+balance_neto ≈ 68.210
+
+ebit_operativo ≈ 42.300
+
+beneficio_neto ≈ 21.666 (teniendo en cuenta provisiones)
+
+cashflow_neto ≈ 66.802
+
+facturacion_total ≈ valor de ventas del mes en seguimiento markup / resumen.
+
+Llama al endpoint del dashboard para octubre:
+
+curl -s "http://localhost:5000/api/dashboard/executive-summary?period=2024-10" (ajusta año si es 2025).
+
+Comprueba que los campos dentro de financialSummary coinciden con monthly_financial_summary.
+
+Cambia de mes en la UI (por ejemplo, septiembre, noviembre) y verifica que:
+
+La capa financiera del dashboard siempre lee de monthly_financial_summary.
+
+No hay hardcodes para octubre.
+
+Confirma que ningún cálculo financiero del dashboard sigue usando fact_rc_month directo; esa tabla queda para análisis más granular, pero la vista CFO se alimenta de monthly_financial_summary.
+
+Haz todos estos pasos de forma incremental, con buenos logs donde sea crítico (especialmente en el ETL de Resumen Ejecutivo) y explícame al final:
+
+Qué columnas exactas encontraste en la hoja “Resumen Ejecutivo” y cómo quedaron mapeadas.
+
+Un dump de 1 fila de monthly_financial_summary para octubre.
+
+El JSON parcial de financialSummary que devuelve el endpoint para octubre.
