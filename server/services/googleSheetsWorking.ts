@@ -1904,6 +1904,217 @@ class GoogleSheetsWorkingService {
 
     return `${monthKey}${year}HourlyRateARS`;
   }
+
+  /**
+   * Obtener datos de Resumen Ejecutivo del Excel MAESTRO
+   * Lee la hoja "Resumen Ejecutivo" y devuelve registros mensuales de KPIs financieros
+   */
+  async getResumenEjecutivo(): Promise<ResumenEjecutivoRow[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = "'Resumen Ejecutivo'!A:Z";
+      
+      console.log('📊 [Resumen Ejecutivo] Obteniendo datos del Excel MAESTRO...');
+      console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
+      console.log(`📋 Range: ${range}`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ [Resumen Ejecutivo] No se encontraron datos');
+        return [];
+      }
+
+      console.log(`📊 [Resumen Ejecutivo] Procesando ${rows.length} filas...`);
+      
+      return this.parseResumenEjecutivo(rows);
+      
+    } catch (error) {
+      console.error('❌ [Resumen Ejecutivo] Error obteniendo datos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Parsear filas del Resumen Ejecutivo
+   * La hoja tiene estructura de tabla con meses como columnas (layout horizontal)
+   * Cada fila es un KPI diferente, cada columna un mes diferente
+   */
+  private parseResumenEjecutivo(rows: any[][]): ResumenEjecutivoRow[] {
+    if (rows.length < 2) return [];
+    
+    const result: ResumenEjecutivoRow[] = [];
+    
+    // La primera fila contiene los meses (ej: "10 oct", "09 sep", etc.)
+    const headerRow = rows[0];
+    
+    // Encontrar columnas de meses (formato "NN mmm" como "10 oct", "09 sep")
+    const monthColumns: { col: number; label: string; year: number; month: number }[] = [];
+    
+    for (let col = 1; col < headerRow.length; col++) {
+      const cell = headerRow[col];
+      if (!cell) continue;
+      
+      const monthMatch = this.parseMonthLabel(cell.toString().trim());
+      if (monthMatch) {
+        monthColumns.push({ col, ...monthMatch });
+      }
+    }
+    
+    console.log(`📊 [Resumen Ejecutivo] Encontradas ${monthColumns.length} columnas de meses`);
+    
+    // Mapa de filas KPI -> nombre de propiedad
+    const kpiRowMapping: Record<string, keyof ResumenEjecutivoRow> = {
+      'total activo': 'totalActivo',
+      'total pasivo': 'totalPasivo',
+      'balance': 'balanceNeto',
+      'caja total': 'cajaTotal',
+      'inversiones': 'inversiones',
+      'crypto': 'inversiones',
+      'cash flow ingresos': 'cashflowIngresos',
+      'ingresos': 'cashflowIngresos',
+      'cash flow egresos': 'cashflowEgresos',
+      'egresos': 'cashflowEgresos',
+      'cash flow neto': 'cashflowNeto',
+      'cash flow': 'cashflowNeto',
+      'cuentas a cobrar usd': 'cuentasCobrarUsd',
+      'cuentas por cobrar': 'cuentasCobrarUsd',
+      'cuentas a pagar usd': 'cuentasPagarUsd',
+      'cuentas por pagar': 'cuentasPagarUsd',
+      'ventas facturadas': 'facturacionTotal',
+      'facturación': 'facturacionTotal',
+      'facturacion': 'facturacionTotal',
+      'costos directos': 'costosDirectos',
+      'costos indirectos': 'costosIndirectos',
+      'iva compras': 'ivaCompras',
+      'impuestos usa': 'impuestosUsa',
+      'ebit': 'ebitOperativo',
+      'ebit operativo': 'ebitOperativo',
+      'beneficio neto': 'beneficioNeto',
+      'resultado neto': 'beneficioNeto',
+      'markup': 'markupPromedio',
+    };
+    
+    // Inicializar registros por mes
+    const monthRecords: Map<string, ResumenEjecutivoRow> = new Map();
+    
+    for (const mc of monthColumns) {
+      const periodKey = `${mc.year}-${String(mc.month).padStart(2, '0')}`;
+      monthRecords.set(periodKey, {
+        periodKey,
+        year: mc.year,
+        monthNumber: mc.month,
+        monthLabel: mc.label,
+      });
+    }
+    
+    // Procesar filas de datos
+    for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx];
+      if (!row || row.length === 0) continue;
+      
+      const kpiName = (row[0] || '').toString().toLowerCase().trim();
+      const kpiField = kpiRowMapping[kpiName];
+      
+      if (!kpiField) continue;
+      
+      // Extraer valores para cada mes
+      for (const mc of monthColumns) {
+        const value = row[mc.col];
+        if (value === undefined || value === null || value === '') continue;
+        
+        const periodKey = `${mc.year}-${String(mc.month).padStart(2, '0')}`;
+        const record = monthRecords.get(periodKey);
+        
+        if (record) {
+          const numValue = this.parseMoneyValue(value.toString());
+          if (numValue !== 0) {
+            (record as any)[kpiField] = numValue;
+          }
+        }
+      }
+    }
+    
+    // Convertir mapa a array
+    for (const record of monthRecords.values()) {
+      result.push(record);
+    }
+    
+    console.log(`✅ [Resumen Ejecutivo] Procesados ${result.length} registros mensuales`);
+    
+    return result;
+  }
+
+  /**
+   * Parsear etiqueta de mes del Excel (ej: "10 oct" -> { label, year, month })
+   */
+  private parseMonthLabel(label: string): { label: string; year: number; month: number } | null {
+    // Formato esperado: "DD mmm" como "10 oct", "09 sep"
+    const match = label.match(/^(\d{1,2})\s*([a-záéíóú]+)$/i);
+    if (!match) return null;
+    
+    const monthNames: Record<string, number> = {
+      'ene': 1, 'enero': 1,
+      'feb': 2, 'febrero': 2,
+      'mar': 3, 'marzo': 3,
+      'abr': 4, 'abril': 4,
+      'may': 5, 'mayo': 5,
+      'jun': 6, 'junio': 6,
+      'jul': 7, 'julio': 7,
+      'ago': 8, 'agosto': 8,
+      'sep': 9, 'sept': 9, 'septiembre': 9,
+      'oct': 10, 'octubre': 10,
+      'nov': 11, 'noviembre': 11,
+      'dic': 12, 'diciembre': 12,
+    };
+    
+    const monthStr = match[2].toLowerCase();
+    const month = monthNames[monthStr];
+    
+    if (!month) return null;
+    
+    // El número antes del mes indica el mes, asumimos año actual o anterior
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    
+    // Si el mes es mayor al actual, asumimos año anterior
+    const year = month > currentMonth ? currentYear - 1 : currentYear;
+    
+    return { label, year, month };
+  }
+}
+
+// Tipo para datos de Resumen Ejecutivo
+export interface ResumenEjecutivoRow {
+  periodKey: string;
+  year: number;
+  monthNumber: number;
+  monthLabel?: string;
+  cierreDate?: Date;
+  totalActivo?: number;
+  totalPasivo?: number;
+  balanceNeto?: number;
+  cajaTotal?: number;
+  inversiones?: number;
+  cashflowIngresos?: number;
+  cashflowEgresos?: number;
+  cashflowNeto?: number;
+  cuentasCobrarUsd?: number;
+  cuentasPagarUsd?: number;
+  facturacionTotal?: number;
+  costosDirectos?: number;
+  costosIndirectos?: number;
+  ivaCompras?: number;
+  impuestosUsa?: number;
+  ebitOperativo?: number;
+  beneficioNeto?: number;
+  markupPromedio?: number;
 }
 
 export const googleSheetsWorkingService = new GoogleSheetsWorkingService();
