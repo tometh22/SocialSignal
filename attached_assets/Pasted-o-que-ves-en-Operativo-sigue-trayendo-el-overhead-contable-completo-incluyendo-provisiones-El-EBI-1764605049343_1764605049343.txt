@@ -1,0 +1,268 @@
+o que ves en Operativo sigue trayendo el overhead contable completo (incluyendo provisiones).
+El EBIT operativo está bien (usa solo directos), pero la barra de “Indirectos (overhead)” está contaminada con provisiones e impuestos. Eso hay que corregir en el ETL.
+
+Te dejo directamente el prompt para el Replit Agent y luego un mini-chequeo de números para que sepas qué esperar.
+
+Prompt para Replit Agent (copia y pega tal cual)
+
+Objetivo general
+Ajustar la lógica del Executive Dashboard para que:
+
+En la vista Operativa se muestren solo costos operativos reales (directos + indirectos sin provisiones ni impuestos).
+
+Las provisiones e impuestos se excluyan de la vista Operativa y se usen solo en la vista Financiera/Contable.
+
+Mantener la consistencia con el Excel maestro Seguimiento Financiero_Economico Para Tablero.xlsx.
+
+Archivos y tablas a revisar
+
+Código de ETL que parsea el Excel maestro Seguimiento Financiero_Economico Para Tablero.xlsx.
+
+En particular las pestañas / CSV mapeadas a:
+
+Costos directos e indirectos
+
+Provisión pasivo proyectos
+
+Impuestos
+
+Pasivo
+
+Seguimiento MarkUp General
+
+Módulo que calcula los agregados mensuales para el Executive Dashboard:
+
+Servicio que calcula: devengado_month, facturado_month, direct_costs_month, indirect_costs_month, burn_rate_month, ebit_operativo_month, ebit_contable_month, etc.
+
+Endpoint backend que alimenta el frontend del Dashboard Ejecutivo (vista Operativo / Financiero).
+
+Documenta en comentarios el mapping exacto “columna Excel → campo ETL” cuando lo encuentres.
+
+Nueva clasificación de costos
+
+Necesitamos introducir una separación explícita de costos en el ETL.
+
+Para cada fila que viene de las hojas de costos, clasificá así:
+
+cost_type: "direct" | "indirect"
+
+direct = costos de equipo imputados a proyectos (lo que hoy aparece como “Directos (equipo)”).
+
+indirect = todo lo demás (overhead, provisiones, impuestos, etc.).
+
+is_provision: boolean
+
+true si la fila corresponde a provisiones o ajustes contables.
+
+false si es overhead operativo real.
+
+provision_kind: string opcional
+
+"cliente_pepsico", "cliente_warner", "impuestos_usa", "impuestos_iva", "otra" según corresponda.
+
+Criterio para marcar is_provision = true:
+
+Si en cualquier columna de texto (subtipo, descripción, cuenta, proyecto) aparece alguno de estos patrones (case insensitive):
+
+"PROVISION"
+
+"PROVISIÓN"
+
+"PEPSICO"
+
+"WARNER"
+
+"IMPUESTOS USA"
+
+"IMPUESTO USA"
+
+"TAX USA"
+
+O si la fila proviene directamente de las pestañas:
+
+Provisión pasivo proyectos
+
+Impuestos
+
+O de la sección de provisiones en Pasivo.
+
+En esos casos:
+
+cost_type = "indirect"
+
+is_provision = true
+
+provision_kind según texto detectado.
+
+Todo lo que sea overhead administrativo real (sueldos administrativos, servicios, alquiler, software, honorarios no imputables, etc.) debe quedar con:
+
+cost_type = "indirect"
+
+is_provision = false
+
+Nueva tabla de agregados mensuales
+
+Crear (o extender) una tabla de agregados mensuales, por ejemplo monthly_costs, con estos campos:
+
+month (YYYY-MM)
+
+direct_costs → suma de todos los costos con cost_type = "direct"
+
+indirect_operational → suma de cost_type = "indirect" AND is_provision = false
+
+indirect_provisions → suma de cost_type = "indirect" AND is_provision = true
+
+tax_iva (si ya está separado, sumarlo aquí)
+
+tax_usa (impuestos USA)
+
+total_costs_contable → total contable que hoy se usa para Burn Rate (debe cuadrar con el Excel).
+
+Validación interna:
+
+Para cada mes, verificar que:
+
+direct_costs + indirect_operational + indirect_provisions + tax_iva + tax_usa ≈ total_costs_contable
+
+Si hay diferencia mayor a 1 USD, loggear un warning con el detalle del mes y los totales.
+
+Recalcular métricas para el Executive Dashboard
+
+A) Vista Operativa
+
+devengado_month → se mantiene igual que hoy (ingreso ganado por % avance).
+
+direct_costs_month → usar monthly_costs.direct_costs.
+
+indirect_costs_month (para el gráfico de composición en Operativo) → usar monthly_costs.indirect_operational solamente.
+
+ebit_operativo_month → devengado_month - direct_costs_month.
+
+markup_operativo_month → devengado_month / direct_costs_month.
+
+tarifa_efectiva → devengado_month / horas_facturables_mes.
+
+Importante:
+
+En la vista Operativa no se deben usar provisiones ni impuestos para ningún KPI.
+
+La barra de “Composición de costos” en la vista Operativa debe mostrar:
+
+Directos (equipo) = direct_costs_month.
+
+Indirectos (overhead) = indirect_operational.
+
+Total = direct_costs_month + indirect_operational.
+
+B) Vista Financiera / Contable
+
+facturado_month → como hoy (facturación del periodo).
+
+direct_costs_month → monthly_costs.direct_costs.
+
+overhead_contable_month → indirect_operational + indirect_provisions + tax_iva + tax_usa.
+
+burn_rate_month → total_costs_contable.
+
+ebit_contable_month → facturado_month - total_costs_contable.
+
+En la vista Financiera:
+
+La tarjeta de “Costos Directos” usa direct_costs_month.
+
+La tarjeta “Overhead” usa overhead_contable_month.
+
+La tarjeta “Burn Rate” usa total_costs_contable.
+
+API / Endpoints
+
+Ajustar el endpoint del Executive Dashboard para que:
+
+Reciba parámetros view=operativo|financiero y period=YYYY-MM.
+
+Cuando view=operativo:
+
+Devuelva:
+
+devengado_month
+
+ebit_operativo_month
+
+markup_operativo_month
+
+tarifa_efectiva
+
+direct_costs_month
+
+indirect_operational
+
+total_costs_operativos = direct_costs_month + indirect_operational.
+
+Cuando view=financiero:
+
+Devuelva:
+
+facturado_month
+
+ebit_contable_month
+
+burn_rate_month
+
+direct_costs_month
+
+overhead_contable_month
+
+total_costs_contable.
+
+Loggear para Octubre 2025 los valores finales que salen de la API y dejarlos en el log para poder compararlos manualmente con el Excel y con lo que ve el frontend.
+
+Frontend
+
+En la pestaña Operativo, el bloque “Composición de costos” debe consumir solo:
+
+direct_costs_month
+
+indirect_operational
+
+total_costs_operativos.
+
+En la pestaña Financiero, el bloque de costos debe consumir:
+
+direct_costs_month
+
+overhead_contable_month
+
+burn_rate_month.
+
+Asegurarse de que el label de la barra en Operativo diga algo como:
+
+“Indirectos (overhead operativo)”
+para distinguirlo de “Overhead contable” en la pestaña Financiera.
+
+Validación con Octubre 2025
+
+Una vez implementado:
+
+Para Octubre 2025, compará:
+
+direct_costs_month con el Excel → deberían ser ≈ 17.4k USD.
+
+indirect_operational → debe excluir provisiones; el valor será menor que los 46.9k actuales.
+
+total_costs_contable y burn_rate_month deben seguir ≈ 64.2k.
+
+Verificar que:
+
+En Operativo, la barra de Indirectos ya no incluye provisiones.
+
+En Financiero, las provisiones sí sigan impactando el overhead y el burn rate.
+
+Dejar en comentarios del PR un breve resumen de los nuevos campos agregados y cómo se calculan.
+
+Con eso el dev/agent tiene todo lo necesario para:
+
+Separar operación real de contabilidad.
+
+Mantener tus KPIs operativos limpios.
+
+Seguir usando las provisiones donde corresponde (financiero).

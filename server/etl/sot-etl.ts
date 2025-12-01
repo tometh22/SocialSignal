@@ -479,44 +479,95 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 // ==================== HECHOS: COSTOS AGREGADOS POR PERÍODO ====================
 
 // Patrones para detectar PROVISIONES CONTABLES (no deben ir en Operativo)
+// Según especificación: Pepsico, Warner, Impuestos USA, IVA, etc.
 const PROVISION_PATTERNS = [
-  'provision', 'provisión', 'pepsico', 'warner', 'impuestos usa', 'impuesto usa',
-  'iva', 'pasivo', 'ajuste', 'percepcion', 'percepción', 'anticipo', 'anticipos',
-  'facturacion adelantada', 'facturación adelantada', 'diferido', 'devengado contable',
+  'provision', 'provisión',
+  'pepsico', 'warner',
+  'impuestos usa', 'impuesto usa', 'tax usa',
+  'iva', 'impuesto iva',
+  'pasivo', 'pasivos',
+  'ajuste', 'ajustes',
+  'percepcion', 'percepción',
+  'anticipo', 'anticipos',
+  'facturacion adelantada', 'facturación adelantada',
+  'diferido', 'devengado contable',
   'reserva', 'estimacion', 'estimación', 'contingencia'
+];
+
+// Subtipos de costo que indican provisiones/impuestos (de la columna "Subtipo de costo")
+const PROVISION_SUBTYPES = [
+  'provision', 'provisión', 'provisiones',
+  'impuesto', 'impuestos', 'tax',
+  'iva', 'percepcion', 'percepción',
+  'ajuste', 'ajustes', 'pasivo', 'pasivos'
 ];
 
 /**
  * Detecta si una fila contiene una provisión contable
- * Basado en campos: Proyecto, Cliente, Detalle, o cualquier campo descriptivo
+ * Basado en múltiples campos: Proyecto, Cliente, Detalle, Subtipo, Descripcion, etc.
+ * IMPORTANTE: Detecta provisiones INDEPENDIENTEMENTE del tipo de costo (Directo/Indirecto)
  */
 function isProvision(row: CostoDirectoRow): boolean {
+  // Campos principales a revisar
   const fieldsToCheck = [
     row.Proyecto || '',
     row.Cliente || '',
     row.Detalle || '',
     (row as any).Descripcion || '',
     (row as any).Concepto || '',
-    (row as any).Categoria || ''
+    (row as any).Categoria || '',
+    (row as any).Cuenta || '',
+    (row as any).Subcuenta || ''
   ];
   
   const combinedText = fieldsToCheck.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   
-  return PROVISION_PATTERNS.some(pattern => {
+  // Revisar patrones de provisión en texto combinado
+  const matchesPattern = PROVISION_PATTERNS.some(pattern => {
     const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return combinedText.includes(normalizedPattern);
   });
+  
+  if (matchesPattern) return true;
+  
+  // Revisar subtipo de costo específicamente
+  const subtipo = ((row as any)['Subtipo de costo'] || (row as any).Subtipo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const matchesSubtype = PROVISION_SUBTYPES.some(st => subtipo.includes(st));
+  
+  return matchesSubtype;
+}
+
+/**
+ * Determina el tipo de provisión para logging y análisis
+ */
+function getProvisionKind(row: CostoDirectoRow): string {
+  const text = [
+    row.Proyecto || '',
+    row.Cliente || '',
+    row.Detalle || '',
+    (row as any)['Subtipo de costo'] || ''
+  ].join(' ').toLowerCase();
+  
+  if (text.includes('pepsico')) return 'cliente_pepsico';
+  if (text.includes('warner')) return 'cliente_warner';
+  if (text.includes('impuestos usa') || text.includes('tax usa')) return 'impuestos_usa';
+  if (text.includes('iva') || text.includes('percepcion')) return 'impuestos_iva';
+  if (text.includes('provision') || text.includes('pasivo')) return 'provision_general';
+  return 'otra';
 }
 
 /**
  * ETL: Costos directos e indirectos → fact_cost_month
  * Separa en 3 buckets:
- * - DIRECTOS: Tipo = "Directo" (costos de equipo)
- * - INDIRECTOS OPERATIVOS: Tipo = "Indirecto" SIN provisiones (overhead real)
- * - PROVISIONES: Tipo = "Indirecto" CON patrones de provisión (solo Financiero)
+ * - DIRECTOS: Tipo = "Directo" Y NO es provisión (costos de equipo operativos)
+ * - INDIRECTOS OPERATIVOS: Tipo = "Indirecto" Y NO es provisión (overhead real)
+ * - PROVISIONES: Cualquier tipo que SEA provisión/impuesto (solo Financiero)
+ * 
+ * IMPORTANTE: La detección de provisiones se hace PRIMERO, independientemente del tipo
  */
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
+  console.log(`   📋 Patrones de provisión activos: ${PROVISION_PATTERNS.slice(0, 5).join(', ')}...`);
   
   const { factCostMonth } = await import('@shared/schema');
   
@@ -524,13 +575,14 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
   const periodCosts = new Map<string, {
     directUSD: number;
     directARS: number;
-    indirectUSD: number;  // Solo overhead operativo real
+    indirectUSD: number;  // Solo overhead operativo real (SIN provisiones)
     indirectARS: number;
-    provisionsUSD: number; // Provisiones contables
+    provisionsUSD: number; // Provisiones contables (Pepsico, Warner, IVA, Impuestos USA, etc.)
     provisionsARS: number;
     directRows: number;
     indirectRows: number;
     provisionsRows: number;
+    provisionDetails: { kind: string; amount: number; description: string }[];
   }>();
   
   let processedDirect = 0;
@@ -552,10 +604,8 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
       const isDirect = tipoCostoNorm === 'directo' || tipoCostoNorm === 'costos directos e indirectos';
       const isIndirect = tipoCostoNorm === 'indirecto';
       
-      if (!isDirect && !isIndirect) {
-        skipped++;
-        continue;
-      }
+      // Permitir cualquier tipo para detectar provisiones (algunas pueden venir sin tipo)
+      const hasValidType = isDirect || isIndirect;
       
       const montoUSD = parseNum(row['Monto Total USD']);
       const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
@@ -570,31 +620,43 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
           directUSD: 0, directARS: 0,
           indirectUSD: 0, indirectARS: 0,
           provisionsUSD: 0, provisionsARS: 0,
-          directRows: 0, indirectRows: 0, provisionsRows: 0
+          directRows: 0, indirectRows: 0, provisionsRows: 0,
+          provisionDetails: []
         });
       }
       
       const acc = periodCosts.get(periodKey)!;
       
-      if (isDirect) {
+      // PASO 1: Verificar si es provisión PRIMERO (independientemente del tipo)
+      const isProvisionRow = isProvision(row);
+      
+      if (isProvisionRow) {
+        // Es una provisión → bucket de provisiones (solo para Financiero)
+        acc.provisionsUSD += montoUSD;
+        acc.provisionsARS += montoARS;
+        acc.provisionsRows++;
+        processedProvisions++;
+        
+        const provisionKind = getProvisionKind(row);
+        const description = row.Proyecto || row.Cliente || row.Detalle || 'N/A';
+        acc.provisionDetails.push({ kind: provisionKind, amount: montoUSD, description });
+        
+        console.log(`  📋 PROVISIÓN [${provisionKind}]: ${description} → $${montoUSD.toFixed(2)} USD (tipo original: ${tipoCostoRaw})`);
+      } else if (isDirect) {
+        // No es provisión y es tipo Directo → bucket de directos
         acc.directUSD += montoUSD;
         acc.directARS += montoARS;
         acc.directRows++;
         processedDirect++;
       } else if (isIndirect) {
-        // Separar provisiones de overhead operativo real
-        if (isProvision(row)) {
-          acc.provisionsUSD += montoUSD;
-          acc.provisionsARS += montoARS;
-          acc.provisionsRows++;
-          processedProvisions++;
-          console.log(`  📋 Provisión detectada: ${row.Proyecto || row.Cliente || 'N/A'} → $${montoUSD.toFixed(2)} USD`);
-        } else {
-          acc.indirectUSD += montoUSD;
-          acc.indirectARS += montoARS;
-          acc.indirectRows++;
-          processedIndirect++;
-        }
+        // No es provisión y es tipo Indirecto → bucket de indirectos operativos
+        acc.indirectUSD += montoUSD;
+        acc.indirectARS += montoARS;
+        acc.indirectRows++;
+        processedIndirect++;
+      } else {
+        // Sin tipo válido y no es provisión → saltar
+        skipped++;
       }
       
     } catch (error) {
