@@ -94,52 +94,41 @@ export function startDailySoTSync() {
 
 // Manual trigger function for testing
 export async function triggerManualSync() {
-  console.log('🔧 [Manual SoT Sync] Ejecutando sincronización manual con PARSER SANITIZADO...');
+  console.log('🔧 [Manual SoT Sync] Ejecutando sincronización manual con RAW DATA (incluye INDIRECTOS)...');
   
   try {
     const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { executeSoTETL } = await import('../etl/sot-etl');
-    const { getCostData } = await import('../domain/costs/data-access');
     
-    // ✅ NEW: Use sanitized parser data instead of raw Google Sheets
-    console.log('📊 [Manual SoT Sync] Fetching PARSED costs data (directo only, FORMATTED_VALUE)...');
-    const parsedCosts = await getCostData('sheets');
+    // ✅ FIXED: Read RAW sheet data to include BOTH Directo AND Indirecto rows
+    // The parser only returns direct costs, but ETL needs indirect costs for fact_cost_month
+    console.log('📊 [Manual SoT Sync] Fetching RAW costs data (ALL types: directo + indirecto)...');
+    const costosRaw = await googleSheetsWorkingService.getSheetValues(
+      '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+      'Costos directos e indirectos'
+    );
     
-    console.log(`✅ [Manual SoT Sync] Retrieved ${parsedCosts.length} PARSED direct cost records`);
-    
-    // Convert ParsedCostRecord[] to legacy format expected by ETL
-    const costosRows = parsedCosts.map((cost, idx) => {
-      // Extract month/year from period (format: YYYY-MM)
-      const [year, month] = cost.period.split('-');
-      const monthNameMap: Record<string, string> = {
-        '01': 'Enero', '02': 'Febrero', '03': 'Marzo', '04': 'Abril',
-        '05': 'Mayo', '06': 'Junio', '07': 'Julio', '08': 'Agosto',
-        '09': 'Septiembre', '10': 'Octubre', '11': 'Noviembre', '12': 'Diciembre'
-      };
-      
-      // Extract additional fields from rawRecord
-      const personName = cost.rawRecord.persona || '';
-      const asanaHours = parseFloat(cost.rawRecord['cantidad_de_horas_asana'] as string || '0') || 0;
-      const fx = parseFloat(cost.rawRecord['tipo_cambio'] as string || '0') || 0;
-      
-      return {
-        __rowId: `cost_${idx}`,
-        'Cliente': cost.clientName,
-        'Proyecto': cost.projectName,
-        'Mes': monthNameMap[month] || month,
-        'Año': parseInt(year),
-        'Detalle': personName,
-        'Tipo de Costo': 'Directo', // Already filtered by parser
-        'Cantidad de horas objetivo': 0, // Not available in ParsedCostRecord
-        'Cantidad de horas reales Asana': asanaHours,
-        'Cantidad de horas para facturación': asanaHours, // Use same value
-        'Monto Total ARS': cost.arsAmount || 0,
-        'Monto Total USD': cost.usdAmount || 0,
-        'Cotización': fx
-      };
+    // Parse raw sheet data to objects (same as daily cron job)
+    const costosHeaders = costosRaw[0] || [];
+    const costosRows = costosRaw.slice(1).map((row, idx) => {
+      const obj: any = { __rowId: `costos_${idx}` };
+      costosHeaders.forEach((header, i) => {
+        obj[header] = row[i];
+      });
+      return obj;
     });
     
-    console.log(`🔄 [Manual SoT Sync] Converted to ${costosRows.length} ETL-compatible rows`);
+    // Count by type for logging
+    const directCount = costosRows.filter(row => {
+      const tipo = (row['Tipo de Costo'] || row['Tipo de Coste'] || '').toLowerCase().trim();
+      return tipo === 'directo' || tipo.includes('directos e indirectos');
+    }).length;
+    const indirectCount = costosRows.filter(row => {
+      const tipo = (row['Tipo de Costo'] || row['Tipo de Coste'] || '').toLowerCase().trim();
+      return tipo === 'indirecto';
+    }).length;
+    
+    console.log(`✅ [Manual SoT Sync] Retrieved ${costosRows.length} RAW cost records (${directCount} direct, ${indirectCount} indirect)`);
     
     // Get RC data (unchanged)
     const rcRaw = await googleSheetsWorkingService.getSheetValues(
