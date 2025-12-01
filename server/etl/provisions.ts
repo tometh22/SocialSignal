@@ -15,7 +15,11 @@ import { factCostMonth } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
 // Lista EXACTA de provisiones válidas (normalizada a minúsculas sin acentos)
+// Incluye variantes con y sin "PROVISIÓN" prefijo porque la hoja "Provisión Pasivo Proyectos"
+// usa nombres simples de cliente (ej: "PepsiCo") mientras que la hoja "Pasivo" puede usar
+// nombres completos (ej: "PROVISIÓN PEPSICO")
 const VALID_PROVISION_NAMES = [
+  // Nombres con prefijo "PROVISIÓN"
   'provision pepsico',
   'provisión pepsico',
   'provision warner',
@@ -26,6 +30,12 @@ const VALID_PROVISION_NAMES = [
   'provisión impuesto usa',
   'provision tax usa',
   'provisión tax usa',
+  // Nombres simples (sin prefijo) - usados en hoja "Provisión Pasivo Proyectos"
+  'pepsico',
+  'warner',
+  'impuestos usa',
+  'impuesto usa',
+  'tax usa',
 ];
 
 // Normalizar texto para comparación
@@ -40,10 +50,27 @@ function normalizeText(text: string): string {
 // Verificar si un concepto es una provisión válida (SOLO nombres exactos)
 export function isValidProvision(concept: string): boolean {
   const normalized = normalizeText(concept);
-  return VALID_PROVISION_NAMES.some(valid => {
+  
+  // Debug: mostrar la comparación
+  console.log(`    🔎 isValidProvision: "${concept}" → normalized: "${normalized}"`);
+  
+  const isValid = VALID_PROVISION_NAMES.some(valid => {
     const normalizedValid = normalizeText(valid);
-    return normalized === normalizedValid || normalized.includes(normalizedValid);
+    const exactMatch = normalized === normalizedValid;
+    const containsMatch = normalized.includes(normalizedValid);
+    
+    if (exactMatch || containsMatch) {
+      console.log(`    ✅ Match found: "${normalized}" ${exactMatch ? '==' : 'includes'} "${normalizedValid}"`);
+      return true;
+    }
+    return false;
   });
+  
+  if (!isValid) {
+    console.log(`    ❌ No match for: "${normalized}" in VALID_PROVISION_NAMES`);
+  }
+  
+  return isValid;
 }
 
 // Detectar el tipo de provisión
@@ -64,7 +91,7 @@ export interface ProcessedProvision {
   concept: string;
   type: 'pepsico' | 'warner' | 'impuestos_usa' | 'otros';
   amountUsd: number;
-  source: 'pasivo' | 'provision_cliente';
+  source: 'pasivo' | 'provision_cliente' | 'impuestos';
 }
 
 // Estructura para resumen por período
@@ -88,17 +115,20 @@ export async function getValidProvisions(): Promise<ProcessedProvision[]> {
   const result: ProcessedProvision[] = [];
   
   try {
-    // Obtener datos de las hojas relevantes
-    const [pasivoData, provisionProyectosData] = await Promise.all([
+    // Obtener datos de las hojas relevantes (incluye "Impuestos" para Impuestos USA)
+    const [pasivoData, provisionProyectosData, impuestosData] = await Promise.all([
       googleSheetsWorkingService.getPasivo(),
-      googleSheetsWorkingService.getProvisionPasivoProyectos()
+      googleSheetsWorkingService.getProvisionPasivoProyectos(),
+      googleSheetsWorkingService.getImpuestos()
     ]);
     
     console.log(`📊 [Provisiones] Hoja Pasivo: ${pasivoData.length} registros`);
     console.log(`📊 [Provisiones] Hoja Provisión Pasivo Proyectos: ${provisionProyectosData.length} registros`);
+    console.log(`📊 [Provisiones] Hoja Impuestos: ${impuestosData.length} registros`);
     
     // Procesar hoja "Pasivo"
     for (const row of pasivoData) {
+      console.log(`  🔍 [Pasivo] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
       if (isValidProvision(row.concept)) {
         const type = detectProvisionType(row.concept);
         result.push({
@@ -114,6 +144,9 @@ export async function getValidProvisions(): Promise<ProcessedProvision[]> {
     
     // Procesar hoja "Provisión pasivo proyectos"
     for (const row of provisionProyectosData) {
+      // Debug: mostrar todos los conceptos leídos con rawValue para debugging
+      console.log(`  🔍 [Provisión Proyectos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
+      
       if (isValidProvision(row.concept)) {
         const type = detectProvisionType(row.concept);
         result.push({
@@ -124,6 +157,25 @@ export async function getValidProvisions(): Promise<ProcessedProvision[]> {
           source: 'provision_cliente'
         });
         console.log(`  ✅ [Provisión Proyectos] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
+      } else {
+        console.log(`  ⚠️ [Provisión Proyectos] Concepto no válido: "${row.concept}"`);
+      }
+    }
+    
+    // Procesar hoja "Impuestos" - buscar específicamente "Impuestos USA"
+    for (const row of impuestosData) {
+      console.log(`  🔍 [Impuestos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
+      
+      if (isValidProvision(row.concept)) {
+        const type = detectProvisionType(row.concept);
+        result.push({
+          periodKey: row.periodKey,
+          concept: row.concept,
+          type,
+          amountUsd: row.amountUsd,
+          source: 'impuestos'
+        });
+        console.log(`  ✅ [Impuestos] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
       }
     }
     
@@ -192,61 +244,52 @@ export async function getProvisionSummaryByPeriod(): Promise<Map<string, Provisi
 /**
  * Actualizar la tabla fact_cost_month con las provisiones correctas
  * REEMPLAZA los valores de provisiones existentes con los valores exactos
+ * Y RECALCULA amountUSD/amountARS para incluir las provisiones en los totales financieros
  */
 export async function updateProvisionsinFactCostMonth(): Promise<void> {
   console.log('📊 [Provisiones] Actualizando provisiones en fact_cost_month...');
   
   const summaryMap = await getProvisionSummaryByPeriod();
   
-  for (const [periodKey, summary] of summaryMap) {
+  // Obtener todos los registros existentes
+  const allRecords = await db.select().from(factCostMonth);
+  
+  for (const record of allRecords) {
+    const { periodKey } = record;
+    const provisionSummary = summaryMap.get(periodKey);
+    const provisionTotal = provisionSummary?.total || 0;
+    const provisionRowsCount = provisionSummary?.details.length || 0;
+    
+    // Calcular totales: directos + indirectos + provisiones
+    const directUSD = parseFloat(record.directUSD || '0');
+    const indirectUSD = parseFloat(record.indirectUSD || '0');
+    const directARS = parseFloat(record.directARS || '0');
+    const indirectARS = parseFloat(record.indirectARS || '0');
+    
+    // amountUSD/ARS = operativo + provisiones (para vista Financiera)
+    const totalUSD = directUSD + indirectUSD + provisionTotal;
+    const totalARS = directARS + indirectARS; // Provisiones ya están en USD
+    
     try {
-      // Verificar si existe el registro para este período
-      const existing = await db
-        .select()
-        .from(factCostMonth)
-        .where(eq(factCostMonth.periodKey, periodKey))
-        .limit(1);
+      await db
+        .update(factCostMonth)
+        .set({
+          provisionsUSD: provisionTotal.toFixed(2),
+          provisionsARS: '0', // Las provisiones ya están en USD
+          provisionsRowsCount: provisionRowsCount,
+          amountUSD: totalUSD.toFixed(2), // Recalcular total incluyendo provisiones
+          amountARS: totalARS.toFixed(2)
+        })
+        .where(eq(factCostMonth.periodKey, periodKey));
       
-      if (existing.length > 0) {
-        // Actualizar provisiones
-        await db
-          .update(factCostMonth)
-          .set({
-            provisionsUSD: summary.total.toFixed(2),
-            provisionsARS: '0', // Las provisiones ya están en USD
-            provisionsRowsCount: summary.details.length
-          })
-          .where(eq(factCostMonth.periodKey, periodKey));
-        
-        console.log(`  ✅ ${periodKey}: Provisiones actualizadas a USD ${summary.total.toFixed(2)}`);
+      if (provisionTotal > 0) {
+        console.log(`  ✅ ${periodKey}: Provisiones=$${provisionTotal.toFixed(2)}, Total=$${totalUSD.toFixed(2)} USD`);
       } else {
-        console.log(`  ⚠️ ${periodKey}: No existe registro en fact_cost_month, se creará en el próximo ETL`);
+        console.log(`  🔄 ${periodKey}: Sin provisiones, Total operativo=$${totalUSD.toFixed(2)} USD`);
       }
     } catch (error) {
       console.error(`  ❌ ${periodKey}: Error actualizando provisiones:`, error);
     }
-  }
-  
-  // Para períodos sin provisiones, establecer a 0
-  try {
-    const allPeriods = await db.select({ periodKey: factCostMonth.periodKey }).from(factCostMonth);
-    
-    for (const { periodKey } of allPeriods) {
-      if (!summaryMap.has(periodKey)) {
-        await db
-          .update(factCostMonth)
-          .set({
-            provisionsUSD: '0',
-            provisionsARS: '0',
-            provisionsRowsCount: 0
-          })
-          .where(eq(factCostMonth.periodKey, periodKey));
-        
-        console.log(`  🔄 ${periodKey}: Sin provisiones, establecido a 0`);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Error limpiando provisiones de períodos sin datos:', error);
   }
   
   console.log('✅ [Provisiones] Actualización completada');

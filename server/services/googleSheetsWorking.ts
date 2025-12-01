@@ -2202,6 +2202,7 @@ class GoogleSheetsWorkingService {
   /**
    * Obtener datos de la hoja "Pasivo"
    * Contiene provisiones varias y pasivos
+   * ESTRUCTURA: Filas con columnas Mes, Año, Concepto/Detalle, Monto Total USD
    */
   async getPasivo(): Promise<ProvisionRow[]> {
     try {
@@ -2225,12 +2226,106 @@ class GoogleSheetsWorkingService {
 
       console.log(`📊 [Pasivo] Procesando ${rows.length} filas...`);
       
-      return this.parseProvisionSheet(rows, 'pasivo');
+      return this.parsePasivoSheet(rows);
       
     } catch (error) {
       console.error('❌ [Pasivo] Error obteniendo datos:', error);
       return [];
     }
+  }
+  
+  /**
+   * Parser específico para la hoja "Pasivo" que tiene estructura de filas
+   * con columnas: Detalle, Subtipo, Mes, Año, ..., Concepto/Detalle, ..., Monto Total USD
+   */
+  private parsePasivoSheet(rows: any[][]): ProvisionRow[] {
+    if (rows.length < 2) return [];
+    
+    const result: ProvisionRow[] = [];
+    const headerRow = rows[0];
+    
+    console.log(`📊 [pasivo] Headers: ${headerRow.slice(0, 15).join(', ')}...`);
+    
+    // Encontrar índices de columnas importantes
+    const findColIndex = (names: string[]): number => {
+      for (let i = 0; i < headerRow.length; i++) {
+        const header = (headerRow[i] || '').toString().toLowerCase().trim();
+        if (names.some(n => header.includes(n.toLowerCase()))) return i;
+      }
+      return -1;
+    };
+    
+    const mesColIdx = findColIndex(['mes']);
+    const yearColIdx = findColIndex(['año', 'ano']);
+    const conceptoColIdx = findColIndex(['concepto', 'detalle']);
+    const montoUsdColIdx = findColIndex(['monto total usd', 'usd', 'total usd']);
+    const detalleColIdx = 0; // Primera columna suele ser "Detalle"
+    
+    console.log(`📊 [pasivo] Columnas encontradas: Mes=${mesColIdx}, Año=${yearColIdx}, Concepto=${conceptoColIdx}, MontoUSD=${montoUsdColIdx}`);
+    
+    if (mesColIdx === -1 || yearColIdx === -1 || montoUsdColIdx === -1) {
+      console.log(`⚠️ [pasivo] No se encontraron todas las columnas necesarias`);
+      return [];
+    }
+    
+    // Procesar cada fila
+    for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx];
+      if (!row || row.length === 0) continue;
+      
+      // Obtener mes y año
+      const mes = parseInt((row[mesColIdx] || '').toString().trim());
+      const year = parseInt((row[yearColIdx] || '').toString().trim());
+      
+      if (isNaN(mes) || isNaN(year) || mes < 1 || mes > 12) continue;
+      
+      const periodKey = `${year}-${String(mes).padStart(2, '0')}`;
+      
+      // Obtener concepto (priorizar columna "Concepto/Detalle", sino usar "Detalle")
+      let concept = '';
+      if (conceptoColIdx >= 0 && row[conceptoColIdx]) {
+        concept = row[conceptoColIdx].toString().trim();
+      }
+      if (!concept && row[detalleColIdx]) {
+        concept = row[detalleColIdx].toString().trim();
+      }
+      
+      if (!concept) continue;
+      
+      // Obtener monto USD
+      const rawValue = row[montoUsdColIdx];
+      let amount = this.parseProvisionAmount(rawValue);
+      
+      if (amount === 0) continue;
+      
+      // Detectar si es provisión
+      const lowerConcept = concept.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const isProvision = this.isProvisionConcept(lowerConcept);
+      const provisionKind = this.detectProvisionKind(lowerConcept, 'pasivo');
+      
+      result.push({
+        periodKey,
+        concept,
+        source: 'pasivo',
+        amountUsd: amount,
+        isProvision,
+        provisionKind,
+        rawValue: rawValue?.toString() || ''
+      });
+    }
+    
+    console.log(`✅ [pasivo] Extraídos ${result.length} registros`);
+    
+    // Log summary por período
+    const byPeriod = new Map<string, number>();
+    for (const r of result) {
+      byPeriod.set(r.periodKey, (byPeriod.get(r.periodKey) || 0) + r.amountUsd);
+    }
+    for (const [period, total] of byPeriod) {
+      console.log(`  📊 [pasivo] ${period}: USD ${total.toFixed(2)}`);
+    }
+    
+    return result;
   }
 
   /**
@@ -2352,7 +2447,8 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Parsear monto de provisión (maneja formatos como "$1.234,56", "1234.56", etc.)
+   * Parsear monto de provisión (maneja formatos como "$1.234,56", "1234.56", "13.413", etc.)
+   * IMPORTANTE: Detecta formato europeo/argentino donde el punto es separador de miles
    */
   private parseProvisionAmount(value: any): number {
     if (value === null || value === undefined || value === '') return 0;
@@ -2360,34 +2456,60 @@ class GoogleSheetsWorkingService {
     const str = value.toString().trim();
     if (!str) return 0;
     
-    // Remover símbolos de moneda y espacios
-    let cleaned = str.replace(/[$€\s]/g, '');
-    
-    // Detectar formato (1.234,56 vs 1,234.56)
-    const hasCommaDecimal = /\d+\.\d{3},\d{2}$/.test(cleaned);
-    const hasDotDecimal = /\d+,\d{3}\.\d{2}$/.test(cleaned);
-    
-    if (hasCommaDecimal) {
-      // Formato europeo: 1.234,56
-      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    } else if (hasDotDecimal) {
-      // Formato US: 1,234.56
-      cleaned = cleaned.replace(/,/g, '');
-    } else {
-      // Formato simple: intentar con coma como decimal
-      if (cleaned.includes(',') && !cleaned.includes('.')) {
-        cleaned = cleaned.replace(',', '.');
-      }
-    }
-    
     // Detectar si es negativo (paréntesis o signo menos)
     const isNegative = str.startsWith('-') || str.startsWith('(') || str.endsWith(')');
-    cleaned = cleaned.replace(/[()\\-]/g, '');
+    
+    // Remover símbolos de moneda, espacios, paréntesis
+    let cleaned = str.replace(/[$€\s()]/g, '');
+    // Remover el signo menos para procesamiento
+    cleaned = cleaned.replace(/^-/, '');
+    
+    // CASO 1: Formato europeo completo con coma decimal: "1.234,56" o "13.413,00"
+    const hasCommaDecimal = /^\d{1,3}(\.\d{3})*,\d{1,2}$/.test(cleaned);
+    
+    // CASO 2: Formato US con punto decimal: "1,234.56"
+    const hasDotDecimal = /^\d{1,3}(,\d{3})*\.\d{1,2}$/.test(cleaned);
+    
+    // CASO 3: Formato europeo SIN decimales: "13.413" (punto como separador de miles)
+    // Detecta patrones como "X.XXX" o "XX.XXX" donde después del punto hay exactamente 3 dígitos
+    const isEuropeanThousands = /^\d{1,3}(\.\d{3})+$/.test(cleaned);
+    
+    // CASO 4: Número simple con punto decimal: "13.41" (2 o menos dígitos después del punto)
+    const isSimpleDecimal = /^\d+\.\d{1,2}$/.test(cleaned);
+    
+    console.log(`  🔢 parseProvisionAmount: "${str}" → cleaned="${cleaned}"`);
+    console.log(`     hasCommaDecimal=${hasCommaDecimal}, hasDotDecimal=${hasDotDecimal}, isEuropeanThousands=${isEuropeanThousands}, isSimpleDecimal=${isSimpleDecimal}`);
+    
+    if (hasCommaDecimal) {
+      // Formato europeo con decimales: 1.234,56 → 1234.56
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+      console.log(`     → Formato europeo con decimales: ${cleaned}`);
+    } else if (hasDotDecimal) {
+      // Formato US: 1,234.56 → 1234.56
+      cleaned = cleaned.replace(/,/g, '');
+      console.log(`     → Formato US: ${cleaned}`);
+    } else if (isEuropeanThousands) {
+      // Formato europeo SIN decimales: 13.413 → 13413
+      cleaned = cleaned.replace(/\./g, '');
+      console.log(`     → Formato europeo miles sin decimales: ${cleaned}`);
+    } else if (isSimpleDecimal) {
+      // Número simple con decimales: 13.41 → 13.41 (sin cambios)
+      console.log(`     → Número simple decimal: ${cleaned}`);
+    } else if (cleaned.includes(',') && !cleaned.includes('.')) {
+      // Coma como decimal sin miles: "13,41" → "13.41"
+      cleaned = cleaned.replace(',', '.');
+      console.log(`     → Coma como decimal: ${cleaned}`);
+    }
     
     const num = parseFloat(cleaned);
-    if (isNaN(num)) return 0;
+    if (isNaN(num)) {
+      console.log(`     ❌ No es un número válido`);
+      return 0;
+    }
     
-    return isNegative ? -num : num;
+    const result = isNegative ? -num : num;
+    console.log(`     ✅ Resultado: ${result}`);
+    return result;
   }
 }
 

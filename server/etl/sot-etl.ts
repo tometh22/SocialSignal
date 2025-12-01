@@ -8,6 +8,7 @@ import { dimPeriod, factLaborMonth, factRCMonth, aggProjectMonth, activeProjects
 import { eq, and, sql } from 'drizzle-orm';
 import { toPeriodKey, normKey, parseNum, prefer, normHours, needsAntiX100, generateFlags } from './sot-utils';
 import { resolveRCRow } from './sot-project-resolver';
+import { updateProvisionsinFactCostMonth, getProvisionSummaryByPeriod } from './provisions';
 
 // ==================== PROJECT ID RESOLVER ====================
 
@@ -478,114 +479,49 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 
 // ==================== HECHOS: COSTOS AGREGADOS POR PERÍODO ====================
 
-// Patrones para detectar PROVISIONES CONTABLES (no deben ir en Operativo)
-// NOTA: 'pepsico' y 'warner' SON CLIENTES REALES con proyectos operativos normales
-// Solo clasificar como provisión si el SUBTIPO o DESCRIPCIÓN indica explícitamente provisión
-// Las provisiones de Impuestos USA, IVA, etc. vienen de hojas separadas (no de Costos Directos)
-const PROVISION_PATTERNS = [
-  'provision pasivo', 'provisión pasivo',
-  'provision cliente', 'provisión cliente',
-  'impuestos usa', 'impuesto usa', 'tax usa',
-  'iva compras', 'iva ventas', 'impuesto iva',
-  'pasivo contable',
-  'facturacion adelantada', 'facturación adelantada',
-  'devengado contable',
-  'estimacion provision', 'estimación provisión'
-];
-
-// Subtipos de costo que indican provisiones/impuestos (de la columna "Subtipo de costo")
-// Solo subtipos MUY específicos para evitar falsos positivos
-const PROVISION_SUBTYPES = [
-  'provision', 'provisión', 'provisiones',
-  'impuesto', 'tax'
-];
-
 /**
- * Detecta si una fila contiene una provisión contable
- * Basado en múltiples campos: Proyecto, Cliente, Detalle, Subtipo, Descripcion, etc.
- * IMPORTANTE: Detecta provisiones INDEPENDIENTEMENTE del tipo de costo (Directo/Indirecto)
+ * NOTA IMPORTANTE: Las provisiones contables ya NO se detectan aquí.
+ * 
+ * Las provisiones se extraen EXCLUSIVAMENTE del módulo dedicado etl/provisions.ts
+ * que lee de las hojas "Pasivo" y "Provisión pasivo proyectos" del Excel MAESTRO.
+ * 
+ * Esta función SOLO procesa costos DIRECTOS e INDIRECTOS operativos.
+ * Las provisiones se actualizan después mediante updateProvisionsInFactCostMonth().
+ * 
+ * Provisiones válidas (nombres exactos):
+ * - PROVISIÓN PEPSICO
+ * - PROVISIÓN WARNER  
+ * - PROVISIÓN IMPUESTOS USA
  */
-function isProvision(row: CostoDirectoRow): boolean {
-  // Campos principales a revisar
-  const fieldsToCheck = [
-    row.Proyecto || '',
-    row.Cliente || '',
-    row.Detalle || '',
-    (row as any).Descripcion || '',
-    (row as any).Concepto || '',
-    (row as any).Categoria || '',
-    (row as any).Cuenta || '',
-    (row as any).Subcuenta || ''
-  ];
-  
-  const combinedText = fieldsToCheck.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
-  // Revisar patrones de provisión en texto combinado
-  const matchesPattern = PROVISION_PATTERNS.some(pattern => {
-    const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return combinedText.includes(normalizedPattern);
-  });
-  
-  if (matchesPattern) return true;
-  
-  // Revisar subtipo de costo específicamente
-  const subtipo = ((row as any)['Subtipo de costo'] || (row as any).Subtipo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const matchesSubtype = PROVISION_SUBTYPES.some(st => subtipo.includes(st));
-  
-  return matchesSubtype;
-}
-
-/**
- * Determina el tipo de provisión para logging y análisis
- */
-function getProvisionKind(row: CostoDirectoRow): string {
-  const text = [
-    row.Proyecto || '',
-    row.Cliente || '',
-    row.Detalle || '',
-    (row as any)['Subtipo de costo'] || ''
-  ].join(' ').toLowerCase();
-  
-  if (text.includes('pepsico')) return 'cliente_pepsico';
-  if (text.includes('warner')) return 'cliente_warner';
-  if (text.includes('impuestos usa') || text.includes('tax usa')) return 'impuestos_usa';
-  if (text.includes('iva') || text.includes('percepcion')) return 'impuestos_iva';
-  if (text.includes('provision') || text.includes('pasivo')) return 'provision_general';
-  return 'otra';
-}
 
 /**
  * ETL: Costos directos e indirectos → fact_cost_month
- * Separa en 3 buckets:
- * - DIRECTOS: Tipo = "Directo" Y NO es provisión (costos de equipo operativos)
- * - INDIRECTOS OPERATIVOS: Tipo = "Indirecto" Y NO es provisión (overhead real)
- * - PROVISIONES: Cualquier tipo que SEA provisión/impuesto (solo Financiero)
+ * Separa en 2 buckets SOLAMENTE (las provisiones vienen de otro módulo):
+ * - DIRECTOS: Tipo = "Directo" (costos de equipo operativos)
+ * - INDIRECTOS: Tipo = "Indirecto" (overhead operativo)
  * 
- * IMPORTANTE: La detección de provisiones se hace PRIMERO, independientemente del tipo
+ * NOTA: Las PROVISIONES se extraen del módulo dedicado etl/provisions.ts
+ * que lee de las hojas "Pasivo" y "Provisión pasivo proyectos" del Excel MAESTRO.
+ * Aquí se inicializan a 0 y se actualizan después con updateProvisionsInFactCostMonth().
  */
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
-  console.log(`   📋 Patrones de provisión activos: ${PROVISION_PATTERNS.slice(0, 5).join(', ')}...`);
+  console.log(`   ℹ️ NOTA: Las provisiones se extraen de hojas separadas (Pasivo, Provisión pasivo proyectos)`);
   
   const { factCostMonth } = await import('@shared/schema');
   
-  // 3 buckets: DIRECTOS, INDIRECTOS OPERATIVOS, PROVISIONES
+  // 2 buckets: DIRECTOS, INDIRECTOS (provisiones vienen de módulo separado)
   const periodCosts = new Map<string, {
     directUSD: number;
     directARS: number;
-    indirectUSD: number;  // Solo overhead operativo real (SIN provisiones)
+    indirectUSD: number;
     indirectARS: number;
-    provisionsUSD: number; // Provisiones contables (Pepsico, Warner, IVA, Impuestos USA, etc.)
-    provisionsARS: number;
     directRows: number;
     indirectRows: number;
-    provisionsRows: number;
-    provisionDetails: { kind: string; amount: number; description: string }[];
   }>();
   
   let processedDirect = 0;
   let processedIndirect = 0;
-  let processedProvisions = 0;
   let skipped = 0;
   
   for (const row of rows) {
@@ -602,9 +538,6 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
       const isDirect = tipoCostoNorm === 'directo' || tipoCostoNorm === 'costos directos e indirectos';
       const isIndirect = tipoCostoNorm === 'indirecto';
       
-      // Permitir cualquier tipo para detectar provisiones (algunas pueden venir sin tipo)
-      const hasValidType = isDirect || isIndirect;
-      
       const montoUSD = parseNum(row['Monto Total USD']);
       const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
       
@@ -617,43 +550,24 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         periodCosts.set(periodKey, {
           directUSD: 0, directARS: 0,
           indirectUSD: 0, indirectARS: 0,
-          provisionsUSD: 0, provisionsARS: 0,
-          directRows: 0, indirectRows: 0, provisionsRows: 0,
-          provisionDetails: []
+          directRows: 0, indirectRows: 0
         });
       }
       
       const acc = periodCosts.get(periodKey)!;
       
-      // PASO 1: Verificar si es provisión PRIMERO (independientemente del tipo)
-      const isProvisionRow = isProvision(row);
-      
-      if (isProvisionRow) {
-        // Es una provisión → bucket de provisiones (solo para Financiero)
-        acc.provisionsUSD += montoUSD;
-        acc.provisionsARS += montoARS;
-        acc.provisionsRows++;
-        processedProvisions++;
-        
-        const provisionKind = getProvisionKind(row);
-        const description = row.Proyecto || row.Cliente || row.Detalle || 'N/A';
-        acc.provisionDetails.push({ kind: provisionKind, amount: montoUSD, description });
-        
-        console.log(`  📋 PROVISIÓN [${provisionKind}]: ${description} → $${montoUSD.toFixed(2)} USD (tipo original: ${tipoCostoRaw})`);
-      } else if (isDirect) {
-        // No es provisión y es tipo Directo → bucket de directos
+      // Solo clasificar por tipo de costo (directo vs indirecto)
+      if (isDirect) {
         acc.directUSD += montoUSD;
         acc.directARS += montoARS;
         acc.directRows++;
         processedDirect++;
       } else if (isIndirect) {
-        // No es provisión y es tipo Indirecto → bucket de indirectos operativos
         acc.indirectUSD += montoUSD;
         acc.indirectARS += montoARS;
         acc.indirectRows++;
         processedIndirect++;
       } else {
-        // Sin tipo válido y no es provisión → saltar
         skipped++;
       }
       
@@ -664,18 +578,16 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
   }
   
   console.log(`💾 [SoT ETL] Guardando ${periodCosts.size} períodos en fact_cost_month...`);
-  console.log(`   📊 Directos: ${processedDirect} | Indirectos Operativos: ${processedIndirect} | Provisiones: ${processedProvisions} | Saltados: ${skipped}`);
+  console.log(`   📊 Directos: ${processedDirect} | Indirectos: ${processedIndirect} | Saltados: ${skipped}`);
   
   for (const [periodKey, costs] of periodCosts) {
     await ensurePeriod(periodKey);
     
-    // Total OPERATIVO (sin provisiones) para compatibilidad
+    // Total OPERATIVO (solo directos + indirectos, SIN provisiones)
     const totalOperativoUSD = costs.directUSD + costs.indirectUSD;
     const totalOperativoARS = costs.directARS + costs.indirectARS;
-    // Total CONTABLE (con provisiones)
-    const totalContableUSD = totalOperativoUSD + costs.provisionsUSD;
-    const totalContableARS = totalOperativoARS + costs.provisionsARS;
-    const totalRows = costs.directRows + costs.indirectRows + costs.provisionsRows;
+    // Provisiones se inicializan a 0, serán actualizadas por updateProvisionsInFactCostMonth()
+    const totalRows = costs.directRows + costs.indirectRows;
     
     await db.insert(factCostMonth)
       .values({
@@ -684,14 +596,14 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         directARS: costs.directARS.toString(),
         indirectUSD: costs.indirectUSD.toString(),
         indirectARS: costs.indirectARS.toString(),
-        provisionsUSD: costs.provisionsUSD.toString(),
-        provisionsARS: costs.provisionsARS.toString(),
-        amountUSD: totalContableUSD.toString(),
-        amountARS: totalContableARS.toString(),
+        provisionsUSD: '0', // Provisiones vienen del módulo dedicado
+        provisionsARS: '0',
+        amountUSD: totalOperativoUSD.toString(), // Se actualizará con provisiones después
+        amountARS: totalOperativoARS.toString(),
         sourceRowsCount: totalRows,
         directRowsCount: costs.directRows,
         indirectRowsCount: costs.indirectRows,
-        provisionsRowsCount: costs.provisionsRows
+        provisionsRowsCount: 0
       })
       .onConflictDoUpdate({
         target: [factCostMonth.periodKey],
@@ -700,22 +612,21 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
           directARS: costs.directARS.toString(),
           indirectUSD: costs.indirectUSD.toString(),
           indirectARS: costs.indirectARS.toString(),
-          provisionsUSD: costs.provisionsUSD.toString(),
-          provisionsARS: costs.provisionsARS.toString(),
-          amountUSD: totalContableUSD.toString(),
-          amountARS: totalContableARS.toString(),
+          // NO sobrescribir provisiones aquí - vienen del módulo dedicado
+          amountUSD: totalOperativoUSD.toString(),
+          amountARS: totalOperativoARS.toString(),
           sourceRowsCount: totalRows,
           directRowsCount: costs.directRows,
           indirectRowsCount: costs.indirectRows,
-          provisionsRowsCount: costs.provisionsRows,
           etlTimestamp: sql`now()`
         }
       });
     
-    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos Ope=$${costs.indirectUSD.toFixed(2)}, Provisiones=$${costs.provisionsUSD.toFixed(2)} USD`);
+    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos=$${costs.indirectUSD.toFixed(2)} USD (provisiones se agregan después)`);
   }
   
-  console.log(`✅ [SoT ETL] Costos separados: ${processedDirect} directos, ${processedIndirect} indirectos operativos, ${processedProvisions} provisiones`);
+  console.log(`✅ [SoT ETL] Costos operativos: ${processedDirect} directos, ${processedIndirect} indirectos`);
+  console.log(`   ℹ️ Las provisiones se actualizarán con updateProvisionsInFactCostMonth()`);
 }
 
 // ==================== PROVISIONES DESDE HOJAS ADICIONALES ====================
@@ -1286,10 +1197,18 @@ export async function executeSoTETL(
     // Incluye Equipo, Coordinación, QA, Admin, etc. - Match 1:1 con Columna R del Excel
     await processCostsByPeriod(filteredCostos); // ← CAMBIADO: pasar filteredCostos (todos) en vez de filteredCostosDirectos
     
-    // 1c. Procesar hojas adicionales de provisiones (Provisión pasivo proyectos, Impuestos, Pasivo)
-    // Agrega Pepsico, Warner, Impuestos USA, IVA, etc. al bucket de provisiones
-    const provisionResult = await processProvisionSheets();
-    console.log(`📊 [SoT ETL] Provisiones adicionales: ${provisionResult.provisionsProcessed} items, $${provisionResult.provisionsTotal.toFixed(2)} USD`);
+    // 1c. Procesar provisiones SOLO desde hojas dedicadas (Pasivo, Provisión pasivo proyectos)
+    // IMPORTANTE: Ya NO se detectan por patrones de texto - solo nombres exactos:
+    // - PROVISIÓN PEPSICO
+    // - PROVISIÓN WARNER
+    // - PROVISIÓN IMPUESTOS USA
+    await updateProvisionsinFactCostMonth();
+    
+    // Log summary de provisiones por período
+    const provisionSummary = await getProvisionSummaryByPeriod();
+    for (const [period, summary] of provisionSummary) {
+      console.log(`📊 [Provisiones] ${period}: Pepsico=$${summary.pepsico.toFixed(2)}, Warner=$${summary.warner.toFixed(2)}, Impuestos USA=$${summary.impuestosUsa.toFixed(2)}, TOTAL=$${summary.total.toFixed(2)}`);
+    }
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);
