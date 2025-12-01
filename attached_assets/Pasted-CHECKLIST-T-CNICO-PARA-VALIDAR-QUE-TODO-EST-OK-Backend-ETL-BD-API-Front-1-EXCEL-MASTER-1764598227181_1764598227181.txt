@@ -1,0 +1,388 @@
+CHECKLIST TÉCNICO PARA VALIDAR QUE TODO ESTÁ OK
+
+(Backend + ETL + BD + API + Front)
+
+1. EXCEL MASTER → ETL
+1.1. Validar estructura esperada (nombres de pestañas)
+
+Debe contener exactamente:
+
+Resumen Ejecutivo
+
+Activo
+
+Pasivo
+
+CashFlow
+
+Seguimiento Mark Up General
+
+Costos directos e indirectos
+
+Info Tipo de Cambio y REM
+
+Provisión pasivo proyectos
+
+Impuestos
+
+Si una pestaña cambia nombre → se rompe el ETL.
+
+Check: confirmar en logs del ETL:
+
+Loaded sheet: Resumen Ejecutivo ✓
+Loaded sheet: Activo ✓
+Loaded sheet: Pasivo ✓
+...
+
+1.2. Validar columnas mínimas esperadas por cada pestaña
+
+(Estas deben estar SIEMPRE)
+
+Costos directos e indirectos
+
+Proyecto
+
+Persona
+
+Mes
+
+Horas
+
+Tipo de costo (Directo / Indirecto)
+
+Monto USD
+
+Seguimiento Mark Up General
+
+Mes
+
+Proyecto
+
+Facturado USD
+
+Costos Directos USD
+
+Costos Indirectos USD
+
+Horas
+
+Estado (Abierto / Cerrado)
+
+Cash Flow
+
+Mes
+
+Ingreso USD
+
+Egreso USD
+
+CashFlow USD
+
+Resumen Ejecutivo
+
+Mes
+
+Facturado Total
+
+Costos Totales
+
+EBIT Contable
+
+Burn Rate
+
+Balance Neto
+
+Check: correr ETL con flag de validación:
+
+Missing column: <…> ❌
+All required columns found ✓
+
+1.3. Validar conversión ARS → USD
+
+Debe usarse UN SOLO tipo de cambio:
+
+Tipo de cambio del mes (Info Tipo de Cambio y REM)
+
+Check:
+ETL debe imprimir:
+
+Exchange rate (ARS→USD) for 2025-10: 1450 ✓
+
+
+Si no aparece: error.
+
+1.4. Validar devengado calculado correctamente
+
+Devengado del mes debe salir de:
+
+devengado = Σ (horas_mes_proyecto × rate_persona)
+
+
+NO usar facturado.
+
+Check:
+
+Devengado for 2025-10 = 42100 ✓
+
+1.5. Validar persistencia en BD
+
+Cada corrida debe escribir una fila en:
+
+fact_operational_month
+
+fact_financial_month
+
+fact_costs_month
+
+fact_hours_month
+
+Check: verificar logs:
+
+Upsert fact_operational_month (2025-10) ✓
+Upsert fact_financial_month (2025-10) ✓
+Upsert fact_costs_month (2025-10) ✓
+Upsert fact_hours_month (2025-10) ✓
+
+2. BASE DE DATOS
+2.1. Validar que existen las tablas requeridas
+
+Debe existir:
+
+fact_operational_month
+fact_financial_month
+fact_costs_month
+fact_hours_month
+projects
+users
+
+
+Check SQL:
+
+SELECT table_name FROM information_schema.tables WHERE table_schema='public';
+
+2.2. Validar esquema mínimo de cada tabla
+
+fact_operational_month
+
+period_key (YYYY-MM)
+
+devengado_usd
+
+ebit_operativo_usd
+
+markup
+
+tarifa_efectiva
+
+horas_facturables
+
+horas_totales
+
+fact_financial_month
+
+period_key
+
+facturado_usd
+
+ebit_contable_usd
+
+burn_rate_usd
+
+fact_costs_month
+
+period_key
+
+costos_directos_usd
+
+costos_indirectos_usd
+
+total_costos_usd
+
+fact_hours_month
+
+period_key
+
+horas_facturables
+
+horas_no_facturables
+
+horas_totales
+
+Check:
+
+SELECT * FROM fact_operational_month LIMIT 1;
+
+
+Debe mostrar valores reales, no nulls.
+
+2.3. Validar unicidad por periodo
+
+Cada tabla debe tener 1 solo registro por mes.
+
+Check:
+
+SELECT period_key, COUNT(*) 
+FROM fact_operational_month 
+GROUP BY period_key;
+
+
+Si da >1 → error.
+
+3. API (BACKEND)
+3.1. Validar endpoint principal del dashboard
+
+Debe existir:
+
+GET /api/dashboard?period=2025-10&mode=operativo
+GET /api/dashboard?period=2025-10&mode=financiero
+
+
+Check:
+
+{
+  "period": "2025-10",
+  "operativo": {
+     "devengado": 42100,
+     "ebit_operativo": 24700,
+     ...
+  }
+}
+
+3.2. Validar que el filtro cambia correctamente
+
+Test:
+
+/api/dashboard?period=2025-09
+/api/dashboard?period=2025-08
+
+
+Debe devolver valores distintos por mes.
+
+Si siempre devuelve 0 o los mismos valores → error en el ETL.
+
+3.3. Validar rendimiento (sin recálculos innecesarios)
+
+Tu backend debe:
+
+Leer solo las tablas "fact_..."
+
+NO recalcular costos ni devengado al vuelo
+
+NO leer 2000 filas de Excel cuando la app carga
+
+Check manual en logs:
+
+SELECT * FROM fact_operational_month WHERE period_key='2025-10';
+
+
+Debe tardar <5ms.
+
+4. FRONTEND
+4.1. Validar que el selector de periodo envía el valor correcto
+
+Con debug:
+
+console.log("Selected period:", selectedPeriod);
+
+
+Debe imprimir 2025-10 cuando cambiás Octubre.
+
+4.2. Validar que las tarjetas muestran el campo correcto
+
+Comparación:
+
+Card	API Source
+Devengado	operativo.devengado
+EBIT Operativo	operativo.ebit_operativo
+Tarifa Efectiva	operativo.tarifa_efectiva
+Markup	operativo.markup
+% Horas Facturables	operativo.porcentaje_horas_facturables
+Facturado (Financiero)	financiero.facturado
+EBIT Contable	financiero.ebit_contable
+Burn Rate	financiero.burn_rate
+
+Check: prueba con valores falsos:
+cambiar un valor en BD y ver si refleja en UI.
+
+4.3. Validar formato de números
+
+USD: $42.1k
+
+Horas: 1659h
+
+Porcentaje: 59%
+
+Tooltip correcto en íconos “(i)”
+
+Check: 1 decimal SIEMPRE para k-format.
+
+4.4. Validar UI responsiva
+
+Desktop > 1200 px
+
+Laptop 1024 px
+
+Tablet 768 px
+
+Cards deben acomodarse sin saltos raros.
+
+5. COHERENCIA ENTRE VISTAS (Operativo vs Financiero)
+5.1. Facturado ≠ Devengado
+
+Validar que son distintos SI hay anticipos.
+
+5.2. EBIT Operativo ≠ EBIT Contable
+
+Solo deberían coincidir por casualidad.
+
+EBIT operativo = Devengado – Directos
+EBIT contable = Facturado – Costos contables
+
+5.3. Burn rate debe salir SIEMPRE de
+directos_usd + overhead_usd
+
+
+Confirmar que NO toma costos contables.
+
+6. TESTS CRÍTICOS (LOS 4 TESTS QUE CONFIRMAN TODO)
+Test 1 — Mes con anticipo
+
+Octubre 2025:
+
+Facturado: 81.8k
+
+Devengado: 42.1k
+
+Si la app muestra esto → ✔ backend OK.
+
+Test 2 — Mes sin actividad
+
+Diciembre 2025 (ejemplo):
+
+Debe mostrar 0 en todo, sin explotar.
+
+Test 3 — Cambio de periodo en UI
+
+Cambiar de Octubre → Septiembre → Agosto
+Los números deben cambiar.
+
+Test 4 — Reprocesar ETL
+
+Subir nuevo Excel y correr ETL.
+
+Debe actualizar:
+
+facturado
+
+devengado
+
+directos
+
+indirectos
+
+horas
+
+burn rate
+sin borrar otros meses.
+
+Si este checklist pasa, tu pipeline está PERFECTO.
