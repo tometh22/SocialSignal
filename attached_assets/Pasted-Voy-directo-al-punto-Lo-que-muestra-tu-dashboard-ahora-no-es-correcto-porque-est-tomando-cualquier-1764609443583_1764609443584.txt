@@ -1,0 +1,155 @@
+Voy directo al punto. Lo que muestra tu dashboard ahora no es correcto porque está tomando cualquier cosa parecida a “provisión” y sumándola como si fuera una provisión contable real.
+El resultado: $146.1k en provisiones, que es imposible y no coincide con los datos del Excel que me pasaste.
+
+Aclaración clave:
+En tu archivo real de octubre las provisiones correctas son solo estas:
+
+Provisión Pepsico → USD 13.413
+
+Provisión Warner → USD 14.493
+
+Provisión Impuestos USA → USD 25.287
+
+Total correcto de provisiones octubre:
+13.413 + 14.493 + 25.287 = 53.193 USD
+(no 146.000)
+
+Por qué tu app te da 146.1k USD
+
+Porque tu ETL está haciendo esto:
+
+Busca cualquier fila cuyo texto contenga "prov", "provi", "provis" o similar
+
+Sumando filas que no son provisiones, por ejemplo:
+
+IVA pagado
+
+IVA por pagar
+
+Costos contables con la palabra "prov" en el nombre del proveedor
+
+Line items donde la descripción del proveedor trae texto como “PRO” o “PROYECTO”
+
+Filas de costos directos con nombres de facturas que incluyen códigos “PRO-322/”… etc.
+
+Esto infla artificialmente el valor y lo vuelve inutilizable.
+
+La corrección precisa (no falla nunca)
+
+Tienes que extraer las provisiones solo desde las pestañas válidas del Excel Máster:
+
+Fuente correcta de provisiones
+
+Son estas dos hojas:
+
+Hoja “Pasivo”
+
+PROVISIÓN IMPUESTOS USA
+
+PROVISIÓN WARNER
+
+PROVISIÓN PEPSICO
+
+Hoja “Provisión pasivo proyectos”
+
+Si aplica otros meses.
+
+Campos que debes leer (y solo esos)
+
+Dentro de esas hojas debes leer:
+
+Nombre (Provisión Pepsico, Provisión Warner, Provisión Impuestos USA)
+
+Monto USD real
+
+Mes de imputación
+
+Nada más.
+Cualquier otra cosa que parezca provisión pero no esté en estas hojas debe ser ignorada.
+
+Valor correcto para octubre
+
+Tomando lo que enviaste arriba:
+
+Provisión Pepsico → $13.413
+
+Provisión Warner → $14.493
+
+Impuestos USA (provisión contable) → $25.287
+
+Total 53.193 USD
+
+Esto es lo que debe mostrar el dashboard financiero.
+
+Qué hacer ahora (exacto)
+
+Necesito darte un instructivo limpio para Replit Agent para que lo arregle.
+Copiá y pegá este bloque textual:
+
+INSTRUCCIONES PARA REPLIT AGENT (copiar y pegar tal cual)
+REFACTORIZAR LÓGICA DE PROVISIONES (FINANCIERO)
+
+1. En el ETL eliminar completamente el patrón que detecta provisiones por texto 
+   (regex como "prov", "provi", "provis", etc.). No debe quedar ninguna referencia 
+   a detección por nombre del ítem.
+
+2. Crear módulo dedicado: etl/provisions.ts.
+
+3. Fuente de provisiones:
+   - Hoja "Pasivo"
+   - Hoja "Provisión pasivo proyectos"
+
+4. Extraer solo estas filas en "Pasivo":
+   - PROVISIÓN IMPUESTOS USA
+   - PROVISIÓN WARNER
+   - PROVISIÓN PEPSICO
+
+   Campos:
+   - nombre (columna A o primera columna)
+   - monto en USD (columna que contenga USD)
+   - periodo (mes/año, usar fecha del archivo)
+
+   Regla: si no coincide exactamente con estos nombres, ignorar la fila.
+
+5. Extraer de "Provisión pasivo proyectos" si existe monto USD para el mes seleccionado.
+
+6. Calcular:
+   totalProvisionesUsd = suma de:
+      provisión impuestos usa + provisión warner + provisión pepsico + provisiones de proyectos
+
+7. En la API:
+   response.financial.provisionsUsd = totalProvisionesUsd
+
+8. En el frontend:
+   Solo la pestaña FINANCIERO debe usar provisionsUsd.
+   La pestaña OPERATIVA nunca debe mostrar ni usar provisiones.
+
+9. Ejecutar ETL de nuevo y validar que para octubre 2025 el total de provisiones sea:
+   53.193 USD (13.413 + 14.493 + 25.287).
+
+Cómo debería quedar tu dashboard ahora
+Pestaña Operativa:
+
+Directos operativos: $16.7k
+
+Overhead operativo: $0 (correcto)
+
+Devengado: $42.1k
+
+EBIT Operativo: $25.3k
+
+Todo perfecto y coherente.
+
+Pestaña Financiera:
+
+Facturado octubre: $81.8k
+
+Directos contables: $16.7k
+
+Overhead contable: $46.9k
+
+Provisiones contables: $53.193
+
+Burn Rate: directos + overhead + provisiones = ~$116k
+
+No $162k y no $146k de provisiones.
