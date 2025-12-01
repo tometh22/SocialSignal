@@ -496,32 +496,64 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 
 /**
  * ETL: Costos directos e indirectos → fact_cost_month
- * Separa en 2 buckets SOLAMENTE (las provisiones vienen de otro módulo):
+ * Separa en 3 buckets:
  * - DIRECTOS: Tipo = "Directo" (costos de equipo operativos)
- * - INDIRECTOS: Tipo = "Indirecto" (overhead operativo)
+ * - INDIRECTOS OPERATIVOS: Tipo = "Indirecto" SIN conceptos de provisión
+ * - INDIRECTOS PROVISIÓN: Tipo = "Indirecto" CON conceptos de provisión (se excluyen de operativo)
  * 
- * NOTA: Las PROVISIONES se extraen del módulo dedicado etl/provisions.ts
- * que lee de las hojas "Pasivo" y "Provisión pasivo proyectos" del Excel MAESTRO.
- * Aquí se inicializan a 0 y se actualizan después con updateProvisionsInFactCostMonth().
+ * NOTA: Las PROVISIONES principales se extraen del módulo etl/provisions.ts.
+ * Aquí solo EXCLUIMOS filas con conceptos de provisión del bucket de indirectos operativos
+ * para evitar doble conteo.
  */
+
+// Patrones que indican una provisión en CDI (deben excluirse de indirect_operational)
+const PROVISION_PATTERNS_CDI = [
+  'provision', 'provisión',
+  'pepsico', 'warner',
+  'impuestos usa', 'impuesto usa', 'tax usa',
+  'iva ventas', 'iva compras',
+  'ajuste contable', 'ajuste provision'
+];
+
+function isProvisionConceptCDI(row: CostoDirectoRow): boolean {
+  // Revisar múltiples campos para detectar conceptos de provisión
+  const fieldsToCheck = [
+    row['Detalle'],
+    row['Subtipo'],
+    row['Concepto'],
+    row['Cuenta'],
+    row['Proyecto'],
+    row['Cliente']
+  ].filter(Boolean);
+  
+  const combined = fieldsToCheck.join(' ').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  return PROVISION_PATTERNS_CDI.some(pattern => combined.includes(pattern));
+}
+
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
-  console.log(`   ℹ️ NOTA: Las provisiones se extraen de hojas separadas (Pasivo, Provisión pasivo proyectos)`);
+  console.log(`   ℹ️ NUEVA LÓGICA: Separando indirectos operativos de provisiones para evitar doble conteo`);
   
   const { factCostMonth } = await import('@shared/schema');
   
-  // 2 buckets: DIRECTOS, INDIRECTOS (provisiones vienen de módulo separado)
+  // 3 buckets: DIRECTOS, INDIRECTOS OPERATIVOS, INDIRECTOS PROVISIÓN (excluidos)
   const periodCosts = new Map<string, {
     directUSD: number;
     directARS: number;
-    indirectUSD: number;
-    indirectARS: number;
+    indirectOperationalUSD: number;
+    indirectOperationalARS: number;
+    indirectProvisionUSD: number; // Excluido del total operativo
+    indirectProvisionARS: number;
     directRows: number;
-    indirectRows: number;
+    indirectOperationalRows: number;
+    indirectProvisionRows: number;
   }>();
   
   let processedDirect = 0;
-  let processedIndirect = 0;
+  let processedIndirectOp = 0;
+  let processedIndirectProv = 0;
   let skipped = 0;
   
   for (const row of rows) {
@@ -549,24 +581,35 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
       if (!periodCosts.has(periodKey)) {
         periodCosts.set(periodKey, {
           directUSD: 0, directARS: 0,
-          indirectUSD: 0, indirectARS: 0,
-          directRows: 0, indirectRows: 0
+          indirectOperationalUSD: 0, indirectOperationalARS: 0,
+          indirectProvisionUSD: 0, indirectProvisionARS: 0,
+          directRows: 0, indirectOperationalRows: 0, indirectProvisionRows: 0
         });
       }
       
       const acc = periodCosts.get(periodKey)!;
       
-      // Solo clasificar por tipo de costo (directo vs indirecto)
       if (isDirect) {
         acc.directUSD += montoUSD;
         acc.directARS += montoARS;
         acc.directRows++;
         processedDirect++;
       } else if (isIndirect) {
-        acc.indirectUSD += montoUSD;
-        acc.indirectARS += montoARS;
-        acc.indirectRows++;
-        processedIndirect++;
+        // Nueva lógica: separar provisiones de indirectos operativos
+        if (isProvisionConceptCDI(row)) {
+          // Provisión detectada en CDI - EXCLUIR del bucket operativo
+          acc.indirectProvisionUSD += montoUSD;
+          acc.indirectProvisionARS += montoARS;
+          acc.indirectProvisionRows++;
+          processedIndirectProv++;
+          console.log(`   🏷️ [CDI] Provisión detectada en ${periodKey}: ${row['Detalle'] || row['Subtipo']} = $${montoUSD.toFixed(2)}`);
+        } else {
+          // Overhead operativo real
+          acc.indirectOperationalUSD += montoUSD;
+          acc.indirectOperationalARS += montoARS;
+          acc.indirectOperationalRows++;
+          processedIndirectOp++;
+        }
       } else {
         skipped++;
       }
@@ -578,31 +621,32 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
   }
   
   console.log(`💾 [SoT ETL] Guardando ${periodCosts.size} períodos en fact_cost_month...`);
-  console.log(`   📊 Directos: ${processedDirect} | Indirectos: ${processedIndirect} | Saltados: ${skipped}`);
+  console.log(`   📊 Directos: ${processedDirect} | Indirectos Operativos: ${processedIndirectOp} | Indirectos Provisión (excluidos): ${processedIndirectProv} | Saltados: ${skipped}`);
   
   for (const [periodKey, costs] of periodCosts) {
     await ensurePeriod(periodKey);
     
-    // Total OPERATIVO (solo directos + indirectos, SIN provisiones)
-    const totalOperativoUSD = costs.directUSD + costs.indirectUSD;
-    const totalOperativoARS = costs.directARS + costs.indirectARS;
-    // Provisiones se inicializan a 0, serán actualizadas por updateProvisionsInFactCostMonth()
-    const totalRows = costs.directRows + costs.indirectRows;
+    // indirect_usd AHORA es solo indirectos operativos (SIN provisiones)
+    // Las provisiones detectadas en CDI se guardan pero NO se suman al total operativo
+    const totalOperativoUSD = costs.directUSD + costs.indirectOperationalUSD;
+    const totalOperativoARS = costs.directARS + costs.indirectOperationalARS;
+    const totalRows = costs.directRows + costs.indirectOperationalRows + costs.indirectProvisionRows;
     
     await db.insert(factCostMonth)
       .values({
         periodKey,
         directUSD: costs.directUSD.toString(),
         directARS: costs.directARS.toString(),
-        indirectUSD: costs.indirectUSD.toString(),
-        indirectARS: costs.indirectARS.toString(),
+        // IMPORTANTE: indirect_usd ahora es SOLO operativo (sin provisiones)
+        indirectUSD: costs.indirectOperationalUSD.toString(),
+        indirectARS: costs.indirectOperationalARS.toString(),
         provisionsUSD: '0', // Provisiones vienen del módulo dedicado
         provisionsARS: '0',
-        amountUSD: totalOperativoUSD.toString(), // Se actualizará con provisiones después
+        amountUSD: totalOperativoUSD.toString(),
         amountARS: totalOperativoARS.toString(),
         sourceRowsCount: totalRows,
         directRowsCount: costs.directRows,
-        indirectRowsCount: costs.indirectRows,
+        indirectRowsCount: costs.indirectOperationalRows,
         provisionsRowsCount: 0
       })
       .onConflictDoUpdate({
@@ -610,23 +654,28 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         set: {
           directUSD: costs.directUSD.toString(),
           directARS: costs.directARS.toString(),
-          indirectUSD: costs.indirectUSD.toString(),
-          indirectARS: costs.indirectARS.toString(),
-          // NO sobrescribir provisiones aquí - vienen del módulo dedicado
+          indirectUSD: costs.indirectOperationalUSD.toString(),
+          indirectARS: costs.indirectOperationalARS.toString(),
           amountUSD: totalOperativoUSD.toString(),
           amountARS: totalOperativoARS.toString(),
           sourceRowsCount: totalRows,
           directRowsCount: costs.directRows,
-          indirectRowsCount: costs.indirectRows,
+          indirectRowsCount: costs.indirectOperationalRows,
           etlTimestamp: sql`now()`
         }
       });
     
-    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos=$${costs.indirectUSD.toFixed(2)} USD (provisiones se agregan después)`);
+    // Log detallado para verificación
+    const indirectExcluded = costs.indirectProvisionUSD;
+    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, IndirectosOp=$${costs.indirectOperationalUSD.toFixed(2)} USD`);
+    if (indirectExcluded > 0) {
+      console.log(`     📋 Provisiones detectadas en CDI (excluidas): $${indirectExcluded.toFixed(2)} USD (${costs.indirectProvisionRows} filas)`);
+    }
   }
   
-  console.log(`✅ [SoT ETL] Costos operativos: ${processedDirect} directos, ${processedIndirect} indirectos`);
-  console.log(`   ℹ️ Las provisiones se actualizarán con updateProvisionsInFactCostMonth()`);
+  console.log(`✅ [SoT ETL] Costos procesados: ${processedDirect} directos, ${processedIndirectOp} indirectos operativos`);
+  console.log(`   🏷️ Provisiones en CDI excluidas: ${processedIndirectProv} filas`);
+  console.log(`   ℹ️ Las provisiones finales se actualizarán con updateProvisionsInFactCostMonth()`);
 }
 
 // ==================== PROVISIONES DESDE HOJAS ADICIONALES ====================
