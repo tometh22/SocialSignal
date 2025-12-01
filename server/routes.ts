@@ -5303,7 +5303,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // ===== EBIT CONTABLE (administrative definition) =====
       // EBIT Contable = Facturado - Costos Totales CONTABLES (directos + indirectos + provisiones)
-      const ebitContableUsd = incomeUsd - totalContableUsd;
+      // Use Excel MAESTRO facturado when available for consistency with displayed values
+      const facturadoForEbit = hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd;
+      const ebitContableUsd = facturadoForEbit - totalContableUsd;
       
       // ===== MARGEN CONTABLE (same as EBIT Contable for legacy compatibility) =====
       const marginContableUsd = ebitContableUsd;
@@ -5355,9 +5357,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // EBIT Operativo uses devengado as base (operational view)
       const ebitOperativoPct = devengadoUsd > 0 ? (ebitOperativoUsd / devengadoUsd) * 100 : 0;
       // EBIT Contable uses facturado as base (financial/accounting view)
-      const ebitContablePct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0;
-      const marginContablePct = incomeUsd > 0 ? (marginContableUsd / incomeUsd) * 100 : 0;
-      const margenAdminPct = incomeUsd > 0 ? (ebitContableUsd / incomeUsd) * 100 : 0; // Same as ebitContablePct
+      const ebitContablePct = facturadoForEbit > 0 ? (ebitContableUsd / facturadoForEbit) * 100 : 0;
+      const marginContablePct = facturadoForEbit > 0 ? (marginContableUsd / facturadoForEbit) * 100 : 0;
+      const margenAdminPct = facturadoForEbit > 0 ? (ebitContableUsd / facturadoForEbit) * 100 : 0; // Same as ebitContablePct
       // Markup Operativo = Devengado / Costos Directos (operational markup)
       const markupOperativoUsd = directCostsUsd > 0 ? (devengadoUsd / directCostsUsd) : 0;
       
@@ -5370,7 +5372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ===== VERIFICATION LOGS =====
       console.log(`📊 DASHBOARD VERIFICATION [${lastPeriodKey}]:`);
       console.log(`   💵 FINANCIERO (Contable):`);
-      console.log(`      Facturado: USD ${incomeUsd.toFixed(2)}`);
+      console.log(`      Facturado: USD ${facturadoForEbit.toFixed(2)}${hasExcelMaestroData ? ' (Excel MAESTRO)' : ' (DB)'}`);
       console.log(`      EBIT Contable (Facturado - Total Contable): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
       console.log(`      Burn Rate (Total Contable): USD ${burnRateUsd.toFixed(2)}`);
       console.log(`      Cash Flow: In=$${cashFlowInUsd.toFixed(2)}, Out=$${cashFlowOutUsd.toFixed(2)}, Net=$${cashFlowOperativoUsd.toFixed(2)}`);
@@ -5565,12 +5567,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           indirectCostsUsd: indirectCostsUsd,    // Alias para compatibilidad
           provisionsUsd: provisionsUsd,          // Provisiones contables separadas
           impuestosUsaUsd: impuestosUsaUsd,      // Impuestos USA (parte del overhead contable)
-          ebitAccountingUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd,
-          ebitAccountingPct: hasExcelMaestroData 
-            ? (excelMaestroSummary.facturacionTotal > 0 
-                ? (excelMaestroSummary.ebitOperativo / excelMaestroSummary.facturacionTotal) * 100 
-                : 0)
-            : ebitContablePct,
+          // EBIT Contable = Facturado - Total Contable (Direct + Indirect + Provisions)
+          // Always use calculated value for accounting consistency
+          ebitAccountingUsd: ebitContableUsd,
+          ebitAccountingPct: ebitContablePct,
           burnRateUsd: burnRateUsd,
           beneficioNetoUsd: hasExcelMaestroData ? excelMaestroSummary.beneficioNeto : beneficioNetoUsd,
           
