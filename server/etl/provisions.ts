@@ -91,7 +91,7 @@ export interface ProcessedProvision {
   concept: string;
   type: 'pepsico' | 'warner' | 'impuestos_usa' | 'otros';
   amountUsd: number;
-  source: 'pasivo' | 'provision_cliente' | 'impuestos';
+  source: 'pasivo' | 'provision_cliente' | 'impuestos' | 'resumen_ejecutivo' | 'cuentas_cobrar';
 }
 
 // Estructura para resumen por período
@@ -106,45 +106,73 @@ export interface ProvisionSummary {
 }
 
 /**
- * Obtener provisiones válidas de las hojas del Excel MAESTRO
- * SOLO extrae: PROVISIÓN PEPSICO, PROVISIÓN WARNER, PROVISIÓN IMPUESTOS USA
+ * Obtener provisiones válidas de TODAS las fuentes del Excel MAESTRO
+ * 
+ * FUENTES DE PROVISIONES:
+ * 1. "Provisión Pasivo Proyectos" - Provisiones de clientes (PepsiCo, ajustes Warner)
+ * 2. "Resumen Ejecutivo" - PROVISIÓN IMPUESTO USA
+ * 3. "Cuentas a Cobrar (contable)" - Facturas futuras = provisiones de ingresos anticipados (Warner)
+ * 4. "Pasivo" - Otras provisiones contables
+ * 5. "Impuestos" - Impuestos varios (no USA)
  */
-export async function getValidProvisions(): Promise<ProcessedProvision[]> {
+export async function getValidProvisions(targetPeriod?: string): Promise<ProcessedProvision[]> {
   console.log('📊 [Provisiones] Extrayendo provisiones válidas del Excel MAESTRO...');
+  console.log('📊 [Provisiones] FUENTES: Provisión Pasivo Proyectos, Resumen Ejecutivo, Cuentas a Cobrar, Pasivo, Impuestos');
   
   const result: ProcessedProvision[] = [];
   
+  // Período target para cuentas a cobrar (facturas futuras)
+  const now = new Date();
+  const period = targetPeriod || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
   try {
-    // Obtener datos de las hojas relevantes (incluye "Impuestos" para Impuestos USA)
-    const [pasivoData, provisionProyectosData, impuestosData] = await Promise.all([
+    // Obtener datos de TODAS las hojas relevantes en paralelo
+    const [
+      pasivoData, 
+      provisionProyectosData, 
+      impuestosData,
+      impuestosUsaData,
+      warnerProvisionData
+    ] = await Promise.all([
       googleSheetsWorkingService.getPasivo(),
       googleSheetsWorkingService.getProvisionPasivoProyectos(),
-      googleSheetsWorkingService.getImpuestos()
+      googleSheetsWorkingService.getImpuestos(),
+      googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo(),
+      googleSheetsWorkingService.getWarnerProvisionFromCuentasCobrar(period)
     ]);
     
     console.log(`📊 [Provisiones] Hoja Pasivo: ${pasivoData.length} registros`);
     console.log(`📊 [Provisiones] Hoja Provisión Pasivo Proyectos: ${provisionProyectosData.length} registros`);
     console.log(`📊 [Provisiones] Hoja Impuestos: ${impuestosData.length} registros`);
+    console.log(`📊 [Provisiones] Resumen Ejecutivo (Impuestos USA): ${impuestosUsaData.length} registros`);
+    console.log(`📊 [Provisiones] Cuentas a Cobrar (Warner facturas futuras): ${warnerProvisionData.length} registros`);
     
-    // Procesar hoja "Pasivo"
-    for (const row of pasivoData) {
-      console.log(`  🔍 [Pasivo] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
-      if (isValidProvision(row.concept)) {
-        const type = detectProvisionType(row.concept);
-        result.push({
-          periodKey: row.periodKey,
-          concept: row.concept,
-          type,
-          amountUsd: row.amountUsd,
-          source: 'pasivo'
-        });
-        console.log(`  ✅ [Pasivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
-      }
+    // 1. PRIORITARIO: Impuestos USA desde Resumen Ejecutivo
+    for (const row of impuestosUsaData) {
+      result.push({
+        periodKey: row.periodKey,
+        concept: row.concept,
+        type: 'impuestos_usa',
+        amountUsd: row.amountUsd,
+        source: 'resumen_ejecutivo'
+      });
+      console.log(`  ✅ [Resumen Ejecutivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (impuestos_usa)`);
     }
     
-    // Procesar hoja "Provisión pasivo proyectos"
+    // 2. PRIORITARIO: Warner provisiones desde Cuentas a Cobrar (facturas futuras)
+    for (const row of warnerProvisionData) {
+      result.push({
+        periodKey: row.periodKey,
+        concept: row.concept,
+        type: row.provisionKind === 'warner' ? 'warner' : 'otros',
+        amountUsd: row.amountUsd,
+        source: 'cuentas_cobrar'
+      });
+      console.log(`  ✅ [Cuentas a Cobrar] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${row.provisionKind})`);
+    }
+    
+    // 3. Procesar hoja "Provisión pasivo proyectos" (ajustes y PepsiCo)
     for (const row of provisionProyectosData) {
-      // Debug: mostrar todos los conceptos leídos con rawValue para debugging
       console.log(`  🔍 [Provisión Proyectos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
       
       if (isValidProvision(row.concept)) {
@@ -162,11 +190,27 @@ export async function getValidProvisions(): Promise<ProcessedProvision[]> {
       }
     }
     
-    // Procesar hoja "Impuestos" - buscar específicamente "Impuestos USA"
-    for (const row of impuestosData) {
-      console.log(`  🔍 [Impuestos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
-      
+    // 4. Procesar hoja "Pasivo"
+    for (const row of pasivoData) {
+      console.log(`  🔍 [Pasivo] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
       if (isValidProvision(row.concept)) {
+        const type = detectProvisionType(row.concept);
+        result.push({
+          periodKey: row.periodKey,
+          concept: row.concept,
+          type,
+          amountUsd: row.amountUsd,
+          source: 'pasivo'
+        });
+        console.log(`  ✅ [Pasivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
+      }
+    }
+    
+    // 5. Procesar hoja "Impuestos" - para otros impuestos (NO USA, viene de Resumen Ejecutivo)
+    for (const row of impuestosData) {
+      // Solo procesar si es un concepto válido de provisión que NO sea USA (ya viene de Resumen Ejecutivo)
+      const normalized = row.concept.toLowerCase();
+      if (isValidProvision(row.concept) && !normalized.includes('usa')) {
         const type = detectProvisionType(row.concept);
         result.push({
           periodKey: row.periodKey,
@@ -189,43 +233,77 @@ export async function getValidProvisions(): Promise<ProcessedProvision[]> {
 }
 
 /**
- * Obtener resumen de provisiones agrupadas por período
+ * Crear resumen de provisiones a partir de una lista
+ */
+function summarizeProvisions(provisions: ProcessedProvision[], periodKey: string): ProvisionSummary {
+  const summary: ProvisionSummary = {
+    periodKey,
+    pepsico: 0,
+    warner: 0,
+    impuestosUsa: 0,
+    otros: 0,
+    total: 0,
+    details: []
+  };
+  
+  for (const prov of provisions) {
+    // Solo contar provisiones que pertenecen a este período
+    if (prov.periodKey === periodKey) {
+      summary.details.push(prov);
+      
+      switch (prov.type) {
+        case 'pepsico':
+          summary.pepsico += prov.amountUsd;
+          break;
+        case 'warner':
+          summary.warner += prov.amountUsd;
+          break;
+        case 'impuestos_usa':
+          summary.impuestosUsa += prov.amountUsd;
+          break;
+        default:
+          summary.otros += prov.amountUsd;
+      }
+    }
+  }
+  
+  summary.total = summary.pepsico + summary.warner + summary.impuestosUsa + summary.otros;
+  return summary;
+}
+
+/**
+ * Obtener resumen de provisiones para un período específico
+ * IMPORTANTE: Calcula las provisiones PARA ese período (ej: facturas futuras desde la perspectiva de octubre)
+ */
+export async function getProvisionSummaryForPeriod(targetPeriod: string): Promise<ProvisionSummary> {
+  console.log(`📊 [Provisiones] Calculando provisiones para período ${targetPeriod}...`);
+  
+  const provisions = await getValidProvisions(targetPeriod);
+  const summary = summarizeProvisions(provisions, targetPeriod);
+  
+  console.log(`  📅 ${targetPeriod}:`);
+  console.log(`     Pepsico: USD ${summary.pepsico.toFixed(2)}`);
+  console.log(`     Warner: USD ${summary.warner.toFixed(2)}`);
+  console.log(`     Impuestos USA: USD ${summary.impuestosUsa.toFixed(2)}`);
+  console.log(`     TOTAL: USD ${summary.total.toFixed(2)}`);
+  
+  return summary;
+}
+
+/**
+ * Obtener resumen de provisiones agrupadas por período (para todos los períodos disponibles)
+ * @deprecated Usar getProvisionSummaryForPeriod para cálculos por período específico
  */
 export async function getProvisionSummaryByPeriod(): Promise<Map<string, ProvisionSummary>> {
   const provisions = await getValidProvisions();
   const summaryMap = new Map<string, ProvisionSummary>();
   
-  for (const prov of provisions) {
-    if (!summaryMap.has(prov.periodKey)) {
-      summaryMap.set(prov.periodKey, {
-        periodKey: prov.periodKey,
-        pepsico: 0,
-        warner: 0,
-        impuestosUsa: 0,
-        otros: 0,
-        total: 0,
-        details: []
-      });
-    }
-    
-    const summary = summaryMap.get(prov.periodKey)!;
-    summary.details.push(prov);
-    
-    switch (prov.type) {
-      case 'pepsico':
-        summary.pepsico += prov.amountUsd;
-        break;
-      case 'warner':
-        summary.warner += prov.amountUsd;
-        break;
-      case 'impuestos_usa':
-        summary.impuestosUsa += prov.amountUsd;
-        break;
-      default:
-        summary.otros += prov.amountUsd;
-    }
-    
-    summary.total = summary.pepsico + summary.warner + summary.impuestosUsa + summary.otros;
+  // Agrupar provisiones por período
+  const periodKeys = new Set(provisions.map(p => p.periodKey));
+  
+  for (const periodKey of periodKeys) {
+    const summary = summarizeProvisions(provisions, periodKey);
+    summaryMap.set(periodKey, summary);
   }
   
   // Log resumen por período
@@ -245,20 +323,26 @@ export async function getProvisionSummaryByPeriod(): Promise<Map<string, Provisi
  * Actualizar la tabla fact_cost_month con las provisiones correctas
  * REEMPLAZA los valores de provisiones existentes con los valores exactos
  * Y RECALCULA amountUSD/amountARS para incluir las provisiones en los totales financieros
+ * 
+ * IMPORTANTE: Calcula provisiones PARA CADA PERÍODO específico
+ * - Las provisiones de Warner (facturas futuras) se calculan desde la perspectiva de cada período
+ * - Esto asegura que octubre 2025 vea las facturas de diciembre como provisiones
  */
 export async function updateProvisionsinFactCostMonth(): Promise<void> {
   console.log('📊 [Provisiones] Actualizando provisiones en fact_cost_month...');
-  
-  const summaryMap = await getProvisionSummaryByPeriod();
+  console.log('📊 [Provisiones] NOTA: Calculando provisiones POR PERÍODO para capturar facturas futuras correctamente');
   
   // Obtener todos los registros existentes
   const allRecords = await db.select().from(factCostMonth);
   
   for (const record of allRecords) {
     const { periodKey } = record;
-    const provisionSummary = summaryMap.get(periodKey);
-    const provisionTotal = provisionSummary?.total || 0;
-    const provisionRowsCount = provisionSummary?.details.length || 0;
+    
+    // CRÍTICO: Calcular provisiones PARA ESTE PERÍODO específico
+    // Esto permite que las facturas futuras se vean como provisiones desde la perspectiva del período
+    const provisionSummary = await getProvisionSummaryForPeriod(periodKey);
+    const provisionTotal = provisionSummary.total;
+    const provisionRowsCount = provisionSummary.details.length;
     
     // Calcular totales: directos + indirectos + provisiones
     const directUSD = parseFloat(record.directUSD || '0');
@@ -284,6 +368,7 @@ export async function updateProvisionsinFactCostMonth(): Promise<void> {
       
       if (provisionTotal > 0) {
         console.log(`  ✅ ${periodKey}: Provisiones=$${provisionTotal.toFixed(2)}, Total=$${totalUSD.toFixed(2)} USD`);
+        console.log(`     Detalle: Pepsico=${provisionSummary.pepsico.toFixed(2)}, Warner=${provisionSummary.warner.toFixed(2)}, ImpUSA=${provisionSummary.impuestosUsa.toFixed(2)}`);
       } else {
         console.log(`  🔄 ${periodKey}: Sin provisiones, Total operativo=$${totalUSD.toFixed(2)} USD`);
       }

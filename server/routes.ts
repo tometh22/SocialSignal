@@ -14216,6 +14216,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Test provision extraction from Activo
+  app.get("/api/debug/provision-test", async (req, res) => {
+    try {
+      const period = req.query.period?.toString() || '2025-10';
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      console.log(`🧪 [Provision Test] Testing provision extraction for period: ${period}`);
+      const provisions = await googleSheetsWorkingService.getWarnerProvisionFromCuentasCobrar(period);
+      
+      res.json({
+        period,
+        provisionsCount: provisions.length,
+        provisions,
+        totalWarnerUsd: provisions
+          .filter(p => p.provisionKind === 'warner')
+          .reduce((sum, p) => sum + p.amountUsd, 0)
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // DEBUG: Verificar estructura de hoja Activo con montos de Warner
+  app.get("/api/debug/sheets-activo", async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      const sheets = googleSheetsWorkingService.createSheetsClientFromJSON();
+      
+      // Get raw data from "Activo" sheet
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: googleSheetsWorkingService.spreadsheetId,
+        range: "'Activo'!A:U",
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      const headers = rows[0] || [];
+      
+      // Find column indices
+      const clienteIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('cliente'));
+      const mesIdx = headers.findIndex((h: string) => h?.toLowerCase() === 'mes');
+      const anioIdx = headers.findIndex((h: string) => h?.toLowerCase() === 'año');
+      const cobradoIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('cobrado'));
+      const usdIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('usd'));
+      const arsIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('ars'));
+      const tipoIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('tipo'));
+      
+      // Find Warner unpaid invoices with amounts
+      const warnerUnpaid: any[] = [];
+      let totalWarnerUSD = 0;
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row) continue;
+        
+        const cliente = (row[clienteIdx] || '').toString().toLowerCase();
+        const tipo = (row[tipoIdx] || '').toString().toLowerCase();
+        const cobrado = (row[cobradoIdx] || '').toString().toLowerCase();
+        const mes = (row[mesIdx] || '').toString();
+        const anio = (row[anioIdx] || '').toString();
+        const usdRaw = row[usdIdx] || '';
+        const arsRaw = row[arsIdx] || '';
+        
+        if (cliente.includes('warner') && tipo.includes('cobrar') && cobrado === 'no') {
+          // Parse amount (European format: 14.493 = 14493)
+          const usd = parseFloat(usdRaw.toString().replace(/\./g, '').replace(',', '.')) || 0;
+          totalWarnerUSD += usd;
+          
+          warnerUnpaid.push({
+            rowIndex: i,
+            cliente: row[clienteIdx],
+            tipo: row[tipoIdx],
+            mes,
+            anio,
+            cobrado: row[cobradoIdx],
+            factura: row[9],
+            usdRaw,
+            usdParsed: usd,
+            arsRaw
+          });
+        }
+      }
+      
+      res.json({
+        headers,
+        columnIndices: { clienteIdx, mesIdx, anioIdx, cobradoIdx, usdIdx, arsIdx, tipoIdx },
+        warnerUnpaidCount: warnerUnpaid.length,
+        totalWarnerUSD,
+        warnerUnpaid
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // DEBUG: Ver datos raw de Google Sheets para Warner
   app.get("/api/debug/sheets-warner", async (req, res) => {
     try {

@@ -2511,6 +2511,460 @@ class GoogleSheetsWorkingService {
     console.log(`     ✅ Resultado: ${result}`);
     return result;
   }
+
+  /**
+   * Listar todas las hojas disponibles en el Excel MAESTRO (para diagnóstico)
+   */
+  async listAvailableSheets(): Promise<string[]> {
+    console.log('🔍 [DEBUG] Listando hojas disponibles en el Excel MAESTRO...');
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const response = await sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+        fields: 'sheets.properties.title'
+      });
+      
+      const sheetNames = response.data.sheets?.map(s => s.properties?.title || 'unknown') || [];
+      console.log(`🔍 [DEBUG] Hojas encontradas (${sheetNames.length}):`);
+      for (const name of sheetNames) {
+        console.log(`   - "${name}"`);
+      }
+      
+      // Verificar si existe "Cuentas a Cobrar"
+      const cuentasSheet = sheetNames.find(n => n.toLowerCase().includes('cuentas') && n.toLowerCase().includes('cobrar'));
+      if (cuentasSheet) {
+        console.log(`✅ [DEBUG] Hoja de cuentas a cobrar encontrada: "${cuentasSheet}"`);
+      } else {
+        console.log(`❌ [DEBUG] NO se encontró hoja de "Cuentas a Cobrar" en el Excel MAESTRO`);
+        console.log(`   Hojas con "cuentas": ${sheetNames.filter(n => n.toLowerCase().includes('cuentas')).join(', ') || 'ninguna'}`);
+      }
+      
+      return sheetNames;
+    } catch (error: any) {
+      console.error('❌ [DEBUG] Error listando hojas:', error?.message || error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener datos de la hoja "Cuentas a Cobrar (contable)"
+   * Extrae facturas futuras que se convierten en provisiones para el período actual
+   * REGLA: Factura de mes futuro = provisión de ingresos anticipados
+   */
+  async getCuentasACobrar(targetPeriod?: string): Promise<CuentaCobrarRow[]> {
+    console.log('🔍 [getCuentasACobrar] INICIO DE FUNCIÓN');
+    try {
+      // Primero listar hojas disponibles para diagnóstico
+      const availableSheets = await this.listAvailableSheets();
+      
+      // Buscar el nombre correcto de la hoja
+      const cuentasSheet = availableSheets.find(n => 
+        n.toLowerCase().includes('cuentas') && n.toLowerCase().includes('cobrar')
+      );
+      
+      if (!cuentasSheet) {
+        console.error('❌ [getCuentasACobrar] NO existe la hoja "Cuentas a Cobrar" en el Excel MAESTRO');
+        console.log('   Las hojas disponibles son:');
+        for (const sheet of availableSheets) {
+          console.log(`      - "${sheet}"`);
+        }
+        return [];
+      }
+      
+      const sheets = this.createSheetsClientFromJSON();
+      const range = `'${cuentasSheet}'!A:Z`;
+      
+      console.log('📊 [Cuentas a Cobrar] Obteniendo datos del Excel MAESTRO...');
+      console.log(`📊 [Cuentas a Cobrar] SpreadsheetId: ${this.spreadsheetId}`);
+      console.log(`📊 [Cuentas a Cobrar] Range: ${range}`);
+      console.log(`📊 [Cuentas a Cobrar] Target period: ${targetPeriod || 'current'}`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+
+      const rows = response.data.values;
+      
+      console.log(`📊 [Cuentas a Cobrar] Response received, rows: ${rows ? rows.length : 'null/undefined'}`);
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ [Cuentas a Cobrar] No se encontraron datos en la hoja');
+        return [];
+      }
+
+      console.log(`📊 [Cuentas a Cobrar] Procesando ${rows.length} filas...`);
+      console.log(`📊 [Cuentas a Cobrar] Primera fila (headers): ${JSON.stringify(rows[0]?.slice(0, 10))}`);
+      
+      const result = this.parseCuentasACobrarSheet(rows, targetPeriod);
+      console.log(`📊 [Cuentas a Cobrar] Parseadas ${result.length} facturas, ${result.filter(r => r.isProvision).length} son provisiones`);
+      
+      return result;
+      
+    } catch (error: any) {
+      console.error('❌ [Cuentas a Cobrar] Error obteniendo datos:', error?.message || error);
+      console.error('❌ [Cuentas a Cobrar] Stack:', error?.stack);
+      return [];
+    }
+  }
+
+  /**
+   * Parser para hoja "Cuentas a Cobrar (contable)"
+   * Estructura típica: Cliente, Factura, Fecha, Vencimiento, Monto USD, Monto ARS, Estado
+   * REGLA: Si fecha factura > período target, es una provisión de ingresos anticipados
+   */
+  private parseCuentasACobrarSheet(rows: any[][], targetPeriod?: string): CuentaCobrarRow[] {
+    if (rows.length < 2) return [];
+    
+    const result: CuentaCobrarRow[] = [];
+    const headerRow = rows[0];
+    
+    console.log(`📊 [cuentas_cobrar] Headers: ${headerRow.slice(0, 12).join(', ')}...`);
+    
+    // Encontrar índices de columnas importantes
+    const findColIndex = (names: string[]): number => {
+      for (let i = 0; i < headerRow.length; i++) {
+        const header = (headerRow[i] || '').toString().toLowerCase().trim();
+        if (names.some(n => header.includes(n.toLowerCase()))) return i;
+      }
+      return -1;
+    };
+    
+    const clienteColIdx = findColIndex(['cliente', 'client', 'razon social']);
+    const facturaColIdx = findColIndex(['factura', 'invoice', 'nro', 'número']);
+    const fechaColIdx = findColIndex(['fecha', 'date', 'emision']);
+    const vencimientoColIdx = findColIndex(['vencimiento', 'vence', 'due date']);
+    const montoUsdColIdx = findColIndex(['usd', 'dolar', 'dollar', 'monto usd', 'importe usd']);
+    const montoArsColIdx = findColIndex(['ars', 'pesos', 'monto ars', 'importe ars']);
+    const estadoColIdx = findColIndex(['estado', 'status', 'situacion']);
+    
+    console.log(`📊 [cuentas_cobrar] Columnas: Cliente=${clienteColIdx}, Fecha=${fechaColIdx}, MontoUSD=${montoUsdColIdx}, MontoARS=${montoArsColIdx}`);
+    
+    // Determinar período target (por defecto, mes actual)
+    const now = new Date();
+    const currentPeriod = targetPeriod || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const [targetYear, targetMonth] = currentPeriod.split('-').map(n => parseInt(n));
+    
+    console.log(`📊 [cuentas_cobrar] Período target: ${currentPeriod}`);
+    
+    // Procesar cada fila
+    for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx];
+      if (!row || row.length === 0) continue;
+      
+      // Obtener cliente
+      const cliente = (row[clienteColIdx] || '').toString().trim();
+      if (!cliente) continue;
+      
+      // Obtener fecha de factura
+      const fechaRaw = fechaColIdx >= 0 ? (row[fechaColIdx] || '').toString().trim() : '';
+      const fechaVencRaw = vencimientoColIdx >= 0 ? (row[vencimientoColIdx] || '').toString().trim() : '';
+      
+      // Parsear fecha de factura
+      const fechaFactura = this.parseDate(fechaRaw);
+      const fechaVencimiento = this.parseDate(fechaVencRaw);
+      
+      // Extraer montos
+      const montoUsdRaw = montoUsdColIdx >= 0 ? row[montoUsdColIdx] : '';
+      const montoArsRaw = montoArsColIdx >= 0 ? row[montoArsColIdx] : '';
+      
+      const montoUsd = this.parseProvisionAmount(montoUsdRaw);
+      const montoArs = this.parseProvisionAmount(montoArsRaw);
+      
+      // Si no hay monto, saltar
+      if (montoUsd === 0 && montoArs === 0) continue;
+      
+      // Determinar moneda primaria
+      const currency: 'USD' | 'ARS' = montoUsd > 0 ? 'USD' : 'ARS';
+      
+      // Determinar período de la factura
+      let facturaPeriod = currentPeriod;
+      if (fechaFactura) {
+        facturaPeriod = `${fechaFactura.getFullYear()}-${String(fechaFactura.getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      // REGLA: Factura de mes POSTERIOR al período target = PROVISIÓN
+      // Esto es porque si la factura es de diciembre y estamos en octubre,
+      // es un ingreso anticipado que debe provisionarse
+      let isProvision = false;
+      if (fechaFactura) {
+        const facturaYear = fechaFactura.getFullYear();
+        const facturaMonth = fechaFactura.getMonth() + 1;
+        isProvision = facturaYear > targetYear || 
+                     (facturaYear === targetYear && facturaMonth > targetMonth);
+      }
+      
+      const estado = estadoColIdx >= 0 ? (row[estadoColIdx] || '').toString().trim() : '';
+      
+      result.push({
+        periodKey: facturaPeriod,
+        cliente,
+        factura: facturaColIdx >= 0 ? (row[facturaColIdx] || '').toString().trim() : undefined,
+        fechaFactura,
+        fechaVencimiento,
+        montoUsd,
+        montoArs,
+        currency,
+        status: estado,
+        isProvision,
+        rawValue: (montoUsdRaw || montoArsRaw || '').toString()
+      });
+      
+      if (isProvision) {
+        console.log(`  💰 [cuentas_cobrar] PROVISIÓN DETECTADA: ${cliente} | ${facturaPeriod} | USD ${montoUsd.toFixed(2)}`);
+      }
+    }
+    
+    // Resumen de provisiones encontradas
+    const provisionesCliente = new Map<string, number>();
+    for (const r of result.filter(r => r.isProvision)) {
+      const key = r.cliente.toLowerCase();
+      provisionesCliente.set(key, (provisionesCliente.get(key) || 0) + r.montoUsd);
+    }
+    
+    console.log(`✅ [cuentas_cobrar] Total ${result.length} facturas, ${result.filter(r => r.isProvision).length} son provisiones`);
+    for (const [cliente, total] of provisionesCliente) {
+      console.log(`  📊 [cuentas_cobrar] PROVISIÓN ${cliente}: USD ${total.toFixed(2)}`);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Parsear fecha en varios formatos
+   */
+  private parseDate(value: string): Date | undefined {
+    if (!value || !value.trim()) return undefined;
+    
+    const str = value.trim();
+    
+    // Formato DD/MM/YYYY o DD-MM-YYYY
+    let match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (match) {
+      const day = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const year = parseInt(match[3]);
+      return new Date(year, month - 1, day);
+    }
+    
+    // Formato YYYY-MM-DD
+    match = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+    if (match) {
+      const year = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const day = parseInt(match[3]);
+      return new Date(year, month - 1, day);
+    }
+    
+    // Formato MM/DD/YYYY (US)
+    match = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);
+    if (match) {
+      const potentialMonth = parseInt(match[1]);
+      const potentialDay = parseInt(match[2]);
+      const year = parseInt(match[3]);
+      // Si el primer número es > 12, es DD/MM/YYYY
+      if (potentialMonth > 12) {
+        return new Date(year, potentialDay - 1, potentialMonth);
+      }
+      // Si el segundo número es > 12, es MM/DD/YYYY
+      if (potentialDay > 12) {
+        return new Date(year, potentialMonth - 1, potentialDay);
+      }
+      // Ambiguo, asumir DD/MM/YYYY (más común en Argentina)
+      return new Date(year, potentialDay - 1, potentialMonth);
+    }
+    
+    // Intentar parse nativo
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    
+    return undefined;
+  }
+
+  /**
+   * Obtener provisiones de "Impuestos USA" desde Resumen Ejecutivo
+   * Devuelve ProvisionRow[] compatible con el sistema de provisiones
+   */
+  async getImpuestosUsaFromResumenEjecutivo(): Promise<ProvisionRow[]> {
+    try {
+      const resumen = await this.getResumenEjecutivo();
+      const result: ProvisionRow[] = [];
+      
+      for (const row of resumen) {
+        if (row.impuestosUsa && row.impuestosUsa > 0) {
+          result.push({
+            periodKey: row.periodKey,
+            concept: 'PROVISIÓN IMPUESTO USA',
+            source: 'resumen_ejecutivo',
+            amountUsd: row.impuestosUsa,
+            isProvision: true,
+            provisionKind: 'impuestos_usa',
+            rawValue: row.impuestosUsa.toString()
+          });
+          console.log(`  ✅ [Resumen Ejecutivo] ${row.periodKey}: IMPUESTOS USA = USD ${row.impuestosUsa.toFixed(2)}`);
+        }
+      }
+      
+      console.log(`📊 [Resumen Ejecutivo] Extraídos ${result.length} registros de Impuestos USA`);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo Impuestos USA:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener provisiones de facturas futuras (ingresos anticipados) desde la hoja "Activo"
+   * Las "Cuentas a Cobrar" están en la hoja "Activo" como Tipo de Activo = "Clientes a cobrar"
+   * 
+   * REGLA DE PROVISIÓN:
+   * - Facturas de meses FUTUROS (después del período target) = provisiones de ingresos anticipados
+   * - Solo facturas NO cobradas (Cobrado = "No")
+   */
+  async getWarnerProvisionFromCuentasCobrar(targetPeriod: string): Promise<ProvisionRow[]> {
+    console.log(`🔍 [getWarnerProvisionFromActivo] ENTRADA - período: ${targetPeriod}`);
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      
+      // Leer hoja "Activo"
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: "'Activo'!A:U",
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        console.log('⚠️ [Activo] No hay datos en la hoja Activo');
+        return [];
+      }
+      
+      const headers = rows[0] || [];
+      console.log(`📊 [Activo] Headers: ${headers.slice(0, 5).join(', ')}...`);
+      
+      // Encontrar índices de columnas
+      const findColIdx = (patterns: string[]): number => {
+        for (let i = 0; i < headers.length; i++) {
+          const h = (headers[i] || '').toString().toLowerCase();
+          if (patterns.some(p => h.includes(p))) return i;
+        }
+        return -1;
+      };
+      
+      const tipoIdx = findColIdx(['tipo']);
+      const clienteIdx = findColIdx(['cliente']);
+      const mesIdx = 3; // Columna D = Mes
+      const anioIdx = 4; // Columna E = Año
+      const cobradoIdx = findColIdx(['cobrado']);
+      const usdIdx = findColIdx(['usd']);
+      
+      console.log(`📊 [Activo] Columnas: tipo=${tipoIdx}, cliente=${clienteIdx}, mes=${mesIdx}, año=${anioIdx}, cobrado=${cobradoIdx}, usd=${usdIdx}`);
+      
+      // Parsear período target
+      const [targetYear, targetMonth] = targetPeriod.split('-').map(n => parseInt(n));
+      
+      // Mapeo de nombres de mes a número
+      const mesMap: Record<string, number> = {
+        'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+        'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12
+      };
+      
+      // Procesar filas buscando facturas futuras de Warner no cobradas
+      const result: ProvisionRow[] = [];
+      const porCliente = new Map<string, number>();
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row) continue;
+        
+        const tipo = (row[tipoIdx] || '').toString().toLowerCase();
+        const cliente = (row[clienteIdx] || '').toString().toLowerCase();
+        const cobrado = (row[cobradoIdx] || '').toString().toLowerCase();
+        const mesRaw = (row[mesIdx] || '').toString().toLowerCase();
+        const anioRaw = (row[anioIdx] || '').toString();
+        const usdRaw = (row[usdIdx] || '').toString();
+        
+        // Solo procesar "Clientes a cobrar" no cobrados
+        if (!tipo.includes('cobrar') || cobrado !== 'no') continue;
+        
+        // Parsear mes y año del registro
+        const mesMatch = mesRaw.match(/(\d+)\s*(\w+)/);
+        let rowMonth = 0;
+        let rowYear = 0;
+        
+        if (mesMatch) {
+          const mesNum = parseInt(mesMatch[1]);
+          const mesNombre = mesMatch[2].substring(0, 3);
+          rowMonth = mesMap[mesNombre] || mesNum;
+        }
+        
+        rowYear = parseInt(anioRaw) || 0;
+        
+        // Verificar si es factura FUTURA (después del período target)
+        const isFuture = (rowYear > targetYear) || 
+                         (rowYear === targetYear && rowMonth > targetMonth);
+        
+        if (!isFuture) continue;
+        
+        // Parsear monto USD (formato argentino: $29.230,00 → 29230.00)
+        const usdClean = usdRaw
+          .replace(/\$/g, '')
+          .replace(/\./g, '')  // Quitar separador de miles
+          .replace(/,/g, '.')  // Convertir coma decimal a punto
+          .trim();
+        const usd = parseFloat(usdClean) || 0;
+        
+        if (usd > 0) {
+          const key = cliente.toLowerCase();
+          porCliente.set(key, (porCliente.get(key) || 0) + usd);
+          console.log(`  📌 [Activo] Factura futura: ${cliente} ${mesRaw} ${anioRaw} = USD ${usd.toFixed(2)} (raw: "${usdRaw}")`);
+        }
+      }
+      
+      // Convertir a ProvisionRow
+      for (const [cliente, total] of porCliente) {
+        if (total > 0) {
+          result.push({
+            periodKey: targetPeriod,
+            concept: `PROVISIÓN ${cliente.toUpperCase()} (INGRESOS ANTICIPADOS)`,
+            source: 'activo',
+            amountUsd: total,
+            isProvision: true,
+            provisionKind: cliente.includes('warner') ? 'warner' : 'cliente',
+            rawValue: total.toString()
+          });
+          console.log(`  ✅ [Activo] ${targetPeriod}: PROVISIÓN ${cliente.toUpperCase()} = USD ${total.toFixed(2)}`);
+        }
+      }
+      
+      console.log(`📊 [Activo] Extraídas ${result.length} provisiones de facturas futuras`);
+      return result;
+      
+    } catch (error: any) {
+      console.error('❌ [getWarnerProvisionFromActivo] Error:', error?.message || error);
+      console.error('❌ [getWarnerProvisionFromActivo] Stack:', error?.stack);
+      return [];
+    }
+  }
+}
+
+// Tipo para cuentas a cobrar (facturas futuras = provisiones)
+export interface CuentaCobrarRow {
+  periodKey: string;
+  cliente: string;
+  factura?: string;
+  fechaFactura?: Date;
+  fechaVencimiento?: Date;
+  montoUsd: number;
+  montoArs: number;
+  currency: 'USD' | 'ARS';
+  status: string;
+  isProvision: boolean;  // True si es factura futura
+  rawValue: string;
 }
 
 // Tipo para datos de provisiones
