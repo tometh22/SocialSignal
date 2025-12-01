@@ -479,27 +479,25 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 // ==================== HECHOS: COSTOS AGREGADOS POR PERÍODO ====================
 
 // Patrones para detectar PROVISIONES CONTABLES (no deben ir en Operativo)
-// Según especificación: Pepsico, Warner, Impuestos USA, IVA, etc.
+// NOTA: 'pepsico' y 'warner' SON CLIENTES REALES con proyectos operativos normales
+// Solo clasificar como provisión si el SUBTIPO o DESCRIPCIÓN indica explícitamente provisión
+// Las provisiones de Impuestos USA, IVA, etc. vienen de hojas separadas (no de Costos Directos)
 const PROVISION_PATTERNS = [
-  'provision', 'provisión',
-  'pepsico', 'warner',
+  'provision pasivo', 'provisión pasivo',
+  'provision cliente', 'provisión cliente',
   'impuestos usa', 'impuesto usa', 'tax usa',
-  'iva', 'impuesto iva',
-  'pasivo', 'pasivos',
-  'ajuste', 'ajustes',
-  'percepcion', 'percepción',
-  'anticipo', 'anticipos',
+  'iva compras', 'iva ventas', 'impuesto iva',
+  'pasivo contable',
   'facturacion adelantada', 'facturación adelantada',
-  'diferido', 'devengado contable',
-  'reserva', 'estimacion', 'estimación', 'contingencia'
+  'devengado contable',
+  'estimacion provision', 'estimación provisión'
 ];
 
 // Subtipos de costo que indican provisiones/impuestos (de la columna "Subtipo de costo")
+// Solo subtipos MUY específicos para evitar falsos positivos
 const PROVISION_SUBTYPES = [
   'provision', 'provisión', 'provisiones',
-  'impuesto', 'impuestos', 'tax',
-  'iva', 'percepcion', 'percepción',
-  'ajuste', 'ajustes', 'pasivo', 'pasivos'
+  'impuesto', 'tax'
 ];
 
 /**

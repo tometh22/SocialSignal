@@ -2281,9 +2281,19 @@ class GoogleSheetsWorkingService {
       // Extraer montos para cada mes
       for (const monthCol of monthColumns) {
         const rawValue = row[monthCol.index];
-        const amount = this.parseProvisionAmount(rawValue);
+        let amount = this.parseProvisionAmount(rawValue);
         
         if (amount !== 0) {
+          // PROTECCIÓN: Valores mayores a $100,000 USD por concepto son probablemente ARS
+          // Usar tipo de cambio aproximado para convertir
+          const MAX_REASONABLE_USD = 100000;
+          const APPROX_FX = 1300; // Tipo de cambio aproximado ARS/USD
+          
+          if (Math.abs(amount) > MAX_REASONABLE_USD) {
+            console.log(`⚠️ [${source}] Valor alto detectado: ${concept} = ${amount.toFixed(2)}, asumiendo ARS → USD ${(amount / APPROX_FX).toFixed(2)}`);
+            amount = amount / APPROX_FX;
+          }
+          
           result.push({
             periodKey: monthCol.periodKey,
             concept,
@@ -2313,16 +2323,16 @@ class GoogleSheetsWorkingService {
 
   /**
    * Detectar si un concepto es una provisión contable
+   * NOTA: pepsico y warner son CLIENTES REALES, no categorías de provisiones
    */
   private isProvisionConcept(text: string): boolean {
     const provisionPatterns = [
       'provision', 'provisión',
-      'pepsico', 'warner',
       'impuesto', 'tax', 'iva',
       'pasivo', 'diferido',
       'reserva', 'contingencia',
-      'ajuste', 'percepcion',
-      'anticipo', 'devengado contable'
+      'percepcion',
+      'devengado contable'
     ];
     
     return provisionPatterns.some(p => text.includes(p));
@@ -2330,14 +2340,14 @@ class GoogleSheetsWorkingService {
 
   /**
    * Detectar el tipo específico de provisión
+   * NOTA: pepsico y warner son clientes reales, usar 'cliente' para provisiones de clientes
    */
   private detectProvisionKind(text: string, source: string): string {
-    if (text.includes('pepsico')) return 'pepsico';
-    if (text.includes('warner')) return 'warner';
     if (text.includes('impuesto usa') || text.includes('tax usa') || text.includes('usa')) return 'impuestos_usa';
     if (text.includes('iva')) return 'iva';
     if (source === 'impuestos') return 'impuestos';
     if (source === 'provision_cliente') return 'cliente';
+    if (text.includes('provision') || text.includes('pasivo')) return 'provision';
     return 'otros';
   }
 
