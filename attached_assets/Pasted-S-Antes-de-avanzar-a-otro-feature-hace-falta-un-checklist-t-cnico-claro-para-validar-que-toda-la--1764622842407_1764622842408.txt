@@ -1,0 +1,308 @@
+Sí.
+Antes de avanzar a otro feature, hace falta un checklist técnico claro para validar que toda la integración ETL + API + dashboards quedó correcta, incluyendo:
+
+CashFlow
+
+Provisiones
+
+Overhead operativo vs contable
+
+FX
+
+Parámetros de Markup / tarifa / horas
+
+Coherencia entre pestaña Operativa y Financiera
+
+Acá tenés el checklist completo, pensado para que vos puedas revisar y para que el Replit Agent lo aplique uno por uno sin perderse nada.
+
+CHECKLIST DEFINITIVO
+0. Estado actual (lo que ya validamos)
+
+Para octubre 2025:
+
+facturadoUsd = 81,838.86 ✓
+
+direct costs = 16,7k ✓
+
+overheadUsd = 72,146.75 ✓
+
+impuestosUsaUsd = 25,287.08 ✓
+
+overhead operativo = 46,859.67 = 72,146 - 25,287 ✓
+
+provisiones = 50,618.16 (PepsiCo + Warner + Impuestos USA) ✓
+
+burn rate contable = 140,127.83 ✓
+
+devengado = 42,057.83 ✓
+
+markup operativo = 2.42x ✓
+
+tarifa efectiva = 25.39/h ✓
+
+billable hours = 1656.77 ✓
+
+total hours = 1659.06 ✓
+
+cashflow neto (fallback Excel) = 66,801.58 ✓
+
+cashflow In/Out = 0/0 (falta ETL) ⚠️
+
+Esto sirve como baseline.
+
+1. CHECKLIST PARA COSTOS
+1.1. Directos
+
+Origen: Costos directos e indirectos-2.csv
+
+Condición: Tipo de costo = DIRECTO
+
+Conversión ARS→USD correcta
+
+Suma mensual = 16,7k ✓
+
+Validar que ninguna provisión esté dentro de “Directo” (no debería pasar nunca).
+
+1.2. Overhead contable (indirectos)
+
+Origen: Costos directos e indirectos-2.csv
+
+Condición: Tipo = INDIRECTO
+
+Incluye: equipo indirecto + estructura + impuestos + gastos generales
+
+Incluye provisiones SOLO si están en esta hoja (no siempre lo están)
+
+Total = 72,146.75 ✓
+
+Debe matchear el Excel Resumen Ejecutivo.
+
+1.3. Provisiones cliente
+
+Origen: Provisión pasivo proyectos.csv
+
+Consumir SOLO las líneas con monto positivo (provisión)
+
+Las reversas (montos negativos) deben RESTAR
+
+Validar para octubre:
+
+Pepsico = ~13,413 ✓
+
+Warner = ~14,493 (?)
+
+Si no aparece en esta hoja: viene de PASIVO.
+
+1.4. Provisiones impuestos USA
+
+Origen: Impuestos.csv o Pasivo.csv
+
+Campo a buscar: "Impuestos USA" / "USA"
+
+Octubre: = 25,287.08 ✓
+
+1.5. Total provisiones
+
+Debe ser:
+
+provisionsUsd = provisionsClientsUsd + impuestosUsaUsd
+
+
+Octubre:
+
+13,413 + 12,? + 25,287 = ~50,618.16 ✓
+
+2. CHECKLIST PARA OPERATIVO
+
+Operativo NO incluye provisiones.
+
+2.1. overheadOperativeUsd
+overheadOperativeUsd = overheadContable - impuestosUsaUsd
+
+
+Para octubre:
+
+72,146.75 - 25,287.08 = 46,859.67 ✓
+
+2.2. EBIT operativo
+ebitOperativo = devengado - directos
+
+
+Octubre:
+
+42,057.83 - 16,7k ≈ 25,3k ✓
+
+2.3. markupX
+markup = devengado / directos
+
+
+Octubre:
+
+42,057.83 / 17k = 2.42 ✓
+
+2.4. tarifa efectiva
+tarifa = devengado / billableHours
+
+
+Octubre:
+
+42,057.83 / 1656.77 = 25.39/h ✓
+
+3. CHECKLIST PARA FINANCIERO
+3.1. ebit contable
+ebitContable = facturadoUsd - (directos + overheadContable)
+
+
+Debe matchear el Excel Resumen Ejecutivo.
+
+3.2. burn rate
+
+Toda la lógica contable va acá.
+
+Debe ser:
+
+burnRateUsd = directos + overheadContable + provisionsUsd
+
+
+Para octubre:
+
+16.7k + 72.1k + 50.6k = 140.127,83 ✓
+
+3.3. cashflow
+
+Por ahora:
+
+cashFlowNetUsd = Resumen Ejecutivo (fallback)
+cashFlowInUsd  = 0 (hasta ETL)
+cashFlowOutUsd = 0
+
+4. CHECKLIST ESPECÍFICO PARA EL ETL DE CASHFLOW
+
+Hoy:
+
+Movimientos importados = 227
+
+Todos aparecen como inflows: incorrecto
+
+Todas las cifras aparecen en ARS: hay que convertir a USD
+
+Falta clasificar inflow / outflow según la columna del Excel
+
+Falta mapear categorías (ingresos, egresos, transferencias internas)
+
+4.1. Pasos exactos para corregir el CashFlow ETL
+
+Identificar columnas en CashFlow.xlsx:
+
+Fecha
+
+Monto
+
+Cuenta
+
+Tipo / Categoría
+
+ARS o USD
+
+Clasificación:
+
+Si monto > 0 → inflow
+
+Si monto < 0 → outflow
+
+Excluir movimientos internos entre cuentas (CAUSE PROBLEMAS)
+
+Ej: “Transferencia entre cuentas”, “Movimiento interno”, “Traspaso”
+
+Conversión:
+
+amount_usd = amount_ars / fx_del_mes
+
+
+Guardar:
+
+id, date, period_key, concept, amount_usd, type, category
+
+
+Agregar:
+
+cashFlowInUsd  = SUM(inflows)
+cashFlowOutUsd = SUM(outflows)
+cashFlowNetUsd = inflows - outflows
+
+5. CHECKLIST DE COHERENCIA ENTRE PESTAÑAS
+Pestaña Operativa
+
+Debe mostrar:
+
+Devengado
+
+EBIT operativo
+
+Tarifa efectiva
+
+Markup operativo
+
+Horas trabajadas
+
+Personas activas
+
+Directos
+
+Overhead operativo (sin provisiones)
+
+Pestaña Financiera
+
+Debe mostrar:
+
+Facturado
+
+EBIT contable
+
+Overhead contable (estructura)
+
+Provisiones
+
+Burn rate
+
+CashFlow (in/out/neto)
+
+La separación contable vs operativo ahora está perfecta.
+
+6. CHECKLIST DE FX (tipo de cambio)
+
+Usar tipo de cambio de:
+Info Tipo de Cambio y REM.csv
+
+Confirmar que en octubre 2025:
+
+Todas las filas ARS → USD usan ese mes
+
+No se mezclan FX de meses distintos
+
+Validar:
+
+sum(directos_usd) (calculado) ≈ directos_usd (Excel)
+sum(overhead_usd) (calculado) ≈ overhead_usd (Excel)
+
+
+Esto garantiza que la conversión es correcta.
+
+7. CHECKLIST DE INTEGRIDAD FINAL
+Para cada mes:
+
+facturadoUsd coincide con Excel
+
+costos (directos + indirectos) coinciden con Excel
+
+ebit contable coincide con Excel
+
+cashflow neto coincide con Excel
+
+overhead operativo = overheadContable − impuestosUSA
+
+provisiones = pepsico + warner + impuestos usa (+ reversas)
+
+burn rate = directos + overheadContable + provisiones
+
+markupX y tarifa efectiva coinciden
