@@ -481,88 +481,101 @@ export default function ExecutiveDashboard() {
               </CardContent>
             </Card>
 
-            {/* ===== FILA 4: COMPOSICIÓN DE COSTOS (col-span-12) ===== */}
-            <Card className="col-span-12 border-0 shadow-lg">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold text-gray-700 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-red-500" />
-                    Composición de costos
-                  </CardTitle>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[280px]">
-                      <p className="text-xs">Incluye solo costos reales del período. Directos = equipo. Indirectos = overhead (alquileres, herramientas, management, etc.).</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                {/* Stacked Bar */}
-                <div className="h-6 rounded-full overflow-hidden bg-gray-200 mb-4">
-                  <div className="h-full flex">
-                    <div 
-                      className="bg-red-400 transition-all"
-                      style={{ 
-                        width: `${financial.totalCostsUsd > 0 
-                          ? (financial.directCostsUsd / financial.totalCostsUsd) * 100 
-                          : 50}%` 
-                      }}
-                    />
-                    <div 
-                      className="bg-orange-400 transition-all"
-                      style={{ 
-                        width: `${financial.totalCostsUsd > 0 
-                          ? (financial.indirectCostsUsd / financial.totalCostsUsd) * 100 
-                          : 50}%` 
-                      }}
-                    />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-3 h-3 bg-red-400 rounded-full" />
-                      <span className="text-gray-600">Directos (equipo)</span>
+            {/* ===== FILA 4: COMPOSICIÓN DE COSTOS OPERATIVOS (col-span-12) ===== */}
+            {/* VISTA OPERATIVA: Solo costos operativos reales (SIN provisiones ni impuestos) */}
+            {(() => {
+              const directCosts = financial.directCostsUsd || 0;
+              const indirectOperational = financial.indirectCostsUsd || 0;
+              const totalOperativo = directCosts + indirectOperational;
+              return (
+                <Card className="col-span-12 border-0 shadow-lg">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-semibold text-gray-700 flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-red-500" />
+                        Composición de costos operativos
+                      </CardTitle>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px]">
+                          <p className="text-xs font-medium mb-1">Costos Operativos Reales</p>
+                          <p className="text-xs">Solo incluye costos operativos del período. Directos = equipo. Overhead operativo = gastos reales (alquileres, herramientas, management, etc.).</p>
+                          <p className="text-xs mt-1 text-yellow-300">NOTA: NO incluye provisiones contables ni impuestos (Pepsico, Warner, IVA, etc.) - esos aparecen en la vista Financiera.</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
-                    <p className="font-semibold text-gray-800" data-testid="metric-direct-costs">
-                      {formatCurrency(financial.directCostsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {financial.totalCostsUsd > 0 
-                        ? `${((financial.directCostsUsd / financial.totalCostsUsd) * 100).toFixed(0)}% del total`
-                        : '0% del total'}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-3 h-3 bg-orange-400 rounded-full" />
-                      <span className="text-gray-600">Indirectos (overhead)</span>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {/* Stacked Bar - Solo directos e indirectos operativos */}
+                    <div className="h-6 rounded-full overflow-hidden bg-gray-200 mb-4">
+                      <div className="h-full flex">
+                        <div 
+                          className="bg-red-400 transition-all"
+                          style={{ 
+                            width: `${totalOperativo > 0 
+                              ? (directCosts / totalOperativo) * 100 
+                              : 50}%` 
+                          }}
+                        />
+                        <div 
+                          className="bg-orange-400 transition-all"
+                          style={{ 
+                            width: `${totalOperativo > 0 
+                              ? (indirectOperational / totalOperativo) * 100 
+                              : 50}%` 
+                          }}
+                        />
+                      </div>
                     </div>
-                    <p className="font-semibold text-gray-800" data-testid="metric-indirect-costs">
-                      {formatCurrency(financial.indirectCostsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {financial.totalCostsUsd > 0 
-                        ? `${((financial.indirectCostsUsd / financial.totalCostsUsd) * 100).toFixed(0)}% del total`
-                        : '0% del total'}
-                    </p>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-3 h-3 bg-gray-400 rounded-full" />
-                      <span className="text-gray-600">Total</span>
+                    
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-3 h-3 bg-red-400 rounded-full" />
+                          <span className="text-gray-600">Directos (equipo)</span>
+                        </div>
+                        <p className="font-semibold text-gray-800" data-testid="metric-direct-costs">
+                          {formatCurrency(directCosts)}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {totalOperativo > 0 
+                            ? `${((directCosts / totalOperativo) * 100).toFixed(0)}% del total operativo`
+                            : '0%'}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-3 h-3 bg-orange-400 rounded-full" />
+                          <span className="text-gray-600">Overhead operativo</span>
+                        </div>
+                        <p className="font-semibold text-gray-800" data-testid="metric-indirect-costs">
+                          {formatCurrency(indirectOperational)}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {totalOperativo > 0 
+                            ? `${((indirectOperational / totalOperativo) * 100).toFixed(0)}% del total operativo`
+                            : '0%'}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-3 h-3 bg-gray-500 rounded-full" />
+                          <span className="text-gray-600">Total Operativo</span>
+                        </div>
+                        <p className="font-bold text-gray-900" data-testid="metric-total-costs-operativo">
+                          {formatCurrency(totalOperativo)}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Sin provisiones contables
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-bold text-gray-900" data-testid="metric-total-costs">
-                      {formatCurrency(financial.totalCostsUsd || 0)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </motion.div>
         )}
 
