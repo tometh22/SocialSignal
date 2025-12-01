@@ -1,0 +1,344 @@
+. Estructura general que debería existir
+1.1. Dimensión de tiempo
+
+En backend tiene que existir un period único tipo YYYY-MM que se use en todos los agregados:
+
+2025-10 para octubre 2025
+
+Se obtiene:
+
+Si la hoja tiene columna “Mes”: usarla.
+
+Si solo tiene fecha: period = format(fecha, 'YYYY-MM').
+
+Todo el ETL debe agrupar por period.
+
+1.2. Objetos agregados por mes
+
+Para cada period deberías tener algo así en la API:
+
+{
+  period: '2025-10',
+  financial: {
+    facturadoUsd,
+    directCostsUsd,
+    overheadUsd,
+    provisionsUsd,
+    burnRateUsd,
+    ebitAccountingUsd,
+    cashFlowInUsd,
+    cashFlowOutUsd,
+    cashFlowNetUsd,
+    totalActivoUsd,
+    totalPasivoUsd,
+    balanceNetoUsd,
+  },
+  operative: {
+    devengadoUsd,
+    directCostsUsd,          // mismos directos que financiero
+    overheadOperativeUsd,    // overhead SIN provisiones
+    ebitOperativeUsd,
+    effectiveRateUsdPerHour,
+    markupX,
+    billableHours,
+    totalHours,
+    activePeople,
+    activeProjects
+  }
+}
+
+
+Claves:
+
+Operativo NO ve provisiones.
+
+Financiero SÍ ve provisiones, separadas y dentro del burn rate.
+
+2. De dónde sale cada métrica (por CSV / pestaña)
+
+Voy uno por uno con tus archivos.
+
+2.1. Seguimiento Financiero_Economico Para Tablero - Resumen Ejecutivo.csv
+
+De acá salen:
+
+totalActivoUsd
+
+totalPasivoUsd
+
+balanceNetoUsd
+
+Y también la versión contable de:
+
+ventasMesUsd (TOTAL VENTAS / TOTAL CONVERTIDO A USD)
+
+totalCostosUsd (TOTAL COSTOS / TOTAL CONVERTIDO A USD)
+
+ebitAccountingUsd (UTILIDAD OPERATIVA (EBIT) / TOTAL CONVERTIDO A USD)
+
+Check técnico:
+
+para cada period:
+  leer fila "TOTAL ACTIVO" → totalActivoUsd
+  leer fila "TOTAL PASIVO" → totalPasivoUsd
+  balanceNetoUsd = totalActivoUsd - totalPasivoUsd
+  leer fila "TOTAL VENTAS" (columna USD o TOTAL CONVERTIDO A USD)
+  leer fila "TOTAL COSTOS" (USD o TOTAL CONVERTIDO A USD)
+  assert |ebitAccountingUsd - (ventasMesUsd - totalCostosUsd)| < 1
+
+2.2. Seguimiento Financiero_Economico Para Tablero - CashFlow.csv
+
+De acá salen los flujos reales de caja:
+
+cashFlowInUsd
+
+cashFlowOutUsd
+
+cashFlowNetUsd
+
+Regla:
+
+Filtrar registros del period (fecha real de movimiento).
+
+Sumar importes positivos a cashFlowInUsd.
+
+Sumar importes negativos (en valor absoluto) a cashFlowOutUsd.
+
+Check:
+
+cashFlowNetUsd = cashFlowInUsd - cashFlowOutUsd
+comparar con "CASH FLOW DEL MES" del Resumen Ejecutivo
+
+2.3. Seguimiento Financiero_Economico Para Tablero - Activo.csv
+
+De acá salen:
+
+Detalle de bancos, crypto, etc.
+
+Alimenta a:
+
+totalActivoUsd (ya validado con Resumen Ejecutivo).
+
+Eventualmente cashTotalUsd si querés mostrar caja líquida.
+
+Regla:
+
+Agrupar por period.
+
+Convertir ARS a USD con tipo de cambio de la hoja de tipo de cambio (ver 2.8).
+
+2.4. Seguimiento Financiero_Economico Para Tablero - Pasivo.csv
+
+De acá salen las deudas contables NO provisionales (proveedores, etc.), si las estás usando.
+
+En este tablero solo importa que:
+
+La suma de pasivos “reales” + pasivos de provisiones = totalPasivoUsd de Resumen Ejecutivo.
+
+2.5. Seguimiento Financiero_Economico Para Tablero - Costos directos e indirectos-2.csv
+
+Este es el corazón de costos contables.
+
+Campos clave típicos:
+
+columna “Tipo de costo” (Directo / Indirecto)
+
+columna “Periodo” o fecha
+
+columna “Descripción / Cuenta”
+
+Regla:
+
+para cada period:
+  directCostsUsd = suma(montoUsd donde tipo = 'Directo')
+
+  // overhead sin provisiones
+  overheadOperativeUsd = suma(montoUsd donde tipo = 'Indirecto' 
+                                y descripcion NO contiene ('PROVISION','PROVISIÓN','IMPUESTO USA','TAX USA'))
+
+  // overhead contable completo
+  overheadUsd = suma(montoUsd donde tipo = 'Indirecto')
+
+
+Check:
+
+totalCostosContablesUsd_desde_costos = directCostsUsd + overheadUsd
+comparar con TOTAL COSTOS (USD) del Resumen Ejecutivo
+
+2.6. Seguimiento Financiero_Economico Para Tablero - Provisión pasivo proyectos.csv
+
+De acá salen solo provisiones de clientes (Pepsico, Warner, etc.).
+
+Regla:
+
+para cada period:
+  provisionsClientsUsd = suma(
+      montoUsd donde cliente in ('PEPSICO','PEPSI','WARNER',...)
+      y signo = positivo
+  )
+
+  // Si hay reversas (valores negativos), se suman también.
+  provisionsClientsUsd += suma(montosNegativos) // corrige total.
+
+2.7. Seguimiento Financiero_Economico Para Tablero - Impuestos.csv
+
+De acá salen:
+
+impuestosUsaUsd (cuando esté)
+
+Otras provisiones de impuestos mensuales.
+
+Regla:
+
+para cada period:
+  provisionsTaxesUsd = suma(montoUsd donde descripcion contiene ('IMPUESTOS USA','TAX USA'))
+
+2.8. Seguimiento Financiero_Economico Para Tablero - Info Tipo de Cambio y REM.csv
+
+De acá sale, por period:
+
+usdRate (tipo de cambio del mes)
+
+Regla:
+
+Todas las hojas que vengan en ARS deben convertirse a USD con este tipo.
+
+2.9. Seguimiento Financiero_Economico Para Tablero - Seguimiento Mark Up General.csv
+
+De acá salen ingresos comerciales y algunas métricas de proyectos:
+
+facturadoUsd del mes (fila resumen, la que te daba 81.8k en octubre).
+
+Si después sumás por proyecto, podés sacar:
+
+devengadoUsd (si distribuís por avance).
+
+markupPorProyecto, etc.
+
+Regla mínima:
+
+para cada period:
+  facturadoUsd = valor fila 'TOTAL VENTAS' o similar (USD)
+  assert facturadoUsd ≈ ventasMesUsd_resumenEjecutivo
+
+3. Cómo deberían calcularse los KPIs
+3.1. Pestaña Operativa
+
+Para cada period:
+
+devengadoUsd = suma(ingreso_ganado_proyectos_en_period)  // de MarkUp + horas
+directCostsUsd  // de Costos directos e indirectos, tipo = Directo
+overheadOperativeUsd  // Indirectos sin provisiones
+
+ebitOperativeUsd = devengadoUsd - directCostsUsd
+
+markupX = devengadoUsd / directCostsUsd
+
+effectiveRateUsdPerHour = devengadoUsd / billableHours
+
+billableHours = suma(horas_facturables_del_periodo)
+totalHours    = suma(horas_totales_del_periodo)
+percentBillable = billableHours / totalHours
+
+activePeople   = cantidad_personas_con_horas>0
+activeProjects = cantidad_proyectos_con_horas>0_o_devengado>0
+
+
+Nada de provisiones acá.
+
+3.2. Pestaña Financiera
+facturadoUsd    // de Seguimiento MarkUp + validado con Resumen Ejecutivo
+directCostsUsd  // mismo que en operativo
+overheadUsd     // de Costos directos e indirectos (todos los indirectos)
+
+provisionsUsd = provisionsClientsUsd + provisionsTaxesUsd
+burnRateUsd   = directCostsUsd + overheadUsd + provisionsUsd
+
+ebitAccountingUsd = facturadoUsd - (directCostsUsd + overheadUsd) 
+// Si en contabilidad las provisiones las manejan aparte, no las restes dos veces.
+// Ajustar hasta cuadrar con "UTILIDAD OPERATIVA (EBIT)" del Resumen Ejecutivo.
+
+
+Check contable fuerte por mes:
+
+assert |ebitAccountingUsd - ebitResumenEjecutivoUsd| < 1
+assert |burnRateUsd - totalCostosContablesUsd - provisionsUsd_extra| < tolerancia
+
+4. Checklist de verificación (lo que le tenés que exigir al dev)
+4.1. Nivel ETL / backend
+
+Revisar mapping de cada CSV
+
+Confirmar que todas las rutas de lectura usan el archivo Seguimiento Financiero_Economico Para Tablero.xlsx o sus CSV equivalentes.
+
+Para cada métrica, anotar en el código: // source: Resumen Ejecutivo, fila XXX.
+
+Validaciones unitarias por mes (mínimo octubre 2025)
+
+Facturado API ≈ TOTAL VENTAS Resumen Ejecutivo.
+
+DirectCosts + Overhead (indirectos) API ≈ TOTAL COSTOS Resumen Ejecutivo.
+
+EBIT contable API = Facturado - TotalCostos.
+
+Balance Neto API = Resumen Ejecutivo.
+
+Cash Flow Net API = CASH FLOW DEL MES del Excel.
+
+Separación correcta de provisiones
+
+Ver que overheadOperativeUsd excluya TODO lo que venga de:
+
+Provisión pasivo proyectos.
+
+Impuestos USA (si son provisión).
+
+Ver que provisionsUsd incluya exactamente esos montos.
+
+Control de doble conteo
+
+Confirmar que ninguna provisión esté contada como “Indirecto” en Costos + de nuevo en Provisiones.
+
+Si una fila está en hoja de costos y también en provisiones, se define una sola fuente y la otra se excluye.
+
+Control de signos
+
+Las reversas de provisiones (montos negativos) deben restar del total de provisiones.
+
+En la sumatoria mensual funcionen como “ajuste”, no como costo nuevo.
+
+4.2. Nivel frontend
+
+Pestaña Operativa
+
+Card “Ingreso devengado” → usa operative.devengadoUsd.
+
+Card “EBIT operativo” → operative.ebitOperativeUsd.
+
+Card “Tarifa efectiva” → operative.effectiveRateUsdPerHour.
+
+Card “Markup operativo” → operative.markupX.
+
+Gráfico “Composición de costos operativos” → directCostsUsd y overheadOperativeUsd.
+
+Tooltips indican explícitamente “sin provisiones contables”.
+
+Pestaña Financiera
+
+Card “Facturado” → financial.facturadoUsd.
+
+Card “EBIT contable” → financial.ebitAccountingUsd.
+
+Card “Directos” → financial.directCostsUsd.
+
+Card “Overhead” → financial.overheadUsd (indirectos sin provisiones, si así lo definen).
+
+Card “Provisiones” → financial.provisionsUsd.
+
+Card “Burn Rate” → financial.burnRateUsd.
+
+Filtros de periodo
+
+Cambiando de mes en el selector, el frontend siempre llama a GET /executive-dashboard?period=YYYY-MM y muestra solo ese periodo.
+
+Probar con agosto, septiembre y octubre: que los números cambien y sigan cuadrando con el Excel.
