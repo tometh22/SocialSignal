@@ -478,79 +478,102 @@ export async function processDirectCostsToFactLabor(rows: CostoDirectoRow[]): Pr
 
 // ==================== HECHOS: COSTOS AGREGADOS POR PERÍODO ====================
 
+// Patrones para detectar PROVISIONES CONTABLES (no deben ir en Operativo)
+const PROVISION_PATTERNS = [
+  'provision', 'provisión', 'pepsico', 'warner', 'impuestos usa', 'impuesto usa',
+  'iva', 'pasivo', 'ajuste', 'percepcion', 'percepción', 'anticipo', 'anticipos',
+  'facturacion adelantada', 'facturación adelantada', 'diferido', 'devengado contable',
+  'reserva', 'estimacion', 'estimación', 'contingencia'
+];
+
+/**
+ * Detecta si una fila contiene una provisión contable
+ * Basado en campos: Proyecto, Cliente, Detalle, o cualquier campo descriptivo
+ */
+function isProvision(row: CostoDirectoRow): boolean {
+  const fieldsToCheck = [
+    row.Proyecto || '',
+    row.Cliente || '',
+    row.Detalle || '',
+    (row as any).Descripcion || '',
+    (row as any).Concepto || '',
+    (row as any).Categoria || ''
+  ];
+  
+  const combinedText = fieldsToCheck.join(' ').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  
+  return PROVISION_PATTERNS.some(pattern => {
+    const normalizedPattern = pattern.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return combinedText.includes(normalizedPattern);
+  });
+}
+
 /**
  * ETL: Costos directos e indirectos → fact_cost_month
- * Separa DIRECTOS e INDIRECTOS según columna "Tipo de Costo"
- * Lee directamente columna R "Monto Total USD" y suma por período
+ * Separa en 3 buckets:
+ * - DIRECTOS: Tipo = "Directo" (costos de equipo)
+ * - INDIRECTOS OPERATIVOS: Tipo = "Indirecto" SIN provisiones (overhead real)
+ * - PROVISIONES: Tipo = "Indirecto" CON patrones de provisión (solo Financiero)
  */
 export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<void> {
   console.log(`💰 [SoT ETL] Procesando costos agregados por período desde ${rows.length} filas...`);
   
-  // Importar tabla y tipos
   const { factCostMonth } = await import('@shared/schema');
   
-  // Mapas para acumular costos DIRECTOS e INDIRECTOS por período
+  // 3 buckets: DIRECTOS, INDIRECTOS OPERATIVOS, PROVISIONES
   const periodCosts = new Map<string, {
     directUSD: number;
     directARS: number;
-    indirectUSD: number;
+    indirectUSD: number;  // Solo overhead operativo real
     indirectARS: number;
+    provisionsUSD: number; // Provisiones contables
+    provisionsARS: number;
     directRows: number;
     indirectRows: number;
+    provisionsRows: number;
   }>();
   
   let processedDirect = 0;
   let processedIndirect = 0;
+  let processedProvisions = 0;
   let skipped = 0;
   
   for (const row of rows) {
     try {
-      // 1) Extraer período
       const periodKey = toPeriodKey(row.Mes, row.Año);
       if (!periodKey) {
         skipped++;
         continue;
       }
       
-      // 2) Clasificar tipo de costo EXACTAMENTE como se especificó
       const tipoCostoRaw = row['Tipo de Costo'] || row['Tipo de Coste'] || row['Tipo Costo'] || '';
       const tipoCostoNorm = tipoCostoRaw.trim().toLowerCase();
       
-      // DIRECTOS: "directo" o "costos directos e indirectos"
       const isDirect = tipoCostoNorm === 'directo' || tipoCostoNorm === 'costos directos e indirectos';
-      
-      // INDIRECTOS: "indirecto"
       const isIndirect = tipoCostoNorm === 'indirecto';
       
-      // Si no es ni directo ni indirecto, saltar
       if (!isDirect && !isIndirect) {
         skipped++;
         continue;
       }
       
-      // 3) Leer montos USD y ARS directamente de columna R
       const montoUSD = parseNum(row['Monto Total USD']);
       const montoARS = parseNum(row['Monto Total ARS'] || row['Monto Original ARS'] || row['Total ARS']);
       
-      // Validar que haya monto válido
       if (montoUSD === 0 && montoARS === 0) {
         skipped++;
         continue;
       }
       
-      // 4) Inicializar acumulador del período si no existe
       if (!periodCosts.has(periodKey)) {
         periodCosts.set(periodKey, {
-          directUSD: 0,
-          directARS: 0,
-          indirectUSD: 0,
-          indirectARS: 0,
-          directRows: 0,
-          indirectRows: 0
+          directUSD: 0, directARS: 0,
+          indirectUSD: 0, indirectARS: 0,
+          provisionsUSD: 0, provisionsARS: 0,
+          directRows: 0, indirectRows: 0, provisionsRows: 0
         });
       }
       
-      // 5) Acumular en el track correspondiente (DIRECTOS o INDIRECTOS)
       const acc = periodCosts.get(periodKey)!;
       
       if (isDirect) {
@@ -559,10 +582,19 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         acc.directRows++;
         processedDirect++;
       } else if (isIndirect) {
-        acc.indirectUSD += montoUSD;
-        acc.indirectARS += montoARS;
-        acc.indirectRows++;
-        processedIndirect++;
+        // Separar provisiones de overhead operativo real
+        if (isProvision(row)) {
+          acc.provisionsUSD += montoUSD;
+          acc.provisionsARS += montoARS;
+          acc.provisionsRows++;
+          processedProvisions++;
+          console.log(`  📋 Provisión detectada: ${row.Proyecto || row.Cliente || 'N/A'} → $${montoUSD.toFixed(2)} USD`);
+        } else {
+          acc.indirectUSD += montoUSD;
+          acc.indirectARS += montoARS;
+          acc.indirectRows++;
+          processedIndirect++;
+        }
       }
       
     } catch (error) {
@@ -571,18 +603,19 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
     }
   }
   
-  // 6) Upsert agregados en fact_cost_month con DIRECTOS e INDIRECTOS separados
   console.log(`💾 [SoT ETL] Guardando ${periodCosts.size} períodos en fact_cost_month...`);
-  console.log(`   📊 Directos: ${processedDirect} filas | Indirectos: ${processedIndirect} filas | Saltados: ${skipped}`);
+  console.log(`   📊 Directos: ${processedDirect} | Indirectos Operativos: ${processedIndirect} | Provisiones: ${processedProvisions} | Saltados: ${skipped}`);
   
   for (const [periodKey, costs] of periodCosts) {
-    // Asegurar que el período existe en dim_period
     await ensurePeriod(periodKey);
     
-    // Total para compatibilidad (amountUSD = directUSD + indirectUSD)
-    const totalUSD = costs.directUSD + costs.indirectUSD;
-    const totalARS = costs.directARS + costs.indirectARS;
-    const totalRows = costs.directRows + costs.indirectRows;
+    // Total OPERATIVO (sin provisiones) para compatibilidad
+    const totalOperativoUSD = costs.directUSD + costs.indirectUSD;
+    const totalOperativoARS = costs.directARS + costs.indirectARS;
+    // Total CONTABLE (con provisiones)
+    const totalContableUSD = totalOperativoUSD + costs.provisionsUSD;
+    const totalContableARS = totalOperativoARS + costs.provisionsARS;
+    const totalRows = costs.directRows + costs.indirectRows + costs.provisionsRows;
     
     await db.insert(factCostMonth)
       .values({
@@ -591,11 +624,14 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
         directARS: costs.directARS.toString(),
         indirectUSD: costs.indirectUSD.toString(),
         indirectARS: costs.indirectARS.toString(),
-        amountUSD: totalUSD.toString(),
-        amountARS: totalARS.toString(),
+        provisionsUSD: costs.provisionsUSD.toString(),
+        provisionsARS: costs.provisionsARS.toString(),
+        amountUSD: totalContableUSD.toString(),
+        amountARS: totalContableARS.toString(),
         sourceRowsCount: totalRows,
         directRowsCount: costs.directRows,
-        indirectRowsCount: costs.indirectRows
+        indirectRowsCount: costs.indirectRows,
+        provisionsRowsCount: costs.provisionsRows
       })
       .onConflictDoUpdate({
         target: [factCostMonth.periodKey],
@@ -604,19 +640,22 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
           directARS: costs.directARS.toString(),
           indirectUSD: costs.indirectUSD.toString(),
           indirectARS: costs.indirectARS.toString(),
-          amountUSD: totalUSD.toString(),
-          amountARS: totalARS.toString(),
+          provisionsUSD: costs.provisionsUSD.toString(),
+          provisionsARS: costs.provisionsARS.toString(),
+          amountUSD: totalContableUSD.toString(),
+          amountARS: totalContableARS.toString(),
           sourceRowsCount: totalRows,
           directRowsCount: costs.directRows,
           indirectRowsCount: costs.indirectRows,
+          provisionsRowsCount: costs.provisionsRows,
           etlTimestamp: sql`now()`
         }
       });
     
-    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos=$${costs.indirectUSD.toFixed(2)}, Total=$${totalUSD.toFixed(2)} USD`);
+    console.log(`  ✅ ${periodKey}: Directos=$${costs.directUSD.toFixed(2)}, Indirectos Ope=$${costs.indirectUSD.toFixed(2)}, Provisiones=$${costs.provisionsUSD.toFixed(2)} USD`);
   }
   
-  console.log(`✅ [SoT ETL] Costos agregados: ${processedDirect} directos, ${processedIndirect} indirectos, ${skipped} saltados, ${periodCosts.size} períodos actualizados`);
+  console.log(`✅ [SoT ETL] Costos separados: ${processedDirect} directos, ${processedIndirect} indirectos operativos, ${processedProvisions} provisiones`);
 }
 
 // ==================== HECHOS: RC (RENDIMIENTO CLIENTE) ====================
