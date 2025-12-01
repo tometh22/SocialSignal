@@ -1,0 +1,243 @@
+En Operativo, las provisiones NO deben aparecer jamás.
+Si aparecen mezcladas dentro de “Indirectos”, el dashboard operativo queda contaminado con contabilidad. Eso rompe tu lectura real del mes y distorsiona:
+
+Markup operativo
+
+EBIT operativo
+
+% horas facturables
+
+Costos de equipo vs overhead real
+
+Esto hay que corregirlo.
+
+A nivel conceptual, la regla es matemática y rígida:
+
+1. OPERATIVO = solo lo que ocurre en el mes
+
+Sin provisiones. Sin ajustes contables. Sin facturación futura.
+Solo realidad del mes.
+
+Operativo incluye:
+
+Horas trabajadas
+
+Costo directo del equipo (solo horas × tarifa interna)
+
+Costo indirecto real del mes (sueldos, overhead administrativo, costos fijos)
+
+Devengado real (horas × tarifa cliente)
+
+Markup operativo real
+
+EBIT operativo = Devengado – Costos directos
+
+% horas facturables
+
+Operativo NO incluye:
+
+Provisión Pepsico
+
+Provisión Warner
+
+Provisión impuestos USA
+
+Ajustes contables de facturas futuras
+
+Acumulación de IVA
+
+Ajustes de “pasivo contable”
+
+2. FINANCIERO = contabilidad + provisiones + anticipos + impuestos
+
+Ahí sí entran:
+
+Financiero incluye:
+
+Facturado total
+
+Provisiones de clientes
+
+Provisiones de impuestos USA
+
+IVA compras y ventas
+
+Cashflow
+
+Burn rate
+
+EBIT contable
+
+Balance
+
+Activo / Pasivo
+
+Cuentas a cobrar/pagar
+
+3. Dónde está el problema ahora mismo
+
+Tus costos indirectos del módulo operativo están tomando esta pestaña del Excel:
+
+Costos directos e indirectos → Indirectos
+
+Pero AHÍ adentro contabilidad metió:
+
+Sueldos
+
+Estimaciones
+
+IVA compras
+
+Provisiones
+
+Ajustes de proyectos
+
+Impuestos USA
+
+Provisión Pepsico
+
+Provisión Warner
+
+Tu ETL está leyendo todo eso y lo está sumando como “Overhead operativo”.
+
+Resultado:
+
+Malo:
+
+Indirectos inflados
+
+Markup operativo erróneo
+
+EBIT operativo subestimado
+
+Burn rate correcto, pero mezclado en la vista incorrecta
+
+4. Lo correcto es separar finalmente 3 buckets:
+A. Directos
+
+Horas del equipo que trabajan en proyectos, multiplicado por costo interno.
+
+B. Indirectos (operativos)
+
+Costos fijos reales del mes, sin provisiones:
+
+Sueldos administrativos
+
+Servicios
+
+Software
+
+Alquiler
+
+Honorarios no imputables
+
+C. Provisiones (solo financiero)
+
+Provisión Pepsico
+
+Provisión Warner
+
+Provisión impuestos USA
+
+IVA compras/ventas
+
+Otros pasivos contables del mes
+
+5. Qué debe ocurrir en el dashboard
+OPERATIVO:
+
+Directos: $17.4k
+Indirectos: solo overhead real del mes
+No incluir provisiones.
+
+FINANCIERO:
+
+Mostrar un bloque separado de:
+
+Provisiones
+
+Impuestos
+
+Ajustes
+
+Contabilidad
+
+6. Qué hay que corregir (ETL)
+
+En la pestaña Costos directos e indirectos:
+
+Filtrar solo Tipo de costo == "Indirecto"
+
+Y además excluir cualquier fila donde la columna “Proyecto” o “Descripción” coincida con:
+
+"PROVISION"
+
+"Pepsico"
+
+"Warner"
+
+"Impuestos USA"
+
+"IVA"
+
+"Provision"
+
+"Pasivo"
+
+"Ajuste"
+
+"Percepción"
+
+Pero dejar los administrativos que sí son overhead real.
+
+Guardar las provisiones en una tabla aparte:
+fact_provisions_month
+
+No incluir provisiones en:
+
+Markup operativo
+
+EBIT operativo
+
+% horas facturables
+
+Composición de costos operativos
+
+Sí incluir provisiones en:
+
+EBIT contable
+
+Facturación neta
+
+Cash flow
+
+Balance
+
+Resumen financiero del mes
+
+7. Resultado esperado luego de la corrección
+Operativo:
+
+Directos: $17.4k
+
+Indirectos correctos: aprox $20–30k (según gastos reales administrativos)
+
+Provisiones: 0
+
+Markup operativo sube
+
+EBIT operativo sube
+
+Horas facturables no cambian
+
+Financiero:
+
+Provisiones se muestran en secciones contables
+
+Burn rate sigue igual (si lo querés contable o cash)
+
+EBIT contable igual
+
+Facturado igual
+
+Balance final igual

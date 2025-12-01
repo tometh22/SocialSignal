@@ -2648,11 +2648,18 @@ export const factCostMonth = pgTable("fact_cost_month", {
   directUSD: numeric("direct_usd", { precision: 14, scale: 2 }).notNull().default('0'),
   directARS: numeric("direct_ars", { precision: 14, scale: 2 }).notNull().default('0'),
   
-  // Costos INDIRECTOS (Tipo de Costo = "Indirecto")
+  // Costos INDIRECTOS OPERATIVOS (overhead real del mes, SIN provisiones)
+  // Incluye: sueldos administrativos, servicios, software, alquiler, honorarios
+  // Excluye: Provisiones, IVA, Impuestos USA, Ajustes contables
   indirectUSD: numeric("indirect_usd", { precision: 14, scale: 2 }).notNull().default('0'),
   indirectARS: numeric("indirect_ars", { precision: 14, scale: 2 }).notNull().default('0'),
   
-  // Montos totales (deprecated - usar directUSD + indirectUSD)
+  // PROVISIONES CONTABLES (solo para vista Financiero)
+  // Incluye: Provisión Pepsico, Warner, Impuestos USA, IVA, Pasivos, Ajustes
+  provisionsUSD: numeric("provisions_usd", { precision: 14, scale: 2 }).notNull().default('0'),
+  provisionsARS: numeric("provisions_ars", { precision: 14, scale: 2 }).notNull().default('0'),
+  
+  // Montos totales (deprecated - usar directUSD + indirectUSD + provisionsUSD para contable)
   amountUSD: numeric("amount_usd", { precision: 14, scale: 2 }).notNull().default('0'),
   amountARS: numeric("amount_ars", { precision: 14, scale: 2 }).default('0'),
   
@@ -2660,6 +2667,7 @@ export const factCostMonth = pgTable("fact_cost_month", {
   sourceRowsCount: integer("source_rows_count").default(0),
   directRowsCount: integer("direct_rows_count").default(0),
   indirectRowsCount: integer("indirect_rows_count").default(0),
+  provisionsRowsCount: integer("provisions_rows_count").default(0),
   etlTimestamp: timestamp("etl_timestamp").notNull().defaultNow(),
 }, (table) => ({
   uniquePeriod: unique().on(table.periodKey)
