@@ -13320,6 +13320,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔄 CASH FLOW ETL - Sync CashFlow movements from Excel MAESTRO
+  app.post("/api/etl/sot/sync-cashflow", requireAuth, async (req, res) => {
+    try {
+      console.log('🔄 Iniciando sincronización de CashFlow...');
+      
+      const { syncCashFlowMovements } = await import('./etl/sot-etl');
+      const result = await syncCashFlowMovements();
+      
+      res.json({
+        success: result.success,
+        recordsProcessed: result.recordsProcessed,
+        recordsInserted: result.recordsInserted,
+        periodsProcessed: result.periodsProcessed,
+        errors: result.errors,
+        executionTimeMs: result.executionTimeMs,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('❌ CashFlow Sync Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  

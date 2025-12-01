@@ -2950,6 +2950,183 @@ class GoogleSheetsWorkingService {
       return [];
     }
   }
+
+  /**
+   * Obtener movimientos de Cash Flow del Excel MAESTRO
+   * Lee la hoja "CashFlow" o similar y devuelve transacciones individuales
+   * Cada fila tiene: fecha, concepto, monto (positivo=ingreso, negativo=egreso)
+   */
+  async getCashFlowMovements(): Promise<CashFlowMovementRow[]> {
+    console.log('🔄 [CashFlow] Obteniendo movimientos del Excel MAESTRO...');
+    
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      
+      // Intentar varios nombres posibles para la hoja
+      const possibleSheetNames = [
+        'CashFlow',
+        'Cash Flow',
+        'Cashflow',
+        'Flujo de Caja',
+        'Flujo Caja',
+        'Movimientos Caja',
+        'Caja'
+      ];
+      
+      // Primero obtener lista de hojas disponibles
+      const spreadsheet = await sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+      });
+      
+      const availableSheets = spreadsheet.data.sheets?.map(s => s.properties?.title || '') || [];
+      console.log(`📋 [CashFlow] Hojas disponibles: ${availableSheets.join(', ')}`);
+      
+      // Buscar hoja de CashFlow
+      const cashFlowSheet = possibleSheetNames.find(name => 
+        availableSheets.some(sheet => 
+          sheet.toLowerCase().trim() === name.toLowerCase().trim()
+        )
+      );
+      
+      if (!cashFlowSheet) {
+        console.log('⚠️ [CashFlow] No se encontró hoja de CashFlow');
+        console.log('⚠️ [CashFlow] Posibles hojas:', availableSheets.slice(0, 10).join(', '));
+        return [];
+      }
+      
+      // Encontrar el nombre exacto de la hoja
+      const exactSheetName = availableSheets.find(sheet => 
+        sheet.toLowerCase().trim() === cashFlowSheet.toLowerCase().trim()
+      );
+      
+      console.log(`📊 [CashFlow] Leyendo hoja: "${exactSheetName}"`);
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `'${exactSheetName}'!A:Z`,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        console.log('⚠️ [CashFlow] No hay datos en la hoja');
+        return [];
+      }
+      
+      return this.parseCashFlowRows(rows);
+      
+    } catch (error: any) {
+      console.error('❌ [CashFlow] Error obteniendo datos:', error?.message || error);
+      return [];
+    }
+  }
+
+  /**
+   * Parsear filas de CashFlow
+   * Estructura esperada: Fecha | Concepto | Monto USD | Categoría | Referencia
+   */
+  private parseCashFlowRows(rows: any[][]): CashFlowMovementRow[] {
+    if (rows.length < 2) return [];
+    
+    const headers = rows[0] || [];
+    const result: CashFlowMovementRow[] = [];
+    
+    // Mapeo de columnas (flexible)
+    const findColIdx = (patterns: string[]): number => {
+      for (let i = 0; i < headers.length; i++) {
+        const h = (headers[i] || '').toString().toLowerCase().trim();
+        if (patterns.some(p => h.includes(p))) return i;
+      }
+      return -1;
+    };
+    
+    const dateIdx = findColIdx(['fecha', 'date', 'dia']);
+    const conceptIdx = findColIdx(['concepto', 'descripcion', 'detalle', 'concept']);
+    const amountIdx = findColIdx(['monto', 'amount', 'importe', 'usd', 'valor']);
+    const categoryIdx = findColIdx(['categoria', 'category', 'tipo']);
+    const referenceIdx = findColIdx(['referencia', 'reference', 'factura', 'invoice']);
+    
+    console.log(`📊 [CashFlow] Columnas: fecha=${dateIdx}, concepto=${conceptIdx}, monto=${amountIdx}, categoria=${categoryIdx}, referencia=${referenceIdx}`);
+    
+    if (dateIdx < 0 || amountIdx < 0) {
+      console.log('⚠️ [CashFlow] No se encontraron columnas de fecha y monto');
+      return [];
+    }
+    
+    // Procesar filas
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      
+      const dateRaw = (row[dateIdx] || '').toString().trim();
+      const conceptRaw = conceptIdx >= 0 ? (row[conceptIdx] || '').toString().trim() : '';
+      const amountRaw = (row[amountIdx] || '').toString().trim();
+      const categoryRaw = categoryIdx >= 0 ? (row[categoryIdx] || '').toString().trim() : '';
+      const referenceRaw = referenceIdx >= 0 ? (row[referenceIdx] || '').toString().trim() : '';
+      
+      // Parsear fecha
+      const date = this.parseDateValue(dateRaw);
+      if (!date) continue;
+      
+      // Parsear monto (formato argentino: $29.230,00 → 29230.00)
+      const amountClean = amountRaw
+        .replace(/\$/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.')
+        .replace(/\s/g, '')
+        .trim();
+      const amount = parseFloat(amountClean) || 0;
+      
+      if (amount === 0) continue;
+      
+      // Determinar período
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+      
+      result.push({
+        date,
+        periodKey,
+        concept: conceptRaw || `Movimiento ${i}`,
+        amountUsd: Math.abs(amount),
+        type: amount >= 0 ? 'ingreso' : 'egreso',
+        category: categoryRaw || undefined,
+        reference: referenceRaw || undefined,
+      });
+    }
+    
+    console.log(`✅ [CashFlow] Parseados ${result.length} movimientos`);
+    return result;
+  }
+
+  /**
+   * Parsear valor de fecha de diferentes formatos
+   */
+  private parseDateValue(value: string): Date | null {
+    if (!value) return null;
+    
+    // Intentar formato ISO
+    let date = new Date(value);
+    if (!isNaN(date.getTime())) return date;
+    
+    // Intentar formato DD/MM/YYYY
+    const dmyMatch = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmyMatch) {
+      const [, d, m, y] = dmyMatch;
+      date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    // Intentar formato DD-MM-YYYY
+    const dmyDashMatch = value.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
+    if (dmyDashMatch) {
+      const [, d, m, y] = dmyDashMatch;
+      date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+      if (!isNaN(date.getTime())) return date;
+    }
+    
+    return null;
+  }
 }
 
 // Tipo para cuentas a cobrar (facturas futuras = provisiones)
@@ -3003,6 +3180,17 @@ export interface ResumenEjecutivoRow {
   ebitOperativo?: number;
   beneficioNeto?: number;
   markupPromedio?: number;
+}
+
+// Tipo para movimientos de cash flow
+export interface CashFlowMovementRow {
+  date: Date;
+  periodKey: string;
+  concept: string;
+  amountUsd: number;
+  type: 'ingreso' | 'egreso';
+  category?: string;
+  reference?: string;
 }
 
 export const googleSheetsWorkingService = new GoogleSheetsWorkingService();

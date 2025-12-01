@@ -1585,3 +1585,157 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
     };
   }
 }
+
+// ==================== CASH FLOW ETL ====================
+
+/**
+ * Sincronizar movimientos de CashFlow desde Excel MAESTRO
+ * Patrón: delete-then-insert por período para idempotencia
+ */
+export async function syncCashFlowMovements(): Promise<{
+  success: boolean;
+  recordsProcessed: number;
+  recordsInserted: number;
+  periodsProcessed: number;
+  errors: string[];
+  executionTimeMs: number;
+}> {
+  const startTime = Date.now();
+  console.log('🔄 [CashFlow ETL] Iniciando sincronización...');
+  
+  const errors: string[] = [];
+  let recordsInserted = 0;
+  const periodsSet = new Set<string>();
+  
+  try {
+    const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
+    const { cashMovements } = await import('@shared/schema');
+    
+    // Obtener movimientos del Excel MAESTRO
+    const movements = await googleSheetsWorkingService.getCashFlowMovements();
+    
+    if (movements.length === 0) {
+      console.log('⚠️ [CashFlow ETL] No se encontraron movimientos de caja');
+      return {
+        success: true,
+        recordsProcessed: 0,
+        recordsInserted: 0,
+        periodsProcessed: 0,
+        errors: [],
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+    
+    console.log(`📊 [CashFlow ETL] ${movements.length} movimientos a procesar`);
+    
+    // Agrupar por período para delete-then-insert idempotente
+    const byPeriod = new Map<string, typeof movements>();
+    for (const mov of movements) {
+      const existing = byPeriod.get(mov.periodKey) || [];
+      existing.push(mov);
+      byPeriod.set(mov.periodKey, existing);
+      periodsSet.add(mov.periodKey);
+    }
+    
+    // Procesar cada período
+    for (const [periodKey, periodMovements] of byPeriod) {
+      try {
+        // Delete existing for this period
+        await db.delete(cashMovements)
+          .where(eq(cashMovements.periodKey, periodKey));
+        
+        // Insert all movements for this period
+        for (const mov of periodMovements) {
+          await db.insert(cashMovements).values({
+            date: mov.date,
+            periodKey: mov.periodKey,
+            concept: mov.concept,
+            amountUsd: mov.type === 'ingreso' ? mov.amountUsd.toString() : (-mov.amountUsd).toString(),
+            type: mov.type,
+            category: mov.category || null,
+            reference: mov.reference || null,
+          });
+          recordsInserted++;
+        }
+        
+        console.log(`  ✅ ${periodKey}: ${periodMovements.length} movimientos insertados`);
+        
+      } catch (error) {
+        const msg = `Error procesando período ${periodKey}: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(`❌ ${msg}`);
+        errors.push(msg);
+      }
+    }
+    
+    const executionTimeMs = Date.now() - startTime;
+    
+    console.log(`✅ [CashFlow ETL] Completado en ${executionTimeMs}ms`);
+    console.log(`📊 Resumen: ${recordsInserted} movimientos insertados en ${periodsSet.size} períodos`);
+    
+    return {
+      success: errors.length === 0,
+      recordsProcessed: movements.length,
+      recordsInserted,
+      periodsProcessed: periodsSet.size,
+      errors,
+      executionTimeMs
+    };
+    
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ [CashFlow ETL] Error:', error);
+    return {
+      success: false,
+      recordsProcessed: 0,
+      recordsInserted: 0,
+      periodsProcessed: 0,
+      errors: [errorMessage],
+      executionTimeMs: Date.now() - startTime
+    };
+  }
+}
+
+/**
+ * Obtener resumen de CashFlow por período desde cash_movements
+ * Calcula cashFlowInUsd, cashFlowOutUsd, y cashFlowNetUsd
+ */
+export async function getCashFlowSummaryByPeriod(periodKey: string): Promise<{
+  cashFlowInUsd: number;
+  cashFlowOutUsd: number;
+  cashFlowNetUsd: number;
+}> {
+  try {
+    const { cashMovements } = await import('@shared/schema');
+    
+    // Obtener todos los movimientos del período
+    const movements = await db.select()
+      .from(cashMovements)
+      .where(eq(cashMovements.periodKey, periodKey));
+    
+    let inflows = 0;
+    let outflows = 0;
+    
+    for (const mov of movements) {
+      const amount = parseFloat(mov.amountUsd as string) || 0;
+      if (amount >= 0) {
+        inflows += amount;
+      } else {
+        outflows += Math.abs(amount);
+      }
+    }
+    
+    return {
+      cashFlowInUsd: inflows,
+      cashFlowOutUsd: outflows,
+      cashFlowNetUsd: inflows - outflows
+    };
+    
+  } catch (error) {
+    console.error('❌ [getCashFlowSummaryByPeriod] Error:', error);
+    return {
+      cashFlowInUsd: 0,
+      cashFlowOutUsd: 0,
+      cashFlowNetUsd: 0
+    };
+  }
+}
