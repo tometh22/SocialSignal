@@ -938,82 +938,45 @@ export async function processProvisionSheets(): Promise<{
       }
     }
     
-    // 6. Actualizar INDIRECT con Impuestos USA (costo indirecto contable) - IDEMPOTENTE
-    // Usamos pl_adjustments para tracking y evitar duplicación
+    // 6. Guardar Impuestos USA SOLO en pl_adjustments (NO en indirect_usd)
+    // ARQUITECTURA THREE-BUCKET:
+    //   - fact_cost_month.direct_usd = Costos directos de proyectos
+    //   - fact_cost_month.indirect_usd = Costos indirectos OPERATIVOS (overhead puro)
+    //   - fact_cost_month.provisions_usd = Provisiones contables (PepsiCo, Warner, otros)
+    //   - pl_adjustments.impuestos_usa = Impuestos USA (separado para cálculo de burn rate)
+    //
+    // FÓRMULAS:
+    //   - Vista Operativa: direct + indirect_usd
+    //   - Burn Rate: direct + indirect_usd + impuestos_usa
+    //   - Vista Financiera (total_contable): direct + indirect_usd + impuestos_usa + provisions
     const { plAdjustments } = await import('@shared/schema');
     
     if (impuestosUsaByPeriod.size > 0) {
-      console.log(`💾 Actualizando Impuestos USA en costos indirectos para ${impuestosUsaByPeriod.size} períodos (idempotente)...`);
+      console.log(`💾 Guardando Impuestos USA en pl_adjustments para ${impuestosUsaByPeriod.size} períodos...`);
       
       for (const [periodKey, impuestosUsa] of impuestosUsaByPeriod) {
         try {
           await ensurePeriod(periodKey);
           
-          // 1. Obtener adjustment previo para este período (si existe)
-          const priorAdjustment = await db.select()
-            .from(plAdjustments)
-            .where(sql`${plAdjustments.periodKey} = ${periodKey} AND ${plAdjustments.type} = 'impuesto' AND ${plAdjustments.concept} = 'Impuestos USA (SoT)'`)
-            .limit(1);
+          // Upsert el adjustment (delete + insert pattern) - SIN modificar indirect_usd
+          await db.delete(plAdjustments)
+            .where(sql`${plAdjustments.periodKey} = ${periodKey} AND ${plAdjustments.type} = 'impuesto' AND ${plAdjustments.concept} = 'Impuestos USA (SoT)'`);
           
-          const priorTax = priorAdjustment.length > 0 ? parseFloat(priorAdjustment[0].amountUsd || '0') : 0;
+          await db.insert(plAdjustments)
+            .values({
+              periodKey,
+              type: 'impuesto',
+              concept: 'Impuestos USA (SoT)',
+              amountUsd: impuestosUsa.toString()
+            });
           
-          // 2. Obtener registro de costos existente
-          const existing = await db.select()
-            .from(factCostMonth)
-            .where(sql`${factCostMonth.periodKey} = ${periodKey}`)
-            .limit(1);
-          
-          if (existing.length > 0) {
-            const currentIndirect = parseFloat(existing[0].indirectUSD || '0');
-            const currentDirect = parseFloat(existing[0].directUSD || '0');
-            const currentProvisions = parseFloat(existing[0].provisionsUSD || '0');
-            
-            // 3. Calcular base indirect (restando prior tax) y aplicar nuevo
-            const baseIndirect = currentIndirect - priorTax;
-            
-            // VALIDATION: Detect negative or implausibly low base indirect
-            if (baseIndirect < 0) {
-              console.warn(`  ⚠️ ${periodKey}: Base indirect NEGATIVA detectada ($${baseIndirect.toFixed(2)}) - prior tax ($${priorTax.toFixed(2)}) excede current indirect ($${currentIndirect.toFixed(2)}). Usando 0 como base.`);
-            }
-            
-            const safeBaseIndirect = Math.max(0, baseIndirect);
-            const newIndirect = safeBaseIndirect + impuestosUsa;
-            const totalContable = currentDirect + newIndirect + currentProvisions;
-            
-            // 4. Ejecutar updates en secuencia (operación atómica por registro)
-            // Actualizar fact_cost_month
-            await db.update(factCostMonth)
-              .set({
-                indirectUSD: newIndirect.toString(),
-                amountUSD: totalContable.toString(),
-                etlTimestamp: sql`now()`
-              })
-              .where(sql`${factCostMonth.periodKey} = ${periodKey}`);
-            
-            // 5. Upsert el adjustment para tracking (delete + insert pattern)
-            await db.delete(plAdjustments)
-              .where(sql`${plAdjustments.periodKey} = ${periodKey} AND ${plAdjustments.type} = 'impuesto' AND ${plAdjustments.concept} = 'Impuestos USA (SoT)'`);
-            
-            await db.insert(plAdjustments)
-              .values({
-                periodKey,
-                type: 'impuesto',
-                concept: 'Impuestos USA (SoT)',
-                amountUsd: impuestosUsa.toString()
-              });
-            
-            if (priorTax > 0) {
-              console.log(`  ✅ ${periodKey}: Base $${safeBaseIndirect.toFixed(2)} + Impuestos USA $${impuestosUsa.toFixed(2)} = $${newIndirect.toFixed(2)} (prior: $${priorTax.toFixed(2)})`);
-            } else {
-              console.log(`  ✅ ${periodKey}: Base $${safeBaseIndirect.toFixed(2)} + Impuestos USA $${impuestosUsa.toFixed(2)} = $${newIndirect.toFixed(2)}`);
-            }
-          }
+          console.log(`  ✅ ${periodKey}: Impuestos USA = $${impuestosUsa.toFixed(2)} (guardado en pl_adjustments)`);
         } catch (error) {
-          console.error(`  ❌ Error actualizando Impuestos USA para ${periodKey}:`, error);
+          console.error(`  ❌ Error guardando Impuestos USA para ${periodKey}:`, error);
         }
       }
       
-      console.log(`✅ [SoT ETL] Impuestos USA actualizados en costos indirectos (idempotente)`);
+      console.log(`✅ [SoT ETL] Impuestos USA guardados en pl_adjustments (separado de indirect_usd)`);
     }
     
     return result;
