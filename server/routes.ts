@@ -5316,17 +5316,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `, [periodKeys]);
       const totalAdjustmentsUsd = parseFloat(adjustmentsData?.total_adjustments || '0');
       
+      // ===== IMPUESTOS USA (para calcular overhead operativo SIN impuestos) =====
+      const { rows: [impuestosUsaData] } = await pool.query(`
+        SELECT COALESCE(SUM(amount_usd), 0) as impuestos_usa
+        FROM pl_adjustments
+        WHERE period_key = ANY($1) AND type = 'impuesto' AND concept = 'Impuestos USA (SoT)'
+      `, [periodKeys]);
+      const impuestosUsaUsd = parseFloat(impuestosUsaData?.impuestos_usa || '0');
+      
+      // ===== OVERHEAD OPERATIVO (indirectos SIN Impuestos USA) =====
+      // Per checklist: overheadOperativeUsd = indirect costs excluding provisions/impuestos
+      const overheadOperativoUsd = Math.max(0, indirectCostsUsd - impuestosUsaUsd);
+      
       // ===== BENEFICIO NETO =====
       // Beneficio Neto = EBIT Contable - Provisiones/Ajustes
       const beneficioNetoUsd = ebitContableUsd - totalAdjustmentsUsd;
       
-      // ===== CASH FLOW OPERATIVO =====
+      // ===== CASH FLOW (Ingresos, Egresos, Neto desde cash_movements) =====
       const { rows: [cashFlowData] } = await pool.query(`
-        SELECT COALESCE(SUM(amount_usd), 0) as cash_flow
+        SELECT 
+          COALESCE(SUM(CASE WHEN amount_usd > 0 THEN amount_usd ELSE 0 END), 0) as cash_in_usd,
+          COALESCE(SUM(CASE WHEN amount_usd < 0 THEN ABS(amount_usd) ELSE 0 END), 0) as cash_out_usd,
+          COALESCE(SUM(amount_usd), 0) as cash_net_usd
         FROM cash_movements
         WHERE period_key = ANY($1)
       `, [periodKeys]);
-      const cashFlowOperativoUsd = parseFloat(cashFlowData?.cash_flow || '0');
+      const cashFlowInUsd = parseFloat(cashFlowData?.cash_in_usd || '0');
+      const cashFlowOutUsd = parseFloat(cashFlowData?.cash_out_usd || '0');
+      const cashFlowNetUsd = parseFloat(cashFlowData?.cash_net_usd || '0');
+      
+      // Fallback: Si no hay datos en cash_movements, usar cashflowNeto de monthly_financial_summary
+      const cashFlowOperativoUsd = cashFlowNetUsd !== 0 ? cashFlowNetUsd : excelMaestroSummary.cashflowNeto;
       
       // ===== BURN RATE (costos totales contables del mes - incluye provisiones) =====
       const burnRateUsd = totalContableUsd;
@@ -5349,18 +5369,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // ===== VERIFICATION LOGS =====
       console.log(`📊 DASHBOARD VERIFICATION [${lastPeriodKey}]:`);
-      console.log(`   💵 FINANCIERO:`);
+      console.log(`   💵 FINANCIERO (Contable):`);
       console.log(`      Facturado: USD ${incomeUsd.toFixed(2)}`);
       console.log(`      EBIT Contable (Facturado - Total Contable): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
       console.log(`      Burn Rate (Total Contable): USD ${burnRateUsd.toFixed(2)}`);
-      console.log(`   📈 OPERATIVO:`);
+      console.log(`      Cash Flow: In=$${cashFlowInUsd.toFixed(2)}, Out=$${cashFlowOutUsd.toFixed(2)}, Net=$${cashFlowOperativoUsd.toFixed(2)}`);
+      console.log(`   📈 OPERATIVO (sin provisiones ni impuestos contables):`);
       console.log(`      Devengado: USD ${devengadoUsd.toFixed(2)}`);
       console.log(`      EBIT Operativo (Devengado - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
+      console.log(`      Overhead Operativo (sin Impuestos USA): USD ${overheadOperativoUsd.toFixed(2)}`);
       console.log(`      Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
       console.log(`      Tarifa Efectiva: USD ${tarifaEfectivaUsd.toFixed(2)}/h`);
       console.log(`   📦 COSTOS (3 buckets separados):`);
       console.log(`      Directos: USD ${directCostsUsd.toFixed(2)}`);
-      console.log(`      Indirectos Operativos: USD ${indirectCostsUsd.toFixed(2)} (overhead real)`);
+      console.log(`      Indirectos Contables: USD ${indirectCostsUsd.toFixed(2)} (overhead + Impuestos USA $${impuestosUsaUsd.toFixed(2)})`);
+      console.log(`      Overhead Operativo: USD ${overheadOperativoUsd.toFixed(2)} (sin Impuestos USA)`);
       console.log(`      Provisiones: USD ${provisionsUsd.toFixed(2)} (contable)`);
       console.log(`      Total Operativo: USD ${totalOperativoUsd.toFixed(2)}`);
       console.log(`      Total Contable: USD ${totalContableUsd.toFixed(2)}`);
@@ -5534,11 +5557,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // ===== FINANCIAL (Visión Socios: usa datos de Excel MAESTRO cuando están disponibles) =====
         financial: {
-          billedUsd: hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd,
+          facturadoUsd: hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd,
+          billedUsd: hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd, // Alias para compatibilidad
           totalCostsUsd: totalContableUsd,       // Total contable (directos + indirectos + provisiones)
           directCostsUsd: directCostsUsd,
-          indirectCostsUsd: indirectCostsUsd,    // Solo overhead operativo (SIN provisiones)
+          overheadUsd: indirectCostsUsd,         // Overhead contable (incluye Impuestos USA) - per checklist
+          indirectCostsUsd: indirectCostsUsd,    // Alias para compatibilidad
           provisionsUsd: provisionsUsd,          // Provisiones contables separadas
+          impuestosUsaUsd: impuestosUsaUsd,      // Impuestos USA (parte del overhead contable)
           ebitAccountingUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd,
           ebitAccountingPct: hasExcelMaestroData 
             ? (excelMaestroSummary.facturacionTotal > 0 
@@ -5555,22 +5581,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inversionesUsd: excelMaestroSummary.inversiones,
           cuentasCobrarUsd: excelMaestroSummary.cuentasCobrarUsd,
           cuentasPagarUsd: excelMaestroSummary.cuentasPagarUsd,
-          cashflowNetoUsd: excelMaestroSummary.cashflowNeto,
+          
+          // Cash Flow separado (per checklist 2.2)
+          cashFlowInUsd: cashFlowInUsd,
+          cashFlowOutUsd: cashFlowOutUsd,
+          cashFlowNetUsd: cashFlowOperativoUsd,
+          cashflowNetoUsd: excelMaestroSummary.cashflowNeto, // Alias legacy
           
           dataSource: hasExcelMaestroData ? 'excel_maestro' : 'calculated'
         },
         
-        // ===== OPERATIONAL (Visión Management: usa Devengado y Costos Directos) =====
+        // ===== OPERATIONAL (Visión Management: usa Devengado y Costos Directos - SIN provisiones ni impuestos) =====
         operational: {
-          earnedUsd: devengadoUsd,                     // Devengado (ingreso ganado)
+          devengadoUsd: devengadoUsd,                  // Ingreso devengado (ganado)
+          earnedUsd: devengadoUsd,                     // Alias para compatibilidad
           directCostsUsd: directCostsUsd,              // Solo costos directos
-          ebitOperationalUsd: ebitOperativoUsd,        // Devengado - Directos
+          overheadOperativeUsd: overheadOperativoUsd,  // Overhead SIN Impuestos USA (per checklist)
+          ebitOperativeUsd: ebitOperativoUsd,          // Devengado - Directos
+          ebitOperationalUsd: ebitOperativoUsd,        // Alias para compatibilidad
           ebitOperationalPct: ebitOperativoPct,        // % sobre Devengado
-          markup: markupOperativoUsd,                  // Devengado / Costos Directos
-          effectiveRateUsd: tarifaEfectivaUsd,         // Devengado / Horas facturables
+          markupX: markupOperativoUsd,                 // Devengado / Costos Directos
+          markup: markupOperativoUsd,                  // Alias para compatibilidad
+          effectiveRateUsdPerHour: tarifaEfectivaUsd,  // Devengado / Horas facturables (per checklist)
+          effectiveRateUsd: tarifaEfectivaUsd,         // Alias para compatibilidad
           
-          hoursTotal: totalHours,
-          hoursBillable: billableHours,
+          billableHours: billableHours,                // Per checklist naming
+          totalHours: totalHours,                      // Per checklist naming
+          hoursTotal: totalHours,                      // Alias legacy
+          hoursBillable: billableHours,                // Alias legacy
           hoursNonBillable: parseFloat(hoursData?.non_billable_hours || '0'),
           billableRatio: billablePct,                  // 0-1
           
@@ -5584,9 +5622,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           billedUsd,
           devengadoUsd,
           directCostsUsd,
-          indirectCostsUsd,             // Indirectos operativos (SIN provisiones)
+          indirectCostsUsd,             // Indirectos contables (CON Impuestos USA)
+          overheadOperativoUsd,         // Indirectos operativos (SIN Impuestos USA)
+          impuestosUsaUsd,              // Impuestos USA (parte de overhead contable)
           provisionsUsd,                // Provisiones contables
-          totalOperativoUsd,            // Directos + Indirectos operativos
+          totalOperativoUsd,            // Directos + Indirectos contables (con impuestos)
           totalContableUsd,             // Directos + Indirectos + Provisiones
           costUsd,
           burnRateUsd,
@@ -5599,7 +5639,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalHours,
           billableHours,
           billablePct,
-          fxWeighted
+          fxWeighted,
+          cashFlowInUsd,
+          cashFlowOutUsd,
+          cashFlowNetUsd: cashFlowOperativoUsd
         },
         
         alerts: alerts,
