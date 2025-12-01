@@ -1,0 +1,300 @@
+1) Mapeo por pestaña (lo que hay que leer del Excel)
+
+Piensalo así: hay 3 bloques de info que la app usa:
+
+Balance / patrimonio
+
+Resultado del mes (ingresos / costos / provisiones)
+
+Flujo de caja (cash flow / caja)
+
+1. Resumen Ejecutivo
+
+Usos:
+
+TOTAL ACTIVO
+
+Campo: “TOTAL ACTIVO A USD” (el total convertido a USD).
+
+Uso: balance.totalActivoUsd para un posible widget de balance general.
+
+TOTAL PASIVO
+
+Campo: “TOTAL PASIVO A USD”.
+
+Uso: balance.totalPasivoUsd.
+
+BALANCE NETO (ACTIVO – PASIVO)
+
+Campo: “BALANCE NETO A USD”.
+
+Uso: balance.netWorthUsd.
+
+CASH FLOW NETO
+
+Campo: “Cash Flow neto” del mes (ya está en Resumen Ejecutivo).
+
+Uso: financial.cashFlowNetUsd (fallback cuando no uses cash_movements).
+
+CUENTAS A COBRAR (USD)
+
+Campo: “DEUDA CLIENTES A USD”.
+
+Uso: financial.accountsReceivableUsd.
+
+CUENTAS A PAGAR (USD)
+
+Campo: “PROVEEDORES A PAGAR A USD” (o similar).
+
+Uso: financial.accountsPayableUsd.
+
+INVERSIONES / CRYPTO (mediano plazo)
+
+Campo: “OTRAS INVERSIONES (CRYPTO MONEDAS) A USD” o subtotal de Activo Mediano Plazo.
+
+Uso: balance.investmentsUsd.
+
+CASH FLOW (para resumen)
+
+Campos:
+
+“Ingresos reales” (cash in del mes)
+
+“Egresos reales” (cash out del mes)
+
+Uso: financial.cashFlowInUsd, financial.cashFlowOutUsd cuando no vengan de cash_movements.
+
+FACTURACIÓN TOTAL DEL MES (ARS + USD)
+
+En tu resumen: esta la trae “Seguimiento Mark Up general Fila 101”.
+
+Pero podés guardar en monthly_financial_summary.facturadoUsd el valor ya consolidado si está además en Resumen Ejecutivo.
+
+2. CashFlow (pestaña “Cash Flow contable”)
+
+Acá hay dos niveles:
+
+Nivel resumen (ya lo estás usando vía Resumen Ejecutivo)
+
+Cash flow neto del mes → cashFlowNetUsd.
+
+Nivel detalle / movimientos (para ETL de cash_movements)
+
+Columnas típicas: Fecha, Concepto, Monto, Cuenta, Moneda.
+
+Lógica:
+
+Si monto > 0 → type = INFLOW.
+
+Si monto < 0 → type = OUTFLOW.
+
+Convertís ARS a USD con FX del mes (pestaña Info Tipo de Cambio).
+
+Guardás amount_usd, date, period_key, concept, category.
+
+Luego agregás en API:
+
+cashFlowInUsd = SUM(inflows)
+
+cashFlowOutUsd = SUM(outflows)
+
+cashFlowNetUsd = In – Out.
+
+3. Seguimiento Markup General
+
+Usos clave:
+
+VENTAS DEL MES (facturación total)
+
+Fila 101: sumatoria de ventas del mes (ARS + USD, ya convertida).
+
+Uso: financial.facturadoUsd.
+
+COSTOS DEL MES (contable)
+
+Fila 76 o sección similar:
+
+Costos directos
+
+Costos indirectos
+
+Uso:
+
+directCostsUsd (contable)
+
+overheadUsd (contable).
+
+IVA compras (Fila 29)
+
+Opcional para análisis de impuestos.
+
+Podés guardar como taxes.ivaComprasUsd.
+
+Impuestos USA (Fila 24)
+
+Uso: financial.impuestosUsaUsd.
+
+Sirve para:
+
+Sumar a provisiones contables.
+
+Restar en overhead operativo (para que la vista Operativa excluya esto).
+
+Facturación de proyectos cerrados (para markup “puro”)
+
+Hoy no está filtrada.
+
+Plan: crear lógica futura que marque proyectos cerrados y calcules un markupClosedProjectsX.
+
+4. Costos directos e indirectos
+
+Usos:
+
+Costos directos
+
+Filtro: Tipo de costo = DIRECTO.
+
+Convertís a USD con FX del mes.
+
+Uso:
+
+operational.directCostsUsd (va directo a EBIT Operativo y markup).
+
+Costos indirectos (estructura + overhead)
+
+Filtro: Tipo de costo = INDIRECTO.
+
+Convertís a USD.
+
+Uso:
+
+financial.overheadUsd (visión contable).
+
+Overhead operativo
+
+Se calcula en ETL, no se lee de la hoja:
+
+Fórmula:
+
+overheadOperativeUsd = overheadUsd - impuestosUsaUsd
+
+
+Uso: operational.overheadOperativeUsd se usa solo como referencia en el gráfico de costos operativos.
+
+5. Pasivo
+
+Usos:
+
+Provisiones clientes (si no vinieran de hoja específica)
+
+Rubros “Provisión Warner”, “Provisión Pepsico”, “Provisión impuestos USA”, etc.
+
+Si están bien discriminadas acá, podés sumarlas a provisionsUsd.
+
+Cuentas a pagar
+
+Ya las estás usando vía Resumen Ejecutivo, pero Pasivo sirve como fuente de verdad.
+
+6. Provisión Pasivo Proyectos
+
+Usos:
+
+Provisiones por cliente/proyecto
+
+Filtrar por cliente: Pepsico, Warner, etc.
+
+Montos positivos → crean provisión
+
+Montos negativos → reversan provisión
+
+Sumatoria por mes y cliente → provisionsClientsUsd.
+
+Total provisiones (parte cliente)
+
+provisionsClientsUsd = sum(provisions Pepsico + Warner + otros clientes)
+
+7. Impuestos
+
+Usos:
+
+Detalle de impuestos (AR / otros)
+
+IVA ventas, IVA compras, Ingresos Brutos, etc.
+
+Si parte de “Impuestos USA” se registra acá, sumarlo a impuestosUsaUsd.
+
+Complemento de provisiones
+
+Parte de las provisiones mensuales puede salir de aquí (p. ej. “Impuesto a pagar USA”).
+
+8. Info Tipo de Cambio y REM
+
+Usos:
+
+Fecha + dólar del mes
+
+Tomás el tipo de cambio “Oficial” o el que definieron para los informes.
+
+Uso:
+
+fxRate[period_key] // guardado en tabla de parámetros
+amountUsd = amountArs / fxRate[period_key]
+
+2) Cómo debe usarlo el ETL (resumen para el Agent)
+
+Texto que podés copiar (adaptalo, pero la lógica es esta):
+
+Leer Seguimiento Financiero_Economico Para Tablero.xlsx.
+
+Para cada period_key (YYYY-MM):
+
+De Resumen Ejecutivo:
+
+totalActivoUsd, totalPasivoUsd, netWorthUsd
+
+accountsReceivableUsd, accountsPayableUsd
+
+investmentsUsd
+
+cashFlowNetUsd (neto)
+
+De Info Tipo de Cambio y REM:
+
+fxRateUsdArs del período
+
+De Seguimiento Markup general:
+
+facturadoUsd (fila 101)
+
+directCostsUsd (fila 76)
+
+overheadUsd (fila 76)
+
+ivaComprasUsd (fila 29)
+
+impuestosUsaUsd (fila 24)
+
+De Costos directos e indirectos:
+
+Recalcular directCostsUsd y overheadUsd sumando filas por tipo, usando fxRate.
+
+De Provisión pasivo proyectos:
+
+provisionsClientsUsd = suma Pepsico + Warner + otros (positivos − negativos).
+
+De Impuestos / Pasivo:
+
+confirmar impuestosUsaUsd del mes.
+
+Calcular:
+
+provisionsUsd        = provisionsClientsUsd + impuestosUsaUsd
+overheadOperativeUsd = overheadUsd - impuestosUsaUsd
+burnRateUsd          = directCostsUsd + overheadUsd + provisionsUsd
+
+
+Guardar todo en monthly_financial_summary y fact_cost_month, y exponer vía /api/dashboard/metrics.
+
+CashFlow ETL lo podés dejar como siguiente iteración: por ahora solo usás cashFlowNetUsd de Resumen Ejecutivo; cashFlowInUsd y cashFlowOutUsd = 0 hasta que la lógica de movimientos esté bien definida.
+
+Con esto, todo queda alineado 1:1 con el Excel MAESTRO y la app puede consumir siempre los mismos campos, mes que elijas.
