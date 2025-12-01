@@ -1233,6 +1233,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Trigger provision ETL sync
+  app.post('/api/debug/provisions/sync', requireAuth, async (req, res) => {
+    try {
+      console.log('📊 DEBUG: Triggering provision ETL sync...');
+      
+      const { processProvisionSheets } = await import('./etl/sot-etl');
+      const result = await processProvisionSheets();
+      
+      res.json({
+        success: result.success,
+        provisionsProcessed: result.provisionsProcessed,
+        provisionsTotal: result.provisionsTotal,
+        byPeriod: Object.fromEntries(result.byPeriod),
+        errors: result.errors,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Provision sync error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  });
+
+  // DEBUG: Provision extraction diagnostic endpoint
+  app.get('/api/debug/provisions', requireAuth, async (req, res) => {
+    try {
+      const period = req.query.period as string || '2025-10';
+      console.log(`📊 DEBUG PROVISIONS: Checking all provision sources for period=${period}`);
+      
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      // Get all provision sources
+      const [activoProvisions, provisionProyectos, impuestos, pasivo, impuestosUsa] = await Promise.all([
+        googleSheetsWorkingService.getWarnerProvisionFromCuentasCobrar(period),
+        googleSheetsWorkingService.getProvisionPasivoProyectos(),
+        googleSheetsWorkingService.getImpuestos(),
+        googleSheetsWorkingService.getPasivo(),
+        googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo()
+      ]);
+      
+      // Filter provisions for the requested period
+      const filterByPeriod = (items: any[]) => items.filter(p => p.periodKey === period);
+      
+      const activoFiltered = activoProvisions; // Already filtered by period
+      const proyectosFiltered = filterByPeriod(provisionProyectos);
+      const impuestosFiltered = filterByPeriod(impuestos);
+      const pasivoFiltered = filterByPeriod(pasivo);
+      const usaFiltered = filterByPeriod(impuestosUsa);
+      
+      // Calculate totals
+      const calcTotal = (items: any[]) => items.reduce((sum, p) => sum + (p.amountUsd || 0), 0);
+      
+      const summary = {
+        activoTotal: calcTotal(activoFiltered),
+        proyectosTotal: calcTotal(proyectosFiltered),
+        impuestosTotal: calcTotal(impuestosFiltered),
+        pasivoTotal: calcTotal(pasivoFiltered),
+        impuestosUsaTotal: calcTotal(usaFiltered),
+        grandTotal: 0
+      };
+      summary.grandTotal = summary.activoTotal + summary.proyectosTotal + 
+                           summary.impuestosTotal + summary.pasivoTotal + 
+                           summary.impuestosUsaTotal;
+      
+      res.json({
+        period,
+        summary,
+        sources: {
+          activo: {
+            count: activoFiltered.length,
+            total: summary.activoTotal,
+            items: activoFiltered
+          },
+          provisionProyectos: {
+            count: proyectosFiltered.length,
+            total: summary.proyectosTotal,
+            items: proyectosFiltered
+          },
+          impuestos: {
+            count: impuestosFiltered.length,
+            total: summary.impuestosTotal,
+            items: impuestosFiltered
+          },
+          pasivo: {
+            count: pasivoFiltered.length,
+            total: summary.pasivoTotal,
+            items: pasivoFiltered
+          },
+          impuestosUsa: {
+            count: usaFiltered.length,
+            total: summary.impuestosUsaTotal,
+            items: usaFiltered
+          }
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error: any) {
+      console.error('❌ Provision debug error:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  });
+
   // Debug endpoint - Verificar mapeo de costos directos 
   app.get('/api/debug/costs-mapping/:projectId', requireAuth, async (req, res) => {
     const projectId = parseInt(req.params.projectId);

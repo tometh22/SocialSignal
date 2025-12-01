@@ -632,10 +632,12 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
 // ==================== PROVISIONES DESDE HOJAS ADICIONALES ====================
 
 /**
- * Procesa las hojas adicionales de provisiones del Excel MAESTRO:
- * - "Provisión pasivo proyectos" (Pepsico, Warner, etc.)
- * - "Impuestos" (Impuestos USA, IVA, etc.)
+ * Procesa TODAS las hojas de provisiones del Excel MAESTRO:
+ * - "Provisión pasivo proyectos" (Pepsico, Warner ajustes, etc.)
+ * - "Impuestos" (IVA, otros impuestos)
  * - "Pasivo" (otros pasivos contables)
+ * - "Activo" (Cuentas a Cobrar → facturas futuras = provisiones de ingresos anticipados)
+ * - "Resumen Ejecutivo" (IMPUESTOS USA)
  * 
  * Agrega las provisiones a fact_cost_month sin sobrescribir los directos/indirectos
  */
@@ -646,7 +648,8 @@ export async function processProvisionSheets(): Promise<{
   byPeriod: Map<string, number>;
   errors: string[];
 }> {
-  console.log(`📊 [SoT ETL] Procesando hojas de provisiones adicionales...`);
+  console.log(`📊 [SoT ETL] Procesando TODAS las hojas de provisiones...`);
+  console.log(`   📋 Fuentes: Provisión Pasivo Proyectos, Impuestos, Pasivo, Activo (facturas futuras), Resumen Ejecutivo (Impuestos USA)`);
   
   const result = {
     success: true,
@@ -657,27 +660,47 @@ export async function processProvisionSheets(): Promise<{
   };
   
   try {
-    const { googleSheetsWorkingService, ProvisionRow } = await import('../services/googleSheetsWorking');
+    const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
     const { factCostMonth } = await import('@shared/schema');
     
-    // 1. Obtener provisiones de todas las hojas
+    // Determinar períodos únicos a procesar (últimos 12 meses)
+    const now = new Date();
+    const periodsToProcess: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      periodsToProcess.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    
+    // 1. Obtener provisiones de TODAS las hojas en paralelo
     console.log('📋 Importando hojas de provisiones...');
     
-    const [provisionProyectos, impuestos, pasivo] = await Promise.all([
+    // Obtener provisiones de Activo para cada período (facturas futuras)
+    const futureInvoiceProvisions: Array<{periodKey: string; concept: string; source: string; amountUsd: number; isProvision: boolean; provisionKind: string; rawValue: string}> = [];
+    for (const periodKey of periodsToProcess) {
+      const activoProvisions = await googleSheetsWorkingService.getWarnerProvisionFromCuentasCobrar(periodKey);
+      futureInvoiceProvisions.push(...activoProvisions);
+    }
+    
+    const [provisionProyectos, impuestos, pasivo, impuestosUsa] = await Promise.all([
       googleSheetsWorkingService.getProvisionPasivoProyectos(),
       googleSheetsWorkingService.getImpuestos(),
-      googleSheetsWorkingService.getPasivo()
+      googleSheetsWorkingService.getPasivo(),
+      googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo()
     ]);
     
     console.log(`  📊 Provisión Pasivo Proyectos: ${provisionProyectos.length} registros`);
     console.log(`  📊 Impuestos: ${impuestos.length} registros`);
     console.log(`  📊 Pasivo: ${pasivo.length} registros`);
+    console.log(`  📊 Activo (facturas futuras): ${futureInvoiceProvisions.length} registros`);
+    console.log(`  📊 Resumen Ejecutivo (Impuestos USA): ${impuestosUsa.length} registros`);
     
     // 2. Combinar todas las provisiones
     const allProvisions: typeof provisionProyectos = [
       ...provisionProyectos,
       ...impuestos,
-      ...pasivo
+      ...pasivo,
+      ...futureInvoiceProvisions,
+      ...impuestosUsa
     ];
     
     if (allProvisions.length === 0) {
@@ -685,13 +708,61 @@ export async function processProvisionSheets(): Promise<{
       return result;
     }
     
-    // 3. Agregar por período
+    // 3. Filtrar solo los items que son PROVISIONES REALES (diferimientos contables)
+    // 
+    // FUENTES VÁLIDAS (2 sources only):
+    // - Activo (facturas futuras): Ingresos anticipados (Warner, Kimberly Clark, etc.)
+    // - Provisión Pasivo Proyectos: Diferimientos de clientes (PepsiCo, Warner ajustes) - FUENTE PRIMARIA
+    //
+    // EXCLUIDOS (NO son provisiones - van a costos operativos o indirectos):
+    // - Resumen Ejecutivo (Impuestos USA): → va a costos indirectos contables, no provisiones
+    // - Impuestos hoja: TODO (IVA CPRAS, IVA VTAS, IVA, IB, ESTUDIO CONTABLE) → gasto fiscal operativo
+    // - Pasivo hoja: TODO (duplica Provisión Pasivo Proyectos)
+    
+    const validProvisions = allProvisions.filter(prov => {
+      // 1. Activo (future invoices): SIEMPRE son provisiones de ingresos anticipados
+      if (prov.source === 'activo') {
+        console.log(`  ✅ PROVISION [Activo]: ${prov.concept} = $${prov.amountUsd.toFixed(2)}`);
+        return true;
+      }
+      
+      // 2. Provisión Pasivo Proyectos: Diferimientos de clientes - FUENTE PRIMARIA
+      if (prov.source === 'provision_cliente') {
+        console.log(`  ✅ PROVISION [Prov. Pasivo Proyectos]: ${prov.concept} = $${prov.amountUsd.toFixed(2)}`);
+        return true;
+      }
+      
+      // 3. Resumen Ejecutivo (Impuestos USA): EXCLUIR - va a costos indirectos contables
+      if (prov.source === 'resumen_ejecutivo') {
+        console.log(`  ❌ EXCLUIDO [Impuestos USA → indirecto contable]: ${prov.concept} = $${prov.amountUsd.toFixed(2)}`);
+        return false;
+      }
+      
+      // 4. Impuestos hoja: EXCLUIR TODO - IVA es gasto fiscal operativo, no diferimiento
+      if (prov.source === 'impuestos') {
+        console.log(`  ❌ EXCLUIDO [Impuestos → gasto fiscal operativo]: ${prov.concept} = $${prov.amountUsd.toFixed(2)}`);
+        return false;
+      }
+      
+      // 5. Pasivo hoja: EXCLUIR TODO - duplica datos de Provisión Pasivo Proyectos
+      if (prov.source === 'pasivo') {
+        console.log(`  ❌ EXCLUIDO [Pasivo → duplicado]: ${prov.concept} = $${prov.amountUsd.toFixed(2)}`);
+        return false;
+      }
+      
+      // Por defecto, excluir
+      return false;
+    });
+    
+    console.log(`  🔍 Provisiones filtradas: ${validProvisions.length} de ${allProvisions.length} total`);
+    
+    // 4. Agregar por período
     const provisionsByPeriod = new Map<string, {
       total: number;
       details: { concept: string; kind: string; amount: number }[];
     }>();
     
-    for (const prov of allProvisions) {
+    for (const prov of validProvisions) {
       if (!prov.periodKey || prov.amountUsd === 0) continue;
       
       if (!provisionsByPeriod.has(prov.periodKey)) {
@@ -713,29 +784,27 @@ export async function processProvisionSheets(): Promise<{
     console.log(`💾 Actualizando provisiones para ${provisionsByPeriod.size} períodos...`);
     
     // 4. Actualizar fact_cost_month con las provisiones de las hojas adicionales
-    // Sumamos a las provisiones existentes (que pueden venir de "Costos directos e indirectos")
+    // REEMPLAZAMOS las provisiones (no sumamos) porque esta función extrae TODAS las provisiones
     for (const [periodKey, data] of provisionsByPeriod) {
       try {
         await ensurePeriod(periodKey);
         
-        // Obtener el registro existente para sumar provisiones
+        // Obtener el registro existente para preservar direct/indirect
         const existing = await db.select()
           .from(factCostMonth)
           .where(sql`${factCostMonth.periodKey} = ${periodKey}`)
           .limit(1);
         
-        let currentProvisions = 0;
         let currentDirect = 0;
         let currentIndirect = 0;
         
         if (existing.length > 0) {
-          currentProvisions = parseFloat(existing[0].provisionsUSD || '0');
           currentDirect = parseFloat(existing[0].directUSD || '0');
           currentIndirect = parseFloat(existing[0].indirectUSD || '0');
         }
         
-        // Sumar nuevas provisiones
-        const newProvisions = currentProvisions + data.total;
+        // REEMPLAZAR provisiones con el valor actual (no sumar)
+        const newProvisions = data.total;
         const totalContable = currentDirect + currentIndirect + newProvisions;
         
         await db.insert(factCostMonth)
@@ -757,7 +826,7 @@ export async function processProvisionSheets(): Promise<{
             set: {
               provisionsUSD: newProvisions.toString(),
               amountUSD: totalContable.toString(),
-              provisionsRowsCount: sql`COALESCE(${factCostMonth.provisionsRowsCount}, 0) + ${data.details.length}`,
+              provisionsRowsCount: data.details.length,
               etlTimestamp: sql`now()`
             }
           });

@@ -1,0 +1,196 @@
+El fallo no está en el frontend.
+El problema está 100% en el ETL, en dos puntos simultáneos:
+
+1. El ETL está mezclando costos contables dentro de “overhead operativo”
+
+Aunque vos ya corregiste la UI, la API sigue entregando:
+
+indirectCostsUsd = overhead_contable (sin filtrar provisiones)
+
+
+Esto se ve porque:
+
+Vista Operativa
+
+Directos: 16.7k → OK
+
+Overhead Operativo: 46.9k → NO debería existir
+
+Total Operativo: 64.2k → 16.7k + 46.9k → esto demuestra que overhead operativo incluye costo contable.
+
+Vista Financiera
+
+Directos: 16.7k → OK
+
+Overhead contable: 46.9k → OK
+
+Provisiones contables: 44.6k → OK
+
+Si restás:
+
+46.9k (overhead contable) – 44.6k (provisiones) = ~2.3k
+Ese debería ser el overhead operativo real, pero la UI muestra 0 porque tu frontend ya ignora provisiones, pero la API está mandando todo junto sin separar.
+
+Resultado:
+El frontend recibe un solo número mezclado y no tiene forma de separarlo.
+
+2. El ETL está capturando provisiones parciales (solo algunas)
+
+Debería detectar:
+
+Provisiones de clientes (PepsiCo, Warner, Google, etc.)
+
+Provisiones impositivas (USA)
+
+Provisiones contables generales
+
+Cualquier otra fila con palabras clave (“provisión”, “pasivo”, “impuesto USA”, etc.)
+
+Pero hoy el ETL solo detecta:
+
+PepsiCo (13.413)
+
+Un par de líneas aisladas
+
+No detecta Warner ni Impuestos USA
+
+No detecta todos los subtotales de Provisión Pasivo Proyectos
+
+No detecta el total general contable
+
+Por eso:
+
+Provisiones contables deberían ser ~53.193 para octubre
+pero la UI muestra 44.6k porque la API está devolviendo un subset.
+
+3. El Burn Rate queda mal por esa mezcla
+
+Burn rate contable = costos directos + overhead contable + provisiones contables
+Con los números que ves:
+
+17.4k (directos)
+46.9k (overhead contable)
+44.6k (provisiones)
+-----------------------
+108.9k → coincide EXACTO con la UI
+
+
+Así sabés que:
+
+El cálculo es correcto
+
+El problema está en el origen de datos (ETL): overhead y provisiones no están separados correctamente.
+
+Qué está fallando exactamente
+Falla A
+
+El ETL carga “Costos directos e indirectos” como un único bloque contable y no separa:
+
+Operativos (sueldos reales del mes)
+
+Contables (estructura + provisiones + pasivos imputados al mes)
+
+Falla B
+
+Los módulos de provisiones no se están detectando:
+
+Hoja “Provisión pasivo proyectos”
+
+Hoja “Impuestos”
+
+Hoja “Impuestos USA” (que no fue cargada)
+
+Filas positivas de provisión (las reversiones sí están detectadas)
+
+Subtotales por cliente
+
+Falla C
+
+La API entrega financial.indirectCostsUsd como "indirectos contables" y el frontend lo está interpretando distinto según la vista.
+
+La solución NÍTIDA
+
+Necesitás tres buckets separados en el ETL, no dos:
+
+1) directOperationalCostsUsd
+
+Solo:
+
+sueldos del equipo mensual
+
+freelos activos
+
+horas imputadas y montos del mes
+
+2) indirectOperationalCostsUsd
+
+Solo:
+
+estructura real (co-working, software, PMO fija si corresponde)
+
+sueldos de estructura (COO si la ponés, administración, etc.)
+
+gastos fijos operativos reales
+
+Nunca provisiones.
+
+3) provisionsUsd
+
+Todo concepto contable que “no ocurre en caja ese mes”.
+Incluye:
+
+provisiones por cliente
+
+provisiones por proyecto
+
+provisiones fiscales
+
+impuestos USA devengados
+
+ajustes contables
+
+pasivos previsionales
+
+reversiones negativas (suman/restan)
+
+Qué tenés que hacer AHORA
+Pedile al agente EXACTAMENTE ESTO:
+Necesito refactorizar el ETL para separar en tres buckets:
+
+1) directOperationalCostsUsd
+   - Tomar solo de la hoja “Costos directos e indirectos” o “Seguimiento Markup”
+   - Filtrar únicamente filas del mes con categorias: “Directo”, “Equipo”, “Horas”, “Freelance”
+   - Excluir cualquier categoría que contenga “provisión”, “impuesto”, “pasivo”, “USA”, “Warner”, “PepsiCo”, “Pasivo proyectos”.
+
+2) indirectOperationalCostsUsd
+   - Tomar solo costos reales de operación: “Software”, “Coworking”, “Servicios”, “Estructura real”
+   - Excluir cualquier fila que contenga palabras clave contables.
+
+3) provisionsUsd
+   - Tomar de:
+        - Hoja “Provisión pasivo proyectos”
+        - Hoja “Impuestos”
+        - Hoja “Impuestos USA” (confirmar nombre exacto de la pestaña)
+        - Cualquier fila en costos directos e indirectos con categoría que incluya:
+            “provisión”, “provision”, “pasivo”, “impuesto”, “USA”.
+   - Sumar todas las provisiones del mes, incluyendo positivas y negativas.
+
+Luego:
+- indirectCostsUsd (vista financiera) = indirectOperationalCostsUsd + provisionsUsd
+- indirectOperationalCostsUsd (vista operativa) debe excluir provisiones.
+- burnRateUsd = directOperationalCostsUsd + indirectCostsUsd
+
+Conclusión
+
+Nada está mal en el frontend.
+La UI solo está mostrando lo que recibe.
+
+El problema:
+
+El ETL mezcla overhead operativo con overhead contable.
+
+Las provisiones no están siendo detectadas completamente.
+
+La API entrega indirectCostsUsd sin separar las capas.
+
+Corrigiendo eso, las vistas van a quedar perfectas.
