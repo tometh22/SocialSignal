@@ -3013,7 +3013,8 @@ class GoogleSheetsWorkingService {
         return [];
       }
       
-      return this.parseCashFlowRows(rows);
+      // Usar parser async con conversión FX
+      return this.parseCashFlowRowsWithFx(rows);
       
     } catch (error: any) {
       console.error('❌ [CashFlow] Error obteniendo datos:', error?.message || error);
@@ -3023,9 +3024,16 @@ class GoogleSheetsWorkingService {
 
   /**
    * Parsear filas de CashFlow
-   * Estructura esperada: Fecha | Concepto | Monto USD | Categoría | Referencia
+   * 
+   * CHECKLIST 4.1 IMPLEMENTATION:
+   * - Detectar moneda (ARS por defecto, convertir a USD)
+   * - Clasificar inflow (monto > 0) vs outflow (monto < 0)
+   * - Excluir transferencias internas entre cuentas
+   * - Convertir ARS → USD usando tipo de cambio del mes
+   * 
+   * Estructura esperada: Fecha | Concepto | Monto | Categoría | Referencia | Moneda
    */
-  private parseCashFlowRows(rows: any[][]): CashFlowMovementRow[] {
+  private async parseCashFlowRowsWithFx(rows: any[][]): Promise<CashFlowMovementRow[]> {
     if (rows.length < 2) return [];
     
     const headers = rows[0] || [];
@@ -3042,18 +3050,52 @@ class GoogleSheetsWorkingService {
     
     const dateIdx = findColIdx(['fecha', 'date', 'dia']);
     const conceptIdx = findColIdx(['concepto', 'descripcion', 'detalle', 'concept']);
-    const amountIdx = findColIdx(['monto', 'amount', 'importe', 'usd', 'valor']);
+    const amountIdx = findColIdx(['monto', 'amount', 'importe', 'valor']);
     const categoryIdx = findColIdx(['categoria', 'category', 'tipo']);
     const referenceIdx = findColIdx(['referencia', 'reference', 'factura', 'invoice']);
+    const currencyIdx = findColIdx(['moneda', 'currency', 'divisa', 'usd', 'ars']);
     
-    console.log(`📊 [CashFlow] Columnas: fecha=${dateIdx}, concepto=${conceptIdx}, monto=${amountIdx}, categoria=${categoryIdx}, referencia=${referenceIdx}`);
+    console.log(`📊 [CashFlow] Columnas: fecha=${dateIdx}, concepto=${conceptIdx}, monto=${amountIdx}, categoria=${categoryIdx}, referencia=${referenceIdx}, moneda=${currencyIdx}`);
     
     if (dateIdx < 0 || amountIdx < 0) {
       console.log('⚠️ [CashFlow] No se encontraron columnas de fecha y monto');
       return [];
     }
     
+    // Patrones para detectar transferencias internas (EXCLUIR)
+    const INTERNAL_TRANSFER_PATTERNS = [
+      'transferencia entre cuenta',
+      'transferencia interna',
+      'movimiento interno',
+      'traspaso',
+      'pase entre cuenta',
+      'compensacion',
+      'ajuste interno',
+    ];
+    
+    const isInternalTransfer = (concept: string): boolean => {
+      const normalized = concept.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return INTERNAL_TRANSFER_PATTERNS.some(p => normalized.includes(p));
+    };
+    
+    // Obtener tipos de cambio disponibles
+    let fxRates = new Map<string, number>();
+    try {
+      const tipoCambioData = await this.getTiposCambio();
+      for (const row of tipoCambioData) {
+        if (row.periodKey && row.tipoCambio > 0) {
+          fxRates.set(row.periodKey, row.tipoCambio);
+        }
+      }
+      console.log(`💱 [CashFlow] Tipos de cambio cargados para ${fxRates.size} períodos`);
+    } catch (e) {
+      console.log('⚠️ [CashFlow] No se pudieron cargar tipos de cambio, usando 1400 por defecto');
+    }
+    
     // Procesar filas
+    let skippedInternal = 0;
+    let convertedToUsd = 0;
+    
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (!row || row.length === 0) continue;
@@ -3063,6 +3105,13 @@ class GoogleSheetsWorkingService {
       const amountRaw = (row[amountIdx] || '').toString().trim();
       const categoryRaw = categoryIdx >= 0 ? (row[categoryIdx] || '').toString().trim() : '';
       const referenceRaw = referenceIdx >= 0 ? (row[referenceIdx] || '').toString().trim() : '';
+      const currencyRaw = currencyIdx >= 0 ? (row[currencyIdx] || '').toString().trim().toUpperCase() : '';
+      
+      // EXCLUIR: Transferencias internas entre cuentas
+      if (isInternalTransfer(conceptRaw) || isInternalTransfer(categoryRaw)) {
+        skippedInternal++;
+        continue;
+      }
       
       // Parsear fecha
       const date = this.parseDateValue(dateRaw);
@@ -3075,11 +3124,101 @@ class GoogleSheetsWorkingService {
         .replace(/,/g, '.')
         .replace(/\s/g, '')
         .trim();
+      const amountRawNum = parseFloat(amountClean) || 0;
+      
+      if (amountRawNum === 0) continue;
+      
+      // Determinar período
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+      
+      // DETERMINAR MONEDA: Si no hay columna moneda, asumir ARS
+      const isUsd = currencyRaw === 'USD' || currencyRaw === 'U$D' || currencyRaw === 'DOLAR';
+      
+      // CONVERTIR ARS → USD si es necesario
+      let amountUsd: number;
+      if (isUsd) {
+        amountUsd = Math.abs(amountRawNum);
+      } else {
+        // Asumir ARS, convertir usando FX del mes
+        const fx = fxRates.get(periodKey) || 1400; // Fallback: ~1400 ARS/USD
+        amountUsd = Math.abs(amountRawNum) / fx;
+        convertedToUsd++;
+      }
+      
+      // CLASIFICAR: monto > 0 → inflow, monto < 0 → outflow
+      const type: 'ingreso' | 'egreso' = amountRawNum >= 0 ? 'ingreso' : 'egreso';
+      
+      result.push({
+        date,
+        periodKey,
+        concept: conceptRaw || `Movimiento ${i}`,
+        amountUsd: Math.round(amountUsd * 100) / 100, // 2 decimales
+        type,
+        category: categoryRaw || undefined,
+        reference: referenceRaw || undefined,
+      });
+    }
+    
+    console.log(`✅ [CashFlow] Parseados ${result.length} movimientos`);
+    console.log(`   📊 Convertidos ARS→USD: ${convertedToUsd}`);
+    console.log(`   🔄 Transferencias internas excluidas: ${skippedInternal}`);
+    console.log(`   💰 Ingresos: ${result.filter(r => r.type === 'ingreso').length}`);
+    console.log(`   💸 Egresos: ${result.filter(r => r.type === 'egreso').length}`);
+    
+    return result;
+  }
+  
+  private parseCashFlowRows(rows: any[][]): CashFlowMovementRow[] {
+    // Versión síncrona simple - delega a la versión async
+    // Esta se mantiene por compatibilidad pero no hace conversión FX
+    console.log('⚠️ [CashFlow] Usando parser síncrono (sin conversión FX)');
+    
+    if (rows.length < 2) return [];
+    
+    const headers = rows[0] || [];
+    const result: CashFlowMovementRow[] = [];
+    
+    const findColIdx = (patterns: string[]): number => {
+      for (let i = 0; i < headers.length; i++) {
+        const h = (headers[i] || '').toString().toLowerCase().trim();
+        if (patterns.some(p => h.includes(p))) return i;
+      }
+      return -1;
+    };
+    
+    const dateIdx = findColIdx(['fecha', 'date', 'dia']);
+    const conceptIdx = findColIdx(['concepto', 'descripcion', 'detalle', 'concept']);
+    const amountIdx = findColIdx(['monto', 'amount', 'importe', 'usd', 'valor']);
+    const categoryIdx = findColIdx(['categoria', 'category', 'tipo']);
+    const referenceIdx = findColIdx(['referencia', 'reference', 'factura', 'invoice']);
+    
+    if (dateIdx < 0 || amountIdx < 0) return [];
+    
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      
+      const dateRaw = (row[dateIdx] || '').toString().trim();
+      const conceptRaw = conceptIdx >= 0 ? (row[conceptIdx] || '').toString().trim() : '';
+      const amountRaw = (row[amountIdx] || '').toString().trim();
+      const categoryRaw = categoryIdx >= 0 ? (row[categoryIdx] || '').toString().trim() : '';
+      const referenceRaw = referenceIdx >= 0 ? (row[referenceIdx] || '').toString().trim() : '';
+      
+      const date = this.parseDateValue(dateRaw);
+      if (!date) continue;
+      
+      const amountClean = amountRaw
+        .replace(/\$/g, '')
+        .replace(/\./g, '')
+        .replace(/,/g, '.')
+        .replace(/\s/g, '')
+        .trim();
       const amount = parseFloat(amountClean) || 0;
       
       if (amount === 0) continue;
       
-      // Determinar período
       const year = date.getFullYear();
       const month = date.getMonth() + 1;
       const periodKey = `${year}-${String(month).padStart(2, '0')}`;
@@ -3095,7 +3234,6 @@ class GoogleSheetsWorkingService {
       });
     }
     
-    console.log(`✅ [CashFlow] Parseados ${result.length} movimientos`);
     return result;
   }
 
