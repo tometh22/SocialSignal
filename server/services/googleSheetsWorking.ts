@@ -2130,6 +2130,266 @@ class GoogleSheetsWorkingService {
     
     return null;
   }
+
+  /**
+   * Obtener datos de la hoja "Provisión pasivo proyectos"
+   * Contiene provisiones de clientes como Pepsico, Warner, etc.
+   */
+  async getProvisionPasivoProyectos(): Promise<ProvisionRow[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = "'Provisión pasivo proyectos'!A:Z";
+      
+      console.log('📊 [Provisión Pasivo Proyectos] Obteniendo datos del Excel MAESTRO...');
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ [Provisión Pasivo Proyectos] No se encontraron datos');
+        return [];
+      }
+
+      console.log(`📊 [Provisión Pasivo Proyectos] Procesando ${rows.length} filas...`);
+      
+      return this.parseProvisionSheet(rows, 'provision_cliente');
+      
+    } catch (error) {
+      console.error('❌ [Provisión Pasivo Proyectos] Error obteniendo datos:', error);
+      return []; // Return empty array on error, don't break ETL
+    }
+  }
+
+  /**
+   * Obtener datos de la hoja "Impuestos"
+   * Contiene provisiones de impuestos USA, IVA, etc.
+   */
+  async getImpuestos(): Promise<ProvisionRow[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = "'Impuestos'!A:Z";
+      
+      console.log('📊 [Impuestos] Obteniendo datos del Excel MAESTRO...');
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ [Impuestos] No se encontraron datos');
+        return [];
+      }
+
+      console.log(`📊 [Impuestos] Procesando ${rows.length} filas...`);
+      
+      return this.parseProvisionSheet(rows, 'impuestos');
+      
+    } catch (error) {
+      console.error('❌ [Impuestos] Error obteniendo datos:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Obtener datos de la hoja "Pasivo"
+   * Contiene provisiones varias y pasivos
+   */
+  async getPasivo(): Promise<ProvisionRow[]> {
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const range = "'Pasivo'!A:Z";
+      
+      console.log('📊 [Pasivo] Obteniendo datos del Excel MAESTRO...');
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: range,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+
+      const rows = response.data.values;
+      
+      if (!rows || rows.length === 0) {
+        console.log('⚠️ [Pasivo] No se encontraron datos');
+        return [];
+      }
+
+      console.log(`📊 [Pasivo] Procesando ${rows.length} filas...`);
+      
+      return this.parseProvisionSheet(rows, 'pasivo');
+      
+    } catch (error) {
+      console.error('❌ [Pasivo] Error obteniendo datos:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parser genérico para hojas de provisiones
+   * Detecta columnas de meses y extrae montos por período
+   */
+  private parseProvisionSheet(rows: any[][], source: string): ProvisionRow[] {
+    if (rows.length < 2) return [];
+    
+    const result: ProvisionRow[] = [];
+    const headerRow = rows[0];
+    
+    console.log(`📊 [${source}] Headers: ${headerRow.slice(0, 15).join(', ')}...`);
+    
+    // Encontrar columnas de meses (ej: "Oct 2024", "oct-24", "2024-10", etc.)
+    const monthColumns: { index: number; periodKey: string; label: string }[] = [];
+    
+    for (let col = 0; col < headerRow.length; col++) {
+      const header = (headerRow[col] || '').toString().trim();
+      const parsed = this.parseMonthLabel(header);
+      if (parsed) {
+        const periodKey = `${parsed.year}-${String(parsed.month).padStart(2, '0')}`;
+        monthColumns.push({ index: col, periodKey, label: header });
+      }
+    }
+    
+    console.log(`📊 [${source}] Encontradas ${monthColumns.length} columnas de meses`);
+    if (monthColumns.length > 0) {
+      console.log(`📊 [${source}] Meses: ${monthColumns.map(m => m.periodKey).join(', ')}`);
+    }
+    
+    // Encontrar columna de concepto/descripción (primera columna textual)
+    const conceptCol = 0;
+    
+    // Procesar cada fila de datos
+    for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
+      const row = rows[rowIdx];
+      if (!row || row.length === 0) continue;
+      
+      const concept = (row[conceptCol] || '').toString().trim();
+      if (!concept) continue;
+      
+      // Detectar si es una provisión conocida
+      const lowerConcept = concept.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const isProvision = this.isProvisionConcept(lowerConcept);
+      const provisionKind = this.detectProvisionKind(lowerConcept, source);
+      
+      // Extraer montos para cada mes
+      for (const monthCol of monthColumns) {
+        const rawValue = row[monthCol.index];
+        const amount = this.parseProvisionAmount(rawValue);
+        
+        if (amount !== 0) {
+          result.push({
+            periodKey: monthCol.periodKey,
+            concept,
+            source,
+            amountUsd: amount,
+            isProvision,
+            provisionKind,
+            rawValue: rawValue?.toString() || ''
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ [${source}] Extraídos ${result.length} registros de provisiones`);
+    
+    // Log summary por período
+    const byPeriod = new Map<string, number>();
+    for (const r of result) {
+      byPeriod.set(r.periodKey, (byPeriod.get(r.periodKey) || 0) + r.amountUsd);
+    }
+    for (const [period, total] of byPeriod) {
+      console.log(`  📊 ${period}: USD ${total.toFixed(2)}`);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Detectar si un concepto es una provisión contable
+   */
+  private isProvisionConcept(text: string): boolean {
+    const provisionPatterns = [
+      'provision', 'provisión',
+      'pepsico', 'warner',
+      'impuesto', 'tax', 'iva',
+      'pasivo', 'diferido',
+      'reserva', 'contingencia',
+      'ajuste', 'percepcion',
+      'anticipo', 'devengado contable'
+    ];
+    
+    return provisionPatterns.some(p => text.includes(p));
+  }
+
+  /**
+   * Detectar el tipo específico de provisión
+   */
+  private detectProvisionKind(text: string, source: string): string {
+    if (text.includes('pepsico')) return 'pepsico';
+    if (text.includes('warner')) return 'warner';
+    if (text.includes('impuesto usa') || text.includes('tax usa') || text.includes('usa')) return 'impuestos_usa';
+    if (text.includes('iva')) return 'iva';
+    if (source === 'impuestos') return 'impuestos';
+    if (source === 'provision_cliente') return 'cliente';
+    return 'otros';
+  }
+
+  /**
+   * Parsear monto de provisión (maneja formatos como "$1.234,56", "1234.56", etc.)
+   */
+  private parseProvisionAmount(value: any): number {
+    if (value === null || value === undefined || value === '') return 0;
+    
+    const str = value.toString().trim();
+    if (!str) return 0;
+    
+    // Remover símbolos de moneda y espacios
+    let cleaned = str.replace(/[$€\s]/g, '');
+    
+    // Detectar formato (1.234,56 vs 1,234.56)
+    const hasCommaDecimal = /\d+\.\d{3},\d{2}$/.test(cleaned);
+    const hasDotDecimal = /\d+,\d{3}\.\d{2}$/.test(cleaned);
+    
+    if (hasCommaDecimal) {
+      // Formato europeo: 1.234,56
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else if (hasDotDecimal) {
+      // Formato US: 1,234.56
+      cleaned = cleaned.replace(/,/g, '');
+    } else {
+      // Formato simple: intentar con coma como decimal
+      if (cleaned.includes(',') && !cleaned.includes('.')) {
+        cleaned = cleaned.replace(',', '.');
+      }
+    }
+    
+    // Detectar si es negativo (paréntesis o signo menos)
+    const isNegative = str.startsWith('-') || str.startsWith('(') || str.endsWith(')');
+    cleaned = cleaned.replace(/[()\\-]/g, '');
+    
+    const num = parseFloat(cleaned);
+    if (isNaN(num)) return 0;
+    
+    return isNegative ? -num : num;
+  }
+}
+
+// Tipo para datos de provisiones
+export interface ProvisionRow {
+  periodKey: string;
+  concept: string;
+  source: string;
+  amountUsd: number;
+  isProvision: boolean;
+  provisionKind: string;
+  rawValue: string;
 }
 
 // Tipo para datos de Resumen Ejecutivo

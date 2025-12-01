@@ -1,0 +1,181 @@
+Necesitás redondear y cerrar el circuito técnico ahora, porque lo que te está pasando es EXACTAMENTE lo que pasa cuando el ETL no está leyendo las hojas correctas o no está detectando provisiones porque:
+
+No están en la hoja de “Costos directos e indirectos”.
+
+Están en las hojas Provisión pasivo proyectos, Impuestos, Pasivo, IVA, etc.
+
+Tus reglas de detección no se aplican porque el ETL nunca toca esas pestañas.
+
+Por eso provisionsUsd = 0 aunque en el Excel hay Pepsico 13.413 y Warner 14.493 y Impuestos USA 25.287.
+
+Te dejo un checklist preciso para que copies al Replit Agent, y vas a ver que encuentra el problema en segundos.
+
+PROMPT EXACTO PARA EL REPLIT AGENT
+
+(copiar/pegar tal cual)
+
+Necesito corregir la detección de provisiones en el ETL.
+
+Hoy provisionsUsd = 0 en todos los meses, lo cual es incorrecto porque en el Excel maestro sí existen provisiones (Pepsico, Warner, Impuestos USA, etc.).
+
+Tareas obligatorias (en orden):
+
+1. Verificar qué hojas del Excel estamos importando realmente
+
+Abrí el archivo server/src/modules/etl/google-sheets/loader.ts o el archivo equivalente donde se leen las pestañas.
+
+Necesito confirmar si estamos importando estas pestañas:
+
+Resumen Ejecutivo
+
+Costos directos e indirectos
+
+Provisión pasivo proyectos
+
+Impuestos
+
+Pasivo
+
+CashFlow
+
+Seguimiento Markup General
+
+Si NO se importan “Provisión pasivo proyectos” o “Impuestos”, agregarlas inmediatamente.
+
+2. Incorporar esas hojas al pipeline del ETL
+
+En el módulo donde se procesan los costos, agregar:
+
+Provisiones cliente (Pepsico/Warner) desde Provisión pasivo proyectos
+
+Impuestos USA desde Impuestos
+
+IVA compras desde Seguimiento Markup General
+
+3. Para cada fila importada, generar la estructura:
+{
+  amountUsd: number,
+  costType: "direct" | "indirect",
+  isProvision: boolean,
+  provisionKind?: string
+}
+
+4. Reglas de clasificación
+
+Si la hoja es Costos directos e indirectos:
+
+Si “Tipo” = Directo → direct
+
+Si “Tipo” = Indirecto → indirect, isProvision = false
+
+Si la hoja es Provisión pasivo proyectos:
+→ costType = "indirect", isProvision = true, provisionKind = "proyecto"
+
+Si la hoja es Impuestos:
+→ costType = "indirect", isProvision = true, provisionKind = "impuestos"
+
+Si la hoja es Pasivo, y el proveedor incluye “Pepsico”, “Warner”, “USA Tax”:
+→ costType = "indirect", isProvision = true
+
+Matchear texto en cualquier columna (case insensitive):
+
+"provision"
+
+"provisión"
+
+"pepsico"
+
+"warner"
+
+"tax"
+
+"impuesto"
+
+"usa"
+
+Si matchea:
+→ isProvision = true
+
+5. Crear agregados mensuales corregidos
+
+Para cada mes:
+
+direct_costs → suma de costType = direct
+
+indirect_operational → indirect AND isProvision = false
+
+indirect_provisions → indirect AND isProvision = true
+
+Guardar estos campos en financial.indirectCostsUsd, financial.indirectOperationalUsd, financial.indirectProvisionsUsd.
+
+6. Cambiar comportamiento del Executive Dashboard
+Vista Operativa:
+
+Usar solo → direct_costs + indirect_operational
+
+EXCLUIR indirect_provisions
+
+Vista Financiera:
+
+Overhead = indirect_operational + indirect_provisions + impuestos
+
+Burn Rate = total_costs_contable
+
+7. Reprocesar el ETL completo
+
+Ejecutar:
+
+pnpm etl:run
+
+
+O el comando equivalente del proyecto.
+
+Luego imprimir en consola los valores de Octubre 2025:
+
+direct_costs
+
+indirect_operational
+
+indirect_provisions
+
+total_costs_contable
+
+Necesito verlos en logs.
+
+8. Validar con los valores reales de Octubre 2025 (Excel)
+
+Directos: ≈ 17.4k
+
+Overhead operativo real: mucho menor que 46.9k (sin provisiones)
+
+Provisiones:
+
+Pepsico 13.413
+
+Warner 14.493
+
+Impuestos USA 25.287
+
+Confirmar que el ETL ahora los detecta y distribuye correctamente.
+
+QUÉ VA A PASAR DESPUÉS DE ESTO
+
+Cuando el Replit Agent haga todo lo de arriba:
+
+En Operativo vas a ver:
+
+Directos = 17.4k
+
+Indirectos operativos reales = (costos administrativos reales, sin provisiones)
+
+TOTAL significativamente menor a los 64.2k actuales
+
+En Financiero vas a ver:
+
+Costos Directos = 17.4k
+
+Overhead = 46.9k (incluye provisiones)
+
+Burn Rate = 64.2k
+
+EBIT Contable = 42.3k (coincide con Excel)
