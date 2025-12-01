@@ -720,6 +720,170 @@ export async function processCostsByPeriod(rows: CostoDirectoRow[]): Promise<voi
   console.log(`✅ [SoT ETL] Costos separados: ${processedDirect} directos, ${processedIndirect} indirectos operativos, ${processedProvisions} provisiones`);
 }
 
+// ==================== PROVISIONES DESDE HOJAS ADICIONALES ====================
+
+/**
+ * Procesa las hojas adicionales de provisiones del Excel MAESTRO:
+ * - "Provisión pasivo proyectos" (Pepsico, Warner, etc.)
+ * - "Impuestos" (Impuestos USA, IVA, etc.)
+ * - "Pasivo" (otros pasivos contables)
+ * 
+ * Agrega las provisiones a fact_cost_month sin sobrescribir los directos/indirectos
+ */
+export async function processProvisionSheets(): Promise<{
+  success: boolean;
+  provisionsProcessed: number;
+  provisionsTotal: number;
+  byPeriod: Map<string, number>;
+  errors: string[];
+}> {
+  console.log(`📊 [SoT ETL] Procesando hojas de provisiones adicionales...`);
+  
+  const result = {
+    success: true,
+    provisionsProcessed: 0,
+    provisionsTotal: 0,
+    byPeriod: new Map<string, number>(),
+    errors: [] as string[]
+  };
+  
+  try {
+    const { googleSheetsWorkingService, ProvisionRow } = await import('../services/googleSheetsWorking');
+    const { factCostMonth } = await import('@shared/schema');
+    
+    // 1. Obtener provisiones de todas las hojas
+    console.log('📋 Importando hojas de provisiones...');
+    
+    const [provisionProyectos, impuestos, pasivo] = await Promise.all([
+      googleSheetsWorkingService.getProvisionPasivoProyectos(),
+      googleSheetsWorkingService.getImpuestos(),
+      googleSheetsWorkingService.getPasivo()
+    ]);
+    
+    console.log(`  📊 Provisión Pasivo Proyectos: ${provisionProyectos.length} registros`);
+    console.log(`  📊 Impuestos: ${impuestos.length} registros`);
+    console.log(`  📊 Pasivo: ${pasivo.length} registros`);
+    
+    // 2. Combinar todas las provisiones
+    const allProvisions: typeof provisionProyectos = [
+      ...provisionProyectos,
+      ...impuestos,
+      ...pasivo
+    ];
+    
+    if (allProvisions.length === 0) {
+      console.log('⚠️ No se encontraron provisiones en las hojas adicionales');
+      return result;
+    }
+    
+    // 3. Agregar por período
+    const provisionsByPeriod = new Map<string, {
+      total: number;
+      details: { concept: string; kind: string; amount: number }[];
+    }>();
+    
+    for (const prov of allProvisions) {
+      if (!prov.periodKey || prov.amountUsd === 0) continue;
+      
+      if (!provisionsByPeriod.has(prov.periodKey)) {
+        provisionsByPeriod.set(prov.periodKey, { total: 0, details: [] });
+      }
+      
+      const acc = provisionsByPeriod.get(prov.periodKey)!;
+      acc.total += prov.amountUsd;
+      acc.details.push({
+        concept: prov.concept,
+        kind: prov.provisionKind,
+        amount: prov.amountUsd
+      });
+      
+      result.provisionsProcessed++;
+      result.provisionsTotal += prov.amountUsd;
+    }
+    
+    console.log(`💾 Actualizando provisiones para ${provisionsByPeriod.size} períodos...`);
+    
+    // 4. Actualizar fact_cost_month con las provisiones de las hojas adicionales
+    // Sumamos a las provisiones existentes (que pueden venir de "Costos directos e indirectos")
+    for (const [periodKey, data] of provisionsByPeriod) {
+      try {
+        await ensurePeriod(periodKey);
+        
+        // Obtener el registro existente para sumar provisiones
+        const existing = await db.select()
+          .from(factCostMonth)
+          .where(sql`${factCostMonth.periodKey} = ${periodKey}`)
+          .limit(1);
+        
+        let currentProvisions = 0;
+        let currentDirect = 0;
+        let currentIndirect = 0;
+        
+        if (existing.length > 0) {
+          currentProvisions = parseFloat(existing[0].provisionsUSD || '0');
+          currentDirect = parseFloat(existing[0].directUSD || '0');
+          currentIndirect = parseFloat(existing[0].indirectUSD || '0');
+        }
+        
+        // Sumar nuevas provisiones
+        const newProvisions = currentProvisions + data.total;
+        const totalContable = currentDirect + currentIndirect + newProvisions;
+        
+        await db.insert(factCostMonth)
+          .values({
+            periodKey,
+            directUSD: currentDirect.toString(),
+            directARS: '0',
+            indirectUSD: currentIndirect.toString(),
+            indirectARS: '0',
+            provisionsUSD: newProvisions.toString(),
+            provisionsARS: '0',
+            amountUSD: totalContable.toString(),
+            amountARS: '0',
+            sourceRowsCount: data.details.length,
+            provisionsRowsCount: data.details.length
+          })
+          .onConflictDoUpdate({
+            target: [factCostMonth.periodKey],
+            set: {
+              provisionsUSD: newProvisions.toString(),
+              amountUSD: totalContable.toString(),
+              provisionsRowsCount: sql`COALESCE(${factCostMonth.provisionsRowsCount}, 0) + ${data.details.length}`,
+              etlTimestamp: sql`now()`
+            }
+          });
+        
+        result.byPeriod.set(periodKey, data.total);
+        
+        // Log detalles de provisiones importantes
+        console.log(`  ✅ ${periodKey}: +$${data.total.toFixed(2)} USD provisiones (${data.details.length} items)`);
+        for (const detail of data.details.slice(0, 3)) {
+          console.log(`     📋 ${detail.kind}: ${detail.concept} → $${detail.amount.toFixed(2)}`);
+        }
+        if (data.details.length > 3) {
+          console.log(`     ... y ${data.details.length - 3} más`);
+        }
+        
+      } catch (error) {
+        const errorMsg = `Error procesando período ${periodKey}: ${error}`;
+        console.error(`  ❌ ${errorMsg}`);
+        result.errors.push(errorMsg);
+      }
+    }
+    
+    console.log(`✅ [SoT ETL] Provisiones adicionales: ${result.provisionsProcessed} items, $${result.provisionsTotal.toFixed(2)} USD total`);
+    
+    return result;
+    
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('❌ [SoT ETL] Error procesando hojas de provisiones:', error);
+    result.success = false;
+    result.errors.push(errorMsg);
+    return result;
+  }
+}
+
 // ==================== HECHOS: RC (RENDIMIENTO CLIENTE) ====================
 
 export interface RendimientoClienteRow {
@@ -1123,6 +1287,11 @@ export async function executeSoTETL(
     // La función processCostsByPeriod() separa internamente directos vs indirectos
     // Incluye Equipo, Coordinación, QA, Admin, etc. - Match 1:1 con Columna R del Excel
     await processCostsByPeriod(filteredCostos); // ← CAMBIADO: pasar filteredCostos (todos) en vez de filteredCostosDirectos
+    
+    // 1c. Procesar hojas adicionales de provisiones (Provisión pasivo proyectos, Impuestos, Pasivo)
+    // Agrega Pepsico, Warner, Impuestos USA, IVA, etc. al bucket de provisiones
+    const provisionResult = await processProvisionSheets();
+    console.log(`📊 [SoT ETL] Provisiones adicionales: ${provisionResult.provisionsProcessed} items, $${provisionResult.provisionsTotal.toFixed(2)} USD`);
     
     // 2. Procesar RC (rendimiento cliente)
     await processRendimientoClienteToFactRC(filteredRC);
