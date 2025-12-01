@@ -5134,12 +5134,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // 2. Costos separados por tipo (directos e indirectos) desde fact_cost_month
+      // 2. Costos separados por tipo (directos, indirectos operativos, provisiones) desde fact_cost_month
       const { rows: [costsData] } = await pool.query(`
         SELECT 
           COALESCE(SUM(direct_usd), 0) as direct_costs_usd,
           COALESCE(SUM(indirect_usd), 0) as indirect_costs_usd,
-          COALESCE(SUM(direct_usd + indirect_usd), 0) as total_cost_usd
+          COALESCE(SUM(COALESCE(provisions_usd, 0)), 0) as provisions_usd,
+          COALESCE(SUM(direct_usd + indirect_usd), 0) as total_operativo_usd,
+          COALESCE(SUM(direct_usd + indirect_usd + COALESCE(provisions_usd, 0)), 0) as total_contable_usd
         FROM fact_cost_month
         WHERE period_key = ANY($1)
       `, [periodKeys]);
@@ -5177,18 +5179,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // WIP = 0 (disabled per business definition)
       const wipUsd = 0;
       
-      // ===== COSTOS (directos e indirectos from "Costos directos e indirectos") =====
+      // ===== COSTOS (3 buckets: directos, indirectos operativos, provisiones) =====
       const directCostsUsd = parseFloat(costsData?.direct_costs_usd || '0');
-      const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0');
-      const totalCostsUsd = directCostsUsd + indirectCostsUsd;
+      const indirectCostsUsd = parseFloat(costsData?.indirect_costs_usd || '0'); // Solo overhead operativo real (SIN provisiones)
+      const provisionsUsd = parseFloat(costsData?.provisions_usd || '0'); // Provisiones contables
+      const totalOperativoUsd = parseFloat(costsData?.total_operativo_usd || '0'); // Para vista Operativo
+      const totalContableUsd = parseFloat(costsData?.total_contable_usd || '0'); // Para vista Financiero (con provisiones)
       
       // ===== EBIT OPERATIVO (business definition: uses DEVENGADO, not Facturado) =====
       // EBIT_operativo = Devengado - Costos_directos (do NOT subtract indirect costs)
       const ebitOperativoUsd = devengadoUsd - directCostsUsd;
       
       // ===== EBIT CONTABLE (administrative definition) =====
-      // EBIT Contable = Facturado - Costos Totales (directos + indirectos)
-      const ebitContableUsd = incomeUsd - totalCostsUsd;
+      // EBIT Contable = Facturado - Costos Totales CONTABLES (directos + indirectos + provisiones)
+      const ebitContableUsd = incomeUsd - totalContableUsd;
       
       // ===== MARGEN CONTABLE (same as EBIT Contable for legacy compatibility) =====
       const marginContableUsd = ebitContableUsd;
@@ -5213,8 +5217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `, [periodKeys]);
       const cashFlowOperativoUsd = parseFloat(cashFlowData?.cash_flow || '0');
       
-      // ===== BURN RATE (costos totales del mes) =====
-      const burnRateUsd = totalCostsUsd;
+      // ===== BURN RATE (costos totales contables del mes - incluye provisiones) =====
+      const burnRateUsd = totalContableUsd;
       
       // ===== PORCENTAJES Y MARKUP =====
       // EBIT Operativo uses devengado as base (operational view)
@@ -5236,20 +5240,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📊 DASHBOARD VERIFICATION [${lastPeriodKey}]:`);
       console.log(`   💵 FINANCIERO:`);
       console.log(`      Facturado: USD ${incomeUsd.toFixed(2)}`);
-      console.log(`      EBIT Contable (Facturado - Costs): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
-      console.log(`      Burn Rate (Total Costs): USD ${burnRateUsd.toFixed(2)}`);
+      console.log(`      EBIT Contable (Facturado - Total Contable): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
+      console.log(`      Burn Rate (Total Contable): USD ${burnRateUsd.toFixed(2)}`);
       console.log(`   📈 OPERATIVO:`);
       console.log(`      Devengado: USD ${devengadoUsd.toFixed(2)}`);
       console.log(`      EBIT Operativo (Devengado - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
       console.log(`      Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
       console.log(`      Tarifa Efectiva: USD ${tarifaEfectivaUsd.toFixed(2)}/h`);
-      console.log(`   📦 COSTOS:`);
+      console.log(`   📦 COSTOS (3 buckets separados):`);
       console.log(`      Directos: USD ${directCostsUsd.toFixed(2)}`);
-      console.log(`      Indirectos: USD ${indirectCostsUsd.toFixed(2)}`);
+      console.log(`      Indirectos Operativos: USD ${indirectCostsUsd.toFixed(2)} (overhead real)`);
+      console.log(`      Provisiones: USD ${provisionsUsd.toFixed(2)} (contable)`);
+      console.log(`      Total Operativo: USD ${totalOperativoUsd.toFixed(2)}`);
+      console.log(`      Total Contable: USD ${totalContableUsd.toFixed(2)}`);
       
       // Legacy compatibility
       const billedUsd = incomeUsd;
-      const costUsd = totalCostsUsd;
+      const costUsd = totalContableUsd; // Usar total contable para compatibilidad
       
       // ===== OPERATIONAL METRICS =====
       
@@ -5417,9 +5424,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // ===== FINANCIAL (Visión Socios: usa datos de Excel MAESTRO cuando están disponibles) =====
         financial: {
           billedUsd: hasExcelMaestroData ? excelMaestroSummary.facturacionTotal : incomeUsd,
-          totalCostsUsd: totalCostsUsd,
+          totalCostsUsd: totalContableUsd,       // Total contable (directos + indirectos + provisiones)
           directCostsUsd: directCostsUsd,
-          indirectCostsUsd: indirectCostsUsd,
+          indirectCostsUsd: indirectCostsUsd,    // Solo overhead operativo (SIN provisiones)
+          provisionsUsd: provisionsUsd,          // Provisiones contables separadas
           ebitAccountingUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd,
           ebitAccountingPct: hasExcelMaestroData 
             ? (excelMaestroSummary.facturacionTotal > 0 
@@ -5465,7 +5473,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           billedUsd,
           devengadoUsd,
           directCostsUsd,
-          indirectCostsUsd,
+          indirectCostsUsd,             // Indirectos operativos (SIN provisiones)
+          provisionsUsd,                // Provisiones contables
+          totalOperativoUsd,            // Directos + Indirectos operativos
+          totalContableUsd,             // Directos + Indirectos + Provisiones
           costUsd,
           burnRateUsd,
           ebitContableUsd,

@@ -658,28 +658,28 @@ export default function ExecutiveDashboard() {
               </CardContent>
             </Card>
 
-            {/* ===== FILA 2: COSTOS (col-span-4 x 3) ===== */}
+            {/* ===== FILA 2: COSTOS (col-span-3 x 4) ===== */}
             
             {/* Costos Directos */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-red-50">
+            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-red-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-red-100 rounded-lg">
                     <DollarSign className="h-5 w-5 text-red-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-red-600 uppercase font-medium">Costos Directos</p>
+                    <p className="text-xs text-red-600 uppercase font-medium">Directos</p>
                     <p className="text-xl font-bold text-red-700" data-testid="metric-direct-costs-fin">
                       {formatCurrency(financial.directCostsUsd || 0)}
                     </p>
-                    <p className="text-xs text-red-400">Equipo del período</p>
+                    <p className="text-xs text-red-400">Equipo</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Overhead */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-orange-50">
+            {/* Overhead Operativo */}
+            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-orange-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-orange-100 rounded-lg">
@@ -690,14 +690,32 @@ export default function ExecutiveDashboard() {
                     <p className="text-xl font-bold text-orange-700" data-testid="metric-overhead">
                       {formatCurrency(financial.indirectCostsUsd || 0)}
                     </p>
-                    <p className="text-xs text-orange-400">Costos indirectos (estructura)</p>
+                    <p className="text-xs text-orange-400">Estructura</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Burn Rate */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-rose-50">
+            {/* Provisiones Contables */}
+            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-purple-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-600 uppercase font-medium">Provisiones</p>
+                    <p className="text-xl font-bold text-purple-700" data-testid="metric-provisions">
+                      {formatCurrency(financial.provisionsUsd || 0)}
+                    </p>
+                    <p className="text-xs text-purple-400">Contable</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Burn Rate Total */}
+            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-rose-50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-rose-100 rounded-lg">
@@ -706,9 +724,9 @@ export default function ExecutiveDashboard() {
                   <div>
                     <p className="text-xs text-rose-600 uppercase font-medium">Burn Rate</p>
                     <p className="text-xl font-bold text-rose-700" data-testid="metric-burn-rate">
-                      {formatCurrency(financial.burnRateUsd || 0)}
+                      {formatCurrency(financial.totalCostsUsd || 0)}
                     </p>
-                    <p className="text-xs text-rose-400">Costos totales / mes</p>
+                    <p className="text-xs text-rose-400">Total contable</p>
                   </div>
                 </div>
               </CardContent>
