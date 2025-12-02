@@ -5335,20 +5335,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const beneficioNetoUsd = ebitContableUsd - totalAdjustmentsUsd;
       
       // ===== CASH FLOW (Ingresos, Egresos, Neto desde cash_movements) =====
+      // Ahora usa type='IN' y type='OUT' en vez de signo del monto
       const { rows: [cashFlowData] } = await pool.query(`
         SELECT 
-          COALESCE(SUM(CASE WHEN amount_usd > 0 THEN amount_usd ELSE 0 END), 0) as cash_in_usd,
-          COALESCE(SUM(CASE WHEN amount_usd < 0 THEN ABS(amount_usd) ELSE 0 END), 0) as cash_out_usd,
-          COALESCE(SUM(amount_usd), 0) as cash_net_usd
+          COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd::numeric ELSE 0 END), 0) as cash_in_usd,
+          COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount_usd::numeric ELSE 0 END), 0) as cash_out_usd,
+          COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd::numeric ELSE -amount_usd::numeric END), 0) as cash_net_usd,
+          COUNT(*) as movement_count
         FROM cash_movements
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       const cashFlowInUsd = parseFloat(cashFlowData?.cash_in_usd || '0');
       const cashFlowOutUsd = parseFloat(cashFlowData?.cash_out_usd || '0');
-      const cashFlowNetUsd = parseFloat(cashFlowData?.cash_net_usd || '0');
+      const cashFlowNetFromMovements = cashFlowInUsd - cashFlowOutUsd;
+      const movementCount = parseInt(cashFlowData?.movement_count || '0');
       
-      // Fallback: Si no hay datos en cash_movements, usar cashflowNeto de monthly_financial_summary
-      const cashFlowOperativoUsd = cashFlowNetUsd !== 0 ? cashFlowNetUsd : excelMaestroSummary.cashflowNeto;
+      // Usar cashflowNeto de monthly_financial_summary (Resumen Ejecutivo) como fuente principal
+      const cashFlowNetUsd = excelMaestroSummary.cashflowNeto || cashFlowNetFromMovements;
+      
+      // VALIDACIÓN DE CONSISTENCIA: Comparar netFromMovements con cashFlowNetUsd del Resumen Ejecutivo
+      if (movementCount > 0 && excelMaestroSummary.cashflowNeto !== 0) {
+        const diff = Math.abs(cashFlowNetFromMovements - excelMaestroSummary.cashflowNeto);
+        if (diff > 1.0) {
+          console.log(`⚠️ [CashFlow INCONSISTENCY] ${lastPeriodKey}:`);
+          console.log(`   In: $${cashFlowInUsd.toFixed(2)}, Out: $${cashFlowOutUsd.toFixed(2)}`);
+          console.log(`   Net (movements): $${cashFlowNetFromMovements.toFixed(2)}`);
+          console.log(`   Net (Resumen Ejecutivo): $${excelMaestroSummary.cashflowNeto.toFixed(2)}`);
+          console.log(`   Difference: $${diff.toFixed(2)}`);
+        }
+      }
       
       // ===== BURN RATE (costos totales contables del mes - incluye provisiones) =====
       const burnRateUsd = totalContableUsd;
@@ -5375,7 +5390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`      Facturado: USD ${facturadoForEbit.toFixed(2)}${hasExcelMaestroData ? ' (Excel MAESTRO)' : ' (DB)'}`);
       console.log(`      EBIT Contable (Facturado - Total Contable): USD ${ebitContableUsd.toFixed(2)} (${ebitContablePct.toFixed(1)}%)`);
       console.log(`      Burn Rate (Total Contable): USD ${burnRateUsd.toFixed(2)}`);
-      console.log(`      Cash Flow: In=$${cashFlowInUsd.toFixed(2)}, Out=$${cashFlowOutUsd.toFixed(2)}, Net=$${cashFlowOperativoUsd.toFixed(2)}`);
+      console.log(`      Cash Flow: In=$${cashFlowInUsd.toFixed(2)}, Out=$${cashFlowOutUsd.toFixed(2)}, Net=$${cashFlowNetUsd.toFixed(2)} (${movementCount} movimientos)`);
       console.log(`   📈 OPERATIVO (sin provisiones ni impuestos contables):`);
       console.log(`      Devengado: USD ${devengadoUsd.toFixed(2)}`);
       console.log(`      EBIT Operativo (Devengado - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
@@ -5587,8 +5602,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Cash Flow separado (per checklist 2.2)
           cashFlowInUsd: cashFlowInUsd,
           cashFlowOutUsd: cashFlowOutUsd,
-          cashFlowNetUsd: cashFlowOperativoUsd,
-          cashflowNetoUsd: excelMaestroSummary.cashflowNeto, // Alias legacy
+          cashFlowNetUsd: cashFlowNetUsd,
+          cashflowNetoUsd: excelMaestroSummary.cashflowNeto, // Alias legacy (Resumen Ejecutivo)
+          netFromMovements: cashFlowNetFromMovements, // Net calculado desde cash_movements
           
           dataSource: hasExcelMaestroData ? 'excel_maestro' : 'calculated'
         },
@@ -5644,7 +5660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fxWeighted,
           cashFlowInUsd,
           cashFlowOutUsd,
-          cashFlowNetUsd: cashFlowOperativoUsd
+          cashFlowNetUsd
         },
         
         alerts: alerts,
