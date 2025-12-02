@@ -151,9 +151,11 @@ export const cashMovements = pgTable("cash_movements", {
   id: serial("id").primaryKey(),
   date: timestamp("date").notNull(),
   periodKey: varchar("period_key", { length: 10 }).notNull(),
+  bank: varchar("bank", { length: 100 }), // Banco (ej: "Galicia", "ICBC")
+  currency: varchar("currency", { length: 20 }), // Moneda original (ej: "ARS", "USD")
   concept: varchar("concept", { length: 300 }).notNull(),
-  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(), // positivo = entrada, negativo = salida
-  type: varchar("type", { length: 50 }).notNull(), // 'ingreso', 'egreso'
+  amountUsd: numeric("amount_usd", { precision: 14, scale: 2 }).notNull(), // siempre positivo
+  type: varchar("type", { length: 10 }).notNull(), // 'IN' = ingreso, 'OUT' = egreso
   category: varchar("category", { length: 100 }), // 'pago_cliente', 'salario', 'proveedor', 'impuesto', etc.
   reference: varchar("reference", { length: 200 }), // invoice number, payment reference
   createdAt: timestamp("created_at").notNull().defaultNow(),

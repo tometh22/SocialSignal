@@ -1,0 +1,327 @@
+Tu sistema hoy ya tiene bien:
+
+Provisiones OCT-25 = 27.906 (Facturación adelantada) + 25.287,08 (Impuestos USA) = 53.193,08
+
+EBIT / Beneficio / Balance / Cash Flow Neto = iguales al Resumen Ejecutivo.
+
+Lo que falta robustecer/corregir es:
+
+CashFlow granular (in/out por mes) desde la pestaña CashFlow.
+
+Caja total de fin de mes (desde Saldo Total USD de esa misma pestaña).
+
+Amarrar esto al endpoint de métricas sin romper nada de lo que ya matchea.
+
+Te dejo las instrucciones completas para Replit Agent.
+
+1. Modelo objetivo para CashFlow
+1.1. Tabla cash_movements
+
+La tabla cash_movements debe representar cada movimiento de caja de la pestaña CashFlow.
+
+Campos mínimos a usar:
+
+id (ya existe)
+
+date → Fecha del movimiento
+
+period_key → "YYYY-MM" calculado desde Fecha
+
+bank → columna Banco
+
+currency → Moneda
+
+type → "IN" / "OUT"
+
+amount_usd → monto del movimiento en USD (positivo)
+
+concept → Concepto (o Detalle Operación si está más completo)
+
+Reglas:
+
+Filtrar solo filas donde Ingreso/Egreso ∈ {"Ingreso", "Egreso"}
+
+Ignorar filas con Ingreso/Egreso = "Saldo" (son estados, no movimientos).
+
+2. ETL de pestaña CashFlow → cash_movements
+2.1. Lógica de parsing
+
+Pseudo-lógica:
+
+Leer la hoja CashFlow desde googleSheetsWorking.ts (o el servicio equivalente).
+
+Para cada fila:
+
+Si Ingreso/Egreso no es "Ingreso" ni "Egreso" → skip.
+
+date = valor de columna Fecha.
+
+period_key = ${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, "0")}
+
+bank = Banco
+
+currency = Moneda
+
+concept = preferentemente Concepto (fallback Detalle Operación si viene vacío)
+
+Cálculo de amount_usd:
+
+Si Monto USD tiene valor numérico:
+
+raw = Monto USD
+
+Si Monto USD está vacío y Monto ARS + Cotización tienen valor:
+
+raw = Monto ARS / Cotización
+
+Si no hay forma de calcular → loguear fila como rechazada y seguir.
+
+Normalización por tipo:
+
+Si Ingreso/Egreso = "Ingreso":
+
+type = "IN"
+
+amount_usd = Math.abs(raw)
+
+Si Ingreso/Egreso = "Egreso":
+
+type = "OUT"
+
+amount_usd = Math.abs(raw)
+
+Insert/Upsert en cash_movements.
+
+2.2. Idempotencia
+
+Antes de insertar movimientos de un period_key dado, hacer:
+
+DELETE FROM cash_movements WHERE period_key = $period_key
+
+Luego insertar todos los movimientos de ese mes.
+
+El ETL general puede:
+
+borrar por rango (BETWEEN 'YYYY-01' AND 'YYYY-12') o
+
+borrar todo y reinsertar (si el rendimiento es aceptable y no necesitás histórico manual).
+
+3. Integración con monthly_financial_summary
+
+Ya estás usando Resumen Ejecutivo para:
+
+cashflow_neto
+
+balance_neto
+
+beneficio_neto
+
+ebitOperativo, etc.
+
+Lo que suma ahora el CashFlow granular es:
+
+3.1. CashFlow In / Out
+
+Para cada period_key:
+
+cashFlowInUsd = SUM(amount_usd) FROM cash_movements WHERE period_key = $period_key AND type = 'IN'
+
+cashFlowOutUsd = SUM(amount_usd) FROM cash_movements WHERE period_key = $period_key AND type = 'OUT'
+
+cashFlowNetFromMovementsUsd = cashFlowInUsd - cashFlowOutUsd
+
+3.2. Caja total de fin de mes
+
+Tenés dos opciones, coherentes con lo que ya definiste:
+
+Seguir leyendo cash_end_of_month_usd desde Resumen Ejecutivo (si ya está)
+
+O derivarlo de la última fila de cada mes en la hoja CashFlow usando Saldo Total USD:
+
+Para cada period_key:
+
+tomar todas las filas de ese mes, ordenar por Fecha y orden original.
+
+tomar la última fila (por fecha / posición).
+
+cash_end_of_month_usd = Saldo Total USD de esa fila.
+
+Grabar ese valor en monthly_financial_summary.cash_end_of_month_usd.
+
+Recomendable: mantener cashflow_neto y cash_end_of_month como vienen hoy de Resumen Ejecutivo y usar el detalle de CashFlow para In/Out + validación.
+
+4. Endpoint /api/dashboard/metrics (capa financiera)
+
+Ajustar la respuesta financiera para usar cash_movements así:
+
+financial.facturadoUsd
+→ ya está correcto (fact_rc_month).
+
+financial.provisionsUsd
+→ ya está correcto (Facturación adelantada + Impuestos USA, desde ETL de provisions.ts).
+
+financial.ebitUtilidadOperativaUsd
+→ ahora viene directo de Resumen Ejecutivo (no recalculado) → dejar así.
+
+financial.beneficioNetoUsd
+→ ya se toma de Resumen Ejecutivo → dejar así.
+
+financial.balanceNetoUsd
+→ ya se toma de Resumen Ejecutivo → dejar así.
+
+financial.cashFlowNetUsd:
+
+Mantener el valor desde monthly_financial_summary.cashflow_neto_usd (Res. Ejecutivo).
+
+NUEVO:
+
+financial.cashFlowInUsd = query sobre cash_movements (suma IN).
+
+financial.cashFlowOutUsd = query sobre cash_movements (suma OUT).
+
+Opcional pero sano:
+
+Calcular netFromMovements = In - Out
+
+Si |netFromMovements - cashFlowNetUsd| > umbral → log de advertencia (WARN) para detectar inconsistencias en Excel.
+
+5. Vista Operativa (control de que no rompas nada)
+
+Confirmar que la lógica operativa no se contamina con esto:
+
+operational.devengadoUsd → se mantiene igual (devengado/producción, no facturación).
+
+operational.directCostsUsd → viene de fact_cost_month.direct_usd.
+
+operational.overheadOperativeUsd → overheadUsd - impuestos_usa_usd - provisiones_usd.
+
+operational.markupX → devengadoUsd / directCostsUsd.
+
+operational.effectiveRateUsdPerHour → devengadoUsd / billableHours.
+
+Nada de CashFlow ni provisiones debería meterse en estos cálculos.
+
+6. Checklist de verificación (usar OCT-25 y un mes más)
+6.1. Octubre 2025
+
+Ejecutar ETL completo (incluyendo sync de CashFlow).
+
+Consultar:
+
+/api/dashboard/metrics?month=10&year=2025
+
+Revisar:
+
+financial.cashFlowInUsd = suma de Monto USD (o ARS/FX) para filas Ingreso de octubre en CashFlow.
+
+financial.cashFlowOutUsd = suma de Monto USD para filas Egreso de octubre.
+
+financial.cashFlowNetUsd = 66.801,58 (desde Resumen Ejecutivo).
+
+cashFlowInUsd - cashFlowOutUsd ≈ 66.801,58 (diferencia mínima por redondeos).
+
+Confirmar que:
+
+Facturado, EBIT, Beneficio Neto, Balance Neto, Provisiones siguen matcheando el informe de administración (ya estaba OK).
+
+Vista Operativa no cambió sus valores de devengado, markup, tarifa efectiva, etc.
+
+6.2. Mes adicional (ej. mayo 2025)
+
+Repetir el mismo ejercicio con otro mes:
+
+Validar que el neto de movimientos de CashFlow coincide con el CashFlow Neto del Resumen Ejecutivo.
+
+7. Bloque listo para pegar en Replit Agent
+
+Cópialo tal cual:
+
+Quiero completar y corregir el ETL de CashFlow usando la pestaña "CashFlow" del Excel Maestro “Seguimiento Financiero_Economico Para Tablero.xlsx”. Hacé TODO esto, en este orden:
+
+1) Revisar la tabla cash_movements
+- Verificá en shared/schema.ts que existe la tabla cash_movements con al menos estos campos:
+  - id
+  - date
+  - period_key
+  - bank
+  - currency
+  - type
+  - amount_usd
+  - concept
+- Si falta alguno, agregalo en el schema y hacé npm run db:push.
+
+2) Implementar ETL de hoja "CashFlow"
+- En server/services/googleSheetsWorking.ts:
+  - Agregá una función getCashFlowRows() que lea la hoja "CashFlow".
+  - Por cada fila:
+    - Si Ingreso/Egreso NO es "Ingreso" ni "Egreso" → skip.
+    - date = Fecha.
+    - period_key = `${year}-${month.padStart(2, "0")}` calculado desde date.
+    - bank = Banco.
+    - currency = Moneda.
+    - concept = Concepto (o Detalle Operación si Concepto está vacío).
+    - Calculá rawAmountUsd:
+      - Si Monto USD es numérico → raw = Monto USD.
+      - Else si Monto ARS y Cotización tienen valor → raw = Monto ARS / Cotización.
+      - Else → logueá la fila como rechazada y no la insertes.
+    - Si Ingreso/Egreso = "Ingreso":
+      - type = "IN"
+      - amount_usd = Math.abs(raw).
+    - Si Ingreso/Egreso = "Egreso":
+      - type = "OUT"
+      - amount_usd = Math.abs(raw).
+- En server/etl/sot-etl.ts:
+  - Agregá una función syncCashFlowMovements():
+    - Borra primero todos los registros de cash_movements (o por rango de period_key, según sea necesario).
+    - Recorre todas las filas de getCashFlowRows() y hace INSERT en cash_movements con los campos anteriores.
+- En server/routes.ts:
+  - Si ya existe /api/etl/sot/sync-cashflow, actualizalo para llamar a syncCashFlowMovements().
+  - Si no existe, crealo.
+
+3) Integrar CashFlow In/Out en el endpoint de métricas
+- En server/routes.ts, en el handler de /api/dashboard/metrics:
+  - Después de obtener los datos de monthly_financial_summary:
+    - Consultá cash_movements para el period_key actual:
+      - cashFlowInUsd = SUM(amount_usd) WHERE type = 'IN'.
+      - cashFlowOutUsd = SUM(amount_usd) WHERE type = 'OUT'.
+    - Añadí estos campos al objeto financial:
+      - financial.cashFlowInUsd
+      - financial.cashFlowOutUsd
+  - NO cambies financial.cashFlowNetUsd: debe seguir viniendo de monthly_financial_summary.cashflow_neto.
+
+4) Validación de consistencia
+- En /api/dashboard/metrics:
+  - Calculá netFromMovements = cashFlowInUsd - cashFlowOutUsd.
+  - Si existe financial.cashFlowNetUsd:
+    - Si la diferencia absoluta entre netFromMovements y financial.cashFlowNetUsd > 1.0:
+      - Logueá un WARN indicando el período y los 3 valores (In, Out, Net, NetResumen).
+
+5) Caja final del mes (opcional)
+- Si monthly_financial_summary tiene columna cash_end_of_month_usd:
+  - Implementá una función que lea de la hoja "CashFlow" la última fila por Fecha/orden para cada period_key y obtenga Saldo Total USD.
+  - Usá ese valor para popular/actualizar cash_end_of_month_usd en monthly_financial_summary.
+  - Verificá que coincida con el saldo final que hoy muestra el Resumen Ejecutivo.
+
+6) Tests para octubre 2025
+- Ejecutá:
+  - /api/etl/sot/sync-cashflow
+  - /api/dashboard/metrics?month=10&year=2025
+- Logueá en consola:
+  - facturadoUsd
+  - provisionsUsd
+  - ebitUtilidadOperativaUsd
+  - beneficioNetoUsd
+  - balanceNetoUsd
+  - cashFlowInUsd
+  - cashFlowOutUsd
+  - cashFlowNetUsd
+  - netFromMovements
+- Confirmá que:
+  - cashFlowNetUsd = 66801.58 (aprox).
+  - netFromMovements ≈ cashFlowNetUsd.
+  - El resto de los valores coinciden con el Resumen Ejecutivo y el informe de administración de OCT-25.
+
+No toques la lógica de provisiones V3 ni el uso del EBIT desde Resumen Ejecutivo. Solo implementá el ETL correcto de la pestaña "CashFlow" y conectalo al dashboard como se indica.
+
+
+Con esto completás la pieza de CashFlow sin romper lo que ya está alineado y dejás el dashboard sólido a nivel financiero y operativo.

@@ -2988,11 +2988,20 @@ class GoogleSheetsWorkingService {
 
   /**
    * Obtener movimientos de Cash Flow del Excel MAESTRO
-   * Lee la hoja "CashFlow" o similar y devuelve transacciones individuales
-   * Cada fila tiene: fecha, concepto, monto (positivo=ingreso, negativo=egreso)
+   * Lee la hoja "CashFlow" y devuelve transacciones individuales
+   * 
+   * COLUMNAS ESPERADAS:
+   * - Fecha
+   * - Banco
+   * - Concepto (o Detalle Operación como fallback)
+   * - Ingreso/Egreso (filtrar: solo "Ingreso" o "Egreso", ignorar "Saldo")
+   * - Moneda
+   * - Monto USD
+   * - Monto ARS
+   * - Cotización
    */
   async getCashFlowMovements(): Promise<CashFlowMovementRow[]> {
-    console.log('🔄 [CashFlow] Obteniendo movimientos del Excel MAESTRO...');
+    console.log('🔄 [CashFlow ETL] Obteniendo movimientos del Excel MAESTRO...');
     
     try {
       const sheets = this.createSheetsClientFromJSON();
@@ -3014,7 +3023,7 @@ class GoogleSheetsWorkingService {
       });
       
       const availableSheets = spreadsheet.data.sheets?.map(s => s.properties?.title || '') || [];
-      console.log(`📋 [CashFlow] Hojas disponibles: ${availableSheets.join(', ')}`);
+      console.log(`📋 [CashFlow ETL] Hojas disponibles: ${availableSheets.join(', ')}`);
       
       // Buscar hoja de CashFlow
       const cashFlowSheet = possibleSheetNames.find(name => 
@@ -3024,8 +3033,8 @@ class GoogleSheetsWorkingService {
       );
       
       if (!cashFlowSheet) {
-        console.log('⚠️ [CashFlow] No se encontró hoja de CashFlow');
-        console.log('⚠️ [CashFlow] Posibles hojas:', availableSheets.slice(0, 10).join(', '));
+        console.log('⚠️ [CashFlow ETL] No se encontró hoja de CashFlow');
+        console.log('⚠️ [CashFlow ETL] Posibles hojas:', availableSheets.slice(0, 10).join(', '));
         return [];
       }
       
@@ -3034,7 +3043,7 @@ class GoogleSheetsWorkingService {
         sheet.toLowerCase().trim() === cashFlowSheet.toLowerCase().trim()
       );
       
-      console.log(`📊 [CashFlow] Leyendo hoja: "${exactSheetName}"`);
+      console.log(`📊 [CashFlow ETL] Leyendo hoja: "${exactSheetName}"`);
       
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
@@ -3044,17 +3053,174 @@ class GoogleSheetsWorkingService {
       
       const rows = response.data.values || [];
       if (rows.length < 2) {
-        console.log('⚠️ [CashFlow] No hay datos en la hoja');
+        console.log('⚠️ [CashFlow ETL] No hay datos en la hoja');
         return [];
       }
       
-      // Usar parser async con conversión FX
-      return this.parseCashFlowRowsWithFx(rows);
+      // Parsear filas con la nueva lógica
+      return this.parseCashFlowRowsV2(rows);
       
     } catch (error: any) {
-      console.error('❌ [CashFlow] Error obteniendo datos:', error?.message || error);
+      console.error('❌ [CashFlow ETL] Error obteniendo datos:', error?.message || error);
       return [];
     }
+  }
+  
+  /**
+   * Parser V2 para CashFlow con columnas específicas:
+   * Fecha, Banco, Concepto, Ingreso/Egreso, Moneda, Monto USD, Monto ARS, Cotización
+   */
+  private parseCashFlowRowsV2(rows: any[][]): CashFlowMovementRow[] {
+    if (rows.length < 2) return [];
+    
+    const headers = rows[0] || [];
+    const result: CashFlowMovementRow[] = [];
+    
+    // Mapeo de columnas (flexible)
+    const findColIdx = (patterns: string[]): number => {
+      for (let i = 0; i < headers.length; i++) {
+        const h = (headers[i] || '').toString().toLowerCase().trim();
+        if (patterns.some(p => h.includes(p))) return i;
+      }
+      return -1;
+    };
+    
+    // Columnas según especificación del usuario
+    const fechaIdx = findColIdx(['fecha', 'date']);
+    const bancoIdx = findColIdx(['banco', 'bank']);
+    const conceptoIdx = findColIdx(['concepto', 'concept']);
+    const detalleOpIdx = findColIdx(['detalle operacion', 'detalle operación', 'detalle']);
+    const ingresoEgresoIdx = findColIdx(['ingreso/egreso', 'ingreso egreso', 'tipo movimiento', 'tipo']);
+    const monedaIdx = findColIdx(['moneda', 'currency']);
+    const montoUsdIdx = findColIdx(['monto usd', 'usd', 'dolares']);
+    const montoArsIdx = findColIdx(['monto ars', 'ars', 'pesos']);
+    const cotizacionIdx = findColIdx(['cotización', 'cotizacion', 'tipo cambio', 'tc']);
+    
+    console.log(`📊 [CashFlow ETL] Columnas detectadas:`);
+    console.log(`   Fecha=${fechaIdx}, Banco=${bancoIdx}, Concepto=${conceptoIdx}`);
+    console.log(`   Detalle=${detalleOpIdx}, Ingreso/Egreso=${ingresoEgresoIdx}`);
+    console.log(`   Moneda=${monedaIdx}, MontoUSD=${montoUsdIdx}, MontoARS=${montoArsIdx}, Cotiz=${cotizacionIdx}`);
+    
+    if (fechaIdx < 0) {
+      console.log('⚠️ [CashFlow ETL] No se encontró columna Fecha');
+      return [];
+    }
+    
+    let processed = 0;
+    let skippedSaldo = 0;
+    let skippedNoAmount = 0;
+    let arsConverted = 0;
+    
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+      
+      // 1. Filtrar por Ingreso/Egreso - SOLO procesar "Ingreso" o "Egreso", ignorar "Saldo"
+      const tipoRaw = ingresoEgresoIdx >= 0 ? (row[ingresoEgresoIdx] || '').toString().trim().toLowerCase() : '';
+      
+      if (tipoRaw !== 'ingreso' && tipoRaw !== 'egreso') {
+        if (tipoRaw === 'saldo') {
+          skippedSaldo++;
+        }
+        continue; // Skip filas que no son movimientos
+      }
+      
+      // 2. Parsear fecha
+      const fechaRaw = (row[fechaIdx] || '').toString().trim();
+      const date = this.parseDateValue(fechaRaw);
+      if (!date) continue;
+      
+      // 3. Calcular period_key
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+      
+      // 4. Extraer banco
+      const bank = bancoIdx >= 0 ? (row[bancoIdx] || '').toString().trim() : undefined;
+      
+      // 5. Extraer moneda
+      const currency = monedaIdx >= 0 ? (row[monedaIdx] || '').toString().trim().toUpperCase() : 'ARS';
+      
+      // 6. Extraer concepto (con fallback a Detalle Operación)
+      let concept = conceptoIdx >= 0 ? (row[conceptoIdx] || '').toString().trim() : '';
+      if (!concept && detalleOpIdx >= 0) {
+        concept = (row[detalleOpIdx] || '').toString().trim();
+      }
+      if (!concept) concept = `Movimiento ${i}`;
+      
+      // 7. Calcular monto en USD
+      let amountUsd: number | null = null;
+      
+      // Primero intentar Monto USD
+      if (montoUsdIdx >= 0) {
+        const montoUsdRaw = (row[montoUsdIdx] || '').toString().trim();
+        const parsed = this.parseNumericValue(montoUsdRaw);
+        if (parsed !== null && parsed !== 0) {
+          amountUsd = Math.abs(parsed);
+        }
+      }
+      
+      // Si no hay USD, intentar ARS / Cotización
+      if (amountUsd === null && montoArsIdx >= 0 && cotizacionIdx >= 0) {
+        const montoArsRaw = (row[montoArsIdx] || '').toString().trim();
+        const cotizRaw = (row[cotizacionIdx] || '').toString().trim();
+        
+        const montoArs = this.parseNumericValue(montoArsRaw);
+        const cotiz = this.parseNumericValue(cotizRaw);
+        
+        if (montoArs !== null && cotiz !== null && cotiz > 0) {
+          amountUsd = Math.abs(montoArs / cotiz);
+          arsConverted++;
+        }
+      }
+      
+      if (amountUsd === null || amountUsd === 0) {
+        skippedNoAmount++;
+        console.log(`⚠️ [CashFlow ETL] Fila ${i+1} sin monto válido: concepto="${concept}"`);
+        continue;
+      }
+      
+      // 8. Determinar tipo: IN o OUT
+      const type: 'IN' | 'OUT' = tipoRaw === 'ingreso' ? 'IN' : 'OUT';
+      
+      result.push({
+        date,
+        periodKey,
+        bank: bank || undefined,
+        currency: currency || undefined,
+        concept,
+        amountUsd: Math.round(amountUsd * 100) / 100,
+        type,
+      });
+      processed++;
+    }
+    
+    console.log(`✅ [CashFlow ETL] Parseados ${processed} movimientos`);
+    console.log(`   💰 Ingresos (IN): ${result.filter(r => r.type === 'IN').length}`);
+    console.log(`   💸 Egresos (OUT): ${result.filter(r => r.type === 'OUT').length}`);
+    console.log(`   💱 Convertidos ARS→USD: ${arsConverted}`);
+    console.log(`   ⏭️ Filas "Saldo" ignoradas: ${skippedSaldo}`);
+    console.log(`   ⚠️ Filas sin monto válido: ${skippedNoAmount}`);
+    
+    return result;
+  }
+  
+  /**
+   * Parsear valor numérico (formato argentino: $29.230,00 → 29230.00)
+   */
+  private parseNumericValue(raw: string): number | null {
+    if (!raw) return null;
+    
+    const cleaned = raw
+      .replace(/\$/g, '')
+      .replace(/USD|ARS|U\$D/gi, '')
+      .replace(/\./g, '')
+      .replace(/,/g, '.')
+      .replace(/\s/g, '')
+      .trim();
+    
+    const val = parseFloat(cleaned);
+    return isNaN(val) ? null : val;
   }
 
   /**
@@ -3360,9 +3526,11 @@ export interface ResumenEjecutivoRow {
 export interface CashFlowMovementRow {
   date: Date;
   periodKey: string;
+  bank?: string;
+  currency?: string;
   concept: string;
   amountUsd: number;
-  type: 'ingreso' | 'egreso';
+  type: 'IN' | 'OUT'; // 'IN' = ingreso, 'OUT' = egreso
   category?: string;
   reference?: string;
 }
