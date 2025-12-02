@@ -54,13 +54,13 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Executive Dashboard Enhancements**: Separation of billed revenue and Work-In-Progress (WIP), showing both actual and projected margins, and integration of intelligent, context-aware business intelligence alerts (e.g., `NO_BILLING_WITH_COSTS`, `BILLABLE_DROP`, `FX_SHIFT`, `OVER_BURN`).
 - **Comprehensive Financial Metrics**: EBIT Operativo (Income - Direct Costs), EBIT Contable (Billed - Total Costs), Beneficio Neto (EBIT Contable - Provisions), Cash Flow Operativo (from `cash_movements` table), Burn Rate (total costs), and Margen Admin % (EBIT Contable / Billed).
 - **Financial P&L Tables**: `pl_adjustments` for tracking provisions and taxes, `cash_movements` for cash flow tracking with inflows/outflows classification.
-- **CashFlow ETL System**: Syncs movement details from Excel MAESTRO "CashFlow" sheet with columns: Fecha, Banco, Concepto, Ingreso/Egreso, Moneda, Monto USD, Monto ARS, Cotización. Stores in `cash_movements` table with type IN/OUT classification.
+- **CashFlow ETL System** *(FROZEN - Approved 2025-12-02)*: Syncs movement details from Excel MAESTRO "CashFlow" sheet with columns: Fecha, Banco, Concepto, Ingreso/Egreso, Moneda, Monto USD, Monto ARS, Cotización. Stores in `cash_movements` table with type IN/OUT classification.
   - **Data Source Architecture**: 
     - `cashFlowNetUsd`: Authoritative value from Resumen Ejecutivo (total monthly net)
     - `cashFlowInUsd`/`cashFlowOutUsd`: Detailed breakdown from CashFlow sheet movements
-    - `netFromMovements`: Calculated In-Out from movements (may differ from Resumen Ejecutivo due to different calculation methods in Excel)
+    - `cashFlowNetFromMovementsUsd`: Calculated In-Out from movements (may differ from Resumen Ejecutivo)
     - `cajaTotalUsd`: End-of-month cash balance from Resumen Ejecutivo
-  - **Known Discrepancy**: The sum of CashFlow sheet movements (In-Out) may differ from Resumen Ejecutivo's cashflow_neto. This is documented behavior as Resumen Ejecutivo uses a different calculation method. The system logs WARN for discrepancies exceeding $100.
+  - **Known Discrepancy**: The sum of CashFlow sheet movements (In-Out) may differ from Resumen Ejecutivo's cashflow_neto. This is documented behavior as Resumen Ejecutivo uses a different calculation method. The system logs WARN for discrepancies exceeding $1. Discrepancies are handled on the Excel side by finance team, not in the ETL.
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.
