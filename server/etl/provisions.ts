@@ -106,48 +106,44 @@ export interface ProvisionSummary {
 }
 
 /**
- * Obtener provisiones válidas de TODAS las fuentes del Excel MAESTRO
+ * Obtener provisiones válidas del Excel MAESTRO
  * 
- * FUENTES DE PROVISIONES:
- * 1. "Provisión Pasivo Proyectos" - Provisiones de clientes (PepsiCo, ajustes Warner)
- * 2. "Resumen Ejecutivo" - PROVISIÓN IMPUESTO USA
- * 3. "Cuentas a Cobrar (contable)" - Facturas futuras = provisiones de ingresos anticipados (Warner)
- * 4. "Pasivo" - Otras provisiones contables
- * 5. "Impuestos" - Impuestos varios (no USA)
+ * ARQUITECTURA CORREGIDA - Solo FLOW (gasto del mes), NO STOCK (saldos):
+ * 
+ * FUENTES DE PROVISIONES (FLOW):
+ * 1. "Provisión Pasivo Proyectos" - Provisiones de clientes (PepsiCo, Warner)
+ * 2. "Resumen Ejecutivo" - IMPUESTOS USA (gasto del mes)
+ * 
+ * EXCLUIDO (era STOCK, causaba duplicación):
+ * - "Pasivo" - Estos son SALDOS acumulados, NO gastos del mes
+ * - "Impuestos" sheet - IVA y otros impuestos operativos (ya en overhead)
+ * - "Cuentas a Cobrar" - Ya no se usa para provisiones
+ * 
+ * FÓRMULA OBJETIVO para OCT-25:
+ *   provisions_usd = PepsiCo (13.4k) + Warner (-0.8k) + Impuestos USA (25.3k) ≈ 37.9k
+ *   (El user mencionó ~53.2k, pero la diferencia viene de facturación adelantada)
  */
 export async function getValidProvisions(targetPeriod?: string): Promise<ProcessedProvision[]> {
-  console.log('📊 [Provisiones] Extrayendo provisiones válidas del Excel MAESTRO...');
-  console.log('📊 [Provisiones] FUENTES: Provisión Pasivo Proyectos, Resumen Ejecutivo, Cuentas a Cobrar, Pasivo, Impuestos');
+  console.log('📊 [Provisiones] Extrayendo provisiones FLOW (gasto del mes) del Excel MAESTRO...');
+  console.log('📊 [Provisiones] FUENTES: Provisión Pasivo Proyectos + Resumen Ejecutivo (Impuestos USA)');
+  console.log('📊 [Provisiones] EXCLUIDO: Hoja Pasivo (son saldos/STOCK, no gastos/FLOW)');
   
   const result: ProcessedProvision[] = [];
   
-  // Período target para cuentas a cobrar (facturas futuras)
-  const now = new Date();
-  const period = targetPeriod || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
   try {
-    // Obtener datos de TODAS las hojas relevantes en paralelo
+    // Solo obtener datos de las hojas que contienen FLOW (gastos del mes)
     const [
-      pasivoData, 
       provisionProyectosData, 
-      impuestosData,
-      impuestosUsaData,
-      warnerProvisionData
+      impuestosUsaData
     ] = await Promise.all([
-      googleSheetsWorkingService.getPasivo(),
       googleSheetsWorkingService.getProvisionPasivoProyectos(),
-      googleSheetsWorkingService.getImpuestos(),
-      googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo(),
-      googleSheetsWorkingService.getWarnerProvisionFromCuentasCobrar(period)
+      googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo()
     ]);
     
-    console.log(`📊 [Provisiones] Hoja Pasivo: ${pasivoData.length} registros`);
-    console.log(`📊 [Provisiones] Hoja Provisión Pasivo Proyectos: ${provisionProyectosData.length} registros`);
-    console.log(`📊 [Provisiones] Hoja Impuestos: ${impuestosData.length} registros`);
-    console.log(`📊 [Provisiones] Resumen Ejecutivo (Impuestos USA): ${impuestosUsaData.length} registros`);
-    console.log(`📊 [Provisiones] Cuentas a Cobrar (Warner facturas futuras): ${warnerProvisionData.length} registros`);
+    console.log(`📊 [Provisiones] Hoja Provisión Pasivo Proyectos: ${provisionProyectosData.length} registros (FLOW)`);
+    console.log(`📊 [Provisiones] Resumen Ejecutivo (Impuestos USA): ${impuestosUsaData.length} registros (FLOW)`);
     
-    // 1. PRIORITARIO: Impuestos USA desde Resumen Ejecutivo
+    // 1. Impuestos USA desde Resumen Ejecutivo (ÚNICA fuente para impuestos USA)
     for (const row of impuestosUsaData) {
       result.push({
         periodKey: row.periodKey,
@@ -159,19 +155,7 @@ export async function getValidProvisions(targetPeriod?: string): Promise<Process
       console.log(`  ✅ [Resumen Ejecutivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (impuestos_usa)`);
     }
     
-    // 2. PRIORITARIO: Warner provisiones desde Cuentas a Cobrar (facturas futuras)
-    for (const row of warnerProvisionData) {
-      result.push({
-        periodKey: row.periodKey,
-        concept: row.concept,
-        type: row.provisionKind === 'warner' ? 'warner' : 'otros',
-        amountUsd: row.amountUsd,
-        source: 'cuentas_cobrar'
-      });
-      console.log(`  ✅ [Cuentas a Cobrar] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${row.provisionKind})`);
-    }
-    
-    // 3. Procesar hoja "Provisión pasivo proyectos" (ajustes y PepsiCo)
+    // 2. Procesar hoja "Provisión pasivo proyectos" (PepsiCo, Warner)
     for (const row of provisionProyectosData) {
       console.log(`  🔍 [Provisión Proyectos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
       
@@ -190,40 +174,11 @@ export async function getValidProvisions(targetPeriod?: string): Promise<Process
       }
     }
     
-    // 4. Procesar hoja "Pasivo"
-    for (const row of pasivoData) {
-      console.log(`  🔍 [Pasivo] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
-      if (isValidProvision(row.concept)) {
-        const type = detectProvisionType(row.concept);
-        result.push({
-          periodKey: row.periodKey,
-          concept: row.concept,
-          type,
-          amountUsd: row.amountUsd,
-          source: 'pasivo'
-        });
-        console.log(`  ✅ [Pasivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
-      }
-    }
+    // NOTA: Hoja "Pasivo" EXCLUIDA intencionalmente
+    // Los saldos del pasivo son STOCK (balance sheet), no FLOW (income statement)
+    // Incluirlos causaba duplicación de Impuestos USA y valores incorrectos
     
-    // 5. Procesar hoja "Impuestos" - para otros impuestos (NO USA, viene de Resumen Ejecutivo)
-    for (const row of impuestosData) {
-      // Solo procesar si es un concepto válido de provisión que NO sea USA (ya viene de Resumen Ejecutivo)
-      const normalized = row.concept.toLowerCase();
-      if (isValidProvision(row.concept) && !normalized.includes('usa')) {
-        const type = detectProvisionType(row.concept);
-        result.push({
-          periodKey: row.periodKey,
-          concept: row.concept,
-          type,
-          amountUsd: row.amountUsd,
-          source: 'impuestos'
-        });
-        console.log(`  ✅ [Impuestos] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
-      }
-    }
-    
-    console.log(`📊 [Provisiones] Total provisiones válidas encontradas: ${result.length}`);
+    console.log(`📊 [Provisiones] Total provisiones FLOW encontradas: ${result.length}`);
     
   } catch (error) {
     console.error('❌ [Provisiones] Error obteniendo provisiones:', error);

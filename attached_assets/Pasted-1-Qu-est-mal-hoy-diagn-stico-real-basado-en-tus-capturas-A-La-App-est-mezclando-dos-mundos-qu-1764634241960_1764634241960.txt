@@ -1,0 +1,197 @@
+1. Qué está mal hoy (diagnóstico real basado en tus capturas)
+A. La App está mezclando dos mundos que NO deben mezclarse
+
+La vista Operativa muestra OVERHEAD = USD 72.1k.
+
+Pero el overhead operativo debería excluir provisiones e impuestos USA.
+
+La vista operativa debería mostrar sólo:
+
+Costos directos (equipo)
+
+Costos indirectos operativos (estructura)
+
+Ninguna provisión
+
+Ningún impuesto USA
+
+→ La App está levantando el overhead contable (incluye provisiones + impuestos), no el operativo.
+
+B. La App está calculando un BURN RATE contable incorrecto
+
+Looker Studio y Excel MAESTRO muestran para OCT 2025:
+
+Proveedores a pagar: 50,625
+
+Impuestos USA: 25,287
+
+Provisión Warner: 14,493
+
+Provisión PepsiCo: 13,413
+
+Provisión Facturación Adelantada: 27,906
+
+Total Provisiones Octubre = 81,099 USD
+Total Pasivo Octubre = 103,818 USD
+
+En tu App, el cálculo contable aparece como:
+
+Provisiones: 50.6k → Mal (debería ser ~81k)
+
+Burn Rate: 140k → Matemáticamente imposible con los datos del Excel.
+
+→ Tu ETL está omitiendo la provisión por facturación adelantada (27,906 USD)
+→ Y posiblemente también está duplicando Impuestos USA en overhead.
+
+C. El problema madre
+
+La App está leyendo las provisiones desde Costos directos e indirectos, cuando los valores correctos están en:
+
+Hoja “Pasivo”
+
+Hoja “Provisión pasivo proyectos”
+
+Hoja “Impuestos”
+
+Y no desde “Costos”.
+Esto hace que algunas provisiones entren doble y otras no entren nunca.
+
+2. VERDADERO origen de cada dato según tu Excel MAESTRO (versión definitiva)
+
+Basado en la captura de VICKY y lo que validamos con las hojas:
+
+1. TOTAL ACTIVO
+
+→ Hoja: Resumen Ejecutivo
+Campos:
+
+Activo líquido (USD)
+
+Activo Mediano Plazo Crypto (USD)
+
+Clientes a Cobrar (USD)
+
+2. TOTAL PASIVO
+
+→ Hoja: Resumen Ejecutivo
+Pero el detalle real viene de:
+
+Hoja Pasivo
+
+Proveedores a pagar
+
+Provisión Impuestos USA
+
+Provisión Facturación Adelantada
+
+Hoja Provisión pasivo proyectos
+
+Provisión Warner
+
+Provisión PepsiCo
+
+3. BALANCE NETO
+
+→ = Total Activo – Total Pasivo
+Fuente: Resumen Ejecutivo
+
+4. CAJA TOTAL (Cash disponible)
+
+→ Última línea del mes en Cash Flow
+Fuente: Hoja “Cash Flow” (saldo final USD)
+
+5. INVERSIONES / CRYPTO
+
+→ Hoja Activo Mediano Plazo Crypto
+
+6. CASH FLOW
+
+Ingresos reales → Hoja Cash Flow, columna ingresos
+Egresos reales → Hoja Cash Flow, columna egresos
+Cash Flow Neto → Resumen Ejecutivo
+
+7. CUENTAS A COBRAR
+
+→ Resumen Ejecutivo → “Deuda Clientes”
+
+8. CUENTAS A PAGAR
+
+→ Resumen Ejecutivo → “Proveedores a pagar”
+
+9. FACTURACIÓN DEL MES
+
+→ Hoja “Seguimiento Markup General”
+
+Facturación total → Fila 101
+
+IVA Compras → Fila 29
+
+Impuestos USA → Fila 24
+
+No depende de provisiones.
+No depende de costos.
+
+10. COSTOS DEL MES (Contable)
+Directos
+
+→ Hoja “Costos directos e indirectos” o fila 76 del Markup.
+
+Indirectos
+
+→ Hoja “Costos directos e indirectos”
+
+IVA Compras
+
+→ Hoja Markup Fila 29
+
+Impuestos USA
+
+→ Hoja Markup Fila 24
+→ También aparece en “Pasivo” como provisión.
+
+11. PROVISIONES (clave para corregir tu App)
+
+Estas NO están en “Costos”. Están en:
+
+A. Proveedores a pagar
+
+→ Hoja “Pasivo”
+
+B. Provisión Impuestos USA
+
+→ Hoja “Pasivo”
+→ Hoja “Impuestos”
+→ Markup fila 24
+
+C. Provisiones por clientes
+
+→ Hoja “Provisión pasivo proyectos”
+
+PepsiCo
+
+Warner
+
+D. Facturación adelantada
+
+→ Hoja “Pasivo”
+→ Columna “Provisión Facturación Adelantada”
+
+→ HOY es la que tu app NO está contabilizando.
+
+12. TIPO DE CAMBIO
+
+→ Hoja Info Tipo de Cambio y REM
+Usar “USD” del mes para convertir ARS → USD
+
+3. Dónde está el error EXACTO en tu app
+Tu App actualmente:
+
+Toma Overhead desde costos → incluye provisiones que no corresponden.
+
+Ignora “Provisión facturación adelantada”.
+
+Ignora Warner y PepsiCo si vienen como USD o ARS mezclado.
+
+Está sumando Impuestos USA dos veces (en overhead y en provisiones).
+
+Está usando el CashFlow in/out mal parseado porque tus CSV estaban en ARS.
