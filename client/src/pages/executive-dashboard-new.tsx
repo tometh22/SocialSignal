@@ -334,7 +334,7 @@ export default function ExecutiveDashboard() {
                         ({formatPct(operational.ebitOperationalPct || 0)})
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">= Devengado – Costos directos</p>
+                    <p className="text-xs text-gray-400 mt-2">= Devengado – costos directos (sin overhead ni provisiones)</p>
                   </div>
                   <div className={`p-3 rounded-full ${
                     (operational.ebitOperationalUsd || 0) >= 0 ? 'bg-emerald-100' : 'bg-red-100'
@@ -646,8 +646,11 @@ export default function ExecutiveDashboard() {
                           <p className="text-xs text-gray-300">Facturado – Costos contables. Visión contable de la rentabilidad según el informe de administración.</p>
                         </TooltipContent>
                       </Tooltip>
+                      <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 bg-gray-100 text-gray-600 border-gray-300">
+                        Incluye provisiones
+                      </Badge>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">Resultado operativo contable</p>
+                    <p className="text-xs text-gray-500 mb-3">Resultado después de todos los costos contables</p>
                     <div className={`text-3xl font-semibold ${
                       (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-800' : 'text-red-700'
                     }`} data-testid="metric-ebit-contable">
@@ -656,7 +659,7 @@ export default function ExecutiveDashboard() {
                         ({formatPct(financial.ebitAccountingPct || 0)})
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">= Facturado – Costos contables</p>
+                    <p className="text-xs text-gray-400 mt-2">= Facturado – Directos – Overhead – Provisiones</p>
                   </div>
                   <div className={`p-3 rounded-full ${
                     (financial.ebitAccountingUsd || 0) >= 0 ? 'bg-blue-100' : 'bg-red-100'
@@ -739,13 +742,83 @@ export default function ExecutiveDashboard() {
                     <p className="text-xl font-bold text-rose-700" data-testid="metric-burn-rate">
                       {formatCurrency(financial.totalCostsUsd || 0)}
                     </p>
-                    <p className="text-xs text-rose-400">Total contable</p>
+                    <p className="text-xs text-rose-400">Directos + Overhead + Provisiones</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* ===== FILA 3: CONTEXTO (col-span-6 x 2) ===== */}
+            {/* ===== FILA 3: CASH FLOW (col-span-12) ===== */}
+            
+            {/* Cash Flow Neto */}
+            <Card className={`col-span-12 border-0 shadow-lg ${
+              (financial.cashFlowNetUsd || 0) >= 0 
+                ? 'bg-gradient-to-r from-cyan-50 to-white' 
+                : 'bg-gradient-to-r from-amber-50 to-white'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-full ${
+                      (financial.cashFlowNetUsd || 0) >= 0 ? 'bg-cyan-100' : 'bg-amber-100'
+                    }`}>
+                      <DollarSign className={`h-6 w-6 ${
+                        (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-600' : 'text-amber-600'
+                      }`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium uppercase tracking-wide ${
+                          (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-700' : 'text-amber-700'
+                        }`}>
+                          Cash Flow Neto
+                        </span>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className={`h-4 w-4 ${
+                              (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-400' : 'text-amber-400'
+                            }`} />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[280px]">
+                            <p className="text-xs font-medium mb-1">Cash Flow Neto</p>
+                            <p className="text-xs text-gray-300">Flujo de caja neto del período desde Resumen Ejecutivo. In/Out son los movimientos detallados de la hoja CashFlow.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className={`text-2xl font-bold mt-1 ${
+                        (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-800' : 'text-amber-800'
+                      }`} data-testid="metric-cashflow-net">
+                        {formatCurrency(financial.cashFlowNetUsd || 0)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="text-center">
+                      <p className="text-xs text-emerald-600 uppercase font-medium">Ingresos</p>
+                      <p className="text-lg font-semibold text-emerald-700" data-testid="metric-cashflow-in">
+                        {formatCurrency(financial.cashFlowInUsd || 0)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-red-600 uppercase font-medium">Egresos</p>
+                      <p className="text-lg font-semibold text-red-700" data-testid="metric-cashflow-out">
+                        {formatCurrency(financial.cashFlowOutUsd || 0)}
+                      </p>
+                    </div>
+                    <div className="text-center border-l pl-4 border-gray-200">
+                      <p className="text-xs text-gray-500 uppercase font-medium">Caja Total</p>
+                      <p className={`text-lg font-semibold ${
+                        (financial.cajaTotalUsd || 0) >= 0 ? 'text-gray-800' : 'text-amber-700'
+                      }`} data-testid="metric-caja-total">
+                        {formatCurrency(financial.cajaTotalUsd || 0)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ===== FILA 4: CONTEXTO (col-span-6 x 2) ===== */}
             
             {/* Personas Activas */}
             <Card className="col-span-12 md:col-span-6 border-0 shadow-md bg-gray-50">

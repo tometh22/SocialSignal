@@ -5513,7 +5513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         alerts.push({
           code: 'OVER_BURN',
           severity: 'warning',
-          msg: `Costos del mes ${increase}% más altos que el promedio de 3 meses ($${avgCost3m.toFixed(0)}).`,
+          msg: `Costos contables del mes ${increase}% más altos que el promedio de 3 meses (USD ${avgCost3m.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}).`,
           action: '/active-projects'
         });
       }

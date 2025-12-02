@@ -1,0 +1,138 @@
+ahora sí se ve el sistema “cerrado”. Te resumo qué está pasando con OCT-25 y qué tenés que revisar.
+
+Coherencia numérica (OCT-25)
+
+Operativo (tab verde)
+
+Ingreso devengado: ~USD 42,1k
+
+Es lo producido en octubre (no lo cobrado).
+
+Abajo mostrás: “Facturado en el período: USD 81,8k” → coincide con el tab financiero.
+
+EBIT operativo: ~USD 24,7k (59%)
+
+Fórmula: devengado – costos directos
+
+42,1k – 17,4k ≈ 24,7k → cuadra perfecto con la tarjeta.
+
+Tarifa efectiva: USD 25/h
+
+Fórmula: devengado / horas facturables
+
+42,1k / 1.659h ≈ 25,4 → ok.
+
+Markup operativo: 2,42x
+
+Fórmula: devengado / costos directos
+
+42,1k / 17,4k ≈ 2,42 → ok.
+
+Composición de costos operativos:
+
+Directos (equipo): USD 17,4k
+
+Overhead operativo: USD 24,4k
+
+Total operativo: USD 41,8k (= 17,4k + 24,4k)
+
+Conclusión: la vista operativa está consistente con las fórmulas que definimos.
+
+Financiero (tab azul)
+
+Facturado: USD 81,8k
+
+Es el mismo valor que mostrás como “Facturado en el período” en Operativo.
+
+Directos: USD 17,4k
+
+Overhead: USD 24,4k
+
+Provisiones: USD 53,2k
+
+Provisiones = Facturación adelantada + Impuestos USA, sin doble contar Pepsi/Warner (esto lo ajustó el ETL según el último mensaje del agent).
+
+Burn rate: USD 95,0k
+
+Fórmula: directos + overhead + provisiones
+
+17,4k + 24,4k + 53,2k ≈ 95,0k → ok.
+
+EBIT contable: ≈ –USD 13,1k (-16%)
+
+Fórmula: Facturado – costos contables (directos + overhead + provisiones)
+
+81,8k – 95,0k ≈ –13,2k → cuadra.
+
+Esto explica la “bifurcación”:
+
+Operación “pura” (equipo vs trabajo hecho): +24,7k → bien para management.
+
+Resultado contable del mes (con estructura + provisiones fuertes): –13,1k → bien para socios / contabilidad.
+
+Cómo se conectan con el Excel MAESTRO
+
+Para OCT-25, con lo que ya hizo el agent:
+
+Facturado, provisiones, cashflow neto, balance neto y beneficio neto están matcheados 1:1 con Resumen Ejecutivo (y la CashFlow sheet se usa solo para In/Out, no para el neto).
+
+Los costos directos/overhead vienen de Costos directos e indirectos.
+
+Las provisiones vienen de Resumen Ejecutivo (Facturación adelantada + Impuestos USA), no de “Provisión pasivo proyectos”.
+
+Es decir: hoy la app está leyendo las mismas fuentes que el informe de administración y los números clave cuadran. Buenísimo.
+
+Ajustes que yo haría ahora (texto/UX, no de lógica)
+
+Sin tocar fórmulas, afiná:
+
+Operativo
+
+Badge amarillo: cambiar copy a algo tipo
+“Costos contables del mes 48% más altos que el promedio de 3 meses (USD 64,1k).”
+→ así queda claro que ese alerta mira la capa contable, no solo el costo operativo de 41,8k.
+
+Card “EBIT operativo”: debajo del número grande agregar una línea chica:
+“= Devengado – costos directos (sin overhead ni provisiones)”
+→ deja explícito qué incluye y qué no.
+
+Financiero
+
+Card “EBIT contable”:
+
+Subtítulo: “Resultado después de todos los costos contables”
+
+Línea chica: “= Facturado – Directos – Overhead – Provisiones”
+
+Añadir un pequeño badge gris: “Incluye provisiones”.
+
+Card “Burn rate”: debajo:
+“Total de costos contables (Directos + Overhead + Provisiones)”.
+
+Checklist rápido para validar cualquier mes
+
+Cuando quieras chequear otro período:
+
+En Excel MAESTRO (Resumen Ejecutivo)
+
+“Ventas del mes” (USD) = Facturado del tab financiero.
+
+“Cash Flow Neto” = cashFlowNetUsd en la API / card de cashflow cuando la agregues.
+
+“Balance Neto” = balanceNetoUsd.
+
+“EBIT / Utilidad operativa” (si la estás trayendo) = ebitUtilidadOperativaUsd en la API.
+
+En Costos directos e indirectos
+
+Suma de directos en USD del mes = Directos en ambas vistas.
+
+Suma de indirectos operativos en USD = Overhead operativo (tab Operativo).
+
+En Resumen Ejecutivo
+
+Facturación adelantada + Impuestos USA = Provisiones (tab Financiero).
+
+Si esos tres bloques cierran, el dashboard está sano.
+
+En síntesis: los números que ves en las capturas son coherentes con el diseño que definimos y con el Excel; el siguiente paso es solo ajustar microcopys y, si querés, agregar una card de “Cash Flow Neto” en la vista financiera usando cashFlowNetUsd (Resumen Ejecutivo) y mostrando abajo In / Out como contexto.
