@@ -1977,6 +1977,7 @@ class GoogleSheetsWorkingService {
       'activo mediano plazo crypto': 'inversiones',
       'activo mediano plazo clientes a cobrar': 'cuentasCobrarUsd',
       'pasivo proveedores a pagar': 'cuentasPagarUsd',
+      'provisión pasivo costos facturación adelantada': 'facturacionAdelantadaUsd',
     };
     
     // Encontrar índices de columnas para cada KPI
@@ -2818,6 +2819,40 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Obtener provisiones de "Facturación Adelantada" desde Resumen Ejecutivo
+   * Columna: "Provisión Pasivo Costos Facturación Adelantada"
+   * Devuelve ProvisionRow[] compatible con el sistema de provisiones
+   */
+  async getFacturacionAdelantadaFromResumenEjecutivo(): Promise<ProvisionRow[]> {
+    try {
+      const resumen = await this.getResumenEjecutivo();
+      const result: ProvisionRow[] = [];
+      
+      for (const row of resumen) {
+        if (row.facturacionAdelantadaUsd && row.facturacionAdelantadaUsd !== 0) {
+          result.push({
+            periodKey: row.periodKey,
+            concept: 'PROVISIÓN FACTURACIÓN ADELANTADA',
+            source: 'resumen_ejecutivo',
+            amountUsd: row.facturacionAdelantadaUsd,
+            isProvision: true,
+            provisionKind: 'facturacion_adelantada',
+            rawValue: row.facturacionAdelantadaUsd.toString()
+          });
+          console.log(`  ✅ [Resumen Ejecutivo] ${row.periodKey}: FACTURACIÓN ADELANTADA = USD ${row.facturacionAdelantadaUsd.toFixed(2)}`);
+        }
+      }
+      
+      console.log(`📊 [Resumen Ejecutivo] Extraídos ${result.length} registros de Facturación Adelantada`);
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo Facturación Adelantada:', error);
+      return [];
+    }
+  }
+
+  /**
    * Obtener provisiones de facturas futuras (ingresos anticipados) desde la hoja "Activo"
    * Las "Cuentas a Cobrar" están en la hoja "Activo" como Tipo de Activo = "Clientes a cobrar"
    * 
@@ -3318,6 +3353,7 @@ export interface ResumenEjecutivoRow {
   ebitOperativo?: number;
   beneficioNeto?: number;
   markupPromedio?: number;
+  facturacionAdelantadaUsd?: number;  // Provisión Pasivo Costos Facturación Adelantada
 }
 
 // Tipo para movimientos de cash flow
