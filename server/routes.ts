@@ -13365,6 +13365,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Analyze raw CashFlow sheet data to identify discrepancies
+  app.get("/api/etl/sot/debug-cashflow", requireAuth, async (req, res) => {
+    try {
+      const period = (req.query.period as string) || '2025-10';
+      console.log(`🔍 Iniciando debug de CashFlow para período ${period}...`);
+      
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      
+      const result = await googleSheetsWorkingService.debugCashFlowSheet(period);
+      
+      // Also get cash_movements totals from DB for comparison
+      const dbQuery = await pool.query(`
+        SELECT 
+          type,
+          SUM(amount_usd) as total_usd,
+          COUNT(*) as count
+        FROM cash_movements
+        WHERE period_key = $1
+        GROUP BY type
+      `, [period]);
+      
+      const dbIn = dbQuery.rows.find(r => r.type === 'IN');
+      const dbOut = dbQuery.rows.find(r => r.type === 'OUT');
+      
+      const dbAnalysis = {
+        totalIngresosDb: parseFloat(dbIn?.total_usd || '0'),
+        totalEgresosDb: parseFloat(dbOut?.total_usd || '0'),
+        netoDb: parseFloat(dbIn?.total_usd || '0') - parseFloat(dbOut?.total_usd || '0'),
+        countIn: parseInt(dbIn?.count || '0'),
+        countOut: parseInt(dbOut?.count || '0')
+      };
+      
+      console.log(`\n📊 [DEBUG_CASHFLOW_DB] Database totals for ${period}:`);
+      console.log(`   💰 totalIngresosDb = $${dbAnalysis.totalIngresosDb.toFixed(2)} (${dbAnalysis.countIn} rows)`);
+      console.log(`   💸 totalEgresosDb = $${dbAnalysis.totalEgresosDb.toFixed(2)} (${dbAnalysis.countOut} rows)`);
+      console.log(`   📈 netoDb = $${dbAnalysis.netoDb.toFixed(2)}`);
+      
+      // Calculate differences
+      const sheetVsDb = {
+        ingresosDiff: result.rawAnalysis.totalIngresosUsd - dbAnalysis.totalIngresosDb,
+        egresosDiff: result.rawAnalysis.totalEgresosUsd - dbAnalysis.totalEgresosDb,
+        netoDiff: result.rawAnalysis.netoHoja - dbAnalysis.netoDb
+      };
+      
+      console.log(`\n📊 [DEBUG_CASHFLOW_COMPARISON] Sheet vs DB:`);
+      console.log(`   Ingresos: Sheet $${result.rawAnalysis.totalIngresosUsd.toFixed(2)} vs DB $${dbAnalysis.totalIngresosDb.toFixed(2)} (diff: $${sheetVsDb.ingresosDiff.toFixed(2)})`);
+      console.log(`   Egresos: Sheet $${result.rawAnalysis.totalEgresosUsd.toFixed(2)} vs DB $${dbAnalysis.totalEgresosDb.toFixed(2)} (diff: $${sheetVsDb.egresosDiff.toFixed(2)})`);
+      console.log(`   Neto: Sheet $${result.rawAnalysis.netoHoja.toFixed(2)} vs DB $${dbAnalysis.netoDb.toFixed(2)} (diff: $${sheetVsDb.netoDiff.toFixed(2)})`);
+      
+      res.json({
+        success: true,
+        period,
+        sheetAnalysis: result.rawAnalysis,
+        dbAnalysis,
+        comparison: sheetVsDb,
+        issues: result.issues,
+        targetNetoResumenEjecutivo: 66801.58
+      });
+      
+    } catch (error) {
+      console.error('❌ CashFlow Debug Error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: error instanceof Error ? error.message : String(error) 
+      });
+    }
+  });
+
   // 🎯 STABLE CONTRACT ENDPOINTS - Universal Aggregator Based
   
   // Main endpoint: GET /api/stable/projects?timeFilter=...&activeOnly=true|false  

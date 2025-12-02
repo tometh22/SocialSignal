@@ -1,0 +1,237 @@
+Estado actual según el log del Agent:
+
+Provisiones OCT-25: 53.193,08 (27.906 + 25.287,08) → OK.
+
+Facturado, EBIT, Beneficio Neto, Balance, Cash Flow Neto → todos matchean Excel / informe → OK.
+
+CashFlow ETL:
+
+cashFlowInUsd (OCT-25): 82.274,01
+
+cashFlowOutUsd (OCT-25): 29.169,42
+
+netFromMovements: 53.104,59
+
+cashflowNetoUsd (Resumen Ejecutivo): 66.801,58
+
+Diferencia ≈ 13.697 → NO es aceptable como “esperable” si esa pestaña es la fuente real de movimientos.
+
+Con esto: la capa financiera está bien, pero el ETL de CashFlow no está leyendo exactamente lo mismo que construye el neto de Resumen Ejecutivo. Hay que ajustar reglas, no conformarse con el WARN.
+
+Te dejo instrucciones concretas para:
+
+Corregir el ETL de CashFlow hasta que In–Out = Neto (± redondeo).
+
+Sumar la “Caja total fin de mes” bien definida.
+
+Todo listo para copiar/pegar en el Agent si querés.
+
+1. Objetivo de corrección
+
+Para cada period_key (ej. 2025-10):
+
+cashFlowInUsd = suma de todos los ingresos reales del mes.
+
+cashFlowOutUsd = suma de todos los egresos reales del mes.
+
+cashFlowInUsd - cashFlowOutUsd debe ser ≈ cashflow_neto_usd que viene de Resumen Ejecutivo.
+
+La diferencia permitida debería ser solo por redondeo (ej. < 1 USD). Si es ~13.7k, el ETL está filtrando / clasificando mal filas.
+
+2. Corrección del ETL: pasos para el Agent
+2.1. Paso 1 – Debug directo contra la hoja CashFlow
+
+Pedirle al Agent algo así:
+
+En server/services/googleSheetsWorking.ts, agregá una función de debug temporal:
+
+- Leé todas las filas de la hoja "CashFlow".
+- Filtrá solo las filas donde la columna Ingreso/Egreso sea EXACTAMENTE lo que viene en Excel (loguá los valores únicos).
+- Para el mes OCT-25 (period_key 2025-10):
+  - Calculá y logueá:
+    - totalIngresosUsdHoja = SUM(Monto USD o Monto ARS/Cotización) para filas Ingreso.
+    - totalEgresosUsdHoja = SUM(Monto USD o Monto ARS/Cotización) para filas Egreso.
+    - netoHoja = totalIngresosUsdHoja - totalEgresosUsdHoja.
+
+Logueá esos tres valores en consola con un prefijo claro, por ejemplo: [DEBUG_CASHFLOW_SHEET_OCT25].
+
+
+Objetivo de este paso:
+
+Ver si, leyendo “a pelo” la hoja, te da algo cercano a 66.801,58 o no.
+
+Si ahí ya no te da 66.801,58, el problema es de Excel (criterios de qué entra en el neto del Resumen Ejecutivo).
+
+Si ahí sí te da ~66.801,58 y en cash_movements te da 53.104,59, el problema está en la lógica del ETL (filtros / mapeos).
+
+2.2. Paso 2 – Normalización de la columna Ingreso/Egreso
+
+Errores típicos:
+
+Valores con espacios: "Ingreso " / " Egreso".
+
+Valores con mayúsculas/minúsculas/acentos raros: "INGRESO", "Egreso", etc.
+
+Alguna fila con otro texto que estás ignorando (p.ej. “Ajuste”, “Transferencia”, “Interbancario”).
+
+Instrucciones para el Agent:
+
+En getCashFlowMovements:
+
+- Antes de evaluar el tipo, normalizá la columna Ingreso/Egreso:
+  - const rawType = (row['Ingreso/Egreso'] || '').toString().trim().toLowerCase();
+  - Si rawType === 'ingreso' → type = 'IN'
+  - Si rawType === 'egreso' → type = 'OUT'
+  - Si rawType === 'saldo' → ignorar (no insertes movimiento)
+  - Cualquier otro valor → loguear WARN con el texto original + period_key.
+
+
+Después de esto, pedile:
+
+Loguear cuántas filas se clasifican como IN, cuántas como OUT y cuántas quedan fuera para OCT-25.
+
+Si ves muchas filas “UNKNOWN”, ahí está parte de la diferencia.
+
+2.3. Paso 3 – Revisión del cálculo de amount_usd
+
+En la implementación actual:
+
+Monto USD puede venir vacío.
+
+Monto ARS + Cotización deben usarse como fallback.
+
+Pedirle al Agent:
+
+En getCashFlowMovements, asegurate de que:
+
+1) amountRawUsd se calcule así:
+   - Si Monto USD es numérico → usarlo.
+   - Else si Monto ARS y Cotización son numéricos → usar Monto ARS / Cotización.
+   - Else → loguear WARN y no insertar movimiento.
+
+2) Siempre guardes amount_usd como valor POSITIVO:
+   - Si type = 'IN' → amount_usd = Math.abs(amountRawUsd)
+   - Si type = 'OUT' → amount_usd = Math.abs(amountRawUsd)
+
+3) Loguees para OCT-25:
+   - total amount_usd calculado desde Monto USD directamente.
+   - total amount_usd calculado desde Monto ARS / Cotización.
+
+
+Esto te permite ver si hay movimientos relevantes ignorados por no tener ni USD ni ARS/Cotización bien parseados.
+
+2.4. Paso 4 – Alineación de period_key
+
+Asegurate:
+
+Que period_key se derive SIEMPRE de la Fecha real (tipo Date), no de una columna texto tipo “10 oct”.
+
+Instrucción al Agent:
+
+En getCashFlowMovements:
+
+- Asegurate de que la columna Fecha se parsea a Date.
+- period_key = `${year}-${String(month + 1).padStart(2, '0')}`.
+- Verificá que para todas las filas de OCT-25, period_key sea "2025-10".
+- Logueá cuántas filas quedan con period_key "2025-10" en el ETL antes de insertarlas.
+
+
+Si está usando otra columna para mes/año, puede estar tirando movimientos de octubre a otro período, lo que explica la diferencia.
+
+2.5. Paso 5 – Comparación directa sheet vs cash_movements
+
+Una vez corregido todo lo anterior:
+
+Volvé a correr /api/etl/sot/sync-cashflow.
+
+Pedile al Agent:
+
+Hacé dos agregaciones para 2025-10:
+
+A) Directo desde la hoja (debug function):
+   - totalIngresosUsdHoja
+   - totalEgresosUsdHoja
+   - netoHoja
+
+B) Desde la tabla cash_movements:
+   - totalIngresosUsdDb = SUM(amount_usd) WHERE type='IN' AND period_key='2025-10'
+   - totalEgresosUsdDb = SUM(amount_usd) WHERE type='OUT' AND period_key='2025-10'
+   - netoDb = totalIngresosUsdDb - totalEgresosUsdDb
+
+Logueá ambos sets en el mismo bloque de log para comparar.
+
+
+Objetivo:
+
+netoHoja y netoDb deben coincidir (± redondeo).
+
+Ambos deberían estar muy cerca de 66.801,58.
+
+Si ahí cierran, ya sabés que:
+
+Diferencia actual de 13.7k era pura lógica de ETL (filtrado/clasificación).
+
+Ahora el pipeline está coherente.
+
+3. Sumar lo que falta: Caja Total fin de mes
+
+Ahora que CashFlow ETL está bien, podés cerrar la parte de caja:
+
+3.1. Definir “Caja total fin de mes”
+
+Tomemos como definición:
+
+cashEndOfMonthUsd = Saldo Total USD de la última fila de ese mes en la hoja CashFlow.
+
+Instrucciones al Agent:
+
+En googleSheetsWorking.ts o en el ETL:
+
+- Implementá una función getCashEndOfMonthByPeriod():
+  - Recorre todas las filas de "CashFlow".
+  - Normalizá Fecha y calculá period_key como ya definimos.
+  - Para cada period_key, quedate con la última fila (por Fecha y por orden en la hoja) que tenga un valor numérico en "Saldo Total USD".
+  - De esa fila, tomá saldoTotalUsd = valor de "Saldo Total USD".
+  - Devolvé un mapa { period_key -> saldoTotalUsd }.
+
+En sot-etl.ts:
+
+- Usá ese mapa para poblar/actualizar monthly_financial_summary.cash_end_of_month_usd.
+
+3.2. Exponerla en el endpoint
+
+En /api/dashboard/metrics:
+
+En financial, asegurate de incluir:
+
+cashEndOfMonthUsd (lo que hoy llamás Caja Total / CAJA TOTAL).
+
+Con esto podés mostrar:
+
+Caja total al cierre
+
+CashFlow neto del mes
+
+Ingresos/Egresos del mes (In/Out).
+
+4. Qué deberías ver cuando esté bien
+
+Para OCT-25, cuando todo esté corregido:
+
+financial.cashFlowInUsd ≈ suma de Ingresos en CashFlow octubre.
+
+financial.cashFlowOutUsd ≈ suma de Egresos en CashFlow octubre.
+
+netFromMovements ≈ financial.cashFlowNetUsd ≈ 66.801,58.
+
+financial.cashEndOfMonthUsd = saldo total USD de la última fila de octubre.
+
+Facturado, EBIT, Beneficio, Provisiones, Balance → sin cambios (siguen matcheando informe).
+
+Ahí sí el sistema queda redondo:
+
+Resumen Ejecutivo = fuente contable mensual.
+
+CashFlow = detalle de movimientos que explica ese resumen.
+
+Dashboard = síntesis de ambos, sin recalcular nada que ya está bien definido en Excel.

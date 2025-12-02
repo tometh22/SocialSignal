@@ -3224,6 +3224,190 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * DEBUG FUNCTION: Analyze raw CashFlow sheet data for specific period
+   * This helps identify discrepancies between sheet totals and ETL results
+   */
+  async debugCashFlowSheet(targetPeriod: string = '2025-10'): Promise<{
+    rawAnalysis: {
+      totalRows: number;
+      uniqueTypes: Record<string, number>;
+      totalIngresosUsd: number;
+      totalEgresosUsd: number;
+      netoHoja: number;
+      periodRows: number;
+    };
+    issues: string[];
+  }> {
+    console.log(`\n🔍 [DEBUG_CASHFLOW_SHEET] Analyzing CashFlow sheet for ${targetPeriod}...`);
+    
+    const issues: string[] = [];
+    
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `'CashFlow'!A:Z`,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        return {
+          rawAnalysis: { totalRows: 0, uniqueTypes: {}, totalIngresosUsd: 0, totalEgresosUsd: 0, netoHoja: 0, periodRows: 0 },
+          issues: ['No data in CashFlow sheet']
+        };
+      }
+      
+      const headers = rows[0] || [];
+      console.log(`   📋 Headers: ${headers.join(' | ')}`);
+      
+      // Find column indices
+      const findColIdx = (patterns: string[]): number => {
+        for (let i = 0; i < headers.length; i++) {
+          const h = (headers[i] || '').toString().toLowerCase().trim();
+          if (patterns.some(p => h.includes(p))) return i;
+        }
+        return -1;
+      };
+      
+      const fechaIdx = findColIdx(['fecha', 'date']);
+      const ingresoEgresoIdx = findColIdx(['ingreso/egreso', 'ingreso egreso', 'tipo movimiento', 'tipo']);
+      const montoUsdIdx = findColIdx(['monto usd', 'usd', 'dolares']);
+      const montoArsIdx = findColIdx(['monto ars', 'ars', 'pesos']);
+      const cotizacionIdx = findColIdx(['cotización', 'cotizacion', 'tipo cambio', 'tc']);
+      
+      console.log(`   📊 Column indices: Fecha=${fechaIdx}, IngresoEgreso=${ingresoEgresoIdx}, MontoUSD=${montoUsdIdx}, MontoARS=${montoArsIdx}, Cotiz=${cotizacionIdx}`);
+      
+      // Analyze ALL rows
+      const uniqueTypes: Record<string, number> = {};
+      let totalIngresosUsd = 0;
+      let totalEgresosUsd = 0;
+      let periodRows = 0;
+      let rowsWithValidAmount = 0;
+      let rowsConvertedFromArs = 0;
+      
+      const [targetYear, targetMonth] = targetPeriod.split('-').map(Number);
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        // Get raw type value exactly as it appears
+        const tipoRaw = ingresoEgresoIdx >= 0 ? (row[ingresoEgresoIdx] || '').toString() : '';
+        const tipoTrimmed = tipoRaw.trim();
+        const tipoLower = tipoTrimmed.toLowerCase();
+        
+        // Track unique types (for debugging)
+        if (tipoTrimmed) {
+          uniqueTypes[tipoTrimmed] = (uniqueTypes[tipoTrimmed] || 0) + 1;
+        }
+        
+        // Parse date to check period
+        const fechaRaw = fechaIdx >= 0 ? (row[fechaIdx] || '').toString().trim() : '';
+        const date = this.parseDateValue(fechaRaw);
+        if (!date) continue;
+        
+        const rowYear = date.getFullYear();
+        const rowMonth = date.getMonth() + 1;
+        
+        // Only analyze target period
+        if (rowYear !== targetYear || rowMonth !== targetMonth) continue;
+        
+        periodRows++;
+        
+        // Calculate amount in USD
+        let amountUsd: number | null = null;
+        let source = '';
+        
+        // Try Monto USD first
+        if (montoUsdIdx >= 0) {
+          const montoUsdRaw = (row[montoUsdIdx] || '').toString().trim();
+          const parsed = this.parseNumericValue(montoUsdRaw);
+          if (parsed !== null && parsed !== 0) {
+            amountUsd = parsed;
+            source = 'USD';
+          }
+        }
+        
+        // Fallback to ARS / Cotización
+        if (amountUsd === null && montoArsIdx >= 0 && cotizacionIdx >= 0) {
+          const montoArsRaw = (row[montoArsIdx] || '').toString().trim();
+          const cotizRaw = (row[cotizacionIdx] || '').toString().trim();
+          
+          const montoArs = this.parseNumericValue(montoArsRaw);
+          const cotiz = this.parseNumericValue(cotizRaw);
+          
+          if (montoArs !== null && cotiz !== null && cotiz > 0) {
+            amountUsd = montoArs / cotiz;
+            source = 'ARS/Cotiz';
+            rowsConvertedFromArs++;
+          }
+        }
+        
+        if (amountUsd === null || amountUsd === 0) {
+          const conceptoRaw = (row[7] || row[6] || '').toString().trim();
+          issues.push(`Row ${i+1}: No valid amount, type="${tipoTrimmed}", concepto="${conceptoRaw.substring(0, 30)}"`);
+          continue;
+        }
+        
+        rowsWithValidAmount++;
+        
+        // Classify and accumulate
+        if (tipoLower === 'ingreso') {
+          totalIngresosUsd += Math.abs(amountUsd);
+        } else if (tipoLower === 'egreso') {
+          totalEgresosUsd += Math.abs(amountUsd);
+        } else if (tipoLower !== 'saldo') {
+          // Unknown type that's not "Saldo"
+          issues.push(`Row ${i+1}: Unknown type="${tipoTrimmed}" with amount=$${amountUsd.toFixed(2)}`);
+        }
+      }
+      
+      const netoHoja = totalIngresosUsd - totalEgresosUsd;
+      
+      console.log(`\n🔍 [DEBUG_CASHFLOW_SHEET_${targetPeriod.toUpperCase().replace('-', '')}] RESULTS:`);
+      console.log(`   📊 Total rows in sheet: ${rows.length - 1}`);
+      console.log(`   📊 Rows for ${targetPeriod}: ${periodRows}`);
+      console.log(`   📊 Rows with valid amount: ${rowsWithValidAmount}`);
+      console.log(`   📊 Rows converted from ARS: ${rowsConvertedFromArs}`);
+      console.log(`   📋 Unique Ingreso/Egreso values:`);
+      Object.entries(uniqueTypes).sort((a, b) => b[1] - a[1]).forEach(([type, count]) => {
+        console.log(`      "${type}": ${count}`);
+      });
+      console.log(`   💰 totalIngresosUsdHoja = $${totalIngresosUsd.toFixed(2)}`);
+      console.log(`   💸 totalEgresosUsdHoja = $${totalEgresosUsd.toFixed(2)}`);
+      console.log(`   📈 netoHoja = $${netoHoja.toFixed(2)}`);
+      console.log(`   🎯 Target (Resumen Ejecutivo) ≈ $66,801.58`);
+      console.log(`   ⚠️ Difference = $${Math.abs(netoHoja - 66801.58).toFixed(2)}`);
+      
+      if (issues.length > 0) {
+        console.log(`   ⚠️ Issues found (first 10):`);
+        issues.slice(0, 10).forEach(issue => console.log(`      - ${issue}`));
+      }
+      
+      return {
+        rawAnalysis: {
+          totalRows: rows.length - 1,
+          uniqueTypes,
+          totalIngresosUsd: Math.round(totalIngresosUsd * 100) / 100,
+          totalEgresosUsd: Math.round(totalEgresosUsd * 100) / 100,
+          netoHoja: Math.round(netoHoja * 100) / 100,
+          periodRows
+        },
+        issues
+      };
+      
+    } catch (error: any) {
+      console.error('❌ [DEBUG_CASHFLOW_SHEET] Error:', error?.message || error);
+      return {
+        rawAnalysis: { totalRows: 0, uniqueTypes: {}, totalIngresosUsd: 0, totalEgresosUsd: 0, netoHoja: 0, periodRows: 0 },
+        issues: [error?.message || 'Unknown error']
+      };
+    }
+  }
+
+  /**
    * Parsear filas de CashFlow
    * 
    * CHECKLIST 4.1 IMPLEMENTATION:
