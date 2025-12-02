@@ -1,0 +1,274 @@
+0. Qué números de referencia tenemos para OCT-25 (Excel / Looker)
+
+Tomando tus capturas, los targets que la app debe reproducir son:
+
+Ventas del mes (facturado): 81.838,86 USD
+
+EBIT utilidad operativa: 42.300,52 USD
+
+Beneficio neto: 35.078,23 USD
+
+Cash Flow neto: 66.801,58 USD
+
+Balance neto (activo-pasivo): 68.210,92 USD
+
+Activo / Pasivo de OCT (última fila de Resumen Ejecutivo y Pasivo)
+
+Provisión Impuestos USA: 25.287,08 USD
+
+Provisión pasivo facturación adelantada: 27.906,00 USD
+
+Proveedores a pagar: 50.625,27 USD
+
+Todo lo que haga la app tiene que aterrizar exactamente en esos números.
+
+1. Errores conceptuales que hoy ves en la app
+
+Estás mezclando dos cosas distintas:
+
+Saldos de provisiones y pasivos (hoja Pasivo).
+
+Gasto del mes por provisiones (hoja Provisión pasivo proyectos + Impuestos).
+
+Parte de las provisiones se está tomando dos veces:
+
+Warner + Pepsico aparecen como:
+
+Saldos en Pasivo (fila “Provisión Pasivo Facturación”).
+
+Y además como cálculo mensual en Provisión pasivo proyectos.
+
+Si sumás ambas cosas, inflás provisionsUsd y por arrastre el burnRate y el EBIT contable.
+
+Para el CashFlow intentaste parsear la hoja CashFlow como si todos fueran movimientos en USD y todos fueran ingresos. Eso disparó cashFlowIn / cashFlowOut absurdos. Después borraste cash_movements, pero la lógica de ETL sigue ahí.
+
+En el dashboard financiero actual:
+
+Directos: 17.4k ✓ (coincide con Costos directos).
+
+Overhead: 24.4k (bien si es solo estructura).
+
+Provisiones: 82.7k ❌ (debería ser ≈ 53.193 si tomás solo Impuestos USA + facturación adelantada o el valor exacto que hoy usa Looker desde los cálculos, no el saldo + el cálculo).
+
+2. Qué hay que corregir, punto por punto
+
+Voy a asumir los nombres de archivos que ya venía usando el agent:
+
+server/services/googleSheetsWorking.ts
+
+server/etl/sot-etl.ts
+
+tablas: monthly_financial_summary, fact_cost_month, cash_movements.
+
+2.1. Provisiones – fuente y cálculo
+
+Objetivo: provisionsUsd debe ser el gasto del mes, no el saldo de la cuenta.
+
+En googleSheetsWorking.ts:
+
+Implementar un método claro para provisiones de clientes:
+
+async getProvisionesClientes(mes: number, anio: number) {
+  // hoja: "Provisión pasivo proyectos"
+  // filtrar por mes/año
+  // incluir SOLO filas de tipos "PROVISIÓN" (no "REVERSIÓN")
+  // incluir SOLO clientes que correspondan a facturación anticipada (Warner, Pepsico, y los que definas)
+  // devolver suma en USD
+}
+
+
+Implementar método para Impuestos USA:
+
+async getProvisionImpuestosUsa(mes: number, anio: number) {
+  // hoja: "Impuestos"
+  // filtrar por mes/año
+  // concepto que contenga "IMPUESTO USA" o el texto exacto que usa Vicky
+  // tomar el campo en USD (si está en ARS, convertir usando Info Tipo de Cambio y REM)
+  // devolver suma en USD
+}
+
+
+No uses la hoja Pasivo para calcular gasto del mes. Pasivo es stock.
+
+En sot-etl.ts, cuando llenes fact_cost_month y monthly_financial_summary:
+
+const provClientesUsd = await sheets.getProvisionesClientes(mes, anio);
+const provImpuestosUsd = await sheets.getProvisionImpuestosUsa(mes, anio);
+
+const provisionsUsd = provClientesUsd + provImpuestosUsd;
+
+// Guardar en fact_cost_month
+factCostMonth.provisions_usd = provisionsUsd;
+
+// Guardar en monthly_financial_summary
+monthlySummary.provisions_usd = provisionsUsd;
+
+
+En el cálculo de burn rate y EBIT contable:
+
+const costosDirectos = monthlySummary.direct_costs_usd;
+const costosIndirectos = monthlySummary.indirect_costs_usd; // estructura sin provisiones ni impuestos
+const provisions = monthlySummary.provisions_usd;
+
+const totalCostosContables = costosDirectos + costosIndirectos + provisions;
+
+monthlySummary.burn_rate_usd = totalCostosContables;
+monthlySummary.ebit_contable_usd = monthlySummary.facturado_usd - totalCostosContables;
+
+
+En el dashboard financiero, la card PROVISIONES debe leer solo financial.provisionsUsd tal cual viene de monthly_financial_summary. Nada de sumarle proveedores a pagar ni otras cuentas del Pasivo.
+
+2.2. Overhead operativo vs contable
+
+Separá bien las versiones:
+
+En monthly_financial_summary:
+
+indirect_costs_usd: solo estructura (costos indirectos de la hoja Costos directo e indirectos).
+
+impuestos_usa_usd: de la función anterior (getProvisionImpuestosUsa).
+
+provisions_usd: ya definido arriba (clientes + Impuestos USA, o solo clientes si decidís separar impuestos en otra card).
+
+En el API que arma los datos del dashboard (/api/dashboard/metrics):
+
+// Vista financiera
+financial.overheadUsd = monthly.indirect_costs_usd; // estructura
+financial.provisionsUsd = monthly.provisions_usd;
+financial.impuestosUsaUsd = monthly.impuestos_usa_usd; // si querés mostrarlo separado
+
+// Vista operativa
+operational.overheadOperativeUsd = monthly.indirect_costs_usd; // sin provisiones NI impuestos
+operational.directCostsUsd = monthly.direct_costs_usd;
+
+
+EBIT operativo (vista Operativa):
+
+operational.devengadoUsd  // ya lo calculás vía WIP + facturación
+operational.ebitOperativoUsd = operational.devengadoUsd - operational.directCostsUsd;
+
+
+No restes overhead ni provisiones en la vista operativa; esa carta es “después de costos de equipo”.
+
+2.3. Cash Flow
+
+Hasta que no replique EXACTAMENTE lo que hace Looker, simplificá:
+
+ETL de cash_movements: dejalo apagado. Ya borraste los registros, mantené el cron deshabilitado o el endpoint de sync comentado.
+
+En monthly_financial_summary:
+
+cashflow_neto_usd lo sacás de la hoja Resumen Ejecutivo (fila “Cash Flow” del mes).
+
+En el API:
+
+financial.cashFlowNetUsd = monthly.cashflow_neto_usd;
+financial.cashFlowInUsd = null;  // o 0 por ahora
+financial.cashFlowOutUsd = null;
+
+
+Más adelante, cuando quieras rearmar el detalle:
+
+Parseás la hoja CashFlow.
+
+Detectás para cada fila: banco, tipo (Ingreso/Egreso), moneda.
+
+Convertís a USD solo si la moneda no es USD usando Info Tipo de Cambio y REM del mes.
+
+Llenás cash_movements y luego agregás SUM(inflows) / SUM(outflows) por período.
+
+2.4. Conversión de moneda
+
+Para evitar desfasajes, regla única:
+
+En TODAS las hojas que tienen columnas tipo:
+
+Dólares
+
+Importe moneda de origen
+
+Moneda país
+
+Usá esta lógica en el parser:
+
+function toUsd(row, fxUsdArs) {
+  if (row.Dólares !== '' && row.Dólares != null) {
+    return parseNumber(row.Dólares); // ya viene en USD
+  }
+  if (row['Moneda país'] === 'Pesos Argentina') {
+    return parseNumber(row['Importe moneda de origen']) / fxUsdArs;
+  }
+  // si es otra moneda y tenés otro FX, ahí lo tratás;
+  // si es USD explícito, devolvés el importe origen.
+}
+
+
+El fxUsdArs del mes lo tomás de la hoja Info Tipo de Cambio y REM para ese mismo mes (el mismo que usa Vicky para Looker).
+
+Nada de convertir de nuevo columnas que ya están en USD.
+
+3. Ajustes en el frontend
+
+Una vez alineado el ETL, el frontend tiene que mapear así:
+
+Vista Operativa
+
+Ingreso devengado: operational.devengadoUsd
+
+EBIT operativo: operational.ebitOperativoUsd
+
+Directos: operational.directCostsUsd
+
+Overhead operativo: operational.overheadOperativeUsd
+
+Total operativo (barra): directCostsUsd + overheadOperativeUsd
+
+Leyenda: “Sin provisiones contables”
+
+Vista Financiera
+
+Facturado: financial.facturadoUsd
+
+EBIT contable: financial.ebitContableUsd
+
+Directos: financial.directCostsUsd
+
+Overhead: financial.overheadUsd (estructura)
+
+Provisiones: financial.provisionsUsd
+
+Burn rate: financial.burnRateUsd = direct + overhead + provisions
+
+Nada de traer provisiones del Pasivo directo en el frontend.
+
+4. Check final que tenés que correr para OCT-25
+
+Después de aplicar todo:
+
+Llamar GET /api/dashboard/metrics?month=10&year=2025 y verificar:
+
+financial.facturadoUsd = 81,838.86
+
+financial.burnRateUsd = suma de directos + overhead + provisions del mes en Excel.
+
+financial.ebitContableUsd = 42,300.52 (o el valor exacto del Resumen Ejecutivo, si ese es tu estándar).
+
+operational.devengadoUsd = valor que uses en tu WIP, pero que concilie con Excel si ya lo tenés ahí.
+
+operational.directCostsUsd = 17.4k (Costos directos del mes).
+
+operational.overheadOperativeUsd = Costos indirectos del mes (sin provisiones ni impuestos).
+
+financial.provisionsUsd ≈ 53,193 (o el número exacto que hoy calcula Looker, NO 82k).
+
+financial.cashFlowNetUsd = 66,801.58.
+
+Comparar cada campo con el Looker Studio. Si algo no coincide, revisás:
+
+Hoja origen.
+
+Columna usada.
+
+Conversión de moneda.
+
+Con estos cambios alineás app, Excel maestro y Looker en la misma lógica.

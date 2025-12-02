@@ -110,63 +110,41 @@ export interface ProvisionSummary {
 /**
  * Obtener provisiones válidas del Excel MAESTRO
  * 
- * ARQUITECTURA CORREGIDA V2 - Solo FLOW (gasto del mes), NO STOCK (saldos):
+ * ARQUITECTURA V3 - Fórmula validada vs Excel/Looker:
+ * 
+ * provisions_usd = Facturación Adelantada + Impuestos USA
  * 
  * FUENTES DE PROVISIONES para fact_cost_month.provisions_usd:
- * 1. "Provisión Pasivo Proyectos" - Provisiones de clientes (PepsiCo, Warner)
- * 2. "Resumen Ejecutivo" col "Facturación Adelantada" - Ingresos diferidos
+ * 1. "Resumen Ejecutivo" col "Provisión Pasivo Costos Facturación Adelantada" = $27,906 USD
+ * 2. "Resumen Ejecutivo" col "Impuestos USA" = $25,287.08 USD
  * 
- * EXCLUIDO de provisions_usd (se trackea en pl_adjustments):
- * - Impuestos USA - Se guarda SOLO en pl_adjustments para evitar doble conteo
+ * TOTAL OCT-25: $27,906 + $25,287.08 = $53,193.08 USD
  * 
- * EXCLUIDO totalmente (era STOCK, causaba duplicación):
- * - "Pasivo" sheet - Estos son SALDOS acumulados, NO gastos del mes
- * - "Impuestos" sheet - IVA y otros impuestos operativos
- * 
- * FÓRMULA para OCT-25:
- *   provisions_usd = PepsiCo (13.4k) + Warner (-0.8k) + Facturación Adelantada (~27.9k)
- *   impuestos_usa separado en pl_adjustments = 25.3k
+ * EXCLUIDO (causaba doble conteo):
+ * - "Provisión Pasivo Proyectos" (PepsiCo/Warner) - YA INCLUIDOS en Facturación Adelantada
+ * - "Pasivo" sheet - STOCK (saldos), no FLOW (gastos del mes)
  */
 export async function getValidProvisions(targetPeriod?: string): Promise<ProcessedProvision[]> {
-  console.log('📊 [Provisiones] Extrayendo provisiones FLOW (gasto del mes) del Excel MAESTRO...');
-  console.log('📊 [Provisiones] FUENTES: Provisión Pasivo Proyectos + Facturación Adelantada');
-  console.log('📊 [Provisiones] NOTA: Impuestos USA se trackea SOLO en pl_adjustments (no en provisions_usd)');
+  console.log('📊 [Provisiones V3] Extrayendo provisiones FLOW (gasto del mes) del Excel MAESTRO...');
+  console.log('📊 [Provisiones V3] FUENTES: Facturación Adelantada + Impuestos USA (ambos de Resumen Ejecutivo)');
+  console.log('📊 [Provisiones V3] EXCLUIDO: Provisión Pasivo Proyectos (ya incluido en Facturación Adelantada)');
   
   const result: ProcessedProvision[] = [];
   
   try {
-    // Obtener datos de las hojas que contienen FLOW para provisions_usd
+    // Obtener datos SOLO de Resumen Ejecutivo (única fuente confiable)
     const [
-      provisionProyectosData, 
-      facturacionAdelantadaData
+      facturacionAdelantadaData,
+      impuestosUsaData
     ] = await Promise.all([
-      googleSheetsWorkingService.getProvisionPasivoProyectos(),
-      googleSheetsWorkingService.getFacturacionAdelantadaFromResumenEjecutivo()
+      googleSheetsWorkingService.getFacturacionAdelantadaFromResumenEjecutivo(),
+      googleSheetsWorkingService.getImpuestosUsaFromResumenEjecutivo()
     ]);
     
-    console.log(`📊 [Provisiones] Hoja Provisión Pasivo Proyectos: ${provisionProyectosData.length} registros (FLOW)`);
-    console.log(`📊 [Provisiones] Resumen Ejecutivo (Facturación Adelantada): ${facturacionAdelantadaData.length} registros (FLOW)`);
+    console.log(`📊 [Provisiones V3] Facturación Adelantada: ${facturacionAdelantadaData.length} registros`);
+    console.log(`📊 [Provisiones V3] Impuestos USA: ${impuestosUsaData.length} registros`);
     
-    // 1. Procesar hoja "Provisión pasivo proyectos" (PepsiCo, Warner)
-    for (const row of provisionProyectosData) {
-      console.log(`  🔍 [Provisión Proyectos] Concepto: "${row.concept}" | Período: ${row.periodKey} | Raw: "${row.rawValue}" | USD: ${row.amountUsd}`);
-      
-      if (isValidProvision(row.concept)) {
-        const type = detectProvisionType(row.concept);
-        result.push({
-          periodKey: row.periodKey,
-          concept: row.concept,
-          type,
-          amountUsd: row.amountUsd,
-          source: 'provision_cliente'
-        });
-        console.log(`  ✅ [Provisión Proyectos] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (${type})`);
-      } else {
-        console.log(`  ⚠️ [Provisión Proyectos] Concepto no válido: "${row.concept}"`);
-      }
-    }
-    
-    // 2. Facturación Adelantada desde Resumen Ejecutivo
+    // 1. Facturación Adelantada desde Resumen Ejecutivo (incluye Warner + PepsiCo)
     for (const row of facturacionAdelantadaData) {
       result.push({
         periodKey: row.periodKey,
@@ -175,17 +153,26 @@ export async function getValidProvisions(targetPeriod?: string): Promise<Process
         amountUsd: row.amountUsd,
         source: 'resumen_ejecutivo'
       });
-      console.log(`  ✅ [Resumen Ejecutivo] ${row.periodKey}: ${row.concept} = USD ${row.amountUsd.toFixed(2)} (facturacion_adelantada)`);
+      console.log(`  ✅ [Facturación Adelantada] ${row.periodKey}: USD ${row.amountUsd.toFixed(2)}`);
     }
     
-    // NOTA: Impuestos USA se excluye de provisions_usd
-    // Se guarda SOLO en pl_adjustments para el cálculo de EBIT Contable
-    // Esto evita doble conteo en burn_rate
+    // 2. Impuestos USA desde Resumen Ejecutivo
+    for (const row of impuestosUsaData) {
+      result.push({
+        periodKey: row.periodKey,
+        concept: row.concept,
+        type: 'impuestos_usa',
+        amountUsd: row.amountUsd,
+        source: 'resumen_ejecutivo'
+      });
+      console.log(`  ✅ [Impuestos USA] ${row.periodKey}: USD ${row.amountUsd.toFixed(2)}`);
+    }
     
-    // NOTA: Hoja "Pasivo" EXCLUIDA intencionalmente
-    // Los saldos del pasivo son STOCK (balance sheet), no FLOW (income statement)
+    // NOTA: "Provisión Pasivo Proyectos" EXCLUIDA
+    // Los valores de PepsiCo/Warner ya están incluidos en Facturación Adelantada
+    // Agregarlos duplicaría el monto
     
-    console.log(`📊 [Provisiones] Total provisiones FLOW encontradas: ${result.length}`);
+    console.log(`📊 [Provisiones V3] Total provisiones FLOW encontradas: ${result.length}`);
     
   } catch (error) {
     console.error('❌ [Provisiones] Error obteniendo provisiones:', error);
@@ -196,14 +183,16 @@ export async function getValidProvisions(targetPeriod?: string): Promise<Process
 
 /**
  * Crear resumen de provisiones a partir de una lista
- * NOTA: Impuestos USA ya no se incluye en provisions_usd (está en pl_adjustments)
+ * 
+ * V3: provisions_usd = Facturación Adelantada + Impuestos USA
+ * Target OCT-25: $27,906 + $25,287.08 = $53,193.08 USD
  */
 function summarizeProvisions(provisions: ProcessedProvision[], periodKey: string): ProvisionSummary {
   const summary: ProvisionSummary = {
     periodKey,
-    pepsico: 0,
-    warner: 0,
-    impuestosUsa: 0,  // Ya no se suma al total (solo para tracking)
+    pepsico: 0,  // Ya no se usa (incluido en facturacionAdelantada)
+    warner: 0,   // Ya no se usa (incluido en facturacionAdelantada)
+    impuestosUsa: 0,
     facturacionAdelantada: 0,
     otros: 0,
     total: 0,
@@ -217,14 +206,15 @@ function summarizeProvisions(provisions: ProcessedProvision[], periodKey: string
       
       switch (prov.type) {
         case 'pepsico':
+          // Ya no se procesan por separado (incluidos en facturacionAdelantada)
           summary.pepsico += prov.amountUsd;
           break;
         case 'warner':
+          // Ya no se procesan por separado (incluidos en facturacionAdelantada)
           summary.warner += prov.amountUsd;
           break;
         case 'impuestos_usa':
-          // Impuestos USA se trackea pero NO se suma al total de provisions_usd
-          // Va a pl_adjustments para el cálculo de EBIT Contable
+          // Impuestos USA SÍ se incluye en provisions_usd (V3)
           summary.impuestosUsa += prov.amountUsd;
           break;
         case 'facturacion_adelantada':
@@ -236,28 +226,28 @@ function summarizeProvisions(provisions: ProcessedProvision[], periodKey: string
     }
   }
   
-  // Total de provisions_usd = clientes + facturación adelantada (SIN impuestos USA)
-  summary.total = summary.pepsico + summary.warner + summary.facturacionAdelantada + summary.otros;
+  // Total de provisions_usd = Facturación Adelantada + Impuestos USA
+  // Target OCT-25: $27,906 + $25,287.08 = $53,193.08 USD
+  summary.total = summary.facturacionAdelantada + summary.impuestosUsa + summary.otros;
   return summary;
 }
 
 /**
  * Obtener resumen de provisiones para un período específico
- * IMPORTANTE: Calcula las provisiones PARA ese período (ej: facturas futuras desde la perspectiva de octubre)
- * NOTA: Impuestos USA no está en provisions_usd, está en pl_adjustments
+ * 
+ * V3: provisions_usd = Facturación Adelantada + Impuestos USA
+ * Target OCT-25: $27,906 + $25,287.08 = $53,193.08 USD
  */
 export async function getProvisionSummaryForPeriod(targetPeriod: string): Promise<ProvisionSummary> {
-  console.log(`📊 [Provisiones] Calculando provisiones para período ${targetPeriod}...`);
+  console.log(`📊 [Provisiones V3] Calculando provisiones para período ${targetPeriod}...`);
   
   const provisions = await getValidProvisions(targetPeriod);
   const summary = summarizeProvisions(provisions, targetPeriod);
   
-  console.log(`  📅 ${targetPeriod} (provisions_usd - sin impuestos USA):`);
-  console.log(`     Pepsico: USD ${summary.pepsico.toFixed(2)}`);
-  console.log(`     Warner: USD ${summary.warner.toFixed(2)}`);
+  console.log(`  📅 ${targetPeriod} (provisions_usd = Facturación Adelantada + Impuestos USA):`);
   console.log(`     Facturación Adelantada: USD ${summary.facturacionAdelantada.toFixed(2)}`);
+  console.log(`     Impuestos USA: USD ${summary.impuestosUsa.toFixed(2)}`);
   console.log(`     TOTAL provisions_usd: USD ${summary.total.toFixed(2)}`);
-  console.log(`     (Impuestos USA: USD ${summary.impuestosUsa.toFixed(2)} - en pl_adjustments)`);
   
   return summary;
 }

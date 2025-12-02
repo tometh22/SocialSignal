@@ -5567,8 +5567,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           indirectCostsUsd: indirectCostsUsd,    // Alias para compatibilidad
           provisionsUsd: provisionsUsd,          // Provisiones contables separadas
           impuestosUsaUsd: impuestosUsaUsd,      // Impuestos USA (parte del overhead contable)
-          // EBIT Contable = Facturado - Total Contable (Direct + Indirect + Provisions)
-          // Always use calculated value for accounting consistency
+          // EBIT: Use Excel MAESTRO value when available (matches Looker/Resumen Ejecutivo)
+          ebitUtilidadOperativaUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd,
+          ebitContableUsd: hasExcelMaestroData ? excelMaestroSummary.ebitOperativo : ebitContableUsd, // Alias
+          // EBIT Contable calculated (for reference)
           ebitAccountingUsd: ebitContableUsd,
           ebitAccountingPct: ebitContablePct,
           burnRateUsd: burnRateUsd,
