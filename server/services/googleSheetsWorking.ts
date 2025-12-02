@@ -3408,6 +3408,106 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Get cash end-of-month balances by period from CashFlow sheet
+   * Returns the last "Saldo" row value for each month as the closing balance
+   */
+  async getCashEndOfMonthByPeriod(): Promise<Map<string, number>> {
+    console.log('🔍 [CashEndOfMonth] Fetching end-of-month cash balances from CashFlow...');
+    
+    const result = new Map<string, number>();
+    
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: `'CashFlow'!A:Z`,
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        console.log('⚠️ [CashEndOfMonth] No data in CashFlow sheet');
+        return result;
+      }
+      
+      const headers = rows[0] || [];
+      
+      // Find column indices
+      const findColIdx = (patterns: string[]): number => {
+        for (let i = 0; i < headers.length; i++) {
+          const h = (headers[i] || '').toString().toLowerCase().trim();
+          if (patterns.some(p => h.includes(p))) return i;
+        }
+        return -1;
+      };
+      
+      const fechaIdx = findColIdx(['fecha', 'date']);
+      const ingresoEgresoIdx = findColIdx(['ingreso/egreso', 'ingreso egreso', 'tipo movimiento', 'tipo']);
+      const saldoTotalUsdIdx = findColIdx(['saldo total usd', 'saldo usd', 'total usd', 'balance usd']);
+      
+      // If no specific Saldo Total USD column, try Monto USD for Saldo rows
+      const montoUsdIdx = saldoTotalUsdIdx === -1 ? findColIdx(['monto usd', 'usd', 'dolares']) : saldoTotalUsdIdx;
+      
+      console.log(`   📊 Column indices: Fecha=${fechaIdx}, IngresoEgreso=${ingresoEgresoIdx}, SaldoUSD=${saldoTotalUsdIdx}, MontoUSD=${montoUsdIdx}`);
+      
+      if (fechaIdx < 0 || montoUsdIdx < 0) {
+        console.log('⚠️ [CashEndOfMonth] Missing required columns');
+        return result;
+      }
+      
+      // Track the last Saldo row for each period
+      const lastSaldoByPeriod = new Map<string, { rowIndex: number; date: Date; saldoUsd: number }>();
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        // Only process "Saldo" rows
+        const tipoRaw = ingresoEgresoIdx >= 0 ? (row[ingresoEgresoIdx] || '').toString().trim().toLowerCase() : '';
+        if (tipoRaw !== 'saldo') continue;
+        
+        // Parse date
+        const fechaRaw = (row[fechaIdx] || '').toString().trim();
+        const date = this.parseDateValue(fechaRaw);
+        if (!date) continue;
+        
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+        
+        // Parse saldo value
+        const saldoRaw = (row[montoUsdIdx] || '').toString().trim();
+        const saldoUsd = this.parseNumericValue(saldoRaw);
+        
+        if (saldoUsd === null) continue;
+        
+        // Keep the last (by row order) saldo for each period
+        const existing = lastSaldoByPeriod.get(periodKey);
+        if (!existing || i > existing.rowIndex) {
+          lastSaldoByPeriod.set(periodKey, { rowIndex: i, date, saldoUsd: Math.abs(saldoUsd) });
+        }
+      }
+      
+      // Convert to result map
+      for (const [periodKey, data] of lastSaldoByPeriod) {
+        result.set(periodKey, Math.round(data.saldoUsd * 100) / 100);
+      }
+      
+      console.log(`✅ [CashEndOfMonth] Found end-of-month balances for ${result.size} periods`);
+      for (const [period, balance] of result) {
+        console.log(`   ${period}: $${balance.toFixed(2)}`);
+      }
+      
+      return result;
+      
+    } catch (error: any) {
+      console.error('❌ [CashEndOfMonth] Error:', error?.message || error);
+      return result;
+    }
+  }
+
+  /**
    * Parsear filas de CashFlow
    * 
    * CHECKLIST 4.1 IMPLEMENTATION:
