@@ -1658,19 +1658,24 @@ export async function syncCashFlowMovements(): Promise<{
         
         // Insert all movements for this period
         for (const mov of periodMovements) {
+          // amountUsd siempre positivo, tipo determina dirección
           await db.insert(cashMovements).values({
             date: mov.date,
             periodKey: mov.periodKey,
+            bank: mov.bank || null,
+            currency: mov.currency || null,
             concept: mov.concept,
-            amountUsd: mov.type === 'ingreso' ? mov.amountUsd.toString() : (-mov.amountUsd).toString(),
-            type: mov.type,
+            amountUsd: mov.amountUsd.toString(), // siempre positivo
+            type: mov.type, // 'IN' o 'OUT'
             category: mov.category || null,
             reference: mov.reference || null,
           });
           recordsInserted++;
         }
         
-        console.log(`  ✅ ${periodKey}: ${periodMovements.length} movimientos insertados`);
+        const inCount = periodMovements.filter(m => m.type === 'IN').length;
+        const outCount = periodMovements.filter(m => m.type === 'OUT').length;
+        console.log(`  ✅ ${periodKey}: ${periodMovements.length} movimientos (${inCount} IN, ${outCount} OUT)`);
         
       } catch (error) {
         const msg = `Error procesando período ${periodKey}: ${error instanceof Error ? error.message : String(error)}`;
@@ -1709,12 +1714,13 @@ export async function syncCashFlowMovements(): Promise<{
 
 /**
  * Obtener resumen de CashFlow por período desde cash_movements
- * Calcula cashFlowInUsd, cashFlowOutUsd, y cashFlowNetUsd
+ * Calcula cashFlowInUsd, cashFlowOutUsd, y netFromMovements
  */
 export async function getCashFlowSummaryByPeriod(periodKey: string): Promise<{
   cashFlowInUsd: number;
   cashFlowOutUsd: number;
-  cashFlowNetUsd: number;
+  netFromMovements: number;
+  movementCount: number;
 }> {
   try {
     const { cashMovements } = await import('@shared/schema');
@@ -1729,17 +1735,19 @@ export async function getCashFlowSummaryByPeriod(periodKey: string): Promise<{
     
     for (const mov of movements) {
       const amount = parseFloat(mov.amountUsd as string) || 0;
-      if (amount >= 0) {
+      // Usar el tipo 'IN'/'OUT' para clasificar
+      if (mov.type === 'IN') {
         inflows += amount;
-      } else {
-        outflows += Math.abs(amount);
+      } else if (mov.type === 'OUT') {
+        outflows += amount;
       }
     }
     
     return {
-      cashFlowInUsd: inflows,
-      cashFlowOutUsd: outflows,
-      cashFlowNetUsd: inflows - outflows
+      cashFlowInUsd: Math.round(inflows * 100) / 100,
+      cashFlowOutUsd: Math.round(outflows * 100) / 100,
+      netFromMovements: Math.round((inflows - outflows) * 100) / 100,
+      movementCount: movements.length
     };
     
   } catch (error) {
@@ -1747,7 +1755,8 @@ export async function getCashFlowSummaryByPeriod(periodKey: string): Promise<{
     return {
       cashFlowInUsd: 0,
       cashFlowOutUsd: 0,
-      cashFlowNetUsd: 0
+      netFromMovements: 0,
+      movementCount: 0
     };
   }
 }
