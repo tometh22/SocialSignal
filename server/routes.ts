@@ -5603,8 +5603,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cashFlowInUsd: cashFlowInUsd,
           cashFlowOutUsd: cashFlowOutUsd,
           cashFlowNetUsd: cashFlowNetUsd,
+          cashFlowNetFromMovementsUsd: cashFlowNetFromMovements, // In - Out (from cash_movements table)
           cashflowNetoUsd: excelMaestroSummary.cashflowNeto, // Alias legacy (Resumen Ejecutivo)
-          netFromMovements: cashFlowNetFromMovements, // Net calculado desde cash_movements
           
           dataSource: hasExcelMaestroData ? 'excel_maestro' : 'calculated'
         },
