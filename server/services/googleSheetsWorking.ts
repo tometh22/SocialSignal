@@ -3096,20 +3096,62 @@ class GoogleSheetsWorkingService {
     const montoArsIdx = findColIdx(['monto ars', 'ars', 'pesos']);
     const cotizacionIdx = findColIdx(['cotización', 'cotizacion', 'tipo cambio', 'tc']);
     
-    console.log(`📊 [CashFlow ETL] Columnas detectadas:`);
-    console.log(`   Fecha=${fechaIdx}, Banco=${bancoIdx}, Concepto=${conceptoIdx}`);
-    console.log(`   Detalle=${detalleOpIdx}, Ingreso/Egreso=${ingresoEgresoIdx}`);
+    // V3: Use Mes and Año columns for period determination (matches admin dashboard logic)
+    const mesIdx = findColIdx(['mes']);
+    const anioIdx = findColIdx(['año', 'ano', 'year']);
+    
+    console.log(`📊 [CashFlow ETL V3] Columnas detectadas:`);
+    console.log(`   Fecha=${fechaIdx}, Mes=${mesIdx}, Año=${anioIdx}`);
+    console.log(`   Banco=${bancoIdx}, Concepto=${conceptoIdx}, Detalle=${detalleOpIdx}`);
+    console.log(`   Ingreso/Egreso=${ingresoEgresoIdx}`);
     console.log(`   Moneda=${monedaIdx}, MontoUSD=${montoUsdIdx}, MontoARS=${montoArsIdx}, Cotiz=${cotizacionIdx}`);
     
-    if (fechaIdx < 0) {
-      console.log('⚠️ [CashFlow ETL] No se encontró columna Fecha');
-      return [];
-    }
+    // Mapa para convertir "10 oct" → 10
+    const monthMap: Record<string, number> = {
+      'ene': 1, 'enero': 1, 'jan': 1, '01': 1, '1': 1, '1 ene': 1, '01 ene': 1,
+      'feb': 2, 'febrero': 2, '02': 2, '2': 2, '2 feb': 2, '02 feb': 2,
+      'mar': 3, 'marzo': 3, '03': 3, '3': 3, '3 mar': 3, '03 mar': 3,
+      'abr': 4, 'abril': 4, 'apr': 4, '04': 4, '4': 4, '4 abr': 4, '04 abr': 4,
+      'may': 5, 'mayo': 5, '05': 5, '5': 5, '5 may': 5, '05 may': 5,
+      'jun': 6, 'junio': 6, '06': 6, '6': 6, '6 jun': 6, '06 jun': 6,
+      'jul': 7, 'julio': 7, '07': 7, '7': 7, '7 jul': 7, '07 jul': 7,
+      'ago': 8, 'agosto': 8, 'aug': 8, '08': 8, '8': 8, '8 ago': 8, '08 ago': 8,
+      'sep': 9, 'septiembre': 9, 'sept': 9, '09': 9, '9': 9, '9 sep': 9, '09 sep': 9,
+      'oct': 10, 'octubre': 10, '10': 10, '10 oct': 10,
+      'nov': 11, 'noviembre': 11, '11': 11, '11 nov': 11,
+      'dic': 12, 'diciembre': 12, 'dec': 12, '12': 12, '12 dic': 12,
+    };
+    
+    // Helper to parse "Mes" column like "10 oct" or "01 ene" 
+    const parseMonthFromMes = (mesRaw: string): number | null => {
+      if (!mesRaw) return null;
+      const lower = mesRaw.toLowerCase().trim();
+      
+      // Try direct lookup
+      if (monthMap[lower]) return monthMap[lower];
+      
+      // Try extracting number from start (e.g., "10 oct" → 10)
+      const match = lower.match(/^(\d{1,2})\s/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num >= 1 && num <= 12) return num;
+      }
+      
+      // Try finding month name in string
+      for (const [key, val] of Object.entries(monthMap)) {
+        if (key.length >= 3 && lower.includes(key)) return val;
+      }
+      
+      return null;
+    };
     
     let processed = 0;
     let skippedSaldo = 0;
     let skippedNoAmount = 0;
+    let skippedNoPeriod = 0;
     let arsConverted = 0;
+    let usedMesAnio = 0;
+    let usedFecha = 0;
     
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -3125,15 +3167,51 @@ class GoogleSheetsWorkingService {
         continue; // Skip filas que no son movimientos
       }
       
-      // 2. Parsear fecha
-      const fechaRaw = (row[fechaIdx] || '').toString().trim();
-      const date = this.parseDateValue(fechaRaw);
-      if (!date) continue;
+      // 2. Determine period using Mes + Año columns (PRIMARY) or Fecha (FALLBACK)
+      let year: number | null = null;
+      let month: number | null = null;
+      let periodKey: string | null = null;
+      let date: Date | null = null;
       
-      // 3. Calcular period_key
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+      // Always try to parse Fecha column for the date object
+      if (fechaIdx >= 0) {
+        const fechaRaw = (row[fechaIdx] || '').toString().trim();
+        date = this.parseDateValue(fechaRaw);
+      }
+      
+      // PRIMARY: Try Mes + Año columns first (matches admin dashboard behavior)
+      if (mesIdx >= 0 && anioIdx >= 0) {
+        const mesRaw = (row[mesIdx] || '').toString().trim();
+        const anioRaw = (row[anioIdx] || '').toString().trim();
+        
+        const parsedMonth = parseMonthFromMes(mesRaw);
+        const parsedYear = parseInt(anioRaw, 10);
+        
+        if (parsedMonth && parsedYear >= 2020 && parsedYear <= 2030) {
+          year = parsedYear;
+          month = parsedMonth;
+          periodKey = `${year}-${String(month).padStart(2, '0')}`;
+          usedMesAnio++;
+          
+          // If we don't have a date from Fecha column, construct one from Mes/Año (first day of month)
+          if (!date) {
+            date = new Date(parsedYear, parsedMonth - 1, 1);
+          }
+        }
+      }
+      
+      // FALLBACK: If Mes/Año didn't work, try using date from Fecha column
+      if (!periodKey && date) {
+        year = date.getFullYear();
+        month = date.getMonth() + 1;
+        periodKey = `${year}-${String(month).padStart(2, '0')}`;
+        usedFecha++;
+      }
+      
+      if (!periodKey || !date) {
+        skippedNoPeriod++;
+        continue;
+      }
       
       // 4. Extraer banco
       const bank = bancoIdx >= 0 ? (row[bancoIdx] || '').toString().trim() : undefined;
@@ -3195,12 +3273,35 @@ class GoogleSheetsWorkingService {
       processed++;
     }
     
-    console.log(`✅ [CashFlow ETL] Parseados ${processed} movimientos`);
+    console.log(`✅ [CashFlow ETL V3] Parseados ${processed} movimientos`);
     console.log(`   💰 Ingresos (IN): ${result.filter(r => r.type === 'IN').length}`);
     console.log(`   💸 Egresos (OUT): ${result.filter(r => r.type === 'OUT').length}`);
+    console.log(`   📅 Período vía Mes+Año: ${usedMesAnio}`);
+    console.log(`   📆 Período vía Fecha: ${usedFecha}`);
     console.log(`   💱 Convertidos ARS→USD: ${arsConverted}`);
     console.log(`   ⏭️ Filas "Saldo" ignoradas: ${skippedSaldo}`);
     console.log(`   ⚠️ Filas sin monto válido: ${skippedNoAmount}`);
+    console.log(`   ⚠️ Filas sin período válido: ${skippedNoPeriod}`);
+    
+    // Calculate totals by period for verification
+    const totalsByPeriod = new Map<string, { in: number, out: number }>();
+    for (const mov of result) {
+      const existing = totalsByPeriod.get(mov.periodKey) || { in: 0, out: 0 };
+      if (mov.type === 'IN') {
+        existing.in += mov.amountUsd;
+      } else {
+        existing.out += mov.amountUsd;
+      }
+      totalsByPeriod.set(mov.periodKey, existing);
+    }
+    
+    console.log(`   📊 Totales por período:`);
+    Array.from(totalsByPeriod.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 5)
+      .forEach(([period, totals]) => {
+        console.log(`      ${period}: IN=$${totals.in.toFixed(2)}, OUT=$${totals.out.toFixed(2)}, NET=$${(totals.in - totals.out).toFixed(2)}`);
+      });
     
     return result;
   }
@@ -3277,7 +3378,50 @@ class GoogleSheetsWorkingService {
       const montoArsIdx = findColIdx(['monto ars', 'ars', 'pesos']);
       const cotizacionIdx = findColIdx(['cotización', 'cotizacion', 'tipo cambio', 'tc']);
       
-      console.log(`   📊 Column indices: Fecha=${fechaIdx}, IngresoEgreso=${ingresoEgresoIdx}, MontoUSD=${montoUsdIdx}, MontoARS=${montoArsIdx}, Cotiz=${cotizacionIdx}`);
+      // V3: Use Mes and Año columns for period determination (matches admin dashboard logic)
+      const mesIdx = findColIdx(['mes']);
+      const anioIdx = findColIdx(['año', 'ano', 'year']);
+      
+      console.log(`   📊 Column indices: Fecha=${fechaIdx}, Mes=${mesIdx}, Año=${anioIdx}, IngresoEgreso=${ingresoEgresoIdx}, MontoUSD=${montoUsdIdx}, MontoARS=${montoArsIdx}, Cotiz=${cotizacionIdx}`);
+      
+      // Mapa para convertir "10 oct" → 10
+      const monthMap: Record<string, number> = {
+        'ene': 1, 'enero': 1, 'jan': 1, '01': 1, '1': 1, '1 ene': 1, '01 ene': 1,
+        'feb': 2, 'febrero': 2, '02': 2, '2': 2, '2 feb': 2, '02 feb': 2,
+        'mar': 3, 'marzo': 3, '03': 3, '3': 3, '3 mar': 3, '03 mar': 3,
+        'abr': 4, 'abril': 4, 'apr': 4, '04': 4, '4': 4, '4 abr': 4, '04 abr': 4,
+        'may': 5, 'mayo': 5, '05': 5, '5': 5, '5 may': 5, '05 may': 5,
+        'jun': 6, 'junio': 6, '06': 6, '6': 6, '6 jun': 6, '06 jun': 6,
+        'jul': 7, 'julio': 7, '07': 7, '7': 7, '7 jul': 7, '07 jul': 7,
+        'ago': 8, 'agosto': 8, 'aug': 8, '08': 8, '8': 8, '8 ago': 8, '08 ago': 8,
+        'sep': 9, 'septiembre': 9, 'sept': 9, '09': 9, '9': 9, '9 sep': 9, '09 sep': 9,
+        'oct': 10, 'octubre': 10, '10': 10, '10 oct': 10,
+        'nov': 11, 'noviembre': 11, '11': 11, '11 nov': 11,
+        'dic': 12, 'diciembre': 12, 'dec': 12, '12': 12, '12 dic': 12,
+      };
+      
+      // Helper to parse "Mes" column like "10 oct" or "01 ene" 
+      const parseMonthFromMes = (mesRaw: string): number | null => {
+        if (!mesRaw) return null;
+        const lower = mesRaw.toLowerCase().trim();
+        
+        // Try direct lookup
+        if (monthMap[lower]) return monthMap[lower];
+        
+        // Try extracting number from start (e.g., "10 oct" → 10)
+        const match = lower.match(/^(\d{1,2})\s/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num >= 1 && num <= 12) return num;
+        }
+        
+        // Try finding month name in string
+        for (const [key, val] of Object.entries(monthMap)) {
+          if (key.length >= 3 && lower.includes(key)) return val;
+        }
+        
+        return null;
+      };
       
       // Analyze ALL rows
       const uniqueTypes: Record<string, number> = {};
@@ -3286,6 +3430,8 @@ class GoogleSheetsWorkingService {
       let periodRows = 0;
       let rowsWithValidAmount = 0;
       let rowsConvertedFromArs = 0;
+      let rowsViaMesAnio = 0;
+      let rowsViaFecha = 0;
       
       const [targetYear, targetMonth] = targetPeriod.split('-').map(Number);
       
@@ -3303,13 +3449,38 @@ class GoogleSheetsWorkingService {
           uniqueTypes[tipoTrimmed] = (uniqueTypes[tipoTrimmed] || 0) + 1;
         }
         
-        // Parse date to check period
-        const fechaRaw = fechaIdx >= 0 ? (row[fechaIdx] || '').toString().trim() : '';
-        const date = this.parseDateValue(fechaRaw);
-        if (!date) continue;
+        // Skip non-movement rows
+        if (tipoLower !== 'ingreso' && tipoLower !== 'egreso') continue;
         
-        const rowYear = date.getFullYear();
-        const rowMonth = date.getMonth() + 1;
+        // Determine period: PRIMARY = Mes + Año columns, FALLBACK = Fecha
+        let rowYear: number | null = null;
+        let rowMonth: number | null = null;
+        
+        // PRIMARY: Try Mes + Año columns first
+        if (mesIdx >= 0 && anioIdx >= 0) {
+          const mesRaw = (row[mesIdx] || '').toString().trim();
+          const anioRaw = (row[anioIdx] || '').toString().trim();
+          
+          const parsedMonth = parseMonthFromMes(mesRaw);
+          const parsedYear = parseInt(anioRaw, 10);
+          
+          if (parsedMonth && parsedYear >= 2020 && parsedYear <= 2030) {
+            rowYear = parsedYear;
+            rowMonth = parsedMonth;
+            rowsViaMesAnio++;
+          }
+        }
+        
+        // FALLBACK: Try Fecha column
+        if (!rowYear && fechaIdx >= 0) {
+          const fechaRaw = (row[fechaIdx] || '').toString().trim();
+          const date = this.parseDateValue(fechaRaw);
+          if (date) {
+            rowYear = date.getFullYear();
+            rowMonth = date.getMonth() + 1;
+            rowsViaFecha++;
+          }
+        }
         
         // Only analyze target period
         if (rowYear !== targetYear || rowMonth !== targetMonth) continue;

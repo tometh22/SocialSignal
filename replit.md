@@ -54,13 +54,15 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Executive Dashboard Enhancements**: Separation of billed revenue and Work-In-Progress (WIP), showing both actual and projected margins, and integration of intelligent, context-aware business intelligence alerts (e.g., `NO_BILLING_WITH_COSTS`, `BILLABLE_DROP`, `FX_SHIFT`, `OVER_BURN`). Enhanced UX with clear formula descriptions: EBIT operativo shows "= Devengado – costos directos (sin overhead ni provisiones)", EBIT contable shows "= Facturado – Directos – Overhead – Provisiones" with "Incluye provisiones" badge, and Burn Rate shows "Directos + Overhead + Provisiones". Financial view includes Cash Flow Neto card with In/Out breakdown and Caja Total.
 - **Comprehensive Financial Metrics**: EBIT Operativo (Income - Direct Costs), EBIT Contable (Billed - Total Costs), Beneficio Neto (EBIT Contable - Provisions), Cash Flow Operativo (from `cash_movements` table), Burn Rate (total costs), and Margen Admin % (EBIT Contable / Billed).
 - **Financial P&L Tables**: `pl_adjustments` for tracking provisions and taxes, `cash_movements` for cash flow tracking with inflows/outflows classification.
-- **CashFlow ETL System** *(FROZEN - Approved 2025-12-02)*: Syncs movement details from Excel MAESTRO "CashFlow" sheet with columns: Fecha, Banco, Concepto, Ingreso/Egreso, Moneda, Monto USD, Monto ARS, Cotización. Stores in `cash_movements` table with type IN/OUT classification.
+- **CashFlow ETL System V3** *(Fixed 2025-12-02)*: Syncs movement details from Excel MAESTRO "CashFlow" sheet with columns: Fecha, Banco, Concepto, Ingreso/Egreso, Moneda, Monto USD, Monto ARS, Cotización. Stores in `cash_movements` table with type IN/OUT classification.
+  - **Critical Fix (2025-12-02)**: Changed period determination from parsing "Fecha" column to using "Mes" (e.g., "10 oct") and "Año" columns directly. This matches how the admin dashboard groups movements and fixed missing ~30K USD Ingresos and ~17K USD Egresos in October 2025.
+  - **Period Detection Strategy**: PRIMARY = Mes + Año columns, FALLBACK = Fecha column parsing. The Mes column uses formats like "10 oct", "01 ene" which are parsed via monthMap.
   - **Data Source Architecture**: 
     - `cashFlowNetUsd`: Authoritative value from Resumen Ejecutivo (total monthly net)
     - `cashFlowInUsd`/`cashFlowOutUsd`: Detailed breakdown from CashFlow sheet movements
-    - `cashFlowNetFromMovementsUsd`: Calculated In-Out from movements (may differ from Resumen Ejecutivo)
+    - `cashFlowNetFromMovementsUsd`: Calculated In-Out from movements (should now match Resumen Ejecutivo)
     - `cajaTotalUsd`: End-of-month cash balance from Resumen Ejecutivo
-  - **Known Discrepancy**: The sum of CashFlow sheet movements (In-Out) may differ from Resumen Ejecutivo's cashflow_neto. This is documented behavior as Resumen Ejecutivo uses a different calculation method. The system logs WARN for discrepancies exceeding $1. Discrepancies are handled on the Excel side by finance team, not in the ETL.
+  - **Verification (Oct 2025)**: Sheet shows IN=$112,638.91, OUT=$45,836.93, NET=$66,801.98. Target from Resumen Ejecutivo is $66,801.58 (difference of $0.40 is acceptable rounding).
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.

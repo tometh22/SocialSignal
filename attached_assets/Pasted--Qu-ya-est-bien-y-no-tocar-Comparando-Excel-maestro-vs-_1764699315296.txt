@@ -1,0 +1,187 @@
+. Qué ya está bien (y no tocar)
+
+Comparando Excel maestro vs dashboards:
+
+Facturado (Oct-25)
+
+Excel / Dashboard admin: USD 81.838,86
+
+App (tab Financiero): USD 81.8k
+→ OK
+
+Costos operativos usados en el Dashboard Ejecutivo (sin provisiones contables)
+
+En la app ves:
+
+Directos: ~USD 17,4k
+
+Overhead: ~USD 24,4k
+
+Total operativo: ~USD 41,8k
+
+Eso coincide exactamente con lo que sale de la hoja “Costos directos e indirectos” cuando se aplica esta lógica:
+
+Filtrar Mes = 10 oct, Año = 2025
+
+Excluir Subtipo = "Provisión Pasivo Facturación"
+
+Excluir Subtipo = "Impuestos USA"
+
+Agrupar por Tipo de Costo:
+
+Directo ≈ 17.362,92
+
+Indirecto ≈ 24.417,67
+
+Total ≈ 41.780,59 (tu 41.8k)
+→ Los costos operativos en la app ya replican el Dashboard Ejecutivo de administración. No los toques.
+
+Provisiones y Burn Rate (tab Financiero)
+
+Provisiones ≈ USD 53,193,08
+
+= Provisión Facturación Adelantada (27.906) + Pasivo Provisión Impuesto USA (25.287,08)
+
+Burn rate ≈ USD 95k y EBIT contable ≈ -13,1k también coinciden con el dashboard financiero de administración.
+→ Bloque Provisiones / Burn rate / EBIT contable también está alineado.
+
+CashFlow neto y Activo líquido
+
+CashFlow (Resumen Ejecutivo y dashboard admin CashFlow): USD 66.801,58
+
+Activo Líquido (caja total): -USD 7.010,68
+
+En la app:
+
+cashFlowNetUsd = 66.801,58
+
+cajaTotalUsd = -7.010,68
+→ Estos dos valores están alineados con el Resumen Ejecutivo y el dashboard viejo.
+
+Hasta acá: todo lo importante del P&L y balance está consistente entre Excel, Looker/looker studio y la nueva app.
+
+2. Lo que NO coincide: CashFlow IN / OUT
+
+El único bloque que hoy no replica el dashboard de administración es el detalle de CashFlow In / Out.
+
+Dashboard de administración (CashFlow, octubre 2025):
+
+Total Ingresos: USD 112.638,90
+
+Total Egresos: USD 45.837,32
+
+Saldo total: 112.638,90 – 45.837,32 = 66.801,58 (mismo CashFlow neto)
+
+App (según el log del agente):
+
+cashFlowInUsd: USD 82.274,01
+
+cashFlowOutUsd: USD 29.169,42
+
+cashFlowNetFromMovementsUsd: USD 53.104,59
+
+Conclusión: el ETL está leyendo solo un subconjunto de movimientos del sheet CashFlow. El problema no está en el Excel: el dashboard viejo y las fórmulas internas del archivo llegan a 112.638,90 / 45.837,32; el bug está en cómo se pobla cash_movements y se calculan In/Out en la app.
+
+3. Lógica correcta para CashFlow (cómo tiene que quedar)
+
+A nivel especificación, lo que tiene que hacer el ETL es:
+
+Fuente única: hoja CashFlow del Excel maestro.
+
+Filtrado de filas:
+
+Usar únicamente filas donde Ingreso/Egreso ∈ {"Ingreso", "Egreso"}.
+
+Excluir explícitamente:
+
+Filas con Ingreso/Egreso = "Saldo"
+
+Filas completamente vacías.
+
+Campos a mapear a la tabla cash_movements:
+
+type:
+
+"IN" si Ingreso/Egreso = "Ingreso"
+
+"OUT" si Ingreso/Egreso = "Egreso"
+
+bank: columna Banco
+
+currency: columna Moneda
+
+date: columna Fecha
+
+monthLabel: columna Mes (por ejemplo "10 oct")
+
+year: columna Año (por ejemplo 2025)
+
+amountUsd: columna Monto USD (no hacer ningún otro cálculo; ya está en USD)
+
+Agrupación por período en el ETL (syncCashFlowMovements):
+
+Definir period = YYYY-MM usando Año + el número de mes que corresponde a Mes.
+
+Para cada period:
+
+cashFlowInUsd = SUM(amountUsd WHERE type = 'IN')
+
+cashFlowOutUsd = SUM(amountUsd WHERE type = 'OUT')
+
+cashFlowNetFromMovementsUsd = cashFlowInUsd - cashFlowOutUsd
+
+Chequeo de consistencia:
+
+cashFlowNetUsd sigue viniendo de Resumen Ejecutivo (columna “CashFlow”) como hasta ahora.
+
+El warning se dispara solo si
+ABS(cashFlowNetFromMovementsUsd - cashFlowNetUsd) > 1.0
+
+Pero con el ETL correcto, para Oct-25 debería dar 0.
+
+Con esa lógica, para Octubre 2025 la API /api/dashboard/metrics tiene que devolver:
+
+financial.cashFlowInUsd = 112638.90
+
+financial.cashFlowOutUsd = 45837.32
+
+financial.cashFlowNetFromMovementsUsd = 66801.58
+
+financial.cashFlowNetUsd = 66801.58
+
+financial.cajaTotalUsd = -7010.68
+
+Y el warning de inconsistencia no debería aparecer para ese mes.
+
+4. Texto para responderle al Replit Agent
+
+Copiale algo así (en inglés, para que no haya lugar a interpretación):
+
+The P&L and provisions are now correct and fully aligned with my existing admin dashboard and the Excel master.
+The only part that is still wrong is the CashFlow In/Out breakdown.
+
+For October 2025, the old admin CashFlow dashboard (which is built on top of the same Excel file) shows:
+– Total In: 112,638.90 USD
+– Total Out: 45,837.32 USD
+– Net: 66,801.58 USD
+
+These values come directly from the CashFlow sheet with the following logic:
+– Use only rows where Ingreso/Egreso is "Ingreso" or "Egreso"
+– Ignore rows where Ingreso/Egreso is "Saldo" or empty
+– Use the Monto USD column as the value
+– Group by Año and Mes = "10 oct" for October 2025
+– Sum In and Out separately
+
+Right now, your ETL is using 82,274.01 (In) and 29,169.42 (Out), which means the cash_movements table is missing some rows or applying extra filters. That’s why cashFlowNetFromMovementsUsd is 53,104.59 instead of 66,801.58.
+
+Please do the following:
+
+Redefine syncCashFlowMovements so that it imports all movements from the CashFlow sheet as described above into the cash_movements table (type IN/OUT, bank, currency, date, period, amountUsd = Monto USD), without extra filters.
+
+Recompute cashFlowInUsd, cashFlowOutUsd, and cashFlowNetFromMovementsUsd from this table.
+
+Keep cashFlowNetUsd coming from Resumen Ejecutivo, but the discrepancy check should now pass: for 2025-10, both nets must be 66,801.58.
+
+Don’t touch the cost ETL (direct/indirect) or provisions: those are already matching the admin dashboards and the Excel master.
+
+Con eso le marcás con precisión qué está mal, qué no debe tocar, y exactamente cómo tiene que calcular el CashFlow para que la app coincida 1:1 con el dashboard de administración
