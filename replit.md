@@ -74,8 +74,23 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - **Implementation**: `server/services/devengado.ts` function `getDevengadoSimple()` now reads from `monthly_financial_summary` table
 - **Debug Summary Endpoint** *(Added 2025-12-05)*: `/api/dashboard/debug/summary?period=YYYY-MM` endpoint for comparing Excel MAESTRO vs App calculations.
   - **Features**: Shows side-by-side comparison of Excel raw values, cost buckets, and app-calculated values
-  - **Validation**: Automatic discrepancy detection for Devengado, EBIT Operativo, and CashFlow
-  - **Known Issue**: EBIT Operativo shows discrepancies - Excel may use different cost base than Devengado - Directos formula
+  - **Validation**: Automatic discrepancy detection for Devengado and CashFlow
+  - **Formula Differences**: Shows informational differences between app formula and Excel values
+- **Dual-View Dashboard System** *(Updated 2025-12-05)*: Separation of operational and financial perspectives.
+  - **Vista OPERATIVA (Management)**: Muestra productividad pura del equipo
+    - `Devengado`: Ingreso devengado del período
+    - `Directos`: Solo costos directos (equipo)
+    - `Overhead Operativo`: **0** (explícitamente excluido)
+    - `EBIT Operativo = Devengado - Directos` (fórmula pura, SIN overhead ni provisiones)
+    - `Margen Operativo = EBIT / Devengado`
+    - `Markup = Devengado / Directos`
+  - **Vista FINANCIERA (Contable)**: Muestra resultado contable real
+    - `Facturado`: Del Excel MAESTRO
+    - `Directos`: Costos directos
+    - `Overhead`: Indirectos contables (incluye Impuestos USA)
+    - `Provisiones`: Facturación adelantada, impuestos
+    - `EBIT Contable = Facturado - Directos - Overhead - Provisiones`
+  - **Verificación Sep 2025**: Operativo EBIT $95,532 (Dev $108,981 - Dir $13,449), Financiero EBIT $70,813 (Excel)
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.

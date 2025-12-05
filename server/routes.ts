@@ -5297,13 +5297,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalOperativoUsd = parseFloat(costsData?.total_operativo_usd || '0'); // Para vista Operativo
       const totalContableUsd = parseFloat(costsData?.total_contable_usd || '0'); // Para vista Financiero (con provisiones)
       
-      // ===== EBIT OPERATIVO (Use Excel MAESTRO value when available for consistency) =====
-      // EBIT Operativo from Excel MAESTRO is the authoritative source
-      // Fallback: calculate as Devengado - Costos_directos if no Excel data
-      const ebitOperativoCalculated = devengadoUsd - directCostsUsd;
-      const ebitOperativoUsd = hasExcelMaestroData && excelMaestroSummary.ebitOperativo !== undefined 
-        ? excelMaestroSummary.ebitOperativo 
-        : ebitOperativoCalculated;
+      // ===== EBIT OPERATIVO (FÓRMULA PURA: Devengado - Directos, SIN overhead) =====
+      // IMPORTANTE: El EBIT operativo es estrictamente Devengado - Costos Directos
+      // NO se usa el valor del Excel MAESTRO porque incluye overhead operativo
+      // La vista operativa muestra productividad pura del equipo
+      const ebitOperativoUsd = devengadoUsd - directCostsUsd;
       
       // ===== EBIT CONTABLE (administrative definition) =====
       // EBIT Contable = Facturado - Costos Totales CONTABLES (directos + indirectos + provisiones)
@@ -5613,15 +5611,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dataSource: hasExcelMaestroData ? 'excel_maestro' : 'calculated'
         },
         
-        // ===== OPERATIONAL (Visión Management: usa Devengado y Costos Directos - SIN provisiones ni impuestos) =====
+        // ===== OPERATIONAL (Visión Management: SOLO Devengado - Directos, SIN overhead ni provisiones) =====
+        // FÓRMULA: EBIT Operativo = Devengado - Directos (productividad pura del equipo)
         operational: {
           devengadoUsd: devengadoUsd,                  // Ingreso devengado (ganado)
           earnedUsd: devengadoUsd,                     // Alias para compatibilidad
           directCostsUsd: directCostsUsd,              // Solo costos directos
-          overheadOperativeUsd: overheadOperativoUsd,  // Overhead SIN Impuestos USA (per checklist)
-          ebitOperativeUsd: ebitOperativoUsd,          // Devengado - Directos
+          overheadOperativeUsd: 0,                     // EXPLÍCITO: 0 en vista operativa (no se usa en EBIT)
+          ebitOperativeUsd: ebitOperativoUsd,          // = Devengado - Directos (SIN overhead)
           ebitOperationalUsd: ebitOperativoUsd,        // Alias para compatibilidad
           ebitOperationalPct: ebitOperativoPct,        // % sobre Devengado
+          ebitMarginOperative: devengadoUsd > 0 ? (ebitOperativoUsd / devengadoUsd) : 0, // 0-1
           markupX: markupOperativoUsd,                 // Devengado / Costos Directos
           markup: markupOperativoUsd,                  // Alias para compatibilidad
           effectiveRateUsdPerHour: tarifaEfectivaUsd,  // Devengado / Horas facturables (per checklist)
