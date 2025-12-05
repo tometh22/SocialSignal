@@ -1,0 +1,386 @@
+Voy directo a lo que necesitás: cómo corregir todo el pipeline para que la app:
+
+copie exactamente la lógica del Excel/Looker
+
+separe bien operativo vs financiero
+
+funcione para cualquier mes.
+
+Te lo dejo escrito como instrucciones para pegar tal cual en Replit Agent.
+
+0. Contexto que el dev tiene que respetar
+
+Fuente única de verdad: archivo
+Seguimiento Financiero_Economico Para Tablero.xlsx.
+
+Las métricas de la app deben calcar lo que hoy sale en:
+
+pestaña Resumen Ejecutivo – Desglose
+
+pestaña Costos directos e indirectos
+
+pestañas de Provisiones e Impuestos
+
+La app tiene dos vistas:
+
+Operativa (management): sin provisiones contables.
+
+Financiera (contable): incluye provisiones.
+
+1. Modelo de datos que hay que armar
+
+Pedirle al agent algo así:
+
+Abrí Seguimiento Financiero_Economico Para Tablero.xlsx y armá un módulo de ETL que lea estas pestañas y genere tablas normalizadas:
+
+1.1. Tabla monthly_summary (desde “Resumen Ejecutivo – Desglose”)
+
+Campos mínimos por fila (un mes):
+
+month_key = 'YYYY-MM' (ej: '2025-09') usando la columna Mes/Fecha.
+
+ventas_mes_usd = “Ventas del mes” convertidas a USD.
+
+ebit_operativa_excel = “EBIT Utilidad operativa”.
+
+beneficio_neto_excel = “Beneficio neto”.
+
+margen_operativo_excel = “Margen operativo”.
+
+mark_up_excel = “MarkUp”.
+
+cashflow_excel = “Cashflow”.
+
+balance_neto = “Balance Neto (Activo-Pasivo)”.
+
+activo_liquido = “Activo Líquido”.
+
+activo_mediano_plazo_crypto = “Activo Mediano Plazo Crypto”.
+
+activo_total = “Activo Total”.
+
+pasivo_proveedores = “Pasivo Proveedores a pagar”.
+
+pasivo_imp_usa = “Pasivo Provisión Impuesto USA”.
+
+pasivo_facturacion_adelantada = “Provisión Facturación Adelantada”.
+
+pasivo_total = “Pasivo Total”.
+
+1.2. Tabla monthly_costs (desde “Costos directos e indirectos”)
+
+Agrupar por mes:
+
+month_key
+
+direct_cost_usd = suma de todos los costos tipo Directo en USD.
+
+indirect_cost_usd = suma de todos los costos tipo Indirecto en USD.
+
+Si en esta pestaña hay filas que son provisiones, agregá flags:
+
+direct_cost_provision_usd
+
+indirect_cost_provision_usd
+y separalas (ver punto 2.3).
+
+1.3. Tabla monthly_provisions (desde “Provisión pasivo proyectos” + “Impuestos”)
+
+Por mes:
+
+month_key
+
+provision_facturacion_adelantada_usd
+(si está sólo en Resumen Ejecutivo, tomala desde ahí).
+
+provision_impuestos_usa_usd
+
+provision_clientes_usd (Warner, Pepsico, etc, si aplica).
+
+provisions_total_usd = suma de todo lo anterior.
+
+1.4. Tabla monthly_hours (si la información de horas está en el Excel maestro)
+
+Si existe pestaña con horas mensuales (costos equipo / Asana, etc):
+
+month_key
+
+hours_facturables
+
+hours_no_facturables
+
+hours_total = suma.
+
+Si las horas vienen de otra base/BD, dejá esta tabla como “joining layer” para conectar con esa fuente usando month_key.
+
+2. Reglas de negocio para cada métrica
+
+Ahora el agent tiene que codificar las fórmulas únicas que la app va a usar.
+
+2.1. Definiciones base
+
+Para cualquier month_key:
+
+facturado = monthly_summary.ventas_mes_usd
+
+directos_reales = monthly_costs.direct_cost_usd
+
+indirectos_reales = monthly_costs.indirect_cost_usd
+
+provisiones_totales = monthly_provisions.provisions_total_usd
+
+prov_facturacion_adelantada = monthly_summary.pasivo_facturacion_adelantada
+(si no existe para ese mes, usar 0).
+
+2.2. Ingreso Devengado (operativo)
+
+Regla simple y estable:
+
+devengado = facturado - prov_facturacion_adelantada
+
+
+Esta diferencia representa trabajo aún no realizado (facturación anticipada).
+
+2.3. Separar costos operativos vs contables
+
+Para OPERATIVO:
+
+costos_directos_operativos = directos_reales
+(sin provisiones; si en la tabla de costos hay filas marcadas como provisión, excluir).
+
+overhead_operativo = indirectos_reales
+(también sin provisiones).
+
+Para FINANCIERO:
+
+costos_directos_financieros = directos_reales
+
+overhead_financiero = indirectos_reales
+
+provisiones_financieras = provisiones_totales
+(no las metas dos veces; si ya vinieron como filas en costos, asegurate de no duplicarlas).
+
+2.4. Métricas OPERATIVAS (vista Operativo)
+
+Para el endpoint operativo:
+
+devengado (como en 2.2)
+
+ebit_operativo = devengado - costos_directos_operativos
+
+margen_operativo_real = ebit_operativo / devengado (si devengado > 0)
+
+markup_operativo = devengado / costos_directos_operativos (si directos > 0)
+
+tarifa_efectiva = devengado / hours_facturables (si hours_facturables > 0)
+
+%_horas_facturables = hours_facturables / hours_total
+
+costos_operativos_totales = costos_directos_operativos + overhead_operativo
+
+Estos son los valores que deben alimentar:
+
+Card “Ingreso Devengado”
+
+Card “EBIT Operativo”
+
+Card “Tarifa efectiva”
+
+Card “Markup operativo”
+
+Card “% Horas facturables”
+
+Barra “Composición de costos operativos”
+
+2.5. Métricas FINANCIERAS (vista Financiero)
+
+Para el endpoint financiero:
+
+facturado
+
+costos_directos_financieros
+
+overhead_financiero
+
+provisiones_financieras
+
+burn_rate = costos_directos_financieros + overhead_financiero + provisiones_financieras
+
+ebit_contable = facturado - burn_rate
+
+cashflow = monthly_summary.cashflow_excel
+
+caja_total = monthly_summary.activo_liquido (o la métrica que uses para Caja).
+
+Cards:
+
+“Facturado”
+
+“EBIT contable (incluye provisiones)”
+
+“Directos”
+
+“Overhead”
+
+“Provisiones”
+
+“Burn Rate”
+
+“Cash Flow Neto”
+
+“Caja total”
+
+3. Backend: endpoints y filtro temporal
+
+Instrucciones directas para Replit Agent:
+
+En el backend, localizá el endpoint que devuelve los datos del “Dashboard Ejecutivo” (por ejemplo /api/dashboard/executive o similar). Vamos a unificar la lógica.
+
+3.1. Parámetros del endpoint
+
+El endpoint debe recibir:
+
+month en formato YYYY-MM
+
+view en { "operativo", "financiero" }
+
+Ejemplo:
+GET /api/dashboard/executive?month=2025-09&view=operativo
+
+3.2. Lógica interna del endpoint
+
+Pseudocódigo que el agent debe traducir a tu stack:
+
+const { month, view } = req.query;
+
+// 1) Leer datos base
+const summary = await monthlySummaryRepo.getByMonth(month);
+const costs   = await monthlyCostsRepo.getByMonth(month);
+const prov    = await monthlyProvisionsRepo.getByMonth(month);
+const hours   = await monthlyHoursRepo.getByMonth(month);
+
+// 2) Variables comunes
+const facturado = summary.ventas_mes_usd || 0;
+const directos  = costs.direct_cost_usd || 0;
+const indirectos = costs.indirect_cost_usd || 0;
+const provFactAdelantada = summary.pasivo_facturacion_adelantada || 0;
+const provisiones = prov.provisions_total_usd || 0;
+
+const devengado = facturado - provFactAdelantada;
+
+if (view === 'operativo') {
+  const horasFact = hours.hours_facturables || 0;
+  const horasNoFact = hours.hours_no_facturables || 0;
+  const horasTotal = horasFact + horasNoFact;
+
+  const ebitOper = devengado - directos;
+  const margenOperReal = devengado > 0 ? ebitOper / devengado : 0;
+  const markupOper = directos > 0 ? devengado / directos : 0;
+  const tarifaEfectiva = horasFact > 0 ? devengado / horasFact : 0;
+  const pctHorasFact = horasTotal > 0 ? horasFact / horasTotal : 0;
+  const totalOper = directos + indirectos;
+
+  return res.json({
+    view: 'operativo',
+    month,
+    facturado,
+    devengado,
+    ebit_operativo: ebitOper,
+    margen_operativo_real: margenOperReal,
+    markup_operativo: markupOper,
+    tarifa_efectiva: tarifaEfectiva,
+    pct_horas_facturables: pctHorasFact,
+    horas_facturables: horasFact,
+    horas_no_facturables: horasNoFact,
+    horas_totales: horasTotal,
+    costos_directos: directos,
+    overhead_operativo: indirectos,
+    costos_operativos_totales: totalOper,
+  });
+}
+
+if (view === 'financiero') {
+  const burnRate = directos + indirectos + provisiones;
+  const ebitCont = facturado - burnRate;
+
+  return res.json({
+    view: 'financiero',
+    month,
+    facturado,
+    directos: directos,
+    overhead: indirectos,
+    provisiones,
+    burn_rate: burnRate,
+    ebit_contable: ebitCont,
+    cashflow: summary.cashflow_excel || 0,
+    caja_total: summary.activo_liquido || 0,
+    balance_neto: summary.balance_neto || 0,
+  });
+}
+
+
+El agent debe adaptar esto al lenguaje (TS/JS/Python) y estructura real del proyecto.
+
+3.3. Filtro temporal en el frontend
+
+El selector de mes debe construir siempre el month_key en YYYY-MM y pasar:
+
+view = "operativo" o "financiero" según la pestaña de toggle.
+
+month = YYYY-MM.
+
+Chequeo: cambiar de septiembre a octubre debe cambiar los números pero la UI no.
+
+4. Validaciones automáticas por mes
+
+Pedile al agent que agregue un endpoint técnico, por ejemplo
+GET /api/dashboard/debug/financial?month=YYYY-MM que devuelva:
+
+{
+  "month": "2025-09",
+  "facturado_excel": 108980.95,
+  "facturado_app": 108980.95,
+  "costos_directos_excel": 18399.76,
+  "costos_directos_app": 18399.76,
+  "costos_indirectos_excel": 33327.00,
+  "costos_indirectos_app": 33327.00,
+  "provisiones_excel": 18500.00,
+  "provisiones_app": 18500.00,
+  "ebit_contable_excel": 70812.59,
+  "ebit_contable_app": 70812.59
+}
+
+
+Así podés comparar rápido si cada mes está alineado con el Excel/Looker.
+
+5. Check final que el agent debe cumplir
+
+Decile que considere el trabajo “aceptado” solo si:
+
+Para septiembre y octubre:
+
+facturado_app == ventas_mes_excel (tolerancia ±1 USD).
+
+directos_app == costos_equipo_excel.
+
+overhead_app == indirectos_excel.
+
+provisiones_app == provisiones_excel.
+
+ebit_contable_app == ebit_contable_excel.
+
+markup_operativo_app ≈ devengado / directos usando la fórmula de este plan.
+
+Cambiar el mes en el filtro no rompe nada y los endpoints responden siempre con un solo month_key.
+
+En la vista Operativa:
+
+No existe ningún campo que sume provisiones dentro de costos totales.
+
+La tarjeta de “Composición de costos operativos” muestra solo Directos + Overhead (sin provisiones).
+
+En la vista Financiera:
+
+Burn Rate incluye sí o sí las provisiones.
+
+La etiqueta de “EBIT contable” tiene un tooltip: “Incluye provisiones”.
