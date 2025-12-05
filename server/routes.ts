@@ -5691,6 +5691,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== DEBUG ENDPOINT: Compare Excel MAESTRO vs App calculations =====
+  // GET /api/dashboard/debug/summary?period=2025-10 or ?mode=month|bimonth|quarter
+  app.get("/api/dashboard/debug/summary", requireAuth, async (req, res) => {
+    try {
+      const { period, mode } = req.query;
+      
+      // Determine period to analyze
+      let periodKey: string;
+      if (period && /^\d{4}-\d{2}$/.test(period as string)) {
+        periodKey = period as string;
+      } else {
+        // Default to current month
+        const now = new Date();
+        periodKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      console.log(`🔍 DEBUG SUMMARY: Analyzing period ${periodKey}`);
+      
+      // 1. Get Excel MAESTRO source data (monthly_financial_summary)
+      const { rows: [excelData] } = await pool.query(`
+        SELECT 
+          period_key,
+          facturacion_total,
+          ebit_operativo,
+          beneficio_neto,
+          markup_promedio,
+          cashflow_neto,
+          pasivo_facturacion_adelantada,
+          impuestos_usa,
+          caja_total,
+          total_activo,
+          total_pasivo,
+          balance_neto,
+          inversiones,
+          cuentas_cobrar_usd,
+          cuentas_pagar_usd,
+          updated_at
+        FROM monthly_financial_summary
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // 2. Get fact_cost_month data (3 buckets)
+      const { rows: [costsData] } = await pool.query(`
+        SELECT 
+          period_key,
+          direct_usd,
+          indirect_usd,
+          provisions_usd,
+          (direct_usd + indirect_usd) as total_operativo_usd,
+          (direct_usd + indirect_usd + COALESCE(provisions_usd, 0)) as total_contable_usd
+        FROM fact_cost_month
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // 3. Get devengado calculation
+      const { getDevengadoSimple } = await import('./services/devengado.js');
+      const devengadoResult = await getDevengadoSimple([periodKey]);
+      
+      // 4. Get hours data
+      const { rows: [hoursData] } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(asana_hours), 0) as total_hours,
+          COALESCE(SUM(billing_hours), 0) as billable_hours
+        FROM fact_labor_month
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // 5. Get cash flow movements
+      const { rows: [cashFlowData] } = await pool.query(`
+        SELECT 
+          COALESCE(SUM(CASE WHEN type = 'IN' THEN amount_usd::numeric ELSE 0 END), 0) as cash_in_usd,
+          COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount_usd::numeric ELSE 0 END), 0) as cash_out_usd,
+          COUNT(*) as movement_count
+        FROM cash_movements
+        WHERE period_key = $1
+      `, [periodKey]);
+      
+      // Parse values
+      const facturacion = parseFloat(excelData?.facturacion_total || '0');
+      const provFacAdelantada = parseFloat(excelData?.pasivo_facturacion_adelantada || '0');
+      const impuestosUsa = parseFloat(excelData?.impuestos_usa || '0');
+      const directCosts = parseFloat(costsData?.direct_usd || '0');
+      const indirectCosts = parseFloat(costsData?.indirect_usd || '0');
+      const provisions = parseFloat(costsData?.provisions_usd || '0');
+      const totalOperativo = parseFloat(costsData?.total_operativo_usd || '0');
+      const totalContable = parseFloat(costsData?.total_contable_usd || '0');
+      const cashIn = parseFloat(cashFlowData?.cash_in_usd || '0');
+      const cashOut = parseFloat(cashFlowData?.cash_out_usd || '0');
+      
+      // Calculate derived values
+      const devengadoCalculated = facturacion - provFacAdelantada;
+      const ebitOperativoCalculated = devengadoCalculated - directCosts;
+      const ebitContableCalculated = facturacion - totalContable;
+      const overheadOperativo = Math.max(0, indirectCosts - impuestosUsa);
+      const billableHours = parseFloat(hoursData?.billable_hours || '0');
+      const tarifaEfectiva = billableHours > 0 ? devengadoCalculated / billableHours : 0;
+      const markup = directCosts > 0 ? devengadoCalculated / directCosts : 0;
+      
+      // Build comparison table
+      const comparison = {
+        period: periodKey,
+        syncedAt: excelData?.updated_at,
+        source: 'excel_maestro',
+        
+        // Excel MAESTRO raw values
+        excelMaestro: {
+          facturacion: facturacion,
+          ebitOperativo: parseFloat(excelData?.ebit_operativo || '0'),
+          beneficioNeto: parseFloat(excelData?.beneficio_neto || '0'),
+          markupPromedio: parseFloat(excelData?.markup_promedio || '0'),
+          cashflowNeto: parseFloat(excelData?.cashflow_neto || '0'),
+          provFacAdelantada: provFacAdelantada,
+          impuestosUsa: impuestosUsa,
+          cajaTotal: parseFloat(excelData?.caja_total || '0'),
+        },
+        
+        // Costs from fact_cost_month (ETL)
+        costsBuckets: {
+          directos: directCosts,
+          indirectos: indirectCosts,
+          provisiones: provisions,
+          totalOperativo: totalOperativo,
+          totalContable: totalContable,
+        },
+        
+        // App calculated values
+        appCalculated: {
+          devengado: devengadoResult.devengadoUsd,
+          devengadoFormula: `${facturacion.toFixed(2)} - ${provFacAdelantada.toFixed(2)} = ${devengadoCalculated.toFixed(2)}`,
+          ebitOperativo: ebitOperativoCalculated,
+          ebitOperativoFormula: `${devengadoCalculated.toFixed(2)} - ${directCosts.toFixed(2)} = ${ebitOperativoCalculated.toFixed(2)}`,
+          ebitContable: ebitContableCalculated,
+          ebitContableFormula: `${facturacion.toFixed(2)} - ${totalContable.toFixed(2)} = ${ebitContableCalculated.toFixed(2)}`,
+          overheadOperativo: overheadOperativo,
+          overheadOperativoFormula: `${indirectCosts.toFixed(2)} - ${impuestosUsa.toFixed(2)} = ${overheadOperativo.toFixed(2)}`,
+          burnRate: totalContable,
+          cashFlowIn: cashIn,
+          cashFlowOut: cashOut,
+          cashFlowNet: cashIn - cashOut,
+          markup: markup,
+          tarifaEfectiva: tarifaEfectiva,
+        },
+        
+        // Hours data
+        hours: {
+          total: parseFloat(hoursData?.total_hours || '0'),
+          billable: billableHours,
+          billablePct: parseFloat(hoursData?.total_hours || '0') > 0 
+            ? (billableHours / parseFloat(hoursData?.total_hours || '0') * 100)
+            : 0,
+        },
+        
+        // Validation checks
+        validations: {
+          devengadoMatch: Math.abs(devengadoResult.devengadoUsd - devengadoCalculated) < 0.01,
+          ebitOperativoMatch: Math.abs(ebitOperativoCalculated - parseFloat(excelData?.ebit_operativo || '0')) < 100,
+          cashFlowMatch: Math.abs((cashIn - cashOut) - parseFloat(excelData?.cashflow_neto || '0')) < 10,
+        },
+        
+        // Discrepancies
+        discrepancies: [] as string[],
+      };
+      
+      // Check for discrepancies
+      if (!comparison.validations.devengadoMatch) {
+        comparison.discrepancies.push(
+          `Devengado: App=${devengadoResult.devengadoUsd.toFixed(2)} vs Calculated=${devengadoCalculated.toFixed(2)}`
+        );
+      }
+      if (!comparison.validations.ebitOperativoMatch) {
+        comparison.discrepancies.push(
+          `EBIT Operativo: App=${ebitOperativoCalculated.toFixed(2)} vs Excel=${parseFloat(excelData?.ebit_operativo || '0').toFixed(2)}`
+        );
+      }
+      if (!comparison.validations.cashFlowMatch) {
+        comparison.discrepancies.push(
+          `CashFlow Net: Movements=${(cashIn - cashOut).toFixed(2)} vs Excel=${parseFloat(excelData?.cashflow_neto || '0').toFixed(2)}`
+        );
+      }
+      
+      console.log(`✅ DEBUG SUMMARY: ${periodKey} analyzed with ${comparison.discrepancies.length} discrepancies`);
+      
+      res.json(comparison);
+      
+    } catch (error) {
+      console.error("❌ DEBUG SUMMARY Error:", error);
+      res.status(500).json({ 
+        error: "Failed to generate debug summary",
+        details: String(error)
+      });
+    }
+  });
+
   // Debug endpoint para verificar datos reales
   app.get("/api/active-projects/debug", requireAuth, async (req, res) => {
     try {

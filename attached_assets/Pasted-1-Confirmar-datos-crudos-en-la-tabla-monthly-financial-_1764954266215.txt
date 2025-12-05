@@ -1,0 +1,190 @@
+1. Confirmar datos crudos en la tabla monthly_financial_summary
+
+Quiero que verifiques y dejes documentado lo siguiente:
+
+Ejecutá estos queries y pegá los resultados en tu respuesta:
+
+SELECT period_key,
+       ventas_mes_usd,
+       facturacion_total,
+       pasivo_facturacion_adelantada,
+       impuestos_usa,
+       ebit_utilidad_operativa,
+       beneficio_neto,
+       cashflow,
+       mark_up
+FROM monthly_financial_summary
+WHERE period_key IN ('2025-08','2025-09','2025-10')
+ORDER BY period_key;
+
+
+Asegurate de que:
+
+ventas_mes_usd o facturacion_total coinciden con “Ventas del Mes” del Excel.
+
+ebit_utilidad_operativa coincide con “EBIT Utilidad operativa”.
+
+cashflow coincide con “Cashflow”.
+
+mark_up coincide con “MarkUp”.
+
+Si algún campo todavía no se llena desde el Excel maestro, actualizá el ETL (server/etl/sot-etl.ts y server/services/googleSheetsWorking.ts) para leerlo de la pestaña correspondiente y sincronizarlo en monthly_financial_summary.
+
+2. Construir capa de costos operativos vs contables
+
+Ahora quiero separar bien costos operativos, overhead y provisiones.
+
+Identificá en qué tabla se están guardando los costos reales del mes (directos e indirectos). Puede ser algo como monthly_costs, team_costs o similar. Si no existe, creala en base a la pestaña “Costos directos e indirectos”.
+
+La tabla mensual de costos debe tener, al menos:
+
+period_key (YYYY-MM)
+direct_cost_usd         -- costos de equipo
+indirect_cost_usd       -- overhead real
+provision_cost_usd      -- si hay provisiones cargadas como costo (sino 0)
+
+
+Asegurate en el ETL que:
+
+direct_cost_usd se calcula como la suma de costos tipo Directo del mes (en USD).
+
+indirect_cost_usd se calcula como la suma de costos tipo Indirecto del mes (en USD).
+
+provision_cost_usd solo incluye provisiones contables; si hoy las estás sumando dentro de indirectos, corregilo para que queden separadas.
+
+Ejecutá un SELECT de esa tabla para septiembre y octubre y confirmá que:
+
+Directos septiembre ≈ USD 18.399 (Costos Equipo).
+
+Costos totales septiembre ≈ USD 51.700 (directos + indirectos).
+
+3. Ajustar /api/dashboard/metrics para vista OPERATIVA
+
+Ahora actualizá la rama operational del endpoint /api/dashboard/metrics para que use la nueva estructura.
+
+Dentro del endpoint, para el período period_key:
+
+const facturado = summary.ventas_mes_usd ?? summary.facturacion_total ?? 0;
+const devengado = facturado - (summary.pasivo_facturacion_adelantada ?? 0);
+
+const directos = monthlyCosts.direct_cost_usd ?? 0;
+const overheadOperativo = monthlyCosts.indirect_cost_usd ?? 0;
+
+const horasFact = monthlyHours.hours_facturables ?? 0;
+const horasNoFact = monthlyHours.hours_no_facturables ?? 0;
+const horasTotales = horasFact + horasNoFact;
+
+const ebitOper = devengado - directos;
+const markupOper = directos > 0 ? devengado / directos : 0;
+const tarifaEfectiva = horasFact > 0 ? devengado / horasFact : 0;
+const pctHorasFact = horasTotales > 0 ? horasFact / horasTotales : 0;
+const totalOper = directos + overheadOperativo;
+
+
+La respuesta JSON de operational debe exponer, al menos:
+
+{
+  "devengadoUsd": ...,
+  "facturadoUsd": ...,
+  "ebitOperativeUsd": ...,
+  "markupOperative": ...,
+  "effectiveRateUsdPerHour": ...,
+  "billableHours": ...,
+  "nonBillableHours": ...,
+  "totalHours": ...,
+  "directCostsUsd": ...,
+  "overheadOperativeUsd": ...,
+  "totalOperativeCostsUsd": ...
+}
+
+
+Verificá con:
+
+curl -s "http://localhost:5000/api/dashboard/metrics?month=9&year=2025" \
+  -H "Cookie: connect.sid=test" | jq '.operational'
+
+
+y chequeá que:
+
+devengadoUsd = 108,980.95 para sep 2025.
+
+ebitOperativeUsd ≈ 70,812.59 si tomás la tabla histórica de Excel como referencia (o documentá la diferencia si usamos otra definición).
+
+El markup aproximado coincida con devengado / directos.
+
+4. Ajustar /api/dashboard/metrics para vista FINANCIERA
+
+Ahora alineá la rama financial para que copie exactamente la lógica del Resumen Ejecutivo.
+
+En el endpoint:
+
+const facturado = summary.ventas_mes_usd ?? summary.facturacion_total ?? 0;
+const directos = monthlyCosts.direct_cost_usd ?? 0;
+const overhead = monthlyCosts.indirect_cost_usd ?? 0;
+
+const provisiones = 
+  (summary.pasivo_facturacion_adelantada ?? 0) +
+  (summary.impuestos_usa ?? 0) +
+  (monthlyCosts.provision_cost_usd ?? 0);
+
+const burnRate = directos + overhead + provisiones;
+const ebitContable = facturado - burnRate;
+
+
+La respuesta JSON de financial debe exponer:
+
+{
+  "facturadoUsd": ...,
+  "directCostsUsd": ...,
+  "overheadUsd": ...,
+  "provisionsUsd": ...,
+  "burnRateUsd": ...,
+  "ebitAccountingUsd": ...,
+  "cashflowUsd": summary.cashflow ?? 0,
+  "netBalanceUsd": summary.balance_neto ?? 0
+}
+
+
+Usá curl para validar septiembre y octubre:
+
+curl -s "http://localhost:5000/api/dashboard/metrics?month=9&year=2025" \
+ -H "Cookie: connect.sid=test" | jq '.financial'
+
+curl -s "http://localhost:5000/api/dashboard/metrics?month=10&year=2025" \
+ -H "Cookie: connect.sid=test" | jq '.financial'
+
+
+y compará:
+
+facturadoUsd con “Ventas del mes”.
+
+ebitAccountingUsd con “EBIT” de Resumen Ejecutivo.
+
+cashflowUsd con “Cash Flow”.
+
+Si hay diferencia, documentá cuál y de dónde viene (definición distinta) en el código o en un comentario en el repo.
+
+5. Endpoint de debug cruzado con Excel
+
+Agregá un endpoint de debug para comparar rápido Excel vs app:
+
+Creá /api/dashboard/debug/summary?month=YYYY-MM que devuelva:
+
+{
+  "period_key": "2025-09",
+  "excel": {
+    "facturadoUsd": ...,
+    "ebitOperativaUsd": ...,
+    "ebitContableUsd": ...,
+    "cashflowUsd": ...,
+    "markUp": ...
+  },
+  "app": {
+    "operational": { "devengadoUsd": ..., "ebitOperativeUsd": ..., "markupOperative": ... },
+    "financial":  { "facturadoUsd": ..., "ebitAccountingUsd": ..., "cashflowUsd": ... }
+  }
+}
+
+
+Usá este endpoint para validar al menos 3 meses: 2025-08, 2025-09, 2025-10.
+Dejá un resumen en los logs indicando “OK / Diferencia” por cada métrica.
