@@ -5297,9 +5297,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalOperativoUsd = parseFloat(costsData?.total_operativo_usd || '0'); // Para vista Operativo
       const totalContableUsd = parseFloat(costsData?.total_contable_usd || '0'); // Para vista Financiero (con provisiones)
       
-      // ===== EBIT OPERATIVO (business definition: uses DEVENGADO, not Facturado) =====
-      // EBIT_operativo = Devengado - Costos_directos (do NOT subtract indirect costs)
-      const ebitOperativoUsd = devengadoUsd - directCostsUsd;
+      // ===== EBIT OPERATIVO (Use Excel MAESTRO value when available for consistency) =====
+      // EBIT Operativo from Excel MAESTRO is the authoritative source
+      // Fallback: calculate as Devengado - Costos_directos if no Excel data
+      const ebitOperativoCalculated = devengadoUsd - directCostsUsd;
+      const ebitOperativoUsd = hasExcelMaestroData && excelMaestroSummary.ebitOperativo !== undefined 
+        ? excelMaestroSummary.ebitOperativo 
+        : ebitOperativoCalculated;
       
       // ===== EBIT CONTABLE (administrative definition) =====
       // EBIT Contable = Facturado - Costos Totales CONTABLES (directos + indirectos + provisiones)
@@ -5393,7 +5397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`      Cash Flow: In=$${cashFlowInUsd.toFixed(2)}, Out=$${cashFlowOutUsd.toFixed(2)}, Net=$${cashFlowNetUsd.toFixed(2)} (${movementCount} movimientos)`);
       console.log(`   📈 OPERATIVO (sin provisiones ni impuestos contables):`);
       console.log(`      Devengado: USD ${devengadoUsd.toFixed(2)}`);
-      console.log(`      EBIT Operativo (Devengado - Directos): USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)`);
+      console.log(`      EBIT Operativo: USD ${ebitOperativoUsd.toFixed(2)} (${ebitOperativoPct.toFixed(1)}%)${hasExcelMaestroData ? ' (Excel MAESTRO)' : ' (Calc: Dev-Dir)'}`);
       console.log(`      Overhead Operativo (sin Impuestos USA): USD ${overheadOperativoUsd.toFixed(2)}`);
       console.log(`      Markup Operativo: ${markupOperativoUsd.toFixed(2)}x`);
       console.log(`      Tarifa Efectiva: USD ${tarifaEfectivaUsd.toFixed(2)}/h`);

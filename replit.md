@@ -72,6 +72,10 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - **New approach**: Uses company-level totals from Excel MAESTRO Resumen Ejecutivo
   - **Verification (Oct 2025)**: Facturado=$81,838.86, Provisión=$27,906.00, Devengado=$53,932.86 ✓
   - **Implementation**: `server/services/devengado.ts` function `getDevengadoSimple()` now reads from `monthly_financial_summary` table
+- **Debug Summary Endpoint** *(Added 2025-12-05)*: `/api/dashboard/debug/summary?period=YYYY-MM` endpoint for comparing Excel MAESTRO vs App calculations.
+  - **Features**: Shows side-by-side comparison of Excel raw values, cost buckets, and app-calculated values
+  - **Validation**: Automatic discrepancy detection for Devengado, EBIT Operativo, and CashFlow
+  - **Known Issue**: EBIT Operativo shows discrepancies - Excel may use different cost base than Devengado - Directos formula
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.
