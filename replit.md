@@ -63,6 +63,15 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
     - `cashFlowNetFromMovementsUsd`: Calculated In-Out from movements (should now match Resumen Ejecutivo)
     - `cajaTotalUsd`: End-of-month cash balance from Resumen Ejecutivo
   - **Verification (Oct 2025)**: Sheet shows IN=$112,638.91, OUT=$45,836.93, NET=$66,801.98. Target from Resumen Ejecutivo is $66,801.58 (difference of $0.40 is acceptable rounding).
+- **Devengado Calculation V2** *(Fixed 2025-12-05)*: New Excel MAESTRO-aligned formula for Devengado.
+  - **Formula**: `Devengado = Facturado - Provisión Facturación Adelantada`
+  - **Data Sources**: 
+    - `facturacion_total` from `monthly_financial_summary` (Excel MAESTRO "Ventas del mes")
+    - `pasivo_facturacion_adelantada` from `monthly_financial_summary` (Excel MAESTRO "Provisión Pasivo Costos Facturación Adelantada")
+  - **Previous approach**: Calculated devengado per-project using fee/one-shot type logic
+  - **New approach**: Uses company-level totals from Excel MAESTRO Resumen Ejecutivo
+  - **Verification (Oct 2025)**: Facturado=$81,838.86, Provisión=$27,906.00, Devengado=$53,932.86 ✓
+  - **Implementation**: `server/services/devengado.ts` function `getDevengadoSimple()` now reads from `monthly_financial_summary` table
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.

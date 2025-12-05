@@ -2761,6 +2761,9 @@ export const monthlyFinancialSummary = pgTable("monthly_financial_summary", {
   ivaCompras: numeric("iva_compras", { precision: 12, scale: 2 }),
   impuestosUsa: numeric("impuestos_usa", { precision: 12, scale: 2 }),
   
+  // Provisiones (para cálculo de Devengado)
+  pasivoFacturacionAdelantada: numeric("pasivo_facturacion_adelantada", { precision: 14, scale: 2 }), // Provisión Facturación Adelantada
+  
   // Resultados
   ebitOperativo: numeric("ebit_operativo", { precision: 14, scale: 2 }), // EBIT (Utilidad operativa)
   beneficioNeto: numeric("beneficio_neto", { precision: 14, scale: 2 }), // Beneficio neto (con provisiones)

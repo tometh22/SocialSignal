@@ -202,10 +202,40 @@ export async function getDevengadoByPeriod(periodKeys: string[]): Promise<Deveng
   };
 }
 
-export async function getDevengadoSimple(periodKeys: string[]): Promise<{ devengadoUsd: number; facturadoUsd: number }> {
-  const result = await getDevengadoByPeriod(periodKeys);
+export async function getDevengadoSimple(periodKeys: string[]): Promise<{ devengadoUsd: number; facturadoUsd: number; source: string }> {
+  // NUEVA FÓRMULA: Devengado = Facturado - Provisión Facturación Adelantada
+  // Fuente: Excel MAESTRO "Resumen Ejecutivo"
+  // Facturado = "Ventas del mes" (columna facturacion_total)
+  // Provisión = "Provisión Pasivo Costos Facturación Adelantada" (columna pasivo_facturacion_adelantada)
+  
+  const { rows: mfsData } = await pool.query(`
+    SELECT 
+      COALESCE(SUM(facturacion_total), 0) as facturado_total,
+      COALESCE(SUM(pasivo_facturacion_adelantada), 0) as provision_adelantada
+    FROM monthly_financial_summary
+    WHERE period_key = ANY($1)
+  `, [periodKeys]);
+  
+  const facturadoUsd = parseFloat(mfsData[0]?.facturado_total || '0');
+  const provisionAdelantada = parseFloat(mfsData[0]?.provision_adelantada || '0');
+  
+  // Devengado = Facturado - Provisión Adelantada
+  const devengadoUsd = facturadoUsd - provisionAdelantada;
+  
+  console.log(`📊 DEVENGADO (Excel MAESTRO formula):`);
+  console.log(`   Periods: ${periodKeys.join(', ')}`);
+  console.log(`   Facturado (Ventas del mes): $${facturadoUsd.toFixed(2)}`);
+  console.log(`   Provisión Adelantada: $${provisionAdelantada.toFixed(2)}`);
+  console.log(`   Devengado (Facturado - Provisión): $${devengadoUsd.toFixed(2)}`);
+  
   return {
-    devengadoUsd: result.totalDevengadoUsd,
-    facturadoUsd: result.totalFacturadoUsd
+    devengadoUsd,
+    facturadoUsd,
+    source: 'excel_maestro'
   };
+}
+
+export async function getDevengadoByProject(periodKeys: string[]): Promise<DevengadoResult> {
+  // Este método mantiene el cálculo por proyecto para análisis operativo detallado
+  return getDevengadoByPeriod(periodKeys);
 }

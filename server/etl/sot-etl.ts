@@ -1543,6 +1543,7 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
           costosIndirectos: row.costosIndirectos?.toString() || null,
           ivaCompras: row.ivaCompras?.toString() || null,
           impuestosUsa: row.impuestosUsa?.toString() || null,
+          pasivoFacturacionAdelantada: row.facturacionAdelantadaUsd?.toString() || null, // Provisión Facturación Adelantada
           ebitOperativo: row.ebitOperativo?.toString() || null,
           beneficioNeto: row.beneficioNeto?.toString() || null,
           markupPromedio: row.markupPromedio?.toString() || null,
