@@ -5848,14 +5848,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         
         // Validation checks
+        // NOTE: EBIT Operativo is now sourced from Excel MAESTRO directly in the dashboard,
+        // so we show both values but consider it "matched" (Excel is authoritative)
         validations: {
           devengadoMatch: Math.abs(devengadoResult.devengadoUsd - devengadoCalculated) < 0.01,
-          ebitOperativoMatch: Math.abs(ebitOperativoCalculated - parseFloat(excelData?.ebit_operativo || '0')) < 100,
+          ebitOperativoExcelUsed: true, // Dashboard uses Excel value directly
+          ebitOperativoFormulaMatch: Math.abs(ebitOperativoCalculated - parseFloat(excelData?.ebit_operativo || '0')) < 100,
           cashFlowMatch: Math.abs((cashIn - cashOut) - parseFloat(excelData?.cashflow_neto || '0')) < 10,
         },
         
-        // Discrepancies
+        // Discrepancies (only for values that should match but don't)
         discrepancies: [] as string[],
+        
+        // Info: Formula differences (not errors, just informational)
+        formulaDifferences: [] as string[],
       };
       
       // Check for discrepancies
@@ -5864,9 +5870,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           `Devengado: App=${devengadoResult.devengadoUsd.toFixed(2)} vs Calculated=${devengadoCalculated.toFixed(2)}`
         );
       }
-      if (!comparison.validations.ebitOperativoMatch) {
-        comparison.discrepancies.push(
-          `EBIT Operativo: App=${ebitOperativoCalculated.toFixed(2)} vs Excel=${parseFloat(excelData?.ebit_operativo || '0').toFixed(2)}`
+      // EBIT Operativo: Show formula difference as INFO (not error), since dashboard uses Excel value
+      if (!comparison.validations.ebitOperativoFormulaMatch) {
+        comparison.formulaDifferences.push(
+          `EBIT Operativo Formula (Devengado-Directos): ${ebitOperativoCalculated.toFixed(2)} vs Excel: ${parseFloat(excelData?.ebit_operativo || '0').toFixed(2)} (Dashboard uses Excel value)`
         );
       }
       if (!comparison.validations.cashFlowMatch) {
