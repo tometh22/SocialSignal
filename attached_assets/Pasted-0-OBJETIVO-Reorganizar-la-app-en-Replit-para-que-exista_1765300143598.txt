@@ -1,0 +1,323 @@
+0. OBJETIVO
+
+Reorganizar la app en Replit para que existan 3 vistas con criterios limpios y queries separadas:
+
+Operativo
+
+Económico (P&L gerencial por devengado)
+
+Finanzas (Contable & Caja)
+
+Sin tocar tablas, sin alterar lógica existente, sin romper el código.
+
+1. CAMBIOS EN EL FRONTEND (Replit / React / Next)
+1.1. Crear archivo central de Tabs
+
+En pages/executive.tsx (o el archivo donde hoy están los tabs):
+
+Reemplazar el esquema actual:
+<TabsTrigger value="operativo">Operativo</TabsTrigger>
+<TabsTrigger value="financiero">Financiero</TabsTrigger>
+
+Por:
+<TabsTrigger value="operativo">Operativo</TabsTrigger>
+<TabsTrigger value="economico">Económico</TabsTrigger>
+<TabsTrigger value="finanzas">Finanzas (Contable & Caja)</TabsTrigger>
+
+
+Y agregar:
+
+<TabsContent value="operativo"><OperativeView /></TabsContent>
+<TabsContent value="economico"><EconomicView /></TabsContent>
+<TabsContent value="finanzas"><FinanceView /></TabsContent>
+
+
+Cada vista en su propio componente.
+
+2. ESTRUCTURA DE COMPONENTES (Replit / src/components)
+
+Crear 3 carpetas:
+
+/components/Executive/Operativo
+/components/Executive/Economico
+/components/Executive/Finanzas
+
+
+Y dentro:
+
+OperativoView.tsx
+EconomicView.tsx
+FinanceView.tsx
+
+
+Cada una con su propio fetch a un endpoint distinto.
+
+Ejemplo:
+
+const { data } = useQuery({
+  queryKey: ["executive-operativo", month],
+  queryFn: () => fetch(`/api/executive/operativo?month=${month}`).then(r => r.json())
+});
+
+3. ENDPOINTS BACKEND (Replit – Node/Python/FastAPI según tu setup)
+
+Hoy tenés (según tu código):
+/api/executive/operativo
+/api/executive/financiero
+
+Deben quedar así:
+/api/executive/operativo
+/api/executive/economico
+/api/executive/finanzas
+
+
+Cada endpoint solo consulta las tablas que corresponden.
+
+4. SEPARACIÓN DE LÓGICA (LO MÁS IMPORTANTE)
+
+Hoy “financiero” mezcla devengado, contabilidad, overhead y caja.
+Eso es lo que está generando contradicciones.
+
+Debés dividir:
+
+4.1 ENDPOINT OPERATIVO
+
+Ruta: /api/executive/operativo
+
+Tablas permitidas:
+
+monthly_financial_summary (solo para facturado & provisión)
+
+fact_cost_month (solo directos)
+
+fact_labor_month (horas)
+
+Fórmulas:
+
+devengado = facturado - provision_facturacion_adelantada
+
+directos = SUM(direct_usd)
+
+ebit_operativo = devengado - directos
+
+markup = devengado / directos
+
+tarifa_efectiva = devengado / horas_facturables
+
+%facturable = horas_facturables / horas_totales
+
+No mostrar aquí:
+
+overhead
+
+provisiones contables
+
+facturado como métrica
+
+burn rate
+
+caja
+
+impuestos
+
+pasivos
+
+cashflow
+
+4.2 ENDPOINT ECONÓMICO
+
+Ruta: /api/executive/economico
+
+Tablas permitidas:
+
+monthly_financial_summary
+
+fact_cost_month (directos + overhead)
+
+fact_rc_month (performance por cliente/proyecto)
+
+Fórmulas:
+
+devengado = facturado - provision_adelantada
+
+directos = SUM(direct_usd)
+
+overhead = SUM(indirect_usd)
+
+ebit_economico = devengado - directos - overhead
+
+margen_economico = ebit_economico / devengado
+
+Por cliente/proyecto: (desde fact_rc_month)
+
+revenue_usd
+
+cost_usd
+
+profit
+
+markup
+
+margin
+
+No mostrar aquí:
+
+provisiones contables
+
+impuestos USA
+
+caja
+
+cashflow
+
+burn rate
+
+facturado
+
+4.3 ENDPOINT FINANZAS (Contable + Caja)
+
+Ruta: /api/executive/finanzas
+
+Tablas permitidas:
+
+monthly_financial_summary
+
+pl_adjustments (provisiones, impuestos)
+
+cash_movements
+
+Activo, Pasivo (según tu estructura)
+
+Fórmulas:
+
+facturado = SUM(facturacion_total)
+
+directos = SUM(direct_usd)
+
+overhead = SUM(indirect_usd)
+
+provisiones = SUM(provisions_usd)
+
+total_contable = directos + overhead + provisiones
+
+ebit_contable = facturado - total_contable
+
+beneficio_neto = ebit_contable - ajustes_pnl
+
+cash_in = SUM(amount_usd WHERE IN)
+
+cash_out = SUM(amount_usd WHERE OUT)
+
+cashflow_neto = cash_in - cash_out
+
+caja_total = snapshot monthly_financial_summary
+
+burn_rate = total_contable
+
+runway = caja_total / burn_rate
+
+activo_total, pasivo_total, patrimonio
+
+No mostrar aquí:
+
+devengado
+
+ebit_operativo
+
+markup operativo
+
+horas
+
+5. UI/UX (CAMBIOS MÍNIMOS, SEGUROS)
+5.1 Tres pestañas claras arriba
+Operativo | Económico | Finanzas
+
+5.2 Paleta por vista
+
+Operativo: verde/azul suave (#C9F0E8 / #E9FFF4)
+
+Económico: azul profundo / gris suave
+
+Finanzas: morado / rojo suave (#F4E8FF / #FFEAEA)
+
+5.3 Big cards arriba
+
+Poner:
+
+Operativo: Devengado + EBIT operativo
+
+Económico: Devengado + EBIT económico
+
+Finanzas: Facturado + EBIT contable
+
+5.4 Tooltip obligatorio
+
+En cada card agregar:
+
+Fórmula:
+Fuente:
+Nota:
+
+
+Ej:
+
+EBIT Operativo
+= Devengado – Directos
+Fuente: fact_cost_month
+Nota: no incluye overhead ni provisiones
+
+6. PRUEBAS (QA)
+6.1 Operativo
+
+No aparece overhead
+
+No aparece burn rate
+
+No aparece caja
+
+No aparece facturado como KPI
+
+Devengado y facturado NO deben coincidir
+
+EBIT operativo positivo cuando markup > 1
+
+6.2 Económico
+
+Aparece overhead
+
+Aparece ebit económico
+
+Proyectos tienen revenue/cost correctos
+
+No aparece caja
+
+No aparece cashflow
+
+6.3 Finanzas
+
+Facturado = Excel Maestro
+
+Caja total = Excel Maestro
+
+Burn rate correcto
+
+Runway correcto
+
+ebit contable negativo o positivo según provisiones
+
+Activo/Pasivo correctos
+
+7. QUÉ NO TOCAR
+
+Tablas de la base
+
+Lógica de cálculo de provisiones
+
+Lógica de cashflow
+
+Lógica de horas
+
+Lógica de revenue por proyecto
+
+Nada de esto cambia.
+Solo se reorganiza la presentación y se limpian criterios.

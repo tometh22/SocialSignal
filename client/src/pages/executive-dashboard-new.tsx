@@ -16,11 +16,13 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { motion } from "framer-motion";
 
-type ViewMode = 'operational' | 'financial';
+type ViewMode = 'operativo' | 'economico' | 'finanzas';
+
+import { OperativoView, EconomicoView, FinanzasView } from '@/components/Executive';
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('operational');
+  const [viewMode, setViewMode] = useState<ViewMode>('operativo');
   const [showPeriodPicker, setShowPeriodPicker] = useState(false);
   const [initialized, setInitialized] = useState(false);
   
@@ -130,42 +132,60 @@ export default function ExecutiveDashboard() {
           
           {/* Derecha: Toggle + Filtro + Refresh */}
           <div className="flex items-center gap-3">
-            {/* Toggle Operativo/Financiero */}
+            {/* Toggle Operativo/Económico/Finanzas */}
             <div className="flex items-center bg-white rounded-lg border border-gray-200 p-0.5">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setViewMode('operational')}
+                    onClick={() => setViewMode('operativo')}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      viewMode === 'operational'
+                      viewMode === 'operativo'
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
-                    data-testid="button-view-operational"
+                    data-testid="button-view-operativo"
                   >
                     Operativo
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  <p className="text-xs max-w-[200px]">Ver rendimiento de la operación según lo producido (devengado).</p>
+                  <p className="text-xs max-w-[220px]">Productividad pura: Devengado – Directos. Sin overhead ni provisiones.</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setViewMode('financial')}
+                    onClick={() => setViewMode('economico')}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                      viewMode === 'financial'
+                      viewMode === 'economico'
                         ? 'bg-blue-600 text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
-                    data-testid="button-view-financial"
+                    data-testid="button-view-economico"
                   >
-                    Financiero
+                    Económico
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  <p className="text-xs max-w-[200px]">Ver visión contable según facturación y costos totales.</p>
+                  <p className="text-xs max-w-[220px]">P&L gerencial: Devengado – Directos – Overhead. Sin provisiones.</p>
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setViewMode('finanzas')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                      viewMode === 'finanzas'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    data-testid="button-view-finanzas"
+                  >
+                    Finanzas
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs max-w-[220px]">Contable + Caja: Facturado – todos los costos. Incluye cashflow y balance.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -254,607 +274,10 @@ export default function ExecutiveDashboard() {
           </div>
         )}
 
-        {/* ==================== OPERATIONAL VIEW ==================== */}
-        {viewMode === 'operational' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="grid grid-cols-12 gap-4"
-          >
-            {/* ===== FILA 1: HERO KPIs (col-span-6 + col-span-6) ===== */}
-            
-            {/* Devengado */}
-            <Card className="col-span-12 md:col-span-6 border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-white">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-emerald-700 uppercase tracking-wide">
-                        Ingreso devengado
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-emerald-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">Ingreso devengado</p>
-                          <p className="text-xs text-gray-300">Ingreso correspondiente al trabajo realizado en el período, independientemente de cuándo se facture.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Trabajo realizado en el período</p>
-                    <div className="text-3xl font-semibold text-emerald-800" data-testid="metric-devengado">
-                      {formatCurrency(operational.earnedUsd || 0)}
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Facturado en el período: {formatCurrency(financial.billedUsd || 0)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-emerald-100 rounded-full">
-                    <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* EBIT Operativo */}
-            <Card className={`col-span-12 md:col-span-6 border-0 shadow-lg ${
-              (operational.ebitOperationalUsd || 0) >= 0 
-                ? 'bg-gradient-to-br from-emerald-50 to-white' 
-                : 'bg-gradient-to-br from-red-50 to-white'
-            }`}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-medium uppercase tracking-wide ${
-                        (operational.ebitOperationalUsd || 0) >= 0 ? 'text-emerald-700' : 'text-red-700'
-                      }`}>
-                        EBIT operativo
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className={`h-4 w-4 ${
-                            (operational.ebitOperationalUsd || 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                          }`} />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">EBIT operativo</p>
-                          <p className="text-xs text-gray-300">Devengado – Costos directos (equipo). Mide la rentabilidad de la operación antes de overhead e impuestos.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Después de costos de equipo</p>
-                    <div className={`text-3xl font-semibold ${
-                      (operational.ebitOperationalUsd || 0) >= 0 ? 'text-emerald-800' : 'text-red-700'
-                    }`} data-testid="metric-ebit-operativo">
-                      {formatCurrency(operational.ebitOperationalUsd || 0)}
-                      <span className="text-lg font-normal ml-2">
-                        ({formatPct(operational.ebitOperationalPct || 0)})
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">= Devengado – costos directos (sin overhead ni provisiones)</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${
-                    (operational.ebitOperationalUsd || 0) >= 0 ? 'bg-emerald-100' : 'bg-red-100'
-                  }`}>
-                    {(operational.ebitOperationalUsd || 0) >= 0 ? (
-                      <ArrowUpRight className="h-6 w-6 text-emerald-600" />
-                    ) : (
-                      <ArrowDownRight className="h-6 w-6 text-red-600" />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 2: EFICIENCIA (col-span-4 x 3) ===== */}
-            
-            {/* Tarifa Efectiva */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-600">Tarifa efectiva</span>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[250px]">
-                      <p className="text-xs font-medium mb-1">Tarifa efectiva</p>
-                      <p className="text-xs text-gray-300">Devengado / Horas facturables. Indica cuánto ingreso genera en promedio cada hora de trabajo facturable.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="text-2xl font-bold text-gray-800" data-testid="metric-tarifa-efectiva">
-                  ${(operational.effectiveRateUsd || 0).toFixed(0)}/h
-                </div>
-                <p className="text-xs text-gray-500 mt-1">USD por hora devengada</p>
-              </CardContent>
-            </Card>
-
-            {/* Markup Operativo */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-600">Markup operativo</span>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[250px]">
-                      <p className="text-xs font-medium mb-1">Markup Operativo</p>
-                      <p className="text-xs text-gray-300">Devengado / Costos directos. Mide cuántas veces recuperás el costo del equipo con lo producido.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="text-2xl font-bold text-gray-800" data-testid="metric-markup">
-                  {(operational.markup || 0).toFixed(2)}x
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Múltiplo sobre costos directos</p>
-              </CardContent>
-            </Card>
-
-            {/* % Horas Facturables */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-600">% Horas facturables</span>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-gray-400" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[250px]">
-                      <p className="text-xs font-medium mb-1">% Horas Facturables</p>
-                      <p className="text-xs text-gray-300">Horas facturables / Horas totales. Idealmente ≥ 70% en empresas de servicios.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className={`text-2xl font-bold ${
-                  (operational.billableRatio || 0) >= 0.6 ? 'text-emerald-700' : 'text-amber-600'
-                }`} data-testid="metric-billable-ratio">
-                  {formatPct((operational.billableRatio || 0) * 100)}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Sobre el total de horas trabajadas</p>
-                <Progress 
-                  value={(operational.billableRatio || 0) * 100} 
-                  className={`h-1.5 mt-2 ${
-                    (operational.billableRatio || 0) >= 0.6 ? '[&>div]:bg-emerald-500' : '[&>div]:bg-amber-500'
-                  }`} 
-                />
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 3: CAPACIDAD (col-span-4 x 3) ===== */}
-            
-            {/* Horas Trabajadas */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-gray-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-200 rounded-lg">
-                    <Clock className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Horas trabajadas</p>
-                    <p className="text-xl font-bold text-gray-800" data-testid="metric-hours-total">
-                      {(operational.hoursTotal || 0).toFixed(0)}h
-                    </p>
-                    <p className="text-xs text-gray-400">En el período seleccionado</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Personas Activas */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-gray-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-200 rounded-lg">
-                    <Users className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Personas activas</p>
-                    <p className="text-xl font-bold text-gray-800" data-testid="metric-people-active">
-                      {operational.activePeople || 0}
-                    </p>
-                    <p className="text-xs text-gray-400">Con al menos 1h registrada</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Proyectos Activos */}
-            <Card className="col-span-12 md:col-span-4 border-0 shadow-md bg-gray-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-200 rounded-lg">
-                    <Briefcase className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Proyectos activos</p>
-                    <p className="text-xl font-bold text-gray-800" data-testid="metric-projects-active">
-                      {operational.activeProjects || 0}
-                    </p>
-                    <p className="text-xs text-gray-400">Con horas o devengado &gt; 0</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 4: COMPOSICIÓN DE COSTOS OPERATIVOS (col-span-12) ===== */}
-            {/* VISTA OPERATIVA: Solo costos operativos reales (SIN provisiones ni impuestos) */}
-            {(() => {
-              const directCosts = financial.directCostsUsd || 0;
-              const indirectOperational = financial.indirectCostsUsd || 0;
-              const totalOperativo = directCosts + indirectOperational;
-              return (
-                <Card className="col-span-12 border-0 shadow-lg">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold text-gray-700 flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-red-500" />
-                        Composición de costos operativos
-                      </CardTitle>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[300px]">
-                          <p className="text-xs font-medium mb-1">Costos Operativos Reales</p>
-                          <p className="text-xs">Solo incluye costos operativos del período. Directos = equipo. Overhead operativo = gastos reales (alquileres, herramientas, management, etc.).</p>
-                          <p className="text-xs mt-1 text-yellow-300">NOTA: NO incluye provisiones contables ni impuestos (Pepsico, Warner, IVA, etc.) - esos aparecen en la vista Financiera.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    {/* Stacked Bar - Solo directos e indirectos operativos */}
-                    <div className="h-6 rounded-full overflow-hidden bg-gray-200 mb-4">
-                      <div className="h-full flex">
-                        <div 
-                          className="bg-red-400 transition-all"
-                          style={{ 
-                            width: `${totalOperativo > 0 
-                              ? (directCosts / totalOperativo) * 100 
-                              : 50}%` 
-                          }}
-                        />
-                        <div 
-                          className="bg-orange-400 transition-all"
-                          style={{ 
-                            width: `${totalOperativo > 0 
-                              ? (indirectOperational / totalOperativo) * 100 
-                              : 50}%` 
-                          }}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-3 h-3 bg-red-400 rounded-full" />
-                          <span className="text-gray-600">Directos (equipo)</span>
-                        </div>
-                        <p className="font-semibold text-gray-800" data-testid="metric-direct-costs">
-                          {formatCurrency(directCosts)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {totalOperativo > 0 
-                            ? `${((directCosts / totalOperativo) * 100).toFixed(0)}% del total operativo`
-                            : '0%'}
-                        </p>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-3 h-3 bg-orange-400 rounded-full" />
-                          <span className="text-gray-600">Overhead operativo</span>
-                        </div>
-                        <p className="font-semibold text-gray-800" data-testid="metric-indirect-costs">
-                          {formatCurrency(indirectOperational)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {totalOperativo > 0 
-                            ? `${((indirectOperational / totalOperativo) * 100).toFixed(0)}% del total operativo`
-                            : '0%'}
-                        </p>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-3 h-3 bg-gray-500 rounded-full" />
-                          <span className="text-gray-600">Total Operativo</span>
-                        </div>
-                        <p className="font-bold text-gray-900" data-testid="metric-total-costs-operativo">
-                          {formatCurrency(totalOperativo)}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Sin provisiones contables
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })()}
-          </motion.div>
-        )}
-
-        {/* ==================== FINANCIAL VIEW ==================== */}
-        {viewMode === 'financial' && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="grid grid-cols-12 gap-4"
-          >
-            {/* ===== FILA 1: HERO KPIs (col-span-6 + col-span-6) ===== */}
-            
-            {/* Facturado */}
-            <Card className="col-span-12 md:col-span-6 border-0 shadow-lg bg-gradient-to-br from-blue-50 to-white">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-blue-700 uppercase tracking-wide">
-                        Facturado
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-blue-400" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[250px]">
-                          <p className="text-xs font-medium mb-1">Facturado</p>
-                          <p className="text-xs text-gray-300">Ingresos facturados en el período según la pestaña Rendimiento Cliente.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Ingresos facturados en el período</p>
-                    <div className="text-3xl font-semibold text-blue-800" data-testid="metric-facturado">
-                      {formatCurrency(financial.billedUsd || 0)}
-                    </div>
-                  </div>
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <DollarSign className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* EBIT Contable */}
-            <Card className={`col-span-12 md:col-span-6 border-0 shadow-lg ${
-              (financial.ebitAccountingUsd || 0) >= 0 
-                ? 'bg-gradient-to-br from-blue-50 to-white' 
-                : 'bg-gradient-to-br from-red-50 to-white'
-            }`}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-medium uppercase tracking-wide ${
-                        (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-700' : 'text-red-700'
-                      }`}>
-                        EBIT contable
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className={`h-4 w-4 ${
-                            (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-400' : 'text-red-400'
-                          }`} />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-[280px]">
-                          <p className="text-xs font-medium mb-1">EBIT contable</p>
-                          <p className="text-xs text-gray-300">Facturado – Costos contables. Visión contable de la rentabilidad según el informe de administración.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 bg-gray-100 text-gray-600 border-gray-300">
-                        Incluye provisiones
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">Resultado después de todos los costos contables</p>
-                    <div className={`text-3xl font-semibold ${
-                      (financial.ebitAccountingUsd || 0) >= 0 ? 'text-blue-800' : 'text-red-700'
-                    }`} data-testid="metric-ebit-contable">
-                      {formatCurrency(financial.ebitAccountingUsd || 0)}
-                      <span className="text-lg font-normal ml-2">
-                        ({formatPct(financial.ebitAccountingPct || 0)})
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">= Facturado – Directos – Overhead – Provisiones</p>
-                  </div>
-                  <div className={`p-3 rounded-full ${
-                    (financial.ebitAccountingUsd || 0) >= 0 ? 'bg-blue-100' : 'bg-red-100'
-                  }`}>
-                    {(financial.ebitAccountingUsd || 0) >= 0 ? (
-                      <ArrowUpRight className="h-6 w-6 text-blue-600" />
-                    ) : (
-                      <ArrowDownRight className="h-6 w-6 text-red-600" />
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 2: COSTOS (col-span-3 x 4) ===== */}
-            
-            {/* Costos Directos */}
-            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-red-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-red-600 uppercase font-medium">Directos</p>
-                    <p className="text-xl font-bold text-red-700" data-testid="metric-direct-costs-fin">
-                      {formatCurrency(financial.directCostsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-red-400">Equipo</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Overhead Operativo */}
-            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-orange-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-orange-600 uppercase font-medium">Overhead</p>
-                    <p className="text-xl font-bold text-orange-700" data-testid="metric-overhead">
-                      {formatCurrency(financial.indirectCostsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-orange-400">Estructura</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Provisiones Contables */}
-            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-purple-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <DollarSign className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-purple-600 uppercase font-medium">Provisiones</p>
-                    <p className="text-xl font-bold text-purple-700" data-testid="metric-provisions">
-                      {formatCurrency(financial.provisionsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-purple-400">Contable</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Burn Rate Total */}
-            <Card className="col-span-6 md:col-span-3 border-0 shadow-md bg-rose-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-rose-100 rounded-lg">
-                    <TrendingDown className="h-5 w-5 text-rose-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-rose-600 uppercase font-medium">Burn Rate</p>
-                    <p className="text-xl font-bold text-rose-700" data-testid="metric-burn-rate">
-                      {formatCurrency(financial.totalCostsUsd || 0)}
-                    </p>
-                    <p className="text-xs text-rose-400">Directos + Overhead + Provisiones</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 3: CASH FLOW (col-span-12) ===== */}
-            
-            {/* Cash Flow Neto */}
-            <Card className={`col-span-12 border-0 shadow-lg ${
-              (financial.cashFlowNetUsd || 0) >= 0 
-                ? 'bg-gradient-to-r from-cyan-50 to-white' 
-                : 'bg-gradient-to-r from-amber-50 to-white'
-            }`}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-full ${
-                      (financial.cashFlowNetUsd || 0) >= 0 ? 'bg-cyan-100' : 'bg-amber-100'
-                    }`}>
-                      <DollarSign className={`h-6 w-6 ${
-                        (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-600' : 'text-amber-600'
-                      }`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium uppercase tracking-wide ${
-                          (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-700' : 'text-amber-700'
-                        }`}>
-                          Cash Flow Neto
-                        </span>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className={`h-4 w-4 ${
-                              (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-400' : 'text-amber-400'
-                            }`} />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-[280px]">
-                            <p className="text-xs font-medium mb-1">Cash Flow Neto</p>
-                            <p className="text-xs text-gray-300">Flujo de caja neto del período desde Resumen Ejecutivo. In/Out son los movimientos detallados de la hoja CashFlow.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <div className={`text-2xl font-bold mt-1 ${
-                        (financial.cashFlowNetUsd || 0) >= 0 ? 'text-cyan-800' : 'text-amber-800'
-                      }`} data-testid="metric-cashflow-net">
-                        {formatCurrency(financial.cashFlowNetUsd || 0)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6 text-sm">
-                    <div className="text-center">
-                      <p className="text-xs text-emerald-600 uppercase font-medium">Ingresos</p>
-                      <p className="text-lg font-semibold text-emerald-700" data-testid="metric-cashflow-in">
-                        {formatCurrency(financial.cashFlowInUsd || 0)}
-                      </p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs text-red-600 uppercase font-medium">Egresos</p>
-                      <p className="text-lg font-semibold text-red-700" data-testid="metric-cashflow-out">
-                        {formatCurrency(financial.cashFlowOutUsd || 0)}
-                      </p>
-                    </div>
-                    <div className="text-center border-l pl-4 border-gray-200">
-                      <p className="text-xs text-gray-500 uppercase font-medium">Caja Total</p>
-                      <p className={`text-lg font-semibold ${
-                        (financial.cajaTotalUsd || 0) >= 0 ? 'text-gray-800' : 'text-amber-700'
-                      }`} data-testid="metric-caja-total">
-                        {formatCurrency(financial.cajaTotalUsd || 0)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ===== FILA 4: CONTEXTO (col-span-6 x 2) ===== */}
-            
-            {/* Personas Activas */}
-            <Card className="col-span-12 md:col-span-6 border-0 shadow-md bg-gray-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-200 rounded-lg">
-                    <Users className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Personas activas</p>
-                    <p className="text-xl font-bold text-gray-800">
-                      {operational.activePeople || 0}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Proyectos Activos */}
-            <Card className="col-span-12 md:col-span-6 border-0 shadow-md bg-gray-50">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-200 rounded-lg">
-                    <Briefcase className="h-5 w-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase">Proyectos activos</p>
-                    <p className="text-xl font-bold text-gray-800">
-                      {operational.activeProjects || 0}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+        {/* ==================== VISTAS ==================== */}
+        {viewMode === 'operativo' && <OperativoView selectedPeriod={selectedPeriod} />}
+        {viewMode === 'economico' && <EconomicoView selectedPeriod={selectedPeriod} />}
+        {viewMode === 'finanzas' && <FinanzasView selectedPeriod={selectedPeriod} />}
 
         {/* Data Freshness Footer */}
         {dashboardMetrics?.dataFreshness?.lastSuccessAt && (
@@ -866,3 +289,4 @@ export default function ExecutiveDashboard() {
     </TooltipProvider>
   );
 }
+

@@ -14784,9 +14784,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== EXECUTIVE ENDPOINTS V1 (Separated by responsibility per spec) =====
   // These endpoints follow the separation of logic principle:
-  // - /api/v1/executive/operativo: Only accesses fact_labor_month, fact_cost_month (direct only), monthly_financial_summary
-  // - /api/v1/executive/financiero: Only accesses fact_cost_month (all buckets), pl_adjustments, monthly_financial_summary
-  // - /api/v1/executive/cashflow: Only accesses cash_movements, monthly_financial_summary
+  // - /api/v1/executive/operativo: Productividad pura (devengado - directos, sin overhead ni provisiones)
+  // - /api/v1/executive/economico: P&L gerencial (devengado - directos - overhead, sin provisiones)
+  // - /api/v1/executive/finanzas: Contable + Caja (facturado - directos - overhead - provisiones + cash)
   
   app.get("/api/v1/executive/operativo", requireAuth, async (req, res) => {
     try {
@@ -14810,9 +14810,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/v1/executive/financiero", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/economico", requireAuth, async (req, res) => {
     try {
-      const { getFinancieroData } = await import('./services/executive-endpoints.js');
+      const { getEconomicoData } = await import('./services/executive-endpoints.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
       
       const period = req.query.period as string;
@@ -14824,17 +14824,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
       
-      const data = await getFinancieroData([periodKey]);
+      const data = await getEconomicoData([periodKey]);
       res.json(data);
     } catch (error) {
-      console.error("❌ Executive Financiero error:", error);
+      console.error("❌ Executive Economico error:", error);
       res.status(500).json({ error: String(error) });
     }
   });
   
-  app.get("/api/v1/executive/cashflow", requireAuth, async (req, res) => {
+  app.get("/api/v1/executive/finanzas", requireAuth, async (req, res) => {
     try {
-      const { getCashflowData } = await import('./services/executive-endpoints.js');
+      const { getFinanzasData } = await import('./services/executive-endpoints.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
       
       const period = req.query.period as string;
@@ -14846,10 +14846,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
       
-      const data = await getCashflowData([periodKey]);
+      const data = await getFinanzasData([periodKey]);
       res.json(data);
     } catch (error) {
-      console.error("❌ Executive Cashflow error:", error);
+      console.error("❌ Executive Finanzas error:", error);
       res.status(500).json({ error: String(error) });
     }
   });
