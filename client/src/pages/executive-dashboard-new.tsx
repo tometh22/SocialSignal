@@ -261,8 +261,8 @@ export default function ExecutiveDashboard() {
             ebitOperativoUsd: financial.ebitOperativoUsd || 0,
             ebitContableUsd: financial.ebitContableUsd || 0,
             cashFlowNetUsd: financial.cashFlowNetUsd || 0,
-            devengadoVariation: financial.devengadoVariation || null,
-            facturadoVariation: financial.facturadoVariation || null,
+            devengadoVariation: financial.devengadoVariation ?? null,
+            facturadoVariation: financial.facturadoVariation ?? null,
           }}
         />
 
