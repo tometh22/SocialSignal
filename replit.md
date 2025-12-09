@@ -76,21 +76,34 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - **Features**: Shows side-by-side comparison of Excel raw values, cost buckets, and app-calculated values
   - **Validation**: Automatic discrepancy detection for Devengado and CashFlow
   - **Formula Differences**: Shows informational differences between app formula and Excel values
-- **Dual-View Dashboard System** *(Updated 2025-12-05)*: Separation of operational and financial perspectives.
-  - **Vista OPERATIVA (Management)**: Muestra productividad pura del equipo
+- **Dual-View Dashboard System V2** *(Updated 2025-12-09)*: Complete separation of operational and financial perspectives with dedicated endpoints.
+  - **API Architecture**: Three separate endpoints with isolated data sources per spec
+    - `/api/v1/executive/operativo`: Only accesses `fact_labor_month`, `fact_cost_month` (direct only), `monthly_financial_summary`
+    - `/api/v1/executive/financiero`: Only accesses `fact_cost_month` (all buckets), `pl_adjustments`, `monthly_financial_summary`
+    - `/api/v1/executive/cashflow`: Only accesses `cash_movements`, `monthly_financial_summary`
+  - **Frontend Components**: `client/src/pages/Executive/Operativo.tsx` and `Financiero.tsx`
+  - **Vista OPERATIVA (Management)**: Productividad pura del equipo
     - `Devengado`: Ingreso devengado del período
     - `Directos`: Solo costos directos (equipo)
-    - `Overhead Operativo`: **0** (explícitamente excluido)
+    - `Overhead Operativo`: **0** (explícitamente excluido, SIEMPRE)
     - `EBIT Operativo = Devengado - Directos` (fórmula pura, SIN overhead ni provisiones)
     - `Margen Operativo = EBIT / Devengado`
     - `Markup = Devengado / Directos`
-  - **Vista FINANCIERA (Contable)**: Muestra resultado contable real
+    - `Tarifa Efectiva = Devengado / Horas Facturables`
+    - Colores: Verde-azul (#C9F0E8 to #E9FFF4)
+  - **Vista FINANCIERA (Contable)**: Resultado contable real
     - `Facturado`: Del Excel MAESTRO
     - `Directos`: Costos directos
     - `Overhead`: Indirectos contables (incluye Impuestos USA)
     - `Provisiones`: Facturación adelantada, impuestos
     - `EBIT Contable = Facturado - Directos - Overhead - Provisiones`
-  - **Verificación Sep 2025**: Operativo EBIT $95,532 (Dev $108,981 - Dir $13,449), Financiero EBIT $70,813 (Excel)
+    - `Burn Rate = Directos + Overhead + Provisiones`
+    - Colores: Lila-rojo (#F4E8FF to #FFEEEE)
+  - **Cashflow View**: Separado para movimientos de caja
+    - `Cash In/Out`: Desde `cash_movements` por tipo IN/OUT
+    - `Cash Flow Neto = In - Out`
+    - `Caja Total`: Snapshot del Excel MAESTRO (nunca calculado)
+  - **Verificación Sep 2025**: Operativo EBIT $95,531.75 (Dev $108,981 - Dir $13,449), Financiero EBIT $49,523.43, Cash Flow Neto -$26,424.05
 
 ### System Design Choices
 - **Unified Data Source**: Centralized data fetching with temporal filtering using a Single Source of Truth (SoT) architecture.
