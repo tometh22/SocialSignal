@@ -19,6 +19,7 @@ import { motion } from "framer-motion";
 type ViewMode = 'operativo' | 'economico' | 'finanzas';
 
 import { OperativoView, EconomicoView, FinanzasView } from '@/components/Executive';
+import { AlertsPanel } from '@/components/Executive/AlertsPanel';
 
 export default function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
@@ -249,30 +250,21 @@ export default function ExecutiveDashboard() {
           />
         )}
 
-        {/* Alerts Bar */}
-        {alerts.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
-            {alerts.slice(0, 3).map((alert: any, idx: number) => (
-              <Link key={idx} href={alert.action || '#'}>
-                <Badge
-                  variant="outline"
-                  className={`whitespace-nowrap cursor-pointer hover:opacity-80 ${
-                    alert.severity === 'warning' || alert.severity === 'urgent'
-                      ? 'border-amber-300 bg-amber-50 text-amber-800'
-                      : 'border-gray-300 bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  {alert.severity === 'warning' || alert.severity === 'urgent' ? (
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                  ) : (
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                  )}
-                  {alert.msg}
-                </Badge>
-              </Link>
-            ))}
-          </div>
-        )}
+        {/* Panel de Alertas Inteligentes */}
+        <AlertsPanel 
+          period={dashboardMetrics?.resolved?.label || formatPeriodLabel(selectedPeriod)}
+          data={{
+            devengadoUsd: financial.devengadoUsd || 0,
+            facturadoUsd: financial.facturadoUsd || 0,
+            directosUsd: financial.directCostsUsd || 0,
+            overheadUsd: financial.overheadUsd || 0,
+            ebitOperativoUsd: financial.ebitOperativoUsd || 0,
+            ebitContableUsd: financial.ebitContableUsd || 0,
+            cashFlowNetUsd: financial.cashFlowNetUsd || 0,
+            devengadoVariation: financial.devengadoVariation || null,
+            facturadoVariation: financial.facturadoVariation || null,
+          }}
+        />
 
         {/* ==================== VISTAS ==================== */}
         {viewMode === 'operativo' && <OperativoView selectedPeriod={selectedPeriod} />}

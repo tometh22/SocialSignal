@@ -127,6 +127,7 @@ function AppRoutes() {
                   {/* Core Application Routes */}
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
+                  <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
                   
                   {/* Quotation Management */}
