@@ -159,8 +159,7 @@ export async function getFinancieroData(periodKeys: string[]): Promise<Financier
   const { rows: [costsData] } = await pool.query(`
     SELECT 
       COALESCE(SUM(direct_usd), 0) as direct_costs_usd,
-      COALESCE(SUM(indirect_usd), 0) as indirect_costs_usd,
-      COALESCE(SUM(COALESCE(provisions_usd, 0)), 0) as provisions_usd
+      COALESCE(SUM(indirect_usd), 0) as indirect_costs_usd
     FROM fact_cost_month
     WHERE period_key = ANY($1)
   `, [periodKeys]);
@@ -176,21 +175,20 @@ export async function getFinancieroData(periodKeys: string[]): Promise<Financier
     FROM active_projects
   `);
   
-  const { rows: [adjustmentsData] } = await pool.query(`
-    SELECT COALESCE(SUM(amount_usd), 0) as total_adjustments
+  const { rows: [provisionesData] } = await pool.query(`
+    SELECT COALESCE(SUM(amount_usd), 0) as provisions_usd
     FROM pl_adjustments
     WHERE period_key = ANY($1)
   `, [periodKeys]);
   
   const directosUsd = parseFloat(costsData?.direct_costs_usd || '0');
   const overheadUsd = parseFloat(costsData?.indirect_costs_usd || '0');
-  const provisionesUsd = parseFloat(costsData?.provisions_usd || '0');
+  const provisionesUsd = parseFloat(provisionesData?.provisions_usd || '0');
   const totalContableUsd = directosUsd + overheadUsd + provisionesUsd;
   const ebitContableUsd = facturadoUsd - totalContableUsd;
   const margenContablePct = facturadoUsd > 0 ? (ebitContableUsd / facturadoUsd) * 100 : 0;
   const burnRateUsd = totalContableUsd;
-  const totalAdjustmentsUsd = parseFloat(adjustmentsData?.total_adjustments || '0');
-  const beneficioNetoUsd = ebitContableUsd - totalAdjustmentsUsd;
+  const beneficioNetoUsd = ebitContableUsd - provisionesUsd;
   
   const [year, month] = lastPeriodKey.split('-').map(Number);
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
