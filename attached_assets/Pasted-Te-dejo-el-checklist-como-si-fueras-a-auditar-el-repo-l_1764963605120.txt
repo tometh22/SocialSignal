@@ -1,0 +1,308 @@
+Te dejo el checklist como si fueras a auditar el repo línea por línea.
+La idea: si todo esto se cumple, el tablero está sano.
+
+1. Esquema de base de datos
+Tabla monthly_financial_summary
+
+Campos mínimos que deben existir y usarse:
+
+period_key (TEXT o VARCHAR, formato YYYY-MM)
+
+facturacion_total (NUMERIC) → “Ventas del mes / Facturado”
+
+pasivo_facturacion_adelantada (NUMERIC) → “Provisión Pasivo Costos Facturación Adelantada”
+
+costos_directos (NUMERIC) → equipo del período
+
+costos_indirectos (NUMERIC) → overhead estructural
+
+provisiones_contables (NUMERIC) → provisiones varias (Pepsico, Warner, impuestos, etc.)
+
+cashflow_neto (NUMERIC)
+
+ingresos_cashflow (NUMERIC)
+
+egresos_cashflow (NUMERIC)
+
+personas_activas (INTEGER)
+
+proyectos_activos (INTEGER)
+
+horas_trabajadas (NUMERIC)
+
+horas_facturables (NUMERIC)
+
+etld_at (timestamp de última actualización)
+
+Verificar:
+
+Columna pasivo_facturacion_adelantada creada (ALTER TABLE ... ADD COLUMN IF NOT EXISTS).
+
+No hay duplicados de period_key.
+
+Todos los meses que existen en el Excel master tienen fila en esta tabla.
+
+2. ETL desde el Excel MAESTRO
+
+Archivo: algo tipo server/etl/sot-etl.ts o similar.
+
+Para cada pestaña del Excel:
+
+Resumen Ejecutivo
+
+Lee:
+
+Ventas del mes → facturacion_total
+
+EBIT Utilidad operativa → (opcional, solo para debug)
+
+Beneficio neto, Margen neto, etc. → opcionales
+
+Cashflow → cashflow_neto
+
+Ingresos reales → ingresos_cashflow
+
+Egresos reales → egresos_cashflow
+
+Cuentas a cobrar → campo de cuentas a cobrar (si lo guardás)
+
+Cuentas a pagar → idem
+
+Lee Provisión Pasivo Costos Facturación Adelantada
+→ mapea directo a pasivo_facturacion_adelantada.
+
+Costos directos e indirectos
+
+Suma “Directos reales” del mes → costos_directos.
+
+Suma “Indirectos reales” del mes → costos_indirectos.
+
+Provisión pasivo proyectos / Impuestos
+
+Suma provisiones del mes → provisiones_contables.
+
+CashFlow
+
+Usa el subtotal del mes para cashflow_neto, ingresos_cashflow, egresos_cashflow.
+
+Horas / Costos equipo (Looker viejo / Asana)
+
+Total horas del mes → horas_trabajadas.
+
+Total horas facturables → horas_facturables.
+
+Personas con horas > 0 → personas_activas.
+
+Proyectos activos
+
+Cuenta proyectos con horas o devengado > 0 → proyectos_activos.
+
+Verificar:
+
+ETL siempre calcula period_key a partir de año+mes del Excel y hace UPSERT (INSERT ON CONFLICT).
+
+No hay hardcodes de mes; todo viene del Excel y la fecha.
+
+Logs muestran claramente: period_key, facturado, provisión, devengado calculado.
+
+3. Servicio devengado.ts (operativo)
+
+Archivo: server/services/devengado.ts o similar.
+
+Debe existir una función del tipo:
+
+function getDevengadoSimple(summary: MonthlyFinancialSummary) {
+  const devengadoUsd =
+    summary.facturacion_total - (summary.pasivo_facturacion_adelantada || 0);
+
+  const ebitOperativoUsd = devengadoUsd - (summary.costos_directos || 0);
+
+  const tarifaEfectivaUsd =
+    summary.horas_facturables && summary.horas_facturables > 0
+      ? devengadoUsd / summary.horas_facturables
+      : 0;
+
+  const markupOperativo =
+    summary.costos_directos && summary.costos_directos > 0
+      ? devengadoUsd / summary.costos_directos
+      : 0;
+
+  return {
+    devengadoUsd,
+    ebitOperativeUsd,
+    tarifaEfectivaUsd,
+    markupOperativo,
+  };
+}
+
+
+Verificar:
+
+No hay lógica de devengado por proyecto mezclada en este cálculo “simple” de resumen mensual.
+
+Las provisiones contables NO se restan en el EBIT operativo. Solo costos_directos.
+
+Overhead solo se usa para mostrar composición de costos, no para devengado.
+
+4. Servicio de métricas del dashboard
+
+Endpoint tipo: GET /api/dashboard/metrics?month=9&year=2025.
+
+En el handler:
+
+Construye period_key = "${year}-${padMonth(month)}".
+
+Consulta monthly_financial_summary por period_key.
+
+Con esa fila arma dos bloques:
+
+const financial = {
+  facturadoUsd: summary.facturacion_total,
+  directosUsd: summary.costos_directos,
+  overheadUsd: summary.costos_indirectos,
+  provisionesUsd: summary.provisiones_contables,
+  ebitContableUsd:
+    summary.facturacion_total -
+    summary.costos_directos -
+    summary.costos_indirectos -
+    (summary.provisiones_contables || 0),
+  burnRateUsd:
+    summary.costos_directos +
+    summary.costos_indirectos +
+    (summary.provisiones_contables || 0),
+  cashflowNetoUsd: summary.cashflow_neto,
+  ingresosCashflowUsd: summary.ingresos_cashflow,
+  egresosCashflowUsd: summary.egresos_cashflow,
+};
+
+const operationalDev = getDevengadoSimple(summary);
+
+const operational = {
+  devengadoUsd: operationalDev.devengadoUsd,
+  ebitOperativeUsd: operationalDev.ebitOperativeUsd,
+  tarifaEfectivaUsd: operationalDev.tarifaEfectivaUsd,
+  markupOperativo: operationalDev.markupOperativo,
+  horasTrabajadas: summary.horas_trabajadas,
+  horasFacturables: summary.horas_facturables,
+  porcentajeFacturables:
+    summary.horas_trabajadas && summary.horas_trabajadas > 0
+      ? (summary.horas_facturables / summary.horas_trabajadas) * 100
+      : 0,
+  personasActivas: summary.personas_activas,
+  proyectosActivos: summary.proyectos_activos,
+  costosDirectosUsd: summary.costos_directos,
+  overheadOperativoUsd: summary.costos_indirectos,
+  totalOperativoUsd:
+    summary.costos_directos + summary.costos_indirectos,
+};
+
+
+Verificar:
+
+Nada de esto está hardcodeado por mes.
+
+Las fórmulas del bloque financial y operational son las mismas para todos los meses.
+
+Devuelve un JSON con estructura clara { financial, operational, meta }.
+
+5. Frontend — pestaña Operativa
+
+Toggle “Operativo / Financiero” solo cambia qué bloque usa, no recalcula nada.
+
+Pestaña Operativo:
+
+Card 1: “INGRESO DEVENGADO”
+
+Valor: operational.devengadoUsd
+
+Subtexto: Facturado en el período: {financial.facturadoUsd}
+
+Card 2: “EBIT OPERATIVO”
+
+Valor: operational.ebitOperativeUsd
+
+Subtexto: = Devengado – Costos directos (sin overhead ni provisiones)
+
+Tarifa efectiva: operational.tarifaEfectivaUsd con /h
+
+Markup operativo: operational.markupOperativo con sufijo x
+
+% Horas facturables: operational.porcentajeFacturables
+
+Horas, personas activas, proyectos activos según operational.
+
+Gráfico de composición de costos:
+
+Directos = operational.costosDirectosUsd
+
+Overhead operativo = operational.overheadOperativoUsd
+
+Total operativo = operational.totalOperativoUsd
+
+Texto claro: “Sin provisiones contables”.
+
+Verificar:
+
+Ninguna card operativa usa provisionesUsd ni burnRateUsd.
+
+Label de Devengado habla de “Trabajo realizado en el período”, no de caja.
+
+6. Frontend — pestaña Financiera
+
+Pestaña Financiero:
+
+Card “FACTURADO”: financial.facturadoUsd
+
+Card “EBIT CONTABLE (Incluye provisiones)”: financial.ebitContableUsd
+
+Card “DIRECTOS”: financial.directosUsd
+
+Card “OVERHEAD”: financial.overheadUsd
+
+Card “PROVISIONES”: financial.provisionesUsd
+
+Card “BURN RATE”: financial.burnRateUsd
+
+Card “CASH FLOW NETO”: financial.cashflowNetoUsd
+
+Mini cards Ingresos/Egresos/Caja Total:
+
+Ingresos = financial.ingresosCashflowUsd
+
+Egresos = financial.egresosCashflowUsd
+
+Caja Total = monthly_financial_summary.activo_liquido o el campo que corresponda si lo traés.
+
+Verificar:
+
+Tooltips explican fórmulas (EBIT contable = Facturado – Directos – Overhead – Provisiones).
+
+Burn rate se define explícito en el subtítulo.
+
+7. Comportamiento multi-mes (generalización)
+
+Filtro de fecha en el frontend siempre llama al mismo endpoint con month, year.
+
+No hay condiciones tipo if (month === 10) { ... } en backend.
+
+Provisión adelantada puede ser 0 sin romper nada (caso sep).
+
+Si un mes nuevo aparece en el Excel, al correr el ETL debe aparecer automáticamente en la app sin tocar nada de código.
+
+8. Validaciones rápidas que podés hacer ahora
+
+Para 3 meses (ejemplo 2025-08, 2025-09, 2025-10):
+
+curl /api/dashboard/metrics?... y revisar:
+
+financial.facturadoUsd = “Ventas del mes” del Excel.
+
+financial.ebitContableUsd = Facturado – Directos – Overhead – Provisiones (coincide con Looker).
+
+operational.devengadoUsd = Facturado – Pasivo_facturacion_adelantada.
+
+operational.ebitOperativeUsd = Devengado – Directos.
+
+Mismos valores se ven en las cards del dashboard sin transformación adicional en el frontend (solo formateo).
+
+Si todo lo anterior se cumple, el código está conceptualmente alineado con el Excel MAESTRO y es estable para cualquier mes.
