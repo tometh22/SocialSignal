@@ -1,0 +1,232 @@
+o que tenés hoy funciona, pero la UX/UI está cargada, repetitiva y no guía la lectura. No aprovecha la pirámide invertida y mezcla niveles de análisis visualmente iguales.
+
+PROBLEMA CENTRAL
+
+Tus dashboards muestran las mismas piezas visuales en las 3 pestañas aunque representan lógicas distintas.
+Esto genera:
+
+– ruido
+– fatiga visual
+– decisiones lentas
+– confusión entre EBIT operativo/ económico / contable
+– alertas que no indican prioridad real
+– demasiadas cards iguales sin jerarquía
+
+SOLUCIÓN ESTRUCTURAL
+
+Usar pirámide invertida + jerarquía visual + reducción de ruido.
+
+A continuación la guía exacta para mejorar cada vista.
+
+1) VISTA OPERATIVA (lo táctico)
+
+Objetivo: productividad, horas, eficiencia, markup, devengado.
+
+Cambios UX/UI
+
+KPIs principales arriba (2 máximo):
+– Devengado
+– EBIT Operativo
+
+Debajo, drivers secundarios:
+– Tarifa efectiva
+– Markup operativo
+– % facturable
+– Horas trabajadas
+– Personas activas
+
+Eliminar overhead y provisiones de esta vista.
+
+Alertas operativas separadas visualmente:
+– “Hay X horas cargadas sin revenue asociado”
+– “Hay proyectos sin actividad”
+
+Gráfico pequeño:
+– Horas devengadas vs horas no facturables
+– Markup histórico
+
+Colorimetría limpia:
+– Verde = productividad
+– Gris = neutro
+– Nada rojo en esta vista (el rojo es contable/finanzas)
+
+2) VISTA ECONÓMICA (lo real del mes)
+
+Objetivo: rentabilidad operativa real (devengado – directos – overhead).
+
+Cambios UX/UI
+
+KPIs principales arriba:
+– Devengado
+– EBIT Económico
+
+Drivers debajo:
+– Directos
+– Overhead
+– Margen económico
+
+Sacar Cash In / Cash Out / Caja de esta vista.
+Eso es Finanzas.
+
+Colores:
+– Rojo suave para pérdidas
+– Azul para neutros
+– Nada verde (el verde es caja / eficiencia)
+
+Gráfico recomendado:
+– Devengado vs Costos Totales Económicos del mes
+– Margen por mes (trend line)
+
+3) VISTA FINANZAS (flujo real + contable)
+
+Objetivo: plata real, runway, provisiones, facturado, patrimonio.
+
+Cambios UX/UI
+
+KPIs principales arriba:
+– Facturado
+– EBIT Contable
+– Cash Flow Neto
+
+Segunda fila:
+– Directos
+– Overhead
+– Provisiones
+– Burn Rate
+
+Tercera fila:
+– Cash In / Cash Out
+– Caja Total
+– Activo / Pasivo / Patrimonio
+– Runway
+
+Alertas financieras claras:
+– “Runway inferior a X meses”
+– “Caja negativa respecto al mes anterior”
+
+Colores:
+– Verde para caja
+– Rojo fuerte para EBIT contable y burn rate
+– Amarillo para provisiones
+
+Gráfico financiero recomendado:
+– Evolución de EBIT contable
+– Evolución de Cash Flow Neto
+– Runway mensual
+
+4) Cambios transversales a las 3 vistas (muy importantes)
+A. Reducir cards: menos cajas, más orden
+
+Hoy tenés demasiadas cards del mismo tamaño → el ojo no sabe qué es clave.
+
+Solución:
+– KPIs grandes (dos o tres)
+– Drivers medianos
+– Detalles chicos (o escondidos)
+
+B. Separar visualmente cada vista
+
+El usuario debe sentir que cambió de “modo”:
+
+Operativo → verde
+Económico → azul
+Finanzas → violeta
+
+(Colores suaves, no saturados)
+
+C. Mantener las fórmulas visibles
+
+Agregar tooltip en cada métrica:
+– “Cómo se calcula”
+– “Fuente de datos”
+– “Qué significa”
+
+D. Alertas más inteligentes
+
+No repetir la misma en las tres vistas.
+
+5) LA GUÍA EXACTA PARA REPLIT (esto es lo que necesitás para tus devs)
+FRONTEND
+
+Crear componentes KPI–Tier1, Tier2, Tier3
+– Tier1: grande, bold, color
+– Tier2: mediano, grey
+– Tier3: pequeño
+
+Layout distinto por pestaña
+/views/operativo/index.tsx
+/views/economico/index.tsx
+/views/finanzas/index.tsx
+
+Alert system refactor
+– Alerts only per view
+– Color-coded by category
+
+Remove repeated cards
+– No repetir Directos en 3 vistas
+– No repetir overhead en operativo
+
+Tooltip engine mejorado
+– Unified tooltip component
+
+BACKEND
+
+Crear 3 endpoints separados según criterio
+
+/metrics/operativo
+
+/metrics/economico
+
+/metrics/finanzas
+
+Cada endpoint con sus propias fórmulas
+Ya te las dejé antes, pero acá están limpias:
+
+Operativo
+devengado = facturado - provision_fact_adelantada
+directos = SUM(direct_usd)
+ebit_operativo = devengado - directos
+markup = devengado / directos
+tarifa = devengado / horas_facturables
+%facturable = horas_facturables / horas_totales
+
+Económico
+devengado
+directos
+overhead
+ebit_economico = devengado - directos - overhead
+margen_economico = ebit_economico / devengado
+
+Finanzas
+facturado
+directos
+overhead
+provisiones
+ebit_contable = facturado - directos - overhead - provisiones
+
+cash_in = SUM(IN)
+cash_out = SUM(OUT)
+cash_flow_neto = cash_in - cash_out
+
+burn_rate = directos + overhead + provisiones
+runway = caja_total / burn_rate
+
+
+Normalizar los nombres de columnas
+– Harmonizar direct_usd, indirect_usd, provisions_usd
+– Asegurar que devengado se calcule igual en todas las vistas
+
+Logging de fórmulas
+– Cada métrica devuelve también su cálculo interno en JSON para debugging
+
+6) Resultado esperado
+
+Un dashboard:
+
+– más claro
+– más intuitivo
+– más profesional
+– más “VC-ready”
+– más rápido para tomar decisiones
+– sin confusión de criterios
+– con consistencia total entre vistas
