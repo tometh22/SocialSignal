@@ -14782,6 +14782,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== EXECUTIVE ENDPOINTS V1 (Separated by responsibility per spec) =====
+  // These endpoints follow the separation of logic principle:
+  // - /api/v1/executive/operativo: Only accesses fact_labor_month, fact_cost_month (direct only), monthly_financial_summary
+  // - /api/v1/executive/financiero: Only accesses fact_cost_month (all buckets), pl_adjustments, monthly_financial_summary
+  // - /api/v1/executive/cashflow: Only accesses cash_movements, monthly_financial_summary
+  
+  app.get("/api/v1/executive/operativo", requireAuth, async (req, res) => {
+    try {
+      const { getOperativoData } = await import('./services/executive-endpoints.js');
+      const { getDefaultPeriod } = await import('./services/period-resolver.js');
+      
+      const period = req.query.period as string;
+      let periodKey: string;
+      
+      if (period && /^\d{4}-\d{2}$/.test(period)) {
+        periodKey = period;
+      } else {
+        periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      const data = await getOperativoData([periodKey]);
+      res.json(data);
+    } catch (error) {
+      console.error("❌ Executive Operativo error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get("/api/v1/executive/financiero", requireAuth, async (req, res) => {
+    try {
+      const { getFinancieroData } = await import('./services/executive-endpoints.js');
+      const { getDefaultPeriod } = await import('./services/period-resolver.js');
+      
+      const period = req.query.period as string;
+      let periodKey: string;
+      
+      if (period && /^\d{4}-\d{2}$/.test(period)) {
+        periodKey = period;
+      } else {
+        periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      const data = await getFinancieroData([periodKey]);
+      res.json(data);
+    } catch (error) {
+      console.error("❌ Executive Financiero error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+  
+  app.get("/api/v1/executive/cashflow", requireAuth, async (req, res) => {
+    try {
+      const { getCashflowData } = await import('./services/executive-endpoints.js');
+      const { getDefaultPeriod } = await import('./services/period-resolver.js');
+      
+      const period = req.query.period as string;
+      let periodKey: string;
+      
+      if (period && /^\d{4}-\d{2}$/.test(period)) {
+        periodKey = period;
+      } else {
+        periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      }
+      
+      const data = await getCashflowData([periodKey]);
+      res.json(data);
+    } catch (error) {
+      console.error("❌ Executive Cashflow error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // DEBUG: Ver datos raw de Google Sheets para Warner
   app.get("/api/debug/sheets-warner", async (req, res) => {
     try {

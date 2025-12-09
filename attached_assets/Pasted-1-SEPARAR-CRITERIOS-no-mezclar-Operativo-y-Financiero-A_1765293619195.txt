@@ -1,0 +1,161 @@
+1. SEPARAR CRITERIOS (no mezclar Operativo y Financiero)
+
+Acciones técnicas:
+
+Mantener dos vistas distintas:
+– /executive?mode=operativo
+– /executive?mode=financiero
+
+Cada vista debe cargar solo sus propios KPIs y solo sus propias fuentes.
+No compartir queries entre vistas.
+
+Agregar en la cabecera un label fijo:
+– Operativo = “Métricas económicas reales basadas en devengado y costos directos.”
+– Financiero = “Métricas contables completas con overhead, provisiones e impuestos.”
+
+En cada tarjeta, agregar un tooltip fijo con la fórmula usada.
+Esto previene interpretaciones erróneas.
+
+2. ESTRUCTURAR LA VISTA OPERATIVA (orden y jerarquía)
+
+Orden correcto de tarjetas:
+
+Ingreso devengado (big card)
+
+EBIT operativo (big card)
+
+Tarifa efectiva
+
+Markup operativo
+
+% horas facturables
+
+Horas trabajadas
+
+Personas activas
+
+Proyectos activos
+
+Composición de costos operativos (gráfico)
+
+Reglas:
+– No mostrar overhead en esta vista.
+– No mostrar provisiones.
+– No mostrar burn rate.
+– Mantener el costo directo como única categoría.
+
+Fórmulas obligatorias (congelarlas):
+– Devengado = facturado – provisión_adelantada
+– EBIT operativo = devengado – directos
+– Markup = devengado / directos
+– Tarifa = devengado / horas_facturables
+
+3. ESTRUCTURAR LA VISTA FINANCIERA (orden correcto)
+
+Facturado (big card)
+
+EBIT contable (big card)
+
+Directos
+
+Overhead
+
+Provisiones
+
+Burn rate
+
+Ingresos / Egresos / Caja total
+
+Personas activas
+
+Proyectos activos
+
+Reglas:
+– Burn rate obligatorio = directos + overhead + provisiones.
+– Caja total debe venir del snapshot maestro, nunca de cashflow acumulado.
+– No mezclar devengado en esta vista.
+
+4. ALERTAS Y NOTIFICACIONES
+
+Reglas:
+
+– La alerta “costos contables altos” solo se muestra en la vista Financiera.
+– Nunca en Operativo.
+– El porcentaje debe calcularse contra 3 meses previos solo contables.
+
+5. DISEÑO (UI) — CAMBIOS SEGUROS
+
+Colores fijos por vista:
+– Operativo: verde/azul suave
+– Financiero: púrpura/rojo suave
+Esto evita confusión mental.
+
+Tamaño de tarjetas:
+– Big cards: Devengado/Facturado y EBIT deberán ser 2× más grandes.
+– Mantener al resto en tarjetas medianas.
+
+Evitar movimientos de layout:
+– Mantener el mismo grid en ambas vistas.
+– Solo cambian los contenidos, no la estructura.
+
+Tipografía y pesos:
+– Números principales: semibold 28–32px
+– Subtítulos: regular 14px
+– Descripciones: regular 12px
+
+Gráfico de costos:
+– Mantenerlo al final
+– Reduce altura 30%
+– No bloquear scroll
+
+6. TOOLTIP OBLIGATORIO CON FÓRMULA
+
+Cada tarjeta lleva tooltip con:
+
+Nombre métrica
+
+Fórmula exacta
+
+Fuente de datos
+
+Notas clave (ej: “sin overhead ni provisiones”)
+
+Esto evita que tu equipo vuelva a hacer interpretaciones diferentes.
+
+7. QUÉ NO TOCAR (para evitar romper)
+
+No cambiar las queries SQL/Drizzle base.
+
+No modificar las tablas fact_cost_month, fact_rc_month, fact_labor_month, cash_movements.
+
+No alterar la lógica de provisiones o overhead en la BD.
+
+No unificar devengado con facturado.
+
+No mezclar costos contables con costos operativos.
+
+No tocar el cálculo actual de caja total (snapshot maestro).
+
+8. TEST EOS (End-of-Sprint)
+
+Checklist para validar:
+
+Operativo
+– No aparece overhead
+– No aparece provisiones
+– No aparece burn rate
+– Devengado ≠ facturado
+– EBIT operativo siempre positivo si markup>1
+
+Financiero
+– Devengado nunca aparece
+– Overhead y provisiones presentes
+– Burn rate correcto
+– EBIT contable coincide con fórmula contable
+– Caja total coincide con Excel maestro
+
+Ambas
+– Layout idéntico
+– Tooltips activos
+– Alertas correctas
+– Números coherentes mes a mes
