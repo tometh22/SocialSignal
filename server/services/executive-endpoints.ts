@@ -7,12 +7,16 @@ export interface OperativoData {
   periodKey: string;
   label: string;
   devengadoUsd: number;
+  devengadoVariation: number | null;
   directosUsd: number;
+  directosVariation: number | null;
   overheadOperativoUsd: 0;
   ebitOperativoUsd: number;
+  ebitVariation: number | null;
   margenOperativoPct: number;
   markupOperativo: number;
   tarifaEfectivaUsd: number;
+  tarifaVariation: number | null;
   horasFacturablesPct: number;
   horasTrabajadas: number;
   personasActivas: number;
@@ -34,9 +38,13 @@ export interface EconomicoData {
   periodKey: string;
   label: string;
   devengadoUsd: number;
+  devengadoVariation: number | null;
   directosUsd: number;
+  directosVariation: number | null;
   overheadUsd: number;
+  overheadVariation: number | null;
   ebitEconomicoUsd: number;
+  ebitVariation: number | null;
   margenEconomicoPct: number;
   personasActivas: number;
   proyectosActivos: number;
@@ -55,17 +63,20 @@ export interface FinanzasData {
   periodKey: string;
   label: string;
   facturadoUsd: number;
+  facturadoVariation: number | null;
   directosUsd: number;
   overheadUsd: number;
   provisionesUsd: number;
   totalContableUsd: number;
   ebitContableUsd: number;
+  ebitVariation: number | null;
   margenContablePct: number;
   burnRateUsd: number;
   beneficioNetoUsd: number;
   cashInUsd: number;
   cashOutUsd: number;
   cashFlowNetoUsd: number;
+  cashFlowVariation: number | null;
   cajaTotalUsd: number;
   runwayMeses: number;
   activoTotalUsd: number;
@@ -154,12 +165,16 @@ export async function getOperativoData(periodKeys: string[]): Promise<OperativoD
     periodKey: lastPeriodKey,
     label,
     devengadoUsd,
+    devengadoVariation: null,
     directosUsd,
+    directosVariation: null,
     overheadOperativoUsd: 0,
     ebitOperativoUsd,
+    ebitVariation: null,
     margenOperativoPct,
     markupOperativo,
     tarifaEfectivaUsd,
+    tarifaVariation: null,
     horasFacturablesPct,
     horasTrabajadas: totalHours,
     personasActivas: parseInt(hoursData?.people_active || '0'),
@@ -217,9 +232,13 @@ export async function getEconomicoData(periodKeys: string[]): Promise<EconomicoD
     periodKey: lastPeriodKey,
     label,
     devengadoUsd,
+    devengadoVariation: null,
     directosUsd,
+    directosVariation: null,
     overheadUsd,
+    overheadVariation: null,
     ebitEconomicoUsd,
+    ebitVariation: null,
     margenEconomicoPct,
     personasActivas: parseInt(hoursData?.people_active || '0'),
     proyectosActivos: parseInt(projectsData?.active || '0'),
@@ -306,17 +325,20 @@ export async function getFinanzasData(periodKeys: string[]): Promise<FinanzasDat
     periodKey: lastPeriodKey,
     label,
     facturadoUsd,
+    facturadoVariation: null,
     directosUsd,
     overheadUsd,
     provisionesUsd,
     totalContableUsd,
     ebitContableUsd,
+    ebitVariation: null,
     margenContablePct,
     burnRateUsd,
     beneficioNetoUsd,
     cashInUsd,
     cashOutUsd,
     cashFlowNetoUsd,
+    cashFlowVariation: null,
     cajaTotalUsd,
     runwayMeses,
     activoTotalUsd,

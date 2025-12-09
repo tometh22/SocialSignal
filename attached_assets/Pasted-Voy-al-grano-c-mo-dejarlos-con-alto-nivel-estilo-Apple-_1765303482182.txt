@@ -1,0 +1,172 @@
+Voy al grano: cómo dejarlos con alto nivel, estilo Apple/Notion/Stripe.
+
+1. Problema actual (síntesis dura)
+
+1. Demasiado espacio vacío → sensación de producto incompleto.
+2. Cards aisladas sin una narrativa visual clara.
+3. Falta estructura en 3 niveles (headline → explicadores → detalles).
+4. Los números están bien pero no “enseñan” nada al usuario.
+5. Los disclaimers están abajo donde nadie los ve.
+6. Los colores no guían la lectura.
+
+Nada grave. Se arregla.
+
+2. Cómo deberían verse (estándar SaaS nivel alto)
+
+Cada pestaña debe tener:
+
+Nivel 1 — Macro KPI (máximo 3 KPI grandes)
+
+Ocupa todo el ancho. Fondo suave, icono, variación porcentual.
+
+Operativo → Devengado, EBIT Operativo
+Económico → EBIT Económico
+Finanzas → Facturado, EBIT Contable, Cash Flow Neto
+
+Nivel 2 — Drivers
+
+Debajo, 4–6 tarjetas pequeñas explicando por qué pasó el KPI:
+
+Operativo → tarifa efectiva, markup, horas, % facturable, directos
+Económico → devengado, directos, overhead, margen
+Finanzas → directos, overhead, provisiones, burn rate
+
+Nivel 3 — Estabilidad financiera (solo en Finanzas)
+
+Caja, Runway, Activo, Patrimonio.
+
+Nivel 4 — Notificaciones inteligentes
+
+Arriba del todo, no abajo:
+– “3 proyectos sin actividad…”
+– “Costos del mes 48% más altos que el promedio…”
+
+Estas alertas valen oro para vos como CEO.
+
+3. Cómo dejarlos PRO (cambios concretos)
+
+Voy por pestaña.
+
+PESTAÑA OPERATIVO — Corrección UX/UI
+Problemas:
+
+– Demasiado aire.
+– KPIs importantes no destacan.
+– No hay storytelling de productividad.
+
+Cambios:
+
+KPI grande: Devengado + EBIT Operativo en una fila completa.
+
+Indicador de variación (+17%, –9%) siempre visible.
+
+Cards de drivers en dos filas, no una sola línea perdida.
+
+Usar colores funcionales:
+– Verde → productividad alta
+– Amarillo → desvío
+– Rojo → baja productividad
+
+Agregar microtexto: “No incluye overhead ni provisiones”.
+Esto da claridad sin empobrecer la card.
+
+Border + shadow suave tipo Apple.
+
+PESTAÑA ECONÓMICO — Corrección UX/UI
+Problemas:
+
+– Se ve demasiado parecida a Operativo.
+– No se siente “EBIT real”.
+
+Cambios:
+
+Headline único: EBIT Económico en card XL.
+
+Color neutro-azul, no verde/rojo.
+Es análisis interno, no contable.
+
+Agregar variación mes vs mes.
+
+Bajo el KPI, fila: Devengado – Directos – Overhead – Margen.
+
+PESTAÑA FINANZAS — Corrección UX/UI
+Problemas:
+
+– Ahora sí se ve pobre.
+– La parte más importante de la empresa (caja) no tiene jerarquía visual.
+– Patrimonio / Activo / Runway se ven como cards sueltas.
+
+Cambios:
+
+Tres grandes KPIs arriba:
+– Facturado
+– EBIT Contable
+– Cash Flow Neto
+
+Debajo, drivers contables:
+– Directos
+– Overhead
+– Provisiones
+– Burn Rate
+
+Agregar módulo destacado tipo Stripe:
+– Caja Total
+– Runway
+
+Abajo de todo, sección “Estructura Financiera”:
+– Activo
+– Pasivo
+– Patrimonio
+– Activo corriente (si lo agregás después)
+
+El resultado queda como un dashboard financiero de empresa real.
+
+4. Cambios UI generales (rápidos)
+Tipografías
+
+– Usa Inter 500 para títulos,
+– Inter 400 para valores,
+– Inter 300 para microtextos.
+
+Sombras
+
+– shadow-sm o shadow-md muy suave.
+– No borders duros.
+
+Gradientes
+
+– Operativo → verde suave
+– Económico → azul suave
+– Finanzas → violeta/lila suave
+
+Esto genera identidad visual por pestaña.
+
+5. ¿Quedaron pobres?
+
+Sí.
+Porque ahora muestran solo KPIs crudos, sin:
+
+– jerarquía
+– diseño
+– narrativa
+– contexto
+– microcopys
+– variaciones
+– alertas
+– agrupamientos
+– density balance
+
+Son dashboards “limpios” pero no “profesionales”.
+
+6. ¿Querés que te arme el diseño final exacto (layout completo), con colores, espaciados y componentes shadcn/ui?
+
+Te lo hago con precisión de Product Designer Senior, para copiar y pegar en el frontend.
+
+Puedo preparar:
+
+– Wireframe
+– UI avanzada
+– Componentes
+– Código React/Next + Tailwind listo para pegar
+
+¿Querés la versión PRO exacta de las tres pestañas?
