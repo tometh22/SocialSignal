@@ -5,6 +5,8 @@ import {
   TrendingUp, ArrowUpRight, ArrowDownRight, Info, Users, Briefcase, RefreshCw
 } from "lucide-react";
 import { motion } from "framer-motion";
+import AlertsBanner from "./AlertsBanner";
+import { Sparkline } from "./KpiCard";
 
 interface EconomicoViewProps {
   selectedPeriod: string;
@@ -60,6 +62,8 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
   }
 
   const ec = data || {};
+  const alerts = ec.alerts || [];
+  const trends = ec.trends || {};
 
   return (
     <motion.div
@@ -68,6 +72,9 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
       transition={{ duration: 0.25 }}
       className="space-y-5"
     >
+      {/* ALERTAS ECONÓMICAS */}
+      <AlertsBanner alerts={alerts} viewName="Vista Económica" />
+
       {/* NIVEL 1: MACRO KPI — EBIT Económico (único protagonista) */}
       <Card className={`border-0 shadow-md hover:shadow-lg transition-shadow ${
         (ec.ebitEconomicoUsd || 0) >= 0 

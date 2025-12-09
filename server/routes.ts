@@ -14791,6 +14791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/v1/executive/operativo", requireAuth, async (req, res) => {
     try {
       const { getOperativoData } = await import('./services/executive-endpoints.js');
+      const { getOperativoTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
       
       const period = req.query.period as string;
@@ -14802,8 +14803,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
       
-      const data = await getOperativoData([periodKey]);
-      res.json(data);
+      const [metrics, analytics] = await Promise.all([
+        getOperativoData([periodKey]),
+        getOperativoTrendsAndDiffs(periodKey)
+      ]);
+      
+      res.json({
+        ...metrics,
+        devengadoVariation: analytics.diffs.devengado.vsPrevMonth,
+        ebitVariation: analytics.diffs.ebitOperativo.vsPrevMonth,
+        tarifaVariation: analytics.diffs.tarifaEfectiva.vsPrevMonth,
+        trends: analytics.trends,
+        diffs: analytics.diffs,
+        alerts: analytics.alerts,
+        breakdowns: analytics.breakdowns
+      });
     } catch (error) {
       console.error("❌ Executive Operativo error:", error);
       res.status(500).json({ error: String(error) });
@@ -14813,6 +14827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/v1/executive/economico", requireAuth, async (req, res) => {
     try {
       const { getEconomicoData } = await import('./services/executive-endpoints.js');
+      const { getEconomicoTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
       
       const period = req.query.period as string;
@@ -14824,8 +14839,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
       
-      const data = await getEconomicoData([periodKey]);
-      res.json(data);
+      const [metrics, analytics] = await Promise.all([
+        getEconomicoData([periodKey]),
+        getEconomicoTrendsAndDiffs(periodKey)
+      ]);
+      
+      res.json({
+        ...metrics,
+        devengadoVariation: analytics.diffs.devengado.vsPrevMonth,
+        ebitVariation: analytics.diffs.ebitEconomico.vsPrevMonth,
+        overheadVariation: analytics.diffs.overhead.vsPrevMonth,
+        trends: analytics.trends,
+        diffs: analytics.diffs,
+        alerts: analytics.alerts,
+        breakdowns: analytics.breakdowns
+      });
     } catch (error) {
       console.error("❌ Executive Economico error:", error);
       res.status(500).json({ error: String(error) });
@@ -14835,6 +14863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/v1/executive/finanzas", requireAuth, async (req, res) => {
     try {
       const { getFinanzasData } = await import('./services/executive-endpoints.js');
+      const { getFinanzasTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
       
       const period = req.query.period as string;
@@ -14846,8 +14875,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
       
-      const data = await getFinanzasData([periodKey]);
-      res.json(data);
+      const [metrics, analytics] = await Promise.all([
+        getFinanzasData([periodKey]),
+        getFinanzasTrendsAndDiffs(periodKey)
+      ]);
+      
+      res.json({
+        ...metrics,
+        facturadoVariation: analytics.diffs.facturado.vsPrevMonth,
+        ebitVariation: analytics.diffs.ebitContable.vsPrevMonth,
+        cashFlowVariation: analytics.diffs.cashFlowNeto.vsPrevMonth,
+        trends: analytics.trends,
+        diffs: analytics.diffs,
+        alerts: analytics.alerts
+      });
     } catch (error) {
       console.error("❌ Executive Finanzas error:", error);
       res.status(500).json({ error: String(error) });

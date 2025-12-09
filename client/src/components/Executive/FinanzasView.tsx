@@ -6,6 +6,8 @@ import {
   Wallet, PiggyBank, Building2, RefreshCw, ArrowDown, ArrowUp, Activity, Timer
 } from "lucide-react";
 import { motion } from "framer-motion";
+import AlertsBanner from "./AlertsBanner";
+import { Sparkline } from "./KpiCard";
 
 interface FinanzasViewProps {
   selectedPeriod: string;
@@ -61,6 +63,8 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
   }
 
   const fin = data || {};
+  const alerts = fin.alerts || [];
+  const trends = fin.trends || {};
 
   return (
     <motion.div
@@ -69,6 +73,9 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
       transition={{ duration: 0.25 }}
       className="space-y-5"
     >
+      {/* ALERTAS FINANCIERAS */}
+      <AlertsBanner alerts={alerts} viewName="Vista Finanzas" />
+
       {/* NIVEL 1: MACRO KPIs — Facturado, EBIT Contable, Cash Flow */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Facturado */}

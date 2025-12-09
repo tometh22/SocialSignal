@@ -1,0 +1,397 @@
+Quiero que revises TODO el repo y desarrolles un Dashboard Ejecutivo con 3 pestañas: Operativo, Económico y Finanzas, llevando lo que ya tengo a un nivel PRO, sin romper nada de lo existente.
+
+0. Contexto
+
+El dashboard ya existe con 3 tabs: Operativo, Económico, Finanzas.
+
+El stack es React/Next + Tailwind + shadcn/ui + React Query (o similar). Confirmalo viendo el código.
+
+Ya hay endpoints para métricas de cada vista (si no están, crealos):
+
+GET /api/executive/operativo
+
+GET /api/executive/economico
+
+GET /api/executive/finanzas
+
+Las tablas de datos principales son (no las modifiques ni cambies estructura):
+
+monthly_financial_summary
+
+fact_cost_month
+
+fact_labor_month
+
+fact_rc_month
+
+cash_movements
+
+pl_adjustments
+
+1. Reglas de negocio (mantener como fuente de verdad)
+1.1. Vista OPERATIVO
+
+Usar SOLO:
+
+devengado = facturado - provision_facturacion_adelantada
+
+directos = SUM(direct_usd)
+
+ebit_operativo = devengado - directos
+
+margen_operativo = ebit_operativo / devengado
+
+markup_operativo = devengado / directos
+
+tarifa_efectiva = devengado / horas_facturables
+
+%facturable = horas_facturables / horas_totales
+
+horas_totales, personas_activas, proyectos_activos
+
+NADA de overhead, provisiones contables, impuestos ni caja en esta vista.
+
+1.2. Vista ECONÓMICO
+
+Usar:
+
+devengado
+
+directos
+
+overhead = SUM(indirect_usd)
+
+ebit_economico = devengado - directos - overhead
+
+margen_economico = ebit_economico / devengado
+
+Tampoco incluye provisiones contables, impuestos ni cash.
+
+1.3. Vista FINANZAS
+
+Usar:
+
+facturado = SUM(facturacion_total)
+
+directos
+
+overhead
+
+provisiones = SUM(provisions_usd)
+
+ebit_contable = facturado - directos - overhead - provisiones
+
+cash_in = SUM(amount_usd WHERE type = 'IN')
+
+cash_out = SUM(amount_usd WHERE type = 'OUT')
+
+cash_flow_neto = cash_in - cash_out
+
+caja_total (snapshot de monthly_financial_summary)
+
+burn_rate = directos + overhead + provisiones
+
+runway_meses = caja_total / burn_rate
+
+activo_total, pasivo_total, patrimonio = activo_total - pasivo_total
+
+Esta vista sí incluye TODO lo contable + caja.
+
+2. Cambios en BACKEND
+2.1. Estructura de endpoints
+
+Para cada endpoint (operativo, economico, finanzas), el JSON de respuesta debe incluir:
+
+{
+  metrics: {
+    // KPIs puntuales del mes seleccionado
+  },
+  trends: {
+    // arrays mensuales de 12 puntos mínimo para sparklines
+  },
+  diffs: {
+    // variaciones vs mes anterior y vs promedio 3 meses
+  },
+  alerts: [
+    // lista de alertas calculadas según reglas de negocio
+  ],
+  breakdowns: {
+    // distribuciones (ej: horas, costos)
+  },
+  rankedItems?: {
+    // para rankings de proyectos/personas si aplica
+  }
+}
+
+
+No cambies nombres de campos ya usados por el frontend; solo extendé.
+
+Si encontrás nombres distintos, adaptá la estructura pero mantené la semántica que describo acá.
+
+2.2. Cálculo de TRENDS
+
+Para cada KPI clave, devolvé un array mensual (últimos 12 meses) con:
+
+trends: {
+  devengado: { months: [...], values: [...] },
+  ebit_operativo: { months: [...], values: [...] },
+  margen_operativo: { months: [...], values: [...] },
+  // etc. según la vista
+}
+
+
+Usá las mismas tablas que hoy se usan para el mes actual, pero en un loop por meses.
+No hagas queries por cada mes aislado si podés evitarlo; preferí una query agrupada por mes.
+
+2.3. Cálculo de DIFFS (variaciones)
+
+Para cada KPI de primer nivel de la vista, devolvé:
+
+diff_vs_prev_month (porcentaje)
+
+diff_vs_3m_avg (porcentaje)
+
+Ejemplo:
+
+diffs: {
+  devengado: {
+    vs_prev_month: 0.08,   // +8%
+    vs_3m_avg: 0.03        // +3%
+  },
+  ebit_operativo: { ... }
+}
+
+2.4. Cálculo de ALERTAS
+
+Definí reglas básicas por vista:
+
+Operativo:
+
+tarifa_efectiva cayó más de 10% vs 3m promedio.
+
+markup_operativo < 2.5x.
+
+%facturable < 80%.
+
+horas_no_productivas (si existe) > 20% del total.
+
+X personas sin registrar horas (si lo podés calcular).
+
+Económico:
+
+margen_economico negativo.
+
+overhead / (directos + overhead) > 0.45.
+
+overhead creció > 20% vs mes anterior.
+
+Finanzas:
+
+runway_meses < 3.
+
+cash_flow_neto negativo dos meses seguidos.
+
+provisiones / facturado > 0.4.
+
+pasivo_total > activo_total.
+
+Cada alerta debe venir en un objeto:
+
+{ type: "critical" | "warning" | "info", message: string, metric: string }
+
+3. Cambios en FRONTEND – por pestaña
+
+Usá Tailwind + shadcn/ui y mantené el estilo actual.
+No reescribas todo; extendé.
+
+3.1. COMPONENTE COMÚN DE KPI
+
+Creamos un componente genérico, por ejemplo KpiCard, con props:
+
+<KpiCard
+  title="Devengado"
+  value="$53.9k"
+  diffPrev={0.08}
+  diff3m={0.03}
+  trend={trends.devengado}
+  tone="positive" // o "negative" / "neutral"
+/>
+
+
+Este componente:
+
+Muestra el valor principal.
+
+Muestra % vs mes anterior y % vs 3m con flechitas ↑↓.
+
+Renderiza un sparkline (usá una lib ligera que ya tengas; si no, generá un SVG simple).
+
+3.2. PESTAÑA OPERATIVO
+
+Layout:
+
+Fila 1 (full width): 2 KpiCard grandes
+
+Devengado
+
+EBIT Operativo (incluyendo margen en el subtítulo)
+
+Fila 2: 4 cards medianas (drivers)
+
+Tarifa efectiva
+
+Markup operativo
+
+% facturable
+
+Directos (costos equipo)
+
+Fila 3: 2 cards pequeñas o un bloque combinado
+
+Horas Totales
+
+Personas activas / Proyectos activos
+
+Fila 4: sección de breakdowns:
+
+Donut Distribución de horas (facturables vs no facturables vs internas). Si no tenés todas las categorías, al menos facturables vs resto.
+
+Donut Distribución de costos directos (si los datos están; si no, dejá preparada la UI comentada).
+
+Alertas:
+
+Arriba del todo, debajo del título “Dashboard Ejecutivo”.
+
+Un componente AlertStrip que lista las alertas de la vista actual, agrupando por critical, warning, info.
+
+Si no hay alertas críticas, mostrar: “Sin alertas críticas. Los indicadores operativos están dentro de rangos normales.” (lo que ya tenés, pero usando el nuevo componente).
+
+Microcopy fijo al pie de la vista:
+Texto simple: “Vista Operativa: productividad del equipo. No incluye overhead ni provisiones contables ni caja.”
+
+3.3. PESTAÑA ECONÓMICO
+
+Layout:
+
+Fila 1: 1 KpiCard XL
+
+EBIT Económico (con margen en porcentaje en el subtítulo)
+
+Fila 2: 4 KpiCard medianas:
+
+Devengado
+
+Directos
+
+Overhead
+
+Margen económico
+
+Fila 3: breakdown sencillo:
+
+Bar horizontal o donut Directos vs Overhead (% del devengado)
+
+Fila 4 (opcional si ya está en el backend):
+
+Tabla mini de “Top 3 proyectos por margen económico” y “Bottom 3”.
+
+Alertas:
+
+Igual que en Operativo, pero con las reglas económicas.
+
+Microcopy al pie:
+“Vista Económica: resultado operativo real por devengado. Incluye overhead, NO incluye provisiones contables ni flujo de caja.”
+
+3.4. PESTAÑA FINANZAS
+
+Layout:
+
+Fila 1: 3 KpiCard grandes:
+
+Facturado
+
+EBIT Contable
+
+Cash Flow Neto
+
+Fila 2: 4 cards medianas:
+
+Directos
+
+Overhead
+
+Provisiones
+
+Burn Rate
+
+Fila 3: bloque de caja:
+
+Caja Total
+
+Runway (meses)
+
+Cash In
+
+Cash Out
+
+Fila 4: bloque “Estructura financiera”:
+
+Activo total
+
+Pasivo total
+
+Patrimonio
+
+Alertas financieras:
+Usar el componente de alertas, pero con reglas de Finanzas.
+
+Microcopy al pie:
+“Vista Finanzas: resultado contable y flujo de caja. Incluye provisiones, impuestos y estructura patrimonial.”
+
+4. Componente de ALERTAS
+
+Crear un componente AlertsBanner que reciba:
+
+<AlertsBanner alerts={alertsFromApi} />
+
+
+– Si hay type === "critical", mostrar una banda roja/amarilla arriba.
+– Si solo hay warnings/info, usar tono amarillo/azul.
+– Si no hay ninguna, mostrar un estado “sin alertas críticas” en verde claro.
+
+5. Lógica de FETCH Y ESTADO
+
+Asegurate de que cada pestaña use su propia query key (["executive", "operativo", month], etc.) para no mezclar caches.
+
+Manejá loading y error states de forma simple (skeletons y mensajes breves).
+
+6. QA / ACEPTACIÓN
+
+Antes de terminar:
+
+Verificá que:
+
+Las métricas actuales siguen dando los mismos números que antes para el mes actual.
+
+Solo se agregaron campos/nuevas métricas pero no se rompió nada en los componentes ya existentes.
+
+Para un mes de ejemplo (ej: octubre 2025):
+
+Devengado y EBIT de cada vista coinciden con lo que hoy ve el dashboard antiguo o los números del Excel.
+
+runway_meses se calcula correctamente como caja_total / burn_rate.
+
+Si caja_total es 0 y burn_rate > 0, mostrás “0.0 meses” y evitás divisiones por cero.
+
+Validá visualmente:
+
+Que los sparklines se vean en las cards.
+
+Que las variaciones (%) aparezcan con flechas y colores correctos.
+
+Que las alertas cambian si forzás datos extremos (podés mockear localmente para probar).
+
+No cambies el estilo general (colores base, tipografías) salvo para añadir los nuevos elementos que pedí.
+
+Implementá todo esto paso a paso.
+Si encontrás inconsistencias entre el código actual y estas reglas de negocio, priorizá NO romper lo que ya funciona y documentá en comentarios dónde quedan dudas.

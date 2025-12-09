@@ -7,6 +7,8 @@ import {
   Briefcase, RefreshCw, DollarSign, Activity
 } from "lucide-react";
 import { motion } from "framer-motion";
+import AlertsBanner from "./AlertsBanner";
+import { Sparkline } from "./KpiCard";
 
 interface OperativoViewProps {
   selectedPeriod: string;
@@ -62,6 +64,8 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
   }
 
   const op = data || {};
+  const alerts = op.alerts || [];
+  const trends = op.trends || {};
 
   return (
     <motion.div
@@ -70,6 +74,9 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
       transition={{ duration: 0.25 }}
       className="space-y-5"
     >
+      {/* ALERTAS OPERATIVAS */}
+      <AlertsBanner alerts={alerts} viewName="Vista Operativa" />
+
       {/* NIVEL 1: MACRO KPIs — Devengado + EBIT Operativo */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Devengado */}
@@ -98,8 +105,11 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">Ingreso productivo del período</p>
               </div>
-              <div className="p-3 bg-emerald-100/80 rounded-2xl">
-                <DollarSign className="h-7 w-7 text-emerald-600" />
+              <div className="flex flex-col items-end gap-2">
+                <div className="p-3 bg-emerald-100/80 rounded-2xl">
+                  <DollarSign className="h-7 w-7 text-emerald-600" />
+                </div>
+                {trends.devengado && <Sparkline data={trends.devengado.values} color="#10b981" />}
               </div>
             </div>
           </CardContent>
@@ -146,12 +156,15 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">Productividad neta del equipo</p>
               </div>
-              <div className={`p-3 rounded-2xl ${(op.ebitOperativoUsd || 0) >= 0 ? 'bg-emerald-100/80' : 'bg-red-100/80'}`}>
-                {(op.ebitOperativoUsd || 0) >= 0 ? (
-                  <TrendingUp className="h-7 w-7 text-emerald-600" />
-                ) : (
-                  <ArrowDownRight className="h-7 w-7 text-red-600" />
-                )}
+              <div className="flex flex-col items-end gap-2">
+                <div className={`p-3 rounded-2xl ${(op.ebitOperativoUsd || 0) >= 0 ? 'bg-emerald-100/80' : 'bg-red-100/80'}`}>
+                  {(op.ebitOperativoUsd || 0) >= 0 ? (
+                    <TrendingUp className="h-7 w-7 text-emerald-600" />
+                  ) : (
+                    <ArrowDownRight className="h-7 w-7 text-red-600" />
+                  )}
+                </div>
+                {trends.ebitOperativo && <Sparkline data={trends.ebitOperativo.values} color="#10b981" />}
               </div>
             </div>
           </CardContent>
