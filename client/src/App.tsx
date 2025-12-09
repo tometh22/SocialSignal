@@ -36,9 +36,6 @@ import CurrencyDemo from "@/pages/currency-demo";
 import GoogleSheetsManager from "@/pages/google-sheets-manager";
 import ExcelMaestroPage from "@/pages/excel-maestro";
 
-// Executive Dashboard Views
-import ExecutiveOperativo from "@/pages/Executive/Operativo";
-import ExecutiveFinanciero from "@/pages/Executive/Financiero";
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -131,8 +128,6 @@ function AppRoutes() {
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
-                  <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} />
-                  <ProtectedRoute path="/executive/financiero" component={ExecutiveFinanciero} />
                   
                   {/* Quotation Management */}
                   <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />

@@ -80,9 +80,7 @@ export default function SidebarFixed() {
     {
       title: "Principal",
       items: [
-        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" },
-        { href: "/executive/operativo", title: "Vista Operativa", icon: Activity, description: "Productividad del equipo" },
-        { href: "/executive/financiero", title: "Vista Financiera", icon: TrendingUp, description: "Resultado contable" }
+        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" }
       ]
     },
     {
