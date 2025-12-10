@@ -134,7 +134,7 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
                     <TooltipContent className="max-w-[260px]">
                       <p className="text-xs font-medium mb-1">EBIT Contable</p>
                       <p className="text-xs text-gray-300">= Facturado − Directos − Overhead − Provisiones</p>
-                      <p className="text-xs text-gray-400 mt-1">Resultado contable real</p>
+                      <p className="text-xs text-gray-400 mt-1">Incluye provisiones e impuestos.</p>
                     </TooltipContent>
                   </Tooltip>
                   <VariationBadge value={fin.ebitVariation} />
@@ -259,8 +259,10 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
               <span className="text-[11px] font-medium text-red-600 uppercase tracking-wide">Burn Rate</span>
               <Tooltip>
                 <TooltipTrigger><Info className="h-3 w-3 text-red-400" /></TooltipTrigger>
-                <TooltipContent className="max-w-[200px]">
+                <TooltipContent className="max-w-[220px]">
+                  <p className="text-xs font-medium mb-1">Burn Rate</p>
                   <p className="text-xs text-gray-300">= Directos + Overhead + Provisiones</p>
+                  <p className="text-xs text-gray-400 mt-1">Gasto total mensual</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -281,7 +283,17 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
                 <Wallet className="h-5 w-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 uppercase">Caja Total</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-medium text-slate-500 uppercase">Caja Total</p>
+                  <Tooltip>
+                    <TooltipTrigger><Info className="h-3 w-3 text-slate-400" /></TooltipTrigger>
+                    <TooltipContent className="max-w-[220px]">
+                      <p className="text-xs font-medium mb-1">Caja Total</p>
+                      <p className="text-xs text-gray-300">Snapshot del Excel Maestro</p>
+                      <p className="text-xs text-gray-400 mt-1">monthly_financial_summary.caja_total</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <p className={`text-2xl font-bold ${(fin.cajaTotalUsd || 0) >= 0 ? 'text-slate-800' : 'text-red-700'}`}
                    data-testid="metric-caja-total">
                   {formatCurrency(fin.cajaTotalUsd || 0)}

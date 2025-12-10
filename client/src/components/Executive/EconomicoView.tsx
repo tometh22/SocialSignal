@@ -99,7 +99,7 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
                   <TooltipContent className="max-w-[280px]">
                     <p className="text-xs font-medium mb-1">EBIT Económico</p>
                     <p className="text-xs text-gray-300">= Devengado − Directos − Overhead</p>
-                    <p className="text-xs text-gray-400 mt-1">Rentabilidad operativa real (sin provisiones)</p>
+                    <p className="text-xs text-gray-400 mt-1">Incluye overhead. Sin provisiones.</p>
                   </TooltipContent>
                 </Tooltip>
                 <VariationBadge value={ec.ebitVariation} />

@@ -110,8 +110,8 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[260px]">
                       <p className="text-xs font-medium mb-1">Devengado</p>
-                      <p className="text-xs text-gray-300">= Facturado − Provisión Fac. Adelantada</p>
-                      <p className="text-xs text-gray-400 mt-1">Ingreso real del período</p>
+                      <p className="text-xs text-gray-300">Suma de fact_rc_month.revenue_usd</p>
+                      <p className="text-xs text-gray-400 mt-1">Ingreso productivo del período</p>
                     </TooltipContent>
                   </Tooltip>
                   <VariationBadge value={op.devengadoVariation} />

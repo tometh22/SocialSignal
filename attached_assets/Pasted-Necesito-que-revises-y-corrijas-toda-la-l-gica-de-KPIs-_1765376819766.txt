@@ -1,0 +1,252 @@
+Necesito que revises y corrijas toda la lógica de KPIs, queries y componentes del Dashboard Ejecutivo de la app.
+El objetivo es alinear 100% los cálculos con las fórmulas oficiales y con los datos del Excel Maestro.
+Seguí estas instrucciones exactamente, sin agregar ni quitar criterios.
+
+────────────────────────
+
+1. Estandarizar fuentes de datos
+
+────────────────────────
+
+Asegurate que cada dato venga de la tabla correcta:
+
+Devengado: fact_rc_month.devengado_usd
+
+Directos: fact_cost_month.direct_usd
+
+Overhead: fact_cost_month.indirect_usd
+
+Provisiones: fact_cost_month.provisions_usd
+
+Facturado: monthly_financial_summary.facturacion_total
+
+Caja Total / Activo / Pasivo / Patrimonio: únicamente de monthly_financial_summary
+
+Horas: fact_labor_month
+
+Cash In/Out: cash_movements
+
+Ajustes P&L: pl_adjustments
+
+Eliminar cualquier fuente alternativa o cálculo duplicado.
+
+────────────────────────
+
+2. Usar estas fórmulas oficiales (SOLO estas)
+
+────────────────────────
+
+2.1 Operativo (NO overhead, NO provisiones)
+devengado = sum(fact_rc_month.devengado_usd)
+directos = sum(fact_cost_month.direct_usd)
+ebit_operativo = devengado - directos
+tarifa_efectiva = devengado / horas_facturables
+markup = devengado / directos
+
+2.2 Económico (incluye overhead, NO provisiones)
+ebit_economico = devengado - directos - overhead
+margen_economico = ebit_economico / devengado
+overhead_pct_total = overhead / (directos + overhead)
+
+2.3 Financiero (contable: incluye TODO)
+facturado = monthly_financial_summary.facturacion_total
+ebit_contable = facturado - directos - overhead - provisiones
+burn_rate = directos + overhead + provisiones
+cash_in = sum(cash_movements WHERE type='IN')
+cash_out = sum(cash_movements WHERE type='OUT')
+cash_flow_neto = cash_in - cash_out
+caja_total = monthly_financial_summary.caja_total
+activo = monthly_financial_summary.activo_total
+pasivo = monthly_financial_summary.pasivo_total
+patrimonio = activo - pasivo
+
+
+Asegurate de que NADA en Operativo traiga overhead o provisiones.
+Asegurate de que Económico NO incluya provisiones ni impuestos.
+Asegurate de que Finanzas incluya TODO.
+
+────────────────────────
+
+3. Revisar backend
+
+────────────────────────
+
+Corregir:
+
+kpi_service.py
+
+financial_service.py
+
+operational_service.py
+
+repositories/fact_repository.py
+
+repositories/summary_repository.py
+
+Acciones:
+
+Consolidar todas las fórmulas en un archivo único:
+core/kpi_formulas.py
+
+Cada endpoint debe devolver KPIs ya calculados, no procesarlos en el frontend.
+
+Unificar filtros de período:
+WHERE month = X AND year = Y
+
+Verificar que Burn Rate no tenga diferencias.
+
+Validar que Caja Total realmente venga del snapshot del Excel Maestro y no se calcule.
+
+────────────────────────
+
+4. Revisar frontend
+
+────────────────────────
+
+Archivos afectados:
+
+components/kpiCards/*.tsx
+
+screens/Dashboard/Operativo.tsx
+
+screens/Dashboard/Economico.tsx
+
+screens/Dashboard/Finanzas.tsx
+
+components/charts/*.tsx
+
+utils/formatters.ts
+
+Acciones:
+
+Cada pestaña debe mostrar un header explicativo:
+
+Operativo: “Productividad del equipo. Solo devengado y costos directos.”
+
+Económico: “Resultado operativo real. Incluye overhead. Sin provisiones.”
+
+Finanzas: “Resultado contable + caja. Incluye provisiones e impuestos.”
+
+Todos los tooltips deben ajustarse a estos textos:
+
+EBIT Operativo: “Devengado – Directos (sin overhead ni provisiones).”
+
+EBIT Económico: “Devengado – Directos – Overhead.”
+
+EBIT Contable: “Facturado – Directos – Overhead – Provisiones.”
+
+Burn Rate: “Directos + Overhead + Provisiones.”
+
+Caja Total: “Snapshot del Excel Maestro.”
+
+Corregir colores según estándar:
+
+verde = positivo
+
+rojo = negativo
+
+amarillo = alerta
+
+azul = económico
+
+púrpura = contable
+
+Sección de evolución:
+
+Operativo: horas, devengado mensual, tarifa, horas por persona.
+
+Económico: ebit mensual, overhead vs directos, margen.
+
+Finanzas: cash flow neto, cash in/out, estructura financiera.
+
+────────────────────────
+
+5. Validaciones numéricas obligatorias
+
+────────────────────────
+
+Crear un test de coherencia para cada mes:
+
+ebit_operativo = devengado − directos
+
+ebit_economico = devengado − directos − overhead
+
+ebit_contable = facturado − directos − overhead − provisiones
+
+burn_rate = directos + overhead + provisiones
+
+patrimonio = activo − pasivo
+
+Si algún KPI difiere del cálculo esperado → mostrar error en consola.
+
+────────────────────────
+
+6. Resolver incompatibilidades detectadas
+
+────────────────────────
+
+Corregir estos puntos:
+
+Burn Rate actual no coincide con el valor teórico → revisar query.
+
+EBIT Contable estaba restando mal overhead o provisiones → unificar fórmula.
+
+Caja Total en Finanzas muestra 0 aunque Excel tiene datos → revisar origen.
+
+En Económico se estaban mezclando campos de contabilidad → corregir.
+
+Tooltip y textos no explicaban qué incluye cada vista → agregar.
+
+────────────────────────
+
+7. Documentación interna
+
+────────────────────────
+
+Generar dos archivos:
+
+docs/kpi_formulas.md
+
+Definición
+
+Fórmula oficial
+
+Ejemplo numérico
+
+Fuente de datos
+
+docs/data_sources.md
+
+Qué trae cada tabla
+
+Qué NO trae
+
+Relación entre tablas
+
+────────────────────────
+
+8. Entrega final esperada
+
+────────────────────────
+
+Cuando termines, necesito:
+
+KPIs alineados y coherentes entre sí.
+
+Ninguna mezcla de criterios por pestaña.
+
+Tooltips correctos.
+
+Caja Total exacta al Excel.
+
+Burn Rate exacto.
+
+Gráficos funcionando con 12 meses.
+
+Código limpio y centralizado en kpi_formulas.py.
+
+Documentación lista.
+
+────────────────────────
+
+Ejecutá todas estas tareas sin romper nada, validando que cada cambio se refleje en las pestañas Operativo / Económico / Finanzas.
