@@ -1,0 +1,275 @@
+Qué tan bien está la UX/UI ahora
+
+En términos de estructura ya estás muy bien encaminado:
+
+Tres pestañas claras (Operativo / Económico / Finanzas).
+
+Banda de “Alertas inteligentes” arriba, coherente en las tres vistas.
+
+Fila de KPIs principales grande y abajo la zona de evolución (gráficos).
+
+La jerarquía visual es correcta: número grande primero, explicación y gráficos después.
+
+Qué ajustaría:
+
+Etiqueta explícita de qué estás viendo
+
+Ahora en el footer hay un texto pequeño (“Vista Operativa…”, etc.).
+
+Yo lo movería justo debajo de las pestañas, como un subtítulo:
+
+Operativo → “Productividad del equipo. Devengado y rentabilidad sin overhead ni provisiones.”
+
+Económico → “Resultado operativo real. Incluye overhead, sin provisiones ni cash.”
+
+Finanzas → “Resultado contable + caja. Incluye provisiones, impuestos y flujo de caja.”
+
+Eso reduce totalmente la ambigüedad y alinea con la “pirámide invertida” de Fede.
+
+Nomenclatura consistente:
+
+Operativo:
+
+“Tarifa efectiva” → aclarar en tooltip: “Devengado / horas facturables”.
+
+“Markup” → tooltip: “Devengado / costos directos (equipo)”.
+
+Económico:
+
+“EBIT Económico” → tooltip con fórmula completa.
+
+“OH % Total” → “Overhead sobre costo total” y en tooltip: “Overhead / (Directos + Overhead)”.
+
+Finanzas:
+
+“EBIT Contable” → fórmula explícita.
+
+“Burn Rate” → aclarar que es “Directos + Overhead + Provisiones mensuales (gasto contable total)”.
+
+“Runway” → “Caja Total / Burn Rate (meses)”.
+
+Gráficos:
+
+Muy bien que cada pestaña tenga una sección clara:
+
+Operativo → “Evolución Operativa”.
+
+Económico → “Tendencia Económica”.
+
+Finanzas → “Evolución Financiera”.
+
+Ajustes finos que mejoran lectura:
+
+Etiquetas de meses más visibles (quizás solo iniciales: Ene, Feb, Mar…).
+
+Línea horizontal de “objetivo” en:
+
+Tarifa efectiva (ej. objetivo 35–40 USD/h).
+
+OH % total en Económico (objetivo 45%).
+
+Es opcional, pero te da contexto de performance, no solo tendencia.
+
+En “Cash In vs Cash Out” usar barras apiladas de cada mes (ya estás cerca de eso, solo cuidar que In y Out siempre tengan colores fijos: verde In, rojo Out).
+
+¿Los datos y criterios están bien?
+
+Voy pestaña por pestaña usando el ejemplo de noviembre 2025 que muestras.
+
+Pestaña Operativo
+
+Devengado: 18.1k
+
+Directos: 15.1k
+
+EBIT Operativo: 3.0k
+
+Markup: 1.2x
+
+Tarifa: 14 USD/h
+
+Horas: 1340h
+
+Verificación lógica:
+
+EBIT Operativo = Devengado − Directos
+
+18.1k − 15.1k ≈ 3.0k → correcto.
+
+Markup = Devengado / Directos
+
+18.1 / 15.1 ≈ 1.2x → correcto.
+
+Tarifa efectiva ≈ Devengado / Horas facturables
+
+18.1k / 1340 ≈ 13.5 → arredondeado 14 USD/h → consistente.
+
+Conclusión:
+La vista Operativa está coherente con el criterio definido: productividad del equipo, solo Devengado y costos directos, sin overhead ni provisiones. Eso está bien y es lo que debe ver Vicky día a día.
+
+Pestaña Económico
+
+Devengado: 18.1k
+
+Directos: 15.1k
+
+Overhead: 16.1k
+
+EBIT Económico: −13.1k
+
+OH % Total: 52%
+
+Verificación:
+
+EBIT Económico = Devengado − Directos − Overhead
+
+18.1 − 15.1 − 16.1 = −13.1k → correcto.
+
+OH % Total = Overhead / (Directos + Overhead)
+
+16.1 / (15.1 + 16.1) = 16.1 / 31.2 ≈ 51.6% → 52% mostrado → correcto.
+
+Conclusión:
+La vista Económica refleja bien la realidad operativa total (incluye estructura/overhead, sin provisiones ni impuestos). Este es el nivel que vos deberías mirar para decisiones de pricing y escalabilidad (porque incluye el peso real de la estructura).
+
+Pestaña Finanzas
+
+Facturado: 46.0k
+
+Directos: 15.1k
+
+Overhead: 16.1k
+
+Provisiones: 26.3k
+
+EBIT Contable: −10.5k
+
+Burn Rate: 56.6k
+
+Cash In: 12.7k
+
+Cash Out: 43.1k
+
+Cash Flow Neto: −30.4k
+
+Caja Total: 0
+
+Activo: 208.2k
+
+Pasivo: 132.4k
+
+Patrimonio: 75.8k
+
+Chequeos:
+
+Patrimonio = Activo − Pasivo
+
+208.2 − 132.4 = 75.8 → correcto.
+
+Burn Rate debería ser: Directos + Overhead + Provisiones
+
+15.1 + 16.1 + 26.3 = 57.5k
+
+Tu tarjeta muestra 56.6k → hay una diferencia de ~0.9k.
+
+Puede ser:
+
+Algún ajuste contable en pl_adjustments que se está sumando/restando.
+
+Diferencias de redondeo por agrupar por proyecto o por día.
+
+Recomendación: revisar en backend que el cálculo de Burn Rate esté estrictamente alineado a:
+
+burn_rate = direct_usd + indirect_usd + provisions_usd
+
+O, si decidís incluir otros ajustes, documentarlo explícito en el tooltip y en tu doc de fórmulas.
+
+EBIT Contable según fórmula base debería ser:
+
+Facturado − Directos − Overhead − Provisiones
+
+46.0 − 15.1 − 16.1 − 26.3 = −11.5k
+
+La tarjeta muestra −10.5k → diferencia de ~1k.
+
+Probable causa:
+
+Estás aplicando algunos ajustes de P&L (IIBB, intereses, IVA no recuperable) en otra tabla y el EBIT que se muestra ya viene “post-ajustes”.
+
+Para que no sea confuso:
+
+Opción A:
+
+Tarjeta: “EBIT Contable (sin impuestos ni ajustes)” = fórmula pura.
+
+Debajo otra tarjeta (más chica): “Ajustes P&L” y “Resultado final” si querés.
+
+Opción B:
+
+Mantener el EBIT ya ajustado, pero cambiar etiqueta y tooltip a algo tipo “Resultado contable después de impuestos y ajustes (ver detalle en reporte contable)”.
+
+Caja Total = 0 mientras Cash Flow Neto es −30.4k y el Activo líquido en tus excels no es cero.
+
+Eso tiene sentido solo si decidiste que:
+
+“Caja Total” en la app refleje exclusivamente lo que está en la tabla cash_movements, y en noviembre no cargaste el snapshot de bancos.
+
+Si no es una decisión consciente, ahí hay una desalineación con el Excel de administración (donde “ACTIVO LÍQUIDO” sí tiene valor).
+
+Definí un criterio:
+
+Si Caja Total = saldo bancos + caja + wallets al cierre de mes (lo que hace tu Excel), entonces en la app deberías traer ese snapshot desde monthly_financial_summary.
+
+Si Caja Total es “cash operativo” sólo (lo que pasa por cash_movements), acláralo en el texto (“Caja operativa. No incluye cuentas no integradas ni crypto”).
+
+Conclusión Finanzas:
+
+La estructura lógica está bien (P&L + cash, todo en una vista).
+
+Hay pequeñas diferencias numéricas (~1k) que probablemente vienen de ajustes/impuestos. No es grave, pero hay que:
+
+Definir exactamente qué entra en cada métrica.
+
+Alinear código + Excel + descripción en tooltips.
+
+Cómo explicitar qué se ve en cada pestaña
+
+Sí, conviene explicitarlo. Te propongo textos muy concretos (podés usarlos tal cual en la UI):
+
+Operativo (subtítulo bajo las pestañas):
+
+“Vista Operativa: productividad del equipo. Muestra Devengado, costos directos y eficiencia de horas. No incluye overhead ni provisiones.”
+
+Económico:
+
+“Vista Económica: resultado operativo real del mes. Incluye overhead, sin provisiones ni efecto de caja.”
+
+Finanzas:
+
+“Vista Finanzas: P&L contable + flujo de caja. Incluye provisiones, impuestos, activos y pasivos.”
+
+Y en el footer, si querés mantener la frase, déjala como resumen aún más corto:
+
+Operativo: “Sin overhead ni provisiones.”
+
+Económico: “Incluye overhead, sin provisiones ni cash.”
+
+Finanzas: “Incluye provisiones e impuestos + caja.”
+
+Qué le diría a un CFO o socio hoy
+
+Las tres vistas ahora representan tres niveles distintos de lectura, consistentes con buenas prácticas:
+
+Operativo → cómo rinde el equipo y los proyectos (base para decisiones de contratación y carga).
+
+Económico → cuánto gana realmente el negocio después de pagar estructura (base para pricing y escalabilidad).
+
+Finanzas → cómo cierra la foto con impuestos, provisiones y caja (base para decisiones de inversión, dividendos, runway).
+
+Lo único pendiente es cerrar:
+
+Definición exacta de EBIT Contable y Burn Rate (si incluyen o no ciertos ajustes).
+
+Alinear “Caja Total” entre Excel y app.
+
+Si querés, en el próximo paso te escribo el checklist técnico concreto para que el dev revise fórmulas y queries una por una.

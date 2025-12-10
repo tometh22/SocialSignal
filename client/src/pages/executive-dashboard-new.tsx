@@ -250,6 +250,30 @@ export default function ExecutiveDashboard() {
           />
         )}
 
+        {/* Subtítulo descriptivo de la vista */}
+        <div className="bg-white border border-gray-200 rounded-lg px-4 py-2.5 mb-3">
+          {viewMode === 'operativo' && (
+            <p className="text-sm text-gray-600">
+              <span className="font-medium text-emerald-700">Vista Operativa:</span>{' '}
+              productividad del equipo. Muestra Devengado, costos directos y eficiencia de horas. 
+              <span className="text-gray-400 ml-1">Sin overhead ni provisiones.</span>
+            </p>
+          )}
+          {viewMode === 'economico' && (
+            <p className="text-sm text-gray-600">
+              <span className="font-medium text-blue-700">Vista Económica:</span>{' '}
+              resultado operativo real del mes. Incluye overhead. 
+              <span className="text-gray-400 ml-1">Sin provisiones ni efecto de caja.</span>
+            </p>
+          )}
+          {viewMode === 'finanzas' && (
+            <p className="text-sm text-gray-600">
+              <span className="font-medium text-purple-700">Vista Finanzas:</span>{' '}
+              P&L contable + flujo de caja. Incluye provisiones, impuestos, activos y pasivos.
+            </p>
+          )}
+        </div>
+
         {/* Panel de Alertas Inteligentes */}
         <AlertsPanel 
           period={dashboardMetrics?.resolved?.label || formatPeriodLabel(selectedPeriod)}
