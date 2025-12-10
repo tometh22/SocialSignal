@@ -249,12 +249,16 @@ export function PieChartSimple({ data, colors, formatValue }: PieChartSimpleProp
     return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Sin datos</div>;
   }
   const format = formatValue || ((v: number) => `$${(v/1000).toFixed(0)}k`);
+  const validData = data.filter(d => d.value > 0);
+  if (!validData.length) {
+    return <div className="flex items-center justify-center h-full text-gray-400 text-sm">Sin datos positivos</div>;
+  }
   
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie
-          data={data}
+          data={validData}
           cx="50%"
           cy="50%"
           innerRadius={40}
@@ -262,17 +266,22 @@ export function PieChartSimple({ data, colors, formatValue }: PieChartSimpleProp
           paddingAngle={2}
           dataKey="value"
           nameKey="label"
+          label={({ name, pct }) => `${name}: ${pct?.toFixed(0) || 0}%`}
+          labelLine={false}
         >
-          {data.map((entry, index) => (
+          {validData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
           ))}
         </Pie>
         <RechartsTooltip 
-          formatter={(v: number, name: string) => [format(v), name]}
+          formatter={(v: number, name: string) => [format(Math.abs(v)), name]}
           contentStyle={{ fontSize: 12, borderRadius: 8 }}
         />
         <Legend 
-          formatter={(value: string, entry: any) => `${value} (${entry.payload.pct.toFixed(0)}%)`}
+          formatter={(value: string, entry: any) => {
+            const pct = entry?.payload?.pct;
+            return `${value || 'N/A'} (${pct?.toFixed(0) || 0}%)`;
+          }}
           wrapperStyle={{ fontSize: 10 }}
         />
       </PieChart>

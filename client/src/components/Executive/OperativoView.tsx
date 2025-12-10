@@ -35,7 +35,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
 
   const formatPct = (value: number) => `${value.toFixed(0)}%`;
 
-  const VariationBadge = ({ value }: { value: number | null }) => {
+  const VariationBadge = ({ value, label }: { value: number | null; label?: string }) => {
     if (value === null) {
       return (
         <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
@@ -50,7 +50,20 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
           ? 'bg-emerald-100 text-emerald-700' 
           : 'bg-red-100 text-red-700'
       }`}>
-        {isPositive ? '+' : ''}{value.toFixed(0)}%
+        {isPositive ? '+' : ''}{value.toFixed(0)}%{label ? ` ${label}` : ''}
+      </span>
+    );
+  };
+
+  const Variation3mBadge = ({ diff }: { diff: { vsPrevMonth: number | null; vs3mAvg: number | null } | undefined }) => {
+    if (!diff?.vs3mAvg) return null;
+    const v = diff.vs3mAvg;
+    const isPositive = v >= 0;
+    return (
+      <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ml-1 ${
+        isPositive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+      }`}>
+        {isPositive ? '↑' : '↓'}{Math.abs(v).toFixed(0)}% vs 3m
       </span>
     );
   };
@@ -68,6 +81,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
   const alerts = op.alerts || [];
   const trends = op.trends || {};
   const breakdowns = op.breakdowns || {};
+  const diffs = op.diffs || {};
 
   return (
     <motion.div
@@ -102,8 +116,11 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                   </Tooltip>
                   <VariationBadge value={op.devengadoVariation} />
                 </div>
-                <div className="text-4xl font-bold text-emerald-800 tracking-tight" data-testid="metric-devengado">
-                  {formatCurrency(op.devengadoUsd || 0)}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold text-emerald-800 tracking-tight" data-testid="metric-devengado">
+                    {formatCurrency(op.devengadoUsd || 0)}
+                  </span>
+                  <Variation3mBadge diff={diffs.devengado} />
                 </div>
                 <p className="text-sm text-gray-500 mt-2">Ingreso productivo del período</p>
               </div>
@@ -144,7 +161,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                   </Tooltip>
                   <VariationBadge value={op.ebitVariation} />
                 </div>
-                <div className="flex items-baseline gap-3">
+                <div className="flex items-baseline gap-3 flex-wrap">
                   <span className={`text-4xl font-bold tracking-tight ${
                     (op.ebitOperativoUsd || 0) >= 0 ? 'text-emerald-800' : 'text-red-700'
                   }`} data-testid="metric-ebit-operativo">
@@ -155,6 +172,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                   }`}>
                     {formatPct(op.margenOperativoPct || 0)} margen
                   </span>
+                  <Variation3mBadge diff={diffs.ebitOperativo} />
                 </div>
                 <p className="text-sm text-gray-500 mt-2">Productividad neta del equipo</p>
               </div>
@@ -261,8 +279,17 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <div className="text-2xl font-bold text-gray-700" data-testid="metric-directos">
-              {formatCurrency(op.directosUsd || 0)}
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold text-gray-700" data-testid="metric-directos">
+                {formatCurrency(op.directosUsd || 0)}
+              </span>
+              {diffs.directos?.vs3mAvg && (
+                <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${
+                  diffs.directos.vs3mAvg > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                }`}>
+                  {diffs.directos.vs3mAvg > 0 ? '↑' : '↓'}{Math.abs(diffs.directos.vs3mAvg).toFixed(0)}%
+                </span>
+              )}
             </div>
             <p className="text-xs text-gray-400 mt-1">costos equipo</p>
           </CardContent>
@@ -301,7 +328,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
         <div className="w-px h-4 bg-gray-300" />
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-gray-400" />
-          <span className="text-xs text-gray-500 italic">Sin overhead ni provisiones</span>
+          <span className="text-xs text-gray-500 italic">Vista Operativa: Productividad del equipo. Sin overhead ni provisiones</span>
         </div>
       </div>
 

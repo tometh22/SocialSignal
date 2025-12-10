@@ -307,30 +307,50 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-md bg-gradient-to-br from-slate-50 to-gray-100">
+        <Card className={`border-0 shadow-md ${
+          (fin.runwayMeses || 0) < 3 
+            ? 'bg-gradient-to-br from-red-50 to-orange-50 ring-2 ring-red-200' 
+            : 'bg-gradient-to-br from-slate-50 to-gray-100'
+        }`}>
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className={`p-2 rounded-lg ${(fin.runwayMeses || 0) >= 3 ? 'bg-emerald-100' : 'bg-red-100'}`}>
                 <Timer className={`h-5 w-5 ${(fin.runwayMeses || 0) >= 3 ? 'text-emerald-600' : 'text-red-600'}`} />
               </div>
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase">Runway</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-slate-500 uppercase">Runway</p>
+                  {(fin.runwayMeses || 0) < 3 && (fin.runwayMeses || 0) > 0 && (
+                    <span className="inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-500 text-white animate-pulse">
+                      CRÍTICO
+                    </span>
+                  )}
+                </div>
                 <p className={`text-2xl font-bold ${(fin.runwayMeses || 0) >= 3 ? 'text-slate-800' : 'text-red-700'}`}
                    data-testid="metric-runway">
                   {(fin.runwayMeses || 0).toFixed(1)} meses
                 </p>
               </div>
             </div>
-            <p className="text-xs text-gray-500">
-              = Caja Total / Burn Rate
-            </p>
+            <Tooltip>
+              <TooltipTrigger className="w-full">
+                <p className="text-xs text-gray-500 text-left">
+                  = Caja Total / Burn Rate
+                </p>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[240px]">
+                <p className="text-xs text-gray-300">Runway = Caja Total / Burn Rate</p>
+                <p className="text-xs text-gray-400 mt-1">Incluye todos los costos contables (directos + overhead + provisiones)</p>
+              </TooltipContent>
+            </Tooltip>
           </CardContent>
         </Card>
       </div>
 
       {/* NIVEL 4: ESTRUCTURA FINANCIERA */}
       <div className="p-4 bg-gray-50 rounded-xl">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Estructura Financiera</p>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Estructura Financiera</p>
+        <p className="text-[10px] text-gray-400 mb-3">Basado en Excel Maestro – Resumen Ejecutivo</p>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
             <div className="flex items-center justify-center gap-1.5 mb-1">
@@ -428,9 +448,9 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
       </div>
 
       {/* Nota */}
-      <p className="text-center text-xs text-gray-400 mt-4">
-        Vista Finanzas: Resultado contable + flujo de caja. Incluye provisiones e impuestos.
-      </p>
+      <div className="flex items-center justify-center gap-6 py-3 px-4 bg-gray-50 rounded-xl mt-4">
+        <span className="text-xs text-gray-500 italic">Vista Finanzas: Resultado contable + flujo de caja. Incluye provisiones e impuestos.</span>
+      </div>
     </motion.div>
   );
 }

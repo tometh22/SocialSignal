@@ -1,0 +1,138 @@
+3) Mejores mejoras UX/UI ahora
+A. Operativo
+
+Está muy bien:
+
+Alertas inteligentes arriba.
+
+KPIs fuertes (Devengado, EBIT Operativo, tarifa, markup, % facturable, horas, directos).
+
+“Evolución Operativa” con 4 gráficos: horas, devengado, tarifa, horas/persona.
+
+Ajustes finos:
+
+Comparativo temporal visible
+
+Ya tenés el texto “Tarifa efectiva cayó 35% vs promedio 3m”. Hacé lo mismo en:
+
+Devengado (vs 3 meses)
+
+EBIT Operativo
+
+Directos (vs media 6 meses)
+
+No agregues más tarjetas; sólo un badge con % al lado del número.
+
+Horas por persona
+
+Ordenar siempre por horas descendente.
+
+Mostrar top-8 y un “+ ver todos” si hay más.
+
+Agregar una línea vertical/cita “promedio” para ver quién está por encima/debajo.
+
+Micro-copy debajo del bloque
+
+La frase que ya pusiste es correcta:
+“Vista Operativa: Productividad del equipo. No incluye overhead ni provisiones.”
+
+Sostenelo igual en todas las vistas para reforzar el modelo mental.
+
+B. Económico
+
+Muy sólido: EBIT Económico como KPI principal + Devengado, Directos, Overhead, Margen + 3 gráficos de tendencia.
+
+Ajustes:
+
+Eliminar redundancia visual de Devengado
+
+El valor es el mismo que en Operativo.
+
+Dejá la card, pero más chica o alineada a la derecha, y en la descripción aclarar:
+“Base de cálculo: Devengado (Facturado – Fact. adelantada)”.
+
+Usá el espacio ganado para una tarjeta nueva: “Overhead sobre costo total (%)”.
+
+Overhead vs Directos (chart)
+
+Agregar una línea o banda de objetivo: por ejemplo “Overhead ≤ 45% costo total”.
+
+Badge arriba: “Overhead representa 58% del costo total (objetivo: <45%)” como ya hiciste; mantenelo siempre que supere el umbral.
+
+Margen económico
+
+En el gráfico de margen, mostrar también una línea horizontal con “target” (ej.: 30%).
+
+Tooltips con fórmula: (EBIT Económico / Devengado).
+
+C. Finanzas
+
+Es la vista más rica y la que más mira un inversor/CFO:
+
+Tarjetas: Facturado, EBIT Contable, Cash Flow Neto, Directos, Overhead, Provisiones, Caja Total, Burn Rate, Runway, Activo, Pasivo, Patrimonio.
+
+Bloque “Estructura Financiera” y “Evolución Financiera” con 4 gráficos.
+
+Ajustes:
+
+Claridad de estructura
+
+Bajo “Estructura Financiera”, añadí un subtítulo:
+“Basado en Excel Maestro – Resumen Ejecutivo (activo, pasivo, patrimonio)”.
+
+En el pie de gráfico de pie, arreglar la leyenda (hoy se ve “undefined (100%)”, etc.). Debe decir “Activo / Pasivo / Patrimonio”.
+
+Cash In vs Cash Out
+
+Agregar línea fina superpuesta de “Cash Flow Neto” (verde si >0, rojo si <0).
+
+Tooltip combinado: In, Out, Net.
+
+Runway
+
+Badge de contexto:
+“Runway = Caja Total / Burn Rate. Incluye todos los costos contables.”
+
+Si Runway < 3 meses, cambiar color del chip a naranja/rojo.
+
+DSO / Clientes a cobrar (mini KPI)
+
+Usás el dato en el Excel (“Clientes a cobrar”).
+
+Agregá una card chica con:
+
+“Clientes a cobrar: XXk”
+
+“DSO (días de cobro): N días” (si tenés facturación por mes).
+
+4) Qué chequear numéricamente (octubre) antes de mostrar al board
+
+Confirmar que en el backend:
+
+devengado = facturado - facturacion_adelantada
+
+ebit_operativo = devengado - costos_directos
+
+ebit_economico = devengado - costos_directos - overhead_sin_provisiones
+
+ebit_contable = facturado - costos_directos - overhead - provisiones
+
+Revisar en el Excel de octubre:
+
+Que la fila “COSTOS Suma total sin considerar impuestos e intereses Oxean” ≈ directos + overhead_económico.
+
+Que la provisión de facturación adelantada de 27.9k esté usada sólo para:
+
+Devengado (resta al facturado), y
+
+Pasivo “Facturación Adelantada”.
+
+Documentar en un .md del repo:
+
+Definición de cada EBIT (Operativo / Económico / Contable).
+
+A qué fila/columna del Excel se mapea cada número.
+
+Ejemplo con octubre 2025 para que cualquiera pueda seguir el puente Excel → DB → App.
+
+Con esto, los números de octubre ya están prácticamente reconciliados y el dashboard queda listo para mostrar a socio, CFO e inversores.

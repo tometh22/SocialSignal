@@ -43,6 +43,7 @@ export interface EconomicoData {
   directosVariation: number | null;
   overheadUsd: number;
   overheadVariation: number | null;
+  overheadRatioPct: number;
   ebitEconomicoUsd: number;
   ebitVariation: number | null;
   margenEconomicoPct: number;
@@ -220,6 +221,8 @@ export async function getEconomicoData(periodKeys: string[]): Promise<EconomicoD
   
   const directosUsd = parseFloat(costsData?.direct_costs_usd || '0');
   const overheadUsd = parseFloat(costsData?.indirect_costs_usd || '0');
+  const totalCosts = directosUsd + overheadUsd;
+  const overheadRatioPct = totalCosts > 0 ? (overheadUsd / totalCosts) * 100 : 0;
   const ebitEconomicoUsd = devengadoUsd - directosUsd - overheadUsd;
   const margenEconomicoPct = devengadoUsd > 0 ? (ebitEconomicoUsd / devengadoUsd) * 100 : 0;
   
@@ -237,6 +240,7 @@ export async function getEconomicoData(periodKeys: string[]): Promise<EconomicoD
     directosVariation: null,
     overheadUsd,
     overheadVariation: null,
+    overheadRatioPct,
     ebitEconomicoUsd,
     ebitVariation: null,
     margenEconomicoPct,

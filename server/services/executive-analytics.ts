@@ -78,6 +78,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     ebitOperativo: DiffData;
     tarifaEfectiva: DiffData;
     markup: DiffData;
+    directos: DiffData;
   };
   alerts: Alert[];
   breakdowns: {
@@ -125,6 +126,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   const margenArr: number[] = [];
   const tarifaArr: number[] = [];
   const markupArr: number[] = [];
+  const directosArr: number[] = [];
 
   for (const p of allPeriods) {
     const fin = financialByPeriod.get(p) || { facturado: 0, provision: 0 };
@@ -142,6 +144,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     margenArr.push(margen);
     tarifaArr.push(tarifa);
     markupArr.push(markup);
+    directosArr.push(directos);
   }
 
   const currentIdx = allPeriods.length - 1;
@@ -150,18 +153,21 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     ebit: ebitArr[currentIdx],
     tarifa: tarifaArr[currentIdx],
     markup: markupArr[currentIdx],
-    margen: margenArr[currentIdx]
+    margen: margenArr[currentIdx],
+    directos: directosArr[currentIdx]
   };
 
   const prevDevengado = currentIdx > 0 ? devengadoArr[currentIdx - 1] : 0;
   const prevEbit = currentIdx > 0 ? ebitArr[currentIdx - 1] : 0;
   const prevTarifa = currentIdx > 0 ? tarifaArr[currentIdx - 1] : 0;
   const prevMarkup = currentIdx > 0 ? markupArr[currentIdx - 1] : 0;
+  const prevDirectos = currentIdx > 0 ? directosArr[currentIdx - 1] : 0;
 
   const last3Devengado = devengadoArr.slice(Math.max(0, currentIdx - 3), currentIdx);
   const last3Ebit = ebitArr.slice(Math.max(0, currentIdx - 3), currentIdx);
   const last3Tarifa = tarifaArr.slice(Math.max(0, currentIdx - 3), currentIdx);
   const last3Markup = markupArr.slice(Math.max(0, currentIdx - 3), currentIdx);
+  const last3Directos = directosArr.slice(Math.max(0, currentIdx - 3), currentIdx);
 
   const hours = hoursByPeriod.get(periodKey) || { total: 0, billable: 0 };
   const horasFacturablesPct = hours.total > 0 ? (hours.billable / hours.total) * 100 : 0;
@@ -265,6 +271,10 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
       markup: {
         vsPrevMonth: calcDiff(currentData.markup, prevMarkup),
         vs3mAvg: calcDiffVs3mAvg(currentData.markup, last3Markup)
+      },
+      directos: {
+        vsPrevMonth: calcDiff(currentData.directos, prevDirectos),
+        vs3mAvg: calcDiffVs3mAvg(currentData.directos, last3Directos)
       }
     },
     alerts,

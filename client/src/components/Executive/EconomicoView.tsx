@@ -130,7 +130,7 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
       </Card>
 
       {/* NIVEL 2: DESGLOSE — Devengado - Directos - Overhead = Margen */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {/* Devengado */}
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-blue-50/50">
           <CardContent className="p-4">
@@ -188,6 +188,35 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
           </CardContent>
         </Card>
 
+        {/* Overhead % sobre costo total */}
+        <Card className={`border-0 shadow-sm hover:shadow-md transition-shadow ${
+          (ec.overheadRatioPct || 0) > 45 ? 'bg-amber-50/60' : 'bg-white'
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">OH % Total</span>
+              <Tooltip>
+                <TooltipTrigger><Info className="h-3 w-3 text-gray-400" /></TooltipTrigger>
+                <TooltipContent className="max-w-[220px]">
+                  <p className="text-xs text-gray-300">= Overhead / (Directos + Overhead)</p>
+                  <p className="text-xs text-gray-400 mt-1">Objetivo: &lt;45%</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className={`text-2xl font-bold ${
+              (ec.overheadRatioPct || 0) > 45 ? 'text-amber-600' : 'text-blue-700'
+            }`} data-testid="metric-overhead-ratio">
+              {formatPct(ec.overheadRatioPct || 0)}
+            </div>
+            {(ec.overheadRatioPct || 0) > 45 && (
+              <p className="text-xs text-amber-600 mt-1">⚠ Sobre objetivo 45%</p>
+            )}
+            {(ec.overheadRatioPct || 0) <= 45 && (
+              <p className="text-xs text-gray-500 mt-1">✓ Dentro de objetivo</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Margen Económico */}
         <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-white">
           <CardContent className="p-4">
@@ -227,7 +256,7 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
           </span>
         </div>
         <div className="w-px h-4 bg-gray-300" />
-        <span className="text-xs text-gray-500 italic">Incluye overhead, sin provisiones</span>
+        <span className="text-xs text-gray-500 italic">Vista Económica: Incluye overhead, sin provisiones</span>
       </div>
 
       {/* EVOLUCIÓN ECONÓMICA — Gráficos de tendencia */}
