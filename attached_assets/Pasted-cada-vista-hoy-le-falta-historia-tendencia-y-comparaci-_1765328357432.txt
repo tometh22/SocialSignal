@@ -1,0 +1,165 @@
+cada vista hoy le falta historia, tendencia y comparación, que es lo que permite tomar decisiones.
+Así como están, las pantallas muestran “estados” pero no permiten entender evolución, desvíos, picos, ciclos ni alertas estructurales.
+
+A nivel UX/Producto, agregar gráficos no es opcional: es lo que completa el modelo mental para cualquier CEO, CFO u operador.
+
+A continuación tenés qué gráfico poner en cada pestaña, qué datos usar y cómo integrarlo sin romper nada.
+
+1) OPERATIVO
+
+Objetivo de la vista: productividad, eficiencia, pricing real, carga del equipo.
+
+Gráficos recomendados
+
+Evolución de Horas Facturables vs No Facturables (últimos 6–12 meses)
+
+Tipo: stacked bar o area chart.
+
+Métricas: horas totales, % billable, % no billable.
+
+Insight: muestra capacidad usada vs desperdiciada.
+
+Evolución del Devengado mensual
+
+Tipo: line chart simple.
+
+Métricas: $ devengado por mes, variación porcentual.
+
+Insight: tendencia real de ingresos productivos.
+
+Evolución de Tarifa Efectiva (blended rate)
+
+Tipo: line chart pequeño (sparkline).
+
+Insight: permite detectar caídas de pricing escondidas.
+
+Distribución de horas por persona / por proyecto (pie o bar)
+
+Insight: identifica sobrecarga y distribución desigual.
+
+Dónde ubicarlo
+
+Debajo de los KPIs principales.
+Un bloque llamado “Evolución Operativa” con 3–4 gráficos compactos.
+
+2) ECONÓMICO
+
+Objetivo: rentabilidad real del negocio (sin impuestos ni cash).
+
+Gráficos recomendados
+
+Margen Económico (% y $) en el tiempo
+
+Línea doble: margen %, margen en USD.
+
+Insight: cuellos de rentabilidad.
+
+Overhead vs Directos mes a mes
+
+Stacked bar o column chart.
+
+Insight: si el overhead se come la rentabilidad.
+
+Evolución del EBIT Económico
+
+Línea simple.
+
+Insight: estabilidad real del negocio.
+
+Dónde va
+
+Bloque “Tendencia Económica” debajo de los KPIs.
+
+3) FINANZAS
+
+Objetivo: liquidez, riesgo, runway y salud financiera.
+
+Gráficos recomendados
+
+Cash Flow Neto (últimos 12 meses)
+
+Barras verdes/rojas.
+
+Insight: meses buenos vs meses quemados.
+
+Runway proyectado (forecast 6 meses)
+
+Línea a futuro usando burn rate actual.
+
+Insight: cuándo se queda sin caja la empresa.
+
+Estructura Financiera (pie): Activo / Pasivo / Patrimonio
+
+Snapshot visual.
+
+Insight: salud del balance.
+
+Cash In vs Cash Out
+
+Columnas lado a lado.
+
+Insight: meses donde el cash out se dispara.
+
+Dónde va
+
+Bloque “Evolución Financiera” debajo de los KPIs.
+
+¿Por qué esto mejora la UX/UI?
+
+Completa el modelo mental del usuario
+Los KPIs dicen “cómo estamos”.
+Los gráficos dicen “cómo llegamos acá”.
+
+Activa toma de decisiones
+Sin tendencia, no hay diagnóstico.
+Sin diagnóstico, no hay decisiones.
+
+Evita pantallas vacías
+Hoy tus vistas tienen demasiado espacio blanco.
+Los gráficos equilibran la composición visual.
+
+Consistencia entre pestañas
+Cada vista pasa a tener:
+
+KPIs principales
+
+Alertas inteligentes
+
+Gráficos de tendencia
+
+Detalles y notas
+
+¿Qué datos necesitás para no romper nada?
+
+Ya tenés todas las métricas base en tu backend:
+
+devengado mensual
+
+facturación mensual
+
+horas
+
+overhead
+
+directos
+
+provisiones
+
+cash in y cash out
+
+caja
+
+Solo necesitás exponerlos vía un endpoint tipo:
+
+GET /metrics/history?metric=devengado&months=12
+GET /metrics/history?metric=ebit_economico&months=12
+GET /metrics/history?metric=cashflow&months=12
+
+
+Y en el front:
+
+incorporar Recharts (ya lo usás)
+
+usar <LineChart>, <BarChart>, <AreaChart> y <PieChart>
+
+estilizar con los colores de cada pestaña (verde/azul/violeta)

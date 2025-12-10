@@ -8,6 +8,7 @@ import {
 import { motion } from "framer-motion";
 import AlertsBanner from "./AlertsBanner";
 import { Sparkline } from "./KpiCard";
+import { ChartCard, LineChartSimple, CashFlowBarChart, GroupedBarChart, PieChartSimple } from "./ChartCard";
 
 interface FinanzasViewProps {
   selectedPeriod: string;
@@ -65,6 +66,7 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
   const fin = data || {};
   const alerts = fin.alerts || [];
   const trends = fin.trends || {};
+  const breakdowns = fin.breakdowns || {};
 
   return (
     <motion.div
@@ -361,8 +363,72 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
         </div>
       </div>
 
+      {/* EVOLUCIÓN FINANCIERA — Gráficos de tendencia */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <Activity className="h-5 w-5 text-violet-600" />
+          Evolución Financiera
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {trends.cashFlowNeto && (
+            <ChartCard 
+              title="Cash Flow Neto" 
+              subtitle="Últimos 12 meses"
+              tooltip="Flujo de caja mensual (verde=positivo, rojo=negativo)"
+              color="violet"
+            >
+              <CashFlowBarChart data={trends.cashFlowNeto} />
+            </ChartCard>
+          )}
+
+          {trends.cashflow && (
+            <ChartCard 
+              title="Cash In vs Cash Out" 
+              subtitle="Ingresos y egresos"
+              tooltip="Comparación de movimientos de caja"
+              color="violet"
+            >
+              <GroupedBarChart 
+                data={trends.cashflow}
+                colors={{ cashIn: '#10b981', cashOut: '#ef4444' }}
+                labels={{ cashIn: 'Ingresos', cashOut: 'Egresos' }}
+              />
+            </ChartCard>
+          )}
+
+          {trends.ebitContable && (
+            <ChartCard 
+              title="EBIT Contable" 
+              subtitle="Resultado mensual"
+              tooltip="Evolución del beneficio contable"
+              color="violet"
+            >
+              <LineChartSimple 
+                data={trends.ebitContable}
+                color="#8b5cf6"
+                showArea
+              />
+            </ChartCard>
+          )}
+
+          {breakdowns?.estructuraFinanciera && breakdowns.estructuraFinanciera.length > 0 && (
+            <ChartCard 
+              title="Estructura Financiera" 
+              subtitle="Activo / Pasivo / Patrimonio"
+              tooltip="Composición del balance"
+              color="violet"
+            >
+              <PieChartSimple 
+                data={breakdowns.estructuraFinanciera}
+                colors={['#8b5cf6', '#f97316', '#10b981']}
+              />
+            </ChartCard>
+          )}
+        </div>
+      </div>
+
       {/* Nota */}
-      <p className="text-center text-xs text-gray-400">
+      <p className="text-center text-xs text-gray-400 mt-4">
         Vista Finanzas: Resultado contable + flujo de caja. Incluye provisiones e impuestos.
       </p>
     </motion.div>

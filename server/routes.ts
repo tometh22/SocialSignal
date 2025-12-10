@@ -14887,7 +14887,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cashFlowVariation: analytics.diffs.cashFlowNeto.vsPrevMonth,
         trends: analytics.trends,
         diffs: analytics.diffs,
-        alerts: analytics.alerts
+        alerts: analytics.alerts,
+        breakdowns: analytics.breakdowns
       });
     } catch (error) {
       console.error("❌ Executive Finanzas error:", error);

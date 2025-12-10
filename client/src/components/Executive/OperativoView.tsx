@@ -9,6 +9,7 @@ import {
 import { motion } from "framer-motion";
 import AlertsBanner from "./AlertsBanner";
 import { Sparkline } from "./KpiCard";
+import { ChartCard, LineChartSimple, StackedBarChart, HorizontalBarChart, PieChartSimple } from "./ChartCard";
 
 interface OperativoViewProps {
   selectedPeriod: string;
@@ -66,6 +67,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
   const op = data || {};
   const alerts = op.alerts || [];
   const trends = op.trends || {};
+  const breakdowns = op.breakdowns || {};
 
   return (
     <motion.div
@@ -300,6 +302,76 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-gray-400" />
           <span className="text-xs text-gray-500 italic">Sin overhead ni provisiones</span>
+        </div>
+      </div>
+
+      {/* EVOLUCIÓN OPERATIVA — Gráficos de tendencia */}
+      <div className="mt-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-emerald-600" />
+          Evolución Operativa
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {trends.horas && (
+            <ChartCard 
+              title="Horas Facturables vs No Facturables" 
+              subtitle="Últimos 12 meses"
+              tooltip="Distribución de horas productivas vs no productivas"
+              color="emerald"
+            >
+              <StackedBarChart 
+                data={trends.horas}
+                colors={{ billable: '#10b981', nonBillable: '#fbbf24' }}
+                labels={{ billable: 'Facturables', nonBillable: 'No facturables' }}
+                formatValue={(v) => `${v.toFixed(0)}h`}
+              />
+            </ChartCard>
+          )}
+
+          {trends.devengado && (
+            <ChartCard 
+              title="Devengado Mensual" 
+              subtitle="Tendencia de ingresos productivos"
+              tooltip="Evolución del ingreso devengado"
+              color="emerald"
+            >
+              <LineChartSimple 
+                data={trends.devengado}
+                color="#10b981"
+                showArea
+              />
+            </ChartCard>
+          )}
+
+          {trends.tarifaEfectiva && (
+            <ChartCard 
+              title="Tarifa Efectiva" 
+              subtitle="$/hora facturable"
+              tooltip="Precio promedio por hora facturada"
+              color="emerald"
+            >
+              <LineChartSimple 
+                data={trends.tarifaEfectiva}
+                color="#059669"
+                formatValue={(v) => `$${v.toFixed(0)}/h`}
+              />
+            </ChartCard>
+          )}
+
+          {breakdowns?.horasPorPersona && breakdowns.horasPorPersona.length > 0 && (
+            <ChartCard 
+              title="Horas por Persona" 
+              subtitle="Distribución del equipo"
+              tooltip="Top personas por horas trabajadas"
+              color="emerald"
+            >
+              <HorizontalBarChart 
+                data={breakdowns.horasPorPersona}
+                color="#10b981"
+                formatValue={(v) => `${v.toFixed(0)}h`}
+              />
+            </ChartCard>
+          )}
         </div>
       </div>
     </motion.div>

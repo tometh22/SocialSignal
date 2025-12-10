@@ -30,6 +30,11 @@ export interface BreakdownItem {
   pct: number;
 }
 
+export interface MultiSeriesTrend {
+  months: string[];
+  series: { [key: string]: number[] };
+}
+
 function getPreviousPeriods(periodKey: string, count: number): string[] {
   const [year, month] = periodKey.split('-').map(Number);
   const periods: string[] = [];
@@ -66,6 +71,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     ebitOperativo: TrendData;
     margenOperativo: TrendData;
     tarifaEfectiva: TrendData;
+    horas: MultiSeriesTrend;
   };
   diffs: {
     devengado: DiffData;
@@ -76,6 +82,8 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   alerts: Alert[];
   breakdowns: {
     horasDistribucion: BreakdownItem[];
+    horasPorPersona: BreakdownItem[];
+    horasPorProyecto: BreakdownItem[];
   };
 }> {
   const prev12 = getPreviousPeriods(periodKey, 11);
@@ -195,12 +203,51 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     });
   }
 
+  const billableArr: number[] = [];
+  const nonBillableArr: number[] = [];
+  for (const p of allPeriods) {
+    const h = hoursByPeriod.get(p) || { total: 0, billable: 0 };
+    billableArr.push(h.billable);
+    nonBillableArr.push(h.total - h.billable);
+  }
+
+  const { rows: personasRows } = await pool.query(`
+    SELECT person_key as person_name, COALESCE(SUM(billing_hours), 0) as hours
+    FROM fact_labor_month
+    WHERE period_key = $1
+    GROUP BY person_key
+    ORDER BY hours DESC
+    LIMIT 8
+  `, [periodKey]);
+  const totalPersonas = personasRows.reduce((s: number, r: any) => s + parseFloat(r.hours), 0);
+  const horasPorPersona: BreakdownItem[] = personasRows.map((r: any) => ({
+    label: r.person_name,
+    value: parseFloat(r.hours),
+    pct: totalPersonas > 0 ? (parseFloat(r.hours) / totalPersonas) * 100 : 0
+  }));
+
+  const { rows: proyectosRows } = await pool.query(`
+    SELECT project_key as project_name, COALESCE(SUM(billing_hours), 0) as hours
+    FROM fact_labor_month
+    WHERE period_key = $1
+    GROUP BY project_key
+    ORDER BY hours DESC
+    LIMIT 8
+  `, [periodKey]);
+  const totalProyectos = proyectosRows.reduce((s: number, r: any) => s + parseFloat(r.hours), 0);
+  const horasPorProyecto: BreakdownItem[] = proyectosRows.map((r: any) => ({
+    label: r.project_name || 'Sin proyecto',
+    value: parseFloat(r.hours),
+    pct: totalProyectos > 0 ? (parseFloat(r.hours) / totalProyectos) * 100 : 0
+  }));
+
   return {
     trends: {
       devengado: { months: allPeriods, values: devengadoArr },
       ebitOperativo: { months: allPeriods, values: ebitArr },
       margenOperativo: { months: allPeriods, values: margenArr },
-      tarifaEfectiva: { months: allPeriods, values: tarifaArr }
+      tarifaEfectiva: { months: allPeriods, values: tarifaArr },
+      horas: { months: allPeriods, series: { billable: billableArr, nonBillable: nonBillableArr } }
     },
     diffs: {
       devengado: { 
@@ -225,7 +272,9 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
       horasDistribucion: [
         { label: 'Facturables', value: hours.billable, pct: horasFacturablesPct },
         { label: 'No facturables', value: horasNoFacturables, pct: 100 - horasFacturablesPct }
-      ]
+      ],
+      horasPorPersona,
+      horasPorProyecto
     }
   };
 }
@@ -235,6 +284,7 @@ export async function getEconomicoTrendsAndDiffs(periodKey: string): Promise<{
     devengado: TrendData;
     ebitEconomico: TrendData;
     margenEconomico: TrendData;
+    costMix: MultiSeriesTrend;
   };
   diffs: {
     devengado: DiffData;
@@ -337,11 +387,18 @@ export async function getEconomicoTrendsAndDiffs(periodKey: string): Promise<{
     });
   }
 
+  const directosArr: number[] = [];
+  for (const p of allPeriods) {
+    const c = costsByPeriod.get(p) || { direct: 0, indirect: 0 };
+    directosArr.push(c.direct);
+  }
+
   return {
     trends: {
       devengado: { months: allPeriods, values: devengadoArr },
       ebitEconomico: { months: allPeriods, values: ebitArr },
-      margenEconomico: { months: allPeriods, values: margenArr }
+      margenEconomico: { months: allPeriods, values: margenArr },
+      costMix: { months: allPeriods, series: { directos: directosArr, overhead: overheadArr } }
     },
     diffs: {
       devengado: {
@@ -372,6 +429,7 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
     facturado: TrendData;
     ebitContable: TrendData;
     cashFlowNeto: TrendData;
+    cashflow: MultiSeriesTrend;
   };
   diffs: {
     facturado: DiffData;
@@ -380,6 +438,10 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
     burnRate: DiffData;
   };
   alerts: Alert[];
+  breakdowns: {
+    estructuraFinanciera: BreakdownItem[];
+    cashflowDistribucion: BreakdownItem[];
+  };
 }> {
   const prev12 = getPreviousPeriods(periodKey, 11);
   const allPeriods = [...prev12.reverse(), periodKey];
@@ -517,11 +579,24 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
     });
   }
 
+  const cashInArr: number[] = [];
+  const cashOutArr: number[] = [];
+  for (const p of allPeriods) {
+    const c = cashByPeriod.get(p) || { cashIn: 0, cashOut: 0 };
+    cashInArr.push(c.cashIn);
+    cashOutArr.push(c.cashOut);
+  }
+
+  const cash = cashByPeriod.get(periodKey) || { cashIn: 0, cashOut: 0 };
+  const cashTotal = cash.cashIn + cash.cashOut;
+  const patrimonio = fin.cajaTotal - costs.indirect;
+
   return {
     trends: {
       facturado: { months: allPeriods, values: facturadoArr },
       ebitContable: { months: allPeriods, values: ebitArr },
-      cashFlowNeto: { months: allPeriods, values: cashFlowArr }
+      cashFlowNeto: { months: allPeriods, values: cashFlowArr },
+      cashflow: { months: allPeriods, series: { cashIn: cashInArr, cashOut: cashOutArr } }
     },
     diffs: {
       facturado: {
@@ -541,6 +616,17 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
         vs3mAvg: calcDiffVs3mAvg(currentData.burnRate, last3BurnRate)
       }
     },
-    alerts
+    alerts,
+    breakdowns: {
+      estructuraFinanciera: [
+        { label: 'Activo (Caja)', value: fin.cajaTotal, pct: 100 },
+        { label: 'Pasivo', value: costs.indirect, pct: fin.cajaTotal > 0 ? (costs.indirect / fin.cajaTotal) * 100 : 0 },
+        { label: 'Patrimonio', value: patrimonio, pct: fin.cajaTotal > 0 ? (patrimonio / fin.cajaTotal) * 100 : 0 }
+      ],
+      cashflowDistribucion: [
+        { label: 'Ingresos', value: cash.cashIn, pct: cashTotal > 0 ? (cash.cashIn / cashTotal) * 100 : 0 },
+        { label: 'Egresos', value: cash.cashOut, pct: cashTotal > 0 ? (cash.cashOut / cashTotal) * 100 : 0 }
+      ]
+    }
   };
 }
