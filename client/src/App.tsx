@@ -35,6 +35,8 @@ import { IndirectCosts } from "@/pages/indirect-costs";
 import CurrencyDemo from "@/pages/currency-demo";
 import GoogleSheetsManager from "@/pages/google-sheets-manager";
 import ExcelMaestroPage from "@/pages/excel-maestro";
+import ExecutiveOperativo from "@/pages/Executive/Operativo";
+import ExecutiveFinanciero from "@/pages/Executive/Financiero";
 
 
 // Authentication & Utilities
@@ -128,6 +130,9 @@ function AppRoutes() {
                   <ProtectedRoute path="/" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
                   <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboard} />
+                  <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} />
+                  <ProtectedRoute path="/executive/economico" component={ExecutiveDashboard} />
+                  <ProtectedRoute path="/executive/finanzas" component={ExecutiveFinanciero} />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
                   
                   {/* Quotation Management */}
