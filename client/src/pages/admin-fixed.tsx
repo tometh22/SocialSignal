@@ -1060,7 +1060,7 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {sortedRoles.length} roles configurados</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toFixed(2)}/hr
+                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS/hr
                   </span>
                 </div>
               </div>
@@ -1589,12 +1589,12 @@ export default function Admin() {
                 name="defaultRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tarifa por Defecto (USD/hora)</FormLabel>
+                    <FormLabel>Tarifa por Defecto (ARS/hora)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
-                        step="0.01"
-                        placeholder="50.00" 
+                        step="1"
+                        placeholder="5000" 
                         {...field} 
                       />
                     </FormControl>
@@ -1692,7 +1692,7 @@ export default function Admin() {
                       <SelectContent>
                         {roles?.map((role) => (
                           <SelectItem key={role.id} value={role.id.toString()}>
-                            {role.name} (${role.defaultRate}/hr)
+                            {role.name} (${role.defaultRate.toLocaleString('es-AR')} ARS/hr)
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1733,12 +1733,12 @@ export default function Admin() {
                 name="hourlyRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tarifa por Hora (USD)</FormLabel>
+                    <FormLabel>Tarifa por Hora (ARS)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
-                        step="0.01"
-                        placeholder="50.00" 
+                        step="1"
+                        placeholder="5000" 
                         {...field} 
                       />
                     </FormControl>
@@ -1755,12 +1755,12 @@ export default function Admin() {
                 name="monthlyFixedSalary"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sueldo Mensual Fijo (USD)</FormLabel>
+                    <FormLabel>Sueldo Mensual Fijo (ARS)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
-                        step="0.01"
-                        placeholder="5000.00" 
+                        step="1"
+                        placeholder="500000" 
                         {...field}
                         disabled={personnelForm.watch("contractType") !== "full-time"}
                       />
@@ -1916,12 +1916,12 @@ export default function Admin() {
                   name="platformCost"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Costo Base (USD)</FormLabel>
+                      <FormLabel>Costo Base (ARS)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
-                          step="0.01"
-                          placeholder="500.00" 
+                          step="1"
+                          placeholder="500000" 
                           {...field} 
                         />
                       </FormControl>
@@ -2039,7 +2039,7 @@ export default function Admin() {
                       <SelectContent>
                         {roles?.map((role) => (
                           <SelectItem key={role.id} value={role.id.toString()}>
-                            {role.name} (${role.defaultRate}/hr)
+                            {role.name} (${role.defaultRate.toLocaleString('es-AR')} ARS/hr)
                           </SelectItem>
                         ))}
                       </SelectContent>

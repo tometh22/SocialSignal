@@ -162,15 +162,15 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
             <span className="text-sm font-medium text-gray-600">$</span>
             <Input
               type="number"
-              step="0.1"
+              step="1"
               min="0"
               value={editedHourlyRate}
               onChange={(e) => setEditedHourlyRate(e.target.value)}
               className="h-9 w-24 border-blue-200 focus:border-blue-400"
               disabled={updateRoleMutation.isPending}
-              placeholder="0.0"
+              placeholder="0"
             />
-            <span className="text-sm text-muted-foreground">/hr</span>
+            <span className="text-sm text-muted-foreground">ARS/hr</span>
           </div>
         </td>
         <td className="px-6 py-4">
@@ -215,8 +215,8 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-green-700">${role.defaultRate.toFixed(1)}</span>
-          <span className="text-xs text-muted-foreground">/hr</span>
+          <span className="text-sm font-semibold text-green-700">${role.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+          <span className="text-xs text-muted-foreground">ARS/hr</span>
         </div>
       </td>
       <td className="px-6 py-4">

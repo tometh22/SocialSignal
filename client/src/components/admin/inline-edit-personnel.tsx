@@ -92,9 +92,35 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const [editedName, setEditedName] = useState(person.name);
   const [editedEmail, setEditedEmail] = useState(person.email);
   const [editedRoleId, setEditedRoleId] = useState(person.roleId.toString());
-  const [editedHourlyRate, setEditedHourlyRate] = useState(person.hourlyRate.toString());
+  const getInitialHourlyRate = () => {
+    const fields = [
+      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
+      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
+      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
+      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
+    ];
+    for (const field of fields) {
+      const value = (person as any)[field];
+      if (value && value > 0) return value.toString();
+    }
+    return person.hourlyRate.toString();
+  };
+  const getInitialSalary = () => {
+    const fields = [
+      'dec2025MonthlySalaryARS', 'nov2025MonthlySalaryARS', 'oct2025MonthlySalaryARS',
+      'sep2025MonthlySalaryARS', 'aug2025MonthlySalaryARS', 'jul2025MonthlySalaryARS',
+      'jun2025MonthlySalaryARS', 'may2025MonthlySalaryARS', 'apr2025MonthlySalaryARS',
+      'mar2025MonthlySalaryARS', 'feb2025MonthlySalaryARS', 'jan2025MonthlySalaryARS'
+    ];
+    for (const field of fields) {
+      const value = (person as any)[field];
+      if (value && value > 0) return value.toString();
+    }
+    return person.monthlyFixedSalary?.toString() || '';
+  };
+  const [editedHourlyRate, setEditedHourlyRate] = useState(getInitialHourlyRate());
   const [editedContractType, setEditedContractType] = useState(person.contractType || 'full-time');
-  const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(person.monthlyFixedSalary?.toString() || '');
+  const [editedMonthlyFixedSalary, setEditedMonthlyFixedSalary] = useState(getInitialSalary());
   const [editedIncludeInRealCosts, setEditedIncludeInRealCosts] = useState(person.includeInRealCosts ?? true);
   const [editedMonthlyHours, setEditedMonthlyHours] = useState(person.monthlyHours?.toString() || '');
   const [editingCells, setEditingCells] = useState<Record<string, string>>({});
@@ -103,14 +129,13 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Sincronizar estados locales con datos de la persona cuando cambien
   useEffect(() => {
     setEditedName(person.name);
     setEditedEmail(person.email);
     setEditedRoleId(person.roleId.toString());
-    setEditedHourlyRate(person.hourlyRate.toString());
+    setEditedHourlyRate(getInitialHourlyRate());
     setEditedContractType(person.contractType || 'full-time');
-    setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
+    setEditedMonthlyFixedSalary(getInitialSalary());
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
   }, [person.id, person.name, person.email, person.roleId, person.hourlyRate, person.contractType, person.monthlyFixedSalary, person.includeInRealCosts, person.monthlyHours]);
@@ -600,13 +625,12 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
   };
 
   const handleSave = () => {
-    // Usar valores históricos en lugar de editados
-    const hourlyRate = getLatestHistoricalHourlyRate() || person.hourlyRate;
-    const monthlyFixedSalary = getLatestHistoricalSalary() || person.monthlyFixedSalary;
+    const hourlyRate = parseFloat(editedHourlyRate) || getLatestHistoricalHourlyRate() || person.hourlyRate;
+    const monthlyFixedSalary = parseFloat(editedMonthlyFixedSalary) || getLatestHistoricalSalary() || person.monthlyFixedSalary;
     const roleId = parseInt(editedRoleId);
     const monthlyHours = editedMonthlyHours ? parseFloat(editedMonthlyHours) : null;
 
-    console.log(`🔧 Validating data before save (usando valores históricos):`, {
+    console.log(`🔧 Validating data before save:`, {
       name: editedName,
       hourlyRate,
       monthlyFixedSalary,
@@ -618,7 +642,7 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     if (isNaN(hourlyRate) || hourlyRate < 0) {
       toast({
         title: "Error",
-        description: "Configure la tarifa por hora en los datos históricos",
+        description: "Ingrese una tarifa por hora válida",
         variant: "destructive"
       });
       return;
@@ -678,9 +702,9 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
     setEditedName(person.name);
     setEditedEmail(person.email);
     setEditedRoleId(person.roleId.toString());
-    setEditedHourlyRate(person.hourlyRate.toString());
+    setEditedHourlyRate(getInitialHourlyRate());
     setEditedContractType(person.contractType || 'full-time');
-    setEditedMonthlyFixedSalary(person.monthlyFixedSalary?.toString() || '');
+    setEditedMonthlyFixedSalary(getInitialSalary());
     setEditedIncludeInRealCosts(person.includeInRealCosts ?? true);
     setEditedMonthlyHours(person.monthlyHours?.toString() || '0');
     setIsEditing(false);
@@ -777,54 +801,54 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
-            {getLatestHistoricalHourlyRate() ? (
-              <>
-                <span className="text-sm font-bold text-green-700">
-                  ${getLatestHistoricalHourlyRate()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </span>
-                <span className="text-xs text-muted-foreground">ARS/hr</span>
-                <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full font-bold">
-                  ✓ DATOS HISTÓRICOS
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-xs text-gray-500 font-semibold">❌ SIN CONFIGURAR</span>
-                <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full font-bold">
-                  Configure en "Datos" ↓
-                </span>
-              </>
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium text-gray-600">$</span>
+              <Input
+                type="number"
+                step="1"
+                min="0"
+                value={editedHourlyRate}
+                onChange={(e) => {
+                  setEditedHourlyRate(e.target.value);
+                }}
+                className="h-9 w-24 border-green-200 focus:border-green-400 text-center"
+                disabled={updatePersonnelMutation.isPending}
+                placeholder="0"
+              />
+              <span className="text-xs text-muted-foreground">ARS/hr</span>
+            </div>
+            {getLatestHistoricalHourlyRate() && (
+              <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                Histórico: ${getLatestHistoricalHourlyRate()!.toLocaleString('es-AR')}
+              </span>
             )}
-            <span className="text-xs text-gray-400 italic mt-1">
-              (No editable)
-            </span>
           </div>
         </td>
         <td className="px-6 py-4">
           {editedContractType === 'full-time' ? (
-            <div className="flex flex-col items-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
-              {getLatestHistoricalSalary() ? (
-                <>
-                  <span className="text-sm font-bold text-blue-700">
-                    ${getLatestHistoricalSalary()!.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </span>
-                  <span className="text-xs text-muted-foreground">ARS/mes</span>
-                  <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full font-bold">
-                    ✓ DATOS HISTÓRICOS
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs text-gray-500 font-semibold">❌ SIN CONFIGURAR</span>
-                  <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full font-bold">
-                    Configure en "Datos" ↓
-                  </span>
-                </>
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-gray-600">$</span>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  value={editedMonthlyFixedSalary}
+                  onChange={(e) => {
+                    setEditedMonthlyFixedSalary(e.target.value);
+                  }}
+                  className="h-9 w-28 border-blue-200 focus:border-blue-400 text-center"
+                  disabled={updatePersonnelMutation.isPending}
+                  placeholder="0"
+                />
+                <span className="text-xs text-muted-foreground">ARS/mes</span>
+              </div>
+              {getLatestHistoricalSalary() && (
+                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                  Histórico: ${getLatestHistoricalSalary()!.toLocaleString('es-AR')}
+                </span>
               )}
-              <span className="text-xs text-gray-400 italic mt-1">
-                (No editable)
-              </span>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 rounded-lg border-2 border-gray-300">
