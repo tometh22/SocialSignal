@@ -767,16 +767,14 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
       console.log('🔍 getPersonnelRate returned (correct currency):', defaultRate);
     }
     
-    // FALLBACK: Only use role default if no personnel assigned
     if (!defaultRate && !member.personnelId) {
-      defaultRate = role?.defaultRate || 50;
-      console.log('🔍 Using fallback rate (no personnel):', defaultRate);
+      defaultRate = role?.defaultRate || 5000;
+      console.log('🔍 Using role default rate (ARS):', defaultRate);
     }
 
-    // EMERGENCY FALLBACK: Absolute minimum rate
     if (!defaultRate) {
-      defaultRate = 150; // ARS reasonable rate
-      console.log('🔍 Using emergency fallback rate:', defaultRate);
+      defaultRate = 5000;
+      console.log('🔍 Using emergency fallback rate (ARS):', defaultRate);
     }
 
     console.log('🔍 Final rate used (currency consistent):', defaultRate);

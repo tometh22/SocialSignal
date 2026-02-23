@@ -204,12 +204,8 @@ export default function FinancialReviewFinal() {
     finalBaseAfterInflationARS = subtotalWithComplexityARS;
   }
 
-  // Platform cost in ARS (tools will be added AFTER markup)
   const platformCostARS = quotationData.financials.platformCost || 0;
-  // Tools cost is stored in USD, convert to ARS
-  const toolsCostUSD = quotationData.financials.toolsCost || 0;
-  const { convertFromUSD } = useCurrency();
-  const toolsCostARS = convertFromUSD(toolsCostUSD, 'ARS');
+  const toolsCostARS = quotationData.financials.toolsCost || 0;
   const subtotalWithPlatformARS = finalBaseAfterInflationARS + platformCostARS;
 
   // Check if we're in manual pricing mode

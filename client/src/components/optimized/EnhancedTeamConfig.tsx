@@ -68,20 +68,11 @@ const EnhancedTeamConfig: React.FC = () => {
   // Estados temporales para edición que permiten strings vacías
   const [tempEditValues, setTempEditValues] = useState<Record<string, {hours: string, rate: string}>>({});
 
-  // Función para obtener la tarifa correcta según la moneda de cotización
   const getCorrectRate = (person: Personnel, role?: Role): number => {
-    const isARS = quotationData.quotationCurrency === 'ARS';
-    
-    if (isARS && person.hourlyRateARS && person.hourlyRateARS > 0) {
-      return person.hourlyRateARS;
-    } else if (!isARS && person.hourlyRate && person.hourlyRate > 0) {
-      return person.hourlyRate;
-    } else if (role && role.defaultRate) {
-      return role.defaultRate;
-    }
-    
-    // Fallback por defecto
-    return isARS ? 5000 : 50; // 5000 ARS o 50 USD por hora por defecto
+    const rate = getPersonnelRate(person.id);
+    if (rate && rate > 0) return rate;
+    if (role && role.defaultRate && role.defaultRate > 0) return role.defaultRate;
+    return 5000;
   };
 
   // Sincronizar con el contexto
@@ -165,11 +156,7 @@ const EnhancedTeamConfig: React.FC = () => {
       const role = getRoleInfo(roleId);
       if (role) {
         const hours = 40;
-        // Para roles sin personal específico, usar la tarifa por defecto del rol convertida
-        const defaultRate = role.defaultRate || 50;
-        const rate = quotationData.quotationCurrency === 'ARS' ? 
-          (defaultRate * 1200) : // Convertir USD a ARS aproximadamente
-          defaultRate;
+        const rate = role.defaultRate || 5000;
         addTeamMember({
           roleId,
           personnelId: null,
@@ -295,14 +282,14 @@ const EnhancedTeamConfig: React.FC = () => {
               <Calculator className="h-4 w-4 text-green-500" />
               <span className="text-sm font-medium">Costo total:</span>
               <span className="font-bold text-green-600">
-                {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{totalCost.toLocaleString()} {quotationData.quotationCurrency}
+                ${totalCost.toLocaleString('es-AR')} ARS
               </span>
             </div>
             <div className="flex items-center space-x-2">
               <DollarSign className="h-4 w-4 text-purple-500" />
               <span className="text-sm font-medium">Promedio/hora:</span>
               <span className="font-bold text-purple-600">
-                {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{totalHours > 0 ? (totalCost / totalHours).toFixed(0) : 0} {quotationData.quotationCurrency}
+                ${totalHours > 0 ? Math.round(totalCost / totalHours).toLocaleString('es-AR') : 0} ARS
               </span>
             </div>
           </div>
@@ -389,7 +376,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       <div className="flex-grow">
                         <div className="font-medium">{role.name}</div>
                         <div className={`${isSelected ? 'text-blue-200' : 'text-gray-500'}`}>
-                          {quotationData.quotationCurrency === 'ARS' ? '$' : '$'}{role.defaultRate}/h
+                          ${role.defaultRate.toLocaleString('es-AR')} ARS/h
                         </div>
                       </div>
                       {isSelected && (
@@ -466,7 +453,7 @@ const EnhancedTeamConfig: React.FC = () => {
                       <div className="flex-grow">
                         <div className="font-medium">{person.name}</div>
                         <div className={`${isSelected ? 'text-green-200' : 'text-gray-500'}`}>
-                          ${getPersonnelRate(person.id, quotationData.quotationCurrency)}/h
+                          ${getPersonnelRate(person.id).toLocaleString('es-AR')} ARS/h
                         </div>
                       </div>
                       {isSelected && (
@@ -619,12 +606,12 @@ const EnhancedTeamConfig: React.FC = () => {
                                   </div>
                                   <div className="text-center">
                                     <div className="font-medium text-sm">
-                                      ${member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                      ${(member.personnelId ? 
+                                        getPersonnelRate(member.personnelId) : 
                                         member.rate
-                                      }
+                                      ).toLocaleString('es-AR')}
                                     </div>
-                                    <div className="text-xs text-gray-500">por hora</div>
+                                    <div className="text-xs text-gray-500">ARS/hora</div>
                                   </div>
                                 </>
                               )}
@@ -634,17 +621,16 @@ const EnhancedTeamConfig: React.FC = () => {
                                 <div className="font-bold text-lg text-primary">
                                   ${(() => {
                                     if (!isEditing) {
-                                      // Recalculate cost with correct rate
                                       const correctRate = member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                        getPersonnelRate(member.personnelId) : 
                                         member.rate;
-                                      return (member.hours * correctRate).toLocaleString();
+                                      return (member.hours * correctRate).toLocaleString('es-AR');
                                     }
                                     
                                     const tempValues = tempEditValues[member.id];
                                     if (!tempValues) {
                                       const correctRate = member.personnelId ? 
-                                        getPersonnelRate(member.personnelId, quotationData.quotationCurrency) : 
+                                        getPersonnelRate(member.personnelId) : 
                                         member.rate;
                                       return (member.hours * correctRate).toLocaleString();
                                     }
