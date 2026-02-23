@@ -276,65 +276,35 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     staleTime: 0, // Force fresh data after fixes
   });
 
-  // Helper function to get personnel hourly rate in ARS
-  const getPersonnelRate = useCallback((personnelId: number) => {
+  const getPersonnelRate = useCallback((personnelId: number, targetCurrency?: string) => {
     if (!personnel || personnel.length === 0) return 0;
     const person = personnel.find(p => p.id === personnelId);
     if (!person) return 0;
 
-    console.log('🔍 DEBUGGING RATE CALCULATION - Full person data:', {
-      id: personnelId,
-      name: person.name,
-      aug_2025_hourly_rate_ars: (person as any).aug_2025_hourly_rate_ars,
-      jul_2025_hourly_rate_ars: (person as any).jul_2025_hourly_rate_ars,
-      jun_2025_hourly_rate_ars: (person as any).jun_2025_hourly_rate_ars,
-      hourly_rate_old: person.hourlyRate,
-      hourlyRateARS_old: person.hourlyRateARS,
-      allPersonData: person
-    });
+    const currency = targetCurrency || quotationData.quotationCurrency || 'ARS';
 
-    // Determine the rate in ARS
-    let rateInARS = 0;
-
-    // Función para obtener la tarifa horaria más reciente desde los datos históricos mensuales
-    const getLatestHistoricalHourlyRate = (): number | null => {
-      const hourlyRateFields = [
-        'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
-        'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
-        'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
-        'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
-      ];
-
-      // Buscar el último valor histórico no nulo, comenzando desde diciembre hacia atrás
-      for (const field of hourlyRateFields) {
-        const value = (person as any)[field];
-        if (value && value > 0) {
-          return value;
-        }
-      }
-      return null;
-    };
-
-    // USAR EXCLUSIVAMENTE las tarifas históricas mensuales más recientes
-    const latestRate = getLatestHistoricalHourlyRate();
-    if (latestRate) {
-      rateInARS = latestRate;
-      console.log('💰 Usando tarifa histórica más reciente:', { 
-        person: person.name,
-        rate: rateInARS,
-        source: 'historical_monthly_data'
-      });
+    if (currency === 'USD') {
+      const usdRate = person.hourlyRate;
+      if (usdRate && usdRate > 0) return usdRate;
+      return 50;
     }
 
-    // Final fallback - tarifa por defecto razonable en pesos
-    if (rateInARS === 0) {
-      rateInARS = 150; // 150 ARS por hora (tarifa razonable para analista)
-      console.log('💰 Usando tarifa de respaldo:', rateInARS);
+    const hourlyRateFields = [
+      'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
+      'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
+      'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
+      'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
+    ];
+
+    for (const field of hourlyRateFields) {
+      const value = (person as any)[field];
+      if (value && value > 0) return value;
     }
 
-    console.log('💰 Final rate in ARS:', rateInARS);
-    return rateInARS;
-  }, [personnel]);
+    if (person.hourlyRateARS && person.hourlyRateARS > 0) return person.hourlyRateARS;
+
+    return 5000;
+  }, [personnel, quotationData.quotationCurrency]);
 
   // Force recalculation function with debouncing
   const forceRecalculate = useCallback(() => {
@@ -689,10 +659,46 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
   }, []);
 
   const updateQuotationCurrency = useCallback((currency: string = 'ARS') => {
-    console.log('💱 Quotation currency fixed at ARS');
-    setQuotationData(prev => ({ ...prev, quotationCurrency: 'ARS' }));
+    console.log('💱 Updating quotation currency to:', currency);
+    setQuotationData(prev => {
+      const newCurrency = currency;
+      const updatedMembers = prev.teamMembers.map(member => {
+        let newRate = member.rate;
+        if (member.personnelId) {
+          const person = personnel?.find(p => p.id === member.personnelId);
+          if (person) {
+            if (newCurrency === 'USD') {
+              newRate = (person.hourlyRate && person.hourlyRate > 0) ? person.hourlyRate : 50;
+            } else {
+              const hourlyRateFields = [
+                'dec2025HourlyRateARS', 'nov2025HourlyRateARS', 'oct2025HourlyRateARS',
+                'sep2025HourlyRateARS', 'aug2025HourlyRateARS', 'jul2025HourlyRateARS',
+                'jun2025HourlyRateARS', 'may2025HourlyRateARS', 'apr2025HourlyRateARS',
+                'mar2025HourlyRateARS', 'feb2025HourlyRateARS', 'jan2025HourlyRateARS'
+              ];
+              for (const field of hourlyRateFields) {
+                const value = (person as any)[field];
+                if (value && value > 0) { newRate = value; break; }
+              }
+              if (newRate === member.rate && person.hourlyRateARS && person.hourlyRateARS > 0) {
+                newRate = person.hourlyRateARS;
+              }
+            }
+          }
+        } else if (member.roleId) {
+          const role = roles?.find(r => r.id === member.roleId);
+          if (role) {
+            newRate = newCurrency === 'USD' 
+              ? ((role as any).defaultRateUsd || 50)
+              : (role.defaultRate || 5000);
+          }
+        }
+        return { ...member, rate: newRate, cost: member.hours * newRate };
+      });
+      return { ...prev, quotationCurrency: newCurrency, teamMembers: updatedMembers };
+    });
     forceRecalculate();
-  }, [forceRecalculate]);
+  }, [forceRecalculate, personnel, roles]);
 
   const updateAnalysisType = useCallback((analysisType: string) => {
     console.log('📝 Updating analysis type:', analysisType);
@@ -750,34 +756,24 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
     const role = roles.find(r => r.id === member.roleId);
     const defaultHours = member.hours || 40;
 
-    // CRITICAL FIX: ALWAYS use getPersonnelRate to ensure correct currency, never trust member.rate
     let defaultRate = 0;
+    const currency = quotationData.quotationCurrency || 'ARS';
 
-    console.log('🔍 ADDING TEAM MEMBER - Initial data:', {
-      memberRateIgnored: member.rate, // Este valor se ignora porque puede estar en moneda incorrecta
-      personnelId: member.personnelId,
-      quotationCurrency: quotationData.quotationCurrency,
-      roleDefaultRate: role?.defaultRate
-    });
-
-    // PRIORITY 1: Always get rate from getPersonnelRate if personnelId exists
     if (member.personnelId) {
-      console.log('🔍 PRIORITY: Using getPersonnelRate for personnelId:', member.personnelId);
-      defaultRate = getPersonnelRate(member.personnelId);
-      console.log('🔍 getPersonnelRate returned (correct currency):', defaultRate);
+      defaultRate = getPersonnelRate(member.personnelId, currency);
     }
     
     if (!defaultRate && !member.personnelId) {
-      defaultRate = role?.defaultRate || 5000;
-      console.log('🔍 Using role default rate (ARS):', defaultRate);
+      if (currency === 'USD') {
+        defaultRate = (role as any)?.defaultRateUsd || 50;
+      } else {
+        defaultRate = role?.defaultRate || 5000;
+      }
     }
 
     if (!defaultRate) {
-      defaultRate = 5000;
-      console.log('🔍 Using emergency fallback rate (ARS):', defaultRate);
+      defaultRate = currency === 'USD' ? 50 : 5000;
     }
-
-    console.log('🔍 Final rate used (currency consistent):', defaultRate);
 
     const newMember: OptimizedTeamMember = {
       ...member,

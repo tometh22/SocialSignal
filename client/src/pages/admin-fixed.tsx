@@ -100,7 +100,8 @@ import {
 const roleSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   description: z.string().optional(),
-  defaultRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0")
+  defaultRate: z.coerce.number().min(0, "La tarifa debe ser mayor o igual a 0"),
+  defaultRateUsd: z.coerce.number().min(0, "La tarifa USD debe ser mayor o igual a 0").optional()
 });
 
 // Schema para el formulario de personal
@@ -267,7 +268,8 @@ export default function Admin() {
     defaultValues: {
       name: "",
       description: "",
-      defaultRate: 0
+      defaultRate: 0,
+      defaultRateUsd: 0
     }
   });
 
@@ -715,7 +717,8 @@ export default function Admin() {
     roleForm.reset({
       name: "",
       description: "",
-      defaultRate: 0
+      defaultRate: 0,
+      defaultRateUsd: 0
     });
     setCurrentRole(null);
     setIsEditing(false);
@@ -726,7 +729,8 @@ export default function Admin() {
     roleForm.reset({
       name: role.name,
       description: role.description || "",
-      defaultRate: role.defaultRate
+      defaultRate: role.defaultRate,
+      defaultRateUsd: role.defaultRateUsd || 0
     });
     setCurrentRole(role);
     setIsEditing(true);
@@ -1038,7 +1042,8 @@ export default function Admin() {
                       <TableRow>
                         <TableHead>Nombre</TableHead>
                         <TableHead>Descripción</TableHead>
-                        <TableHead>Tarifa por Defecto</TableHead>
+                        <TableHead>Tarifa ARS/h</TableHead>
+                        <TableHead>Tarifa USD/h</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1060,7 +1065,7 @@ export default function Admin() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Total: {sortedRoles.length} roles configurados</span>
                   <span className="text-blue-600 font-medium">
-                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS/hr
+                    Tarifa promedio: ${(sortedRoles.reduce((sum, role) => sum + role.defaultRate, 0) / sortedRoles.length).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS/hr | ${(sortedRoles.reduce((sum, role) => sum + (role.defaultRateUsd || 0), 0) / sortedRoles.length).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} USD/hr
                   </span>
                 </div>
               </div>
@@ -1116,7 +1121,7 @@ export default function Admin() {
                             </TooltipProvider>
                           </div>
                         </TableHead>
-                        <TableHead>Tarifa/Hora</TableHead>
+                        <TableHead>Tarifa ARS/h | USD/h</TableHead>
                         <TableHead>
                           <div className="flex items-center gap-1">
                             Sueldo Mensual
@@ -1599,7 +1604,29 @@ export default function Admin() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Esta será la tarifa por defecto para nuevo personal con este rol.
+                      Tarifa en pesos argentinos por hora.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={roleForm.control}
+                name="defaultRateUsd"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tarifa por Defecto (USD/hora)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="15" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Tarifa en dólares por hora (opcional).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -1733,7 +1760,7 @@ export default function Admin() {
                 name="hourlyRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tarifa por Hora (ARS)</FormLabel>
+                    <FormLabel>Tarifa por Hora USD</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
@@ -1743,7 +1770,7 @@ export default function Admin() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Puede ser diferente a la tarifa por defecto del rol.
+                      Tarifa en dólares por hora para cotizaciones en USD.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

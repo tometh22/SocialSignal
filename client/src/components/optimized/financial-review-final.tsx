@@ -90,9 +90,9 @@ export default function FinancialReviewFinal() {
     }
   }, [quotationData.financials?.marginFactor, quotationData.financials?.discountPercentage]);
 
-  // Helper function to format currency in ARS
+  const currencyLabel = quotationData.quotationCurrency || 'ARS';
   const formatFinalCurrency = (amount: number) => 
-    `ARS ${amount.toLocaleString('es-AR', { 
+    `${currencyLabel} ${amount.toLocaleString('es-AR', { 
       minimumFractionDigits: 0, 
       maximumFractionDigits: 0 
     })}`;
@@ -116,9 +116,8 @@ export default function FinancialReviewFinal() {
       const memberHours = Number(member.hours) || 0;
       let memberRate = Number(member.rate) || 0;
       
-      // If we have personnelId, get the rate in ARS
       if (member.personnelId) {
-        memberRate = getPersonnelRate(member.personnelId);
+        memberRate = getPersonnelRate(member.personnelId, quotationData.quotationCurrency);
       }
       
       const memberCost = memberHours * memberRate;

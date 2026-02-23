@@ -197,12 +197,14 @@ export const roles = pgTable("roles", {
   name: text("name").notNull(),
   description: text("description"),
   defaultRate: doublePrecision("default_rate").notNull(),
+  defaultRateUsd: doublePrecision("default_rate_usd"),
 });
 
 export const insertRoleSchema = createInsertSchema(roles).pick({
   name: true,
   description: true,
   defaultRate: true,
+  defaultRateUsd: true,
 });
 
 // ==================== PERSONAL ====================

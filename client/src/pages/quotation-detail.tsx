@@ -196,7 +196,8 @@ const QuotationDetail: React.FC = () => {
 
   // Formatear moneda
   const formatCurrency = (amount: number) => {
-    return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS`;
+    const curr = quotation?.quotationCurrency || 'ARS';
+    return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${curr}`;
   };
 
   // Formatear fecha

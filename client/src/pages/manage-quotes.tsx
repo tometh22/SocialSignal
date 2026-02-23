@@ -618,8 +618,8 @@ export default function ManageQuotes() {
       : 0,
   };
 
-    const formatCurrency = (amount: number) => {
-        return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ARS`;
+    const formatCurrency = (amount: number, curr: string = 'ARS') => {
+        return `$${amount.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ${curr}`;
     };
 
     const getStatusVariant = (status: string) => {

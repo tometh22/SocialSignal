@@ -1038,6 +1038,14 @@ export default function InlineEditPersonnel({ person, roles }: InlineEditPersonn
             <span className="text-xs text-gray-400">Sin configurar</span>
           )}
         </div>
+        {person.hourlyRate > 0 && (
+          <div className="flex items-center gap-1 mt-1">
+            <span className="text-sm font-semibold text-blue-700">
+              ${person.hourlyRate.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-xs text-blue-500">USD/hr</span>
+          </div>
+        )}
       </td>
       <td className="px-6 py-4">
         <div className="flex flex-col items-start gap-1">

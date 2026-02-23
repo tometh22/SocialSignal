@@ -13,6 +13,7 @@ interface InlineEditRoleProps {
     name: string;
     description: string;
     defaultRate: number;
+    defaultRateUsd: number | null;
   };
 }
 
@@ -22,19 +23,20 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
   const [editedName, setEditedName] = useState(role.name);
   const [editedDescription, setEditedDescription] = useState(role.description || "");
   const [editedHourlyRate, setEditedHourlyRate] = useState(role.defaultRate.toString());
+  const [editedHourlyRateUsd, setEditedHourlyRateUsd] = useState((role.defaultRateUsd || 0).toString());
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const updateRoleMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; defaultRate: number }) => {
+    mutationFn: async (data: { name: string; description: string; defaultRate: number; defaultRateUsd?: number }) => {
       return apiRequest(`/api/roles/${role.id}`, "PATCH", data);
     },
     onSuccess: (updatedRole) => {
-      // Actualizar los valores locales inmediatamente
       setEditedName(updatedRole.name);
       setEditedDescription(updatedRole.description || "");
       setEditedHourlyRate(updatedRole.defaultRate.toString());
+      setEditedHourlyRateUsd((updatedRole.defaultRateUsd || 0).toString());
 
       // Actualizar cache de forma optimista
       queryClient.setQueryData(["/api/roles"], (old: any) => {
@@ -122,10 +124,13 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       return;
     }
 
+    const hourlyRateUsd = parseFloat(editedHourlyRateUsd);
+
     updateRoleMutation.mutate({
       name: editedName.trim(),
       description: editedDescription.trim(),
-      defaultRate: hourlyRate
+      defaultRate: hourlyRate,
+      defaultRateUsd: isNaN(hourlyRateUsd) ? 0 : hourlyRateUsd
     });
   };
 
@@ -133,6 +138,7 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
     setEditedName(role.name);
     setEditedDescription(role.description || "");
     setEditedHourlyRate(role.defaultRate.toString());
+    setEditedHourlyRateUsd((role.defaultRateUsd || 0).toString());
     setIsEditing(false);
   };
 
@@ -171,6 +177,22 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
               placeholder="0"
             />
             <span className="text-sm text-muted-foreground">ARS/hr</span>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-medium text-gray-600">$</span>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={editedHourlyRateUsd}
+              onChange={(e) => setEditedHourlyRateUsd(e.target.value)}
+              className="h-9 w-24 border-blue-200 focus:border-blue-400"
+              disabled={updateRoleMutation.isPending}
+              placeholder="0"
+            />
+            <span className="text-sm text-muted-foreground">USD/hr</span>
           </div>
         </td>
         <td className="px-6 py-4">
@@ -217,6 +239,12 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
         <div className="flex items-center gap-1">
           <span className="text-sm font-semibold text-green-700">${role.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
           <span className="text-xs text-muted-foreground">ARS/hr</span>
+        </div>
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-semibold text-blue-700">${(role.defaultRateUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+          <span className="text-xs text-muted-foreground">USD/hr</span>
         </div>
       </td>
       <td className="px-6 py-4">
