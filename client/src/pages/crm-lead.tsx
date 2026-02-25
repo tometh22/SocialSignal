@@ -9,14 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Building2, Mail, Phone, User, Plus, Trash2, CheckCircle2,
   Bell, FileText, MessageSquare, Calendar, Target, Edit3, Trophy, XCircle,
-  Send, Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase, Paperclip, Download, X
+  Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase, Paperclip, Download, X
 } from "lucide-react";
 
 type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -75,10 +75,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [emailTo, setEmailTo] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
+
 
   const [newActivity, setNewActivity] = useState({ type: 'note' as ActivityType, title: '', content: '' });
   const [activityOpen, setActivityOpen] = useState(false);
@@ -184,16 +181,6 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     onSuccess: () => invalidate(),
   });
 
-  const sendEmail = useMutation({
-    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', data),
-    onSuccess: () => {
-      invalidate();
-      setEmailOpen(false);
-      setEmailTo(''); setEmailSubject(''); setEmailBody('');
-      toast({ title: 'Email enviado y registrado en el timeline' });
-    },
-    onError: () => toast({ title: 'Error al enviar email', variant: 'destructive' }),
-  });
 
   const handleStageChange = (stage: string) => {
     updateLead.mutate({ stage });
@@ -284,10 +271,6 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
               <XCircle className="w-3.5 h-3.5" /> Perdido
             </Button>
           )}
-          <Button size="sm" className="gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white"
-            onClick={() => setEmailOpen(true)}>
-            <Mail className="w-3.5 h-3.5" /> Enviar Email
-          </Button>
         </div>
       </div>
 
@@ -636,58 +619,6 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Email Composer Sheet */}
-      <Sheet open={emailOpen} onOpenChange={setEmailOpen}>
-        <SheetContent className="w-full sm:max-w-xl">
-          <SheetHeader className="pb-4">
-            <SheetTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-indigo-600" /> Enviar Email
-            </SheetTitle>
-          </SheetHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Para *</Label>
-              <Input type="email" placeholder="destinatario@empresa.com" value={emailTo}
-                onChange={e => setEmailTo(e.target.value)} />
-              {lead.contacts.filter(c => c.email).length > 0 && (
-                <div className="flex gap-1.5 mt-1.5 flex-wrap">
-                  {lead.contacts.filter(c => c.email).map(c => (
-                    <button key={c.id} onClick={() => setEmailTo(c.email!)}
-                      className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full hover:bg-indigo-100 transition-colors">
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <Label>Asunto *</Label>
-              <Input placeholder="Asunto del email" value={emailSubject}
-                onChange={e => setEmailSubject(e.target.value)} />
-            </div>
-            <div>
-              <Label>Mensaje *</Label>
-              <Textarea placeholder="Redactá tu mensaje aquí..." value={emailBody}
-                onChange={e => setEmailBody(e.target.value)} rows={10} className="resize-none" />
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setEmailOpen(false)}>Cancelar</Button>
-              <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
-                onClick={() => sendEmail.mutate({ to: emailTo, subject: emailSubject, body: emailBody })}
-                disabled={!emailTo || !emailSubject || !emailBody || sendEmail.isPending}>
-                {sendEmail.isPending ? (
-                  <><Clock className="w-4 h-4 animate-spin" /> Enviando...</>
-                ) : (
-                  <><Send className="w-4 h-4" /> Enviar Email</>
-                )}
-              </Button>
-            </div>
-            <p className="text-xs text-slate-400 text-center">
-              El email quedará registrado automáticamente en el historial del lead.
-            </p>
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {/* Activity Detail Modal */}
       {selectedActivity && (() => {
