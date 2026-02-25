@@ -47,6 +47,7 @@ export default function SidebarFixed() {
   const [currentPath] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [projectCount, setProjectCount] = useState(0);
+  const [crmOverdue, setCrmOverdue] = useState(0);
 
   // Función para obtener el conteo real
   const fetchProjectCount = async () => {
@@ -62,10 +63,21 @@ export default function SidebarFixed() {
     }
   };
 
+  const fetchCrmStats = async () => {
+    try {
+      const response = await fetch('/api/crm/stats');
+      if (response.ok) {
+        const data = await response.json();
+        setCrmOverdue(data.overdueReminders || 0);
+      }
+    } catch {}
+  };
+
   // Actualizar inmediatamente y cada 2 minutos (optimizado)
   useEffect(() => {
     fetchProjectCount();
-    const interval = setInterval(fetchProjectCount, 120000); // 2 minutos en lugar de 2 segundos
+    fetchCrmStats();
+    const interval = setInterval(() => { fetchProjectCount(); fetchCrmStats(); }, 120000);
     return () => clearInterval(interval);
   }, []);
 
@@ -87,6 +99,7 @@ export default function SidebarFixed() {
       title: "Gestión Comercial",
       items: [
         { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
+        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline y seguimiento de prospectos" },
         { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones" },
         { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" }
       ]

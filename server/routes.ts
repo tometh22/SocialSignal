@@ -80,7 +80,15 @@ import {
   costsSot,
   factLaborMonth,
   factRCMonth,
-  dimPeriod
+  dimPeriod,
+  crmLeads,
+  crmContacts,
+  crmActivities,
+  crmReminders,
+  insertCrmLeadSchema,
+  insertCrmContactSchema,
+  insertCrmActivitySchema,
+  insertCrmReminderSchema
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -14918,6 +14926,355 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       });
     } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // ==================== CRM VENTAS ====================
+
+  // GET /api/crm/stats — métricas del pipeline
+  app.get("/api/crm/stats", async (req: Request, res: Response) => {
+    try {
+      const now = new Date();
+      const leadsResult = await db.select().from(crmLeads);
+      const remindersResult = await db.select().from(crmReminders).where(eq(crmReminders.completed, false));
+      
+      const byStage: Record<string, number> = {};
+      let totalPipelineUsd = 0;
+      let wonThisMonth = 0;
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      for (const lead of leadsResult) {
+        byStage[lead.stage] = (byStage[lead.stage] || 0) + 1;
+        if (!['won', 'lost'].includes(lead.stage)) {
+          totalPipelineUsd += lead.estimatedValueUsd || 0;
+        }
+        if (lead.stage === 'won' && lead.wonAt) {
+          const wonDate = new Date(lead.wonAt);
+          if (wonDate.getMonth() === currentMonth && wonDate.getFullYear() === currentYear) {
+            wonThisMonth++;
+          }
+        }
+      }
+
+      const overdueReminders = remindersResult.filter(r => new Date(r.dueDate) < now);
+
+      res.json({
+        totalActive: leadsResult.filter(l => !['won', 'lost'].includes(l.stage)).length,
+        totalPipelineUsd,
+        wonThisMonth,
+        overdueReminders: overdueReminders.length,
+        byStage,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/crm/leads — lista de leads
+  app.get("/api/crm/leads", async (req: Request, res: Response) => {
+    try {
+      const { stage, search } = req.query;
+      
+      let allLeads = await db.select().from(crmLeads).orderBy(desc(crmLeads.updatedAt));
+      
+      if (stage && typeof stage === 'string' && stage !== 'all') {
+        allLeads = allLeads.filter(l => l.stage === stage);
+      }
+      if (search && typeof search === 'string') {
+        const q = search.toLowerCase();
+        allLeads = allLeads.filter(l => l.companyName.toLowerCase().includes(q));
+      }
+
+      // Enrich with primary contact and last activity
+      const enriched = await Promise.all(allLeads.map(async (lead) => {
+        const contacts = await db.select().from(crmContacts)
+          .where(eq(crmContacts.leadId, lead.id))
+          .orderBy(desc(crmContacts.isPrimary));
+        const activities = await db.select().from(crmActivities)
+          .where(eq(crmActivities.leadId, lead.id))
+          .orderBy(desc(crmActivities.activityDate))
+          .limit(1);
+        const reminders = await db.select().from(crmReminders)
+          .where(and(eq(crmReminders.leadId, lead.id), eq(crmReminders.completed, false)));
+        return {
+          ...lead,
+          primaryContact: contacts.find(c => c.isPrimary) || contacts[0] || null,
+          lastActivity: activities[0] || null,
+          pendingReminders: reminders.length,
+        };
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/crm/leads — crear lead
+  app.post("/api/crm/leads", async (req: Request, res: Response) => {
+    try {
+      const data = insertCrmLeadSchema.parse(req.body);
+      const userId = (req.session as any)?.userId;
+      const [lead] = await db.insert(crmLeads).values({ ...data, createdBy: userId }).returning();
+      
+      // Si viene con contacto inicial, crearlo
+      if (req.body.contactName) {
+        await db.insert(crmContacts).values({
+          leadId: lead.id,
+          name: req.body.contactName,
+          email: req.body.contactEmail || null,
+          phone: req.body.contactPhone || null,
+          position: req.body.contactPosition || null,
+          isPrimary: true,
+        });
+      }
+      
+      res.status(201).json(lead);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/crm/leads/:id — detalle completo
+  app.get("/api/crm/leads/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, id));
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+      const contacts = await db.select().from(crmContacts)
+        .where(eq(crmContacts.leadId, id))
+        .orderBy(desc(crmContacts.isPrimary));
+      const activities = await db.select().from(crmActivities)
+        .where(eq(crmActivities.leadId, id))
+        .orderBy(desc(crmActivities.activityDate));
+      const reminders = await db.select().from(crmReminders)
+        .where(eq(crmReminders.leadId, id))
+        .orderBy(asc(crmReminders.dueDate));
+
+      res.json({ ...lead, contacts, activities, reminders });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // PATCH /api/crm/leads/:id — actualizar lead
+  app.patch("/api/crm/leads/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates: any = { ...req.body, updatedAt: new Date() };
+      
+      // Auto-set dates when stage changes
+      if (req.body.stage === 'won' && !updates.wonAt) updates.wonAt = new Date();
+      if (req.body.stage === 'lost' && !updates.lostAt) updates.lostAt = new Date();
+      
+      const [lead] = await db.update(crmLeads).set(updates).where(eq(crmLeads.id, id)).returning();
+      if (!lead) return res.status(404).json({ error: 'Lead not found' });
+      res.json(lead);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // DELETE /api/crm/leads/:id
+  app.delete("/api/crm/leads/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(crmLeads).where(eq(crmLeads.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/crm/leads/:id/contacts
+  app.get("/api/crm/leads/:id/contacts", async (req: Request, res: Response) => {
+    try {
+      const contacts = await db.select().from(crmContacts)
+        .where(eq(crmContacts.leadId, parseInt(req.params.id)))
+        .orderBy(desc(crmContacts.isPrimary));
+      res.json(contacts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/crm/leads/:id/contacts
+  app.post("/api/crm/leads/:id/contacts", async (req: Request, res: Response) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      const data = insertCrmContactSchema.parse({ ...req.body, leadId });
+      const [contact] = await db.insert(crmContacts).values(data).returning();
+      res.status(201).json(contact);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // PATCH /api/crm/contacts/:id
+  app.patch("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+    try {
+      const [contact] = await db.update(crmContacts).set(req.body)
+        .where(eq(crmContacts.id, parseInt(req.params.id))).returning();
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // DELETE /api/crm/contacts/:id
+  app.delete("/api/crm/contacts/:id", async (req: Request, res: Response) => {
+    try {
+      await db.delete(crmContacts).where(eq(crmContacts.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/crm/leads/:id/activities
+  app.get("/api/crm/leads/:id/activities", async (req: Request, res: Response) => {
+    try {
+      const activities = await db.select().from(crmActivities)
+        .where(eq(crmActivities.leadId, parseInt(req.params.id)))
+        .orderBy(desc(crmActivities.activityDate));
+      res.json(activities);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/crm/leads/:id/activities
+  app.post("/api/crm/leads/:id/activities", async (req: Request, res: Response) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      const userId = (req.session as any)?.userId;
+      const body = { ...req.body, leadId, createdBy: userId };
+      if (typeof body.activityDate === 'string') body.activityDate = new Date(body.activityDate);
+      const data = insertCrmActivitySchema.parse(body);
+      const [activity] = await db.insert(crmActivities).values(data).returning();
+      // Update lead's updatedAt
+      await db.update(crmLeads).set({ updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
+      res.status(201).json(activity);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // DELETE /api/crm/activities/:id
+  app.delete("/api/crm/activities/:id", async (req: Request, res: Response) => {
+    try {
+      await db.delete(crmActivities).where(eq(crmActivities.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // GET /api/crm/leads/:id/reminders
+  app.get("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
+    try {
+      const reminders = await db.select().from(crmReminders)
+        .where(eq(crmReminders.leadId, parseInt(req.params.id)))
+        .orderBy(asc(crmReminders.dueDate));
+      res.json(reminders);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/crm/leads/:id/reminders
+  app.post("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      const userId = (req.session as any)?.userId;
+      const body = { ...req.body, leadId, createdBy: userId };
+      // Convert date string to Date object for Zod validation
+      if (typeof body.dueDate === 'string') body.dueDate = new Date(body.dueDate);
+      const data = insertCrmReminderSchema.parse(body);
+      const [reminder] = await db.insert(crmReminders).values(data).returning();
+      res.status(201).json(reminder);
+    } catch (error) {
+      if (error instanceof z.ZodError) return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // PATCH /api/crm/reminders/:id — marcar completo u otros cambios
+  app.patch("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+    try {
+      const updates: any = { ...req.body };
+      if (req.body.completed === true) updates.completedAt = new Date();
+      const [reminder] = await db.update(crmReminders).set(updates)
+        .where(eq(crmReminders.id, parseInt(req.params.id))).returning();
+      res.json(reminder);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // DELETE /api/crm/reminders/:id
+  app.delete("/api/crm/reminders/:id", async (req: Request, res: Response) => {
+    try {
+      await db.delete(crmReminders).where(eq(crmReminders.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // POST /api/crm/leads/:id/send-email — enviar email via SendGrid y registrar actividad
+  app.post("/api/crm/leads/:id/send-email", async (req: Request, res: Response) => {
+    try {
+      const leadId = parseInt(req.params.id);
+      const { to, subject, body, contactId } = req.body;
+      const userId = (req.session as any)?.userId;
+
+      if (!to || !subject || !body) {
+        return res.status(400).json({ error: 'Se requieren los campos: to, subject, body' });
+      }
+
+      const sgApiKey = process.env.SENDGRID_API_KEY;
+      if (!sgApiKey) {
+        return res.status(500).json({ error: 'SendGrid no configurado. Falta SENDGRID_API_KEY.' });
+      }
+
+      // Enviar email via SendGrid
+      const sgMail = await import('@sendgrid/mail');
+      sgMail.default.setApiKey(sgApiKey);
+      
+      const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@epical.digital';
+      
+      await sgMail.default.send({
+        to,
+        from: fromEmail,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, '<br>'),
+      });
+
+      // Registrar actividad de email en el timeline
+      const [activity] = await db.insert(crmActivities).values({
+        leadId,
+        type: 'email',
+        title: `Email: ${subject}`,
+        content: body,
+        activityDate: new Date(),
+        createdBy: userId,
+        emailMetadata: { subject, to, body, sentAt: new Date().toISOString() },
+      }).returning();
+
+      // Actualizar updatedAt del lead
+      await db.update(crmLeads).set({ updatedAt: new Date() }).where(eq(crmLeads.id, leadId));
+
+      res.json({ success: true, activity });
+    } catch (error: any) {
+      console.error('SendGrid error:', error?.response?.body || error.message);
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });

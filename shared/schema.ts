@@ -2915,3 +2915,92 @@ export interface ProjectDetailsVM {
     recommendations?: any;
   };
 }
+
+// ==================== CRM VENTAS ====================
+
+export const crmLeads = pgTable("crm_leads", {
+  id: serial("id").primaryKey(),
+  companyName: varchar("company_name", { length: 255 }).notNull(),
+  stage: varchar("stage", { length: 50 }).notNull().default('new'), // new|contacted|qualified|proposal|negotiation|won|lost
+  source: varchar("source", { length: 100 }), // referido|linkedin|web|evento|otro
+  estimatedValueUsd: doublePrecision("estimated_value_usd"),
+  notes: text("notes"),
+  clientId: integer("client_id").references(() => clients.id), // vínculo a cliente existente
+  assignedTo: integer("assigned_to").references(() => users.id),
+  lostReason: text("lost_reason"),
+  wonAt: timestamp("won_at"),
+  lostAt: timestamp("lost_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
+});
+
+export const crmContacts = pgTable("crm_contacts", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => crmLeads.id, { onDelete: 'cascade' }),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  position: varchar("position", { length: 150 }),
+  isPrimary: boolean("is_primary").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const crmActivities = pgTable("crm_activities", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => crmLeads.id, { onDelete: 'cascade' }),
+  type: varchar("type", { length: 50 }).notNull(), // note|call|email|meeting|proposal|followup
+  title: varchar("title", { length: 255 }),
+  content: text("content"),
+  activityDate: timestamp("activity_date").notNull().defaultNow(),
+  quotationId: integer("quotation_id").references(() => quotations.id),
+  emailMetadata: json("email_metadata"), // { subject, to, body, sentAt }
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const crmReminders = pgTable("crm_reminders", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull().references(() => crmLeads.id, { onDelete: 'cascade' }),
+  description: text("description").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  completed: boolean("completed").default(false),
+  completedAt: timestamp("completed_at"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Insert Schemas — CRM
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  wonAt: true,
+  lostAt: true,
+});
+
+export const insertCrmContactSchema = createInsertSchema(crmContacts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmActivitySchema = createInsertSchema(crmActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCrmReminderSchema = createInsertSchema(crmReminders).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+// Types — CRM
+export type CrmLead = typeof crmLeads.$inferSelect;
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type InsertCrmContact = z.infer<typeof insertCrmContactSchema>;
+export type CrmActivity = typeof crmActivities.$inferSelect;
+export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
+export type CrmReminder = typeof crmReminders.$inferSelect;
+export type InsertCrmReminder = z.infer<typeof insertCrmReminderSchema>;

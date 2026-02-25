@@ -37,6 +37,8 @@ import GoogleSheetsManager from "@/pages/google-sheets-manager";
 import ExcelMaestroPage from "@/pages/excel-maestro";
 import ExecutiveOperativo from "@/pages/Executive/Operativo";
 import ExecutiveFinanciero from "@/pages/Executive/Financiero";
+import CRMPage from "@/pages/crm";
+import CRMLeadPage from "@/pages/crm-lead";
 
 
 // Authentication & Utilities
@@ -168,6 +170,10 @@ function AppRoutes() {
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} />
                   
+                  {/* CRM Ventas */}
+                  <ProtectedRoute path="/crm" component={CRMPage} />
+                  <ProtectedRoute path="/crm/:id" component={CRMLeadPage} />
+
                   {/* Client & Resource Management */}
                   <ProtectedRoute path="/clients" component={Clients} />
                   <ProtectedRoute path="/admin" component={Admin} />
