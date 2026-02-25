@@ -2966,6 +2966,7 @@ export const crmReminders = pgTable("crm_reminders", {
   dueDate: timestamp("due_date").notNull(),
   completed: boolean("completed").default(false),
   completedAt: timestamp("completed_at"),
+  notifiedAt: timestamp("notified_at"),
   createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -2993,6 +2994,7 @@ export const insertCrmReminderSchema = createInsertSchema(crmReminders).omit({
   id: true,
   createdAt: true,
   completedAt: true,
+  notifiedAt: true,
 });
 
 // Types — CRM

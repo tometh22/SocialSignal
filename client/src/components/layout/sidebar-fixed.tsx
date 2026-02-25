@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,9 +31,11 @@ import {
   Receipt,
   FileSpreadsheet,
   DollarSign,
+  Bell,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 
-// Tipo para elementos de navegación
 type NavItem = {
   href: string;
   title: string;
@@ -42,14 +45,24 @@ type NavItem = {
   description?: string;
 };
 
+type DueReminder = {
+  id: number;
+  description: string;
+  dueDate: string;
+  leadId: number;
+  leadName: string | null;
+  isOverdue: boolean;
+};
+
 export default function SidebarFixed() {
   const { user, logoutMutation } = useAuth();
   const [currentPath] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [projectCount, setProjectCount] = useState(0);
   const [crmOverdue, setCrmOverdue] = useState(0);
+  const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
+  const [bellOpen, setBellOpen] = useState(false);
 
-  // Función para obtener el conteo real
   const fetchProjectCount = async () => {
     try {
       const response = await fetch('/api/active-projects/count?' + Date.now());
@@ -58,7 +71,6 @@ export default function SidebarFixed() {
         setProjectCount(data.count);
       }
     } catch (error) {
-      console.error('Error fetching project count:', error);
       setProjectCount(0);
     }
   };
@@ -73,21 +85,33 @@ export default function SidebarFixed() {
     } catch {}
   };
 
-  // Actualizar inmediatamente y cada 2 minutos (optimizado)
+  const fetchDueReminders = async () => {
+    try {
+      const response = await fetch('/api/crm/reminders/due', { credentials: 'include' });
+      if (response.ok) {
+        const data = await response.json();
+        setDueReminders(data);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     fetchProjectCount();
     fetchCrmStats();
-    const interval = setInterval(() => { fetchProjectCount(); fetchCrmStats(); }, 120000);
+    fetchDueReminders();
+    const interval = setInterval(() => {
+      fetchProjectCount();
+      fetchCrmStats();
+      fetchDueReminders();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Función para obtener las iniciales del usuario
   const getUserInitials = () => {
     if (!user) return "US";
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
-  // Navegación organizada por secciones
   const navSections = [
     {
       title: "Principal",
@@ -105,7 +129,7 @@ export default function SidebarFixed() {
       ]
     },
     {
-      title: "Gestión Operacional", 
+      title: "Gestión Operacional",
       items: [
         { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso" }
       ]
@@ -127,7 +151,6 @@ export default function SidebarFixed() {
     }
   ];
 
-  // Renderizar enlace de navegación compacto
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
     const isActive = currentPath === item.href;
@@ -154,12 +177,12 @@ export default function SidebarFixed() {
                     <span className="truncate font-medium">{item.title}</span>
                     <div className="flex items-center gap-1.5 ml-2">
                       {item.badge && (
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className={cn(
                             "h-4 px-1.5 text-xs font-medium",
-                            isActive 
-                              ? "bg-primary-foreground/20 text-primary-foreground" 
+                            isActive
+                              ? "bg-primary-foreground/20 text-primary-foreground"
                               : "bg-primary/10 text-primary"
                           )}
                         >
@@ -189,13 +212,16 @@ export default function SidebarFixed() {
     );
   };
 
+  const totalDue = dueReminders.length;
+  const overdueCount = dueReminders.filter(r => r.isOverdue).length;
+
   return (
     <TooltipProvider>
       <div className={cn(
         "flex flex-col h-screen bg-background border-r border-border transition-all duration-300 shadow-sm",
         isCollapsed ? "w-16" : "w-64"
       )}>
-        {/* Header minimalista */}
+        {/* Header */}
         <div className="flex items-center justify-between p-2.5 border-b border-border">
           {!isCollapsed && (
             <div className="flex items-center gap-2.5">
@@ -206,20 +232,106 @@ export default function SidebarFixed() {
             </div>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="h-6 w-6 p-0 hover:bg-accent"
-          >
-            <ChevronRight className={cn("h-3 w-3 transition-transform text-muted-foreground", isCollapsed ? "" : "rotate-180")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            {/* Bell icon with popover */}
+            <Popover open={bellOpen} onOpenChange={setBellOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-accent relative"
+                >
+                  <Bell className={cn("h-3.5 w-3.5", totalDue > 0 ? "text-amber-500" : "text-muted-foreground")} />
+                  {totalDue > 0 && (
+                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+                      {totalDue > 9 ? "9+" : totalDue}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="w-80 p-0 shadow-lg"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-amber-500" />
+                    <span className="font-semibold text-sm">Recordatorios</span>
+                  </div>
+                  {totalDue > 0 && (
+                    <Badge variant="destructive" className="text-xs h-5 px-1.5">
+                      {totalDue}
+                    </Badge>
+                  )}
+                </div>
+
+                {totalDue === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                    <Bell className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                    <p className="text-sm text-muted-foreground">Sin recordatorios pendientes</p>
+                  </div>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                    {dueReminders.map((reminder) => (
+                      <Link
+                        key={reminder.id}
+                        href={`/crm/${reminder.leadId}`}
+                        onClick={() => setBellOpen(false)}
+                        className="block px-4 py-3 hover:bg-accent transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <div className={cn(
+                            "mt-0.5 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
+                            reminder.isOverdue
+                              ? "bg-red-100 text-red-600"
+                              : "bg-amber-100 text-amber-600"
+                          )}>
+                            {reminder.isOverdue
+                              ? <AlertCircle className="h-3 w-3" />
+                              : <Clock className="h-3 w-3" />
+                            }
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "text-xs font-semibold truncate",
+                              reminder.isOverdue ? "text-red-600" : "text-amber-600"
+                            )}>
+                              {reminder.leadName || `Lead #${reminder.leadId}`}
+                            </p>
+                            <p className="text-xs text-foreground truncate mt-0.5">
+                              {reminder.description}
+                            </p>
+                            <p className={cn(
+                              "text-xs mt-1 font-medium",
+                              reminder.isOverdue ? "text-red-500" : "text-amber-500"
+                            )}>
+                              {reminder.isOverdue ? "Vencido — " : "Vence "}{new Date(reminder.dueDate).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-6 w-6 p-0 hover:bg-accent"
+            >
+              <ChevronRight className={cn("h-3 w-3 transition-transform text-muted-foreground", isCollapsed ? "" : "rotate-180")} />
+            </Button>
+          </div>
         </div>
 
         {/* Navegación principal organizada por secciones */}
         <div className="flex-1 px-2 py-3 overflow-y-auto">
           <nav className="space-y-4">
-            {navSections.map((section, index) => (
+            {navSections.map((section) => (
               <div key={section.title}>
                 {!isCollapsed && (
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
@@ -234,7 +346,7 @@ export default function SidebarFixed() {
           </nav>
         </div>
 
-        {/* Footer minimalista */}
+        {/* Footer */}
         <div className="border-t border-border p-2">
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">

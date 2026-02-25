@@ -15176,6 +15176,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/crm/reminders/due — recordatorios vencidos o próximos (24hs), para alertas in-app
+  app.get("/api/crm/reminders/due", async (req: Request, res: Response) => {
+    try {
+      const now = new Date();
+      const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const dueReminders = await db
+        .select({
+          id: crmReminders.id,
+          description: crmReminders.description,
+          dueDate: crmReminders.dueDate,
+          leadId: crmReminders.leadId,
+          leadName: crmLeads.companyName,
+        })
+        .from(crmReminders)
+        .leftJoin(crmLeads, eq(crmLeads.id, crmReminders.leadId))
+        .where(
+          and(
+            eq(crmReminders.completed, false),
+            lte(crmReminders.dueDate, in24h)
+          )
+        )
+        .orderBy(asc(crmReminders.dueDate));
+
+      const result = dueReminders.map(r => ({
+        ...r,
+        isOverdue: new Date(r.dueDate) < now,
+      }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // GET /api/crm/leads/:id/reminders
   app.get("/api/crm/leads/:id/reminders", async (req: Request, res: Response) => {
     try {
