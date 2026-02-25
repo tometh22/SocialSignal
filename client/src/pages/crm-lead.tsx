@@ -110,6 +110,10 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
     },
   });
 
+  const { data: clients = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['/api/clients'],
+  });
+
   const invalidate = () => {
     refetch();
     queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] });
@@ -466,6 +470,38 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                       </Button>
                     </div>
                   </div>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-slate-500">Cliente vinculado</p>
+                </div>
+                <Select
+                  value={lead.clientId?.toString() ?? 'none'}
+                  onValueChange={val => {
+                    const newClientId = val === 'none' ? null : parseInt(val);
+                    updateLead.mutate({ clientId: newClientId });
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-sm border-slate-200 bg-slate-50 hover:bg-white transition-colors">
+                    <SelectValue placeholder="Sin cliente vinculado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      <span className="text-slate-400">Sin cliente vinculado</span>
+                    </SelectItem>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {lead.clientId && (
+                  <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                    Cliente vinculado — podés crear cotizaciones desde este lead
+                  </p>
                 )}
               </div>
             </CardContent>
