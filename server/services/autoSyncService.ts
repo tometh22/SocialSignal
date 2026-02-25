@@ -143,72 +143,63 @@ export class AutoSyncService {
       let etlExecuted = false;
       const syncId = `sync_${Date.now()}`;
       
-      if (costsResult.success && (costsResult.costsImported > 0 || costsResult.costsUpdated > 0)) {
-        try {
-          console.log(`🌟 [${syncId}] AUTO-ETL: Ejecutando Star Schema ETL después de sincronización...`);
-          
-          // Importar ETL dinámicamente
-          const { executeSoTETL } = await import('../etl/sot-etl');
-          
-          // Leer datos frescos desde Excel MAESTRO
-          const costosRaw = await googleSheetsWorkingService.getSheetValues(
-            '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
-            'Costos directos e indirectos',
-            {
-              valueRenderOption: 'UNFORMATTED_VALUE',
-              dateTimeRenderOption: 'SERIAL_NUMBER'
-            }
-          );
-          
-          const rcRaw = await googleSheetsWorkingService.getSheetValues(
-            '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
-            'Rendimiento Cliente',
-            {
-              valueRenderOption: 'UNFORMATTED_VALUE',
-              dateTimeRenderOption: 'SERIAL_NUMBER'
-            }
-          );
-          
-          // Parse headers
-          const costosHeaders = costosRaw[0] || [];
-          const rcHeaders = rcRaw[0] || [];
-          
-          const costosRows = costosRaw.slice(1).map((row: any, idx: number) => {
-            const obj: any = { __rowId: `costos_${idx}` };
-            costosHeaders.forEach((header: any, i: number) => {
-              obj[header] = row[i];
-            });
-            return obj;
-          });
-          
-          const rcRows = rcRaw.slice(1).map((row: any, idx: number) => {
-            const obj: any = { __rowId: `rc_${idx}` };
-            rcHeaders.forEach((header: any, i: number) => {
-              obj[header] = row[i];
-            });
-            return obj;
-          });
-          
-          // Ejecutar ETL completo (todos los períodos)
-          etlResult = await executeSoTETL(costosRows, rcRows, {
-            dryRun: false,
-            recomputeAgg: true
-          });
-          
-          etlExecuted = true;
-          
-          if (etlResult.success) {
-            console.log(`✅ [${syncId}] AUTO-ETL completado: ${etlResult.periodsProcessed.length} períodos procesados, ${etlResult.laborRowsProcessed} labor rows, ${etlResult.rcRowsProcessed} RC rows`);
-          } else {
-            console.error(`⚠️ [${syncId}] AUTO-ETL completado con errores:`, etlResult.errors);
+      try {
+        console.log(`🌟 [${syncId}] AUTO-ETL: Ejecutando Star Schema ETL después de sincronización...`);
+        
+        const { executeSoTETL } = await import('../etl/sot-etl');
+        
+        const costosRaw = await googleSheetsWorkingService.getSheetValues(
+          '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+          'Costos directos e indirectos',
+          {
+            valueRenderOption: 'UNFORMATTED_VALUE',
+            dateTimeRenderOption: 'SERIAL_NUMBER'
           }
-          
-        } catch (etlError: any) {
-          console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
-          // No fallar la sincronización completa si el ETL falla
+        );
+        
+        const rcRaw = await googleSheetsWorkingService.getSheetValues(
+          '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc',
+          'Rendimiento Cliente',
+          {
+            valueRenderOption: 'UNFORMATTED_VALUE',
+            dateTimeRenderOption: 'SERIAL_NUMBER'
+          }
+        );
+        
+        const costosHeaders = costosRaw[0] || [];
+        const rcHeaders = rcRaw[0] || [];
+        
+        const costosRows = costosRaw.slice(1).map((row: any, idx: number) => {
+          const obj: any = { __rowId: `costos_${idx}` };
+          costosHeaders.forEach((header: any, i: number) => {
+            obj[header] = row[i];
+          });
+          return obj;
+        });
+        
+        const rcRows = rcRaw.slice(1).map((row: any, idx: number) => {
+          const obj: any = { __rowId: `rc_${idx}` };
+          rcHeaders.forEach((header: any, i: number) => {
+            obj[header] = row[i];
+          });
+          return obj;
+        });
+        
+        etlResult = await executeSoTETL(costosRows, rcRows, {
+          dryRun: false,
+          recomputeAgg: true
+        });
+        
+        etlExecuted = true;
+        
+        if (etlResult.success) {
+          console.log(`✅ [${syncId}] AUTO-ETL completado: ${etlResult.periodsProcessed.length} períodos procesados, ${etlResult.laborRowsProcessed} labor rows, ${etlResult.rcRowsProcessed} RC rows`);
+        } else {
+          console.error(`⚠️ [${syncId}] AUTO-ETL completado con errores:`, etlResult.errors);
         }
-      } else {
-        console.log(`⏭️ [${syncId}] Saltando AUTO-ETL: No hubo cambios en costos directos`);
+        
+      } catch (etlError: any) {
+        console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
       }
 
       // 4. Combinar resultados

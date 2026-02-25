@@ -5315,9 +5315,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE period_key = ANY($1)
       `, [periodKeys]);
       
-      // ===== INCOME (from fact_rc_month - source: "Rendimiento Cliente" TOTAL CONVERTIDO A USD) =====
-      // Income = SUM(revenue_usd) for Real/Facturado rows in the selected month
-      const incomeUsd = parseFloat(billingData?.billed_usd || '0');
+      // ===== INCOME (from fact_rc_month - fuente: "Rendimiento Cliente") =====
+      // Fallback a financial_sot cuando fact_rc_month no tiene datos para el período
+      let incomeUsd = parseFloat(billingData?.billed_usd || '0');
+      if (incomeUsd === 0) {
+        const { rows: [sotIncome] } = await pool.query(`
+          SELECT COALESCE(SUM(revenue_usd), 0) as sot_revenue
+          FROM financial_sot
+          WHERE month_key = ANY($1)
+        `, [periodKeys]);
+        const sotRevenue = parseFloat(sotIncome?.sot_revenue || '0');
+        if (sotRevenue > 0) {
+          incomeUsd = sotRevenue;
+          console.log(`📊 DASHBOARD FALLBACK: Using financial_sot revenue $${sotRevenue.toFixed(2)} (fact_rc_month empty for ${periodKeys.join(', ')})`);
+        }
+      }
+
+      // Fallback de facturacionTotal en excelMaestroSummary cuando es 0 pero financial_sot tiene datos
+      if (hasExcelMaestroData && excelMaestroSummary.facturacionTotal === 0 && incomeUsd > 0) {
+        excelMaestroSummary.facturacionTotal = incomeUsd;
+        console.log(`📊 DASHBOARD FALLBACK: Patched excelMaestroSummary.facturacionTotal with financial_sot $${incomeUsd.toFixed(2)} for ${periodKeys.join(', ')}`);
+      }
       
       // ===== DEVENGADO (from devengado module - calculates accrued revenue by project type) =====
       const { getDevengadoSimple } = await import('./services/devengado.js');
