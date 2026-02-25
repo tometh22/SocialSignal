@@ -91,6 +91,8 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [newReminder, setNewReminder] = useState({ description: '', dueDate: '' });
   const [reminderOpen, setReminderOpen] = useState(false);
 
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
   const [editingValue, setEditingValue] = useState(false);
   const [tempValue, setTempValue] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -376,12 +378,16 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
             {lead.activities.map(activity => {
               const m = ACTIVITY_ICONS[activity.type] || ACTIVITY_ICONS.note;
               const Icon = m.icon;
+              const hasMore = (activity.content && activity.content.length > 80) || activity.emailMetadata?.attachment || activity.emailMetadata?.to;
               return (
                 <div key={activity.id} className="flex gap-3 group">
                   <div className={`w-8 h-8 rounded-full ${m.bg} flex items-center justify-center shrink-0 mt-1`}>
                     <Icon className={`w-4 h-4 ${m.color}`} />
                   </div>
-                  <div className="flex-1 bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 transition-colors">
+                  <div
+                    className="flex-1 bg-white border border-slate-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer"
+                    onClick={() => setSelectedActivity(activity)}
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -391,32 +397,18 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                           )}
                         </div>
                         {activity.content && (
-                          <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{activity.content}</p>
-                        )}
-                        {activity.emailMetadata?.to && (
-                          <div className="mt-1 text-xs text-slate-500 bg-slate-50 rounded p-2">
-                            <span className="font-medium">Para:</span> {(activity.emailMetadata as any).to}
-                          </div>
+                          <p className="text-sm text-slate-500 mt-1 line-clamp-2">{activity.content}</p>
                         )}
                         {activity.emailMetadata?.attachment && (
-                          <a
-                            href={(activity.emailMetadata.attachment as any).url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={(activity.emailMetadata.attachment as any).name}
-                            className="mt-2 flex items-center gap-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors group/dl w-fit"
-                          >
-                            <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            <span className="text-xs text-amber-800 truncate max-w-[180px]">
-                              {(activity.emailMetadata.attachment as any).name}
-                            </span>
-                            <Download className="w-3 h-3 text-amber-500 opacity-0 group-hover/dl:opacity-100 transition-opacity shrink-0" />
-                          </a>
+                          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700">
+                            <Paperclip className="w-3 h-3" />
+                            <span className="truncate max-w-[160px]">{(activity.emailMetadata.attachment as any).name}</span>
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400">{fmtDate(activity.activityDate)}</span>
-                        <button onClick={() => deleteActivity.mutate(activity.id)}
+                        <button onClick={e => { e.stopPropagation(); deleteActivity.mutate(activity.id); }}
                           className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -697,10 +689,77 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
         </SheetContent>
       </Sheet>
 
-      {/* Add Contact Dialog */}
-      <Dialog open={false} onOpenChange={() => {}}>
-        <DialogContent />
-      </Dialog>
+      {/* Activity Detail Modal */}
+      {selectedActivity && (() => {
+        const m = ACTIVITY_ICONS[selectedActivity.type] || ACTIVITY_ICONS.note;
+        const Icon = m.icon;
+        return (
+          <Dialog open={!!selectedActivity} onOpenChange={open => { if (!open) setSelectedActivity(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <span className={`w-7 h-7 rounded-full ${m.bg} flex items-center justify-center`}>
+                    <Icon className={`w-3.5 h-3.5 ${m.color}`} />
+                  </span>
+                  <span className={`text-sm font-semibold ${m.color}`}>{m.label}</span>
+                  {selectedActivity.title && (
+                    <span className="text-slate-800 font-medium">— {selectedActivity.title}</span>
+                  )}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{fmtDate(selectedActivity.activityDate)}</span>
+                </div>
+                {selectedActivity.content ? (
+                  <div className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{selectedActivity.content}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">Sin descripción.</p>
+                )}
+                {selectedActivity.emailMetadata?.to && (
+                  <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 rounded-lg p-3">
+                    <Mail className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <div>
+                      <span className="font-medium">Para:</span> {(selectedActivity.emailMetadata as any).to}
+                      {(selectedActivity.emailMetadata as any).subject && (
+                        <p className="text-xs text-slate-500 mt-0.5">Asunto: {(selectedActivity.emailMetadata as any).subject}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {selectedActivity.emailMetadata?.attachment && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Adjunto</p>
+                    <a
+                      href={(selectedActivity.emailMetadata.attachment as any).url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={(selectedActivity.emailMetadata.attachment as any).name}
+                      className="flex items-center gap-3 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                    >
+                      <FileText className="w-5 h-5 text-amber-600 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-amber-900 font-medium truncate">
+                          {(selectedActivity.emailMetadata.attachment as any).name}
+                        </p>
+                        {(selectedActivity.emailMetadata.attachment as any).size && (
+                          <p className="text-xs text-amber-600">
+                            {((selectedActivity.emailMetadata.attachment as any).size / 1024).toFixed(0)} KB
+                          </p>
+                        )}
+                      </div>
+                      <Download className="w-4 h-4 text-amber-500 shrink-0" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
