@@ -89,9 +89,12 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [newReminder, setNewReminder] = useState({ description: '', dueDate: '' });
   const [reminderOpen, setReminderOpen] = useState(false);
 
-  const [editingStage, setEditingStage] = useState(false);
   const [editingValue, setEditingValue] = useState(false);
   const [tempValue, setTempValue] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [tempNotes, setTempNotes] = useState('');
 
   const { data: lead, isLoading } = useQuery<Lead>({
     queryKey: ['/api/crm/leads', leadId],
@@ -160,7 +163,6 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
 
   const handleStageChange = (stage: string) => {
     updateLead.mutate({ stage });
-    setEditingStage(false);
   };
 
   const handleValueSave = () => {
@@ -193,15 +195,33 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
           <div className="w-px h-5 bg-slate-200" />
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-slate-900">{lead.companyName}</h1>
-              {!editingStage ? (
-                <button onClick={() => setEditingStage(true)}
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-full border cursor-pointer hover:opacity-80 transition-opacity ${meta.bg} ${meta.color} ${meta.border}`}>
-                  {meta.label} ▾
-                </button>
+              {!editingName ? (
+                <div className="flex items-center gap-2 group/name">
+                  <h1 className="text-xl font-bold text-slate-900">{lead.companyName}</h1>
+                  <button onClick={() => { setTempName(lead.companyName); setEditingName(true); }}
+                    className="opacity-0 group-hover/name:opacity-100 text-slate-400 hover:text-indigo-600 transition-all">
+                    <Edit3 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ) : (
-                <Select onValueChange={handleStageChange} defaultOpen>
-                  <SelectTrigger className="w-40 h-7 text-xs"><SelectValue /></SelectTrigger>
+                <div className="flex items-center gap-2">
+                  <Input value={tempName} onChange={e => setTempName(e.target.value)}
+                    className="h-8 text-lg font-bold w-64"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { updateLead.mutate({ companyName: tempName }); setEditingName(false); }
+                      if (e.key === 'Escape') setEditingName(false);
+                    }}
+                    autoFocus />
+                  <Button size="sm" className="h-8 px-2 bg-indigo-600 text-white"
+                    onClick={() => { updateLead.mutate({ companyName: tempName }); setEditingName(false); }}>✓</Button>
+                  <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setEditingName(false)}>✕</Button>
+                </div>
+              )}
+              {!editingName && (
+                <Select value={lead.stage} onValueChange={handleStageChange}>
+                  <SelectTrigger className={`w-36 h-7 text-xs font-semibold border ${meta.border} ${meta.bg} ${meta.color}`}>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {STAGES.map(s => (
                       <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
@@ -371,8 +391,30 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                 )}
               </div>
               <div>
-                <p className="text-xs text-slate-500">Notas</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{lead.notes || '—'}</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-slate-500">Notas</p>
+                  {!editingNotes && (
+                    <button onClick={() => { setTempNotes(lead.notes || ''); setEditingNotes(true); }}
+                      className="text-slate-400 hover:text-indigo-600 transition-colors">
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {!editingNotes ? (
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{lead.notes || '—'}</p>
+                ) : (
+                  <div className="space-y-2">
+                    <Textarea value={tempNotes} onChange={e => setTempNotes(e.target.value)}
+                      rows={3} className="text-sm" placeholder="Notas sobre el lead..." />
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditingNotes(false)}>Cancelar</Button>
+                      <Button size="sm" className="h-7 px-3 bg-indigo-600 text-white"
+                        onClick={() => { updateLead.mutate({ notes: tempNotes }); setEditingNotes(false); }}>
+                        Guardar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
