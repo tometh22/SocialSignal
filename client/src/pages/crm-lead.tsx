@@ -104,51 +104,51 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['/api/crm/leads', leadId] });
 
   const updateLead = useMutation({
-    mutationFn: (data: any) => apiRequest('PATCH', `/api/crm/leads/${leadId}`, data),
+    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', data),
     onSuccess: () => { invalidate(); queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] }); },
   });
 
   const addActivity = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/crm/leads/${leadId}/activities`, data),
+    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/activities`, 'POST', data),
     onSuccess: () => { invalidate(); setActivityOpen(false); setNewActivity({ type: 'note', title: '', content: '' }); toast({ title: 'Actividad registrada' }); },
     onError: () => toast({ title: 'Error al registrar actividad', variant: 'destructive' }),
   });
 
   const deleteActivity = useMutation({
-    mutationFn: (id: number) => apiRequest('DELETE', `/api/crm/activities/${id}`),
+    mutationFn: (id: number) => apiRequest(`/api/crm/activities/${id}`, 'DELETE'),
     onSuccess: () => { invalidate(); toast({ title: 'Actividad eliminada' }); },
   });
 
   const addContact = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/crm/leads/${leadId}/contacts`, data),
+    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/contacts`, 'POST', data),
     onSuccess: () => { invalidate(); setContactOpen(false); setNewContact({ name: '', email: '', phone: '', position: '', isPrimary: false }); toast({ title: 'Contacto agregado' }); },
     onError: () => toast({ title: 'Error al agregar contacto', variant: 'destructive' }),
   });
 
   const deleteContact = useMutation({
-    mutationFn: (id: number) => apiRequest('DELETE', `/api/crm/contacts/${id}`),
+    mutationFn: (id: number) => apiRequest(`/api/crm/contacts/${id}`, 'DELETE'),
     onSuccess: () => { invalidate(); toast({ title: 'Contacto eliminado' }); },
   });
 
   const addReminder = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/crm/leads/${leadId}/reminders`, data),
+    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/reminders`, 'POST', data),
     onSuccess: () => { invalidate(); setReminderOpen(false); setNewReminder({ description: '', dueDate: '' }); toast({ title: 'Recordatorio creado' }); },
     onError: () => toast({ title: 'Error al crear recordatorio', variant: 'destructive' }),
   });
 
   const toggleReminder = useMutation({
     mutationFn: ({ id, completed }: { id: number; completed: boolean }) =>
-      apiRequest('PATCH', `/api/crm/reminders/${id}`, { completed }),
+      apiRequest(`/api/crm/reminders/${id}`, 'PATCH', { completed }),
     onSuccess: () => invalidate(),
   });
 
   const deleteReminder = useMutation({
-    mutationFn: (id: number) => apiRequest('DELETE', `/api/crm/reminders/${id}`),
+    mutationFn: (id: number) => apiRequest(`/api/crm/reminders/${id}`, 'DELETE'),
     onSuccess: () => invalidate(),
   });
 
   const sendEmail = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', `/api/crm/leads/${leadId}/send-email`, data),
+    mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/send-email`, 'POST', data),
     onSuccess: () => {
       invalidate();
       setEmailOpen(false);
