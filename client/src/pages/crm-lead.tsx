@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft, Building2, Mail, Phone, User, Plus, Trash2, CheckCircle2,
   Bell, FileText, MessageSquare, Calendar, Target, Edit3, Trophy, XCircle,
-  Send, Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase
+  Send, Clock, ChevronDown, ChevronUp, AlertCircle, Briefcase, Paperclip, Download, X
 } from "lucide-react";
 
 type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -82,6 +82,8 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
 
   const [newActivity, setNewActivity] = useState({ type: 'note' as ActivityType, title: '', content: '' });
   const [activityOpen, setActivityOpen] = useState(false);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const [newContact, setNewContact] = useState({ name: '', email: '', phone: '', position: '', isPrimary: false });
   const [contactOpen, setContactOpen] = useState(false);
@@ -116,9 +118,36 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
 
   const addActivity = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}/activities`, 'POST', data),
-    onSuccess: () => { invalidate(); setActivityOpen(false); setNewActivity({ type: 'note', title: '', content: '' }); toast({ title: 'Actividad registrada' }); },
+    onSuccess: () => {
+      invalidate();
+      setActivityOpen(false);
+      setNewActivity({ type: 'note', title: '', content: '' });
+      setAttachmentFile(null);
+      toast({ title: 'Actividad registrada' });
+    },
     onError: () => toast({ title: 'Error al registrar actividad', variant: 'destructive' }),
   });
+
+  const handleSubmitActivity = async () => {
+    let emailMetadata: any = undefined;
+    if (newActivity.type === 'proposal' && attachmentFile) {
+      setUploadingAttachment(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', attachmentFile);
+        const res = await fetch('/api/crm/attachments', { method: 'POST', body: formData, credentials: 'include' });
+        if (!res.ok) throw new Error('Error al subir archivo');
+        const data = await res.json();
+        emailMetadata = { attachment: { name: data.name, url: data.url, size: data.size, mimeType: data.mimeType } };
+      } catch {
+        toast({ title: 'Error al subir el archivo adjunto', variant: 'destructive' });
+        setUploadingAttachment(false);
+        return;
+      }
+      setUploadingAttachment(false);
+    }
+    addActivity.mutate({ ...newActivity, emailMetadata });
+  };
 
   const deleteActivity = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/crm/activities/${id}`, 'DELETE'),
@@ -299,12 +328,37 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                     onChange={e => setNewActivity(a => ({ ...a, title: e.target.value }))} />
                   <Textarea placeholder="Descripción, detalles de la conversación..." value={newActivity.content}
                     onChange={e => setNewActivity(a => ({ ...a, content: e.target.value }))} rows={3} />
+                  {newActivity.type === 'proposal' && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5" /> Adjuntar propuesta (PDF, Word, Excel)
+                      </label>
+                      {!attachmentFile ? (
+                        <label className="flex items-center gap-2 px-3 py-2 border-2 border-dashed border-amber-300 rounded-lg cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all text-xs text-amber-700">
+                          <Paperclip className="w-4 h-4" />
+                          <span>Seleccionar archivo...</span>
+                          <input type="file" className="hidden"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg"
+                            onChange={e => setAttachmentFile(e.target.files?.[0] || null)} />
+                        </label>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <FileText className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span className="text-xs text-amber-800 flex-1 truncate">{attachmentFile.name}</span>
+                          <span className="text-xs text-amber-500">({(attachmentFile.size / 1024).toFixed(0)} KB)</span>
+                          <button onClick={() => setAttachmentFile(null)} className="text-amber-400 hover:text-red-500 transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex justify-end gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setActivityOpen(false)}>Cancelar</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setActivityOpen(false); setAttachmentFile(null); }}>Cancelar</Button>
                     <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                      onClick={() => addActivity.mutate(newActivity)}
-                      disabled={addActivity.isPending || (!newActivity.title && !newActivity.content)}>
-                      {addActivity.isPending ? 'Guardando...' : 'Registrar'}
+                      onClick={handleSubmitActivity}
+                      disabled={addActivity.isPending || uploadingAttachment || (!newActivity.title && !newActivity.content)}>
+                      {uploadingAttachment ? 'Subiendo...' : addActivity.isPending ? 'Guardando...' : 'Registrar'}
                     </Button>
                   </div>
                 </div>
@@ -339,10 +393,25 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                         {activity.content && (
                           <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{activity.content}</p>
                         )}
-                        {activity.emailMetadata && (
+                        {activity.emailMetadata?.to && (
                           <div className="mt-1 text-xs text-slate-500 bg-slate-50 rounded p-2">
                             <span className="font-medium">Para:</span> {(activity.emailMetadata as any).to}
                           </div>
+                        )}
+                        {activity.emailMetadata?.attachment && (
+                          <a
+                            href={(activity.emailMetadata.attachment as any).url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={(activity.emailMetadata.attachment as any).name}
+                            className="mt-2 flex items-center gap-2 px-2.5 py-1.5 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors group/dl w-fit"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span className="text-xs text-amber-800 truncate max-w-[180px]">
+                              {(activity.emailMetadata.attachment as any).name}
+                            </span>
+                            <Download className="w-3 h-3 text-amber-500 opacity-0 group-hover/dl:opacity-100 transition-opacity shrink-0" />
+                          </a>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">

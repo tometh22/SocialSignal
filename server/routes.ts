@@ -95,7 +95,7 @@ import { resolveTimeFilter } from "./services/time";
 import { CoverageCalculator } from "./domain/coverage";
 import { eq, and, isNull, isNotNull, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { reinitializeDatabase } from "./reinit-data";
-import { upload, deleteOldFile } from "./upload";
+import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth } from "./auth";
 import path from 'path';
@@ -15277,6 +15277,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('SendGrid error:', error?.response?.body || error.message);
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
+  });
+
+  // POST /api/crm/attachments — subir archivo adjunto para propuesta
+  app.post("/api/crm/attachments", (req: Request, res: Response) => {
+    uploadDocument.single('file')(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({ error: err.message || 'Error al procesar el archivo.' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+      }
+      const url = `/uploads/proposals/${path.basename(req.file.path)}`;
+      res.json({
+        url,
+        name: req.file.originalname,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+    });
   });
 
   // Finalize routes setup and return server
