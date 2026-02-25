@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import {
   Target, Plus, Search, TrendingUp, DollarSign, Trophy, AlertCircle,
-  Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw, GripVertical
+  Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw, GripVertical, Trash2
 } from "lucide-react";
 
 type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
@@ -186,10 +186,11 @@ interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
   onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
+  onDelete: (id: number) => void;
   draggingId: number | null;
 }
 
-function LeadCard({ lead, onClick, onDragStart, draggingId }: LeadCardProps) {
+function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
   const isDragging = draggingId === lead.id;
@@ -258,6 +259,18 @@ function LeadCard({ lead, onClick, onDragStart, draggingId }: LeadCardProps) {
           ) : days !== null ? (
             <span className="text-xs text-slate-400">hace {days}d</span>
           ) : null}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`¿Eliminar "${lead.companyName}"?`)) {
+                onDelete(lead.id);
+              }
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 ml-0.5"
+            title="Eliminar lead"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
           <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-indigo-400" />
         </div>
       </div>
@@ -271,12 +284,13 @@ interface KanbanColumnProps {
   onLeadClick: (id: number) => void;
   onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
   onDrop: (e: React.DragEvent, toStage: Stage) => void;
+  onDelete: (id: number) => void;
   isDropTarget: boolean;
   draggingId: number | null;
   compact?: boolean;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, isDropTarget, draggingId, compact }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, isDropTarget, draggingId, compact }: KanbanColumnProps) {
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [dragCounter, setDragCounter] = useState(0);
   const isOver = dragCounter > 0;
@@ -338,6 +352,7 @@ function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, isDropTa
             lead={lead}
             onClick={() => onLeadClick(lead.id)}
             onDragStart={onDragStart}
+            onDelete={onDelete}
             draggingId={draggingId}
           />
         ))}
@@ -467,6 +482,18 @@ export default function CRMPage() {
   };
 
   const handleDragEnd = () => setDraggingId(null);
+
+  const handleDeleteLead = (id: number) => {
+    setLocalLeads(prev => prev.filter(l => l.id !== id));
+    apiRequest(`/api/crm/leads/${id}`, 'DELETE')
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
+      })
+      .catch(() => {
+        toast({ title: 'Error al eliminar el lead', variant: 'destructive' });
+        refetch().then(r => { if (r.data) setLocalLeads(r.data); });
+      });
+  };
 
   const handleLeadClick = (id: number) => navigate(`/crm/${id}`);
   const handleRefresh = () => {
@@ -604,6 +631,7 @@ export default function CRMPage() {
               onLeadClick={handleLeadClick}
               onDragStart={handleDragStart}
               onDrop={handleDrop}
+              onDelete={handleDeleteLead}
               isDropTarget={false}
               draggingId={draggingId}
             />
@@ -618,6 +646,7 @@ export default function CRMPage() {
                 onLeadClick={handleLeadClick}
                 onDragStart={handleDragStart}
                 onDrop={handleDrop}
+                onDelete={handleDeleteLead}
                 isDropTarget={false}
                 draggingId={draggingId}
                 compact
