@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,20 +12,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import {
   Target, Plus, Search, TrendingUp, DollarSign, Trophy, AlertCircle,
-  Building2, Clock, Bell, ChevronRight, LayoutGrid, List, Mail, Phone,
-  RefreshCw
+  Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw, GripVertical
 } from "lucide-react";
 
 type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
-const STAGES: { key: Stage; label: string; color: string; bg: string; border: string }[] = [
-  { key: 'new',         label: 'Nuevo',        color: 'text-slate-700',   bg: 'bg-slate-50',    border: 'border-slate-200' },
-  { key: 'contacted',   label: 'Contactado',   color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200' },
-  { key: 'qualified',   label: 'Calificado',   color: 'text-indigo-700',  bg: 'bg-indigo-50',   border: 'border-indigo-200' },
-  { key: 'proposal',    label: 'Propuesta',    color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200' },
-  { key: 'negotiation', label: 'Negociación',  color: 'text-orange-700',  bg: 'bg-orange-50',   border: 'border-orange-200' },
-  { key: 'won',         label: 'Ganado',       color: 'text-green-700',   bg: 'bg-green-50',    border: 'border-green-200' },
-  { key: 'lost',        label: 'Perdido',      color: 'text-red-700',     bg: 'bg-red-50',      border: 'border-red-200' },
+const STAGES: { key: Stage; label: string; color: string; bg: string; border: string; dropActive: string }[] = [
+  { key: 'new',         label: 'Nuevo',        color: 'text-slate-700',   bg: 'bg-slate-50',    border: 'border-slate-200',  dropActive: 'bg-slate-100 border-slate-400' },
+  { key: 'contacted',   label: 'Contactado',   color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200',   dropActive: 'bg-blue-100 border-blue-500' },
+  { key: 'qualified',   label: 'Calificado',   color: 'text-indigo-700',  bg: 'bg-indigo-50',   border: 'border-indigo-200', dropActive: 'bg-indigo-100 border-indigo-500' },
+  { key: 'proposal',    label: 'Propuesta',    color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200',  dropActive: 'bg-amber-100 border-amber-500' },
+  { key: 'negotiation', label: 'Negociación',  color: 'text-orange-700',  bg: 'bg-orange-50',   border: 'border-orange-200', dropActive: 'bg-orange-100 border-orange-500' },
+  { key: 'won',         label: 'Ganado',       color: 'text-green-700',   bg: 'bg-green-50',    border: 'border-green-200',  dropActive: 'bg-green-100 border-green-500' },
+  { key: 'lost',        label: 'Perdido',      color: 'text-red-700',     bg: 'bg-red-50',      border: 'border-red-200',    dropActive: 'bg-red-100 border-red-500' },
 ];
 
 function stageMeta(stage: Stage) {
@@ -35,8 +33,7 @@ function stageMeta(stage: Stage) {
 
 function daysSince(dateStr: string | null) {
   if (!dateStr) return null;
-  const diff = Date.now() - new Date(dateStr).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 
 function fmtUsd(val: number | null | undefined) {
@@ -185,40 +182,70 @@ function NewLeadModal({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
-  const meta = stageMeta(lead.stage);
+interface LeadCardProps {
+  lead: Lead;
+  onClick: () => void;
+  onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
+  draggingId: number | null;
+}
+
+function LeadCard({ lead, onClick, onDragStart, draggingId }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
+  const isDragging = draggingId === lead.id;
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const didDrag = useRef(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    didDrag.current = false;
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    didDrag.current = true;
+    onDragStart(e, lead.id, lead.stage);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (didDrag.current) {
+      e.preventDefault();
+      return;
+    }
+    onClick();
+  };
 
   return (
     <div
-      onClick={onClick}
-      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-pointer hover:shadow-md hover:border-indigo-300 transition-all group"
+      draggable
+      onMouseDown={handleMouseDown}
+      onDragStart={handleDragStart}
+      onClick={handleClick}
+      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
+      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all group select-none"
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
-            {lead.companyName}
-          </p>
-          {lead.primaryContact && (
-            <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>
+      <div className="flex items-start gap-2 mb-2">
+        <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors" />
+        <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
+              {lead.companyName}
+            </p>
+            {lead.primaryContact && (
+              <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>
+            )}
+          </div>
+          {lead.estimatedValueUsd && (
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+              {fmtUsd(lead.estimatedValueUsd)}
+            </span>
           )}
         </div>
-        {lead.estimatedValueUsd && (
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
-            {fmtUsd(lead.estimatedValueUsd)}
-          </span>
-        )}
       </div>
 
-      <div className="flex items-center justify-between gap-1">
+      <div className="flex items-center justify-between gap-1 pl-5">
         <div className="flex items-center gap-1.5">
-          {lead.primaryContact?.email && (
-            <Mail className="w-3 h-3 text-slate-400" />
-          )}
-          {lead.primaryContact?.phone && (
-            <Phone className="w-3 h-3 text-slate-400" />
-          )}
+          {lead.primaryContact?.email && <Mail className="w-3 h-3 text-slate-400" />}
+          {lead.primaryContact?.phone && <Phone className="w-3 h-3 text-slate-400" />}
           {lead.pendingReminders > 0 && (
             <span className="flex items-center gap-0.5 text-xs text-amber-600">
               <Bell className="w-3 h-3" />{lead.pendingReminders}
@@ -226,14 +253,11 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {isStale && (
-            <span className="text-xs text-orange-500 bg-orange-50 px-1 rounded">
-              {days}d sin contacto
-            </span>
-          )}
-          {!isStale && days !== null && (
+          {isStale ? (
+            <span className="text-xs text-orange-500 bg-orange-50 px-1 rounded">{days}d sin contacto</span>
+          ) : days !== null ? (
             <span className="text-xs text-slate-400">hace {days}d</span>
-          )}
+          ) : null}
           <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-indigo-400" />
         </div>
       </div>
@@ -241,11 +265,56 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   );
 }
 
-function KanbanColumn({ stage, leads, onLeadClick }: { stage: typeof STAGES[0]; leads: Lead[]; onLeadClick: (id: number) => void }) {
+interface KanbanColumnProps {
+  stage: typeof STAGES[0];
+  leads: Lead[];
+  onLeadClick: (id: number) => void;
+  onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
+  onDrop: (e: React.DragEvent, toStage: Stage) => void;
+  isDropTarget: boolean;
+  draggingId: number | null;
+  compact?: boolean;
+}
+
+function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, isDropTarget, draggingId, compact }: KanbanColumnProps) {
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
+  const [dragCounter, setDragCounter] = useState(0);
+  const isOver = dragCounter > 0;
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragCounter(c => c + 1);
+  };
+
+  const handleDragLeave = () => {
+    setDragCounter(c => Math.max(0, c - 1));
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    setDragCounter(0);
+    onDrop(e, stage.key);
+  };
+
+  const columnClass = isOver
+    ? `rounded-xl border-2 ${stage.dropActive} flex flex-col transition-all duration-150 shadow-lg scale-[1.01]`
+    : `rounded-xl border ${stage.border} ${stage.bg} flex flex-col transition-all duration-150`;
+
+  const minW = compact ? 'min-w-[200px] max-w-[200px]' : 'flex-1 min-w-[220px] max-w-[270px]';
+
   return (
-    <div className={`flex-1 min-w-[220px] max-w-[280px] rounded-xl border ${stage.border} ${stage.bg} flex flex-col`}>
-      <div className={`px-3 py-2.5 border-b ${stage.border} flex items-center justify-between`}>
+    <div
+      className={`${minW} ${columnClass}`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className={`px-3 py-2.5 border-b ${isOver ? stage.dropActive.split(' ')[1] : stage.border} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold uppercase tracking-wide ${stage.color}`}>{stage.label}</span>
           <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${stage.border} ${stage.color}`}>
@@ -256,13 +325,27 @@ function KanbanColumn({ stage, leads, onLeadClick }: { stage: typeof STAGES[0]; 
           <span className="text-xs text-slate-500 font-medium">{fmtUsd(totalValue)}</span>
         )}
       </div>
-      <div className="p-2 flex-1 overflow-y-auto max-h-[60vh]">
+      <div className={`p-2 flex-1 overflow-y-auto ${compact ? 'max-h-[26vh]' : 'max-h-[58vh]'} ${isOver ? 'bg-white/30' : ''}`}>
         {leads.length === 0 && (
-          <div className="text-center py-6 text-slate-400 text-xs">Sin leads en esta etapa</div>
+          <div className={`text-center text-slate-400 text-xs flex items-center justify-center border-2 border-dashed rounded-lg transition-colors
+            ${isOver ? 'border-current py-8 opacity-70' : 'border-transparent py-6'}`}>
+            {isOver ? '↓ Soltar aquí' : 'Sin leads'}
+          </div>
         )}
         {leads.map(lead => (
-          <LeadCard key={lead.id} lead={lead} onClick={() => onLeadClick(lead.id)} />
+          <LeadCard
+            key={lead.id}
+            lead={lead}
+            onClick={() => onLeadClick(lead.id)}
+            onDragStart={onDragStart}
+            draggingId={draggingId}
+          />
         ))}
+        {leads.length > 0 && isOver && (
+          <div className="border-2 border-dashed border-current rounded-lg py-3 text-center text-xs text-slate-400 opacity-60">
+            ↓ Soltar aquí
+          </div>
+        )}
       </div>
     </div>
   );
@@ -329,6 +412,7 @@ export default function CRMPage() {
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [draggingId, setDraggingId] = useState<number | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ['/api/crm/stats'],
@@ -347,15 +431,54 @@ export default function CRMPage() {
     refetchInterval: false,
   });
 
+  const moveStage = useMutation({
+    mutationFn: ({ id, stage }: { id: number; stage: Stage }) =>
+      apiRequest('PATCH', `/api/crm/leads/${id}`, { stage }),
+    onMutate: async ({ id, stage }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/crm/leads', stageFilter, search] });
+      const prev = queryClient.getQueryData<Lead[]>(['/api/crm/leads', stageFilter, search]);
+      queryClient.setQueryData<Lead[]>(['/api/crm/leads', stageFilter, search], old =>
+        (old || []).map(l => l.id === id ? { ...l, stage } : l)
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(['/api/crm/leads', stageFilter, search], ctx.prev);
+      toast({ title: 'Error al mover el lead', variant: 'destructive' });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
+    },
+  });
+
+  const handleDragStart = (e: React.DragEvent, leadId: number, fromStage: Stage) => {
+    e.dataTransfer.setData('leadId', leadId.toString());
+    e.dataTransfer.setData('fromStage', fromStage);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingId(leadId);
+  };
+
+  const handleDrop = (e: React.DragEvent, toStage: Stage) => {
+    e.preventDefault();
+    const leadId = parseInt(e.dataTransfer.getData('leadId'));
+    const fromStage = e.dataTransfer.getData('fromStage') as Stage;
+    setDraggingId(null);
+    if (fromStage !== toStage && leadId) {
+      moveStage.mutate({ id: leadId, stage: toStage });
+    }
+  };
+
+  const handleDragEnd = () => setDraggingId(null);
+
   const handleLeadClick = (id: number) => navigate(`/crm/${id}`);
   const handleRefresh = () => { refetch(); queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }); };
 
-  const leadsForKanban = (stage: Stage) => leads.filter(l => l.stage === stage);
-
-  const KANBAN_STAGES = STAGES.filter(s => s.key !== 'won' && s.key !== 'lost');
+  const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
+  const MAIN_STAGES = STAGES.filter(s => s.key !== 'won' && s.key !== 'lost');
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" onDragEnd={handleDragEnd}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -460,6 +583,11 @@ export default function CRMPage() {
             <List className="w-4 h-4" />
           </button>
         </div>
+        {draggingId && (
+          <span className="text-xs text-indigo-600 font-medium animate-pulse">
+            Arrastrando — soltá en una columna para mover
+          </span>
+        )}
       </div>
 
       {/* Main content */}
@@ -467,30 +595,32 @@ export default function CRMPage() {
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {KANBAN_STAGES.map(stage => (
-            <KanbanColumn key={stage.key} stage={stage}
-              leads={leadsForKanban(stage.key)}
-              onLeadClick={handleLeadClick} />
+          {MAIN_STAGES.map(stage => (
+            <KanbanColumn
+              key={stage.key}
+              stage={stage}
+              leads={leadsForStage(stage.key)}
+              onLeadClick={handleLeadClick}
+              onDragStart={handleDragStart}
+              onDrop={handleDrop}
+              isDropTarget={false}
+              draggingId={draggingId}
+            />
           ))}
-          {/* Won / Lost mini columns */}
-          <div className="flex flex-col gap-3 min-w-[220px] max-w-[220px]">
+          {/* Won / Lost compact columns */}
+          <div className="flex flex-col gap-3 min-w-[200px] max-w-[200px]">
             {[STAGES.find(s => s.key === 'won')!, STAGES.find(s => s.key === 'lost')!].map(stage => (
-              <div key={stage.key} className={`rounded-xl border ${stage.border} ${stage.bg}`}>
-                <div className={`px-3 py-2.5 border-b ${stage.border} flex items-center justify-between`}>
-                  <span className={`text-xs font-semibold uppercase tracking-wide ${stage.color}`}>{stage.label}</span>
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${stage.border} ${stage.color}`}>
-                    {leadsForKanban(stage.key).length}
-                  </span>
-                </div>
-                <div className="p-2 max-h-[28vh] overflow-y-auto">
-                  {leadsForKanban(stage.key).length === 0 && (
-                    <div className="text-center py-3 text-slate-400 text-xs">—</div>
-                  )}
-                  {leadsForKanban(stage.key).map(lead => (
-                    <LeadCard key={lead.id} lead={lead} onClick={() => handleLeadClick(lead.id)} />
-                  ))}
-                </div>
-              </div>
+              <KanbanColumn
+                key={stage.key}
+                stage={stage}
+                leads={leadsForStage(stage.key)}
+                onLeadClick={handleLeadClick}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+                isDropTarget={false}
+                draggingId={draggingId}
+                compact
+              />
             ))}
           </div>
         </div>
