@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -413,13 +413,14 @@ export default function CRMPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [localLeads, setLocalLeads] = useState<Lead[]>([]);
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ['/api/crm/stats'],
     refetchInterval: 60000,
   });
 
-  const { data: leads = [], isLoading: leadsLoading, refetch } = useQuery<Lead[]>({
+  const { data: fetchedLeads = [], isLoading: leadsLoading, refetch } = useQuery<Lead[]>({
     queryKey: ['/api/crm/leads', stageFilter, search],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -431,26 +432,10 @@ export default function CRMPage() {
     refetchInterval: false,
   });
 
-  const moveStage = useMutation({
-    mutationFn: ({ id, stage }: { id: number; stage: Stage }) =>
-      apiRequest(`/api/crm/leads/${id}`, 'PATCH', { stage }),
-    onMutate: async ({ id, stage }) => {
-      await queryClient.cancelQueries({ queryKey: ['/api/crm/leads', stageFilter, search] });
-      const prev = queryClient.getQueryData<Lead[]>(['/api/crm/leads', stageFilter, search]);
-      queryClient.setQueryData<Lead[]>(['/api/crm/leads', stageFilter, search], old =>
-        (old || []).map(l => l.id === id ? { ...l, stage } : l)
-      );
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(['/api/crm/leads', stageFilter, search], ctx.prev);
-      toast({ title: 'Error al mover el lead', variant: 'destructive' });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
-    },
-  });
+  // Sync local leads whenever server refetches new data
+  useEffect(() => {
+    setLocalLeads(fetchedLeads);
+  }, [fetchedLeads]);
 
   const handleDragStart = (e: React.DragEvent, leadId: number, fromStage: Stage) => {
     e.dataTransfer.setData('leadId', leadId.toString());
@@ -464,16 +449,32 @@ export default function CRMPage() {
     const leadId = parseInt(e.dataTransfer.getData('leadId'));
     const fromStage = e.dataTransfer.getData('fromStage') as Stage;
     setDraggingId(null);
-    if (fromStage !== toStage && leadId) {
-      moveStage.mutate({ id: leadId, stage: toStage });
-    }
+    if (!fromStage || fromStage === toStage || !leadId) return;
+
+    // Update local state immediately — no waiting for server
+    setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: toStage } : l));
+
+    // Fire PATCH in background — localLeads already updated, no need to refetch
+    apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
+      })
+      .catch(() => {
+        // Revert local state on failure
+        setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
+        toast({ title: 'Error al mover el lead', variant: 'destructive' });
+      });
   };
 
   const handleDragEnd = () => setDraggingId(null);
 
   const handleLeadClick = (id: number) => navigate(`/crm/${id}`);
-  const handleRefresh = () => { refetch(); queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }); };
+  const handleRefresh = () => {
+    refetch().then(r => { if (r.data) setLocalLeads(r.data); });
+    queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
+  };
 
+  const leads = localLeads.length > 0 ? localLeads : fetchedLeads;
   const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
   const MAIN_STAGES = STAGES.filter(s => s.key !== 'won' && s.key !== 'lost');
 
