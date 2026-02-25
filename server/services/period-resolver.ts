@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { factLaborMonth, aggProjectMonth, dimPeriod } from "@shared/schema";
+import { factLaborMonth, aggProjectMonth, dimPeriod, financialSot } from "@shared/schema";
 import { sql, desc, or, gt } from "drizzle-orm";
 
 export interface PeriodInfo {
@@ -17,10 +17,9 @@ export interface AvailablePeriodsResult {
 /**
  * Detecta si un período tiene datos reales (no vacío)
  * Un período se considera "real" cuando tiene:
- * - Horas Asana > 0
- * - Revenue > 0
- * - Costos > 0
- * - Personnel count > 0
+ * - Horas Asana > 0 (fact_labor_month)
+ * - Revenue > 0 o Costos > 0 (agg_project_month)
+ * - Revenue > 0 en financial_sot (fuente de verdad de ingresos)
  */
 async function getPeriodWithData(periodKey: string): Promise<boolean> {
   // Check fact_labor_month for hours
@@ -38,7 +37,7 @@ async function getPeriodWithData(periodKey: string): Promise<boolean> {
   // Check agg_project_month for revenue/costs
   const aggData = await db
     .select({
-      totalRevenue: sql<number>`COALESCE(SUM(${aggProjectMonth.viewConsolidadaRevenue}), 0)`,
+      totalRevenue: sql<number>`COALESCE(SUM(${aggProjectMonth.viewOperativaRevenue}), 0)`,
       totalCost: sql<number>`COALESCE(SUM(${aggProjectMonth.totalCostUSD}), 0)`,
     })
     .from(aggProjectMonth)
@@ -52,6 +51,19 @@ async function getPeriodWithData(periodKey: string): Promise<boolean> {
     }
   }
 
+  // Check financial_sot — fuente de verdad de ingresos (incluye meses recientes
+  // que aún no llegaron al Star Schema por ausencia de costos nuevos)
+  const sotData = await db
+    .select({
+      totalRevenue: sql<number>`COALESCE(SUM(${financialSot.revenueUsd}), 0)`,
+    })
+    .from(financialSot)
+    .where(sql`${financialSot.monthKey} = ${periodKey}`);
+
+  if (sotData.length > 0 && Number(sotData[0].totalRevenue) > 0) {
+    return true;
+  }
+
   return false;
 }
 
@@ -59,7 +71,7 @@ async function getPeriodWithData(periodKey: string): Promise<boolean> {
  * Resuelve los períodos disponibles y el período por defecto (último con datos)
  */
 export async function resolveAvailablePeriods(): Promise<AvailablePeriodsResult> {
-  // Get all distinct periods from both fact tables, ordered descending
+  // Get all distinct periods from fact tables + financial_sot
   const periodsFromFact = await db
     .selectDistinct({
       periodKey: factLaborMonth.periodKey,
@@ -72,10 +84,17 @@ export async function resolveAvailablePeriods(): Promise<AvailablePeriodsResult>
     })
     .from(aggProjectMonth);
 
+  const periodsFromSot = await db
+    .selectDistinct({
+      periodKey: financialSot.monthKey,
+    })
+    .from(financialSot);
+
   // Combine and deduplicate
   const allPeriodKeys = new Set<string>();
   periodsFromFact.forEach(p => allPeriodKeys.add(p.periodKey));
   periodsFromAgg.forEach(p => allPeriodKeys.add(p.periodKey));
+  periodsFromSot.forEach(p => allPeriodKeys.add(p.periodKey));
 
   // Sort descending (newest first)
   const sortedPeriods = Array.from(allPeriodKeys).sort().reverse();
@@ -114,7 +133,7 @@ export async function resolveAvailablePeriods(): Promise<AvailablePeriodsResult>
  * Si no hay ningún período con datos, devuelve el más reciente disponible
  */
 export async function getDefaultPeriod(): Promise<string | null> {
-  // Get all periods with any data, ordered descending
+  // Check fact_labor_month for hours
   const periodsWithLabor = await db
     .select({
       periodKey: factLaborMonth.periodKey,
@@ -129,18 +148,34 @@ export async function getDefaultPeriod(): Promise<string | null> {
     return periodsWithLabor[0].periodKey;
   }
 
+  // Check agg_project_month for revenue
   const periodsWithAgg = await db
     .select({
       periodKey: aggProjectMonth.periodKey,
-      totalRevenue: sql<number>`SUM(${aggProjectMonth.viewConsolidadaRevenue})`,
+      totalRevenue: sql<number>`SUM(${aggProjectMonth.viewOperativaRevenue})`,
     })
     .from(aggProjectMonth)
     .groupBy(aggProjectMonth.periodKey)
-    .having(gt(sql`SUM(${aggProjectMonth.viewConsolidadaRevenue})`, 0))
+    .having(gt(sql`SUM(${aggProjectMonth.viewOperativaRevenue})`, 0))
     .orderBy(desc(aggProjectMonth.periodKey));
 
   if (periodsWithAgg.length > 0) {
     return periodsWithAgg[0].periodKey;
+  }
+
+  // Check financial_sot — fuente de verdad de ingresos (meses recientes)
+  const periodsWithSot = await db
+    .select({
+      periodKey: financialSot.monthKey,
+      totalRevenue: sql<number>`SUM(${financialSot.revenueUsd})`,
+    })
+    .from(financialSot)
+    .groupBy(financialSot.monthKey)
+    .having(gt(sql`SUM(${financialSot.revenueUsd})`, 0))
+    .orderBy(desc(financialSot.monthKey));
+
+  if (periodsWithSot.length > 0) {
+    return periodsWithSot[0].periodKey;
   }
 
   // Fallback: return the most recent period in dim_period
