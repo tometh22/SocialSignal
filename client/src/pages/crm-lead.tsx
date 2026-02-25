@@ -96,15 +96,18 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [tempNotes, setTempNotes] = useState('');
 
-  const { data: lead, isLoading } = useQuery<Lead>({
+  const { data: lead, isLoading, refetch } = useQuery<Lead>({
     queryKey: ['/api/crm/leads', leadId],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/leads/${leadId}`);
+      const res = await fetch(`/api/crm/leads/${leadId}`, { credentials: 'include' });
       return res.json();
     },
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['/api/crm/leads', leadId] });
+  const invalidate = () => {
+    refetch();
+    queryClient.invalidateQueries({ queryKey: ['/api/crm/leads'] });
+  };
 
   const updateLead = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', data),
