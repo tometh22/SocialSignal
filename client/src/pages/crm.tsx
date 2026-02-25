@@ -433,7 +433,7 @@ export default function CRMPage() {
 
   const moveStage = useMutation({
     mutationFn: ({ id, stage }: { id: number; stage: Stage }) =>
-      apiRequest('PATCH', `/api/crm/leads/${id}`, { stage }),
+      apiRequest(`/api/crm/leads/${id}`, 'PATCH', { stage }),
     onMutate: async ({ id, stage }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/crm/leads', stageFilter, search] });
       const prev = queryClient.getQueryData<Lead[]>(['/api/crm/leads', stageFilter, search]);
