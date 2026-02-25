@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X, Clock, RefreshCw, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Save, ArrowLeft, Building2, FileText, Calendar, Loader2, AlertTriangle, X, Clock, RefreshCw, Plus, Target } from 'lucide-react';
 import { PageLayout } from "@/components/ui/page-layout";
 import AutosaveIndicator from '@/components/ui/autosave-indicator';
 import { useOnlineStatus } from '@/hooks/use-online-status';
@@ -46,7 +46,8 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     updateClient,
     updateProjectName,
     resetQuotation,
-    setQuotationData: setQuotationDataDirect
+    setQuotationData: setQuotationDataDirect,
+    updateQuotationData,
   } = useOptimizedQuote();
 
   // Get quotation ID from URL if not passed as prop
@@ -55,6 +56,9 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
   const effectiveQuotationId = quotationId || (urlQuotationId && !isNaN(parseInt(urlQuotationId)) ? parseInt(urlQuotationId) : null);
 
   const isEditing = Boolean(effectiveQuotationId);
+
+  // Read leadId from URL query params (e.g., /optimized-quote?leadId=5&clientId=3)
+  const [leadOrigin, setLeadOrigin] = useState<{ leadId: number; leadName?: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [bannerVisible, setBannerVisible] = useState(true);
@@ -77,6 +81,20 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [quotationData]);
+
+  // Read leadId from URL query params and pre-link the quotation to a CRM lead
+  useEffect(() => {
+    if (isEditing) return; // Don't override when editing existing quotation
+    const searchParams = new URLSearchParams(window.location.search);
+    const leadIdParam = searchParams.get('leadId');
+    const leadNameParam = searchParams.get('leadName');
+    const clientIdParam = searchParams.get('clientId');
+    if (leadIdParam && !isNaN(parseInt(leadIdParam))) {
+      const lid = parseInt(leadIdParam);
+      updateQuotationData({ leadId: lid });
+      setLeadOrigin({ leadId: lid, leadName: leadNameParam || undefined });
+    }
+  }, [isEditing]);
 
   // Load quotation if editing
   useEffect(() => {
@@ -325,6 +343,22 @@ const OptimizedQuoteContent: React.FC<OptimizedQuoteProps> = ({ quotationId, isR
           </div>
         </div>
       </div>
+
+      {/* CRM Lead banner */}
+      {leadOrigin && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <Target className="h-5 w-5 text-indigo-600 flex-shrink-0" />
+          <span className="text-sm text-indigo-800 flex-1">
+            Esta cotización se vinculará al lead{leadOrigin.leadName ? <> <strong>{leadOrigin.leadName}</strong></> : ''} del CRM.
+          </span>
+          <a
+            href={`/crm/${leadOrigin.leadId}`}
+            className="text-xs text-indigo-600 underline hover:text-indigo-800"
+          >
+            Ver lead
+          </a>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="space-y-6">

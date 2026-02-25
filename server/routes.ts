@@ -4121,9 +4121,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quotations routes
-  app.get("/api/quotations", requireAuth, async (_, res) => {
-    const quotations = await storage.getQuotations();
-    res.json(quotations);
+  app.get("/api/quotations", requireAuth, async (req, res) => {
+    const leadIdParam = req.query.leadId;
+    if (leadIdParam) {
+      const leadId = parseInt(leadIdParam as string);
+      if (isNaN(leadId)) return res.status(400).json({ message: "Invalid leadId" });
+      const result = await db.select().from(quotations).where(eq(quotations.leadId, leadId)).orderBy(desc(quotations.createdAt));
+      return res.json(result);
+    }
+    const result = await storage.getQuotations();
+    res.json(result);
   });
 
   app.get("/api/quotations/client/:clientId", requireAuth, async (req, res) => {
@@ -4165,6 +4172,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Crear cotización
         const quotation = await storage.createQuotation(validatedData);
+
+        // Si viene de un lead CRM, registrar actividad automáticamente
+        if (validatedData.leadId) {
+          try {
+            const userId = (req.session as any)?.userId;
+            await db.insert(crmActivities).values({
+              leadId: validatedData.leadId,
+              type: 'proposal',
+              title: `Cotización creada: ${validatedData.projectName}`,
+              content: `Se generó una nueva cotización para el proyecto "${validatedData.projectName}". Estado: Borrador. ID: #${quotation.id}`,
+              activityDate: new Date(),
+              createdBy: userId,
+            });
+            // Avanzar el lead a etapa "proposal" si está en etapas anteriores
+            const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, validatedData.leadId));
+            if (lead && ['new', 'contacted', 'qualified'].includes(lead.stage)) {
+              await db.update(crmLeads).set({ stage: 'proposal', updatedAt: new Date() }).where(eq(crmLeads.id, validatedData.leadId));
+            }
+          } catch (crmError) {
+            console.warn('⚠️ Could not register CRM activity for quotation:', crmError);
+          }
+        }
 
         res.status(201).json(quotation);
       } catch (validationError) {
@@ -15055,7 +15084,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(crmReminders.leadId, id))
         .orderBy(asc(crmReminders.dueDate));
 
-      res.json({ ...lead, contacts, activities, reminders });
+      const linkedQuotations = await db.select({
+        id: quotations.id,
+        projectName: quotations.projectName,
+        totalAmount: quotations.totalAmount,
+        quotationCurrency: quotations.quotationCurrency,
+        status: quotations.status,
+        createdAt: quotations.createdAt,
+      }).from(quotations).where(eq(quotations.leadId, id)).orderBy(desc(quotations.createdAt));
+
+      res.json({ ...lead, contacts, activities, reminders, quotations: linkedQuotations });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }

@@ -61,6 +61,7 @@ export interface QuotationData {
     projectStartDate: string;
   };
   proposalLink?: string; // Link a la propuesta original
+  leadId?: number; // Lead CRM de origen (para integración CRM-Cotizaciones)
 }
 
 interface OptimizedQuoteContextType {
@@ -999,6 +1000,7 @@ const OptimizedQuoteProvider: React.FC<OptimizedQuoteProviderProps> = ({ childre
         projectStartDate: quotationData.inflation.projectStartDate ? new Date(quotationData.inflation.projectStartDate) : undefined,
         quotationCurrency: quotationData.quotationCurrency || 'ARS',
         proposalLink: quotationData.proposalLink || null,
+        leadId: quotationData.leadId || null,
         status: status
       };
 

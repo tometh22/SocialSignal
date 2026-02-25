@@ -410,6 +410,7 @@ export const quotations = pgTable("quotations", {
   exchangeRateAtQuote: numeric("exchange_rate_at_quote", { precision: 10, scale: 4 }), // Tipo de cambio al momento de cotizar
   proposalLink: text("proposal_link"), // Link to the proposal document
   quotationType: text("quotation_type").default("recurring"), // 'one-time' | 'recurring' | 'fee'
+  leadId: integer("lead_id").references(() => crmLeads.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   createdBy: integer("created_by").references(() => users.id),

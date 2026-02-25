@@ -63,11 +63,16 @@ function isOverdue(d: string) { return new Date(d) < new Date(); }
 interface Contact { id: number; name: string; email: string | null; phone: string | null; position: string | null; isPrimary: boolean; }
 interface Activity { id: number; type: ActivityType; title: string | null; content: string | null; activityDate: string; emailMetadata: any; }
 interface Reminder { id: number; description: string; dueDate: string; completed: boolean; }
+interface LinkedQuotation {
+  id: number; projectName: string; totalAmount: number;
+  quotationCurrency: string; status: string; createdAt: string;
+}
 interface Lead {
   id: number; companyName: string; stage: Stage; source: string | null;
-  estimatedValueUsd: number | null; notes: string | null;
+  estimatedValueUsd: number | null; notes: string | null; clientId: number | null;
   createdAt: string; updatedAt: string; lostReason: string | null;
   contacts: Contact[]; activities: Activity[]; reminders: Reminder[];
+  quotations: LinkedQuotation[];
 }
 
 export default function CRMLeadPage({ params }: { params: { id: string } }) {
@@ -613,6 +618,81 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
                     </Button>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Cotizaciones vinculadas */}
+          <Card className="border border-slate-200">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-500" />
+                  Cotizaciones
+                  {lead?.quotations?.length ? (
+                    <span className="ml-1 bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                      {lead.quotations.length}
+                    </span>
+                  ) : null}
+                </CardTitle>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                  onClick={() => {
+                    if (!lead?.clientId) {
+                      toast({ title: "Vinculá un cliente", description: "Primero asociá este lead a un cliente antes de crear una cotización.", variant: "destructive" });
+                      return;
+                    }
+                    const leadName = encodeURIComponent(lead?.companyName || '');
+                    window.location.href = `/optimized-quote?leadId=${leadId}&leadName=${leadName}&clientId=${lead.clientId}`;
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Nueva Cotización
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-2">
+              {!lead?.quotations?.length ? (
+                <p className="text-xs text-slate-400 py-2 text-center">Sin cotizaciones vinculadas</p>
+              ) : lead.quotations.map(q => {
+                const statusMap: Record<string, { label: string; cls: string }> = {
+                  draft:          { label: 'Borrador',      cls: 'bg-gray-100 text-gray-600' },
+                  pending:        { label: 'Pendiente',     cls: 'bg-blue-100 text-blue-700' },
+                  'in-negotiation': { label: 'Negociación', cls: 'bg-amber-100 text-amber-700' },
+                  approved:       { label: 'Aprobada',      cls: 'bg-green-100 text-green-700' },
+                  rejected:       { label: 'Rechazada',     cls: 'bg-red-100 text-red-700' },
+                };
+                const s = statusMap[q.status] || { label: q.status, cls: 'bg-gray-100 text-gray-600' };
+                const amount = q.totalAmount
+                  ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: q.quotationCurrency || 'ARS', maximumFractionDigits: 0 }).format(q.totalAmount)
+                  : '—';
+                return (
+                  <div key={q.id} className="flex items-start gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-800 truncate">{q.projectName}</p>
+                      <p className="text-xs text-slate-500">{amount}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                      <a href={`/manage-quotes`} className="text-[10px] text-indigo-500 hover:underline">Ver</a>
+                    </div>
+                  </div>
+                );
+              })}
+              {lead?.quotations?.some(q => q.status === 'approved') && lead?.stage !== 'won' && (
+                <Button
+                  size="sm"
+                  className="w-full mt-2 bg-green-600 hover:bg-green-700 text-white text-xs h-8"
+                  onClick={() => {
+                    updateLead.mutate({ stage: 'won' });
+                    toast({ title: "¡Ganado!", description: "El lead fue marcado como Ganado." });
+                  }}
+                >
+                  <Trophy className="w-3 h-3 mr-1" />
+                  Marcar como Ganado
+                </Button>
               )}
             </CardContent>
           </Card>

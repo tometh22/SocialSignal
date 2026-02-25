@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase } from "lucide-react";
+import { Search, FileText, CheckCircle, AlertCircle, Clock, Edit, Eye, Trash2, PenLine, Plus, X, MessageCircle, Filter, Loader2, Building2, Calendar, DollarSign, TrendingUp, Zap, Users, Handshake, Briefcase, Target } from "lucide-react";
 import { PageLayout } from "@/components/ui/page-layout";
 import { Loader } from "@/components/ui/loader";
 import {
@@ -836,6 +836,17 @@ export default function ManageQuotes() {
                         {/* Status badges - NEW LOCATION: Top right corner */}
                         <div className="absolute top-3 right-3 flex flex-col items-end gap-2 z-10">
                           {getStatusBadge(quote.status)}
+                          {(quote as any).leadId && (
+                            <Link href={`/crm/${(quote as any).leadId}`}>
+                              <Badge
+                                variant="outline"
+                                className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-medium px-3 py-1 rounded-md inline-flex items-center gap-1.5 whitespace-nowrap hover:bg-indigo-100 cursor-pointer"
+                              >
+                                <Target className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>Lead CRM</span>
+                              </Badge>
+                            </Link>
+                          )}
                           {negotiationData[quote.id] && quote.status === 'approved' && (
                             <Badge 
                               variant="outline" 
