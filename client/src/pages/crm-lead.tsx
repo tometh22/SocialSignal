@@ -190,7 +190,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/crm')} className="gap-1.5 text-slate-500">
             <ArrowLeft className="w-4 h-4" /> CRM
