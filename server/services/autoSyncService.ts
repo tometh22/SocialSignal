@@ -202,18 +202,20 @@ export class AutoSyncService {
         console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
       }
 
-      // 4b. Sincronizar CashFlow y Resumen Ejecutivo hacia monthly_financial_summary
+      // 4b. Sincronizar CashFlow, Resumen Ejecutivo y Activo hacia monthly_financial_summary
       try {
-        console.log(`💰 [${syncId}] Sincronizando CashFlow y Resumen Ejecutivo...`);
-        const { syncCashFlowMovements, syncResumenEjecutivoToMonthlyFinancialSummary } = await import('../etl/sot-etl');
-        const [cashFlowResult, resumenResult] = await Promise.all([
+        console.log(`💰 [${syncId}] Sincronizando CashFlow, Resumen Ejecutivo y Activo...`);
+        const { syncCashFlowMovements, syncResumenEjecutivoToMonthlyFinancialSummary, syncActivoToMonthlyFinancialSummary } = await import('../etl/sot-etl');
+        const [cashFlowResult, resumenResult, activoResult] = await Promise.all([
           syncCashFlowMovements(),
-          syncResumenEjecutivoToMonthlyFinancialSummary()
+          syncResumenEjecutivoToMonthlyFinancialSummary(),
+          syncActivoToMonthlyFinancialSummary()
         ]);
         console.log(`✅ [${syncId}] CashFlow: ${cashFlowResult.recordsInserted} movimientos en ${cashFlowResult.periodsProcessed} períodos`);
         console.log(`✅ [${syncId}] Resumen Ejecutivo: ${resumenResult.recordsInserted} insertados, ${resumenResult.recordsUpdated} actualizados`);
+        console.log(`✅ [${syncId}] Activo: ${activoResult.periodsUpdated} períodos actualizados (caja_total, total_activo)`);
       } catch (finErr: any) {
-        console.error(`⚠️ [${syncId}] Error en CashFlow/Resumen ETL (no crítico):`, finErr?.message || finErr);
+        console.error(`⚠️ [${syncId}] Error en CashFlow/Resumen/Activo ETL (no crítico):`, finErr?.message || finErr);
       }
 
       // 4. Combinar resultados

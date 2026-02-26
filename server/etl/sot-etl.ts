@@ -1761,3 +1761,82 @@ export async function getCashFlowSummaryByPeriod(periodKey: string): Promise<{
     };
   }
 }
+
+// ==================== ACTIVO ETL ====================
+
+/**
+ * Sincronizar balances de la hoja "Activo" del MAESTRO a monthly_financial_summary.
+ * Rellena caja_total, cuentas_cobrar_usd, total_activo para todos los períodos disponibles.
+ * Es la fuente de verdad para estos campos cuando el Resumen Ejecutivo no tiene datos.
+ */
+export async function syncActivoToMonthlyFinancialSummary(): Promise<{
+  success: boolean;
+  periodsUpdated: number;
+  errors: string[];
+  executionTimeMs: number;
+}> {
+  const startTime = Date.now();
+  console.log('🏦 [Activo ETL] Iniciando sincronización de balances de Activo...');
+  
+  const errors: string[] = [];
+  let periodsUpdated = 0;
+  
+  try {
+    const { googleSheetsWorkingService } = await import('../services/googleSheetsWorking');
+    const { monthlyFinancialSummary } = await import('@shared/schema');
+    const { sql } = await import('drizzle-orm');
+    
+    const balanceByPeriod = await googleSheetsWorkingService.getActivoLiquidoByPeriod();
+    
+    if (balanceByPeriod.size === 0) {
+      console.log('⚠️ [Activo ETL] No se obtuvieron datos de la hoja Activo');
+      return { success: true, periodsUpdated: 0, errors: [], executionTimeMs: Date.now() - startTime };
+    }
+    
+    for (const [periodKey, data] of balanceByPeriod) {
+      try {
+        const [year, month] = periodKey.split('-').map(Number);
+        
+        const existing = await db.select({ id: monthlyFinancialSummary.id, cajaTotal: monthlyFinancialSummary.cajaTotal })
+          .from(monthlyFinancialSummary)
+          .where(sql`${monthlyFinancialSummary.periodKey} = ${periodKey}`)
+          .limit(1);
+        
+        if (existing.length > 0) {
+          await db.update(monthlyFinancialSummary)
+            .set({
+              cajaTotal: data.activoLiquido.toString(),
+              cuentasCobrarUsd: data.cuentasCobrar.toString(),
+              totalActivo: data.activoTotal.toString(),
+              updatedAt: new Date()
+            })
+            .where(sql`${monthlyFinancialSummary.periodKey} = ${periodKey}`);
+        } else {
+          await db.insert(monthlyFinancialSummary).values({
+            periodKey,
+            year,
+            monthNumber: month,
+            cajaTotal: data.activoLiquido.toString(),
+            cuentasCobrarUsd: data.cuentasCobrar.toString(),
+            totalActivo: data.activoTotal.toString(),
+          });
+        }
+        
+        periodsUpdated++;
+        console.log(`  ✅ ${periodKey}: Caja=$${data.activoLiquido.toFixed(2)}, CxC=$${data.cuentasCobrar.toFixed(2)}, Total=$${data.activoTotal.toFixed(2)}`);
+      } catch (err) {
+        const msg = `Error en período ${periodKey}: ${err instanceof Error ? err.message : String(err)}`;
+        console.error(`  ❌ ${msg}`);
+        errors.push(msg);
+      }
+    }
+    
+    console.log(`✅ [Activo ETL] Completado: ${periodsUpdated} períodos actualizados en ${Date.now() - startTime}ms`);
+    return { success: errors.length === 0, periodsUpdated, errors, executionTimeMs: Date.now() - startTime };
+    
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ [Activo ETL] Error:', error);
+    return { success: false, periodsUpdated: 0, errors: [errorMessage], executionTimeMs: Date.now() - startTime };
+  }
+}

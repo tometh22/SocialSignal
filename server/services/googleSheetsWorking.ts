@@ -3614,6 +3614,108 @@ class GoogleSheetsWorkingService {
   }
 
   /**
+   * Lee la hoja "Activo" del MAESTRO y calcula el balance por período.
+   * Fuente de verdad para caja_total (Activo Líquido) y activos/pasivos.
+   * 
+   * Estructura: Concepto/Banco | Tipo de Activo | Cliente | Mes | Año |
+   *             Cobrado/No Cobrado AL CIERRE | ... | Moneda original USD | Cotización | Monto Total USD
+   * 
+   * Tipos de activo: "Activo Líquido" (caja bancaria), "Clientes a cobrar" (cuentas por cobrar)
+   */
+  async getActivoLiquidoByPeriod(): Promise<Map<string, { activoLiquido: number; cuentasCobrar: number; activoTotal: number }>> {
+    console.log('🏦 [Activo ETL] Leyendo hoja "Activo" del MAESTRO...');
+    const result = new Map<string, { activoLiquido: number; cuentasCobrar: number; activoTotal: number }>();
+    
+    try {
+      const sheets = this.createSheetsClientFromJSON();
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: this.spreadsheetId,
+        range: "'Activo'!A:U",
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      
+      const rows = response.data.values || [];
+      if (rows.length < 2) {
+        console.log('⚠️ [Activo ETL] No hay datos en la hoja Activo');
+        return result;
+      }
+      
+      const headers = rows[0] || [];
+      // Find column indices
+      const tipoIdx = headers.findIndex((h: any) => (h || '').toLowerCase().includes('tipo de activo'));
+      const mesIdx = headers.findIndex((h: any) => (h || '').toLowerCase() === 'mes');
+      const anioIdx = headers.findIndex((h: any) => (h || '').toLowerCase() === 'año');
+      const cobradoIdx = headers.findIndex((h: any) => (h || '').toLowerCase().includes('cobrado'));
+      // "Monto Total USD" is col 16 (index 16)
+      const montoUsdIdx = headers.findIndex((h: any) => (h || '').toLowerCase().includes('monto total usd'));
+      // "Moneda original USD" is col 14
+      const usdIdx = headers.findIndex((h: any) => (h || '').toLowerCase().includes('moneda original usd') || ((h || '').toLowerCase() === 'moneda original usd'));
+      
+      // Use whichever USD column is found
+      const amountColIdx = montoUsdIdx >= 0 ? montoUsdIdx : usdIdx;
+      
+      console.log(`📊 [Activo ETL] Cols: tipo=${tipoIdx}, mes=${mesIdx}, año=${anioIdx}, cobrado=${cobradoIdx}, monto=${amountColIdx}`);
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+        
+        const tipo = (row[tipoIdx] || '').toString().toLowerCase().trim();
+        const mesLabel = (row[mesIdx] || '').toString().trim();
+        const anioRaw = (row[anioIdx] || '').toString().trim();
+        const cobrado = (row[cobradoIdx] || '').toString().toLowerCase().trim();
+        const amountRaw = (row[amountColIdx] || '').toString().trim();
+        
+        if (!mesLabel || !anioRaw || !amountRaw) continue;
+        
+        // Parse year
+        const year = parseInt(anioRaw);
+        if (isNaN(year)) continue;
+        
+        // Parse month from "01 ene", "02 feb", etc.
+        const monthParsed = this.parseMonthLabel(mesLabel);
+        if (!monthParsed) continue;
+        
+        const periodKey = `${year}-${String(monthParsed.month).padStart(2, '0')}`;
+        
+        // Parse amount (European format: $52.228,91 → 52228.91)
+        const amount = this.parseMoneyValue(amountRaw);
+        if (isNaN(amount) || amount === 0) continue;
+        
+        if (!result.has(periodKey)) {
+          result.set(periodKey, { activoLiquido: 0, cuentasCobrar: 0, activoTotal: 0 });
+        }
+        const entry = result.get(periodKey)!;
+        
+        // "Activo Liquido" = caja bancaria (saldos bancarios)
+        if (tipo.includes('activo liquido') || tipo.includes('activo líquido')) {
+          entry.activoLiquido += amount;
+          entry.activoTotal += amount;
+        }
+        // "Mediano Plazo" = inversiones/crypto
+        else if (tipo.includes('mediano plazo') || tipo.includes('mediano_plazo')) {
+          entry.activoTotal += amount;
+        }
+        // "Clientes a cobrar" = cuentas por cobrar
+        else if (tipo.includes('cobrar')) {
+          entry.cuentasCobrar += amount;
+          entry.activoTotal += amount;
+        }
+      }
+      
+      console.log(`✅ [Activo ETL] Calculado balance para ${result.size} períodos`);
+      for (const [period, data] of [...result.entries()].sort()) {
+        console.log(`   ${period}: Caja=$${data.activoLiquido.toFixed(2)}, CxC=$${data.cuentasCobrar.toFixed(2)}, Total=$${data.activoTotal.toFixed(2)}`);
+      }
+      
+      return result;
+    } catch (error: any) {
+      console.error('❌ [Activo ETL] Error:', error?.message || error);
+      return result;
+    }
+  }
+
+  /**
    * Parsear filas de CashFlow
    * 
    * CHECKLIST 4.1 IMPLEMENTATION:

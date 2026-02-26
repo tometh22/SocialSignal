@@ -34,7 +34,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Financial Management System**: Dual-purpose analysis (operational sales vs. financial transactions) with project-level financial management, including comprehensive P&L tables and cash flow tracking.
 - **Time & Deliverable Tracking**: Hourly and cost-based time entry, MODO-style deliverable tracking with quality metrics.
 - **Analytics Dashboard**: Executive and operational dashboards with KPIs, financial analysis (ROI, profit margin, cost efficiency), predictive insights, and context-aware business intelligence alerts (e.g., `NO_BILLING_WITH_COSTS`, `BILLABLE_DROP`, `FX_SHIFT`, `OVER_BURN`). Features advanced temporal filtering and a dual-view system separating operational and financial perspectives.
-- **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization for various financial data sheets ("Ventas Tomi", "Rendimiento Cliente", "CashFlow").
+- **Google Sheets Integration**: Automated client import and complete Excel MAESTRO synchronization for various financial data sheets ("Ventas Tomi", "Rendimiento Cliente", "CashFlow", "Activo"). The "Resumen Ejecutivo" sheet only has data through April 2025; newer periods use the "Activo" sheet as source of truth for caja_total and total_activo.
 - **Universal ETL System "Líneas Generales"**: Flexible data processing with currency handling, intelligent field preferences, automatic format detection, and anti-×100 pattern correction.
 - **Temporal Consistency Guard (TCG)**: Anomaly detection and autocorrection system for costs.
 - **Business Logic**: Cost calculation engine, template system, quality metrics, inflation management.

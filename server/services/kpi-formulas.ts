@@ -100,7 +100,8 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
   `, [periodKey]);
 
   let facturado = parseFloat(data?.facturacion_total || '0');
-  let cajaTotal = parseFloat(data?.caja_total || '0');
+  // caja_total puede ser negativo (saldo bancario negativo), usar NULL como indicador de dato faltante
+  let cajaTotal = data?.caja_total != null ? parseFloat(data.caja_total) : null;
   const activoTotal = parseFloat(data?.total_activo || '0');
   const pasivoTotal = parseFloat(data?.total_pasivo || '0');
 
@@ -116,7 +117,6 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
       console.log(`💡 [Finanzas] Facturado fallback a fact_rc_month para ${periodKey}: $${rcRevenue.toFixed(2)}`);
       facturado = rcRevenue;
     } else {
-      // Segundo fallback: financial_sot
       const { rows: [sotData] } = await pool.query(`
         SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
         FROM financial_sot
@@ -130,25 +130,9 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
     }
   }
 
-  // Fallback para caja_total: usar el valor más reciente anterior no-nulo
-  if (cajaTotal === 0) {
-    const { rows: [prevData] } = await pool.query(`
-      SELECT caja_total
-      FROM monthly_financial_summary
-      WHERE period_key < $1 AND caja_total::numeric > 0
-      ORDER BY period_key DESC
-      LIMIT 1
-    `, [periodKey]);
-    const prevCaja = parseFloat(prevData?.caja_total || '0');
-    if (prevCaja > 0) {
-      console.log(`💡 [Finanzas] Caja Total fallback al período anterior para ${periodKey}: $${prevCaja.toFixed(2)}`);
-      cajaTotal = prevCaja;
-    }
-  }
-
   return {
     facturado,
-    cajaTotal,
+    cajaTotal: cajaTotal ?? 0,
     activoTotal,
     pasivoTotal,
   };

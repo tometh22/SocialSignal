@@ -5090,6 +5090,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/trigger-activo-sync", requireAuth, async (req, res) => {
+    try {
+      const { syncActivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
+      console.log('🏦 [API] Triggering Activo ETL sync...');
+      const result = await syncActivoToMonthlyFinancialSummary();
+      res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('❌ [API] Activo ETL sync failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // 🔍 DEBUG: Ver estructura de hoja Resumen Ejecutivo
   app.get("/api/debug/resumen-ejecutivo-headers", requireAuth, async (req, res) => {
     try {
@@ -5099,7 +5111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: "'Resumen Ejecutivo'!A1:Z5",
+        range: "'Resumen Ejecutivo'!A1:Z100",
         valueRenderOption: 'FORMATTED_VALUE',
       });
       
@@ -14777,61 +14789,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         valueRenderOption: 'FORMATTED_VALUE',
       });
       
-      const rows = response.data.values || [];
-      const headers = rows[0] || [];
-      
-      // Find column indices
-      const clienteIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('cliente'));
-      const mesIdx = headers.findIndex((h: string) => h?.toLowerCase() === 'mes');
-      const anioIdx = headers.findIndex((h: string) => h?.toLowerCase() === 'año');
-      const cobradoIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('cobrado'));
-      const usdIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('usd'));
-      const arsIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('ars'));
-      const tipoIdx = headers.findIndex((h: string) => h?.toLowerCase()?.includes('tipo'));
-      
-      // Find Warner unpaid invoices with amounts
-      const warnerUnpaid: any[] = [];
-      let totalWarnerUSD = 0;
-      
-      for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row) continue;
-        
-        const cliente = (row[clienteIdx] || '').toString().toLowerCase();
-        const tipo = (row[tipoIdx] || '').toString().toLowerCase();
-        const cobrado = (row[cobradoIdx] || '').toString().toLowerCase();
-        const mes = (row[mesIdx] || '').toString();
-        const anio = (row[anioIdx] || '').toString();
-        const usdRaw = row[usdIdx] || '';
-        const arsRaw = row[arsIdx] || '';
-        
-        if (cliente.includes('warner') && tipo.includes('cobrar') && cobrado === 'no') {
-          // Parse amount (European format: 14.493 = 14493)
-          const usd = parseFloat(usdRaw.toString().replace(/\./g, '').replace(',', '.')) || 0;
-          totalWarnerUSD += usd;
-          
-          warnerUnpaid.push({
-            rowIndex: i,
-            cliente: row[clienteIdx],
-            tipo: row[tipoIdx],
-            mes,
-            anio,
-            cobrado: row[cobradoIdx],
-            factura: row[9],
-            usdRaw,
-            usdParsed: usd,
-            arsRaw
-          });
-        }
-      }
-      
-      res.json({
-        headers,
-        columnIndices: { clienteIdx, mesIdx, anioIdx, cobradoIdx, usdIdx, arsIdx, tipoIdx },
-        warnerUnpaidCount: warnerUnpaid.length,
-        totalWarnerUSD,
-        warnerUnpaid
-      });
+      const rawRows = response.data.values || [];
+      const rawHeaders = rawRows[0] || [];
+      const tipoIdx2 = rawHeaders.findIndex((h: any) => (h || '').toLowerCase().includes('tipo de activo'));
+      const tiposUnicos = [...new Set(rawRows.slice(1).map((r: any) => r[tipoIdx2] || '').filter(Boolean))];
+      const recentRows = rawRows.slice(1).filter((r: any) => {
+        const anio = (r[rawHeaders.findIndex((h: any) => (h || '').toLowerCase() === 'año')] || '').toString();
+        return anio === '2025' || anio === '2026';
+      }).slice(0, 20).map((r: any) => ({
+        tipo: r[tipoIdx2], mes: r[3], anio: r[4], cobrado: r[5], monto: r[16] || r[14]
+      }));
+      return res.json({ success: true, tiposUnicos, recentRows, headers: rawHeaders, totalRows: rawRows.length });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
