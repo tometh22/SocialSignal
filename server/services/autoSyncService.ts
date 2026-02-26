@@ -202,6 +202,20 @@ export class AutoSyncService {
         console.error(`❌ [${syncId}] Error ejecutando AUTO-ETL:`, etlError);
       }
 
+      // 4b. Sincronizar CashFlow y Resumen Ejecutivo hacia monthly_financial_summary
+      try {
+        console.log(`💰 [${syncId}] Sincronizando CashFlow y Resumen Ejecutivo...`);
+        const { syncCashFlowMovements, syncResumenEjecutivoToMonthlyFinancialSummary } = await import('../etl/sot-etl');
+        const [cashFlowResult, resumenResult] = await Promise.all([
+          syncCashFlowMovements(),
+          syncResumenEjecutivoToMonthlyFinancialSummary()
+        ]);
+        console.log(`✅ [${syncId}] CashFlow: ${cashFlowResult.recordsInserted} movimientos en ${cashFlowResult.periodsProcessed} períodos`);
+        console.log(`✅ [${syncId}] Resumen Ejecutivo: ${resumenResult.recordsInserted} insertados, ${resumenResult.recordsUpdated} actualizados`);
+      } catch (finErr: any) {
+        console.error(`⚠️ [${syncId}] Error en CashFlow/Resumen ETL (no crítico):`, finErr?.message || finErr);
+      }
+
       // 4. Combinar resultados
       const combinedErrors = [
         ...salesResult.errors,

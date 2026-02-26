@@ -98,11 +98,59 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
     FROM monthly_financial_summary
     WHERE period_key = $1
   `, [periodKey]);
+
+  let facturado = parseFloat(data?.facturacion_total || '0');
+  let cajaTotal = parseFloat(data?.caja_total || '0');
+  const activoTotal = parseFloat(data?.total_activo || '0');
+  const pasivoTotal = parseFloat(data?.total_pasivo || '0');
+
+  // Fallback para facturado: si monthly_financial_summary no tiene dato, usar fact_rc_month
+  if (facturado === 0) {
+    const { rows: [rcData] } = await pool.query(`
+      SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
+      FROM fact_rc_month
+      WHERE period_key = $1
+    `, [periodKey]);
+    const rcRevenue = parseFloat(rcData?.total_revenue || '0');
+    if (rcRevenue > 0) {
+      console.log(`💡 [Finanzas] Facturado fallback a fact_rc_month para ${periodKey}: $${rcRevenue.toFixed(2)}`);
+      facturado = rcRevenue;
+    } else {
+      // Segundo fallback: financial_sot
+      const { rows: [sotData] } = await pool.query(`
+        SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
+        FROM financial_sot
+        WHERE month_key = $1
+      `, [periodKey]);
+      const sotRevenue = parseFloat(sotData?.total_revenue || '0');
+      if (sotRevenue > 0) {
+        console.log(`💡 [Finanzas] Facturado fallback a financial_sot para ${periodKey}: $${sotRevenue.toFixed(2)}`);
+        facturado = sotRevenue;
+      }
+    }
+  }
+
+  // Fallback para caja_total: usar el valor más reciente anterior no-nulo
+  if (cajaTotal === 0) {
+    const { rows: [prevData] } = await pool.query(`
+      SELECT caja_total
+      FROM monthly_financial_summary
+      WHERE period_key < $1 AND caja_total::numeric > 0
+      ORDER BY period_key DESC
+      LIMIT 1
+    `, [periodKey]);
+    const prevCaja = parseFloat(prevData?.caja_total || '0');
+    if (prevCaja > 0) {
+      console.log(`💡 [Finanzas] Caja Total fallback al período anterior para ${periodKey}: $${prevCaja.toFixed(2)}`);
+      cajaTotal = prevCaja;
+    }
+  }
+
   return {
-    facturado: parseFloat(data?.facturacion_total || '0'),
-    cajaTotal: parseFloat(data?.caja_total || '0'),
-    activoTotal: parseFloat(data?.total_activo || '0'),
-    pasivoTotal: parseFloat(data?.total_pasivo || '0'),
+    facturado,
+    cajaTotal,
+    activoTotal,
+    pasivoTotal,
   };
 }
 
