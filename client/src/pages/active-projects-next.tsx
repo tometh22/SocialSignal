@@ -2,6 +2,7 @@
 
 import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -326,7 +327,7 @@ async function fetchProjects(period: string, fresh: boolean): Promise<ProjectsAp
   url.searchParams.set("period", period);
   if (fresh) url.searchParams.set("source", "fresh"); // backend bypass cache
 
-  const res = await fetch(url.toString(), { cache: "no-store" });
+  const res = await authFetch(url.toString(), { cache: "no-store" });
   if (!res.ok) throw new Error(`API ${res.status}`);
   const backendData = await res.json();
   
@@ -516,9 +517,8 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
             onClick={async () => {
               if (!confirm(`¿Estás seguro de marcar "${p.projectName}" como terminado?`)) return;
               try {
-                const res = await fetch(`/api/active-projects/${p.projectId}/finish`, {
+                const res = await authFetch(`/api/active-projects/${p.projectId}/finish`, {
                   method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' }
                 });
                 if (!res.ok) throw new Error(await res.text());
                 // Invalidate cache to refresh data

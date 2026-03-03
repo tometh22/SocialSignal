@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -105,7 +105,7 @@ export default function CRMLeadPage({ params }: { params: { id: string } }) {
   const { data: lead, isLoading, refetch } = useQuery<Lead>({
     queryKey: ['/api/crm/leads', leadId],
     queryFn: async () => {
-      const res = await fetch(`/api/crm/leads/${leadId}`, { credentials: 'include' });
+      const res = await authFetch(`/api/crm/leads/${leadId}`);
       return res.json();
     },
   });

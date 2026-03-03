@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -41,7 +42,7 @@ export default function ExecutiveDashboard() {
     queryKey: ['/api/dashboard/metrics', queryParams],
     queryFn: async () => {
       console.log('Fetching dashboard metrics with params:', queryParams);
-      const res = await fetch(`/api/dashboard/metrics?${queryParams}`);
+      const res = await authFetch(`/api/dashboard/metrics?${queryParams}`);
       if (!res.ok) throw new Error('Failed to fetch dashboard metrics');
       const data = await res.json();
       console.log('Dashboard metrics received:', data);

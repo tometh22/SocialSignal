@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from '@/lib/queryClient';
 import { useRoute, useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -110,7 +111,7 @@ const QuotationDetail: React.FC = () => {
       try {
         // Obtener cotización
         console.log('🔍 Fetching quotation with ID:', quotationId);
-        const quotationRes = await fetch(`/api/quotations/${quotationId}`);
+        const quotationRes = await authFetch(`/api/quotations/${quotationId}`);
         console.log('📊 Quotation response status:', quotationRes.status);
         
         if (!quotationRes.ok) {
@@ -125,7 +126,7 @@ const QuotationDetail: React.FC = () => {
         
         // Obtener equipo
         console.log('👥 Fetching team for quotation ID:', quotationId);
-        const teamRes = await fetch(`/api/quotation-team/${quotationId}`);
+        const teamRes = await authFetch(`/api/quotation-team/${quotationId}`);
         console.log('👥 Team response status:', teamRes.status);
         
         if (!teamRes.ok) {
@@ -140,7 +141,7 @@ const QuotationDetail: React.FC = () => {
         
         // Obtener datos del cliente
         if (quotationData.clientId) {
-          const clientRes = await fetch(`/api/clients/${quotationData.clientId}`);
+          const clientRes = await authFetch(`/api/clients/${quotationData.clientId}`);
           if (!clientRes.ok) throw new Error('Error al cargar el cliente');
           const clientData = await clientRes.json();
           setClient(clientData);
@@ -148,7 +149,7 @@ const QuotationDetail: React.FC = () => {
         
         // Obtener datos de la plantilla
         if (quotationData.templateId) {
-          const templateRes = await fetch(`/api/templates/${quotationData.templateId}`);
+          const templateRes = await authFetch(`/api/templates/${quotationData.templateId}`);
           if (templateRes.ok) {
             const templateData = await templateRes.json();
             setTemplate(templateData);
@@ -156,13 +157,13 @@ const QuotationDetail: React.FC = () => {
         }
         
         // Obtener roles
-        const rolesRes = await fetch('/api/roles');
+        const rolesRes = await authFetch('/api/roles');
         if (!rolesRes.ok) throw new Error('Error al cargar roles');
         const rolesData = await rolesRes.json();
         setRoles(rolesData);
         
         // Obtener personal
-        const personnelRes = await fetch('/api/personnel');
+        const personnelRes = await authFetch('/api/personnel');
         if (!personnelRes.ok) throw new Error('Error al cargar personal');
         const personnelData = await personnelRes.json();
         setPersonnel(personnelData);

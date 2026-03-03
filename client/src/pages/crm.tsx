@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -441,7 +441,7 @@ export default function CRMPage() {
       const params = new URLSearchParams();
       if (stageFilter !== 'all') params.set('stage', stageFilter);
       if (search) params.set('search', search);
-      const res = await fetch(`/api/crm/leads?${params}`);
+      const res = await authFetch(`/api/crm/leads?${params}`);
       return res.json();
     },
     refetchInterval: false,

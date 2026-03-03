@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Quotation } from "@shared/schema";
@@ -76,7 +76,7 @@ export default function ManageQuotes() {
       await Promise.all(
         approvedQuotations.map(async (quotation) => {
           try {
-            const response = await fetch(`/api/quotations/${quotation.id}/negotiation-history`, {
+            const response = await authFetch(`/api/quotations/${quotation.id}/negotiation-history`, {
               credentials: 'include'
             });
             if (response.ok) {
@@ -107,7 +107,7 @@ export default function ManageQuotes() {
       await Promise.all(
         approvedQuotations.map(async (quotation) => {
           try {
-            const response = await fetch(`/api/active-projects/quotation/${quotation.id}`, {
+            const response = await authFetch(`/api/active-projects/quotation/${quotation.id}`, {
               credentials: 'include'
             });
             if (response.ok) {
@@ -235,7 +235,7 @@ export default function ManageQuotes() {
         
         // Obtener la cotización actualizada con el precio negociado
         try {
-          const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
+          const response = await authFetch(`/api/quotations/${selectedQuote.id}`, {
             credentials: 'include'
           });
           
@@ -290,7 +290,7 @@ export default function ManageQuotes() {
     setCheckingProjects(true);
 
     try {
-      const response = await fetch(`/api/active-projects/quotation/${quote.id}`);
+      const response = await authFetch(`/api/active-projects/quotation/${quote.id}`);
       const projects = await response.json();
       setAssociatedProjects(projects || []);
     } catch (error) {
@@ -307,7 +307,7 @@ export default function ManageQuotes() {
 
     // First, check if the quotation has only role-based team members
     try {
-      const quotationTeamResponse = await fetch(`/api/quotation-team/${approvedQuote.id}`, {
+      const quotationTeamResponse = await authFetch(`/api/quotation-team/${approvedQuote.id}`, {
         credentials: 'include'
       });
       
@@ -458,7 +458,7 @@ export default function ManageQuotes() {
       setDeletingQuoteId(selectedQuote.id);
       const startTime = performance.now();
 
-      const response = await fetch(`/api/quotations/${selectedQuote.id}`, {
+      const response = await authFetch(`/api/quotations/${selectedQuote.id}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {

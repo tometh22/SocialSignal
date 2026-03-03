@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -120,7 +121,7 @@ export default function ExecutiveFinanciero({ period }: ExecutiveFinancieroProps
       const url = period 
         ? `/api/v1/executive/financiero?period=${period}` 
         : '/api/v1/executive/financiero';
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await authFetch(url);
       if (!res.ok) throw new Error('Failed to fetch financiero data');
       return res.json();
     }
@@ -132,7 +133,7 @@ export default function ExecutiveFinanciero({ period }: ExecutiveFinancieroProps
       const url = period 
         ? `/api/v1/executive/cashflow?period=${period}` 
         : '/api/v1/executive/cashflow';
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await authFetch(url);
       if (!res.ok) throw new Error('Failed to fetch cashflow data');
       return res.json();
     }

@@ -17,9 +17,27 @@ export const queryClient = new QueryClient({
 });
 
 // Returns Authorization header if a session token exists in sessionStorage
-function getAuthHeader(): Record<string, string> {
+export function getAuthHeader(): Record<string, string> {
   const token = sessionStorage.getItem('auth_token');
   return token ? { 'Authorization': `Session ${token}` } : {};
+}
+
+// Wrapper over fetch that always includes credentials + auth header
+export function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const existingHeaders = options.headers
+    ? (options.headers instanceof Headers
+        ? Object.fromEntries((options.headers as Headers).entries())
+        : (options.headers as Record<string, string>))
+    : {};
+  return fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
+      ...existingHeaders,
+    },
+  });
 }
 
 // Default query function that will be used by react-query

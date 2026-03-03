@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
 import { watchSummaryDropped } from "@/utils/consistencyWatchdog";
 import { toProjectVM, formatCurrency, useWhichCost } from "@/selectors/projectVM";
@@ -1163,7 +1164,7 @@ const ProjectDetailsPage = () => {
       const queryParams = timeFilterForHook 
         ? `?timeFilter=${timeFilterForHook}&basis=ECON`
         : '?basis=ECON';
-      const response = await fetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
+      const response = await authFetch(`/api/projects/${projectId}/deviation-analysis${queryParams}`);
       return response.json();
     },
     enabled: !!projectId,
