@@ -10,7 +10,6 @@ import ManageQuotes from "@/pages/manage-quotes";
 import QuotationDetail from "@/pages/quotation-detail";
 import QuoteRedirect from "@/pages/quote-redirect";
 import Clients from "@/pages/clients";
-import AnalyticsConsolidated from "@/pages/analytics-consolidated";
 import Admin from "@/pages/admin-fixed";
 import AdminInflation from "@/pages/admin-inflation";
 
@@ -24,17 +23,14 @@ import NewProjectWithTooltips from "@/pages/new-project-with-tooltips";
 import TimeEntries from "@/pages/time-entries";
 import EditProject from "@/pages/edit-project";
 import ProjectFinancialManagement from "@/pages/project-financial-management";
-import FinancialOverview from "@/pages/financial-overview";
 
 // Analytics & Specialized Pages
 import ProjectAnalyticsView from "@/pages/project-analytics-view";
 import ClientSummaryCompact from "@/pages/client-summary-compact";
 import QualityScores from "@/pages/quality-scores";
 import QuarterlyNpsSurvey from "@/pages/quarterly-nps-survey";
-import { IndirectCosts } from "@/pages/indirect-costs";
 import CurrencyDemo from "@/pages/currency-demo";
 import GoogleSheetsManager from "@/pages/google-sheets-manager";
-import ExcelMaestroPage from "@/pages/excel-maestro";
 import ExecutiveOperativo from "@/pages/Executive/Operativo";
 import ExecutiveFinanciero from "@/pages/Executive/Financiero";
 import CRMPage from "@/pages/crm";
@@ -168,8 +164,6 @@ function AppRoutes() {
                   <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} requiredPermission="projects" />
                   
                   {/* Analytics & Reports */}
-                  <ProtectedRoute path="/financial-overview" component={FinancialOverview} requiredPermission="projects" />
-                  <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} requiredPermission="finance" />
                   <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} requiredPermission="finance" />
                   <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} requiredPermission="projects" />
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} requiredPermission="projects" />
@@ -184,9 +178,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
                   <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
                   <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
-                  <ProtectedRoute path="/indirect-costs" component={IndirectCosts} requiredPermission="projects" />
                   <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} requiredPermission="admin" />
-                  <ProtectedRoute path="/excel-maestro" component={ExcelMaestroPage} requiredPermission="admin" />
                   
                   {/* Specialized Tools */}
                   <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} requiredPermission="projects" />
@@ -197,7 +189,11 @@ function AppRoutes() {
 
                   
                   {/* Legacy Redirects */}
-                  <ProtectedRoute path="/history" component={() => <Redirect to="/statistics" />} />
+                  <ProtectedRoute path="/history" component={() => <Redirect to="/" />} />
+                  <ProtectedRoute path="/statistics" component={() => <Redirect to="/" />} />
+                  <ProtectedRoute path="/financial-overview" component={() => <Redirect to="/" />} />
+                  <ProtectedRoute path="/indirect-costs" component={() => <Redirect to="/" />} />
+                  <ProtectedRoute path="/excel-maestro" component={() => <Redirect to="/" />} />
                   <ProtectedRoute path="/project-details/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
                   <ProtectedRoute path="/project/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/projects/${params.id}`} />} />
                   

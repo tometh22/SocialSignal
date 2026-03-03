@@ -29,7 +29,7 @@ export function usePermissions() {
     if (hasPermission('crm')) return '/crm';
     if (hasPermission('quotations')) return '/quotations';
     if (hasPermission('projects')) return '/active-projects';
-    if (hasPermission('finance')) return '/statistics';
+    if (hasPermission('finance')) return '/';
     return '/unauthorized';
   };
 

@@ -15,14 +15,10 @@ import {
   FileText,
   Briefcase,
   Building2,
-  BarChart3,
   Settings,
   LogOut,
   Target,
   Plus,
-  Receipt,
-  FileSpreadsheet,
-  DollarSign,
   Bell,
   AlertCircle,
   Clock,
@@ -132,17 +128,8 @@ export default function SidebarFixed() {
       ]
     },
     {
-      title: "Análisis Financiero",
-      items: [
-        { href: "/financial-overview", title: "Resumen Financiero", icon: DollarSign, description: "Vista consolidada financiera", permission: 'projects' as AppSection },
-        { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado", permission: 'finance' as AppSection },
-        { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos", permission: 'projects' as AppSection }
-      ]
-    },
-    {
       title: "Herramientas",
       items: [
-        { href: "/excel-maestro", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva", permission: 'admin' as AppSection },
         { href: "/admin/users", title: "Gestión de Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
