@@ -7,8 +7,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Pencil, UserX, UserCheck, ShieldCheck, Shield } from "lucide-react";
+import { UserPlus, Pencil, UserX, UserCheck, ShieldCheck, Shield, Trash2 } from "lucide-react";
 
 type UserRecord = {
   id: number;
@@ -62,28 +66,29 @@ export default function AdminUsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [form, setForm] = useState<FormData>(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
 
   const { data: users = [], isLoading } = useQuery<UserRecord[]>({
     queryKey: ["/api/admin/users"],
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest("POST", "/api/admin/users", data),
+    mutationFn: (data: FormData) =>
+      apiRequest("/api/admin/users", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setModalOpen(false);
       setForm(emptyForm);
       toast({ title: "Usuario creado correctamente" });
     },
-    onError: async (error: any) => {
-      const msg = error?.message || "Error al crear usuario";
-      toast({ title: msg, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: error?.message || "Error al crear usuario", variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<FormData> }) =>
-      apiRequest("PATCH", `/api/admin/users/${id}`, data),
+      apiRequest(`/api/admin/users/${id}`, "PATCH", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setModalOpen(false);
@@ -91,22 +96,33 @@ export default function AdminUsersPage() {
       setForm(emptyForm);
       toast({ title: "Usuario actualizado correctamente" });
     },
-    onError: async (error: any) => {
-      const msg = error?.message || "Error al actualizar usuario";
-      toast({ title: msg, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: error?.message || "Error al actualizar usuario", variant: "destructive" });
     },
   });
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
-      apiRequest("PATCH", `/api/admin/users/${id}`, { isActive }),
+      apiRequest(`/api/admin/users/${id}`, "PATCH", { isActive }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       toast({ title: vars.isActive ? "Usuario activado" : "Usuario desactivado" });
     },
-    onError: async (error: any) => {
-      const msg = error?.message || "Error al cambiar estado";
-      toast({ title: msg, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: error?.message || "Error al cambiar estado", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest(`/api/admin/users/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setDeleteTarget(null);
+      toast({ title: "Usuario eliminado permanentemente" });
+    },
+    onError: (error: any) => {
+      toast({ title: error?.message || "Error al eliminar usuario", variant: "destructive" });
     },
   });
 
@@ -127,6 +143,12 @@ export default function AdminUsersPage() {
       permissions: user.permissions || [],
     });
     setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingUser(null);
+    setForm(emptyForm);
   };
 
   const handleSubmit = () => {
@@ -238,7 +260,7 @@ export default function AdminUsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -251,7 +273,7 @@ export default function AdminUsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className={`h-8 gap-1 text-xs ${user.isActive ? "text-destructive hover:text-destructive" : "text-green-600 hover:text-green-700"}`}
+                          className={`h-8 gap-1 text-xs ${user.isActive ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}`}
                           onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
                           disabled={toggleActiveMutation.isPending}
                         >
@@ -259,6 +281,15 @@ export default function AdminUsersPage() {
                             ? <><UserX className="h-3.5 w-3.5" /> Desactivar</>
                             : <><UserCheck className="h-3.5 w-3.5" /> Activar</>
                           }
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteTarget(user)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Eliminar
                         </Button>
                       </div>
                     </TableCell>
@@ -270,10 +301,14 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) { setModalOpen(false); setEditingUser(null); setForm(emptyForm); } }}>
+      {/* Modal Crear / Editar */}
+      <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) closeModal(); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingUser ? "Editar usuario" : "Crear nuevo usuario"}</DialogTitle>
+            <DialogDescription>
+              {editingUser ? "Modificá los datos y permisos del usuario." : "Completá los datos para crear un nuevo usuario en el sistema."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -311,7 +346,8 @@ export default function AdminUsersPage() {
 
             <div className="space-y-1.5">
               <Label htmlFor="password">
-                Contraseña {editingUser && <span className="text-muted-foreground text-xs">(dejá en blanco para no cambiar)</span>}
+                Contraseña{" "}
+                {editingUser && <span className="text-muted-foreground text-xs font-normal">(dejá en blanco para no cambiar)</span>}
               </Label>
               <Input
                 id="password"
@@ -359,15 +395,37 @@ export default function AdminUsersPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setModalOpen(false); setEditingUser(null); setForm(emptyForm); }}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={closeModal}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={isPending}>
               {isPending ? "Guardando..." : editingUser ? "Guardar cambios" : "Crear usuario"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmación eliminación permanente */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar usuario permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto va a eliminar a <strong>{deleteTarget?.firstName} {deleteTarget?.lastName}</strong> ({deleteTarget?.email}) de forma permanente. Esta acción no se puede deshacer.
+              <br /><br />
+              Si solo querés bloquear su acceso temporalmente, usá <strong>Desactivar</strong> en su lugar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Sí, eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

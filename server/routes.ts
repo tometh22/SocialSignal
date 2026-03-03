@@ -7880,16 +7880,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = parseInt(req.params.id);
       const requestingUserId = req.session.userId;
       if (userId === requestingUserId) {
-        return res.status(400).json({ message: "No podés desactivar tu propia cuenta" });
+        return res.status(400).json({ message: "No podés eliminar tu propia cuenta" });
       }
-      const updatedUser = await storage.updateUser(userId, { isActive: false, updatedAt: new Date() });
-      if (!updatedUser) {
+      const deleted = await storage.deleteUser(userId);
+      if (!deleted) {
         return res.status(404).json({ message: "Usuario no encontrado" });
       }
-      res.json({ message: "Usuario desactivado correctamente" });
+      res.json({ message: "Usuario eliminado correctamente" });
     } catch (error) {
-      console.error("Error deactivating user:", error);
-      res.status(500).json({ message: "Error al desactivar usuario" });
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Error al eliminar usuario" });
     }
   });
 
