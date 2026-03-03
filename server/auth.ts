@@ -61,17 +61,15 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  const isReplit = !!(process.env.REPLIT_DOMAINS || process.env.REPL_ID);
-
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
     resave: false,
     saveUninitialized: false,
     rolling: true,
     cookie: {
-      secure: isReplit,
+      secure: false,
       maxAge: 1000 * 60 * 60 * 24 * 30,
-      sameSite: (isReplit ? 'none' : 'lax') as 'none' | 'lax',
+      sameSite: 'lax' as const,
       httpOnly: true,
       path: '/',
     },
