@@ -75,7 +75,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       httpOnly: true,
       path: '/',
     },
-    name: 'epical.sid',
+    name: 'epical_sid',
   };
 
   // Agregar el store de sesiones a la configuración
@@ -138,33 +138,21 @@ export function setupAuth(app: Express, storage: IStorage) {
         return res.status(403).json({ message: "Tu cuenta está desactivada. Contactá al administrador." });
       }
 
-      // Establecer la sesión y guardarla explícitamente
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}`);
 
-      // Guardar la sesión explícitamente antes de enviar la respuesta
-      req.session.save((saveError) => {
-        if (saveError) {
-          console.error('❌ Error saving session:', saveError);
-          return res.status(500).json({ message: "Error al guardar sesión" });
-        }
+      const userResponse = {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatar: user.avatar || null,
+        isAdmin: user.isAdmin,
+        isActive: user.isActive,
+        permissions: (user as any).permissions || []
+      };
 
-        console.log(`💾 Session saved successfully for user: ${user.id}`);
-
-        const userResponse = {
-          id: user.id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          avatar: user.avatar || null,
-          isAdmin: user.isAdmin,
-          isActive: user.isActive,
-          permissions: (user as any).permissions || []
-        };
-
-        console.log(`📤 Sending login response for: ${user.email}`);
-        res.status(200).json(userResponse);
-      });
+      res.status(200).json(userResponse);
     } catch (error) {
       console.error("Error al iniciar sesión:", error);
       res.status(500).json({ message: "Error al iniciar sesión" });

@@ -10,7 +10,8 @@ import cors from 'cors';
 
 const app = express();
 
-// 🚫 ENDPOINT DUPLICADO ELIMINADO - Ahora usa implementación universal en routes.ts
+// Trust Replit's reverse proxy so express-session sets Secure cookies correctly
+app.set('trust proxy', 1);
 
 // Request logging middleware for debugging (reduced noise)
 app.use((req, res, next) => {
