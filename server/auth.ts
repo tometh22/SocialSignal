@@ -31,8 +31,6 @@ export async function hashPassword(password: string) {
 
 // Función para comparar contraseñas
 async function comparePasswords(supplied: string, stored: string) {
-
-  // Verificar que stored tenga el formato correcto
   if (!stored.includes(".")) {
     console.error("Formato de hash incorrecto, no contiene separador '.'");
     return false;
@@ -42,22 +40,28 @@ async function comparePasswords(supplied: string, stored: string) {
 
   try {
     const hashedBuf = Buffer.from(hashed, "hex");
-
     const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
 
     try {
-      const result = timingSafeEqual(hashedBuf, suppliedBuf);
-      return result;
+      return timingSafeEqual(hashedBuf, suppliedBuf);
     } catch (error) {
       console.error("Error en timingSafeEqual:", error);
-      // Fallback en caso de error con timingSafeEqual
-      const result = Buffer.compare(hashedBuf, suppliedBuf) === 0;
-      return result;
+      return Buffer.compare(hashedBuf, suppliedBuf) === 0;
     }
   } catch (error) {
     console.error("Error al comparar contraseñas:", error);
     return false;
   }
+}
+
+// Helper: resolve userId from session store by session ID token
+function getUserIdFromStore(store: session.Store, sessionId: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    store.get(sessionId, (err, sessionData) => {
+      if (err || !sessionData) return resolve(null);
+      resolve((sessionData as any).userId ?? null);
+    });
+  });
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
@@ -76,25 +80,43 @@ export function setupAuth(app: Express, storage: IStorage) {
     name: 'epical_sid',
   };
 
-  // Agregar el store de sesiones a la configuración
+  const sessionStore = storage.sessionStore;
+
   const sessionWithStore = {
     ...sessionConfig,
-    store: storage.sessionStore
+    store: sessionStore
   };
 
   app.use(session(sessionWithStore));
 
+  // Helper: resolve session from Authorization: Session <token> header when cookie is missing
+  async function resolveSessionFromToken(req: Request): Promise<number | null> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Session ')) return null;
+    const tokenId = authHeader.slice(8).trim();
+    if (!tokenId) return null;
+    return getUserIdFromStore(sessionStore, tokenId);
+  }
+
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
-    if (!req.session?.userId) {
+    let userId = req.session?.userId;
+
+    // Fallback: token-based auth for environments where cookies don't propagate (e.g. Replit preview iframe)
+    if (!userId) {
+      const tokenUserId = await resolveSessionFromToken(req);
+      if (tokenUserId) userId = tokenUserId;
+    }
+
+    if (!userId) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(userId);
 
       if (!user) {
-        req.session.destroy(() => {});
+        req.session?.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
 
@@ -117,14 +139,12 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       console.log(`🔐 Login attempt for: ${email}`);
 
-      // Buscar el usuario
       const user = await storage.getUserByEmail(email);
 
       if (!user) {
         console.log(`❌ User not found: ${email}`);
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
-
 
       const isPasswordValid = await comparePasswords(password, user.password);
 
@@ -137,7 +157,7 @@ export function setupAuth(app: Express, storage: IStorage) {
       }
 
       req.session.userId = user.id;
-      console.log(`✅ Session established for user ID: ${user.id}`);
+      console.log(`✅ Session established for user ID: ${user.id}, sessionID: ${req.sessionID}`);
 
       const userResponse = {
         id: user.id,
@@ -147,7 +167,8 @@ export function setupAuth(app: Express, storage: IStorage) {
         avatar: user.avatar || null,
         isAdmin: user.isAdmin,
         isActive: user.isActive,
-        permissions: (user as any).permissions || []
+        permissions: (user as any).permissions || [],
+        sessionToken: req.sessionID,
       };
 
       res.status(200).json(userResponse);
@@ -168,23 +189,30 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       console.log('✅ Session destroyed successfully');
 
-      res.clearCookie('sessionId', { path: '/' });
-      res.clearCookie('connect.sid', { path: '/' });
+      res.clearCookie('epical_sid', { path: '/' });
 
       res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
 
   app.get("/api/current-user", async (req, res) => {
-    if (!req.session?.userId) {
+    let userId = req.session?.userId;
+
+    // Fallback: token-based auth for environments where cookies don't propagate
+    if (!userId) {
+      const tokenUserId = await resolveSessionFromToken(req);
+      if (tokenUserId) userId = tokenUserId;
+    }
+
+    if (!userId) {
       return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(userId);
 
       if (!user) {
-        req.session.destroy(() => {});
+        req.session?.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
 
@@ -201,31 +229,22 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const { email } = req.body;
 
-      // Verificar si el usuario existe
       const user = await storage.getUserByEmail(email);
       if (!user) {
-        // Por seguridad, siempre devolvemos éxito incluso si el email no existe
         return res.status(200).json({ 
           message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación." 
         });
       }
 
-      // Generar token único
       const resetToken = randomBytes(32).toString('hex');
-
-      // Token expira en 1 hora
       const expiresAt = new Date(Date.now() + 3600000);
 
-      // Guardar token en la base de datos
       await storage.createPasswordResetToken(email, resetToken, expiresAt);
 
-      // En un entorno real, aquí enviarías un email
-      // Por ahora, devolvemos el token para testing
       console.log(`🔑 Password reset token for ${email}: ${resetToken}`);
 
       res.status(200).json({ 
         message: "Si el correo existe en nuestro sistema, recibirás un enlace de recuperación.",
-        // En producción, remove esta línea por seguridad
         token: resetToken 
       });
     } catch (error) {
@@ -238,7 +257,6 @@ export function setupAuth(app: Express, storage: IStorage) {
     try {
       const { token, password } = req.body;
 
-      // Verificar token
       const resetToken = await storage.getPasswordResetToken(token);
 
       if (!resetToken) {
@@ -253,13 +271,8 @@ export function setupAuth(app: Express, storage: IStorage) {
         return res.status(400).json({ message: "Token expirado" });
       }
 
-      // Hash de la nueva contraseña
       const hashedPassword = await hashPassword(password);
-
-      // Actualizar contraseña del usuario
       await storage.updateUserPassword(resetToken.email, hashedPassword);
-
-      // Marcar token como usado
       await storage.markPasswordResetTokenAsUsed(token);
 
       res.status(200).json({ message: "Contraseña actualizada correctamente" });
@@ -269,6 +282,5 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   });
 
-  // Exportar el middleware para su uso en otras rutas
   return { requireAuth };
 }

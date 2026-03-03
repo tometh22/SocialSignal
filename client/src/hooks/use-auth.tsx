@@ -26,16 +26,18 @@ type LoginData = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function getAuthHeader(): Record<string, string> {
+  const token = sessionStorage.getItem('auth_token');
+  return token ? { 'Authorization': `Session ${token}` } : {};
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
-  // Consulta al servidor para verificar la sesión actual
   const { data: user, isLoading, error } = useQuery({
     queryKey: ["/api/current-user"],
     queryFn: async (): Promise<UserType | null> => {
       try {
-        console.log('🔍 Fetching current user...');
-
         const response = await fetch("/api/current-user", {
           credentials: 'include',
           method: 'GET',
@@ -43,15 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           headers: {
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache',
+            ...getAuthHeader(),
           },
         });
 
-        console.log('🔍 Response status:', response.status);
-
         if (!response.ok) {
           if (response.status === 401) {
-            console.log('🔒 User not authenticated');
-            localStorage.removeItem('tempUserId');
             return null;
           }
           const errorText = await response.text();
@@ -75,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     gcTime: 5 * 60 * 1000,
   });
 
-  // Mutación para el inicio de sesión
   const loginMutation = useMutation({
     mutationFn: async (credentials: { email: string; password: string }): Promise<UserType> => {
       console.log('🔐 Attempting login for:', credentials.email);
@@ -88,24 +86,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('🔐 Login response status:', response.status);
-      console.log('🔐 Login response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Error de autenticación');
+        throw new Error(errorData.message || errorData.error || 'Error de autenticación');
       }
 
       const userData = await response.json();
       console.log('✅ Login successful for:', credentials.email);
-      console.log('✅ User data:', userData);
+
+      // Persist session token for environments where cookies don't propagate (e.g. Replit preview iframe)
+      if (userData.sessionToken) {
+        sessionStorage.setItem('auth_token', userData.sessionToken);
+      }
 
       return userData;
     },
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
 
-      queryClient.setQueryData(["/api/current-user"], userData);
-      queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
+      // Strip sessionToken from cached user data — it's only needed for headers
+      const { sessionToken, ...userForCache } = userData as any;
+      queryClient.setQueryData(["/api/current-user"], userForCache);
 
       toast({
         title: "Inicio de sesión exitoso",
@@ -113,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
 
-      // Redirigir a la primera sección disponible según permisos
       const getFirstRoute = (user: any): string => {
         if (user.isAdmin) return '/';
         const perms: string[] = user.permissions || [];
@@ -134,12 +135,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Mutación para el cierre de sesión
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
       const response = await fetch("/api/logout", {
         method: "POST",
-        credentials: "include"
+        credentials: "include",
+        headers: {
+          ...getAuthHeader(),
+        },
       });
 
       if (!response.ok) {
@@ -147,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
+      sessionStorage.removeItem('auth_token');
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear();
 
@@ -156,7 +160,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
 
-      // Redirect inmediato a la página de autenticación
       setTimeout(() => {
         window.location.href = "/auth";
       }, 300);
@@ -170,7 +173,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Create stable callback functions
   const login = useCallback(async (email: string, password: string) => {
     return loginMutation.mutateAsync({ email, password });
   }, [loginMutation]);

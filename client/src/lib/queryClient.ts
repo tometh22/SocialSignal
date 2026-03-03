@@ -7,23 +7,30 @@ type FetcherOptions = {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes - optimal for most data
-      gcTime: 1000 * 60 * 30, // 30 minutes - extended cache for better performance (v5 uses gcTime)
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
       retry: 1,
-      refetchOnWindowFocus: false, // Prevent excessive refetching
-      refetchOnReconnect: true, // Refetch when connection is restored
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
     },
   },
 });
+
+// Returns Authorization header if a session token exists in sessionStorage
+function getAuthHeader(): Record<string, string> {
+  const token = sessionStorage.getItem('auth_token');
+  return token ? { 'Authorization': `Session ${token}` } : {};
+}
 
 // Default query function that will be used by react-query
 export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
   const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
   
-  const response = await fetch(url, {
-    credentials: "include", // Asegurar que las cookies se envíen con la solicitud
+  const response = await fetch(url as string, {
+    credentials: "include",
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...getAuthHeader(),
     }
   });
   
@@ -43,7 +50,6 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[
     throw new Error(errorMessage);
   }
   
-  // For empty responses like 204 No Content
   if (response.status === 204) {
     return null;
   }
@@ -56,10 +62,11 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
   return async ({ queryKey }: { queryKey: readonly unknown[] }) => {
     const url = Array.isArray(queryKey) ? queryKey[0] : queryKey;
     
-    const response = await fetch(url, {
-      credentials: "include", // Asegurar que las cookies se envíen con la solicitud
+    const response = await fetch(url as string, {
+      credentials: "include",
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
       }
     });
     
@@ -83,7 +90,6 @@ export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
       throw new Error(errorMessage);
     }
     
-    // For empty responses like 204 No Content
     if (response.status === 204) {
       return null;
     }
@@ -107,7 +113,6 @@ export async function apiRequest(
   methodOrOptions: string | { method: string; body?: any },
   data?: any
 ) {
-  // Handle different parameter formats
   let method: string;
   let requestData: any;
   
@@ -121,8 +126,9 @@ export async function apiRequest(
   const url = endpoint;
   
   try {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      ...getAuthHeader(),
     };
     
     const options: RequestInit = {
@@ -135,10 +141,8 @@ export async function apiRequest(
       options.body = JSON.stringify(requestData);
     }
     
-    // Realizar la solicitud
     const response = await fetch(url, options);
     
-    // Manejar errores de respuesta
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`API Error: ${method} ${url} status ${response.status}`, errorText);
@@ -154,18 +158,15 @@ export async function apiRequest(
       throw new Error(errorMessage);
     }
     
-    // Para respuestas vacías
     if (response.status === 204) {
       return null;
     }
     
-    // Verificar si el cuerpo de la respuesta tiene contenido
     const responseText = await response.text();
     if (!responseText) {
       return null;
     }
     
-    // Intentar analizar la respuesta como JSON
     try {
       return JSON.parse(responseText);
     } catch (error) {
