@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useCallback, ReactNode } from 'react';
 import {
   useQuery,
   useMutation,
   UseMutationResult,
 } from "@tanstack/react-query";
-import { User as UserType, InsertUser } from "@shared/schema";
-import { apiRequest, queryClient } from "../lib/queryClient";
+import { User as UserType } from "@shared/schema";
+import { queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type AuthContextType = {
@@ -14,9 +14,7 @@ type AuthContextType = {
   error: Error | null;
   loginMutation: UseMutationResult<UserType, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<UserType, Error, InsertUser>;
   login: (email: string, password: string) => Promise<UserType>;
-  register: (userData: InsertUser) => Promise<UserType>;
   logout: () => Promise<void>;
   loading: boolean;
 };
@@ -109,8 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/current-user"], userData);
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
 
-      localStorage.removeItem('tempUserId');
-
       toast({
         title: "Inicio de sesión exitoso",
         description: `Bienvenido ${userData.firstName}`,
@@ -138,42 +134,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  // Mutación para el registro de usuario
-  const registerMutation = useMutation<UserType, Error, InsertUser>({
-    mutationFn: async (userData) => {
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(userData),
-        credentials: "include"
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Error al registrarse" }));
-        throw new Error(errorData.message || "Error al registrarse");
-      }
-
-      return await response.json();
-    },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/current-user"], user);
-      toast({
-        title: "Registro exitoso",
-        description: `Bienvenido ${user.firstName} ${user.lastName}`,
-        variant: "default",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Error al registrarse",
-        description: error.message || "No se pudo crear la cuenta",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Mutación para el cierre de sesión
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
@@ -187,12 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     onSuccess: () => {
-      console.log('🚪 Logout successful, clearing user data...');
-
-      // Limpiar datos locales específicos
-      localStorage.removeItem('tempUserId');
-
-      // Limpiar datos del cache de queries
       queryClient.setQueryData(["/api/current-user"], null);
       queryClient.clear();
 
@@ -221,10 +175,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return loginMutation.mutateAsync({ email, password });
   }, [loginMutation]);
 
-  const register = useCallback(async (userData: InsertUser) => {
-    return registerMutation.mutateAsync(userData);
-  }, [registerMutation]);
-
   const logout = useCallback(async () => {
     return logoutMutation.mutateAsync();
   }, [logoutMutation]);
@@ -237,9 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         loginMutation,
         logoutMutation,
-        registerMutation,
         login,
-        register,
         logout,
         loading: isLoading,
       }}

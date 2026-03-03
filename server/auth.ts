@@ -61,23 +61,21 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express, storage: IStorage) {
-  // Configuración de la sesión optimizada para entorno multiusuario y trabajo prolongado
-  const isProduction = process.env.NODE_ENV === 'production';
-  const isReplit = process.env.REPLIT_DOMAINS || process.env.REPL_ID;
+  const isReplit = !!(process.env.REPLIT_DOMAINS || process.env.REPL_ID);
 
   const sessionConfig = {
     secret: process.env.SESSION_SECRET || "epical-secret-key-enhanced-2025",
-    resave: false, // Solo guardar cuando se modifica
-    saveUninitialized: false, // No guardar sesiones vacías
-    rolling: true, // Renovar cookie en cada respuesta para mantener activo
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,
     cookie: {
-      secure: false, // No HTTPS en desarrollo
-      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días para sesiones persistentes
-      sameSite: 'lax' as const, // Mejorar compatibilidad
-      httpOnly: false, // Permitir acceso desde JS para debugging
+      secure: isReplit,
+      maxAge: 1000 * 60 * 60 * 24 * 30,
+      sameSite: (isReplit ? 'none' : 'lax') as 'none' | 'lax',
+      httpOnly: true,
       path: '/',
     },
-    name: 'sessionId', // Nombre simple para evitar conflictos
+    name: 'epical.sid',
   };
 
   // Agregar el store de sesiones a la configuración
@@ -90,60 +88,8 @@ export function setupAuth(app: Express, storage: IStorage) {
 
   // Middleware para verificar autenticación
   const requireAuth = async (req: Request, res: Response, next: Function) => {
-    console.log('🔍 Auth middleware - Headers:', req.headers.cookie);
-    console.log('🔍 Auth middleware - Session ID:', req.sessionID);
-    console.log('🔍 Auth middleware - Session data:', req.session);
-
-    // RECUPERACIÓN DE SESIÓN: Si no hay sesión pero existe cookie persistente
-    if (!req.session?.userId && req.cookies && req.cookies['epical.persistent.sid']) {
-      const persistentUserId = parseInt(req.cookies['epical.persistent.sid']);
-      console.log('🔍 Auth middleware - Found persistent cookie, User ID:', persistentUserId);
-      
-      if (!isNaN(persistentUserId) && persistentUserId > 0) {
-        // Verificar que el usuario existe antes de restaurar la sesión
-        try {
-          const user = await storage.getUser(persistentUserId);
-          if (user) {
-            req.session.userId = persistentUserId;
-            console.log('✅ Auth middleware - Session restored from persistent cookie for user:', user.email);
-          }
-        } catch (error) {
-          console.log('❌ Auth middleware - Error verifying persistent cookie user:', error);
-        }
-      }
-    }
-
-    // SOLUCIÓN TEMPORAL: Si no hay sesión, pero hay Authorization header, usar eso
-    if (!req.session?.userId && req.headers.authorization) {
-      const token = req.headers.authorization.replace('Bearer ', '');
-      console.log('🔍 Auth middleware - Checking Authorization header:', token);
-
-      // Simple validación de token temporal (solo números = user ID)
-      if (/^\d+$/.test(token)) {
-        req.session.userId = parseInt(token);
-        console.log('✅ Auth middleware - Using Authorization header user ID:', req.session.userId);
-      }
-    }
-
-    // 🔥 TEMPORAL FIX: Auto-login demo user for development access (SAME AS current-user)
     if (!req.session?.userId) {
-      console.log(`🚀 TEMP FIX requireAuth: No session found, attempting auto-login for development`);
-      
-      try {
-        // Try to find demo user
-        const demoUser = await storage.getUserByEmail("demo@epical.digital");
-        
-        if (demoUser) {
-          req.session.userId = demoUser.id;
-          console.log(`✅ TEMP FIX requireAuth: Auto-logged in demo user: ${demoUser.email}`);
-        } else {
-          console.log(`❌ requireAuth: Demo user not found, returning 401`);
-          return res.status(401).json({ message: "No autenticado" });
-        }
-      } catch (error) {
-        console.error("❌ Error in requireAuth temp auto-login:", error);
-        return res.status(401).json({ message: "No autenticado" });
-      }
+      return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
@@ -162,39 +108,9 @@ export function setupAuth(app: Express, storage: IStorage) {
     }
   };
 
-  // Rutas de autenticación
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { email, password, firstName, lastName } = req.body;
-
-      // Verificar si el correo ya existe
-      const existingUser = await storage.getUserByEmail(email);
-
-      if (existingUser) {
-        return res.status(400).json({ message: "El correo electrónico ya está registrado" });
-      }
-
-      // Crear el usuario
-      const hashedPassword = await hashPassword(password);
-
-      const user = await storage.createUser({
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        isAdmin: false,
-      });
-
-      // Establecer la sesión
-      req.session.userId = user.id;
-
-      // Enviar respuesta
-      const { password: _, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error al registrar usuario:", error);
-      res.status(500).json({ message: "Error al crear el usuario" });
-    }
+  // Registro público deshabilitado — los usuarios se crean desde el panel de administración
+  app.post("/api/register", (_req, res) => {
+    res.status(403).json({ message: "El registro público está deshabilitado. Contactá al administrador." });
   });
 
   app.post("/api/login", async (req, res) => {
@@ -212,35 +128,19 @@ export function setupAuth(app: Express, storage: IStorage) {
       }
 
 
-      // SOLUCIÓN TEMPORAL PARA TESTING Y ACCESO FACILITADO
-      let isPasswordValid = false;
-
-      if ((email === "victoria.puricelli@epical.digital" && password === "epical2025") ||
-          (email === "tomas@epical.digital" && password === "epical2025") ||
-          (email === "demo@epical.digital" && password === "demo123")) {
-        isPasswordValid = true;
-      } else {
-        // Verificar la contraseña para otros usuarios
-        isPasswordValid = await comparePasswords(password, user.password);
-      }
-
+      const isPasswordValid = await comparePasswords(password, user.password);
 
       if (!isPasswordValid) {
         return res.status(401).json({ message: "Credenciales incorrectas" });
       }
 
+      if (user.isActive === false) {
+        return res.status(403).json({ message: "Tu cuenta está desactivada. Contactá al administrador." });
+      }
+
       // Establecer la sesión y guardarla explícitamente
       req.session.userId = user.id;
       console.log(`✅ Session established for user ID: ${user.id}`);
-
-      // Agregar cookie persistente para sobrevivir reinicios del servidor
-      res.cookie('epical.persistent.sid', user.id, {
-        httpOnly: false,
-        secure: false,
-        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 días
-        sameSite: 'lax',
-        path: '/'
-      });
 
       // Guardar la sesión explícitamente antes de enviar la respuesta
       req.session.save((saveError) => {
@@ -251,14 +151,15 @@ export function setupAuth(app: Express, storage: IStorage) {
 
         console.log(`💾 Session saved successfully for user: ${user.id}`);
 
-        // Preparar respuesta sin información sensible
         const userResponse = {
           id: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
           avatar: user.avatar || null,
-          isAdmin: user.isAdmin
+          isAdmin: user.isAdmin,
+          isActive: user.isActive,
+          permissions: (user as any).permissions || []
         };
 
         console.log(`📤 Sending login response for: ${user.email}`);
@@ -281,96 +182,26 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       console.log('✅ Session destroyed successfully');
 
-      // Limpiar la cookie de sesión
-      res.clearCookie('sessionId', {
-        path: '/',
-        httpOnly: false,
-        secure: false,
-        sameSite: false
-      });
+      res.clearCookie('sessionId', { path: '/' });
+      res.clearCookie('connect.sid', { path: '/' });
 
-      // También limpiar cualquier otra cookie relacionada con sesión
-      res.clearCookie('connect.sid', {
-        path: '/',
-        httpOnly: false,
-        secure: false,
-        sameSite: false
-      });
-
-      // Limpiar la cookie persistente también
-      res.clearCookie('epical.persistent.sid', {
-        path: '/',
-        httpOnly: false,
-        secure: false,
-        sameSite: 'lax'
-      });
-
-      console.log('🍪 Session cookies cleared');
       res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
 
   app.get("/api/current-user", async (req, res) => {
-    console.log(`🔍 Current user check. Session ID: ${req.session.userId}`);
-
-    // RECUPERACIÓN DE SESIÓN: Si no hay sesión pero existe cookie persistente
-    if (!req.session?.userId && req.cookies && req.cookies['epical.persistent.sid']) {
-      const persistentUserId = parseInt(req.cookies['epical.persistent.sid']);
-      console.log('🔍 Current user - Found persistent cookie, User ID:', persistentUserId);
-      
-      if (!isNaN(persistentUserId) && persistentUserId > 0) {
-        // Verificar que el usuario existe antes de restaurar la sesión
-        try {
-          const user = await storage.getUser(persistentUserId);
-          if (user) {
-            req.session.userId = persistentUserId;
-            console.log('✅ Current user - Session restored from persistent cookie for user:', user.email);
-          }
-        } catch (error) {
-          console.log('❌ Current user - Error verifying persistent cookie user:', error);
-        }
-      }
-    }
-
-    // 🔥 TEMPORAL FIX: Auto-login demo user for development access
-    if (!req.session.userId) {
-      console.log(`🚀 TEMP FIX: No session found, attempting auto-login for development`);
-      
-      try {
-        // Try to find demo user
-        const demoUser = await storage.getUserByEmail("demo@epical.digital");
-        
-        if (demoUser) {
-          req.session.userId = demoUser.id;
-          console.log(`✅ TEMP FIX: Auto-logged in demo user: ${demoUser.email}`);
-          
-          // Set persistent cookie for future requests
-          res.cookie('epical.persistent.sid', demoUser.id, {
-            httpOnly: false,
-            secure: false,
-            maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
-            sameSite: 'lax',
-            path: '/'
-          });
-        } else {
-          console.log(`❌ Demo user not found, returning 401`);
-          return res.status(401).json({ message: "No autenticado" });
-        }
-      } catch (error) {
-        console.error("❌ Error in temp auto-login:", error);
-        return res.status(401).json({ message: "No autenticado" });
-      }
+    if (!req.session?.userId) {
+      return res.status(401).json({ message: "No autenticado" });
     }
 
     try {
       const user = await storage.getUser(req.session.userId);
 
       if (!user) {
-        console.log(`❌ User not found for session ID: ${req.session.userId}`);
+        req.session.destroy(() => {});
         return res.status(401).json({ message: "Usuario no encontrado" });
       }
 
-      console.log(`✅ Current user validated: ${user.email}`);
       const { password, ...userWithoutPassword } = user;
       res.status(200).json(userWithoutPassword);
     } catch (error) {

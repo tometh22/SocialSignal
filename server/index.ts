@@ -5,8 +5,6 @@ import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
 import { autoSyncService } from "./services/autoSyncService";
 import cors from 'cors';
-import session from 'express-session';
-import cookieParser from 'cookie-parser';
 
 // Note: Session types are declared in server/auth.ts
 
@@ -30,9 +28,7 @@ app.use((req, res, next) => {
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cookieParser()); // Parsing de cookies para persistent sessions
-
-// CORS configuration - Permitir todos los orígenes para debugging en Replit
+// CORS configuration
 app.use(cors({
   origin: true, // Permitir cualquier origen durante debugging
   credentials: true,
@@ -42,67 +38,7 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-// Configuración de la sesión - Compatible con Replit webview y pestañas externas
 const isProduction = process.env.NODE_ENV === 'production';
-const isReplit = process.env.REPL_ID !== undefined;
-
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'tu-clave-secreta-muy-segura',
-    resave: false,
-    saveUninitialized: true, // Crear sesión automáticamente en primera visita
-    cookie: {
-      secure: isReplit, // true en Replit (usa HTTPS), false en local
-      httpOnly: false, // false para que sea accesible desde el frontend si es necesario
-      sameSite: isReplit ? 'none' : 'lax', // 'none' para cross-origin en Replit, 'lax' en local
-      maxAge: 24 * 60 * 60 * 1000, // 24 horas
-      path: '/', // Cookie disponible en todas las rutas
-      domain: undefined // Auto-detectar el dominio
-    }
-  })
-);
-
-// Auth check endpoint - CRITICAL FOR FRONTEND
-app.get('/auth/check', async (req: Request, res: Response) => {
-  const userId = req.session?.userId;
-  
-  console.log(`🔍 Auth check: Session ID = ${req.sessionID}, User ID = ${userId}`);
-  
-  if (userId) {
-    // Get user from storage
-    const user = await storage.getUser(userId);
-    if (user) {
-      res.json({
-        authenticated: true,
-        user: { email: user.email }
-      });
-    } else {
-      res.json({ authenticated: false });
-    }
-  } else {
-    // Auto-authenticate in development - use default user ID 1
-    try {
-      const user = await storage.getUser(1);
-      if (user) {
-        req.session.userId = user.id;
-        req.session.save((err) => {
-          if (err) {
-            console.error('Error saving session:', err);
-          }
-        });
-        res.json({
-          authenticated: true,
-          user: { email: user.email }
-        });
-      } else {
-        res.json({ authenticated: false });
-      }
-    } catch (err) {
-      console.error('Error getting user:', err);
-      res.json({ authenticated: false });
-    }
-  }
-});
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
