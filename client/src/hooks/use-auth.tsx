@@ -106,15 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (userData) => {
       console.log('✅ Login mutation success, setting user data...');
 
-      // Establecer inmediatamente los datos del usuario en el cache
       queryClient.setQueryData(["/api/current-user"], userData);
-
-      // Invalidar para forzar una nueva consulta
       queryClient.invalidateQueries({ queryKey: ["/api/current-user"] });
 
-      console.log('🚀 Login successful, user data set in cache');
-
-      // Eliminar tempUserId si existe ya que ahora tenemos sesión real
       localStorage.removeItem('tempUserId');
 
       toast({
@@ -123,9 +117,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         variant: "default",
       });
 
-      // Redirect automático al dashboard después del login
+      // Redirigir a la primera sección disponible según permisos
+      const getFirstRoute = (user: any): string => {
+        if (user.isAdmin) return '/';
+        const perms: string[] = user.permissions || [];
+        if (perms.includes('dashboard')) return '/';
+        if (perms.includes('crm')) return '/crm';
+        if (perms.includes('quotations')) return '/quotations';
+        if (perms.includes('projects')) return '/active-projects';
+        if (perms.includes('finance')) return '/statistics';
+        return '/unauthorized';
+      };
+
       setTimeout(() => {
-        window.location.href = "/";
+        window.location.href = getFirstRoute(userData);
       }, 100);
     },
     onError: (error) => {

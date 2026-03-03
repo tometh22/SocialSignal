@@ -47,6 +47,8 @@ import EditDeliverable from "@/pages/edit-deliverable";
 import EditRobustnessPage from "@/pages/edit-robustness";
 import AlwaysOnProjectView from "@/pages/always-on-project-view";
 import RecurringTemplatesPage from "@/pages/recurring-templates";
+import AdminUsersPage from "@/pages/admin-users";
+import UnauthorizedPage from "@/pages/unauthorized";
 import SidebarFixed from "@/components/layout/sidebar-fixed";
 import Topbar from "@/components/layout/topbar";
 import { AuthProvider } from "@/hooks/use-auth";
@@ -128,21 +130,24 @@ function AppRoutes() {
             <main className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="max-w-full p-3 sm:p-4">
                 <Switch>
+                  {/* Unauthorized */}
+                  <Route path="/unauthorized" component={UnauthorizedPage} />
+
                   {/* Core Application Routes */}
-                  <ProtectedRoute path="/" component={ExecutiveDashboard} />
-                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} />
-                  <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboard} />
-                  <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} />
-                  <ProtectedRoute path="/executive/economico" component={ExecutiveDashboard} />
-                  <ProtectedRoute path="/executive/finanzas" component={ExecutiveFinanciero} />
+                  <ProtectedRoute path="/" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/executive/economico" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/executive/finanzas" component={ExecutiveFinanciero} requiredPermission="finance" />
                   <ProtectedRoute path="/principal" component={() => <Redirect to="/" />} />
                   
                   {/* Quotation Management */}
-                  <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} />
-                  <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} />
+                  <ProtectedRoute path="/optimized-quote" component={OptimizedQuoteWrapper} requiredPermission="quotations" />
+                  <ProtectedRoute path="/optimized-quote/:id" component={OptimizedQuotePathWrapper} requiredPermission="quotations" />
                   <ProtectedRoute path="/new-quote" component={() => <Redirect to="/optimized-quote" />} />
-                  <ProtectedRoute path="/quotations" component={ManageQuotes} />
-                  <ProtectedRoute path="/quotations/:id" component={QuotationDetail} />
+                  <ProtectedRoute path="/quotations" component={ManageQuotes} requiredPermission="quotations" />
+                  <ProtectedRoute path="/quotations/:id" component={QuotationDetail} requiredPermission="quotations" />
                   <ProtectedRoute path="/quote-redirect" component={QuoteRedirect} />
                   
                   {/* Legacy Redirects for Quotations */}
@@ -150,43 +155,44 @@ function AppRoutes() {
                   <ProtectedRoute path="/quotation/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/quotations/${params.id}`} />} />
                   
                   {/* Project Management */}
-                  <ProtectedRoute path="/active-projects" component={ActiveProjectsNext} />
-                  <ProtectedRoute path="/active-projects-next" component={ActiveProjectsNext} />
-                  <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} />
-                  <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} />
-                  <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} />
-                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsWithProvider} />
-                  <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} />
-                  <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} />
+                  <ProtectedRoute path="/active-projects" component={ActiveProjectsNext} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects-next" component={ActiveProjectsNext} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects-old" component={ActiveProjectsV2} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/new" component={NewProjectWithTooltips} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id/edit" component={EditProject} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id" component={ProjectDetailsWithProvider} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:id/time-entries" component={TimeEntries} requiredPermission="projects" />
+                  <ProtectedRoute path="/active-projects/:projectId/financial-management" component={ProjectFinancialManagement} requiredPermission="projects" />
                   <ProtectedRoute path="/projects/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
-                  <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} />
-                  <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} />
+                  <ProtectedRoute path="/project-settings/:id" component={ProjectSettings} requiredPermission="projects" />
+                  <ProtectedRoute path="/time-entries/project/:projectId" component={TimeEntries} requiredPermission="projects" />
                   
                   {/* Analytics & Reports */}
-                  <ProtectedRoute path="/financial-overview" component={FinancialOverview} />
-                  <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} />
-                  <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} />
-                  <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} />
-                  <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} />
-                  <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} />
+                  <ProtectedRoute path="/financial-overview" component={FinancialOverview} requiredPermission="projects" />
+                  <ProtectedRoute path="/statistics" component={AnalyticsConsolidated} requiredPermission="finance" />
+                  <ProtectedRoute path="/project-analytics/:projectId" component={ProjectAnalyticsView} requiredPermission="finance" />
+                  <ProtectedRoute path="/client-summary/:clientId" component={ClientSummaryCompact} requiredPermission="projects" />
+                  <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} requiredPermission="projects" />
+                  <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} requiredPermission="projects" />
                   
                   {/* CRM Ventas */}
-                  <ProtectedRoute path="/crm" component={CRMPage} />
-                  <ProtectedRoute path="/crm/:id" component={CRMLeadPage} />
+                  <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
+                  <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
 
                   {/* Client & Resource Management */}
-                  <ProtectedRoute path="/clients" component={Clients} />
-                  <ProtectedRoute path="/admin" component={Admin} />
-                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} />
-                  <ProtectedRoute path="/indirect-costs" component={IndirectCosts} />
-                  <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} />
-                  <ProtectedRoute path="/excel-maestro" component={ExcelMaestroPage} />
+                  <ProtectedRoute path="/clients" component={Clients} requiredPermission="crm" />
+                  <ProtectedRoute path="/admin/users" component={AdminUsersPage} requiredPermission="admin" />
+                  <ProtectedRoute path="/admin/inflation" component={AdminInflation} requiredPermission="admin" />
+                  <ProtectedRoute path="/admin" component={Admin} requiredPermission="admin" />
+                  <ProtectedRoute path="/indirect-costs" component={IndirectCosts} requiredPermission="projects" />
+                  <ProtectedRoute path="/google-sheets" component={GoogleSheetsManager} requiredPermission="admin" />
+                  <ProtectedRoute path="/excel-maestro" component={ExcelMaestroPage} requiredPermission="admin" />
                   
                   {/* Specialized Tools */}
-                  <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} />
-                  <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} />
-                  <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} />
-                  <ProtectedRoute path="/recurring-templates/:projectId" component={RecurringTemplatesPage} />
+                  <ProtectedRoute path="/edit-deliverable/:id" component={EditDeliverable} requiredPermission="projects" />
+                  <ProtectedRoute path="/edit-indicators/:id" component={EditRobustnessPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/always-on-project/:projectId" component={AlwaysOnProjectView} requiredPermission="projects" />
+                  <ProtectedRoute path="/recurring-templates/:projectId" component={RecurringTemplatesPage} requiredPermission="projects" />
                   <ProtectedRoute path="/currency-demo" component={CurrencyDemo} />
 
                   

@@ -13,6 +13,8 @@ export const users = pgTable("users", {
   password: varchar("password", { length: 255 }).notNull(),
   avatar: varchar("avatar", { length: 255 }),
   isAdmin: boolean("is_admin").default(false),
+  isActive: boolean("is_active").default(true),
+  permissions: text("permissions").array().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

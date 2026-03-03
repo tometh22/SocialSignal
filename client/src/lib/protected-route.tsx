@@ -1,22 +1,23 @@
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Loader2 } from "lucide-react";
 import { Route, Redirect, RouteProps } from "wouter";
 
 interface ProtectedRouteProps extends RouteProps {
   component: React.ComponentType<any>;
+  requiredPermission?: AppSection;
 }
 
 export function ProtectedRoute({
   path,
   component: Component,
+  requiredPermission,
   children,
   ...rest
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const { hasPermission, getFirstAllowedRoute } = usePermissions();
 
-  console.log('🔍 ProtectedRoute (' + (path || 'unknown') + '):', { user: !!user, isLoading: loading });
-
-  // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
       <Route path={path}>
@@ -27,9 +28,7 @@ export function ProtectedRoute({
     );
   }
 
-  // Solo redirigir si no hay usuario Y no está cargando
   if (!user && !loading) {
-    console.log(`🚫 No user found, redirecting to /auth from ${path}`);
     return (
       <Route path={path}>
         <Redirect to="/auth" />
@@ -37,13 +36,18 @@ export function ProtectedRoute({
     );
   }
 
-  // Si hay usuario, renderizar el componente
+  if (user && requiredPermission && !hasPermission(requiredPermission)) {
+    return (
+      <Route path={path}>
+        <Redirect to="/unauthorized" />
+      </Route>
+    );
+  }
+
   if (user) {
-    console.log(`✅ User found, rendering component for ${path}`);
     return <Route path={path} component={Component} {...rest} />;
   }
 
-  // Estado intermedio, mostrar loading
   return (
     <Route path={path}>
       <div className="flex items-center justify-center min-h-screen">

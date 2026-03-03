@@ -6,34 +6,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 
 import {
   ChevronRight,
-  Activity,
   LayoutDashboard,
   FileText,
-  ListChecks,
   Briefcase,
-  Users,
+  Building2,
   BarChart3,
   Settings,
-  ChevronDown,
   LogOut,
-  Star,
-  Zap,
-  Building2,
   Target,
-  TrendingUp,
-  Calendar,
   Plus,
-  Layers,
   Receipt,
   FileSpreadsheet,
   DollarSign,
   Bell,
   AlertCircle,
   Clock,
+  Users,
 } from "lucide-react";
 
 type NavItem = {
@@ -43,6 +36,7 @@ type NavItem = {
   badge?: string;
   status?: 'new';
   description?: string;
+  permission?: AppSection;
 };
 
 type DueReminder = {
@@ -56,6 +50,7 @@ type DueReminder = {
 
 export default function SidebarFixed() {
   const { user, logoutMutation } = useAuth();
+  const { hasPermission } = usePermissions();
   const [currentPath] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [projectCount, setProjectCount] = useState(0);
@@ -112,44 +107,54 @@ export default function SidebarFixed() {
     return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
   };
 
+  const isAdmin = (user as any)?.isAdmin;
+
   const navSections = [
     {
       title: "Principal",
       items: [
-        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs" }
+        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs", permission: 'dashboard' as AppSection }
       ]
     },
     {
       title: "Gestión Comercial",
       items: [
-        { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización" },
-        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline y seguimiento de prospectos" },
-        { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones" },
-        { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes" }
+        { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización", permission: 'quotations' as AppSection },
+        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline y seguimiento de prospectos", permission: 'crm' as AppSection },
+        { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
+        { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection }
       ]
     },
     {
       title: "Gestión Operacional",
       items: [
-        { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso" }
+        { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso", permission: 'projects' as AppSection }
       ]
     },
     {
       title: "Análisis Financiero",
       items: [
-        { href: "/financial-overview", title: "Resumen Financiero", icon: DollarSign, description: "Vista consolidada financiera" },
-        { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado" },
-        { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos" }
+        { href: "/financial-overview", title: "Resumen Financiero", icon: DollarSign, description: "Vista consolidada financiera", permission: 'projects' as AppSection },
+        { href: "/statistics", title: "Analytics & Reportes", icon: BarChart3, description: "Análisis detallado", permission: 'finance' as AppSection },
+        { href: "/indirect-costs", title: "Costos Indirectos", icon: Receipt, description: "Gestión de costos", permission: 'projects' as AppSection }
       ]
     },
     {
       title: "Herramientas",
       items: [
-        { href: "/excel-maestro", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva" },
-        { href: "/admin", title: "Configuración", icon: Settings, description: "Administración" }
+        { href: "/excel-maestro", title: "Excel MAESTRO", icon: FileSpreadsheet, description: "Importación masiva", permission: 'admin' as AppSection },
+        { href: "/admin/users", title: "Gestión de Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
+        { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
     }
   ];
+
+  const filteredNavSections = navSections.map(section => ({
+    ...section,
+    items: section.items.filter(item =>
+      !item.permission || hasPermission(item.permission)
+    )
+  })).filter(section => section.items.length > 0);
 
   const renderNavLink = (item: NavItem) => {
     const Icon = item.icon || LayoutDashboard;
@@ -331,7 +336,7 @@ export default function SidebarFixed() {
         {/* Navegación principal organizada por secciones */}
         <div className="flex-1 px-2 py-3 overflow-y-auto">
           <nav className="space-y-4">
-            {navSections.map((section) => (
+            {filteredNavSections.map((section) => (
               <div key={section.title}>
                 {!isCollapsed && (
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
@@ -363,7 +368,9 @@ export default function SidebarFixed() {
                 </p>
                 <div className="flex items-center gap-1">
                   <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-                  <span className="text-xs text-muted-foreground">Online</span>
+                  <span className="text-xs text-muted-foreground">
+                    {isAdmin ? "Administrador" : "Online"}
+                  </span>
                 </div>
               </div>
             )}
