@@ -1227,6 +1227,70 @@ export const insertChatParticipantSchema = createInsertSchema(chatConversationPa
   createdAt: true,
 });
 
+// ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
+// Tabla principal de tareas (similar a Asana)
+export const tasks = pgTable("tasks", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  projectId: integer("project_id").references(() => activeProjects.id),
+  sectionName: text("section_name").default("General"),
+  assigneeId: integer("assignee_id").references(() => personnel.id),
+  collaboratorIds: jsonb("collaborator_ids").$type<number[]>().default([]),
+  startDate: timestamp("start_date"),
+  dueDate: timestamp("due_date"),
+  estimatedHours: doublePrecision("estimated_hours"),
+  loggedHours: doublePrecision("logged_hours").default(0),
+  status: text("status").notNull().default("todo"),
+  priority: text("priority").notNull().default("medium"),
+  parentTaskId: integer("parent_task_id"),
+  position: integer("position").default(0),
+  completedAt: timestamp("completed_at"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  loggedHours: true,
+}).extend({
+  startDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
+  dueDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
+  completedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional().nullable(),
+  collaboratorIds: z.array(z.number()).optional().default([]),
+  status: z.enum(["todo", "in_progress", "done", "cancelled"]).default("todo"),
+  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+});
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+
+// Registro de horas contra tareas específicas
+export const taskTimeEntries = pgTable("task_time_entries", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id),
+  date: timestamp("date").notNull(),
+  hours: doublePrecision("hours").notNull(),
+  description: text("description"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  date: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  hours: z.number().positive(),
+});
+
+export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
+export type InsertTaskTimeEntry = z.infer<typeof insertTaskTimeEntrySchema>;
+
 // ==================== RELACIONES ====================
 
 // Relaciones de clientes

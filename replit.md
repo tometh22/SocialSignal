@@ -27,6 +27,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Schema Management**: Drizzle Kit
 
 ### Core Modules & Features
+- **Task Management Module (Asana-style)**: Full task management system with 4 views: "Mis Tareas" (personal weekly calendar), "Calendario Equipo" (monthly team calendar with person/project filters), "Panel de Horas" (consolidated hours dashboard with charts), and "Tareas" tab inside each project (sections + tasks + subtasks). DB tables: `tasks`, `task_time_entries`. API: `/api/tasks/*`, `/api/tasks-personnel`, `/api/tasks-projects`. Separate from financial analysis — accessible to all team members with `projects` permission.
 - **Sales CRM Module**: Kanban pipeline, lead/contact management, activity timelines, reminders, email integration.
 - **User & Client Management**: Role-based access control and Google Sheets integration for client import.
 - **Quotation System**: Comprehensive creation with team assignment and cost multipliers, supporting dual-currency rates (ARS/USD).

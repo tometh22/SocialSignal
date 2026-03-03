@@ -24,6 +24,9 @@ import {
   AlertCircle,
   Clock,
   Users,
+  CheckSquare,
+  CalendarDays,
+  BarChart2,
 } from "lucide-react";
 
 type NavItem = {
@@ -126,6 +129,14 @@ export default function SidebarFixed() {
       title: "Gestión Operacional",
       items: [
         { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso", permission: 'projects' as AppSection }
+      ]
+    },
+    {
+      title: "Gestión de Tareas",
+      items: [
+        { href: "/tasks/my-tasks", title: "Mis Tareas", icon: CheckSquare, description: "Tus tareas asignadas", permission: 'projects' as AppSection },
+        { href: "/tasks/team-calendar", title: "Calendario Equipo", icon: CalendarDays, description: "Vista de tareas del equipo", permission: 'projects' as AppSection },
+        { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas consolidadas por persona y proyecto", permission: 'projects' as AppSection },
       ]
     },
     {

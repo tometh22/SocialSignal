@@ -88,7 +88,11 @@ import {
   insertCrmLeadSchema,
   insertCrmContactSchema,
   insertCrmActivitySchema,
-  insertCrmReminderSchema
+  insertCrmReminderSchema,
+  tasks,
+  taskTimeEntries,
+  insertTaskSchema,
+  insertTaskTimeEntrySchema
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -15447,6 +15451,326 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimeType: req.file.mimetype,
       });
     });
+  });
+
+  // ==================== MÓDULO DE GESTIÓN DE TAREAS ====================
+
+  // GET /api/tasks — lista filtrable
+  app.get("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { assigneeId, projectId, status, dateFrom, dateTo } = req.query;
+      let conditions: any[] = [];
+      if (assigneeId) conditions.push(eq(tasks.assigneeId, parseInt(assigneeId as string)));
+      if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
+      if (status) conditions.push(eq(tasks.status, status as string));
+      if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
+      if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
+
+      const result = conditions.length > 0
+        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.position), asc(tasks.createdAt))
+        : await db.select().from(tasks).orderBy(asc(tasks.position), asc(tasks.createdAt));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener tareas" });
+    }
+  });
+
+  // GET /api/tasks/my-tasks — tareas del usuario logueado (busca por email en personnel)
+  app.get("/api/tasks/my-tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const personnelRecord = user?.email
+        ? await db.select().from(personnel).where(eq(personnel.email, user.email)).limit(1)
+        : [];
+      
+      let myTasks: any[] = [];
+      if (personnelRecord.length > 0) {
+        const pid = personnelRecord[0].id;
+        const { status, dateFrom, dateTo } = req.query;
+        let conditions: any[] = [eq(tasks.assigneeId, pid)];
+        if (status && status !== 'all') conditions.push(eq(tasks.status, status as string));
+        if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
+        if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
+        myTasks = await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate), asc(tasks.position));
+      }
+      
+      res.json({ tasks: myTasks, personnelId: personnelRecord[0]?.id || null });
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener mis tareas" });
+    }
+  });
+
+  // GET /api/tasks/team-calendar — todas las tareas para el calendario de equipo
+  app.get("/api/tasks/team-calendar", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { dateFrom, dateTo, assigneeId, projectId } = req.query;
+      let conditions: any[] = [];
+      if (dateFrom) conditions.push(gte(tasks.dueDate, new Date(dateFrom as string)));
+      if (dateTo) conditions.push(lte(tasks.dueDate, new Date(dateTo as string)));
+      if (assigneeId) conditions.push(eq(tasks.assigneeId, parseInt(assigneeId as string)));
+      if (projectId) conditions.push(eq(tasks.projectId, parseInt(projectId as string)));
+
+      const result = conditions.length > 0
+        ? await db.select().from(tasks).where(and(...conditions)).orderBy(asc(tasks.dueDate))
+        : await db.select().from(tasks).orderBy(asc(tasks.dueDate));
+
+      // Enrich with assignee info
+      const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
+      const allProjects = await db.select({ id: activeProjects.id }).from(activeProjects);
+      
+      // Get project names from quotations
+      const projectsWithNames = await db.execute(sql`
+        SELECT ap.id, q.project_name, c.name as client_name
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+      `);
+      const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
+      const personnelMap = new Map(allPersonnel.map(p => [p.id, p.name]));
+
+      const enriched = result.map(t => ({
+        ...t,
+        assigneeName: t.assigneeId ? personnelMap.get(t.assigneeId) : null,
+        projectName: t.projectId ? projectMap.get(t.projectId)?.name : null,
+        clientName: t.projectId ? projectMap.get(t.projectId)?.client : null,
+      }));
+
+      res.json(enriched);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener calendario del equipo" });
+    }
+  });
+
+  // GET /api/tasks/project/:projectId — tareas de un proyecto agrupadas por sección
+  app.get("/api/tasks/project/:projectId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { projectId } = req.params;
+      const result = await db.select().from(tasks)
+        .where(eq(tasks.projectId, parseInt(projectId)))
+        .orderBy(asc(tasks.sectionName), asc(tasks.position), asc(tasks.createdAt));
+      
+      // Agrupar por sección
+      const sections: Record<string, any[]> = {};
+      for (const task of result) {
+        const section = task.sectionName || "General";
+        if (!sections[section]) sections[section] = [];
+        sections[section].push(task);
+      }
+      
+      res.json({ tasks: result, sections });
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener tareas del proyecto" });
+    }
+  });
+
+  // GET /api/tasks/hours-summary — resumen de horas para el dashboard
+  app.get("/api/tasks/hours-summary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { personnelId, projectId, dateFrom, dateTo } = req.query;
+      let conditions: any[] = [];
+      if (personnelId) conditions.push(eq(taskTimeEntries.personnelId, parseInt(personnelId as string)));
+      if (dateFrom) conditions.push(gte(taskTimeEntries.date, new Date(dateFrom as string)));
+      if (dateTo) conditions.push(lte(taskTimeEntries.date, new Date(dateTo as string)));
+      if (projectId) {
+        const projectTasks = await db.select({ id: tasks.id }).from(tasks)
+          .where(eq(tasks.projectId, parseInt(projectId as string)));
+        const taskIds = projectTasks.map(t => t.id);
+        if (taskIds.length > 0) conditions.push(inArray(taskTimeEntries.taskId, taskIds));
+        else return res.json({ entries: [], byWeek: [], byProject: [], byPerson: [] });
+      }
+
+      const entries = conditions.length > 0
+        ? await db.select().from(taskTimeEntries).where(and(...conditions)).orderBy(asc(taskTimeEntries.date))
+        : await db.select().from(taskTimeEntries).orderBy(asc(taskTimeEntries.date));
+
+      // Enrich entries with task/personnel info
+      const allPersonnel = await db.select({ id: personnel.id, name: personnel.name }).from(personnel);
+      const allTasks = await db.select({ id: tasks.id, title: tasks.title, projectId: tasks.projectId }).from(tasks);
+      
+      const projectsWithNames = await db.execute(sql`
+        SELECT ap.id, q.project_name, c.name as client_name
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+      `);
+      const projectMap = new Map((projectsWithNames.rows as any[]).map(p => [p.id, { name: p.project_name, client: p.client_name }]));
+      const personnelMap = new Map(allPersonnel.map(p => [p.id, p.name]));
+      const taskMap = new Map(allTasks.map(t => [t.id, t]));
+
+      const enriched = entries.map(e => {
+        const task = taskMap.get(e.taskId);
+        const proj = task?.projectId ? projectMap.get(task.projectId) : null;
+        return {
+          ...e,
+          personnelName: personnelMap.get(e.personnelId) || `ID ${e.personnelId}`,
+          taskTitle: task?.title || `Tarea #${e.taskId}`,
+          projectId: task?.projectId || null,
+          projectName: proj?.name || "Sin proyecto",
+          clientName: proj?.client || null,
+        };
+      });
+
+      // By week
+      const byWeekMap: Record<string, number> = {};
+      for (const e of enriched) {
+        const d = new Date(e.date);
+        const weekStart = new Date(d);
+        weekStart.setDate(d.getDate() - d.getDay() + 1);
+        const key = weekStart.toISOString().slice(0, 10);
+        byWeekMap[key] = (byWeekMap[key] || 0) + e.hours;
+      }
+      const byWeek = Object.entries(byWeekMap).map(([week, hours]) => ({ week, hours })).sort((a, b) => a.week.localeCompare(b.week));
+
+      // By project
+      const byProjectMap: Record<string, { name: string; hours: number }> = {};
+      for (const e of enriched) {
+        const key = e.projectName;
+        if (!byProjectMap[key]) byProjectMap[key] = { name: key, hours: 0 };
+        byProjectMap[key].hours += e.hours;
+      }
+      const byProject = Object.values(byProjectMap).sort((a, b) => b.hours - a.hours);
+
+      // By person
+      const byPersonMap: Record<number, { name: string; hours: number }> = {};
+      for (const e of enriched) {
+        if (!byPersonMap[e.personnelId]) byPersonMap[e.personnelId] = { name: e.personnelName, hours: 0 };
+        byPersonMap[e.personnelId].hours += e.hours;
+      }
+      const byPerson = Object.values(byPersonMap).sort((a, b) => b.hours - a.hours);
+
+      res.json({ entries: enriched, byWeek, byProject, byPerson });
+    } catch (error) {
+      console.error("Error hours-summary:", error);
+      res.status(500).json({ message: "Error al obtener resumen de horas" });
+    }
+  });
+
+  // GET /api/tasks/:id — obtener tarea individual con sus entradas de tiempo
+  app.get("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, parseInt(id)));
+      if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+      
+      const timeLog = await db.select().from(taskTimeEntries).where(eq(taskTimeEntries.taskId, parseInt(id))).orderBy(desc(taskTimeEntries.date));
+      const subtasks = await db.select().from(tasks).where(eq(tasks.parentTaskId, parseInt(id))).orderBy(asc(tasks.position));
+      
+      res.json({ ...task, timeEntries: timeLog, subtasks });
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener tarea" });
+    }
+  });
+
+  // POST /api/tasks — crear tarea
+  app.post("/api/tasks", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      const data = insertTaskSchema.parse({ ...req.body, createdBy: user.id });
+      const [created] = await db.insert(tasks).values(data).returning();
+      res.json(created);
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error al crear tarea" });
+    }
+  });
+
+  // PUT /api/tasks/:id — actualizar tarea
+  app.put("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updates: any = { ...req.body, updatedAt: new Date() };
+      
+      // Handle status completion
+      if (updates.status === "done" && !updates.completedAt) updates.completedAt = new Date();
+      if (updates.status !== "done") updates.completedAt = null;
+      
+      // Parse dates if strings
+      if (updates.dueDate && typeof updates.dueDate === 'string') updates.dueDate = new Date(updates.dueDate);
+      if (updates.startDate && typeof updates.startDate === 'string') updates.startDate = new Date(updates.startDate);
+      
+      const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, parseInt(id))).returning();
+      if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Error al actualizar tarea" });
+    }
+  });
+
+  // DELETE /api/tasks/:id — eliminar tarea
+  app.delete("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      await db.delete(tasks).where(eq(tasks.id, parseInt(id)));
+      res.json({ message: "Tarea eliminada" });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar tarea" });
+    }
+  });
+
+  // POST /api/tasks/:id/time — registrar horas contra una tarea
+  app.post("/api/tasks/:id/time", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = (req as any).user;
+      
+      const taskId = parseInt(id);
+      const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+      if (!task) return res.status(404).json({ message: "Tarea no encontrada" });
+
+      const data = insertTaskTimeEntrySchema.parse({ ...req.body, taskId, createdBy: user.id });
+      const [created] = await db.insert(taskTimeEntries).values(data).returning();
+      
+      // Update logged hours on task
+      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${taskId}`);
+      const total = (totalResult.rows[0] as any).total;
+      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, taskId));
+      
+      res.json(created);
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ message: "Datos inválidos", errors: error.errors });
+      res.status(500).json({ message: "Error al registrar horas" });
+    }
+  });
+
+  // DELETE /api/tasks/:taskId/time/:entryId — eliminar entrada de horas
+  app.delete("/api/tasks/:taskId/time/:entryId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { taskId, entryId } = req.params;
+      await db.delete(taskTimeEntries).where(eq(taskTimeEntries.id, parseInt(entryId)));
+      const totalResult = await db.execute(sql`SELECT COALESCE(SUM(hours), 0) as total FROM task_time_entries WHERE task_id = ${parseInt(taskId)}`);
+      const total = (totalResult.rows[0] as any).total;
+      await db.update(tasks).set({ loggedHours: parseFloat(total), updatedAt: new Date() }).where(eq(tasks.id, parseInt(taskId)));
+      res.json({ message: "Entrada eliminada" });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar entrada" });
+    }
+  });
+
+  // GET /api/tasks-personnel — lista de personnel para el módulo de tareas (no requiere admin)
+  app.get("/api/tasks-personnel", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await db.select({ id: personnel.id, name: personnel.name, email: personnel.email }).from(personnel).orderBy(asc(personnel.name));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener personal" });
+    }
+  });
+
+  // GET /api/tasks-projects — lista de proyectos activos para el módulo de tareas
+  app.get("/api/tasks-projects", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+        WHERE ap.status = 'active'
+        ORDER BY c.name, q.project_name
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener proyectos" });
+    }
   });
 
   // Finalize routes setup and return server

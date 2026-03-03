@@ -36,6 +36,11 @@ import ExecutiveFinanciero from "@/pages/Executive/Financiero";
 import CRMPage from "@/pages/crm";
 import CRMLeadPage from "@/pages/crm-lead";
 
+// Task Management Module
+import MyTasksPage from "@/pages/my-tasks";
+import TeamCalendarPage from "@/pages/team-calendar";
+import HoursDashboardPage from "@/pages/hours-dashboard";
+
 
 // Authentication & Utilities
 import AuthPage from "@/pages/auth-page";
@@ -169,6 +174,11 @@ function AppRoutes() {
                   <ProtectedRoute path="/quality-scores/:clientId" component={QualityScores} requiredPermission="projects" />
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} requiredPermission="projects" />
                   
+                  {/* Gestión de Tareas */}
+                  <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredPermission="projects" />
+
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />

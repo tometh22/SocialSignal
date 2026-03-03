@@ -96,6 +96,8 @@ import { useCompleteProjectData } from '@/hooks/useCompleteProjectData';
 import { OneShotBanner } from '@/components/one-shot-banner';
 import { ProjectLifetimeMetrics } from '@/components/project-lifetime-metrics';
 import { DeltaBadge } from '@/components/ui/delta-badge';
+import ProjectTaskList from '@/components/tasks/ProjectTaskList';
+import { CheckSquare } from 'lucide-react';
 
 interface ProjectMetric {
   label: string;
@@ -2189,7 +2191,7 @@ const ProjectDetailsPage = () => {
       {/* Contenido principal con tabs */}
       <div className="px-6 py-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-9 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
+          <TabsList className="grid grid-cols-10 w-full max-w-7xl bg-white border border-gray-200 p-1 rounded-lg shadow-sm">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-sm"
@@ -2252,6 +2254,13 @@ const ProjectDetailsPage = () => {
             >
               <Zap className="h-3.5 w-3.5" />
               Eficiencia
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tasks" 
+              className="flex items-center gap-1.5 text-xs font-medium px-2 py-2 data-[state=active]:bg-violet-50 data-[state=active]:text-violet-700 data-[state=active]:shadow-sm"
+            >
+              <CheckSquare className="h-3.5 w-3.5" />
+              Tareas
             </TabsTrigger>
           </TabsList>
 
@@ -5521,6 +5530,17 @@ const ProjectDetailsPage = () => {
               </Card>
             </div>
 
+          </TabsContent>
+
+          {/* TAREAS TAB */}
+          <TabsContent value="tasks" className="space-y-4">
+            <div className="bg-card rounded-xl border p-4">
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-foreground">Gestión de Tareas</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">Tareas organizadas por sección para este proyecto</p>
+              </div>
+              <ProjectTaskList projectId={parseInt(params.id)} />
+            </div>
           </TabsContent>
 
         </Tabs>
