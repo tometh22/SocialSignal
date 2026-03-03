@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
@@ -19,7 +20,7 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ["/api/v1/executive/operativo", selectedPeriod],
     queryFn: async () => {
-      const res = await fetch(`/api/v1/executive/operativo?period=${selectedPeriod}`);
+      const res = await authFetch(`/api/v1/executive/operativo?period=${selectedPeriod}`);
       if (!res.ok) throw new Error('Failed to fetch operativo data');
       return res.json();
     },
@@ -35,8 +36,8 @@ export default function OperativoView({ selectedPeriod }: OperativoViewProps) {
 
   const formatPct = (value: number) => `${value.toFixed(0)}%`;
 
-  const VariationBadge = ({ value, label }: { value: number | null; label?: string }) => {
-    if (value === null) {
+  const VariationBadge = ({ value, label }: { value: number | null | undefined; label?: string }) => {
+    if (value == null) {
       return (
         <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
           —%

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -17,7 +18,7 @@ export default function EconomicoView({ selectedPeriod }: EconomicoViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ["/api/v1/executive/economico", selectedPeriod],
     queryFn: async () => {
-      const res = await fetch(`/api/v1/executive/economico?period=${selectedPeriod}`);
+      const res = await authFetch(`/api/v1/executive/economico?period=${selectedPeriod}`);
       if (!res.ok) throw new Error('Failed to fetch economico data');
       return res.json();
     },

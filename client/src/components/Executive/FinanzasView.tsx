@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -18,7 +19,7 @@ export default function FinanzasView({ selectedPeriod }: FinanzasViewProps) {
   const { data, isLoading } = useQuery({
     queryKey: ["/api/v1/executive/finanzas", selectedPeriod],
     queryFn: async () => {
-      const res = await fetch(`/api/v1/executive/finanzas?period=${selectedPeriod}`);
+      const res = await authFetch(`/api/v1/executive/finanzas?period=${selectedPeriod}`);
       if (!res.ok) throw new Error('Failed to fetch finanzas data');
       return res.json();
     },

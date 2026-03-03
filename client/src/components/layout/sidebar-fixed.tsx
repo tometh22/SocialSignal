@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
+import { authFetch } from "@/lib/queryClient";
 
 import {
   ChevronRight,
@@ -56,7 +57,7 @@ export default function SidebarFixed() {
 
   const fetchProjectCount = async () => {
     try {
-      const response = await fetch('/api/active-projects/count?' + Date.now());
+      const response = await authFetch('/api/active-projects/count?' + Date.now());
       if (response.ok) {
         const data = await response.json();
         setProjectCount(data.count);
@@ -68,7 +69,7 @@ export default function SidebarFixed() {
 
   const fetchCrmStats = async () => {
     try {
-      const response = await fetch('/api/crm/stats');
+      const response = await authFetch('/api/crm/stats');
       if (response.ok) {
         const data = await response.json();
         setCrmOverdue(data.overdueReminders || 0);
@@ -78,7 +79,7 @@ export default function SidebarFixed() {
 
   const fetchDueReminders = async () => {
     try {
-      const response = await fetch('/api/crm/reminders/due', { credentials: 'include' });
+      const response = await authFetch('/api/crm/reminders/due');
       if (response.ok) {
         const data = await response.json();
         setDueReminders(data);
