@@ -184,6 +184,9 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       onUpdate?.();
     },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo guardar el cambio. Intenta de nuevo." });
+    },
   });
 
   const addSubtaskMutation = useMutation({

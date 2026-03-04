@@ -15907,7 +15907,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const combined = [...projects, ...ownProjects];
-      console.log(`[tasks/projects] Returning ${combined.length} projects (${projects.length} active + ${ownProjects.length} own)`);
       res.json(combined);
     } catch (error) {
       console.error("Error en GET /api/tasks/projects:", error);

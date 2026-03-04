@@ -81,11 +81,8 @@ const port = Number(process.env.PORT || 5000);
 
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
-        console.error(`❌ Port ${port} is in use. Retrying in 3 seconds...`);
-        setTimeout(() => {
-          server.close();
-          server.listen(port, "0.0.0.0");
-        }, 3000);
+        console.error(`❌ Port ${port} is already in use. Exiting so the process manager can restart cleanly.`);
+        process.exit(1);
       } else {
         console.error("❌ Server error:", err);
         process.exit(1);
