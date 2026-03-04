@@ -15683,7 +15683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/tasks/:id — obtener tarea individual con sus entradas de tiempo
-  app.get("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const [task] = await db.select().from(tasks).where(eq(tasks.id, parseInt(id)));
@@ -15713,7 +15713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PUT /api/tasks/:id — actualizar tarea
-  app.put("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       
@@ -15747,7 +15747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/tasks/:id — eliminar tarea
-  app.delete("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       await db.delete(tasks).where(eq(tasks.id, parseInt(id)));
@@ -15906,7 +15906,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         colorIndex: p.color_index,
       }));
 
-      res.json([...projects, ...ownProjects]);
+      const combined = [...projects, ...ownProjects];
+      console.log(`[tasks/projects] Returning ${combined.length} projects (${projects.length} active + ${ownProjects.length} own)`);
+      res.json(combined);
     } catch (error) {
       console.error("Error en GET /api/tasks/projects:", error);
       res.status(500).json({ message: "Error al obtener proyectos" });
