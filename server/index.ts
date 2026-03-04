@@ -5,6 +5,7 @@ import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
 import { autoSyncService } from "./services/autoSyncService";
 import cors from 'cors';
+import { execSync } from 'child_process';
 
 // Note: Session types are declared in server/auth.ts
 
@@ -53,6 +54,11 @@ const port = Number(process.env.PORT || 5000);
 
 (async () => {
   try {
+    // Kill any process holding the port before we try to bind
+    try {
+      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { stdio: 'ignore' });
+    } catch (_) { /* no process on port, that's fine */ }
+
     console.log("🔄 Starting application...");
     console.log(`Environment: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'}`);
     

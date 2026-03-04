@@ -160,6 +160,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryKey: ["/api/tasks", taskId],
     queryFn: () => authFetch(`/api/tasks/${taskId}`).then(r => r.json()),
     enabled: !!taskId,
+    staleTime: Infinity,
+    refetchOnReconnect: false,
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
@@ -174,22 +176,19 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const updateMutation = useMutation({
     mutationFn: (updates: Partial<Task>) => {
-      console.log("[TaskPanel] PUT /api/tasks/" + taskId, updates);
       return apiRequest(`/api/tasks/${taskId}`, "PUT", updates);
     },
     onSuccess: (updated: any) => {
-      console.log("[TaskPanel] PUT success:", updated);
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
         ...updated,
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
-      onUpdate?.();
     },
     onError: (err: any) => {
-      console.error("[TaskPanel] PUT error:", err);
       toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo guardar el cambio. Intenta de nuevo." });
     },
   });

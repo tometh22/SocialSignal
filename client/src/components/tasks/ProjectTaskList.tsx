@@ -758,11 +758,18 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           <span className="font-semibold text-xs text-foreground">{label}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          {tasks.reduce((s, t) => s + (t.loggedHours || 0), 0) > 0 && (
-            <span className="text-[10px] text-muted-foreground">
-              {formatHours(tasks.reduce((s, t) => s + (t.loggedHours || 0), 0))}
-            </span>
-          )}
+          {(() => {
+            const estH = tasks.reduce((s, t) => s + (t.estimatedHours || 0), 0);
+            const logH = tasks.reduce((s, t) => s + (t.loggedHours || 0), 0);
+            if (estH > 0 || logH > 0) {
+              return (
+                <span className="text-[10px] text-muted-foreground">
+                  {logH > 0 ? `${formatHours(logH)} / ` : ""}{estH > 0 ? `${formatHours(estH)} est.` : ""}
+                </span>
+              );
+            }
+            return null;
+          })()}
           <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
             {tasks.length}
           </span>
