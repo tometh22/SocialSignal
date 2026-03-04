@@ -199,11 +199,6 @@ function AppRoutes() {
 
                   
                   {/* Legacy Redirects */}
-                  <ProtectedRoute path="/history" component={() => <Redirect to="/" />} />
-                  <ProtectedRoute path="/statistics" component={() => <Redirect to="/" />} />
-                  <ProtectedRoute path="/financial-overview" component={() => <Redirect to="/" />} />
-                  <ProtectedRoute path="/indirect-costs" component={() => <Redirect to="/" />} />
-                  <ProtectedRoute path="/excel-maestro" component={() => <Redirect to="/" />} />
                   <ProtectedRoute path="/project-details/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/active-projects/${params.id}`} />} />
                   <ProtectedRoute path="/project/:id" component={({ params }: { params: { id: string } }) => <Redirect to={`/projects/${params.id}`} />} />
                   

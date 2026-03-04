@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, User, Flag, GripVertical, Loader2
+  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
@@ -36,13 +37,6 @@ type Task = {
 
 type Personnel = { id: number; name: string };
 
-const STATUS_COLORS: Record<string, string> = {
-  todo: "bg-gray-200",
-  in_progress: "bg-blue-400",
-  done: "bg-green-400",
-  cancelled: "bg-red-300",
-};
-
 const PRIORITY_COLORS: Record<string, string> = {
   low: "text-gray-400",
   medium: "text-yellow-500",
@@ -50,12 +44,29 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "text-red-500",
 };
 
+const AVATAR_COLORS = [
+  "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
+  "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-amber-500",
+  "bg-rose-500", "bg-cyan-500",
+];
+
 function getInitials(name: string) {
   return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function getAvatarColor(id: number) {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length];
+}
+
 function isOverdue(task: Task) {
   return task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+}
+
+function formatHours(hours: number) {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}min`;
 }
 
 interface NewTaskRowProps {
@@ -90,40 +101,52 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel 
   };
 
   return (
-    <div className="flex items-center gap-2 py-1.5 pl-8 pr-2 bg-accent/30 rounded">
-      <Input
-        autoFocus
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onCancel(); }}
-        placeholder="Nombre de la tarea..."
-        className="h-7 text-sm flex-1 border-none bg-transparent focus-visible:ring-0 shadow-none"
-      />
-      <Select value={assigneeId} onValueChange={setAssigneeId}>
-        <SelectTrigger className="h-7 w-28 text-xs">
-          <SelectValue placeholder="Asignar" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">Sin asignar</SelectItem>
-          {allPersonnel.map(p => (
-            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-7 text-xs">
-            {dueDate ? format(dueDate, "dd/MM") : <CalendarIcon className="h-3 w-3" />}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0">
-          <Calendar mode="single" selected={dueDate} onSelect={setDueDate} locale={es} />
-        </PopoverContent>
-      </Popover>
-      <Button size="sm" className="h-7 text-xs" onClick={handleCreate} disabled={createMutation.isPending || !title.trim()}>
-        {createMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Agregar"}
-      </Button>
-      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onCancel}>✕</Button>
+    <div className="flex items-center border-b border-border hover:bg-accent/20 transition-colors">
+      <div className="w-8 flex-shrink-0" />
+      <div className="w-5 flex-shrink-0 flex items-center justify-center py-2">
+        <div className="w-3.5 h-3.5 rounded border border-dashed border-muted-foreground/40" />
+      </div>
+      <div className="flex-1 px-2 py-1.5">
+        <Input
+          autoFocus
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") onCancel(); }}
+          placeholder="Nombre de la tarea..."
+          className="h-7 text-sm border-none bg-transparent focus-visible:ring-0 shadow-none px-0"
+        />
+      </div>
+      <div className="w-32 px-2 flex-shrink-0">
+        <Select value={assigneeId} onValueChange={setAssigneeId}>
+          <SelectTrigger className="h-7 text-xs border-none bg-transparent shadow-none">
+            <SelectValue placeholder="Asignar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Sin asignar</SelectItem>
+            {allPersonnel.map(p => (
+              <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="w-20 px-2 flex-shrink-0">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 w-full text-xs justify-start font-normal">
+              {dueDate ? format(dueDate, "dd/MM") : <CalendarIcon className="h-3 w-3 text-muted-foreground" />}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar mode="single" selected={dueDate} onSelect={setDueDate} locale={es} />
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="w-24 px-2 flex-shrink-0 flex items-center gap-1">
+        <Button size="sm" className="h-6 text-xs px-2" onClick={handleCreate} disabled={createMutation.isPending || !title.trim()}>
+          {createMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "OK"}
+        </Button>
+        <Button size="sm" variant="ghost" className="h-6 text-xs px-1" onClick={onCancel}>✕</Button>
+      </div>
     </div>
   );
 }
@@ -131,61 +154,125 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel 
 interface TaskRowProps {
   task: Task;
   allPersonnel: Personnel[];
-  onOpen: (id: number) => void;
+  onOpen: (id: number, focusTime?: boolean) => void;
   onToggle: (task: Task) => void;
+  isSubtask?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: TaskRowProps) {
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
+  const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   const overdue = isOverdue(task);
+  const isDone = task.status === "done";
+  const loggedH = task.loggedHours || 0;
 
   return (
-    <div
-      className="flex items-center gap-2 py-1.5 pl-6 pr-2 rounded hover:bg-accent/50 group cursor-pointer transition-colors"
-      onClick={() => onOpen(task.id)}
-    >
-      <div onClick={e => { e.stopPropagation(); onToggle(task); }}>
-        <Checkbox
-          checked={task.status === "done"}
-          className="h-4 w-4"
-        />
-      </div>
-
-      <span className={cn(
-        "flex-1 text-sm truncate",
-        task.status === "done" ? "line-through text-muted-foreground" : "text-foreground"
-      )}>
-        {task.title}
-      </span>
-
-      <Flag className={cn("h-3 w-3 flex-shrink-0", PRIORITY_COLORS[task.priority] || "text-gray-400")} />
-
-      {task.estimatedHours && (
-        <div className="flex items-center gap-0.5 text-xs text-muted-foreground flex-shrink-0">
-          <Clock className="h-3 w-3" />
-          <span>{(task.loggedHours || 0).toFixed(1)}/{task.estimatedHours}h</span>
+    <TooltipProvider>
+      <div
+        className={cn(
+          "flex items-center border-b border-border hover:bg-accent/30 transition-colors group cursor-pointer",
+          isDone && "opacity-60",
+          isSubtask && "bg-muted/10"
+        )}
+        onClick={() => onOpen(task.id)}
+      >
+        {/* indent / subtask indicator */}
+        <div className={cn("flex-shrink-0 flex items-center", isSubtask ? "w-12 pl-6" : "w-8")}>
+          {isSubtask && <span className="text-muted-foreground/50 text-xs mr-1">↳</span>}
         </div>
-      )}
 
-      {task.dueDate && (
-        <span className={cn(
-          "text-xs flex-shrink-0",
-          overdue ? "text-red-500 font-medium" : "text-muted-foreground"
-        )}>
-          {format(new Date(task.dueDate), "dd MMM", { locale: es })}
-        </span>
-      )}
+        {/* Checkbox */}
+        <div className="w-5 flex-shrink-0 flex items-center justify-center py-2.5" onClick={e => { e.stopPropagation(); onToggle(task); }}>
+          <Checkbox checked={isDone} className="h-3.5 w-3.5" />
+        </div>
 
-      {assignee ? (
-        <Avatar className="h-5 w-5 flex-shrink-0">
-          <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{getInitials(assignee.name)}</AvatarFallback>
-        </Avatar>
-      ) : (
-        <div className="h-5 w-5 rounded-full border border-dashed border-muted-foreground/30 flex-shrink-0" />
-      )}
+        {/* Title */}
+        <div className="flex-1 min-w-0 px-2 py-2 flex items-center gap-1.5">
+          <Flag className={cn("h-2.5 w-2.5 flex-shrink-0", PRIORITY_COLORS[task.priority] || "text-gray-300")} />
+          <span className={cn("text-sm truncate", isDone && "line-through text-muted-foreground")}>
+            {task.title}
+          </span>
+        </div>
 
-      <div className={cn("w-2 h-2 rounded-full flex-shrink-0", STATUS_COLORS[task.status] || "bg-gray-200")} />
-    </div>
+        {/* Responsable */}
+        <div className="w-28 px-2 flex-shrink-0 flex items-center">
+          {assignee ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className={cn("text-[9px] text-white", getAvatarColor(assignee.id))}>
+                    {getInitials(assignee.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent side="top"><p>{assignee.name}</p></TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="w-6 h-6 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center">
+              <span className="text-[8px] text-muted-foreground/40">—</span>
+            </div>
+          )}
+        </div>
+
+        {/* Colaboradores */}
+        <div className="w-28 px-2 flex-shrink-0 flex items-center gap-0.5">
+          {collaborators.slice(0, 3).map(c => (
+            <Tooltip key={c.id}>
+              <TooltipTrigger asChild>
+                <Avatar className="h-5 w-5 -ml-1 first:ml-0 ring-1 ring-background">
+                  <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(c.id))}>
+                    {getInitials(c.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent side="top"><p>{c.name}</p></TooltipContent>
+            </Tooltip>
+          ))}
+          {collaborators.length > 3 && (
+            <span className="text-[9px] text-muted-foreground ml-0.5">+{collaborators.length - 3}</span>
+          )}
+        </div>
+
+        {/* Fecha entrega */}
+        <div className="w-24 px-2 flex-shrink-0 text-xs">
+          {task.dueDate ? (
+            <span className={cn(overdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
+              {format(new Date(task.dueDate), "dd MMM", { locale: es })}
+            </span>
+          ) : (
+            <span className="text-muted-foreground/30">—</span>
+          )}
+        </div>
+
+        {/* Tiempo real */}
+        <div className="w-28 px-2 flex-shrink-0 text-xs flex items-center gap-1">
+          {loggedH > 0 ? (
+            <>
+              <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <span className={cn(
+                "font-medium",
+                task.estimatedHours && loggedH > task.estimatedHours ? "text-red-500" : "text-foreground"
+              )}>
+                {formatHours(loggedH)}
+              </span>
+              {task.estimatedHours && (
+                <span className="text-muted-foreground">/{task.estimatedHours}h</span>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground/30">—</span>
+          )}
+          {/* Quick log hours button on hover */}
+          <button
+            className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={e => { e.stopPropagation(); onOpen(task.id, true); }}
+            title="Registrar horas"
+          >
+            <Clock className="h-3 w-3 text-primary" />
+          </button>
+        </div>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -194,7 +281,7 @@ interface SectionBlockProps {
   tasks: Task[];
   projectId: number;
   allPersonnel: Personnel[];
-  onOpenTask: (id: number) => void;
+  onOpenTask: (id: number, focusTime?: boolean) => void;
   onToggleTask: (task: Task) => void;
   onRefresh: () => void;
 }
@@ -203,40 +290,74 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, onOpenTask,
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
-  const done = tasks.filter(t => t.status === "done").length;
+  const rootTasks = tasks.filter(t => !t.parentTaskId);
+  const subtaskMap: Record<number, Task[]> = {};
+  tasks.filter(t => t.parentTaskId).forEach(sub => {
+    if (!subtaskMap[sub.parentTaskId!]) subtaskMap[sub.parentTaskId!] = [];
+    subtaskMap[sub.parentTaskId!].push(sub);
+  });
+
+  const done = rootTasks.filter(t => t.status === "done").length;
+  const totalLogged = tasks.reduce((acc, t) => acc + (t.loggedHours || 0), 0);
 
   return (
-    <div className="mb-4">
-      {/* Section header */}
-      <div className="flex items-center gap-2 py-1 px-2 group hover:bg-accent/30 rounded cursor-pointer" onClick={() => setCollapsed(!collapsed)}>
-        {collapsed
-          ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-        }
-        <span className="font-semibold text-sm text-foreground">{sectionName}</span>
-        <span className="text-xs text-muted-foreground ml-1">{done}/{tasks.length}</span>
-        {!collapsed && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-5 w-5 p-0 ml-auto opacity-0 group-hover:opacity-100"
-            onClick={e => { e.stopPropagation(); setShowAdd(true); }}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        )}
+    <div>
+      {/* Section header row */}
+      <div
+        className="flex items-center border-b border-border bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors group"
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <div className="w-8 flex-shrink-0 flex items-center justify-center py-2">
+          {collapsed
+            ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          }
+        </div>
+        <div className="w-5 flex-shrink-0" />
+        <div className="flex-1 px-2 py-2 flex items-center gap-2">
+          <span className="font-semibold text-sm text-foreground">{sectionName}</span>
+          <span className="text-xs text-muted-foreground">{done}/{rootTasks.length}</span>
+          {!collapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 ml-1"
+              onClick={e => { e.stopPropagation(); setShowAdd(true); }}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <div className="w-28 px-2 flex-shrink-0" />
+        <div className="w-28 px-2 flex-shrink-0" />
+        <div className="w-24 px-2 flex-shrink-0" />
+        {/* SUMA */}
+        <div className="w-28 px-2 flex-shrink-0 text-xs text-muted-foreground font-medium">
+          {totalLogged > 0 && <span>SUMA {formatHours(totalLogged)}</span>}
+        </div>
       </div>
 
       {!collapsed && (
-        <div className="ml-2 border-l border-border pl-1 space-y-0.5">
-          {tasks.filter(t => !t.parentTaskId).map(task => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              allPersonnel={allPersonnel}
-              onOpen={onOpenTask}
-              onToggle={onToggleTask}
-            />
+        <>
+          {rootTasks.map(task => (
+            <div key={task.id}>
+              <TaskRow
+                task={task}
+                allPersonnel={allPersonnel}
+                onOpen={onOpenTask}
+                onToggle={onToggleTask}
+              />
+              {(subtaskMap[task.id] || []).map(sub => (
+                <TaskRow
+                  key={sub.id}
+                  task={sub}
+                  allPersonnel={allPersonnel}
+                  onOpen={onOpenTask}
+                  onToggle={onToggleTask}
+                  isSubtask
+                />
+              ))}
+            </div>
           ))}
 
           {showAdd ? (
@@ -248,14 +369,17 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, onOpenTask,
               allPersonnel={allPersonnel}
             />
           ) : (
-            <button
-              className="flex items-center gap-1.5 pl-6 py-1 text-xs text-muted-foreground hover:text-primary transition-colors w-full"
-              onClick={() => setShowAdd(true)}
-            >
-              <Plus className="h-3 w-3" />Agregar tarea
-            </button>
+            <div className="flex items-center border-b border-border">
+              <div className="w-8 flex-shrink-0" />
+              <button
+                className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => setShowAdd(true)}
+              >
+                <Plus className="h-3 w-3" />Agregar tarea
+              </button>
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
@@ -267,6 +391,7 @@ interface Props {
 
 export default function ProjectTaskList({ projectId }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
 
@@ -294,20 +419,21 @@ export default function ProjectTaskList({ projectId }: Props) {
 
   const sections = data?.sections || {};
   const sectionNames = Object.keys(sections);
+  const totalTasks = data?.tasks?.length || 0;
+  const doneTasks = data?.tasks?.filter(t => t.status === "done").length || 0;
+
+  const handleOpen = (id: number, ft = false) => {
+    setFocusTime(ft);
+    setSelectedTaskId(id);
+  };
 
   return (
-    <div className="space-y-2">
+    <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between pb-2 border-b">
+      <div className="flex items-center justify-between pb-3 mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">
-            {data?.tasks?.length || 0} tareas
-          </span>
-          {data?.tasks && (
-            <span className="text-xs text-muted-foreground">
-              · {data.tasks.filter(t => t.status === "done").length} completadas
-            </span>
-          )}
+          <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
+          <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
         </div>
         <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
           <Plus className="h-3 w-3 mr-1" />Nueva sección
@@ -319,23 +445,24 @@ export default function ProjectTaskList({ projectId }: Props) {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : sectionNames.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="text-center py-12 rounded-xl border border-dashed border-border">
           <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-3">
             <Plus className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground mb-3">Todavía no hay tareas en este proyecto</p>
+          <p className="text-sm text-muted-foreground mb-3">Todavía no hay secciones ni tareas en este proyecto</p>
           <Button size="sm" onClick={() => setShowAddSection(true)}>Crear primera sección</Button>
         </div>
       ) : (
-        <div>
+        <div className="rounded-xl border border-border overflow-hidden">
           {/* Column headers */}
-          <div className="flex items-center gap-2 pl-8 pr-2 py-1 text-xs text-muted-foreground border-b mb-1">
-            <span className="flex-1">Nombre</span>
-            <span className="w-4" />
-            <span className="w-16 text-center">Horas</span>
-            <span className="w-12 text-center">Vence</span>
-            <span className="w-5 text-center">Resp.</span>
-            <span className="w-2" />
+          <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
+            <div className="w-8 flex-shrink-0" />
+            <div className="w-5 flex-shrink-0" />
+            <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
+            <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
+            <div className="w-28 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
+            <div className="w-24 px-2 flex-shrink-0 py-2.5">Fecha entrega</div>
+            <div className="w-28 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
           </div>
 
           {sectionNames.map(section => (
@@ -345,7 +472,7 @@ export default function ProjectTaskList({ projectId }: Props) {
               tasks={sections[section]}
               projectId={projectId}
               allPersonnel={allPersonnel}
-              onOpenTask={setSelectedTaskId}
+              onOpenTask={handleOpen}
               onToggleTask={(task) => toggleMutation.mutate(task)}
               onRefresh={refetch}
             />
@@ -354,7 +481,7 @@ export default function ProjectTaskList({ projectId }: Props) {
       )}
 
       {showAddSection && (
-        <div className="flex items-center gap-2 p-3 border rounded-lg bg-accent/20">
+        <div className="flex items-center gap-2 p-3 mt-3 border rounded-lg bg-accent/20">
           <Input
             autoFocus
             value={newSectionName}
@@ -386,8 +513,9 @@ export default function ProjectTaskList({ projectId }: Props) {
       <TaskDetailPanel
         taskId={selectedTaskId}
         open={!!selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => { setSelectedTaskId(null); setFocusTime(false); }}
         onUpdate={refetch}
+        initialFocusTime={focusTime}
       />
     </div>
   );
