@@ -42,6 +42,7 @@ import TeamCalendarPage from "@/pages/team-calendar";
 import HoursDashboardPage from "@/pages/hours-dashboard";
 import ProjectsHubPage from "@/pages/tasks/projects-hub";
 import ProjectTasksPage from "@/pages/tasks/project-tasks-page";
+import TasksHomePage from "@/pages/tasks/tasks-home";
 
 
 // Authentication & Utilities
@@ -177,6 +178,7 @@ function AppRoutes() {
                   <ProtectedRoute path="/quarterly-nps/:clientId" component={QuarterlyNpsSurvey} requiredPermission="projects" />
                   
                   {/* Gestión de Tareas */}
+                  <ProtectedRoute path="/tasks" component={TasksHomePage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredPermission="projects" />

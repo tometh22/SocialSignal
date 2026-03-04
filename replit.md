@@ -27,7 +27,18 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
 - **Schema Management**: Drizzle Kit
 
 ### Core Modules & Features
-- **Task Management Module (Asana-style)**: Full task management system with 4 views: "Mis Tareas" (personal weekly calendar), "Calendario Equipo" (monthly team calendar with person/project filters), "Panel de Horas" (consolidated hours dashboard with charts), and "Tareas" tab inside each project (sections + tasks + subtasks). DB tables: `tasks`, `task_time_entries`. API: `/api/tasks/*`, `/api/tasks-personnel`, `/api/tasks-projects`. Separate from financial analysis — accessible to all team members with `projects` permission.
+- **Task Management Module (Asana-style)**: Full Asana-style task management system with 6 views/pages:
+  - `/tasks` — **Home page** with widgets: "Mis tareas" (upcoming/overdue/done tabs), "Proyectos recientes" (grid 2x3), "Tareas que asigné" (tasks created by user but assigned to others)
+  - `/tasks/my-tasks` — Personal weekly calendar view with task cards
+  - `/tasks/team-calendar` — Monthly team calendar with person/project filters
+  - `/tasks/hours-dashboard` — Consolidated hours dashboard with charts
+  - `/tasks/projects` — Projects Hub grid with member avatars, task stats, join/leave
+  - `/tasks/projects/:id` — Project detail with sticky header (breadcrumb, color icon, member avatars, "Compartir" button, "Miembros" sheet) + **Lista/Tablero tabs** (kanban board with 3 columns: Por hacer / En progreso / Completado)
+  - **ProjectTaskList component** supports `view="list"` (Asana-style table with sections) and `view="board"` (3-column kanban)
+  - DB tables: `tasks`, `task_time_entries`, `task_project_members` (projectId, personnelId, role owner|member)
+  - API: `/api/tasks/*`, `/api/tasks-personnel`, `/api/tasks/projects`, `/api/tasks/projects/:id/members`
+  - Sidebar: "GESTIÓN DE TAREAS" section includes "Inicio" link + "PROYECTOS" subsection with color icon squares per project and "+" button
+  - Separate from financial analysis — accessible to all team members with `projects` permission.
 - **Sales CRM Module**: Kanban pipeline, lead/contact management, activity timelines, reminders, email integration.
 - **User & Client Management**: Role-based access control and Google Sheets integration for client import.
 - **Quotation System**: Comprehensive creation with team assignment and cost multipliers, supporting dual-currency rates (ARS/USD).

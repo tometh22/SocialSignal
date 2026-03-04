@@ -29,12 +29,23 @@ import {
   CalendarDays,
   BarChart2,
   FolderOpen,
+  Home,
 } from "lucide-react";
 
-const PROJECT_DOT_COLORS = [
-  "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
-  "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-rose-500",
+const PROJECT_ICON_COLORS = [
+  { bg: "bg-blue-500", text: "text-white" },
+  { bg: "bg-purple-500", text: "text-white" },
+  { bg: "bg-green-500", text: "text-white" },
+  { bg: "bg-orange-500", text: "text-white" },
+  { bg: "bg-pink-500", text: "text-white" },
+  { bg: "bg-teal-500", text: "text-white" },
+  { bg: "bg-indigo-500", text: "text-white" },
+  { bg: "bg-rose-500", text: "text-white" },
 ];
+
+function getProjectIconColor(id: number) {
+  return PROJECT_ICON_COLORS[id % PROJECT_ICON_COLORS.length];
+}
 
 type TaskProjectSummary = {
   id: number;
@@ -123,7 +134,6 @@ export default function SidebarFixed() {
 
   const isAdmin = (user as any)?.isAdmin;
 
-  // Fetch task projects for sidebar
   const { data: rawTaskProjects } = useQuery<TaskProjectSummary[]>({
     queryKey: ["/api/tasks/projects"],
     queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
@@ -159,6 +169,7 @@ export default function SidebarFixed() {
     {
       title: "Gestión de Tareas",
       items: [
+        { href: "/tasks", title: "Inicio", icon: Home, description: "Resumen de tareas y proyectos", permission: 'projects' as AppSection },
         { href: "/tasks/my-tasks", title: "Mis Tareas", icon: CheckSquare, description: "Tus tareas asignadas", permission: 'projects' as AppSection },
         { href: "/tasks/team-calendar", title: "Calendario Equipo", icon: CalendarDays, description: "Vista de tareas del equipo", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas consolidadas por persona y proyecto", permission: 'projects' as AppSection },
@@ -357,7 +368,7 @@ export default function SidebarFixed() {
           </div>
         </div>
 
-        {/* Navegación principal organizada por secciones */}
+        {/* Navegación principal */}
         <div className="flex-1 px-2 py-3 overflow-y-auto">
           <nav className="space-y-4">
             {filteredNavSections.map((section) => (
@@ -371,43 +382,111 @@ export default function SidebarFixed() {
                   {section.items.map((item) => renderNavLink(item))}
                 </div>
 
-                {/* Projects sub-list under Gestión de Tareas */}
-                {section.title === "Gestión de Tareas" && !isCollapsed && sidebarProjects.length > 0 && (
-                  <div className="mt-1 ml-3 border-l border-border/50 pl-2 space-y-0.5">
-                    {sidebarProjects.map(proj => {
-                      const dotColor = PROJECT_DOT_COLORS[proj.id % PROJECT_DOT_COLORS.length];
-                      const isActive = currentPath === `/tasks/projects/${proj.id}`;
-                      return (
-                        <Link
-                          key={proj.id}
-                          href={`/tasks/projects/${proj.id}`}
-                          className={cn(
-                            "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-all duration-150",
-                            isActive
-                              ? "bg-primary/10 text-primary font-semibold"
-                              : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                          )}
-                        >
-                          <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotColor)} />
-                          <span className="truncate flex-1">{proj.clientName} · {proj.name}</span>
-                          {proj.pendingCount > 0 && (
-                            <span className={cn(
-                              "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                              isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                            )}>
-                              {proj.pendingCount}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                    {hasMoreProjects && (
-                      <Link
-                        href="/tasks/projects"
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <FolderOpen className="h-3 w-3" />
-                        <span>Ver todos los proyectos</span>
+                {/* Projects sub-section under Gestión de Tareas */}
+                {section.title === "Gestión de Tareas" && (
+                  <div className="mt-2">
+                    {/* Section header with + button */}
+                    {!isCollapsed && (
+                      <div className="flex items-center justify-between px-3 mb-1">
+                        <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Proyectos</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link href="/tasks/projects">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-4 w-4 p-0 hover:bg-accent text-muted-foreground hover:text-primary"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Ver todos los proyectos</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    )}
+
+                    {/* Project list */}
+                    {sidebarProjects.length > 0 && (
+                      <div className={cn("space-y-0.5", !isCollapsed && "ml-1")}>
+                        {sidebarProjects.map(proj => {
+                          const color = getProjectIconColor(proj.id);
+                          const isActive = currentPath === `/tasks/projects/${proj.id}`;
+                          const initial = proj.clientName.charAt(0).toUpperCase();
+
+                          return (
+                            <TooltipProvider key={proj.id}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    href={`/tasks/projects/${proj.id}`}
+                                    className={cn(
+                                      "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
+                                      isActive
+                                        ? "bg-primary/10 text-primary font-semibold"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+                                      isCollapsed && "justify-center px-1"
+                                    )}
+                                  >
+                                    {/* Color icon square */}
+                                    <span className={cn(
+                                      "inline-flex flex-shrink-0 items-center justify-center rounded-md font-bold",
+                                      color.bg, color.text,
+                                      isCollapsed ? "w-7 h-7 text-[10px]" : "w-5 h-5 text-[9px]"
+                                    )}>
+                                      {initial}
+                                    </span>
+                                    {!isCollapsed && (
+                                      <>
+                                        <span className="truncate flex-1 font-medium">{proj.name}</span>
+                                        {proj.pendingCount > 0 && (
+                                          <span className={cn(
+                                            "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
+                                            isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                          )}>
+                                            {proj.pendingCount}
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </Link>
+                                </TooltipTrigger>
+                                {isCollapsed && (
+                                  <TooltipContent side="right">
+                                    {proj.clientName} · {proj.name}
+                                    {proj.pendingCount > 0 && ` (${proj.pendingCount})`}
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </TooltipProvider>
+                          );
+                        })}
+
+                        {/* Ver todos link — always shown */}
+                        {!isCollapsed && (
+                          <Link
+                            href="/tasks/projects"
+                            className={cn(
+                              "flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/60 hover:text-primary transition-colors",
+                              currentPath === "/tasks/projects" && "text-primary font-medium"
+                            )}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span>Ver todos los proyectos</span>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Empty state */}
+                    {sidebarProjects.length === 0 && !isCollapsed && (
+                      <Link href="/tasks/projects">
+                        <div className="ml-2 px-2 py-1.5 rounded-lg text-xs text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1.5">
+                          <FolderOpen className="h-3 w-3" />
+                          <span>Ver proyectos</span>
+                        </div>
                       </Link>
                     )}
                   </div>

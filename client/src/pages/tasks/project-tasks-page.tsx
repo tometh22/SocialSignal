@@ -10,7 +10,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Users, Trash2, Plus, ChevronRight, FolderOpen } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -50,6 +50,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
+  const [view, setView] = useState<"list" | "board">("list");
 
   const { data: project, isLoading } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
@@ -88,6 +89,11 @@ export default function ProjectTasksPage({ params }: Props) {
     addMemberMutation.mutate({ personnelId: parseInt(addPersonnelId), role: addRole });
   };
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast({ title: "Enlace copiado al portapapeles" });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -105,91 +111,131 @@ export default function ProjectTasksPage({ params }: Props) {
   const dotColor = getProjectColor(project.id);
   const currentMemberIds = (project.members || []).map(m => m.personnelId);
   const availablePersonnel = allPersonnel.filter(p => !currentMemberIds.includes(p.id));
+  const visibleMembers = (project.members || []).slice(0, 6);
+  const extraMembers = (project.members || []).length - 6;
 
   return (
     <TooltipProvider>
-      <div className="space-y-4 max-w-6xl mx-auto">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Link href="/tasks/my-tasks" className="hover:text-foreground transition-colors">Tareas</Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/tasks/projects" className="hover:text-foreground transition-colors">Proyectos</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">{project.clientName} · {project.name}</span>
-        </nav>
+      <div className="space-y-0 max-w-6xl mx-auto">
+        {/* ─── Sticky header ─────────────────────────────────────────── */}
+        <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pb-0">
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-1.5 text-xs text-muted-foreground py-2">
+            <Link href="/tasks" className="hover:text-foreground transition-colors">Tareas</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/tasks/projects" className="hover:text-foreground transition-colors">Proyectos</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">{project.clientName} · {project.name}</span>
+          </nav>
 
-        {/* Project header */}
-        <div className="bg-card rounded-xl border shadow-sm p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className={cn("inline-block w-4 h-4 rounded-full flex-shrink-0", dotColor)} />
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
-                <p className="text-sm text-muted-foreground">{project.clientName}</p>
+          {/* Project header */}
+          <div className="border-b border-border pb-3 mb-0">
+            <div className="flex items-start justify-between gap-4">
+              {/* Left: icon + name + client */}
+              <div className="flex items-center gap-3 min-w-0">
+                <span className={cn(
+                  "inline-flex w-9 h-9 rounded-xl flex-shrink-0 items-center justify-center text-white font-bold text-sm shadow-sm",
+                  dotColor
+                )}>
+                  {project.clientName.charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-bold text-foreground truncate">{project.name}</h1>
+                    <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50 flex-shrink-0">
+                      Activo
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{project.clientName}</p>
+                </div>
               </div>
-              <Badge variant="outline" className="text-xs text-green-700 border-green-300 bg-green-50 ml-1 flex-shrink-0">
-                Activo
-              </Badge>
-            </div>
 
-            {/* Stats */}
-            <div className="hidden md:flex items-center gap-5 text-xs text-muted-foreground flex-shrink-0">
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">{project.pendingCount}</p>
-                <p>pendientes</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">{project.taskCount}</p>
-                <p>total</p>
-              </div>
-              <div className="text-center">
-                <p className="text-lg font-bold text-foreground">{project.totalHours.toFixed(1)}h</p>
-                <p>registradas</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Members row */}
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t">
-            <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="flex items-center gap-1.5 flex-wrap flex-1">
-              {(project.members || []).length === 0 && (
-                <span className="text-xs text-muted-foreground italic">Sin miembros asignados</span>
-              )}
-              {(project.members || []).map(m => (
-                <Tooltip key={m.personnelId}>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1 bg-accent rounded-full pl-0.5 pr-2 py-0.5 cursor-default">
-                      <Avatar className="h-5 w-5">
-                        <AvatarFallback className={cn("text-[9px] font-semibold text-white", dotColor)}>
-                          {getInitials(m.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-xs font-medium">{m.name.split(" ")[0]}</span>
-                      {m.role === "owner" && (
-                        <span className="text-[10px] text-amber-600 font-semibold">★</span>
-                      )}
+              {/* Right: stats + actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Member avatars */}
+                <div className="flex items-center gap-0.5">
+                  {visibleMembers.map(m => (
+                    <Tooltip key={m.personnelId}>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-7 w-7 -ml-1 first:ml-0 ring-2 ring-background cursor-default">
+                          <AvatarFallback className={cn("text-[9px] text-white", dotColor)}>
+                            {getInitials(m.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>{m.name} · {m.role === "owner" ? "Responsable" : "Miembro"}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                  {extraMembers > 0 && (
+                    <div className="h-7 w-7 -ml-1 rounded-full ring-2 ring-background bg-muted flex items-center justify-center text-[9px] font-medium text-muted-foreground">
+                      +{extraMembers}
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{m.name} · {m.role === "owner" ? "Responsable" : "Miembro"}</TooltipContent>
-                </Tooltip>
-              ))}
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleShare}
+                >
+                  <Share2 className="h-3 w-3 mr-1.5" />
+                  Compartir
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setMembersOpen(true)}
+                >
+                  <Users className="h-3.5 w-3.5 mr-1.5" />
+                  Miembros
+                </Button>
+
+                {/* Stats */}
+                <div className="hidden lg:flex items-center gap-3 text-xs text-muted-foreground pl-2 border-l">
+                  <span><strong className="text-foreground">{project.pendingCount}</strong> pendientes</span>
+                  <span><strong className="text-foreground">{project.taskCount}</strong> total</span>
+                  <span><strong className="text-foreground">{project.totalHours.toFixed(1)}h</strong> registradas</span>
+                </div>
+              </div>
             </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs flex-shrink-0"
-              onClick={() => setMembersOpen(true)}
-            >
-              <Users className="h-3.5 w-3.5 mr-1.5" />
-              Gestionar miembros
-            </Button>
+            {/* Tabs */}
+            <div className="flex items-center gap-0 mt-3 border-b border-border -mb-[1px]">
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "list"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("list")}
+              >
+                <List className="h-3.5 w-3.5" />
+                Lista
+              </button>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "board"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("board")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Tablero
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Task list */}
-        <ProjectTaskList projectId={projectId} projectMembers={project.members || []} />
+        {/* Task list / board */}
+        <div className="pt-4">
+          <ProjectTaskList projectId={projectId} projectMembers={project.members || []} view={view} />
+        </div>
       </div>
 
       {/* Members management sheet */}

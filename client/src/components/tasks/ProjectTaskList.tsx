@@ -44,6 +44,17 @@ const PRIORITY_COLORS: Record<string, string> = {
   urgent: "text-red-500",
 };
 
+const PRIORITY_BADGE: Record<string, string> = {
+  low: "bg-gray-100 text-gray-600",
+  medium: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  high: "bg-orange-50 text-orange-700 border-orange-200",
+  urgent: "bg-red-50 text-red-700 border-red-200",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: "Baja", medium: "Media", high: "Alta", urgent: "Urgente",
+};
+
 const AVATAR_COLORS = [
   "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
   "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-amber-500",
@@ -76,9 +87,10 @@ interface NewTaskRowProps {
   onCancel: () => void;
   allPersonnel: Personnel[];
   projectMembers?: { personnelId: number; name: string; role: string }[];
+  defaultStatus?: string;
 }
 
-function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel, projectMembers = [] }: NewTaskRowProps) {
+function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel, projectMembers = [], defaultStatus = "todo" }: NewTaskRowProps) {
   const [title, setTitle] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("none");
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -96,7 +108,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
       sectionName,
       assigneeId: assigneeId !== "none" ? parseInt(assigneeId) : null,
       dueDate: dueDate?.toISOString() || null,
-      status: "todo",
+      status: defaultStatus,
       priority: "medium",
     });
   };
@@ -401,12 +413,117 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   );
 }
 
+// ─── Board / Kanban view ────────────────────────────────────────────────────
+
+const BOARD_COLUMNS = [
+  { status: "todo",        label: "Por hacer",   headerClass: "bg-gray-100 text-gray-700 border-gray-200" },
+  { status: "in_progress", label: "En progreso",  headerClass: "bg-blue-50 text-blue-700 border-blue-200" },
+  { status: "done",        label: "Completado",   headerClass: "bg-green-50 text-green-700 border-green-200" },
+];
+
+interface BoardColumnProps {
+  label: string;
+  headerClass: string;
+  status: string;
+  tasks: Task[];
+  allPersonnel: Personnel[];
+  projectId: number;
+  projectMembers: { personnelId: number; name: string; role: string }[];
+  onOpen: (id: number) => void;
+  onRefresh: () => void;
+}
+
+function BoardColumn({ label, headerClass, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
+  const [showAdd, setShowAdd] = useState(false);
+
+  return (
+    <div className="flex-1 min-w-0 flex flex-col rounded-xl border border-border overflow-hidden">
+      {/* Column header */}
+      <div className={cn("flex items-center justify-between px-3 py-2 border-b font-semibold text-xs", headerClass)}>
+        <span>{label}</span>
+        <span className="opacity-70">{tasks.length}</span>
+      </div>
+      {/* Cards */}
+      <div className="flex-1 p-2 space-y-2 overflow-y-auto bg-muted/10 min-h-[200px]">
+        {tasks.map(task => {
+          const assignee = allPersonnel.find(p => p.id === task.assigneeId);
+          const overdue = isOverdue(task);
+          const isDone = task.status === "done";
+          return (
+            <div
+              key={task.id}
+              className={cn(
+                "bg-card rounded-lg border border-border p-2.5 cursor-pointer hover:shadow-sm hover:border-primary/30 transition-all",
+                isDone && "opacity-60"
+              )}
+              onClick={() => onOpen(task.id)}
+            >
+              <p className={cn("text-sm font-medium leading-snug mb-1.5", isDone && "line-through text-muted-foreground")}>
+                {task.title}
+              </p>
+              <div className="flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1.5">
+                  {task.priority && task.priority !== "medium" && (
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border", PRIORITY_BADGE[task.priority])}>
+                      {PRIORITY_LABELS[task.priority]}
+                    </span>
+                  )}
+                  {task.dueDate && (
+                    <span className={cn("text-[10px]", overdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
+                      {format(new Date(task.dueDate), "d MMM", { locale: es })}
+                    </span>
+                  )}
+                </div>
+                {assignee && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Avatar className="h-5 w-5 flex-shrink-0">
+                          <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(assignee.id))}>
+                            {getInitials(assignee.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TooltipTrigger>
+                      <TooltipContent>{assignee.name}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {showAdd ? (
+          <NewTaskRow
+            projectId={projectId}
+            sectionName="General"
+            defaultStatus={status}
+            onCreated={() => { setShowAdd(false); onRefresh(); }}
+            onCancel={() => setShowAdd(false)}
+            allPersonnel={allPersonnel}
+            projectMembers={projectMembers}
+          />
+        ) : (
+          <button
+            className="w-full flex items-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-accent/50"
+            onClick={() => setShowAdd(true)}
+          >
+            <Plus className="h-3 w-3" />Agregar tarea
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ─────────────────────────────────────────────────────────
+
 interface Props {
   projectId: number;
   projectMembers?: { personnelId: number; name: string; role: string }[];
+  view?: "list" | "board";
 }
 
-export default function ProjectTaskList({ projectId, projectMembers = [] }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [], view = "list" }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
@@ -434,97 +551,130 @@ export default function ProjectTaskList({ projectId, projectMembers = [] }: Prop
     onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionName(""); },
   });
 
+  const allTasks = data?.tasks || [];
   const sections = data?.sections || {};
   const sectionNames = Object.keys(sections);
-  const totalTasks = data?.tasks?.length || 0;
-  const doneTasks = data?.tasks?.filter(t => t.status === "done").length || 0;
+  const totalTasks = allTasks.length;
+  const doneTasks = allTasks.filter(t => t.status === "done").length;
 
   const handleOpen = (id: number, ft = false) => {
     setFocusTime(ft);
     setSelectedTaskId(id);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between pb-3 mb-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
-          <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
-        </div>
-        <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
-          <Plus className="h-3 w-3 mr-1" />Nueva sección
-        </Button>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      ) : sectionNames.length === 0 ? (
-        <div className="text-center py-12 rounded-xl border border-dashed border-border">
-          <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-3">
-            <Plus className="h-6 w-6 text-muted-foreground" />
+      {view === "board" ? (
+        // ─── Board view ───────────────────────────────────────────────
+        <div>
+          <div className="flex items-center gap-2 pb-3 mb-1">
+            <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
+            <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
           </div>
-          <p className="text-sm text-muted-foreground mb-3">Todavía no hay secciones ni tareas en este proyecto</p>
-          <Button size="sm" onClick={() => setShowAddSection(true)}>Crear primera sección</Button>
+          <div className="flex gap-3">
+            {BOARD_COLUMNS.map(col => (
+              <BoardColumn
+                key={col.status}
+                label={col.label}
+                headerClass={col.headerClass}
+                status={col.status}
+                tasks={allTasks.filter(t => t.status === col.status && !t.parentTaskId)}
+                allPersonnel={allPersonnel}
+                projectId={projectId}
+                projectMembers={projectMembers}
+                onOpen={id => handleOpen(id)}
+                onRefresh={refetch}
+              />
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
-          {/* Column headers */}
-          <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
-            <div className="w-8 flex-shrink-0" />
-            <div className="w-5 flex-shrink-0" />
-            <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
-            <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
-            <div className="w-28 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
-            <div className="w-24 px-2 flex-shrink-0 py-2.5">Fecha entrega</div>
-            <div className="w-28 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
+        // ─── List view ────────────────────────────────────────────────
+        <div>
+          <div className="flex items-center justify-between pb-3 mb-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
+              <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
+            </div>
+            <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
+              <Plus className="h-3 w-3 mr-1" />Nueva sección
+            </Button>
           </div>
 
-          {sectionNames.map(section => (
-            <SectionBlock
-              key={section}
-              sectionName={section}
-              tasks={sections[section]}
-              projectId={projectId}
-              allPersonnel={allPersonnel}
-              projectMembers={projectMembers}
-              onOpenTask={handleOpen}
-              onToggleTask={(task) => toggleMutation.mutate(task)}
-              onRefresh={refetch}
-            />
-          ))}
-        </div>
-      )}
+          {sectionNames.length === 0 ? (
+            <div className="text-center py-12 rounded-xl border border-dashed border-border">
+              <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-3">
+                <Plus className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">Todavía no hay secciones ni tareas en este proyecto</p>
+              <Button size="sm" onClick={() => setShowAddSection(true)}>Crear primera sección</Button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border overflow-hidden">
+              {/* Column headers */}
+              <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
+                <div className="w-8 flex-shrink-0" />
+                <div className="w-5 flex-shrink-0" />
+                <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
+                <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
+                <div className="w-28 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
+                <div className="w-24 px-2 flex-shrink-0 py-2.5">Fecha entrega</div>
+                <div className="w-28 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
+              </div>
 
-      {showAddSection && (
-        <div className="flex items-center gap-2 p-3 mt-3 border rounded-lg bg-accent/20">
-          <Input
-            autoFocus
-            value={newSectionName}
-            onChange={e => setNewSectionName(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter" && newSectionName.trim()) {
-                createSectionTask.mutate({ title: "Nueva tarea", projectId, sectionName: newSectionName.trim(), status: "todo", priority: "medium" });
-              }
-              if (e.key === "Escape") { setShowAddSection(false); setNewSectionName(""); }
-            }}
-            placeholder="Nombre de la sección..."
-            className="h-8 text-sm"
-          />
-          <Button
-            size="sm"
-            onClick={() => {
-              if (newSectionName.trim()) {
-                createSectionTask.mutate({ title: "Nueva tarea", projectId, sectionName: newSectionName.trim(), status: "todo", priority: "medium" });
-              }
-            }}
-            disabled={!newSectionName.trim() || createSectionTask.isPending}
-          >
-            Crear
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setShowAddSection(false); setNewSectionName(""); }}>Cancelar</Button>
+              {sectionNames.map(section => (
+                <SectionBlock
+                  key={section}
+                  sectionName={section}
+                  tasks={sections[section]}
+                  projectId={projectId}
+                  allPersonnel={allPersonnel}
+                  projectMembers={projectMembers}
+                  onOpenTask={handleOpen}
+                  onToggleTask={(task) => toggleMutation.mutate(task)}
+                  onRefresh={refetch}
+                />
+              ))}
+            </div>
+          )}
+
+          {showAddSection && (
+            <div className="flex items-center gap-2 p-3 mt-3 border rounded-lg bg-accent/20">
+              <Input
+                autoFocus
+                value={newSectionName}
+                onChange={e => setNewSectionName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newSectionName.trim()) {
+                    createSectionTask.mutate({ title: "Nueva tarea", projectId, sectionName: newSectionName.trim(), status: "todo", priority: "medium" });
+                  }
+                  if (e.key === "Escape") { setShowAddSection(false); setNewSectionName(""); }
+                }}
+                placeholder="Nombre de la sección..."
+                className="h-8 text-sm"
+              />
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (newSectionName.trim()) {
+                    createSectionTask.mutate({ title: "Nueva tarea", projectId, sectionName: newSectionName.trim(), status: "todo", priority: "medium" });
+                  }
+                }}
+                disabled={!newSectionName.trim() || createSectionTask.isPending}
+              >
+                Crear
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setShowAddSection(false); setNewSectionName(""); }}>Cancelar</Button>
+            </div>
+          )}
         </div>
       )}
 
