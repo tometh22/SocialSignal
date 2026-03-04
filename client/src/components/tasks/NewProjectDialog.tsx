@@ -63,8 +63,7 @@ export default function NewProjectDialog({ open, onClose }: Props) {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks/projects/create", "POST", data),
-    onSuccess: async (res: any) => {
-      const data = await res.json();
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
       toast({ title: "Proyecto creado" });
       onClose();

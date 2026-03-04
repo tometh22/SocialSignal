@@ -37,7 +37,7 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - **ProjectTaskList component** supports `view="list"` (Asana-style table with sections) and `view="board"` (3-column kanban)
   - DB tables: `tasks`, `task_time_entries`, `task_project_members` (projectId, personnelId, role owner|member), `task_own_projects` (standalone projects not tied to active_projects)
   - API: `/api/tasks/*`, `/api/tasks-personnel`, `/api/tasks/projects` (includes own projects), `/api/tasks/projects/create` (POST), `/api/tasks/projects/:id/members`
-  - Sidebar: "GESTIÓN DE TAREAS" section includes "Inicio" link + "PROYECTOS" subsection with color icon squares per project and "+" button that opens NewProjectDialog
+  - Sidebar: "GESTIÓN DE TAREAS" section includes "Inicio", "Mis Tareas", **"Proyectos"** (direct link to hub), "Calendario Equipo", "Panel de Horas" + "PROYECTOS" subsection with color icon squares per project and "+" button that opens NewProjectDialog
   - UX: Animated circle checkboxes (not square), inline date picker popover per task row, user avatar in home greeting, "Mostrar más" expand/collapse, badge counts on tabs
   - Separate from financial analysis — accessible to all team members with `projects` permission.
 - **Sales CRM Module**: Kanban pipeline, lead/contact management, activity timelines, reminders, email integration.
