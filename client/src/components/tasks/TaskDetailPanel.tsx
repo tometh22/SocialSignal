@@ -176,6 +176,15 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (updates: Partial<Task>) => {
       return apiRequest(`/api/tasks/${taskId}`, "PUT", updates);
     },
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks", taskId] });
+      const previous = queryClient.getQueryData(["/api/tasks", taskId]);
+      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
+        ...(old ?? {}),
+        ...updates,
+      }));
+      return { previous };
+    },
     onSuccess: (updated: any) => {
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
@@ -186,7 +195,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       refetchTask();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
     },
-    onError: () => {
+    onError: (_err, _updates, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/tasks", taskId], context.previous);
+      }
       toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo guardar el cambio. Intenta de nuevo." });
     },
   });
