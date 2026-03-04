@@ -15716,6 +15716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
+      console.log(`[PUT /api/tasks/${id}] body:`, JSON.stringify(req.body));
       
       // Whitelist of editable fields — never allow overwriting id, createdBy, loggedHours, etc.
       const ALLOWED_FIELDS = [

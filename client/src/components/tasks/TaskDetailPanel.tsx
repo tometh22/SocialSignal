@@ -173,8 +173,12 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   });
 
   const updateMutation = useMutation({
-    mutationFn: (updates: Partial<Task>) => apiRequest(`/api/tasks/${taskId}`, "PUT", updates),
+    mutationFn: (updates: Partial<Task>) => {
+      console.log("[TaskPanel] PUT /api/tasks/" + taskId, updates);
+      return apiRequest(`/api/tasks/${taskId}`, "PUT", updates);
+    },
     onSuccess: (updated: any) => {
+      console.log("[TaskPanel] PUT success:", updated);
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
         ...updated,
@@ -184,7 +188,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       onUpdate?.();
     },
-    onError: () => {
+    onError: (err: any) => {
+      console.error("[TaskPanel] PUT error:", err);
       toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo guardar el cambio. Intenta de nuevo." });
     },
   });
