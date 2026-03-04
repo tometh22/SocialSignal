@@ -196,17 +196,17 @@ function HomeTaskRow({
         onClick={e => { e.stopPropagation(); onToggle(task); }}
       />
 
-      <div className="flex-1 min-w-0">
-        <p className={cn(
-          "text-sm truncate transition-all duration-200",
+      <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
+        <span className={cn(
+          "text-sm truncate transition-all duration-200 leading-5",
           isDone ? "line-through text-muted-foreground" : "text-foreground"
         )}>
           {task.title}
-        </p>
+        </span>
         {(task.clientName || task.projectName) && (
-          <p className="text-[11px] text-muted-foreground/70 truncate">
-            {task.clientName || task.projectName}
-          </p>
+          <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 truncate hidden sm:inline">
+            · {task.clientName || task.projectName}
+          </span>
         )}
       </div>
 
@@ -556,12 +556,14 @@ export default function TasksHomePage() {
                       )}>
                         {isDone && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn("text-sm truncate", isDone && "line-through text-muted-foreground")}>
+                      <div className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
+                        <span className={cn("text-sm truncate leading-5", isDone && "line-through text-muted-foreground")}>
                           {task.title}
-                        </p>
+                        </span>
                         {(task.clientName || task.projectName) && (
-                          <p className="text-[11px] text-muted-foreground/70 truncate">{task.clientName || task.projectName}</p>
+                          <span className="text-[11px] text-muted-foreground/50 flex-shrink-0 hidden sm:inline">
+                            · {task.clientName || task.projectName}
+                          </span>
                         )}
                       </div>
                       {task.dueDate && (
