@@ -45,11 +45,12 @@ export default function NewProjectDialog({ open, onClose }: Props) {
   const [privacy, setPrivacy] = useState<"team" | "private">("team");
   const [activeProjectId, setActiveProjectId] = useState<string>("none");
 
-  const { data: taskProjects = [] } = useQuery<any[]>({
+  const { data: taskProjectsRaw } = useQuery<any[]>({
     queryKey: ["/api/tasks/projects"],
     queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
     enabled: open,
   });
+  const taskProjects = Array.isArray(taskProjectsRaw) ? taskProjectsRaw : [];
   const activeProjects = taskProjects.filter((p: any) => p.source === 'active_project' || !p.source);
 
   const { data: personnel = [] } = useQuery<Personnel[]>({
