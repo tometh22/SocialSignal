@@ -463,10 +463,10 @@ interface SectionBlockProps {
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onRefresh: () => void;
   clientName?: string | null;
-  autoOpenAdd?: boolean;
+  autoOpenAdd?: number;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh, clientName, autoOpenAdd = false }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh, clientName, autoOpenAdd = 0 }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [renamingSection, setRenamingSection] = useState(false);
@@ -475,7 +475,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    if (autoOpenAdd) setShowAdd(true);
+    if (autoOpenAdd > 0) setShowAdd(true);
   }, [autoOpenAdd]);
 
   const rootTasks = tasks.filter(t => !t.parentTaskId);
@@ -954,7 +954,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   onDateSet={handleDateSet}
                   onRefresh={refetch}
                   clientName={clientName}
-                  autoOpenAdd={idx === 0 && firstSectionAutoAdd > 0}
+                  autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}
                 />
               ))}
             </div>

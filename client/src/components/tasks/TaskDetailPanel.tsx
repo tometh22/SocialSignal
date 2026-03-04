@@ -171,8 +171,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       setSubtaskTitle("");
       setShowAddSubtask(false);
+      onUpdate?.();
     },
   });
 

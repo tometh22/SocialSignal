@@ -1233,7 +1233,7 @@ export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  projectId: integer("project_id").references(() => activeProjects.id),
+  projectId: integer("project_id"),
   sectionName: text("section_name").default("General"),
   assigneeId: integer("assignee_id").references(() => personnel.id),
   collaboratorIds: jsonb("collaborator_ids").$type<number[]>().default([]),

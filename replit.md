@@ -49,6 +49,9 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
     - **TaskDetailPanel (Asana-style)**: Auto-save on blur/select for all fields; status pills; priority pills; responsable with avatar; collaborators as chips with ×; date range pickers; estimated hours; description textarea; subtasks with circle checkboxes; time log form + history; delete with confirmation alert
   - **Backend**: `GET /api/tasks/project/:projectId` now returns `subtaskCount` per task; `PUT /api/tasks/section/rename` and `DELETE /api/tasks/section` endpoints added
   - `TaskProject.clientName` typed as `string | null` to prevent crashes on own projects (id >= 1,000,000)
+  - **FK constraints removed**: `tasks.project_id` and `task_project_members.project_id` have NO FK to `active_projects` — required so own project IDs (≥1,000,000) work without constraint violations
+  - **Toolbar "Agregar tarea"**: Uses a counter prop (`autoOpenAdd: number`) on SectionBlock so repeated clicks always re-trigger the inline add row
+  - **Subtask invalidation**: Adding a subtask in TaskDetailPanel now invalidates `/api/tasks/project` so the badge count in the list refreshes immediately
   - Separate from financial analysis — accessible to all team members with `projects` permission.
 - **Sales CRM Module**: Kanban pipeline, lead/contact management, activity timelines, reminders, email integration.
 - **User & Client Management**: Role-based access control and Google Sheets integration for client import.
