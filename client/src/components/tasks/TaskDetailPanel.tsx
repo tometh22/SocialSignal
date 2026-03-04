@@ -193,7 +193,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         subtasks: old?.subtasks ?? [],
       }));
       refetchTask();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      onUpdate?.();
     },
     onError: (_err, _updates, context: any) => {
       if (context?.previous) {
@@ -207,7 +207,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => {
       refetchTask();
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
+      onUpdate?.();
       setSubtaskTitle("");
       setShowAddSubtask(false);
     },
