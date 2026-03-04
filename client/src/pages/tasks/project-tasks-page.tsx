@@ -125,7 +125,9 @@ export default function ProjectTasksPage({ params }: Props) {
             <ChevronRight className="h-3 w-3" />
             <Link href="/tasks/projects" className="hover:text-foreground transition-colors">Proyectos</Link>
             <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">{project.clientName} · {project.name}</span>
+            <span className="text-foreground font-medium">
+              {project.clientName ? `${project.clientName} · ` : ""}{project.name}
+            </span>
           </nav>
 
           {/* Project header */}
@@ -137,7 +139,7 @@ export default function ProjectTasksPage({ params }: Props) {
                   "inline-flex w-9 h-9 rounded-xl flex-shrink-0 items-center justify-center text-white font-bold text-sm shadow-sm",
                   dotColor
                 )}>
-                  {project.clientName.charAt(0).toUpperCase()}
+                  {(project.clientName || project.name || "P").charAt(0).toUpperCase()}
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -146,7 +148,7 @@ export default function ProjectTasksPage({ params }: Props) {
                       Activo
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">{project.clientName}</p>
+                  {project.clientName && <p className="text-sm text-muted-foreground">{project.clientName}</p>}
                 </div>
               </div>
 

@@ -15896,14 +15896,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.id);
-      const projectResult = await db.execute(sql`
-        SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
-        FROM active_projects ap
-        JOIN quotations q ON q.id = ap.quotation_id
-        JOIN clients c ON c.id = ap.client_id
-        WHERE ap.id = ${projectId}
-      `);
-      if (!projectResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
+      const isOwnProject = projectId >= 1000000;
+
+      let projectRow: any;
+
+      if (isOwnProject) {
+        const realId = projectId - 1000000;
+        const ownResult = await db.execute(sql`
+          SELECT id, name, color_index, privacy, created_by_personnel_id
+          FROM task_own_projects
+          WHERE id = ${realId}
+        `);
+        if (!ownResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
+        const op = ownResult.rows[0] as any;
+        projectRow = {
+          id: projectId,
+          name: op.name,
+          clientName: null,
+          status: 'active',
+          colorIndex: op.color_index,
+          source: 'own',
+        };
+      } else {
+        const projectResult = await db.execute(sql`
+          SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
+          FROM active_projects ap
+          JOIN quotations q ON q.id = ap.quotation_id
+          JOIN clients c ON c.id = ap.client_id
+          WHERE ap.id = ${projectId}
+        `);
+        if (!projectResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
+        const p = projectResult.rows[0] as any;
+        projectRow = {
+          id: p.id,
+          name: p.name,
+          clientName: p.client_name,
+          status: p.status,
+          source: 'active_project',
+        };
+      }
 
       const membersResult = await db.execute(sql`
         SELECT tpm.personnel_id, tpm.role, p.name as personnel_name
@@ -15921,14 +15952,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM tasks WHERE project_id = ${projectId}
       `);
 
-      const p = projectResult.rows[0] as any;
       const stats = statsResult.rows[0] as any;
 
       res.json({
-        id: p.id,
-        name: p.name,
-        clientName: p.client_name,
-        status: p.status,
+        ...projectRow,
         taskCount: parseInt(stats.task_count) || 0,
         pendingCount: parseInt(stats.pending_count) || 0,
         totalHours: parseFloat(stats.total_hours) || 0,
