@@ -484,14 +484,16 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 // ─── Board / Kanban view ────────────────────────────────────────────────────
 
 const BOARD_COLUMNS = [
-  { status: "todo",        label: "Por hacer",   headerClass: "bg-gray-100 text-gray-700 border-gray-200" },
-  { status: "in_progress", label: "En progreso",  headerClass: "bg-blue-50 text-blue-700 border-blue-200" },
-  { status: "done",        label: "Completado",   headerClass: "bg-green-50 text-green-700 border-green-200" },
+  { status: "todo",        label: "Por hacer",   dot: "bg-gray-400",  ring: "border-t-gray-300",  empty: "Acá aparecerán las tareas nuevas" },
+  { status: "in_progress", label: "En progreso",  dot: "bg-blue-500",  ring: "border-t-blue-400",  empty: "Mové una tarea aquí para comenzar" },
+  { status: "done",        label: "Completado",   dot: "bg-green-500", ring: "border-t-green-400", empty: "Las tareas finalizadas aparecen aquí" },
 ];
 
 interface BoardColumnProps {
   label: string;
-  headerClass: string;
+  dot: string;
+  ring: string;
+  empty: string;
   status: string;
   tasks: Task[];
   allPersonnel: Personnel[];
@@ -501,43 +503,72 @@ interface BoardColumnProps {
   onRefresh: () => void;
 }
 
-function BoardColumn({ label, headerClass, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
+const PRIORITY_LEFT_BORDER: Record<string, string> = {
+  low: "border-l-gray-300",
+  medium: "border-l-transparent",
+  high: "border-l-orange-400",
+  urgent: "border-l-red-500",
+};
+
+function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
   const [showAdd, setShowAdd] = useState(false);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col rounded-xl border border-border overflow-hidden">
+    <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5", ring)}>
       {/* Column header */}
-      <div className={cn("flex items-center justify-between px-3 py-2 border-b font-semibold text-xs", headerClass)}>
-        <span>{label}</span>
-        <span className="opacity-70">{tasks.length}</span>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
+        <div className="flex items-center gap-2">
+          <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
+          <span className="font-semibold text-xs text-foreground">{label}</span>
+        </div>
+        <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+          {tasks.length}
+        </span>
       </div>
+
       {/* Cards */}
-      <div className="flex-1 p-2 space-y-2 overflow-y-auto bg-muted/10 min-h-[200px]">
+      <div className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
+        {tasks.length === 0 && !showAdd && (
+          <div className="flex flex-col items-center justify-center py-8 text-center px-2">
+            <span className={cn("w-8 h-8 rounded-full mb-2 flex items-center justify-center opacity-20", dot.replace("bg-", "bg-").concat(" bg-opacity-20"))}>
+              <span className={cn("w-3 h-3 rounded-full", dot)} />
+            </span>
+            <p className="text-[11px] text-muted-foreground/60 leading-tight">{empty}</p>
+          </div>
+        )}
+
         {tasks.map(task => {
           const assignee = allPersonnel.find(p => p.id === task.assigneeId);
           const overdue = isOverdue(task);
           const isDone = task.status === "done";
+          const leftBorder = PRIORITY_LEFT_BORDER[task.priority] || "border-l-transparent";
           return (
             <div
               key={task.id}
               className={cn(
-                "bg-card rounded-lg border border-border p-2.5 cursor-pointer hover:shadow-sm hover:border-primary/30 transition-all",
-                isDone && "opacity-60"
+                "bg-card rounded-lg border border-border border-l-2 p-2.5 cursor-pointer",
+                "hover:shadow-md hover:border-primary/20 hover:-translate-y-px transition-all duration-150",
+                isDone && "opacity-50",
+                leftBorder
               )}
               onClick={() => onOpen(task.id)}
             >
-              <p className={cn("text-sm font-medium leading-snug mb-1.5", isDone && "line-through text-muted-foreground")}>
+              <p className={cn("text-sm font-medium leading-snug mb-2", isDone && "line-through text-muted-foreground")}>
                 {task.title}
               </p>
               <div className="flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {task.priority && task.priority !== "medium" && (
-                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border", PRIORITY_BADGE[task.priority])}>
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full border font-medium", PRIORITY_BADGE[task.priority])}>
                       {PRIORITY_LABELS[task.priority]}
                     </span>
                   )}
                   {task.dueDate && (
-                    <span className={cn("text-[10px]", overdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
+                    <span className={cn(
+                      "text-[10px] flex items-center gap-0.5",
+                      overdue ? "text-red-500 font-semibold" : "text-muted-foreground"
+                    )}>
+                      <CalendarIcon className="h-2.5 w-2.5" />
                       {format(new Date(task.dueDate), "d MMM", { locale: es })}
                     </span>
                   )}
@@ -546,7 +577,7 @@ function BoardColumn({ label, headerClass, status, tasks, allPersonnel, projectI
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Avatar className="h-5 w-5 flex-shrink-0">
+                        <Avatar className="h-5 w-5 flex-shrink-0 ring-1 ring-border">
                           <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(assignee.id))}>
                             {getInitials(assignee.name)}
                           </AvatarFallback>
@@ -560,22 +591,26 @@ function BoardColumn({ label, headerClass, status, tasks, allPersonnel, projectI
             </div>
           );
         })}
+
         {showAdd ? (
-          <NewTaskRow
-            projectId={projectId}
-            sectionName="General"
-            defaultStatus={status}
-            onCreated={() => { setShowAdd(false); onRefresh(); }}
-            onCancel={() => setShowAdd(false)}
-            allPersonnel={allPersonnel}
-            projectMembers={projectMembers}
-          />
+          <div className="bg-card rounded-lg border border-primary/30 p-2">
+            <NewTaskRow
+              projectId={projectId}
+              sectionName="General"
+              defaultStatus={status}
+              onCreated={() => { setShowAdd(false); onRefresh(); }}
+              onCancel={() => setShowAdd(false)}
+              allPersonnel={allPersonnel}
+              projectMembers={projectMembers}
+            />
+          </div>
         ) : (
           <button
-            className="w-full flex items-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-accent/50"
+            className="w-full flex items-center gap-1.5 px-2 py-2 text-xs text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-accent/50 group"
             onClick={() => setShowAdd(true)}
           >
-            <Plus className="h-3 w-3" />Agregar tarea
+            <Plus className="h-3 w-3 group-hover:scale-110 transition-transform" />
+            Agregar tarea
           </button>
         )}
       </div>
@@ -662,7 +697,9 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
               <BoardColumn
                 key={col.status}
                 label={col.label}
-                headerClass={col.headerClass}
+                dot={col.dot}
+                ring={col.ring}
+                empty={col.empty}
                 status={col.status}
                 tasks={allTasks.filter(t => t.status === col.status && !t.parentTaskId)}
                 allPersonnel={allPersonnel}

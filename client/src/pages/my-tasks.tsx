@@ -5,13 +5,12 @@ import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, eachDayOfInterval, 
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  ChevronLeft, ChevronRight, Plus, Calendar, List, Clock, Flag, Loader2
+  ChevronLeft, ChevronRight, Plus, Calendar, List, Clock, Flag, Loader2, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "@/components/tasks/TaskDetailPanel";
@@ -39,6 +38,25 @@ const PRIORITY_COLORS: Record<string, string> = {
   high: "text-orange-500",
   urgent: "text-red-500",
 };
+
+function CircleCheck({ checked, onClick, pending }: { checked: boolean; onClick: (e: React.MouseEvent) => void; pending?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={pending}
+      className={cn(
+        "flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center",
+        "transition-all duration-200 ease-in-out focus:outline-none hover:scale-110 active:scale-95",
+        checked
+          ? "bg-green-500 border-green-500 shadow-sm shadow-green-200"
+          : "border-muted-foreground/40 hover:border-primary/60 hover:bg-primary/5",
+        pending && "opacity-60 cursor-wait"
+      )}
+    >
+      {checked && <Check className="h-2 w-2 text-white" strokeWidth={3} />}
+    </button>
+  );
+}
 
 const PROJECT_PALETTE = [
   { bg: "bg-blue-100 dark:bg-blue-950/50", border: "border-l-blue-500", text: "text-blue-800 dark:text-blue-200" },
@@ -363,7 +381,11 @@ export default function MyTasksPage() {
                                 style={{ gridTemplateColumns: "24px 1fr 100px 80px 80px" }}
                               >
                                 <div onClick={e => { e.stopPropagation(); toggleMutation.mutate(task); }}>
-                                  <Checkbox checked={task.status === "done"} className="h-4 w-4" />
+                                  <CircleCheck
+                                    checked={task.status === "done"}
+                                    pending={toggleMutation.isPending}
+                                    onClick={e => { e.stopPropagation(); toggleMutation.mutate(task); }}
+                                  />
                                 </div>
                                 <div className="min-w-0 flex items-center gap-1.5" onClick={() => setSelectedTaskId(task.id)}>
                                   <Flag className={cn("h-2.5 w-2.5 flex-shrink-0", PRIORITY_COLORS[task.priority])} />

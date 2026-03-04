@@ -202,7 +202,27 @@ export default function ProjectTasksPage({ params }: Props) {
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Progress bar */}
+            {project.taskCount > 0 && (
+              <div className="mt-3 mb-1">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                  <span>
+                    {project.taskCount - project.pendingCount} de {project.taskCount} completadas
+                  </span>
+                  <span className="font-medium">
+                    {Math.round(((project.taskCount - project.pendingCount) / project.taskCount) * 100)}%
+                  </span>
+                </div>
+                <div className="h-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-700"
+                    style={{ width: `${Math.round(((project.taskCount - project.pendingCount) / project.taskCount) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+          {/* Tabs */}
             <div className="flex items-center gap-0 mt-3 border-b border-border -mb-[1px]">
               <button
                 className={cn(

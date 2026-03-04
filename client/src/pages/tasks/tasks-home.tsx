@@ -1,13 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, Plus } from "lucide-react";
+import { FolderOpen, Clock, ChevronRight, CalendarIcon, Check, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -272,6 +273,9 @@ export default function TasksHomePage() {
   const [showAllMy, setShowAllMy] = useState(false);
   const [showAllAssigned, setShowAllAssigned] = useState(false);
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickInputFocused, setQuickInputFocused] = useState(false);
+  const quickInputRef = useRef<HTMLInputElement>(null);
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
     queryKey: ["/api/tasks/my-tasks"],
@@ -312,6 +316,23 @@ export default function TasksHomePage() {
       }),
     onSuccess: () => refetchMyTasks(),
   });
+
+  const quickCreateMutation = useMutation({
+    mutationFn: (title: string) => apiRequest("/api/tasks", "POST", {
+      title,
+      status: "todo",
+      priority: "medium",
+    }),
+    onSuccess: () => {
+      setQuickTitle("");
+      refetchMyTasks();
+    },
+  });
+
+  const handleQuickCreate = () => {
+    if (!quickTitle.trim()) return;
+    quickCreateMutation.mutate(quickTitle.trim());
+  };
 
   const handleToggle = useCallback((task: Task) => {
     if (task.status !== "done") {
@@ -405,13 +426,41 @@ export default function TasksHomePage() {
             <TabBar active={myTab} onChange={t => { setMyTab(t); setShowAllMy(false); }} counts={taskCounts} />
           </div>
 
-          {/* Quick create */}
-          <Link href="/tasks/my-tasks">
-            <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer border-b border-border/50">
-              <Plus className="h-3.5 w-3.5" />
-              <span>Crear tarea</span>
+          {/* Quick create inline */}
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-2 border-b border-border/50 transition-all",
+            quickInputFocused && "bg-accent/20"
+          )}>
+            <div className={cn(
+              "flex-shrink-0 w-4 h-4 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center transition-colors",
+              quickInputFocused && "border-primary/40"
+            )}>
+              {quickCreateMutation.isPending && <Loader2 className="h-2 w-2 animate-spin text-primary" />}
             </div>
-          </Link>
+            <Input
+              ref={quickInputRef}
+              value={quickTitle}
+              onChange={e => setQuickTitle(e.target.value)}
+              onFocus={() => setQuickInputFocused(true)}
+              onBlur={() => setQuickInputFocused(false)}
+              onKeyDown={e => {
+                if (e.key === "Enter") handleQuickCreate();
+                if (e.key === "Escape") { setQuickTitle(""); quickInputRef.current?.blur(); }
+              }}
+              placeholder="Agregar tarea..."
+              className="border-none shadow-none bg-transparent text-xs h-auto py-0 px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1"
+            />
+            {quickTitle && (
+              <Button
+                size="sm"
+                className="h-5 text-[10px] px-2 flex-shrink-0"
+                onClick={handleQuickCreate}
+                disabled={quickCreateMutation.isPending}
+              >
+                Crear
+              </Button>
+            )}
+          </div>
 
           <div className="flex-1 divide-y divide-border/60 min-h-[160px]">
             {filteredMyTasks.length === 0 ? (
