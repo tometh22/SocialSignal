@@ -15716,15 +15716,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/tasks/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const updates: any = { ...req.body, updatedAt: new Date() };
       
-      // Handle status completion
-      if (updates.status === "done" && !updates.completedAt) updates.completedAt = new Date();
-      if (updates.status !== "done") updates.completedAt = null;
+      // Whitelist of editable fields — never allow overwriting id, createdBy, loggedHours, etc.
+      const ALLOWED_FIELDS = [
+        'title', 'description', 'status', 'priority', 'assigneeId', 'collaboratorIds',
+        'startDate', 'dueDate', 'estimatedHours', 'sectionName', 'parentTaskId', 'position'
+      ];
       
-      // Parse dates if strings
+      const updates: any = { updatedAt: new Date() };
+      for (const field of ALLOWED_FIELDS) {
+        if (field in req.body) updates[field] = req.body[field];
+      }
+      
+      // Handle status completion timestamp
+      if (updates.status === "done") updates.completedAt = new Date();
+      else if (updates.status !== undefined && updates.status !== "done") updates.completedAt = null;
+      
+      // Parse ISO date strings to Date objects
       if (updates.dueDate && typeof updates.dueDate === 'string') updates.dueDate = new Date(updates.dueDate);
       if (updates.startDate && typeof updates.startDate === 'string') updates.startDate = new Date(updates.startDate);
+      if (updates.dueDate === null) updates.dueDate = null;
+      if (updates.startDate === null) updates.startDate = null;
       
       const [updated] = await db.update(tasks).set(updates).where(eq(tasks.id, parseInt(id))).returning();
       if (!updated) return res.status(404).json({ message: "Tarea no encontrada" });

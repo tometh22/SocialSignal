@@ -275,6 +275,8 @@ export default function TasksHomePage() {
   const [hidingTaskId, setHidingTaskId] = useState<number | null>(null);
   const [quickTitle, setQuickTitle] = useState("");
   const [quickInputFocused, setQuickInputFocused] = useState(false);
+  const [quickDueDate, setQuickDueDate] = useState<Date | undefined>(undefined);
+  const [quickDateOpen, setQuickDateOpen] = useState(false);
   const quickInputRef = useRef<HTMLInputElement>(null);
 
   const { data: myTasksResponse, refetch: refetchMyTasks } = useQuery({
@@ -318,20 +320,30 @@ export default function TasksHomePage() {
   });
 
   const quickCreateMutation = useMutation({
-    mutationFn: (title: string) => apiRequest("/api/tasks", "POST", {
-      title,
-      status: "todo",
-      priority: "medium",
-    }),
+    mutationFn: ({ title, assigneeId, dueDate }: { title: string; assigneeId?: number; dueDate?: string }) =>
+      apiRequest("/api/tasks", "POST", {
+        title,
+        status: "todo",
+        priority: "medium",
+        sectionName: "General",
+        ...(assigneeId ? { assigneeId } : {}),
+        ...(dueDate ? { dueDate } : {}),
+      }),
     onSuccess: () => {
       setQuickTitle("");
+      setQuickDueDate(undefined);
       refetchMyTasks();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
     },
   });
 
   const handleQuickCreate = () => {
     if (!quickTitle.trim()) return;
-    quickCreateMutation.mutate(quickTitle.trim());
+    quickCreateMutation.mutate({
+      title: quickTitle.trim(),
+      assigneeId: myPersonnel?.id,
+      dueDate: quickDueDate ? quickDueDate.toISOString() : undefined,
+    });
   };
 
   const handleToggle = useCallback((task: Task) => {
@@ -451,14 +463,47 @@ export default function TasksHomePage() {
               className="border-none shadow-none bg-transparent text-xs h-auto py-0 px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1"
             />
             {quickTitle && (
-              <Button
-                size="sm"
-                className="h-5 text-[10px] px-2 flex-shrink-0"
-                onClick={handleQuickCreate}
-                disabled={quickCreateMutation.isPending}
-              >
-                Crear
-              </Button>
+              <>
+                <Popover open={quickDateOpen} onOpenChange={setQuickDateOpen}>
+                  <PopoverTrigger asChild>
+                    <button className={cn(
+                      "flex-shrink-0 flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors",
+                      quickDueDate
+                        ? "border-primary/30 text-primary bg-primary/5"
+                        : "border-border text-muted-foreground hover:text-foreground hover:border-border/60"
+                    )}>
+                      <CalendarIcon className="h-2.5 w-2.5" />
+                      {quickDueDate ? format(quickDueDate, "d MMM", { locale: es }) : "Fecha"}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={quickDueDate}
+                      onSelect={d => { setQuickDueDate(d); setQuickDateOpen(false); }}
+                      locale={es}
+                    />
+                    {quickDueDate && (
+                      <div className="px-3 pb-2">
+                        <button
+                          onClick={() => { setQuickDueDate(undefined); setQuickDateOpen(false); }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        >
+                          Quitar fecha
+                        </button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  size="sm"
+                  className="h-5 text-[10px] px-2 flex-shrink-0"
+                  onClick={handleQuickCreate}
+                  disabled={quickCreateMutation.isPending}
+                >
+                  Crear
+                </Button>
+              </>
             )}
           </div>
 

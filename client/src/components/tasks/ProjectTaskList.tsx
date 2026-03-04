@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check,
-  Filter, ArrowUpDown, Layers, MoreHorizontal, Pencil, Trash2
+  Filter, ArrowUpDown, Layers, MoreHorizontal, Pencil, Trash2, Search, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
@@ -505,10 +505,12 @@ interface SectionBlockProps {
   onRefresh: () => void;
   clientName?: string | null;
   autoOpenAdd?: number;
+  forceExpand?: boolean;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0 }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
   const [renamingSection, setRenamingSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState(sectionName);
@@ -566,7 +568,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
         onClick={() => !renamingSection && setCollapsed(!collapsed)}
       >
         <div className="w-8 flex-shrink-0 flex items-center justify-center py-2">
-          {collapsed
+          {effectiveCollapsed
             ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           }
@@ -591,7 +593,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
             <span className="font-semibold text-sm text-foreground">{sectionName}</span>
           )}
           <span className="text-xs text-muted-foreground">{done}/{rootTasks.length}</span>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
               <Button
                 variant="ghost"
@@ -639,7 +641,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
         <div className="w-28 px-2 flex-shrink-0" />
       </div>
 
-      {!collapsed && (
+      {!effectiveCollapsed && (
         <>
           {rootTasks.map(task => (
             <div key={task.id}>
@@ -755,9 +757,16 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
           <span className="font-semibold text-xs text-foreground">{label}</span>
         </div>
-        <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-          {tasks.length}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {tasks.reduce((s, t) => s + (t.loggedHours || 0), 0) > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {formatHours(tasks.reduce((s, t) => s + (t.loggedHours || 0), 0))}
+            </span>
+          )}
+          <span className="text-[11px] font-medium text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+            {tasks.length}
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
@@ -867,6 +876,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [firstSectionAutoAdd, setFirstSectionAutoAdd] = useState(0);
+  const [filterText, setFilterText] = useState("");
+  const [showFilter, setShowFilter] = useState(false);
 
   useEffect(() => {
     if (onQuickAddTrigger > 0) {
@@ -916,8 +927,24 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionName(""); },
   });
 
-  const allTasks = data?.tasks || [];
-  const sections = data?.sections || {};
+  const allTasksRaw = data?.tasks || [];
+  const sectionsRaw = data?.sections || {};
+
+  // Apply filter
+  const allTasks = filterText.trim()
+    ? allTasksRaw.filter(t => t.title.toLowerCase().includes(filterText.toLowerCase()))
+    : allTasksRaw;
+
+  // When filtering, rebuild sections from filtered tasks
+  const sections: Record<string, Task[]> = filterText.trim()
+    ? allTasks.reduce((acc: Record<string, Task[]>, t) => {
+        const sec = t.sectionName || "General";
+        if (!acc[sec]) acc[sec] = [];
+        acc[sec].push(t);
+        return acc;
+      }, {})
+    : sectionsRaw;
+
   const sectionNames = Object.keys(sections);
   const totalTasks = allTasks.length;
   const doneTasks = allTasks.filter(t => t.status === "done").length;
@@ -937,12 +964,58 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
 
   return (
     <div>
+      {/* ── Filter bar (shared between views) ── */}
+      {showFilter && (
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              autoFocus
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              onKeyDown={e => { if (e.key === "Escape") { setFilterText(""); setShowFilter(false); } }}
+              placeholder="Buscar tarea..."
+              className="h-8 text-sm pl-8 pr-8"
+            />
+            {filterText && (
+              <button
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setFilterText("")}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {filterText.trim() && (
+            <span className="text-xs text-muted-foreground">
+              {allTasks.length} resultado{allTasks.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          <button
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            onClick={() => { setFilterText(""); setShowFilter(false); }}
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {view === "board" ? (
         // ─── Board view ───────────────────────────────────────────────
         <div>
           <div className="flex items-center gap-2 pb-3 mb-1">
             <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
             <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn("h-7 text-xs gap-1", showFilter && "bg-accent")}
+              onClick={() => setShowFilter(v => !v)}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              {filterText ? <span className="text-primary font-medium">Filtro activo</span> : "Filtrar"}
+            </Button>
           </div>
           <div className="flex gap-3">
             {BOARD_COLUMNS.map(col => (
@@ -966,7 +1039,21 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       ) : (
         // ─── List view ────────────────────────────────────────────────
         <div>
-          <div className="flex items-center justify-end pb-2 mb-1">
+          <div className="flex items-center justify-end pb-2 mb-1 gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn("h-7 text-xs gap-1", showFilter && "bg-accent text-primary")}
+              onClick={() => setShowFilter(v => !v)}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              {filterText ? "Filtro activo" : "Filtrar"}
+              {filterText && (
+                <span className="ml-1 bg-primary text-primary-foreground rounded-full text-[9px] px-1.5 py-0.5 font-bold leading-none">
+                  {allTasks.length}
+                </span>
+              )}
+            </Button>
             <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
             </Button>
@@ -1009,6 +1096,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   onRefresh={refetch}
                   clientName={clientName}
                   autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}
+                  forceExpand={!!filterText.trim()}
                 />
               ))}
             </div>
@@ -1052,6 +1140,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         onClose={() => { setSelectedTaskId(null); setFocusTime(false); }}
         onUpdate={refetch}
         initialFocusTime={focusTime}
+        onNavigateToTask={(id) => setSelectedTaskId(id)}
       />
     </div>
   );

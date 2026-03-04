@@ -123,9 +123,10 @@ interface Props {
   onClose: () => void;
   onUpdate?: () => void;
   initialFocusTime?: boolean;
+  onNavigateToTask?: (taskId: number) => void;
 }
 
-export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initialFocusTime = false }: Props) {
+export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initialFocusTime = false, onNavigateToTask }: Props) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [showAddSubtask, setShowAddSubtask] = useState(false);
@@ -141,7 +142,18 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   useEffect(() => {
     if (open && initialFocusTime) setShowTimeLog(true);
-    if (!open) { setShowTimeLog(false); setEditingTitle(false); setShowAddSubtask(false); setStartDateOpen(false); setDueDateOpen(false); }
+    if (!open) {
+      setShowTimeLog(false);
+      setEditingTitle(false);
+      setShowAddSubtask(false);
+      setStartDateOpen(false);
+      setDueDateOpen(false);
+      // Cancel any pending description save to avoid race condition
+      if (descTimerRef.current) clearTimeout(descTimerRef.current);
+    }
+    return () => {
+      if (descTimerRef.current) clearTimeout(descTimerRef.current);
+    };
   }, [open, initialFocusTime]);
 
   const { data: task, isLoading } = useQuery<Task>({
@@ -227,9 +239,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const handleDescBlur = (value: string) => {
     if (descTimerRef.current) clearTimeout(descTimerRef.current);
-    descTimerRef.current = setTimeout(() => {
-      updateMutation.mutate({ description: value || null });
-    }, 0);
+    // Direct call — no deferred timeout to avoid race conditions on panel close
+    updateMutation.mutate({ description: value || null });
   };
 
   if (!task && !isLoading) return null;
@@ -252,6 +263,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
               <div className="flex flex-col h-full">
                 {/* ── Header ── */}
                 <div className="px-5 pt-4 pb-3 border-b flex-shrink-0">
+                  {/* Back to parent task button */}
+                  {task.parentTaskId && onNavigateToTask && (
+                    <button
+                      onClick={() => onNavigateToTask(task.parentTaskId!)}
+                      className="flex items-center gap-1 text-[11px] text-primary/80 hover:text-primary mb-2 transition-colors"
+                    >
+                      <ChevronRight className="h-2.5 w-2.5 rotate-180" />
+                      Volver a tarea padre
+                    </button>
+                  )}
+
                   {/* Breadcrumb */}
                   <nav className="flex items-center gap-1 text-[11px] text-muted-foreground mb-2.5 flex-wrap">
                     {project && (
@@ -592,9 +614,16 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                                 .then(() => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }));
                             }}
                           />
-                          <span className={cn("text-sm flex-1", sub.status === "done" ? "line-through text-muted-foreground" : "")}>
+                          <span
+                            className={cn(
+                              "text-sm flex-1 cursor-pointer hover:text-primary transition-colors",
+                              sub.status === "done" ? "line-through text-muted-foreground" : ""
+                            )}
+                            onClick={() => onNavigateToTask?.(sub.id)}
+                          >
                             {sub.title}
                           </span>
+                          <ChevronRight className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 flex-shrink-0" />
                         </div>
                       ))}
                       {(task.subtasks || []).length === 0 && !showAddSubtask && (
