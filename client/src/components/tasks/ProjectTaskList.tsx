@@ -295,6 +295,7 @@ interface TaskRowProps {
   onOpen: (id: number, focusTime?: boolean) => void;
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
+  onAssignee: (taskId: number, assigneeId: number | null) => void;
   isSubtask?: boolean;
   clientName?: string | null;
   subtaskMap?: Record<number, Task[]>;
@@ -302,7 +303,8 @@ interface TaskRowProps {
   onToggleSubtasks?: (taskId: number) => void;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: TaskRowProps) {
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   const overdue = !!isOverdue(task);
@@ -357,24 +359,62 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
           )}
         </div>
 
-        {/* Responsable */}
+        {/* Responsable — inline editable */}
         <div className="w-28 px-2 flex-shrink-0 flex items-center">
-          {assignee ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className={cn("text-[9px] text-white", getAvatarColor(assignee.id))}>
-                    {getInitials(assignee.name)}
-                  </AvatarFallback>
-                </Avatar>
-              </TooltipTrigger>
-              <TooltipContent side="top"><p>{assignee.name}</p></TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="w-6 h-6 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center">
-              <span className="text-[8px] text-muted-foreground/40">—</span>
-            </div>
-          )}
+          <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+            <PopoverTrigger asChild>
+              <button
+                onClick={e => { e.stopPropagation(); setAssigneeOpen(true); }}
+                className="rounded-full hover:ring-2 hover:ring-primary/30 transition-all"
+              >
+                {assignee ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className={cn("text-[9px] text-white", getAvatarColor(assignee.id))}>
+                          {getInitials(assignee.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="top"><p>{assignee.name}</p></TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <div className="w-6 h-6 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center hover:border-primary/60 transition-colors">
+                    <Plus className="h-2.5 w-2.5 text-muted-foreground/40" />
+                  </div>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1 shadow-lg" align="start" onClick={e => e.stopPropagation()}>
+              <div className="space-y-0.5">
+                <button
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-accent rounded-md flex items-center gap-2 transition-colors"
+                  onClick={() => { onAssignee(task.id, null); setAssigneeOpen(false); }}
+                >
+                  <div className="w-5 h-5 rounded-full border border-dashed border-muted-foreground/40 flex-shrink-0" />
+                  <span className="text-muted-foreground">Sin asignar</span>
+                </button>
+                {allPersonnel.map(p => (
+                  <button
+                    key={p.id}
+                    className={cn(
+                      "w-full text-left text-xs px-2 py-1.5 hover:bg-accent rounded-md flex items-center gap-2 transition-colors",
+                      task.assigneeId === p.id && "bg-primary/10 text-primary font-medium"
+                    )}
+                    onClick={() => { onAssignee(task.id, p.id); setAssigneeOpen(false); }}
+                  >
+                    <Avatar className="h-5 w-5 flex-shrink-0">
+                      <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(p.id))}>
+                        {getInitials(p.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{p.name}</span>
+                    {task.assigneeId === p.id && <Check className="h-3 w-3 ml-auto flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Colaboradores */}
@@ -461,12 +501,13 @@ interface SectionBlockProps {
   onOpenTask: (id: number, focusTime?: boolean) => void;
   onToggleTask: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
+  onAssignee: (taskId: number, assigneeId: number | null) => void;
   onRefresh: () => void;
   clientName?: string | null;
   autoOpenAdd?: number;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh, clientName, autoOpenAdd = 0 }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0 }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [renamingSection, setRenamingSection] = useState(false);
@@ -608,6 +649,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                 onOpen={onOpenTask}
                 onToggle={onToggleTask}
                 onDateSet={onDateSet}
+                onAssignee={onAssignee}
                 clientName={clientName}
                 subtaskMap={subtaskMap}
                 expandedSubtasks={expandedSubtasks}
@@ -621,6 +663,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   onOpen={onOpenTask}
                   onToggle={onToggleTask}
                   onDateSet={onDateSet}
+                  onAssignee={onAssignee}
                   isSubtask
                 />
               ))}
@@ -858,6 +901,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     dateMutation.mutate({ taskId, date: d });
   };
 
+  const inlineUpdateMutation = useMutation({
+    mutationFn: ({ taskId, updates }: { taskId: number; updates: any }) =>
+      apiRequest(`/api/tasks/${taskId}`, "PUT", updates),
+    onSuccess: () => refetch(),
+  });
+
+  const handleAssignee = (taskId: number, assigneeId: number | null) => {
+    inlineUpdateMutation.mutate({ taskId, updates: { assigneeId } });
+  };
+
   const createSectionTask = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionName(""); },
@@ -952,6 +1005,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   onOpenTask={handleOpen}
                   onToggleTask={(task) => toggleMutation.mutate(task)}
                   onDateSet={handleDateSet}
+                  onAssignee={handleAssignee}
                   onRefresh={refetch}
                   clientName={clientName}
                   autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}

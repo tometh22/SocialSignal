@@ -135,11 +135,13 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [logDesc, setLogDesc] = useState("");
   const [showTimeLog, setShowTimeLog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [dueDateOpen, setDueDateOpen] = useState(false);
   const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open && initialFocusTime) setShowTimeLog(true);
-    if (!open) { setShowTimeLog(false); setEditingTitle(false); setShowAddSubtask(false); }
+    if (!open) { setShowTimeLog(false); setEditingTitle(false); setShowAddSubtask(false); setStartDateOpen(false); setDueDateOpen(false); }
   }, [open, initialFocusTime]);
 
   const { data: task, isLoading } = useQuery<Task>({
@@ -160,9 +162,14 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const updateMutation = useMutation({
     mutationFn: (updates: Partial<Task>) => apiRequest(`/api/tasks/${taskId}`, "PUT", updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    onSuccess: (updated: any) => {
+      queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
+        ...(old ?? {}),
+        ...updated,
+        timeEntries: old?.timeEntries ?? [],
+        subtasks: old?.subtasks ?? [],
+      }));
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       onUpdate?.();
     },
   });
@@ -227,7 +234,6 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   if (!task && !isLoading) return null;
 
-  const statusInfo = STATUS_OPTIONS.find(s => s.value === task?.status);
   const assignee = allPersonnel.find(p => p.id === task?.assigneeId);
   const project = allProjects.find(p => p.id === task?.projectId);
   const collaborators = allPersonnel.filter(p => (task?.collaboratorIds || []).includes(p.id));
@@ -313,7 +319,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       value={task.assigneeId?.toString() || "none"}
                       onValueChange={v => updateMutation.mutate({ assigneeId: v === "none" ? null : parseInt(v) })}
                     >
-                      <SelectTrigger className="h-7 text-xs flex-1 border-none bg-transparent shadow-none hover:bg-accent px-2">
+                      <SelectTrigger className="h-8 text-sm flex-1 border-dashed hover:bg-accent px-2">
                         <div className="flex items-center gap-2">
                           {assignee ? (
                             <>
@@ -354,21 +360,21 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </div>
                     <div className="flex-1 flex items-center gap-1.5 flex-wrap">
                       {collaborators.map(c => (
-                        <div key={c.id} className="flex items-center gap-1 bg-accent rounded-full pl-0.5 pr-1.5 py-0.5 text-xs">
-                          <Avatar className="h-5 w-5">
+                        <div key={c.id} className="flex items-center gap-1 bg-primary/10 border border-primary/20 rounded-full pl-0.5 pr-2 py-0.5 text-xs">
+                          <Avatar className="h-5 w-5 flex-shrink-0">
                             <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(c.id))}>
                               {getInitials(c.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <span>{c.name}</span>
+                          <span className="text-foreground font-medium">{c.name}</span>
                           <button
-                            className="ml-0.5 text-muted-foreground hover:text-red-500"
+                            className="ml-0.5 text-muted-foreground hover:text-red-500 transition-colors"
                             onClick={() => {
                               const current = task.collaboratorIds || [];
                               updateMutation.mutate({ collaboratorIds: current.filter(id => id !== c.id) });
                             }}
                           >
-                            <X className="h-2.5 w-2.5" />
+                            <X className="h-3 w-3" />
                           </button>
                         </div>
                       ))}
@@ -378,12 +384,21 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           updateMutation.mutate({ collaboratorIds: [...current, parseInt(v)] });
                         }
                       }}>
-                        <SelectTrigger className="h-6 w-auto border-dashed text-xs px-2 text-muted-foreground">
+                        <SelectTrigger className="h-7 w-auto border-dashed text-xs px-2 text-muted-foreground hover:bg-accent">
                           <Plus className="h-3 w-3 mr-1" />Agregar
                         </SelectTrigger>
                         <SelectContent>
                           {allPersonnel.filter(p => !(task.collaboratorIds || []).includes(p.id) && p.id !== task.assigneeId).map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-4 w-4">
+                                  <AvatarFallback className={cn("text-[7px] text-white", getAvatarColor(p.id))}>
+                                    {getInitials(p.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {p.name}
+                              </div>
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -396,42 +411,78 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarIcon className="h-3 w-3" />Fechas</p>
                     </div>
                     <div className="flex items-center gap-2 flex-1">
-                      <Popover>
+                      {/* Fecha inicio */}
+                      <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-7 text-xs justify-start font-normal border-dashed">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs justify-start font-normal border-dashed min-w-[70px]"
+                            onClick={() => setStartDateOpen(true)}
+                          >
                             {task.startDate ? format(new Date(task.startDate), "d MMM", { locale: es }) : "Inicio"}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0" side="bottom" align="start">
                           <Calendar
                             mode="single"
                             selected={task.startDate ? new Date(task.startDate) : undefined}
-                            onSelect={d => updateMutation.mutate({ startDate: d?.toISOString() || null })}
+                            onSelect={d => {
+                              updateMutation.mutate({ startDate: d ? d.toISOString() : null });
+                              setStartDateOpen(false);
+                            }}
                             locale={es}
+                            initialFocus
                           />
+                          {task.startDate && (
+                            <div className="p-2 border-t">
+                              <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
+                                onClick={() => { updateMutation.mutate({ startDate: null }); setStartDateOpen(false); }}>
+                                Quitar fecha inicio
+                              </Button>
+                            </div>
+                          )}
                         </PopoverContent>
                       </Popover>
-                      <span className="text-muted-foreground text-xs">→</span>
-                      <Popover>
+
+                      <span className="text-muted-foreground text-sm">→</span>
+
+                      {/* Fecha fin */}
+                      <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
                             size="sm"
                             className={cn(
-                              "h-7 text-xs justify-start font-normal border-dashed",
-                              task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "border-red-300 text-red-600" : ""
+                              "h-7 text-xs justify-start font-normal border-dashed min-w-[70px]",
+                              task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done"
+                                ? "border-red-300 text-red-600"
+                                : ""
                             )}
+                            onClick={() => setDueDateOpen(true)}
                           >
                             {task.dueDate ? format(new Date(task.dueDate), "d MMM", { locale: es }) : "Fin"}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0" side="bottom" align="start">
                           <Calendar
                             mode="single"
                             selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                            onSelect={d => updateMutation.mutate({ dueDate: d?.toISOString() || null })}
+                            onSelect={d => {
+                              updateMutation.mutate({ dueDate: d ? d.toISOString() : null });
+                              setDueDateOpen(false);
+                            }}
                             locale={es}
+                            initialFocus
                           />
+                          {task.dueDate && (
+                            <div className="p-2 border-t">
+                              <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
+                                onClick={() => { updateMutation.mutate({ dueDate: null }); setDueDateOpen(false); }}>
+                                Quitar fecha fin
+                              </Button>
+                            </div>
+                          )}
                         </PopoverContent>
                       </Popover>
                     </div>
@@ -466,6 +517,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                     </div>
                     <div className="flex items-center gap-2 flex-1">
                       <Input
+                        key={`est-${taskId}-${task.estimatedHours}`}
                         type="number"
                         min="0"
                         step="0.5"
@@ -494,6 +546,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                       <p className="text-[11px] text-muted-foreground">Sección</p>
                     </div>
                     <Input
+                      key={`sec-${taskId}-${task.sectionName}`}
                       defaultValue={task.sectionName || "General"}
                       onBlur={e => updateMutation.mutate({ sectionName: e.target.value || "General" })}
                       className="h-7 text-xs flex-1 border-dashed"
@@ -505,6 +558,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                   <div>
                     <p className="text-[11px] text-muted-foreground mb-1.5">Descripción</p>
                     <Textarea
+                      key={`desc-${taskId}`}
                       defaultValue={task.description || ""}
                       onBlur={e => handleDescBlur(e.target.value)}
                       className="min-h-[72px] text-sm resize-none"
@@ -538,7 +592,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                                 .then(() => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }));
                             }}
                           />
-                          <span className={cn("text-sm flex-1 cursor-pointer hover:text-primary transition-colors", sub.status === "done" ? "line-through text-muted-foreground" : "")}>
+                          <span className={cn("text-sm flex-1", sub.status === "done" ? "line-through text-muted-foreground" : "")}>
                             {sub.title}
                           </span>
                         </div>
