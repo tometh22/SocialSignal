@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -12,10 +12,19 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import {
+  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check,
+  Filter, ArrowUpDown, Layers, MoreHorizontal, Pencil, Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
+import { toast } from "@/hooks/use-toast";
 
 type Task = {
   id: number;
@@ -32,6 +41,7 @@ type Task = {
   status: string;
   priority: string;
   parentTaskId?: number | null;
+  subtaskCount?: number;
 };
 
 type Personnel = { id: number; name: string };
@@ -60,6 +70,30 @@ const AVATAR_COLORS = [
   "bg-rose-500", "bg-cyan-500",
 ];
 
+const CLIENT_TAG_COLORS = [
+  "bg-blue-100 text-blue-800 border-blue-200",
+  "bg-purple-100 text-purple-800 border-purple-200",
+  "bg-green-100 text-green-800 border-green-200",
+  "bg-orange-100 text-orange-800 border-orange-200",
+  "bg-pink-100 text-pink-800 border-pink-200",
+  "bg-teal-100 text-teal-800 border-teal-200",
+  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "bg-amber-100 text-amber-800 border-amber-200",
+];
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getClientTagColor(clientName: string) {
+  return CLIENT_TAG_COLORS[hashString(clientName) % CLIENT_TAG_COLORS.length];
+}
+
 function getInitials(name: string) {
   return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 }
@@ -75,8 +109,21 @@ function isOverdue(task: Task) {
 function formatHours(hours: number) {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}min`;
+}
+
+function formatDateRange(startDate?: string | null, dueDate?: string | null) {
+  if (!startDate && !dueDate) return null;
+  if (startDate && dueDate) {
+    const s = format(new Date(startDate), "d MMM", { locale: es });
+    const d = format(new Date(dueDate), "d MMM", { locale: es });
+    return `${s} – ${d}`;
+  }
+  if (dueDate) return format(new Date(dueDate), "d MMM", { locale: es });
+  if (startDate) return `${format(new Date(startDate), "d MMM", { locale: es })} →`;
+  return null;
 }
 
 function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: React.MouseEvent) => void }) {
@@ -97,42 +144,41 @@ function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: Reac
   );
 }
 
-function InlineDateButton({ date, taskId, onSet, overdue }: {
-  date?: string | null;
+function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue }: {
+  startDate?: string | null;
+  dueDate?: string | null;
   taskId: number;
   onSet: (taskId: number, d: Date | undefined) => void;
   overdue: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const label = formatDateRange(startDate, dueDate);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           onClick={e => { e.stopPropagation(); setOpen(true); }}
           className={cn(
-            "flex items-center gap-1 text-xs rounded px-1 py-0.5 transition-all",
-            date
+            "flex items-center gap-1 text-xs rounded px-1 py-0.5 transition-all whitespace-nowrap",
+            label
               ? overdue
                 ? "text-red-500 font-medium hover:bg-red-50"
                 : "text-muted-foreground hover:bg-accent"
               : "text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-primary"
           )}
         >
-          {date
-            ? format(new Date(date), "dd MMM", { locale: es })
-            : <CalendarIcon className="h-3 w-3" />
-          }
+          {label || <CalendarIcon className="h-3 w-3" />}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
         <Calendar
           mode="single"
-          selected={date ? new Date(date) : undefined}
+          selected={dueDate ? new Date(dueDate) : undefined}
           onSelect={d => { onSet(taskId, d); setOpen(false); }}
           locale={es}
           initialFocus
         />
-        {date && (
+        {dueDate && (
           <div className="p-2 border-t">
             <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
               onClick={() => { onSet(taskId, undefined); setOpen(false); }}>
@@ -198,7 +244,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           className="h-7 text-sm border-none bg-transparent focus-visible:ring-0 shadow-none px-0"
         />
       </div>
-      <div className="w-32 px-2 flex-shrink-0">
+      <div className="w-28 px-2 flex-shrink-0">
         <Select value={assigneeId} onValueChange={setAssigneeId}>
           <SelectTrigger className="h-7 text-xs border-none bg-transparent shadow-none">
             <SelectValue placeholder="Asignar" />
@@ -220,11 +266,11 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </SelectContent>
         </Select>
       </div>
-      <div className="w-20 px-2 flex-shrink-0">
+      <div className="w-32 px-2 flex-shrink-0">
         <Popover>
           <PopoverTrigger asChild>
             <Button variant="ghost" size="sm" className="h-7 w-full text-xs justify-start font-normal">
-              {dueDate ? format(dueDate, "dd/MM") : <CalendarIcon className="h-3 w-3 text-muted-foreground" />}
+              {dueDate ? format(dueDate, "d MMM", { locale: es }) : <CalendarIcon className="h-3 w-3 text-muted-foreground" />}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0">
@@ -232,6 +278,7 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel,
           </PopoverContent>
         </Popover>
       </div>
+      <div className="w-28 px-2 flex-shrink-0" />
       <div className="w-24 px-2 flex-shrink-0 flex items-center gap-1">
         <Button size="sm" className="h-6 text-xs px-2" onClick={handleCreate} disabled={createMutation.isPending || !title.trim()}>
           {createMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "OK"}
@@ -249,14 +296,21 @@ interface TaskRowProps {
   onToggle: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
   isSubtask?: boolean;
+  clientName?: string | null;
+  subtaskMap?: Record<number, Task[]>;
+  expandedSubtasks?: Set<number>;
+  onToggleSubtasks?: (taskId: number) => void;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = false }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: TaskRowProps) {
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   const overdue = !!isOverdue(task);
   const isDone = task.status === "done";
   const loggedH = task.loggedHours || 0;
+  const subtaskCount = task.subtaskCount || 0;
+  const hasSubtasks = subtaskCount > 0;
+  const isExpanded = expandedSubtasks?.has(task.id) || false;
 
   return (
     <TooltipProvider>
@@ -287,6 +341,20 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
           <span className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}>
             {task.title}
           </span>
+          {hasSubtasks && !isSubtask && (
+            <button
+              onClick={e => { e.stopPropagation(); onToggleSubtasks?.(task.id); }}
+              className={cn(
+                "flex-shrink-0 flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors",
+                isExpanded
+                  ? "bg-primary/10 text-primary border-primary/20"
+                  : "bg-muted text-muted-foreground border-border hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {subtaskCount}
+              <ChevronDown className={cn("h-2.5 w-2.5 transition-transform", isExpanded && "rotate-180")} />
+            </button>
+          )}
         </div>
 
         {/* Responsable */}
@@ -310,7 +378,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
         </div>
 
         {/* Colaboradores */}
-        <div className="w-28 px-2 flex-shrink-0 flex items-center gap-0.5">
+        <div className="w-24 px-2 flex-shrink-0 flex items-center gap-0.5">
           {collaborators.slice(0, 3).map(c => (
             <Tooltip key={c.id}>
               <TooltipTrigger asChild>
@@ -328,13 +396,19 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
           )}
         </div>
 
-        {/* Fecha entrega — inline editable */}
-        <div className="w-24 px-1 flex-shrink-0 text-xs flex items-center">
-          <InlineDateButton date={task.dueDate} taskId={task.id} onSet={onDateSet} overdue={overdue} />
+        {/* Fecha entrega / rango */}
+        <div className="w-32 px-1 flex-shrink-0 text-xs flex items-center">
+          <InlineDateButton
+            startDate={task.startDate}
+            dueDate={task.dueDate}
+            taskId={task.id}
+            onSet={onDateSet}
+            overdue={overdue}
+          />
         </div>
 
         {/* Tiempo real */}
-        <div className="w-28 px-2 flex-shrink-0 text-xs flex items-center gap-1">
+        <div className="w-24 px-2 flex-shrink-0 text-xs flex items-center gap-1">
           {loggedH > 0 ? (
             <>
               <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -353,7 +427,6 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
               <Clock className="h-3 w-3" />
             </span>
           )}
-          {/* Quick log hours button on hover */}
           <button
             className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={e => { e.stopPropagation(); onOpen(task.id, true); }}
@@ -361,6 +434,18 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = 
           >
             <Clock className="h-3 w-3 text-primary" />
           </button>
+        </div>
+
+        {/* Cliente tag */}
+        <div className="w-28 px-2 flex-shrink-0">
+          {clientName && (
+            <span className={cn(
+              "inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border truncate max-w-full",
+              getClientTagColor(clientName)
+            )}>
+              {clientName}
+            </span>
+          )}
         </div>
       </div>
     </TooltipProvider>
@@ -377,11 +462,21 @@ interface SectionBlockProps {
   onToggleTask: (task: Task) => void;
   onDateSet: (taskId: number, d: Date | undefined) => void;
   onRefresh: () => void;
+  clientName?: string | null;
+  autoOpenAdd?: boolean;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh, clientName, autoOpenAdd = false }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [renamingSection, setRenamingSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState(sectionName);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    if (autoOpenAdd) setShowAdd(true);
+  }, [autoOpenAdd]);
 
   const rootTasks = tasks.filter(t => !t.parentTaskId);
   const subtaskMap: Record<number, Task[]> = {};
@@ -393,12 +488,41 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   const done = rootTasks.filter(t => t.status === "done").length;
   const totalLogged = tasks.reduce((acc, t) => acc + (t.loggedHours || 0), 0);
 
+  const renameMutation = useMutation({
+    mutationFn: (newName: string) => apiRequest("/api/tasks/section/rename", "PUT", { projectId, oldName: sectionName, newName }),
+    onSuccess: () => { onRefresh(); setRenamingSection(false); toast({ title: "Sección renombrada" }); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest("/api/tasks/section", "DELETE", { projectId, sectionName }),
+    onSuccess: () => { onRefresh(); toast({ title: "Sección eliminada", description: "Las tareas se movieron a General" }); },
+  });
+
+  const handleRenameBlur = () => {
+    const trimmed = newSectionName.trim();
+    if (trimmed && trimmed !== sectionName) {
+      renameMutation.mutate(trimmed);
+    } else {
+      setRenamingSection(false);
+      setNewSectionName(sectionName);
+    }
+  };
+
+  const toggleSubtasks = (taskId: number) => {
+    setExpandedSubtasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
   return (
     <div>
       {/* Section header row */}
       <div
         className="flex items-center border-b border-border bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors group"
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={() => !renamingSection && setCollapsed(!collapsed)}
       >
         <div className="w-8 flex-shrink-0 flex items-center justify-center py-2">
           {collapsed
@@ -408,26 +532,70 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
         </div>
         <div className="w-5 flex-shrink-0" />
         <div className="flex-1 px-2 py-2 flex items-center gap-2">
-          <span className="font-semibold text-sm text-foreground">{sectionName}</span>
+          {renamingSection ? (
+            <Input
+              autoFocus
+              value={newSectionName}
+              onChange={e => setNewSectionName(e.target.value)}
+              onBlur={handleRenameBlur}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === "Enter") handleRenameBlur();
+                if (e.key === "Escape") { setRenamingSection(false); setNewSectionName(sectionName); }
+              }}
+              onClick={e => e.stopPropagation()}
+              className="h-6 text-sm font-semibold border-primary bg-background w-48 px-1.5"
+            />
+          ) : (
+            <span className="font-semibold text-sm text-foreground">{sectionName}</span>
+          )}
           <span className="text-xs text-muted-foreground">{done}/{rootTasks.length}</span>
           {!collapsed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 ml-1"
-              onClick={e => { e.stopPropagation(); setShowAdd(true); }}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 w-5 p-0"
+                onClick={e => { e.stopPropagation(); setShowAdd(true); }}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 w-5 p-0"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem onClick={e => { e.stopPropagation(); setRenamingSection(true); setNewSectionName(sectionName); }}>
+                    <Pencil className="h-3.5 w-3.5 mr-2" />
+                    Renombrar sección
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-red-600 focus:text-red-600"
+                    onClick={e => { e.stopPropagation(); setShowDeleteConfirm(true); }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Eliminar sección
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
         <div className="w-28 px-2 flex-shrink-0" />
-        <div className="w-28 px-2 flex-shrink-0" />
         <div className="w-24 px-2 flex-shrink-0" />
-        {/* SUMA */}
-        <div className="w-28 px-2 flex-shrink-0 text-xs text-muted-foreground font-medium">
+        <div className="w-32 px-2 flex-shrink-0" />
+        <div className="w-24 px-2 flex-shrink-0 text-xs text-muted-foreground font-medium">
           {totalLogged > 0 && <span>SUMA {formatHours(totalLogged)}</span>}
         </div>
+        <div className="w-28 px-2 flex-shrink-0" />
       </div>
 
       {!collapsed && (
@@ -440,8 +608,12 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                 onOpen={onOpenTask}
                 onToggle={onToggleTask}
                 onDateSet={onDateSet}
+                clientName={clientName}
+                subtaskMap={subtaskMap}
+                expandedSubtasks={expandedSubtasks}
+                onToggleSubtasks={toggleSubtasks}
               />
-              {(subtaskMap[task.id] || []).map(sub => (
+              {expandedSubtasks.has(task.id) && (subtaskMap[task.id] || []).map(sub => (
                 <TaskRow
                   key={sub.id}
                   task={sub}
@@ -477,6 +649,26 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
           )}
         </>
       )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar sección "{sectionName}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Las tareas de esta sección se moverán a "General". Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteMutation.mutate()}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -515,7 +707,6 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
 
   return (
     <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5", ring)}>
-      {/* Column header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
         <div className="flex items-center gap-2">
           <span className={cn("w-2 h-2 rounded-full flex-shrink-0", dot)} />
@@ -526,7 +717,6 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
         </span>
       </div>
 
-      {/* Cards */}
       <div className="flex-1 p-2 space-y-2 overflow-y-auto min-h-[200px] max-h-[calc(100vh-280px)]">
         {tasks.length === 0 && !showAdd && (
           <div className="flex flex-col items-center justify-center py-8 text-center px-2">
@@ -624,13 +814,22 @@ interface Props {
   projectId: number;
   projectMembers?: { personnelId: number; name: string; role: string }[];
   view?: "list" | "board";
+  clientName?: string | null;
+  onQuickAddTrigger?: number;
 }
 
-export default function ProjectTaskList({ projectId, projectMembers = [], view = "list" }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0 }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
+  const [firstSectionAutoAdd, setFirstSectionAutoAdd] = useState(0);
+
+  useEffect(() => {
+    if (onQuickAddTrigger > 0) {
+      setFirstSectionAutoAdd(v => v + 1);
+    }
+  }, [onQuickAddTrigger]);
 
   const { data, isLoading, refetch } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
     queryKey: ["/api/tasks/project", projectId],
@@ -714,11 +913,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       ) : (
         // ─── List view ────────────────────────────────────────────────
         <div>
-          <div className="flex items-center justify-between pb-3 mb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
-              <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
-            </div>
+          <div className="flex items-center justify-end pb-2 mb-1">
             <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
             </Button>
@@ -740,12 +935,13 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                 <div className="w-5 flex-shrink-0" />
                 <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
                 <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
-                <div className="w-28 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
-                <div className="w-24 px-2 flex-shrink-0 py-2.5">Fecha entrega</div>
-                <div className="w-28 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
+                <div className="w-24 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
+                <div className="w-32 px-2 flex-shrink-0 py-2.5">Fechas</div>
+                <div className="w-24 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
+                <div className="w-28 px-2 flex-shrink-0 py-2.5">Cliente</div>
               </div>
 
-              {sectionNames.map(section => (
+              {sectionNames.map((section, idx) => (
                 <SectionBlock
                   key={section}
                   sectionName={section}
@@ -757,6 +953,8 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   onToggleTask={(task) => toggleMutation.mutate(task)}
                   onDateSet={handleDateSet}
                   onRefresh={refetch}
+                  clientName={clientName}
+                  autoOpenAdd={idx === 0 && firstSectionAutoAdd > 0}
                 />
               ))}
             </div>

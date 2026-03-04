@@ -10,7 +10,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2 } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -19,7 +19,7 @@ type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
   id: number;
   name: string;
-  clientName: string;
+  clientName: string | null;
   status: string;
   taskCount: number;
   pendingCount: number;
@@ -51,6 +51,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
   const [view, setView] = useState<"list" | "board">("list");
+  const [quickAddTrigger, setQuickAddTrigger] = useState(0);
 
   const { data: project, isLoading } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
@@ -254,9 +255,44 @@ export default function ProjectTasksPage({ params }: Props) {
           </div>
         </div>
 
+        {/* Toolbar — only in list view */}
+        {view === "list" && (
+          <div className="flex items-center justify-between py-2 border-b border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-sm text-primary border-primary/40 hover:bg-primary/5 font-medium gap-1.5"
+              onClick={() => setQuickAddTrigger(v => v + 1)}
+            >
+              <Plus className="h-4 w-4" />
+              Agregar tarea
+            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
+                <Filter className="h-3.5 w-3.5" />Filtrar
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
+                <Layers className="h-3.5 w-3.5" />Agrupar
+              </Button>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Task list / board */}
         <div className="pt-4">
-          <ProjectTaskList projectId={projectId} projectMembers={project.members || []} view={view} />
+          <ProjectTaskList
+            projectId={projectId}
+            projectMembers={project.members || []}
+            view={view}
+            clientName={project.clientName}
+            onQuickAddTrigger={quickAddTrigger}
+          />
         </div>
       </div>
 
@@ -268,7 +304,7 @@ export default function ProjectTasksPage({ params }: Props) {
               <Users className="h-5 w-5" />
               Miembros del proyecto
             </SheetTitle>
-            <p className="text-sm text-muted-foreground">{project.clientName} · {project.name}</p>
+            <p className="text-sm text-muted-foreground">{project.clientName ? `${project.clientName} · ` : ""}{project.name}</p>
           </SheetHeader>
 
           <div className="space-y-4 mt-6">

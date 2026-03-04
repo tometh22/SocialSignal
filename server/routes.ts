@@ -15548,18 +15548,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.select().from(tasks)
         .where(eq(tasks.projectId, parseInt(projectId)))
         .orderBy(asc(tasks.sectionName), asc(tasks.position), asc(tasks.createdAt));
+
+      // Calcular subtaskCount para cada tarea
+      const subtaskCounts: Record<number, number> = {};
+      for (const task of result) {
+        if (task.parentTaskId) {
+          subtaskCounts[task.parentTaskId] = (subtaskCounts[task.parentTaskId] || 0) + 1;
+        }
+      }
+      const enrichedTasks = result.map(t => ({ ...t, subtaskCount: subtaskCounts[t.id] || 0 }));
       
       // Agrupar por sección
       const sections: Record<string, any[]> = {};
-      for (const task of result) {
+      for (const task of enrichedTasks) {
         const section = task.sectionName || "General";
         if (!sections[section]) sections[section] = [];
         sections[section].push(task);
       }
       
-      res.json({ tasks: result, sections });
+      res.json({ tasks: enrichedTasks, sections });
     } catch (error) {
       res.status(500).json({ message: "Error al obtener tareas del proyecto" });
+    }
+  });
+
+  // PUT /api/tasks/section/rename — renombrar sección
+  app.put("/api/tasks/section/rename", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { projectId, oldName, newName } = req.body;
+      if (!projectId || !oldName || !newName) return res.status(400).json({ message: "Faltan datos" });
+      await db.update(tasks)
+        .set({ sectionName: newName.trim() })
+        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, oldName)));
+      res.json({ message: "Sección renombrada" });
+    } catch (error) {
+      res.status(500).json({ message: "Error al renombrar sección" });
+    }
+  });
+
+  // DELETE /api/tasks/section — eliminar sección (mueve tareas a General)
+  app.delete("/api/tasks/section", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { projectId, sectionName } = req.body;
+      if (!projectId || !sectionName) return res.status(400).json({ message: "Faltan datos" });
+      await db.update(tasks)
+        .set({ sectionName: "General" })
+        .where(and(eq(tasks.projectId, parseInt(projectId)), eq(tasks.sectionName, sectionName)));
+      res.json({ message: "Sección eliminada" });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar sección" });
     }
   });
 

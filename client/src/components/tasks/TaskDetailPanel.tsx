@@ -1,25 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle
+  Sheet, SheetContent
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  CalendarIcon, Clock, Plus, Trash2, User, Users, Tag, Flag
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,63 +48,73 @@ type Personnel = { id: number; name: string; email?: string | null };
 type Project = { id: number; name: string; client_name: string };
 
 const STATUS_OPTIONS = [
-  { value: "todo", label: "Pendiente", color: "bg-gray-100 text-gray-700" },
-  { value: "in_progress", label: "En curso", color: "bg-blue-100 text-blue-700" },
-  { value: "done", label: "Completada", color: "bg-green-100 text-green-700" },
-  { value: "cancelled", label: "Cancelada", color: "bg-red-100 text-red-700" },
+  { value: "todo",        label: "Pendiente",  bg: "bg-gray-100 hover:bg-gray-200 text-gray-700",   active: "bg-gray-600 text-white" },
+  { value: "in_progress", label: "En curso",   bg: "bg-blue-50 hover:bg-blue-100 text-blue-700",   active: "bg-blue-600 text-white" },
+  { value: "done",        label: "Completada", bg: "bg-green-50 hover:bg-green-100 text-green-700", active: "bg-green-600 text-white" },
+  { value: "cancelled",   label: "Cancelada",  bg: "bg-red-50 hover:bg-red-100 text-red-700",       active: "bg-red-600 text-white" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "low", label: "Baja", color: "text-gray-500" },
-  { value: "medium", label: "Media", color: "text-yellow-600" },
-  { value: "high", label: "Alta", color: "text-orange-600" },
-  { value: "urgent", label: "Urgente", color: "text-red-600" },
+  { value: "low",    label: "Baja",    bg: "bg-gray-100 hover:bg-gray-200 text-gray-600",     active: "bg-gray-500 text-white",   icon: "text-gray-400" },
+  { value: "medium", label: "Media",   bg: "bg-yellow-50 hover:bg-yellow-100 text-yellow-700", active: "bg-yellow-500 text-white", icon: "text-yellow-500" },
+  { value: "high",   label: "Alta",    bg: "bg-orange-50 hover:bg-orange-100 text-orange-700", active: "bg-orange-500 text-white", icon: "text-orange-500" },
+  { value: "urgent", label: "Urgente", bg: "bg-red-50 hover:bg-red-100 text-red-700",           active: "bg-red-500 text-white",   icon: "text-red-500" },
+];
+
+const AVATAR_COLORS = [
+  "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
+  "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-amber-500",
 ];
 
 function getInitials(name: string) {
   return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 }
+function getAvatarColor(id: number) {
+  return AVATAR_COLORS[id % AVATAR_COLORS.length];
+}
 
 function ProjectColorDot({ projectId }: { projectId?: number | null }) {
   const colors = ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-teal-500"];
   if (!projectId) return null;
-  const color = colors[projectId % colors.length];
-  return <span className={cn("inline-block w-2.5 h-2.5 rounded-full mr-1.5", color)} />;
+  return <span className={cn("inline-block w-2.5 h-2.5 rounded-full mr-1.5 flex-shrink-0", colors[projectId % colors.length])} />;
 }
 
 function parseHoursInput(value: string): number | null {
-  // Accepts: "1.5", "1h30", "1h30m", "1:30", "90min"
   value = value.trim().toLowerCase();
   if (!value) return null;
-
-  // "1h30" or "1h30m"
   const hm1 = value.match(/^(\d+)h(\d+)m?$/);
   if (hm1) return parseInt(hm1[1]) + parseInt(hm1[2]) / 60;
-
-  // "1h" only
   const hOnly = value.match(/^(\d+(?:\.\d+)?)h$/);
   if (hOnly) return parseFloat(hOnly[1]);
-
-  // "1:30"
   const colon = value.match(/^(\d+):(\d+)$/);
   if (colon) return parseInt(colon[1]) + parseInt(colon[2]) / 60;
-
-  // "90min" or "90m"
   const minOnly = value.match(/^(\d+)m(?:in)?$/);
   if (minOnly) return parseInt(minOnly[1]) / 60;
-
-  // plain number "1.5"
   const num = parseFloat(value);
   if (!isNaN(num)) return num;
-
   return null;
 }
 
 function formatHours(hours: number) {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}min`;
+}
+
+function CircleCheckSmall({ checked, onClick }: { checked: boolean; onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all",
+        checked ? "bg-green-500 border-green-500" : "border-muted-foreground/40 hover:border-primary/60"
+      )}
+    >
+      {checked && <Check className="h-2 w-2 text-white" strokeWidth={3} />}
+    </button>
+  );
 }
 
 interface Props {
@@ -123,17 +134,12 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [logDate, setLogDate] = useState(new Date().toISOString().slice(0, 10));
   const [logDesc, setLogDesc] = useState("");
   const [showTimeLog, setShowTimeLog] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("details");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // When initialFocusTime triggers, switch to time tab and open form
   useEffect(() => {
-    if (open && initialFocusTime) {
-      setActiveTab("time");
-      setShowTimeLog(true);
-    } else if (!open) {
-      setActiveTab("details");
-      setShowTimeLog(false);
-    }
+    if (open && initialFocusTime) setShowTimeLog(true);
+    if (!open) { setShowTimeLog(false); setEditingTitle(false); setShowAddSubtask(false); }
   }, [open, initialFocusTime]);
 
   const { data: task, isLoading } = useQuery<Task>({
@@ -175,26 +181,21 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
-      setLogHours("");
-      setLogDesc("");
-      setShowTimeLog(false);
-      toast({ title: "Horas registradas", description: "Las horas se registraron correctamente." });
+      setLogHours(""); setLogDesc(""); setShowTimeLog(false);
+      toast({ title: "Horas registradas" });
     },
   });
 
   const deleteTimeMutation = useMutation({
     mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => apiRequest(`/api/tasks/${taskId}`, "DELETE"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
-      onUpdate?.();
-      onClose();
+      onUpdate?.(); onClose();
       toast({ title: "Tarea eliminada" });
     },
   });
@@ -209,194 +210,194 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const handleLogTime = () => {
     const hours = parseHoursInput(logHours);
     if (!hours || hours <= 0) {
-      toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30, 1:30" });
+      toast({ variant: "destructive", title: "Error", description: "Ingresá un valor válido: ej. 1.5, 1h30" });
       return;
     }
-    logTimeMutation.mutate({
-      personnelId: task?.assigneeId,
-      date: logDate,
-      hours: Math.round(hours * 100) / 100,
-      description: logDesc,
-    });
+    logTimeMutation.mutate({ personnelId: task?.assigneeId, date: logDate, hours: Math.round(hours * 100) / 100, description: logDesc });
+  };
+
+  const handleDescBlur = (value: string) => {
+    if (descTimerRef.current) clearTimeout(descTimerRef.current);
+    descTimerRef.current = setTimeout(() => {
+      updateMutation.mutate({ description: value || null });
+    }, 0);
   };
 
   if (!task && !isLoading) return null;
 
   const statusInfo = STATUS_OPTIONS.find(s => s.value === task?.status);
-  const priorityInfo = PRIORITY_OPTIONS.find(p => p.value === task?.priority);
   const assignee = allPersonnel.find(p => p.id === task?.assigneeId);
   const project = allProjects.find(p => p.id === task?.projectId);
   const collaborators = allPersonnel.filter(p => (task?.collaboratorIds || []).includes(p.id));
   const loggedH = task?.loggedHours || 0;
-  const timeCount = task?.timeEntries?.length || 0;
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto p-0" side="right">
-        {isLoading || !task ? (
-          <div className="p-8 text-center text-muted-foreground">Cargando tarea...</div>
-        ) : (
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="px-6 pt-5 pb-4 border-b">
-              {/* Project tag */}
-              {project && (
-                <div className="flex items-center mb-2">
-                  <ProjectColorDot projectId={task.projectId} />
-                  <span className="text-xs text-muted-foreground">{project.client_name} · {project.name}</span>
-                  {task.sectionName && <span className="ml-2 text-xs text-muted-foreground">· {task.sectionName}</span>}
-                </div>
-              )}
-              {/* Title */}
-              {editingTitle ? (
-                <Input
-                  autoFocus
-                  value={titleValue}
-                  onChange={e => setTitleValue(e.target.value)}
-                  onBlur={handleTitleSave}
-                  onKeyDown={e => { if (e.key === "Enter") handleTitleSave(); if (e.key === "Escape") setEditingTitle(false); }}
-                  className="text-xl font-bold border-none shadow-none px-0 focus-visible:ring-0"
-                />
-              ) : (
-                <h2
-                  className="text-xl font-bold cursor-pointer hover:text-primary transition-colors"
-                  onClick={() => { setTitleValue(task.title); setEditingTitle(true); }}
-                >
-                  {task.title}
-                </h2>
-              )}
-              {/* Status + Priority + Hours chip */}
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
-                <Select value={task.status} onValueChange={v => updateMutation.mutate({ status: v })}>
-                  <SelectTrigger className={cn("h-7 w-auto text-xs border-none px-2 font-medium", statusInfo?.color)}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(s => (
-                      <SelectItem key={s.value} value={s.value}>
-                        <span className={cn("font-medium", s.color.replace("bg-", "text-").split(" ")[0])}>{s.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={task.priority} onValueChange={v => updateMutation.mutate({ priority: v })}>
-                  <SelectTrigger className="h-7 w-auto text-xs border-none px-2">
-                    <Flag className={cn("h-3 w-3 mr-1", priorityInfo?.color)} />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITY_OPTIONS.map(p => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Hours chip */}
-                {loggedH > 0 && (
-                  <div className={cn(
-                    "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium",
-                    task.estimatedHours && loggedH > task.estimatedHours
-                      ? "bg-red-100 text-red-700"
-                      : "bg-green-100 text-green-700"
-                  )}>
-                    <Clock className="h-3 w-3" />
-                    {formatHours(loggedH)} registradas
-                    {task.estimatedHours && <span className="opacity-60"> / {task.estimatedHours}h est.</span>}
-                  </div>
-                )}
-
-                {/* Quick register button */}
-                <Button
-                  size="sm"
-                  className="h-7 text-xs ml-auto bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => { setActiveTab("time"); setShowTimeLog(true); }}
-                >
-                  <Clock className="h-3 w-3 mr-1" />Registrar horas
-                </Button>
-              </div>
+    <>
+      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col" side="right">
+          {isLoading || !task ? (
+            <div className="flex items-center justify-center flex-1 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />Cargando...
             </div>
-
-            {/* Tabs body */}
-            <div className="flex-1 overflow-y-auto">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-                <TabsList className="w-full rounded-none border-b px-6 h-9 justify-start bg-transparent gap-0">
-                  <TabsTrigger value="details" className="h-9 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs px-4">
-                    Detalles
-                  </TabsTrigger>
-                  <TabsTrigger value="subtasks" className="h-9 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs px-4">
-                    Subtareas
-                    {(task.subtasks?.length || 0) > 0 && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px] ml-1.5">
-                        {task.subtasks?.filter(s => s.status === "done").length}/{task.subtasks?.length}
-                      </Badge>
+          ) : (
+            <TooltipProvider>
+              <div className="flex flex-col h-full">
+                {/* ── Header ── */}
+                <div className="px-5 pt-4 pb-3 border-b flex-shrink-0">
+                  {/* Breadcrumb */}
+                  <nav className="flex items-center gap-1 text-[11px] text-muted-foreground mb-2.5 flex-wrap">
+                    {project && (
+                      <>
+                        <ProjectColorDot projectId={task.projectId} />
+                        <span>{project.client_name || project.name}</span>
+                        <ChevronRight className="h-2.5 w-2.5" />
+                        <span>{project.name}</span>
+                        {task.sectionName && (
+                          <>
+                            <ChevronRight className="h-2.5 w-2.5" />
+                            <span>{task.sectionName}</span>
+                          </>
+                        )}
+                      </>
                     )}
-                  </TabsTrigger>
-                  <TabsTrigger value="time" className="h-9 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent text-xs px-4">
-                    Tiempo
-                    {timeCount > 0 && (
-                      <Badge variant="secondary" className="h-4 px-1.5 text-[10px] ml-1.5">
-                        {formatHours(loggedH)}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
+                  </nav>
 
-                {/* DETAILS TAB */}
-                <TabsContent value="details" className="px-6 py-4 space-y-5 mt-0">
-                  {/* Key fields grid */}
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Assignee */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1"><User className="h-3 w-3" />Responsable</p>
-                      <Select value={task.assigneeId?.toString() || "none"} onValueChange={v => updateMutation.mutate({ assigneeId: v === "none" ? null : parseInt(v) })}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Sin asignar" />
+                  {/* Title */}
+                  {editingTitle ? (
+                    <Input
+                      autoFocus
+                      value={titleValue}
+                      onChange={e => setTitleValue(e.target.value)}
+                      onBlur={handleTitleSave}
+                      onKeyDown={e => { if (e.key === "Enter") handleTitleSave(); if (e.key === "Escape") setEditingTitle(false); }}
+                      className="text-xl font-bold border-none shadow-none px-0 focus-visible:ring-0 h-auto py-0.5"
+                    />
+                  ) : (
+                    <h2
+                      className="text-xl font-bold cursor-pointer hover:text-primary transition-colors leading-snug"
+                      onClick={() => { setTitleValue(task.title); setEditingTitle(true); }}
+                    >
+                      {task.title}
+                    </h2>
+                  )}
+
+                  {/* Status pills */}
+                  <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1">Estado</span>
+                    {STATUS_OPTIONS.map(s => (
+                      <button
+                        key={s.value}
+                        onClick={() => updateMutation.mutate({ status: s.value })}
+                        className={cn(
+                          "px-2.5 py-0.5 rounded-full text-xs font-medium transition-all",
+                          task.status === s.value ? s.active : s.bg
+                        )}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Scrollable body ── */}
+                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+                  {/* Responsable */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><User className="h-3 w-3" />Responsable</p>
+                    </div>
+                    <Select
+                      value={task.assigneeId?.toString() || "none"}
+                      onValueChange={v => updateMutation.mutate({ assigneeId: v === "none" ? null : parseInt(v) })}
+                    >
+                      <SelectTrigger className="h-7 text-xs flex-1 border-none bg-transparent shadow-none hover:bg-accent px-2">
+                        <div className="flex items-center gap-2">
+                          {assignee ? (
+                            <>
+                              <Avatar className="h-5 w-5">
+                                <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(assignee.id))}>
+                                  {getInitials(assignee.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span>{assignee.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">Sin asignar</span>
+                          )}
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {allPersonnel.map(p => (
+                          <SelectItem key={p.id} value={p.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-4 w-4">
+                                <AvatarFallback className={cn("text-[7px] text-white", getAvatarColor(p.id))}>
+                                  {getInitials(p.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              {p.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Colaboradores */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-28 flex-shrink-0 pt-1">
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />Colaboradores</p>
+                    </div>
+                    <div className="flex-1 flex items-center gap-1.5 flex-wrap">
+                      {collaborators.map(c => (
+                        <div key={c.id} className="flex items-center gap-1 bg-accent rounded-full pl-0.5 pr-1.5 py-0.5 text-xs">
+                          <Avatar className="h-5 w-5">
+                            <AvatarFallback className={cn("text-[8px] text-white", getAvatarColor(c.id))}>
+                              {getInitials(c.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{c.name}</span>
+                          <button
+                            className="ml-0.5 text-muted-foreground hover:text-red-500"
+                            onClick={() => {
+                              const current = task.collaboratorIds || [];
+                              updateMutation.mutate({ collaboratorIds: current.filter(id => id !== c.id) });
+                            }}
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <Select onValueChange={v => {
+                        const current = task.collaboratorIds || [];
+                        if (!current.includes(parseInt(v))) {
+                          updateMutation.mutate({ collaboratorIds: [...current, parseInt(v)] });
+                        }
+                      }}>
+                        <SelectTrigger className="h-6 w-auto border-dashed text-xs px-2 text-muted-foreground">
+                          <Plus className="h-3 w-3 mr-1" />Agregar
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Sin asignar</SelectItem>
-                          {allPersonnel.map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-4 w-4">
-                                  <AvatarFallback className="text-[8px]">{getInitials(p.name)}</AvatarFallback>
-                                </Avatar>
-                                {p.name}
-                              </div>
-                            </SelectItem>
+                          {allPersonnel.filter(p => !(task.collaboratorIds || []).includes(p.id) && p.id !== task.assigneeId).map(p => (
+                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
 
-                    {/* Project */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1"><Tag className="h-3 w-3" />Proyecto</p>
-                      <Select value={task.projectId?.toString() || "none"} onValueChange={v => updateMutation.mutate({ projectId: v === "none" ? null : parseInt(v) })}>
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Sin proyecto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sin proyecto</SelectItem>
-                          {allProjects.map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>
-                              <div className="flex items-center">
-                                <ProjectColorDot projectId={p.id} />
-                                <span>{p.client_name} · {p.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Fechas */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><CalendarIcon className="h-3 w-3" />Fechas</p>
                     </div>
-
-                    {/* Start date */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1"><CalendarIcon className="h-3 w-3" />Fecha de inicio</p>
+                    <div className="flex items-center gap-2 flex-1">
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className="h-8 w-full text-xs justify-start font-normal">
-                            {task.startDate ? format(new Date(task.startDate), "dd/MM/yyyy", { locale: es }) : "Sin fecha"}
+                          <Button variant="outline" size="sm" className="h-7 text-xs justify-start font-normal border-dashed">
+                            {task.startDate ? format(new Date(task.startDate), "d MMM", { locale: es }) : "Inicio"}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -408,15 +409,18 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                           />
                         </PopoverContent>
                       </Popover>
-                    </div>
-
-                    {/* Due date */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1"><CalendarIcon className="h-3 w-3" />Fecha límite</p>
+                      <span className="text-muted-foreground text-xs">→</span>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm" className={cn("h-8 w-full text-xs justify-start font-normal", task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "border-red-300 text-red-600" : "")}>
-                            {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy", { locale: es }) : "Sin fecha"}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "h-7 text-xs justify-start font-normal border-dashed",
+                              task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "border-red-300 text-red-600" : ""
+                            )}
+                          >
+                            {task.dueDate ? format(new Date(task.dueDate), "d MMM", { locale: es }) : "Fin"}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -429,209 +433,201 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         </PopoverContent>
                       </Popover>
                     </div>
+                  </div>
 
-                    {/* Estimated hours */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1"><Clock className="h-3 w-3" />Horas estimadas</p>
+                  {/* Prioridad */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Flag className="h-3 w-3" />Prioridad</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {PRIORITY_OPTIONS.map(p => (
+                        <button
+                          key={p.value}
+                          onClick={() => updateMutation.mutate({ priority: p.value })}
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-xs font-medium transition-all flex items-center gap-1",
+                            task.priority === p.value ? p.active : p.bg
+                          )}
+                        >
+                          <Flag className={cn("h-2.5 w-2.5", task.priority === p.value ? "text-white" : p.icon)} />
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Horas estimadas */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />Horas est.</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1">
                       <Input
                         type="number"
                         min="0"
                         step="0.5"
                         defaultValue={task.estimatedHours?.toString() || ""}
                         onBlur={e => updateMutation.mutate({ estimatedHours: e.target.value ? parseFloat(e.target.value) : null })}
-                        className="h-8 text-xs"
+                        className="h-7 text-xs w-20 border-dashed"
                         placeholder="0"
                       />
-                    </div>
-
-                    {/* Sección */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1.5">Sección</p>
-                      <Input
-                        defaultValue={task.sectionName || "General"}
-                        onBlur={e => updateMutation.mutate({ sectionName: e.target.value || "General" })}
-                        className="h-8 text-xs"
-                        placeholder="General"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Collaborators */}
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><Users className="h-3 w-3" />Colaboradores</p>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {collaborators.map(c => (
-                        <div key={c.id} className="flex items-center gap-1 bg-accent rounded-full px-2 py-0.5 text-xs">
-                          <Avatar className="h-4 w-4">
-                            <AvatarFallback className="text-[8px]">{getInitials(c.name)}</AvatarFallback>
-                          </Avatar>
-                          <span>{c.name}</span>
-                        </div>
-                      ))}
-                      <Select onValueChange={v => {
-                        const current = task.collaboratorIds || [];
-                        if (!current.includes(parseInt(v))) {
-                          updateMutation.mutate({ collaboratorIds: [...current, parseInt(v)] });
-                        }
-                      }}>
-                        <SelectTrigger className="h-7 w-32 text-xs">
-                          <Plus className="h-3 w-3 mr-1" />
-                          <SelectValue placeholder="Agregar" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allPersonnel.filter(p => !(task.collaboratorIds || []).includes(p.id) && p.id !== task.assigneeId).map(p => (
-                            <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <span className="text-xs text-muted-foreground">horas</span>
+                      {loggedH > 0 && (
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded-full font-medium",
+                          task.estimatedHours && loggedH > task.estimatedHours
+                            ? "bg-red-100 text-red-700"
+                            : "bg-green-100 text-green-700"
+                        )}>
+                          {formatHours(loggedH)} registradas
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Description */}
+                  {/* Sección */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-[11px] text-muted-foreground">Sección</p>
+                    </div>
+                    <Input
+                      defaultValue={task.sectionName || "General"}
+                      onBlur={e => updateMutation.mutate({ sectionName: e.target.value || "General" })}
+                      className="h-7 text-xs flex-1 border-dashed"
+                      placeholder="General"
+                    />
+                  </div>
+
+                  {/* Descripción */}
                   <div>
-                    <p className="text-xs text-muted-foreground mb-1.5">Descripción</p>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">Descripción</p>
                     <Textarea
                       defaultValue={task.description || ""}
-                      onBlur={e => updateMutation.mutate({ description: e.target.value || null })}
-                      className="min-h-[80px] text-sm resize-none"
+                      onBlur={e => handleDescBlur(e.target.value)}
+                      className="min-h-[72px] text-sm resize-none"
                       placeholder="Agregar descripción..."
                     />
                   </div>
-                </TabsContent>
 
-                {/* SUBTASKS TAB */}
-                <TabsContent value="subtasks" className="px-6 py-4 mt-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-xs font-semibold text-foreground">Subtareas</p>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowAddSubtask(true)}>
-                      <Plus className="h-3 w-3 mr-1" />Agregar
-                    </Button>
-                  </div>
-
-                  <div className="space-y-1">
-                    {(task.subtasks || []).map(sub => (
-                      <div key={sub.id} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent group">
-                        <Checkbox
-                          checked={sub.status === "done"}
-                          onCheckedChange={checked => {
-                            apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: checked ? "done" : "todo" }).then(() => {
-                              queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
-                            });
-                          }}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span className={cn("text-sm flex-1", sub.status === "done" ? "line-through text-muted-foreground" : "")}>{sub.title}</span>
-                      </div>
-                    ))}
-
-                    {(task.subtasks || []).length === 0 && !showAddSubtask && (
-                      <p className="text-xs text-muted-foreground italic py-2">Sin subtareas todavía</p>
-                    )}
-
-                    {showAddSubtask && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Input
-                          autoFocus
-                          value={subtaskTitle}
-                          onChange={e => setSubtaskTitle(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === "Enter" && subtaskTitle.trim()) {
-                              addSubtaskMutation.mutate({ title: subtaskTitle.trim(), parentTaskId: taskId, projectId: task.projectId, sectionName: task.sectionName });
-                            }
-                            if (e.key === "Escape") { setShowAddSubtask(false); setSubtaskTitle(""); }
-                          }}
-                          placeholder="Nombre de la subtarea..."
-                          className="h-7 text-xs flex-1"
-                        />
-                        <Button size="sm" className="h-7 text-xs" onClick={() => {
-                          if (subtaskTitle.trim()) addSubtaskMutation.mutate({ title: subtaskTitle.trim(), parentTaskId: taskId, projectId: task.projectId, sectionName: task.sectionName });
-                        }}>OK</Button>
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAddSubtask(false); setSubtaskTitle(""); }}>✕</Button>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                {/* TIME TAB */}
-                <TabsContent value="time" className="px-6 py-4 mt-0">
-                  {/* Time log form */}
-                  {showTimeLog ? (
-                    <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl p-4 mb-4 space-y-3">
-                      <p className="text-sm font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />Registrar horas trabajadas
+                  {/* ── Subtareas ── */}
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground">
+                        Subtareas
+                        {(task.subtasks?.length || 0) > 0 && (
+                          <span className="ml-1.5 text-muted-foreground font-normal">
+                            {task.subtasks?.filter(s => s.status === "done").length}/{task.subtasks?.length}
+                          </span>
+                        )}
                       </p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1.5 font-medium">Horas *</p>
-                          <Input
-                            autoFocus={activeTab === "time"}
-                            value={logHours}
-                            onChange={e => setLogHours(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") handleLogTime(); }}
-                            className="h-9 text-sm"
-                            placeholder="ej: 1.5 · 1h30 · 1:30"
-                          />
-                          <p className="text-[10px] text-muted-foreground mt-0.5">Acepta: 1.5, 1h30, 1:30, 90min</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-1.5 font-medium">Fecha</p>
-                          <Input
-                            type="date"
-                            value={logDate}
-                            onChange={e => setLogDate(e.target.value)}
-                            className="h-9 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1.5 font-medium">Descripción (opcional)</p>
-                        <Input
-                          value={logDesc}
-                          onChange={e => setLogDesc(e.target.value)}
-                          onKeyDown={e => { if (e.key === "Enter") handleLogTime(); }}
-                          className="h-9 text-sm"
-                          placeholder="¿En qué trabajaste?"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          className="bg-green-600 hover:bg-green-700 text-white h-9"
-                          onClick={handleLogTime}
-                          disabled={logTimeMutation.isPending || !logHours.trim()}
-                        >
-                          {logTimeMutation.isPending ? "Guardando..." : "Registrar horas"}
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-9" onClick={() => setShowTimeLog(false)}>
-                          Cancelar
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowAddSubtask(true)}>
+                        <Plus className="h-3 w-3 mr-1" />Agregar
+                      </Button>
                     </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full h-9 text-sm mb-4 border-dashed"
-                      onClick={() => setShowTimeLog(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />Agregar registro de horas
-                    </Button>
-                  )}
+                    <div className="divide-y divide-border">
+                      {(task.subtasks || []).map(sub => (
+                        <div key={sub.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-accent/20 group">
+                          <CircleCheckSmall
+                            checked={sub.status === "done"}
+                            onClick={e => {
+                              e.stopPropagation();
+                              apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: sub.status === "done" ? "todo" : "done" })
+                                .then(() => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }));
+                            }}
+                          />
+                          <span className={cn("text-sm flex-1 cursor-pointer hover:text-primary transition-colors", sub.status === "done" ? "line-through text-muted-foreground" : "")}>
+                            {sub.title}
+                          </span>
+                        </div>
+                      ))}
+                      {(task.subtasks || []).length === 0 && !showAddSubtask && (
+                        <p className="text-xs text-muted-foreground italic px-3 py-2">Sin subtareas todavía</p>
+                      )}
+                      {showAddSubtask && (
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <div className="w-4 h-4 rounded-full border-2 border-dashed border-muted-foreground/30 flex-shrink-0" />
+                          <Input
+                            autoFocus
+                            value={subtaskTitle}
+                            onChange={e => setSubtaskTitle(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" && subtaskTitle.trim()) {
+                                addSubtaskMutation.mutate({ title: subtaskTitle.trim(), parentTaskId: taskId, projectId: task.projectId, sectionName: task.sectionName, status: "todo", priority: "medium" });
+                              }
+                              if (e.key === "Escape") { setShowAddSubtask(false); setSubtaskTitle(""); }
+                            }}
+                            placeholder="Nombre de la subtarea..."
+                            className="h-7 text-xs flex-1 border-none shadow-none px-0 focus-visible:ring-0"
+                          />
+                          <Button size="sm" className="h-6 text-xs px-2" onClick={() => {
+                            if (subtaskTitle.trim()) addSubtaskMutation.mutate({ title: subtaskTitle.trim(), parentTaskId: taskId, projectId: task.projectId, sectionName: task.sectionName, status: "todo", priority: "medium" });
+                          }}>OK</Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-xs px-1" onClick={() => { setShowAddSubtask(false); setSubtaskTitle(""); }}>✕</Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                  {/* Time entries list */}
-                  {(task.timeEntries || []).length > 0 ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Historial</p>
-                        <p className="text-xs font-semibold text-foreground">Total: {formatHours(loggedH)}</p>
+                  {/* ── Tiempo registrado ── */}
+                  <div className="border border-border rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/20 border-b border-border">
+                      <p className="text-xs font-semibold text-foreground">
+                        Tiempo registrado
+                        {loggedH > 0 && <span className="ml-1.5 text-muted-foreground font-normal">{formatHours(loggedH)}</span>}
+                      </p>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowTimeLog(v => !v)}>
+                        {showTimeLog ? <X className="h-3 w-3" /> : <><Plus className="h-3 w-3 mr-1" />Registrar</>}
+                      </Button>
+                    </div>
+
+                    {showTimeLog && (
+                      <div className="px-3 py-3 border-b border-border bg-accent/10 space-y-2.5">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Horas *</p>
+                            <Input
+                              autoFocus
+                              value={logHours}
+                              onChange={e => setLogHours(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") handleLogTime(); }}
+                              className="h-8 text-sm"
+                              placeholder="ej: 1.5 · 1h30"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground mb-1">Fecha</p>
+                            <Input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} className="h-8 text-sm" />
+                          </div>
+                        </div>
+                        <div>
+                          <Input
+                            value={logDesc}
+                            onChange={e => setLogDesc(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") handleLogTime(); }}
+                            className="h-8 text-sm"
+                            placeholder="¿En qué trabajaste? (opcional)"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleLogTime} disabled={logTimeMutation.isPending || !logHours.trim()}>
+                            {logTimeMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Registrar"}
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowTimeLog(false)}>Cancelar</Button>
+                        </div>
                       </div>
-                      {task.timeEntries!.map(entry => (
-                        <div key={entry.id} className="flex items-center gap-2 py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 group text-xs transition-colors">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                          <span className="font-semibold text-primary w-10 flex-shrink-0">{entry.hours}h</span>
+                    )}
+
+                    <div className="divide-y divide-border">
+                      {(task.timeEntries || []).length === 0 && !showTimeLog && (
+                        <p className="text-xs text-muted-foreground italic px-3 py-2">Sin horas registradas</p>
+                      )}
+                      {(task.timeEntries || []).map(entry => (
+                        <div key={entry.id} className="flex items-center gap-2 px-3 py-2 hover:bg-accent/20 group text-xs">
+                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span className="font-semibold text-primary w-10 flex-shrink-0">{formatHours(entry.hours)}</span>
                           <span className="text-muted-foreground flex-shrink-0">{format(new Date(entry.date), "dd/MM/yy")}</span>
-                          {entry.description && (
-                            <span className="text-muted-foreground flex-1 truncate">— {entry.description}</span>
-                          )}
+                          {entry.description && <span className="text-muted-foreground flex-1 truncate">— {entry.description}</span>}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -643,33 +639,47 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-6">
-                      <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-xs text-muted-foreground">Sin horas registradas en esta tarea</p>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
+                  </div>
 
-            {/* Footer */}
-            <div className="border-t px-6 py-3 flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">
-                {task.createdAt ? `Creada ${format(new Date(task.createdAt), "dd/MM/yyyy", { locale: es })}` : ""}
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 text-xs"
-                onClick={() => { if (confirm("¿Eliminar esta tarea?")) deleteMutation.mutate(); }}
-              >
-                <Trash2 className="h-3 w-3 mr-1" />Eliminar tarea
-              </Button>
-            </div>
-          </div>
-        )}
-      </SheetContent>
-    </Sheet>
+                  {/* ── Footer: eliminar tarea ── */}
+                  <div className="pt-2 pb-6">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Eliminar tarea
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TooltipProvider>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar tarea?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. La tarea y su historial de horas serán eliminados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

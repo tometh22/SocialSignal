@@ -39,6 +39,16 @@ User specifically wants automatic synchronization with the Excel MAESTRO rather 
   - API: `/api/tasks/*`, `/api/tasks-personnel`, `/api/tasks/projects` (includes own projects), `/api/tasks/projects/create` (POST), `/api/tasks/projects/:id/members`
   - Sidebar: "GESTIÓN DE TAREAS" section includes "Inicio", "Mis Tareas", **"Proyectos"** (direct link to hub), "Calendario Equipo", "Panel de Horas" + "PROYECTOS" subsection with color icon squares per project and "+" button that opens NewProjectDialog
   - UX: Animated circle checkboxes (not square), inline date picker popover per task row, user avatar in home greeting, "Mostrar más" expand/collapse, badge counts on tabs
+  - **Asana-parity UI** (latest iteration):
+    - **Toolbar**: "Agregar tarea" CTA + Filtrar/Ordenar/Agrupar/··· decorative buttons above the task list in `view="list"`
+    - **Date ranges**: Task rows show "26 feb – 3 mar" when both `startDate` and `dueDate` are set; otherwise shows single date or arrow suffix
+    - **Subtask badges**: Subtasks hidden by default; badge `"N↓"` appears next to task title with count; click toggles expand/collapse inline
+    - **Client tag column**: New "Cliente" column with color-coded pill badges per task row, color derived from client name hash
+    - **Time format**: "30min" for < 1h, "1h 30min" for >= 1h (removed "0h 30min" format)
+    - **Section management**: Hover on section header reveals "+" (add task) + "···" (DropdownMenu) with Renombrar/Eliminar; rename is inline, delete moves tasks to "General"
+    - **TaskDetailPanel (Asana-style)**: Auto-save on blur/select for all fields; status pills; priority pills; responsable with avatar; collaborators as chips with ×; date range pickers; estimated hours; description textarea; subtasks with circle checkboxes; time log form + history; delete with confirmation alert
+  - **Backend**: `GET /api/tasks/project/:projectId` now returns `subtaskCount` per task; `PUT /api/tasks/section/rename` and `DELETE /api/tasks/section` endpoints added
+  - `TaskProject.clientName` typed as `string | null` to prevent crashes on own projects (id >= 1,000,000)
   - Separate from financial analysis — accessible to all team members with `projects` permission.
 - **Sales CRM Module**: Kanban pipeline, lead/contact management, activity timelines, reminders, email integration.
 - **User & Client Management**: Role-based access control and Google Sheets integration for client import.
