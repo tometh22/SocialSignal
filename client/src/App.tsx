@@ -40,6 +40,8 @@ import CRMLeadPage from "@/pages/crm-lead";
 import MyTasksPage from "@/pages/my-tasks";
 import TeamCalendarPage from "@/pages/team-calendar";
 import HoursDashboardPage from "@/pages/hours-dashboard";
+import ProjectsHubPage from "@/pages/tasks/projects-hub";
+import ProjectTasksPage from "@/pages/tasks/project-tasks-page";
 
 
 // Authentication & Utilities
@@ -178,6 +180,8 @@ function AppRoutes() {
                   <ProtectedRoute path="/tasks/my-tasks" component={MyTasksPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/team-calendar" component={TeamCalendarPage} requiredPermission="projects" />
                   <ProtectedRoute path="/tasks/hours-dashboard" component={HoursDashboardPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/projects" component={ProjectsHubPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/tasks/projects/:id" component={ProjectTasksPage} requiredPermission="projects" />
 
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />

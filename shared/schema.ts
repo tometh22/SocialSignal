@@ -1291,6 +1291,23 @@ export const insertTaskTimeEntrySchema = createInsertSchema(taskTimeEntries).omi
 export type TaskTimeEntry = typeof taskTimeEntries.$inferSelect;
 export type InsertTaskTimeEntry = z.infer<typeof insertTaskTimeEntrySchema>;
 
+// Miembros asignados a proyectos dentro del módulo de tareas
+export const taskProjectMembers = pgTable("task_project_members", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
+  personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("member"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTaskProjectMemberSchema = createInsertSchema(taskProjectMembers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type TaskProjectMember = typeof taskProjectMembers.$inferSelect;
+export type InsertTaskProjectMember = z.infer<typeof insertTaskProjectMemberSchema>;
+
 // ==================== RELACIONES ====================
 
 // Relaciones de clientes

@@ -75,9 +75,10 @@ interface NewTaskRowProps {
   onCreated: () => void;
   onCancel: () => void;
   allPersonnel: Personnel[];
+  projectMembers?: { personnelId: number; name: string; role: string }[];
 }
 
-function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel }: NewTaskRowProps) {
+function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel, projectMembers = [] }: NewTaskRowProps) {
   const [title, setTitle] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("none");
   const [dueDate, setDueDate] = useState<Date | undefined>();
@@ -99,6 +100,10 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel 
       priority: "medium",
     });
   };
+
+  const memberIds = projectMembers.map(m => m.personnelId);
+  const memberPersonnel = allPersonnel.filter(p => memberIds.includes(p.id));
+  const otherPersonnel = allPersonnel.filter(p => !memberIds.includes(p.id));
 
   return (
     <div className="flex items-center border-b border-border hover:bg-accent/20 transition-colors">
@@ -123,7 +128,16 @@ function NewTaskRow({ projectId, sectionName, onCreated, onCancel, allPersonnel 
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">Sin asignar</SelectItem>
-            {allPersonnel.map(p => (
+            {memberPersonnel.length > 0 && (
+              <>
+                <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Miembros del proyecto</div>
+                {memberPersonnel.map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                ))}
+                {otherPersonnel.length > 0 && <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide border-t mt-1">Equipo</div>}
+              </>
+            )}
+            {otherPersonnel.map(p => (
               <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
             ))}
           </SelectContent>
@@ -281,12 +295,13 @@ interface SectionBlockProps {
   tasks: Task[];
   projectId: number;
   allPersonnel: Personnel[];
+  projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpenTask: (id: number, focusTime?: boolean) => void;
   onToggleTask: (task: Task) => void;
   onRefresh: () => void;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, onOpenTask, onToggleTask, onRefresh }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onRefresh }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -367,6 +382,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, onOpenTask,
               onCreated={() => { setShowAdd(false); onRefresh(); }}
               onCancel={() => setShowAdd(false)}
               allPersonnel={allPersonnel}
+              projectMembers={projectMembers}
             />
           ) : (
             <div className="flex items-center border-b border-border">
@@ -387,9 +403,10 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, onOpenTask,
 
 interface Props {
   projectId: number;
+  projectMembers?: { personnelId: number; name: string; role: string }[];
 }
 
-export default function ProjectTaskList({ projectId }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [] }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
@@ -472,6 +489,7 @@ export default function ProjectTaskList({ projectId }: Props) {
               tasks={sections[section]}
               projectId={projectId}
               allPersonnel={allPersonnel}
+              projectMembers={projectMembers}
               onOpenTask={handleOpen}
               onToggleTask={(task) => toggleMutation.mutate(task)}
               onRefresh={refetch}

@@ -15773,6 +15773,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== TASK PROJECT HUB ENDPOINTS ====================
+
+  // GET /api/tasks/projects — lista de proyectos con stats y miembros
+  app.get("/api/tasks/projects", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectsResult = await db.execute(sql`
+        SELECT 
+          ap.id,
+          q.project_name as name,
+          c.name as client_name,
+          ap.status,
+          COUNT(DISTINCT t.id) as task_count,
+          COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count,
+          MAX(t.updated_at) as last_activity
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+        LEFT JOIN tasks t ON t.project_id = ap.id
+        WHERE ap.status = 'active'
+        GROUP BY ap.id, q.project_name, c.name, ap.status
+        ORDER BY c.name, q.project_name
+      `);
+
+      const membersResult = await db.execute(sql`
+        SELECT tpm.project_id, tpm.personnel_id, tpm.role, p.name as personnel_name
+        FROM task_project_members tpm
+        JOIN personnel p ON p.id = tpm.personnel_id
+        ORDER BY tpm.role DESC, p.name
+      `);
+
+      const membersByProject: Record<number, any[]> = {};
+      for (const m of membersResult.rows as any[]) {
+        if (!membersByProject[m.project_id]) membersByProject[m.project_id] = [];
+        membersByProject[m.project_id].push({
+          personnelId: m.personnel_id,
+          name: m.personnel_name,
+          role: m.role,
+        });
+      }
+
+      const projects = (projectsResult.rows as any[]).map(p => ({
+        id: p.id,
+        name: p.name,
+        clientName: p.client_name,
+        status: p.status,
+        taskCount: parseInt(p.task_count) || 0,
+        pendingCount: parseInt(p.pending_count) || 0,
+        lastActivity: p.last_activity,
+        members: membersByProject[p.id] || [],
+      }));
+
+      res.json(projects);
+    } catch (error) {
+      console.error("Error en GET /api/tasks/projects:", error);
+      res.status(500).json({ message: "Error al obtener proyectos" });
+    }
+  });
+
+  // GET /api/tasks/projects/:id — detalle de proyecto con members y stats
+  app.get("/api/tasks/projects/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const projectResult = await db.execute(sql`
+        SELECT ap.id, q.project_name as name, c.name as client_name, ap.status
+        FROM active_projects ap
+        JOIN quotations q ON q.id = ap.quotation_id
+        JOIN clients c ON c.id = ap.client_id
+        WHERE ap.id = ${projectId}
+      `);
+      if (!projectResult.rows.length) return res.status(404).json({ message: "Proyecto no encontrado" });
+
+      const membersResult = await db.execute(sql`
+        SELECT tpm.personnel_id, tpm.role, p.name as personnel_name
+        FROM task_project_members tpm
+        JOIN personnel p ON p.id = tpm.personnel_id
+        WHERE tpm.project_id = ${projectId}
+        ORDER BY tpm.role DESC, p.name
+      `);
+
+      const statsResult = await db.execute(sql`
+        SELECT 
+          COUNT(*) as task_count,
+          COUNT(CASE WHEN status NOT IN ('done', 'cancelled') THEN 1 END) as pending_count,
+          COALESCE(SUM(logged_hours), 0) as total_hours
+        FROM tasks WHERE project_id = ${projectId}
+      `);
+
+      const p = projectResult.rows[0] as any;
+      const stats = statsResult.rows[0] as any;
+
+      res.json({
+        id: p.id,
+        name: p.name,
+        clientName: p.client_name,
+        status: p.status,
+        taskCount: parseInt(stats.task_count) || 0,
+        pendingCount: parseInt(stats.pending_count) || 0,
+        totalHours: parseFloat(stats.total_hours) || 0,
+        members: (membersResult.rows as any[]).map(m => ({
+          personnelId: m.personnel_id,
+          name: m.personnel_name,
+          role: m.role,
+        })),
+      });
+    } catch (error) {
+      console.error("Error en GET /api/tasks/projects/:id:", error);
+      res.status(500).json({ message: "Error al obtener proyecto" });
+    }
+  });
+
+  // POST /api/tasks/projects/:id/members — agregar miembro
+  app.post("/api/tasks/projects/:id/members", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const { personnelId, role = "member" } = req.body;
+      if (!personnelId) return res.status(400).json({ message: "personnelId requerido" });
+
+      await db.execute(sql`
+        INSERT INTO task_project_members (project_id, personnel_id, role)
+        VALUES (${projectId}, ${personnelId}, ${role})
+        ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = ${role}
+      `);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error en POST /api/tasks/projects/:id/members:", error);
+      res.status(500).json({ message: "Error al agregar miembro" });
+    }
+  });
+
+  // DELETE /api/tasks/projects/:id/members/:personnelId — quitar miembro
+  app.delete("/api/tasks/projects/:id/members/:personnelId", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.id);
+      const personnelId = parseInt(req.params.personnelId);
+      await db.execute(sql`
+        DELETE FROM task_project_members
+        WHERE project_id = ${projectId} AND personnel_id = ${personnelId}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error en DELETE /api/tasks/projects/:id/members:", error);
+      res.status(500).json({ message: "Error al quitar miembro" });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }

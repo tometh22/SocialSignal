@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -27,7 +28,20 @@ import {
   CheckSquare,
   CalendarDays,
   BarChart2,
+  FolderOpen,
 } from "lucide-react";
+
+const PROJECT_DOT_COLORS = [
+  "bg-blue-500", "bg-purple-500", "bg-green-500", "bg-orange-500",
+  "bg-pink-500", "bg-teal-500", "bg-indigo-500", "bg-rose-500",
+];
+
+type TaskProjectSummary = {
+  id: number;
+  name: string;
+  clientName: string;
+  pendingCount: number;
+};
 
 type NavItem = {
   href: string;
@@ -108,6 +122,17 @@ export default function SidebarFixed() {
   };
 
   const isAdmin = (user as any)?.isAdmin;
+
+  // Fetch task projects for sidebar
+  const { data: rawTaskProjects } = useQuery<TaskProjectSummary[]>({
+    queryKey: ["/api/tasks/projects"],
+    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
+    staleTime: 60000,
+  });
+  const taskProjects: TaskProjectSummary[] = Array.isArray(rawTaskProjects) ? rawTaskProjects : [];
+  const MAX_SIDEBAR_PROJECTS = 8;
+  const sidebarProjects = taskProjects.slice(0, MAX_SIDEBAR_PROJECTS);
+  const hasMoreProjects = taskProjects.length > MAX_SIDEBAR_PROJECTS;
 
   const navSections = [
     {
@@ -345,6 +370,48 @@ export default function SidebarFixed() {
                 <div className="space-y-1">
                   {section.items.map((item) => renderNavLink(item))}
                 </div>
+
+                {/* Projects sub-list under Gestión de Tareas */}
+                {section.title === "Gestión de Tareas" && !isCollapsed && sidebarProjects.length > 0 && (
+                  <div className="mt-1 ml-3 border-l border-border/50 pl-2 space-y-0.5">
+                    {sidebarProjects.map(proj => {
+                      const dotColor = PROJECT_DOT_COLORS[proj.id % PROJECT_DOT_COLORS.length];
+                      const isActive = currentPath === `/tasks/projects/${proj.id}`;
+                      return (
+                        <Link
+                          key={proj.id}
+                          href={`/tasks/projects/${proj.id}`}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-all duration-150",
+                            isActive
+                              ? "bg-primary/10 text-primary font-semibold"
+                              : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                          )}
+                        >
+                          <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", dotColor)} />
+                          <span className="truncate flex-1">{proj.clientName} · {proj.name}</span>
+                          {proj.pendingCount > 0 && (
+                            <span className={cn(
+                              "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
+                              isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                            )}>
+                              {proj.pendingCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                    {hasMoreProjects && (
+                      <Link
+                        href="/tasks/projects"
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <FolderOpen className="h-3 w-3" />
+                        <span>Ver todos los proyectos</span>
+                      </Link>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </nav>
