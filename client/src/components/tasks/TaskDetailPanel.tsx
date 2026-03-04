@@ -156,12 +156,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     };
   }, [open, initialFocusTime]);
 
-  const { data: task, isLoading } = useQuery<Task>({
+  const { data: task, isLoading, refetch: refetchTask } = useQuery<Task>({
     queryKey: ["/api/tasks", taskId],
     queryFn: () => authFetch(`/api/tasks/${taskId}`).then(r => r.json()),
     enabled: !!taskId,
-    staleTime: Infinity,
-    refetchOnReconnect: false,
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
@@ -185,10 +183,10 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      refetchTask();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
     },
-    onError: (err: any) => {
+    onError: () => {
       toast({ variant: "destructive", title: "Error al guardar", description: "No se pudo guardar el cambio. Intenta de nuevo." });
     },
   });
@@ -196,18 +194,17 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const addSubtaskMutation = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      refetchTask();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
       setSubtaskTitle("");
       setShowAddSubtask(false);
-      onUpdate?.();
     },
   });
 
   const logTimeMutation = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/tasks/${taskId}/time`, "POST", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      refetchTask();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/hours-summary"] });
       setLogHours(""); setLogDesc(""); setShowTimeLog(false);
       toast({ title: "Horas registradas" });
@@ -216,7 +213,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
 
   const deleteTimeMutation = useMutation({
     mutationFn: (entryId: number) => apiRequest(`/api/tasks/${taskId}/time/${entryId}`, "DELETE"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }),
+    onSuccess: () => refetchTask(),
   });
 
   const deleteMutation = useMutation({
@@ -618,7 +615,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                             onClick={e => {
                               e.stopPropagation();
                               apiRequest(`/api/tasks/${sub.id}`, "PUT", { status: sub.status === "done" ? "todo" : "done" })
-                                .then(() => queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] }));
+                                .then(() => refetchTask());
                             }}
                           />
                           <span
