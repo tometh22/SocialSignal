@@ -173,6 +173,7 @@ export default function SidebarFixed() {
       items: [
         { href: "/tasks", title: "Inicio", icon: Home, description: "Resumen de tareas y proyectos", permission: 'projects' as AppSection },
         { href: "/tasks/my-tasks", title: "Mis Tareas", icon: CheckSquare, description: "Tus tareas asignadas", permission: 'projects' as AppSection },
+        { href: "/tasks/projects", title: "Proyectos", icon: FolderOpen, description: "Hub de proyectos y tableros", permission: 'projects' as AppSection },
         { href: "/tasks/team-calendar", title: "Calendario Equipo", icon: CalendarDays, description: "Vista de tareas del equipo", permission: 'projects' as AppSection },
         { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas consolidadas por persona y proyecto", permission: 'projects' as AppSection },
       ]
