@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check,
-  Filter, ArrowUpDown, Layers, MoreHorizontal, Pencil, Trash2, Search, X
+  MoreHorizontal, Pencil, Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
@@ -868,16 +868,15 @@ interface Props {
   view?: "list" | "board";
   clientName?: string | null;
   onQuickAddTrigger?: number;
+  filterText?: string;
 }
 
-export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0 }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "" }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [firstSectionAutoAdd, setFirstSectionAutoAdd] = useState(0);
-  const [filterText, setFilterText] = useState("");
-  const [showFilter, setShowFilter] = useState(false);
 
   useEffect(() => {
     if (onQuickAddTrigger > 0) {
@@ -964,39 +963,9 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
 
   return (
     <div>
-      {/* ── Filter bar (shared between views) ── */}
-      {showFilter && (
-        <div className="flex items-center gap-2 mb-3 px-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              autoFocus
-              value={filterText}
-              onChange={e => setFilterText(e.target.value)}
-              onKeyDown={e => { if (e.key === "Escape") { setFilterText(""); setShowFilter(false); } }}
-              placeholder="Buscar tarea..."
-              className="h-8 text-sm pl-8 pr-8"
-            />
-            {filterText && (
-              <button
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setFilterText("")}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          {filterText.trim() && (
-            <span className="text-xs text-muted-foreground">
-              {allTasks.length} resultado{allTasks.length !== 1 ? "s" : ""}
-            </span>
-          )}
-          <button
-            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-            onClick={() => { setFilterText(""); setShowFilter(false); }}
-          >
-            Cerrar
-          </button>
+      {filterText.trim() && (
+        <div className="mb-2 text-xs text-muted-foreground px-1">
+          {allTasks.length} resultado{allTasks.length !== 1 ? "s" : ""} para "{filterText}"
         </div>
       )}
 
@@ -1006,16 +975,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
           <div className="flex items-center gap-2 pb-3 mb-1">
             <span className="text-sm font-medium text-foreground">{totalTasks} tareas</span>
             <span className="text-xs text-muted-foreground">· {doneTasks} completadas</span>
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("h-7 text-xs gap-1", showFilter && "bg-accent")}
-              onClick={() => setShowFilter(v => !v)}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              {filterText ? <span className="text-primary font-medium">Filtro activo</span> : "Filtrar"}
-            </Button>
           </div>
           <div className="flex gap-3">
             {BOARD_COLUMNS.map(col => (
@@ -1039,21 +998,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       ) : (
         // ─── List view ────────────────────────────────────────────────
         <div>
-          <div className="flex items-center justify-end pb-2 mb-1 gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn("h-7 text-xs gap-1", showFilter && "bg-accent text-primary")}
-              onClick={() => setShowFilter(v => !v)}
-            >
-              <Filter className="h-3.5 w-3.5" />
-              {filterText ? "Filtro activo" : "Filtrar"}
-              {filterText && (
-                <span className="ml-1 bg-primary text-primary-foreground rounded-full text-[9px] px-1.5 py-0.5 font-bold leading-none">
-                  {allTasks.length}
-                </span>
-              )}
-            </Button>
+          <div className="flex items-center justify-end pb-2 mb-1">
             <Button size="sm" className="h-7 text-xs" onClick={() => setShowAddSection(true)}>
               <Plus className="h-3 w-3 mr-1" />Nueva sección
             </Button>

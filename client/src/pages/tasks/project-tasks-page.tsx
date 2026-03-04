@@ -10,7 +10,8 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -52,6 +53,8 @@ export default function ProjectTasksPage({ params }: Props) {
   const [addRole, setAddRole] = useState("member");
   const [view, setView] = useState<"list" | "board">("list");
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterText, setFilterText] = useState("");
 
   const { data: project, isLoading } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
@@ -255,34 +258,83 @@ export default function ProjectTasksPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Toolbar — only in list view */}
-        {view === "list" && (
-          <div className="flex items-center justify-between py-2 border-b border-border">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between py-2 border-b border-border gap-2">
+          {view === "list" ? (
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-sm text-primary border-primary/40 hover:bg-primary/5 font-medium gap-1.5"
+              className="h-8 text-sm text-primary border-primary/40 hover:bg-primary/5 font-medium gap-1.5 flex-shrink-0"
               onClick={() => setQuickAddTrigger(v => v + 1)}
             >
               <Plus className="h-4 w-4" />
               Agregar tarea
             </Button>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
-                <Filter className="h-3.5 w-3.5" />Filtrar
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
-                <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
-                <Layers className="h-3.5 w-3.5" />Agrupar
-              </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+          ) : (
+            <div />
+          )}
+
+          {/* Filter input — shown inline when active */}
+          {showFilter && (
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                autoFocus
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Escape") { setFilterText(""); setShowFilter(false); }
+                }}
+                placeholder="Buscar tarea..."
+                className="h-8 text-sm pl-8 pr-8"
+              />
+              {filterText && (
+                <button
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setFilterText("")}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
+          )}
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 text-xs gap-1.5 transition-colors",
+                showFilter
+                  ? "text-primary bg-primary/10 hover:bg-primary/15"
+                  : "text-muted-foreground"
+              )}
+              onClick={() => {
+                setShowFilter(v => !v);
+                if (showFilter) setFilterText("");
+              }}
+            >
+              <Filter className="h-3.5 w-3.5" />
+              {filterText ? (
+                <span className="font-semibold">
+                  Filtro activo
+                  <span className="ml-1 bg-primary text-primary-foreground rounded-full text-[9px] px-1.5 leading-none inline-block">
+                    {filterText}
+                  </span>
+                </span>
+              ) : "Filtrar"}
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
+              <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
+              <Layers className="h-3.5 w-3.5" />Agrupar
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
           </div>
-        )}
+        </div>
 
         {/* Task list / board */}
         <div className="pt-4">
@@ -292,6 +344,7 @@ export default function ProjectTasksPage({ params }: Props) {
             view={view}
             clientName={project.clientName}
             onQuickAddTrigger={quickAddTrigger}
+            filterText={filterText}
           />
         </div>
       </div>
