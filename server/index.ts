@@ -79,6 +79,19 @@ const port = Number(process.env.PORT || 5000);
       console.log(`🚀 Server running on port ${port}`);
     });
 
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`❌ Port ${port} is in use. Retrying in 3 seconds...`);
+        setTimeout(() => {
+          server.close();
+          server.listen(port, "0.0.0.0");
+        }, 3000);
+      } else {
+        console.error("❌ Server error:", err);
+        process.exit(1);
+      }
+    });
+
     // Setup Vite or static file serving based on environment
     // CRITICAL: This must be called AFTER API routes are registered
     if (isProduction) {
