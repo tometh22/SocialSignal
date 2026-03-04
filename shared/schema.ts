@@ -1308,6 +1308,24 @@ export const insertTaskProjectMemberSchema = createInsertSchema(taskProjectMembe
 export type TaskProjectMember = typeof taskProjectMembers.$inferSelect;
 export type InsertTaskProjectMember = z.infer<typeof insertTaskProjectMemberSchema>;
 
+// Standalone task projects (without an active_project base)
+export const taskOwnProjects = pgTable("task_own_projects", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  colorIndex: integer("color_index").notNull().default(0),
+  privacy: text("privacy").notNull().default("team"),
+  createdByPersonnelId: integer("created_by_personnel_id").references(() => personnel.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTaskOwnProjectSchema = createInsertSchema(taskOwnProjects).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type TaskOwnProject = typeof taskOwnProjects.$inferSelect;
+export type InsertTaskOwnProject = z.infer<typeof insertTaskOwnProjectSchema>;
+
 // ==================== RELACIONES ====================
 
 // Relaciones de clientes

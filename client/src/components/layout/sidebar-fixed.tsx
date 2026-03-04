@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePermissions, AppSection } from "@/hooks/use-permissions";
 import { Badge } from "@/components/ui/badge";
 import { authFetch } from "@/lib/queryClient";
+import NewProjectDialog from "@/components/tasks/NewProjectDialog";
 
 import {
   ChevronRight,
@@ -82,6 +83,7 @@ export default function SidebarFixed() {
   const [crmOverdue, setCrmOverdue] = useState(0);
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
 
   const fetchProjectCount = async () => {
     try {
@@ -392,17 +394,16 @@ export default function SidebarFixed() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Link href="/tasks/projects">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-4 w-4 p-0 hover:bg-accent text-muted-foreground hover:text-primary"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-accent text-muted-foreground hover:text-primary"
+                                onClick={() => setNewProjectOpen(true)}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="right">Ver todos los proyectos</TooltipContent>
+                            <TooltipContent side="right">Nuevo proyecto</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </div>
@@ -538,6 +539,8 @@ export default function SidebarFixed() {
           </div>
         </div>
       </div>
+
+      <NewProjectDialog open={newProjectOpen} onClose={() => setNewProjectOpen(false)} />
     </TooltipProvider>
   );
 }

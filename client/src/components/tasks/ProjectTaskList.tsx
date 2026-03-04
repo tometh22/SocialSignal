@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2
+  Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
@@ -78,6 +77,72 @@ function formatHours(hours: number) {
   const m = Math.round((hours - h) * 60);
   if (m === 0) return `${h}h`;
   return `${h}h ${m}min`;
+}
+
+function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center",
+        "transition-all duration-200 ease-in-out focus:outline-none",
+        "hover:scale-110 active:scale-95",
+        checked
+          ? "bg-green-500 border-green-500"
+          : "border-muted-foreground/40 hover:border-primary/60 hover:bg-primary/5",
+      )}
+    >
+      {checked && <Check className="h-2 w-2 text-white" strokeWidth={3} />}
+    </button>
+  );
+}
+
+function InlineDateButton({ date, taskId, onSet, overdue }: {
+  date?: string | null;
+  taskId: number;
+  onSet: (taskId: number, d: Date | undefined) => void;
+  overdue: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={e => { e.stopPropagation(); setOpen(true); }}
+          className={cn(
+            "flex items-center gap-1 text-xs rounded px-1 py-0.5 transition-all",
+            date
+              ? overdue
+                ? "text-red-500 font-medium hover:bg-red-50"
+                : "text-muted-foreground hover:bg-accent"
+              : "text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-primary"
+          )}
+        >
+          {date
+            ? format(new Date(date), "dd MMM", { locale: es })
+            : <CalendarIcon className="h-3 w-3" />
+          }
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0 shadow-lg" onClick={e => e.stopPropagation()}>
+        <Calendar
+          mode="single"
+          selected={date ? new Date(date) : undefined}
+          onSelect={d => { onSet(taskId, d); setOpen(false); }}
+          locale={es}
+          initialFocus
+        />
+        {date && (
+          <div className="p-2 border-t">
+            <Button variant="ghost" size="sm" className="w-full h-7 text-xs text-muted-foreground"
+              onClick={() => { onSet(taskId, undefined); setOpen(false); }}>
+              Quitar fecha
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 interface NewTaskRowProps {
@@ -182,13 +247,14 @@ interface TaskRowProps {
   allPersonnel: Personnel[];
   onOpen: (id: number, focusTime?: boolean) => void;
   onToggle: (task: Task) => void;
+  onDateSet: (taskId: number, d: Date | undefined) => void;
   isSubtask?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, isSubtask = false }: TaskRowProps) {
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
-  const overdue = isOverdue(task);
+  const overdue = !!isOverdue(task);
   const isDone = task.status === "done";
   const loggedH = task.loggedHours || 0;
 
@@ -196,7 +262,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: Ta
     <TooltipProvider>
       <div
         className={cn(
-          "flex items-center border-b border-border hover:bg-accent/30 transition-colors group cursor-pointer",
+          "flex items-center border-b border-border hover:bg-accent/30 transition-all duration-150 group cursor-pointer",
           isDone && "opacity-60",
           isSubtask && "bg-muted/10"
         )}
@@ -207,15 +273,18 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: Ta
           {isSubtask && <span className="text-muted-foreground/50 text-xs mr-1">↳</span>}
         </div>
 
-        {/* Checkbox */}
-        <div className="w-5 flex-shrink-0 flex items-center justify-center py-2.5" onClick={e => { e.stopPropagation(); onToggle(task); }}>
-          <Checkbox checked={isDone} className="h-3.5 w-3.5" />
+        {/* Circle Checkbox */}
+        <div className="w-5 flex-shrink-0 flex items-center justify-center py-2.5">
+          <CircleCheck
+            checked={isDone}
+            onClick={e => { e.stopPropagation(); onToggle(task); }}
+          />
         </div>
 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-2 flex items-center gap-1.5">
           <Flag className={cn("h-2.5 w-2.5 flex-shrink-0", PRIORITY_COLORS[task.priority] || "text-gray-300")} />
-          <span className={cn("text-sm truncate", isDone && "line-through text-muted-foreground")}>
+          <span className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}>
             {task.title}
           </span>
         </div>
@@ -259,15 +328,9 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: Ta
           )}
         </div>
 
-        {/* Fecha entrega */}
-        <div className="w-24 px-2 flex-shrink-0 text-xs">
-          {task.dueDate ? (
-            <span className={cn(overdue ? "text-red-500 font-medium" : "text-muted-foreground")}>
-              {format(new Date(task.dueDate), "dd MMM", { locale: es })}
-            </span>
-          ) : (
-            <span className="text-muted-foreground/30">—</span>
-          )}
+        {/* Fecha entrega — inline editable */}
+        <div className="w-24 px-1 flex-shrink-0 text-xs flex items-center">
+          <InlineDateButton date={task.dueDate} taskId={task.id} onSet={onDateSet} overdue={overdue} />
         </div>
 
         {/* Tiempo real */}
@@ -286,7 +349,9 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, isSubtask = false }: Ta
               )}
             </>
           ) : (
-            <span className="text-muted-foreground/30">—</span>
+            <span className="text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Clock className="h-3 w-3" />
+            </span>
           )}
           {/* Quick log hours button on hover */}
           <button
@@ -310,10 +375,11 @@ interface SectionBlockProps {
   projectMembers?: { personnelId: number; name: string; role: string }[];
   onOpenTask: (id: number, focusTime?: boolean) => void;
   onToggleTask: (task: Task) => void;
+  onDateSet: (taskId: number, d: Date | undefined) => void;
   onRefresh: () => void;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onRefresh }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onRefresh }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -373,6 +439,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                 allPersonnel={allPersonnel}
                 onOpen={onOpenTask}
                 onToggle={onToggleTask}
+                onDateSet={onDateSet}
               />
               {(subtaskMap[task.id] || []).map(sub => (
                 <TaskRow
@@ -381,6 +448,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                   allPersonnel={allPersonnel}
                   onOpen={onOpenTask}
                   onToggle={onToggleTask}
+                  onDateSet={onDateSet}
                   isSubtask
                 />
               ))}
@@ -546,6 +614,16 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     onSuccess: () => refetch(),
   });
 
+  const dateMutation = useMutation({
+    mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
+      apiRequest(`/api/tasks/${taskId}`, "PUT", { dueDate: date ? date.toISOString() : null }),
+    onSuccess: () => refetch(),
+  });
+
+  const handleDateSet = (taskId: number, d: Date | undefined) => {
+    dateMutation.mutate({ taskId, date: d });
+  };
+
   const createSectionTask = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
     onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionName(""); },
@@ -640,6 +718,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                   projectMembers={projectMembers}
                   onOpenTask={handleOpen}
                   onToggleTask={(task) => toggleMutation.mutate(task)}
+                  onDateSet={handleDateSet}
                   onRefresh={refetch}
                 />
               ))}

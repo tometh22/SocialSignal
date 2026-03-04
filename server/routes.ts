@@ -15775,7 +15775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== TASK PROJECT HUB ENDPOINTS ====================
 
-  // GET /api/tasks/projects — lista de proyectos con stats y miembros
+  // GET /api/tasks/projects — lista de proyectos con stats y miembros (active_projects + task_own_projects)
   app.get("/api/tasks/projects", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectsResult = await db.execute(sql`
@@ -15786,7 +15786,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ap.status,
           COUNT(DISTINCT t.id) as task_count,
           COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count,
-          MAX(t.updated_at) as last_activity
+          MAX(t.updated_at) as last_activity,
+          'active_project' as source
         FROM active_projects ap
         JOIN quotations q ON q.id = ap.quotation_id
         JOIN clients c ON c.id = ap.client_id
@@ -15794,6 +15795,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE ap.status = 'active'
         GROUP BY ap.id, q.project_name, c.name, ap.status
         ORDER BY c.name, q.project_name
+      `);
+
+      // Include own task projects (id offset by 1,000,000 to avoid collisions)
+      const ownProjectsResult = await db.execute(sql`
+        SELECT 
+          top.id,
+          top.name,
+          top.color_index,
+          top.privacy,
+          top.created_by_personnel_id,
+          COUNT(DISTINCT t.id) as task_count,
+          COUNT(DISTINCT CASE WHEN t.status NOT IN ('done', 'cancelled') THEN t.id END) as pending_count
+        FROM task_own_projects top
+        LEFT JOIN tasks t ON t.project_id = (top.id + 1000000)
+        GROUP BY top.id, top.name, top.color_index, top.privacy, top.created_by_personnel_id
+        ORDER BY top.created_at DESC
       `);
 
       const membersResult = await db.execute(sql`
@@ -15813,6 +15830,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      const PALETTE = ["blue", "purple", "green", "orange", "pink", "teal", "indigo", "rose"];
+
       const projects = (projectsResult.rows as any[]).map(p => ({
         id: p.id,
         name: p.name,
@@ -15822,12 +15841,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingCount: parseInt(p.pending_count) || 0,
         lastActivity: p.last_activity,
         members: membersByProject[p.id] || [],
+        source: 'active_project',
       }));
 
-      res.json(projects);
+      const ownProjects = (ownProjectsResult.rows as any[]).map(p => ({
+        id: p.id + 1000000,
+        name: p.name,
+        clientName: "—",
+        status: 'active',
+        taskCount: parseInt(p.task_count) || 0,
+        pendingCount: parseInt(p.pending_count) || 0,
+        members: membersByProject[p.id + 1000000] || [],
+        source: 'own',
+        colorIndex: p.color_index,
+      }));
+
+      res.json([...projects, ...ownProjects]);
     } catch (error) {
       console.error("Error en GET /api/tasks/projects:", error);
       res.status(500).json({ message: "Error al obtener proyectos" });
+    }
+  });
+
+  // POST /api/tasks/projects/create — crear nuevo proyecto de tareas
+  app.post("/api/tasks/projects/create", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { name, activeProjectId, colorIndex = 0, privacy = "team", personnelId } = req.body;
+
+      if (activeProjectId) {
+        // Join existing active project — add user as owner member
+        await db.execute(sql`
+          INSERT INTO task_project_members (project_id, personnel_id, role)
+          VALUES (${activeProjectId}, ${personnelId}, 'owner')
+          ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
+        `);
+        return res.json({ id: activeProjectId, type: 'active_project' });
+      }
+
+      // Create standalone task project
+      const result = await db.execute(sql`
+        INSERT INTO task_own_projects (name, color_index, privacy, created_by_personnel_id)
+        VALUES (${name}, ${colorIndex}, ${privacy}, ${personnelId || null})
+        RETURNING id
+      `);
+      const newId = (result.rows[0] as any).id;
+      res.json({ id: newId + 1000000, type: 'own' });
+    } catch (error) {
+      console.error("Error en POST /api/tasks/projects/create:", error);
+      res.status(500).json({ message: "Error al crear proyecto" });
     }
   });
 
