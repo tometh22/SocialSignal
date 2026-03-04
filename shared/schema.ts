@@ -1294,7 +1294,7 @@ export type InsertTaskTimeEntry = z.infer<typeof insertTaskTimeEntrySchema>;
 // Miembros asignados a proyectos dentro del módulo de tareas
 export const taskProjectMembers = pgTable("task_project_members", {
   id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: "cascade" }),
+  projectId: integer("project_id").notNull(),
   personnelId: integer("personnel_id").notNull().references(() => personnel.id, { onDelete: "cascade" }),
   role: text("role").notNull().default("member"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

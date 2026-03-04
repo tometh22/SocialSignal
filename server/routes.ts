@@ -15922,7 +15922,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         RETURNING id
       `);
       const newId = (result.rows[0] as any).id;
-      res.json({ id: newId + 1000000, type: 'own' });
+      const offsetId = newId + 1000000;
+
+      // Auto-add creator as owner member
+      if (personnelId) {
+        await db.execute(sql`
+          INSERT INTO task_project_members (project_id, personnel_id, role)
+          VALUES (${offsetId}, ${personnelId}, 'owner')
+          ON CONFLICT (project_id, personnel_id) DO UPDATE SET role = 'owner'
+        `);
+      }
+
+      res.json({ id: offsetId, type: 'own' });
     } catch (error) {
       console.error("Error en POST /api/tasks/projects/create:", error);
       res.status(500).json({ message: "Error al crear proyecto" });

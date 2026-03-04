@@ -165,7 +165,7 @@ export default function SidebarFixed() {
     {
       title: "Gestión Operacional",
       items: [
-        { href: "/active-projects", title: "Proyectos Activos", icon: Briefcase, badge: projectCount.toString(), description: "Proyectos en curso", permission: 'projects' as AppSection }
+        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos de clientes", permission: 'projects' as AppSection }
       ]
     },
     {

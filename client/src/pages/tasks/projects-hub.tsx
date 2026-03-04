@@ -5,7 +5,7 @@ import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Plus, Check, Users, LayoutGrid, List } from "lucide-react";
+import { Loader2, Search, Plus, Check, Users, LayoutGrid, List, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
@@ -15,12 +15,13 @@ type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
   id: number;
   name: string;
-  clientName: string;
+  clientName: string | null;
   status: string;
   taskCount: number;
   pendingCount: number;
   lastActivity?: string;
   members: ProjectMember[];
+  source?: string;
 };
 type Personnel = { id: number; name: string; email?: string | null };
 
@@ -36,15 +37,24 @@ const PALETTE_LIGHT = [
 ];
 
 function getPaletteBg(id: number) { return PALETTE_BG[id % PALETTE_BG.length]; }
-function getPaletteLight(id: number) { return PALETTE_LIGHT[id % PALETTE_LIGHT.length]; }
 
 function getInitials(name: string) {
   return name.split(" ").map(p => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function getProjectInitial(project: TaskProject) {
+  const displayName = project.clientName && project.clientName !== "—"
+    ? project.clientName
+    : project.name;
+  return displayName.charAt(0).toUpperCase() || "P";
+}
+
+function getProjectLabel(project: TaskProject) {
+  if (project.clientName && project.clientName !== "—") return project.clientName;
+  return null;
+}
+
 function ProgressBar({ done, total }: { done: number; total: number }) {
-  const pct = total === 0 ? 0 : Math.round(((total - done) / total) * 100);
-  // "done" here means pendingCount, so completed = total - pending
   const completedPct = total === 0 ? 0 : Math.round(((total - done) / total) * 100);
   return (
     <div className="space-y-1">
@@ -73,34 +83,33 @@ interface ProjectCardProps {
 
 function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving }: ProjectCardProps) {
   const bg = getPaletteBg(project.id);
-  const light = getPaletteLight(project.id);
   const isMember = myPersonnelId ? project.members.some(m => m.personnelId === myPersonnelId) : false;
   const visibleMembers = project.members.slice(0, 4);
   const overflow = project.members.length - 4;
   const doneCount = project.taskCount - project.pendingCount;
+  const clientLabel = getProjectLabel(project);
 
   return (
     <div className="bg-card rounded-xl border border-border hover:border-border/80 hover:shadow-md transition-all duration-200 group flex flex-col overflow-hidden">
-      {/* Card header with color accent */}
       <div className="p-4 flex-1 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
-          {/* Project icon + name */}
           <Link href={`/tasks/projects/${project.id}`} className="flex items-center gap-3 min-w-0 flex-1">
             <span className={cn(
-              "inline-flex w-9 h-9 rounded-xl flex-shrink-0 items-center justify-center text-white font-bold text-sm shadow-sm flex-shrink-0",
+              "inline-flex w-9 h-9 rounded-xl flex-shrink-0 items-center justify-center text-white font-bold text-sm shadow-sm",
               bg
             )}>
-              {project.clientName.charAt(0).toUpperCase()}
+              {getProjectInitial(project)}
             </span>
             <div className="min-w-0">
               <h3 className="font-semibold text-sm text-foreground truncate group-hover:text-primary transition-colors leading-tight">
-                {project.name}
+                {project.name || "(Sin nombre)"}
               </h3>
-              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{project.clientName}</p>
+              {clientLabel && (
+                <p className="text-[11px] text-muted-foreground truncate mt-0.5">{clientLabel}</p>
+              )}
             </div>
           </Link>
 
-          {/* Member/join button */}
           {myPersonnelId && (
             <button
               onClick={e => { e.preventDefault(); isMember ? onLeave() : onJoin(); }}
@@ -119,12 +128,10 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
           )}
         </div>
 
-        {/* Progress bar */}
         {project.taskCount > 0 && (
           <ProgressBar done={project.pendingCount} total={project.taskCount} />
         )}
 
-        {/* Stats row */}
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
           <span>
             <strong className="text-foreground font-semibold">{project.pendingCount}</strong> pendientes
@@ -142,7 +149,6 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
         </div>
       </div>
 
-      {/* Footer: members + link */}
       <Link href={`/tasks/projects/${project.id}`}>
         <div className="px-4 py-2.5 border-t border-border/50 flex items-center justify-between hover:bg-accent/20 transition-colors cursor-pointer">
           {project.members.length > 0 ? (
@@ -166,7 +172,9 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
               </span>
             </div>
           ) : (
-            <span className="text-[11px] text-muted-foreground/50 italic">Sin miembros</span>
+            <span className="text-[11px] text-muted-foreground/50 italic flex items-center gap-1">
+              <Users className="h-2.5 w-2.5" />Sin miembros — clic para agregar
+            </span>
           )}
           <span className="text-[11px] text-primary font-medium">Ver tareas →</span>
         </div>
@@ -175,21 +183,38 @@ function ProjectCard({ project, myPersonnelId, onJoin, onLeave, joining, leaving
   );
 }
 
+async function fetchProjects(): Promise<TaskProject[]> {
+  const res = await authFetch("/api/tasks/projects");
+  if (!res.ok) {
+    throw new Error(`Error ${res.status} al obtener proyectos`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) {
+    throw new Error("Respuesta inesperada del servidor");
+  }
+  return data;
+}
+
 export default function ProjectsHubPage() {
   const [search, setSearch] = useState("");
   const [gridMode, setGridMode] = useState<"grid" | "list">("grid");
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const { user } = useAuth();
 
-  const { data: rawProjects, isLoading } = useQuery({
+  const { data: projects = [], isLoading, isError, refetch } = useQuery<TaskProject[], Error, TaskProject[]>({
     queryKey: ["/api/tasks/projects"],
-    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
+    queryFn: fetchProjects,
+    retry: 2,
+    staleTime: 0,
+    select: (data) => Array.isArray(data) ? data : [],
   });
-  const projects: TaskProject[] = Array.isArray(rawProjects) ? rawProjects : [];
 
   const { data: personnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
-    queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
+    queryFn: () => authFetch("/api/tasks-personnel").then(r => {
+      if (!r.ok) throw new Error("Error al obtener personal");
+      return r.json();
+    }),
   });
 
   const joinMutation = useMutation({
@@ -215,8 +240,8 @@ export default function ProjectsHubPage() {
 
   const filtered = projects.filter(p =>
     !search ||
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.clientName.toLowerCase().includes(search.toLowerCase())
+    (p.name || "").toLowerCase().includes(search.toLowerCase()) ||
+    (p.clientName || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const myProjects = filtered.filter(p => myPersonnelId && p.members.some(m => m.personnelId === myPersonnelId));
@@ -226,6 +251,16 @@ export default function ProjectsHubPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <AlertCircle className="h-8 w-8 text-destructive/60" />
+        <p className="text-sm text-muted-foreground">No se pudieron cargar los proyectos.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Reintentar</Button>
       </div>
     );
   }
