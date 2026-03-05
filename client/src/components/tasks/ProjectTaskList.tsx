@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check,
-  MoreHorizontal, Pencil, Trash2, GripVertical
+  MoreHorizontal, Pencil, Trash2, GripVertical, CheckCircle2, ListTodo
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
@@ -59,6 +59,13 @@ const PRIORITY_COLORS: Record<string, string> = {
   medium: "text-yellow-500",
   high: "text-orange-500",
   urgent: "text-red-500",
+};
+
+const PRIORITY_DOT: Record<string, string> = {
+  low: "bg-gray-300",
+  medium: "bg-yellow-400",
+  high: "bg-orange-500",
+  urgent: "bg-red-500",
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -112,6 +119,18 @@ function getAvatarColor(id: number) {
 
 function isOverdue(task: Task) {
   return task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+}
+
+function isDueSoon(task: Task) {
+  if (!task.dueDate || task.status === "done" || isOverdue(task)) return false;
+  const diff = new Date(task.dueDate).getTime() - new Date().getTime();
+  return diff >= 0 && diff < 2 * 24 * 60 * 60 * 1000;
+}
+
+function isDueThisWeek(task: Task) {
+  if (!task.dueDate || task.status === "done" || isOverdue(task) || isDueSoon(task)) return false;
+  const diff = new Date(task.dueDate).getTime() - new Date().getTime();
+  return diff >= 0 && diff < 7 * 24 * 60 * 60 * 1000;
 }
 
 function formatHours(hours: number) {
@@ -177,29 +196,36 @@ function CircleCheck({ checked, onClick }: { checked: boolean; onClick: (e: Reac
   );
 }
 
-function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue }: {
+function InlineDateButton({ startDate, dueDate, taskId, onSet, overdue, dueSoon, dueThisWeek }: {
   startDate?: string | null;
   dueDate?: string | null;
   taskId: number;
   onSet: (taskId: number, d: Date | undefined) => void;
   overdue: boolean;
+  dueSoon?: boolean;
+  dueThisWeek?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const label = formatDateRange(startDate, dueDate);
+  const dateColorClass = label
+    ? overdue
+      ? "text-red-500 font-medium hover:bg-red-50"
+      : dueSoon
+        ? "text-amber-500 font-medium hover:bg-amber-50"
+        : dueThisWeek
+          ? "text-blue-500 hover:bg-blue-50"
+          : "text-muted-foreground hover:bg-accent"
+    : "text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-primary";
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           onClick={e => { e.stopPropagation(); setOpen(true); }}
-          className={cn(
-            "flex items-center gap-1 text-xs rounded px-1 py-0.5 transition-all whitespace-nowrap",
-            label
-              ? overdue
-                ? "text-red-500 font-medium hover:bg-red-50"
-                : "text-muted-foreground hover:bg-accent"
-              : "text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-primary"
-          )}
+          className={cn("flex items-center gap-1 text-xs rounded px-1 py-0.5 transition-all whitespace-nowrap", dateColorClass)}
         >
+          {(overdue || dueSoon) && label && (
+            <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", overdue ? "bg-red-500" : "bg-amber-500")} />
+          )}
           {label || <CalendarIcon className="h-3 w-3" />}
         </button>
       </PopoverTrigger>
@@ -343,6 +369,8 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
   const overdue = !!isOverdue(task);
+  const dueSoon = isDueSoon(task);
+  const dueThisWeek = isDueThisWeek(task);
   const isDone = task.status === "done";
   const loggedH = task.loggedHours || 0;
   const subtaskCount = task.subtaskCount || 0;
@@ -385,7 +413,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
 
         {/* Title */}
         <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
-          <Flag className={cn("h-2.5 w-2.5 flex-shrink-0", PRIORITY_COLORS[task.priority] || "text-gray-300")} />
+          <div className={cn("w-2 h-2 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority] || "bg-gray-200")} />
           <span className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}>
             {task.title}
           </span>
@@ -490,6 +518,8 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
             taskId={task.id}
             onSet={onDateSet}
             overdue={overdue}
+            dueSoon={dueSoon}
+            dueThisWeek={dueThisWeek}
           />
         </div>
 
@@ -564,6 +594,7 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [renamingSection, setRenamingSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState(sectionName);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -620,6 +651,8 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
       ]
     : rawRootTasks;
   const sortedRootTasks = sortTaskList(orderedRootTasks, sortBy, allPersonnelForSort);
+  const pendingTasks = sortedRootTasks.filter(t => t.status !== "done");
+  const completedTasks = sortedRootTasks.filter(t => t.status === "done");
 
   return (
     <div className={cn(isDragging && "opacity-50 bg-accent/10")}>
@@ -663,7 +696,17 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
           ) : (
             <span className="font-bold text-sm text-foreground tracking-tight">{sectionName}</span>
           )}
-          <span className="text-xs text-muted-foreground font-medium">{done}/{rootTasks.length}</span>
+          {rootTasks.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground font-medium">{done}/{rootTasks.length}</span>
+              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary/50 transition-all duration-500"
+                  style={{ width: `${Math.round((done / rootTasks.length) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
           {!effectiveCollapsed && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
               <Button
@@ -714,8 +757,8 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
       {!effectiveCollapsed && (
         <>
-          <SortableContext items={sortedRootTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
-          {sortedRootTasks.map(task => (
+          <SortableContext items={pendingTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
+          {pendingTasks.map(task => (
             <SortableTaskRow
               key={task.id}
               taskId={task.id}
@@ -732,6 +775,34 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
             />
           ))}
           </SortableContext>
+
+          {completedTasks.length > 0 && (
+            <>
+              <div
+                className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground border-b border-border cursor-pointer hover:bg-accent/20 transition-colors select-none"
+                onClick={() => setShowCompleted(v => !v)}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500/70" />
+                <span>{completedTasks.length} completada{completedTasks.length !== 1 ? "s" : ""}</span>
+                <ChevronDown className={cn("h-3 w-3 ml-auto transition-transform", showCompleted && "rotate-180")} />
+              </div>
+              {showCompleted && completedTasks.map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  allPersonnel={allPersonnel}
+                  onOpen={onOpenTask}
+                  onToggle={onToggleTask}
+                  onDateSet={onDateSet}
+                  onAssignee={onAssignee}
+                  clientName={clientName}
+                  subtaskMap={subtaskMap}
+                  expandedSubtasks={expandedSubtasks}
+                  onToggleSubtasks={toggleSubtasks}
+                />
+              ))}
+            </>
+          )}
 
           {showAdd ? (
             <NewTaskRow
@@ -1301,12 +1372,18 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
           </div>
 
           {orderedSectionNames.length === 0 ? (
-            <div className="text-center py-12 rounded-xl border border-dashed border-border">
-              <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-3">
-                <Plus className="h-6 w-6 text-muted-foreground" />
+            <div className="text-center py-16 rounded-xl border border-dashed border-border/60 bg-muted/20">
+              <ListTodo className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-base font-medium text-foreground mb-1">Este proyecto no tiene tareas aún</p>
+              <p className="text-sm text-muted-foreground mb-5">Creá una sección para empezar a organizar el trabajo</p>
+              <div className="flex items-center justify-center gap-2">
+                <Button size="sm" onClick={() => setShowAddSection(true)}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />Nueva sección
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setFirstSectionAutoAdd(v => v + 1)}>
+                  Agregar tarea directamente
+                </Button>
               </div>
-              <p className="text-sm text-muted-foreground mb-3">Todavía no hay secciones ni tareas en este proyecto</p>
-              <Button size="sm" onClick={() => setShowAddSection(true)}>Crear primera sección</Button>
             </div>
           ) : (
             <DndContext
