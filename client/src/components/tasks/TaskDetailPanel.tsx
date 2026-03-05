@@ -188,13 +188,15 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
       return { previous };
     },
     onSuccess: (updated: any) => {
+      // Confirm cache with server response — do NOT invalidate individual task
+      // (invalidate would trigger a refetch that can race and revert the update)
       queryClient.setQueryData(["/api/tasks", taskId], (old: any) => ({
         ...(old ?? {}),
         ...updated,
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
+      // Update the project list in background (doesn't affect this panel's query)
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
     },
     onError: (_err, _updates, context: any) => {

@@ -1151,6 +1151,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     const { active, over } = event;
     setActiveId(null);
     setActiveDragData(null);
+    console.log('[DnD] end — active:', active.id, 'over:', over?.id ?? 'null');
     if (!over || active.id === over.id) return;
 
     const activeData = active.data.current;
@@ -1213,7 +1214,9 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         });
 
         // Persist to server
-        apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds });
+        console.log('[DnD] Calling reorder with taskIds:', newIds);
+        apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds })
+          .catch((e: any) => console.error('[DnD] reorder failed:', e?.message));
       } else {
         // Cross-section move
         const newFromIds = fromIds.filter(id => id !== taskId);
