@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useEffect } from 'react';
+import { getAuthHeader } from '@/lib/queryClient';
 
 interface CompleteProjectData {
   // Root level properties (for direct access)
@@ -296,7 +297,8 @@ export const useCompleteProjectData = (
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
-            'Expires': '0'
+            'Expires': '0',
+            ...getAuthHeader(),
           }
         });
         
@@ -358,15 +360,15 @@ export const useCompleteProjectData = (
     },
     enabled: Number.isFinite(projectId) && projectId > 0,
     retry: (failureCount, error: any) => {
-      // No retry for client errors (4xx) or if already tried 2 times
       if (failureCount >= 2) return false;
       if (error?.message?.includes('no encontrado')) return false;
       if (error?.message?.includes('404')) return false;
+      if (error?.message?.includes('401')) return false;
+      if (error?.message?.includes('autenticad')) return false;
       return true;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     gcTime: 5 * 60 * 1000, // 5 minute cache - better performance
-    refetchOnWindowFocus: false, // Disable refetch on window focus
     refetchInterval: false, // Disable automatic polling
     placeholderData: undefined, // No usar datos previos al cambiar período (evita mezclar shapes)
   });
