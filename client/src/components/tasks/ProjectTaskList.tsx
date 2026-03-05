@@ -956,7 +956,12 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
       apiRequest(`/api/tasks/${task.id}`, "PUT", {
         status: task.status === "done" ? "todo" : "done",
       }),
-    onSuccess: () => onRefresh(),
+    onSuccess: () => {
+      onRefresh();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+    },
   });
 
   return (
@@ -1147,17 +1152,23 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
   });
 
+  const invalidateRelated = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+  };
+
   const toggleMutation = useMutation({
     mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
       status: task.status === "done" ? "todo" : "done",
     }),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); invalidateRelated(); },
   });
 
   const dateMutation = useMutation({
     mutationFn: ({ taskId, date }: { taskId: number; date: Date | undefined }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", { dueDate: date ? date.toISOString() : null }),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); invalidateRelated(); },
   });
 
   const handleDateSet = (taskId: number, d: Date | undefined) => {
@@ -1167,7 +1178,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const inlineUpdateMutation = useMutation({
     mutationFn: ({ taskId, updates }: { taskId: number; updates: any }) =>
       apiRequest(`/api/tasks/${taskId}`, "PUT", updates),
-    onSuccess: () => refetch(),
+    onSuccess: () => { refetch(); invalidateRelated(); },
   });
 
   const handleAssignee = (taskId: number, assigneeId: number | null) => {
@@ -1176,7 +1187,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
 
   const createSectionTask = useMutation({
     mutationFn: (data: any) => apiRequest("/api/tasks", "POST", data),
-    onSuccess: () => { refetch(); setShowAddSection(false); setNewSectionName(""); },
+    onSuccess: () => { refetch(); invalidateRelated(); setShowAddSection(false); setNewSectionName(""); },
   });
 
   const allTasksRaw = data?.tasks || [];

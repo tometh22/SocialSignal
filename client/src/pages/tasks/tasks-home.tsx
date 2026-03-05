@@ -299,6 +299,11 @@ export default function TasksHomePage() {
     queryFn: () => authFetch("/api/tasks-personnel").then(r => r.json()),
   });
 
+  const invalidateRelated = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
+  };
+
   const toggleMutation = useMutation({
     mutationFn: (task: Task) => apiRequest(`/api/tasks/${task.id}`, "PUT", {
       status: task.status === "done" ? "todo" : "done",
@@ -307,6 +312,7 @@ export default function TasksHomePage() {
       setTimeout(() => {
         setHidingTaskId(null);
         refetchMyTasks();
+        invalidateRelated();
       }, 300);
     },
   });
@@ -316,7 +322,7 @@ export default function TasksHomePage() {
       apiRequest(`/api/tasks/${taskId}`, "PUT", {
         dueDate: date ? date.toISOString() : null,
       }),
-    onSuccess: () => refetchMyTasks(),
+    onSuccess: () => { refetchMyTasks(); invalidateRelated(); },
   });
 
   const quickCreateMutation = useMutation({
@@ -334,6 +340,7 @@ export default function TasksHomePage() {
       setQuickDueDate(undefined);
       refetchMyTasks();
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/my-tasks"] });
+      invalidateRelated();
     },
   });
 
