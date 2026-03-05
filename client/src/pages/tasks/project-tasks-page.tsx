@@ -11,7 +11,11 @@ import {
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuLabel
+} from "@/components/ui/dropdown-menu";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -56,6 +60,8 @@ export default function ProjectTasksPage({ params }: Props) {
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [localMembers, setLocalMembers] = useState<ProjectMember[] | null>(null);
+  const [sortBy, setSortBy] = useState("default");
+  const [groupBy, setGroupBy] = useState("section");
 
   const { data: project, isLoading } = useQuery<TaskProject>({
     queryKey: ["/api/tasks/projects", projectId],
@@ -361,12 +367,62 @@ export default function ProjectTasksPage({ params }: Props) {
                 </span>
               ) : "Filtrar"}
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
-              <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
-            </Button>
-            <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground gap-1.5">
-              <Layers className="h-3.5 w-3.5" />Agrupar
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={sortBy !== "default" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />Ordenar
+                  {sortBy !== "default" && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-0.5" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs">Ordenar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {[
+                  { value: "default", label: "Predeterminado" },
+                  { value: "dueDate_asc", label: "Fecha límite ↑" },
+                  { value: "dueDate_desc", label: "Fecha límite ↓" },
+                  { value: "priority", label: "Prioridad" },
+                  { value: "title", label: "Nombre A→Z" },
+                  { value: "assignee", label: "Responsable" },
+                ].map(opt => (
+                  <DropdownMenuItem key={opt.value} onClick={() => setSortBy(opt.value)} className="flex items-center justify-between">
+                    {opt.label}
+                    {sortBy === opt.value && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant={groupBy !== "section" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Layers className="h-3.5 w-3.5" />Agrupar
+                  {groupBy !== "section" && <span className="w-1.5 h-1.5 rounded-full bg-primary ml-0.5" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel className="text-xs">Agrupar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {[
+                  { value: "section", label: "Sección" },
+                  { value: "assignee", label: "Responsable" },
+                  { value: "priority", label: "Prioridad" },
+                ].map(opt => (
+                  <DropdownMenuItem key={opt.value} onClick={() => setGroupBy(opt.value)} className="flex items-center justify-between">
+                    {opt.label}
+                    {groupBy === opt.value && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
@@ -382,6 +438,8 @@ export default function ProjectTasksPage({ params }: Props) {
             clientName={project.clientName}
             onQuickAddTrigger={quickAddTrigger}
             filterText={filterText}
+            sortBy={sortBy}
+            groupBy={groupBy}
           />
         </div>
       </div>
