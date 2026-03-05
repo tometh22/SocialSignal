@@ -557,9 +557,10 @@ interface SectionBlockProps {
   sortBy?: string;
   allPersonnelForSort?: Personnel[];
   isFirst?: boolean;
+  taskOrderOverride?: number[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false, taskOrderOverride }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -611,7 +612,11 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
     });
   };
 
-  const sortedRootTasks = sortTaskList(tasks.filter(t => !t.parentTaskId), sortBy, allPersonnelForSort);
+  const rawRootTasks = tasks.filter(t => !t.parentTaskId);
+  const orderedRootTasks = taskOrderOverride
+    ? taskOrderOverride.map(id => rawRootTasks.find(t => t.id === id)).filter(Boolean) as Task[]
+    : rawRootTasks;
+  const sortedRootTasks = sortTaskList(orderedRootTasks, sortBy, allPersonnelForSort);
 
   return (
     <div className={cn(isDragging && "opacity-50 bg-accent/10")}>
@@ -823,7 +828,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   );
 }
 
-function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[]; isFirst?: boolean }) {
+function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[]; isFirst?: boolean; taskOrderOverride?: number[] }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `section:${props.sectionName}`,
     data: { type: 'section', sectionName: props.sectionName },
@@ -1011,11 +1016,12 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(`sectionOrder:${projectId}`) || '[]'); } catch { return []; }
   });
+  const [taskOrderMap, setTaskOrderMap] = useState<Record<string, number[]>>({});
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
   useEffect(() => {
@@ -1027,7 +1033,13 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const { data, isLoading, refetch } = useQuery<{ tasks: Task[]; sections: Record<string, Task[]> }>({
     queryKey: ["/api/tasks/project", projectId],
     queryFn: () => authFetch(`/api/tasks/project/${projectId}`).then(r => r.json()),
+    staleTime: 30 * 1000,
   });
+
+  // Reset task order overrides when server data refreshes
+  useEffect(() => {
+    if (data?.sections) setTaskOrderMap({});
+  }, [data]);
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
@@ -1150,47 +1162,46 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       const activeTask = activeData.task as Task;
       const fromSection = activeTask.sectionName || 'General';
       let targetSection: string;
-      let targetRootTasks: Task[];
 
       if (overData?.type === 'task') {
-        const overTask = overData.task as Task;
-        targetSection = overTask.sectionName || 'General';
-        targetRootTasks = (sections[targetSection] || []).filter(t => !t.parentTaskId);
+        targetSection = (overData.task as Task).sectionName || 'General';
       } else if (overData?.type === 'section') {
         targetSection = overData.sectionName;
-        targetRootTasks = (sections[targetSection] || []).filter(t => !t.parentTaskId);
       } else {
         return;
       }
 
-      const overIndex = overData?.type === 'task'
-        ? targetRootTasks.findIndex(t => t.id === overData.taskId)
-        : targetRootTasks.length;
+      // Get current ordered IDs for each section (from override or from sections data)
+      const getOrderedIds = (sec: string) =>
+        taskOrderMap[sec] ?? (sections[sec] || []).filter(t => !t.parentTaskId).map(t => t.id);
 
-      // Optimistic cache update — no refetch needed
-      queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
-        if (!old) return old;
-        const updatedTask = { ...activeTask, sectionName: targetSection };
+      const fromIds = getOrderedIds(fromSection);
+      const toIds = fromSection === targetSection ? fromIds : getOrderedIds(targetSection);
 
-        // Rebuild sections
-        const newSections: Record<string, Task[]> = {};
-        for (const [sec, tasks] of Object.entries(old.sections as Record<string, Task[]>)) {
-          newSections[sec] = tasks.filter(t => t.id !== taskId);
-        }
-        if (!newSections[targetSection]) newSections[targetSection] = [];
-        const insertAt = overIndex >= 0 ? overIndex : newSections[targetSection].filter(t => !t.parentTaskId).length;
-        const targetRootCount = newSections[targetSection].filter(t => !t.parentTaskId).length;
-        const clampedIndex = Math.min(insertAt, targetRootCount);
-        newSections[targetSection].splice(clampedIndex, 0, updatedTask);
-
-        const newTasks = old.tasks.map((t: Task) => t.id === taskId ? updatedTask : t);
-        return { ...old, tasks: newTasks, sections: newSections };
-      });
-
-      // Persist to server silently
-      const updates: any = { position: overIndex };
-      if (targetSection !== fromSection) updates.sectionName = targetSection;
-      apiRequest(`/api/tasks/${taskId}`, "PUT", updates);
+      if (fromSection === targetSection) {
+        // Same-section reorder — use arrayMove for correct index handling
+        const fromIdx = fromIds.indexOf(taskId);
+        const toTask = overData?.type === 'task' ? (overData.task as Task) : null;
+        const toIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length - 1;
+        if (fromIdx === -1) return;
+        const newIds = arrayMove(fromIds, fromIdx, toIdx >= 0 ? toIdx : toIds.length - 1);
+        setTaskOrderMap(prev => ({ ...prev, [fromSection]: newIds }));
+        apiRequest(`/api/tasks/${taskId}`, "PUT", { position: toIdx });
+      } else {
+        // Cross-section move
+        const newFromIds = fromIds.filter(id => id !== taskId);
+        const toTask = overData?.type === 'task' ? (overData.task as Task) : null;
+        const insertIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length;
+        const newToIds = [...toIds];
+        newToIds.splice(insertIdx >= 0 ? insertIdx : newToIds.length, 0, taskId);
+        setTaskOrderMap(prev => ({ ...prev, [fromSection]: newFromIds, [targetSection]: newToIds }));
+        // Also update sectionName in the query cache so the task appears in the right section
+        queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
+          if (!old) return old;
+          return { ...old, tasks: old.tasks.map((t: Task) => t.id === taskId ? { ...t, sectionName: targetSection } : t) };
+        });
+        apiRequest(`/api/tasks/${taskId}`, "PUT", { sectionName: targetSection, position: insertIdx });
+      }
     }
   };
 
@@ -1296,6 +1307,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       sortBy={sortBy}
                       allPersonnelForSort={allPersonnel}
                       isFirst={idx === 0}
+                      taskOrderOverride={taskOrderMap[section]}
                     />
                   ))}
                 </SortableContext>
