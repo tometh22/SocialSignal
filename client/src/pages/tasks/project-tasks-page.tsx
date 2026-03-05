@@ -70,21 +70,60 @@ export default function ProjectTasksPage({ params }: Props) {
   const addMemberMutation = useMutation({
     mutationFn: ({ personnelId, role }: { personnelId: number; role: string }) =>
       apiRequest(`/api/tasks/projects/${projectId}/members`, "POST", { personnelId, role }),
+    onMutate: async ({ personnelId, role }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks/projects", projectId] });
+      const previous = queryClient.getQueryData<TaskProject>(["/api/tasks/projects", projectId]);
+      const person = allPersonnel.find(p => p.id === personnelId);
+      if (previous && person) {
+        queryClient.setQueryData<TaskProject>(["/api/tasks/projects", projectId], {
+          ...previous,
+          members: [...(previous.members || []), { personnelId, name: person.name, role }],
+        });
+      }
+      setAddPersonnelId("none");
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/tasks/projects", projectId], context.previous);
+      }
+      toast({ title: "Error al agregar miembro", variant: "destructive" });
+    },
     onSuccess: () => {
+      toast({ title: "Miembro agregado" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
-      setAddPersonnelId("none");
-      toast({ title: "Miembro agregado" });
     },
   });
 
   const removeMemberMutation = useMutation({
     mutationFn: (personnelId: number) =>
       apiRequest(`/api/tasks/projects/${projectId}/members/${personnelId}`, "DELETE"),
+    onMutate: async (personnelId) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tasks/projects", projectId] });
+      const previous = queryClient.getQueryData<TaskProject>(["/api/tasks/projects", projectId]);
+      if (previous) {
+        queryClient.setQueryData<TaskProject>(["/api/tasks/projects", projectId], {
+          ...previous,
+          members: (previous.members || []).filter(m => m.personnelId !== personnelId),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/tasks/projects", projectId], context.previous);
+      }
+      toast({ title: "Error al quitar miembro", variant: "destructive" });
+    },
     onSuccess: () => {
+      toast({ title: "Miembro quitado" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects", projectId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/projects"] });
-      toast({ title: "Miembro quitado" });
     },
   });
 
@@ -415,7 +454,7 @@ export default function ProjectTasksPage({ params }: Props) {
                 <p className="text-sm text-muted-foreground italic py-2">Sin miembros todavía</p>
               )}
               {(project.members || []).map(m => (
-                <div key={m.personnelId} className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-accent/40 hover:bg-accent/60 transition-colors group">
+                <div key={m.personnelId} className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-accent/40 hover:bg-accent/60 transition-all duration-200 group animate-in fade-in slide-in-from-top-1">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className={cn("text-xs font-semibold text-white", dotColor)}>
                       {getInitials(m.name)}
