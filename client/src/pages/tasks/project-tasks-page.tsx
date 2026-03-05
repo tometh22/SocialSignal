@@ -423,9 +423,32 @@ export default function ProjectTasksPage({ params }: Props) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  onClick={() => { setSortBy("default"); setGroupBy("section"); }}
+                  disabled={sortBy === "default" && groupBy === "section"}
+                >
+                  Restablecer vista
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleShare}>
+                  Copiar enlace del proyecto
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-muted-foreground"
+                  onClick={() => toast({ title: "Próximamente", description: "La función de archivar proyectos estará disponible pronto." })}
+                >
+                  Archivar proyecto
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
