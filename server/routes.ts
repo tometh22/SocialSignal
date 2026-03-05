@@ -15703,6 +15703,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = (req as any).user;
       const data = insertTaskSchema.parse({ ...req.body, createdBy: user.id });
+      if (!req.body.parentTaskId && data.projectId) {
+        const sectionFilter = data.sectionName
+          ? eq(tasks.sectionName, data.sectionName)
+          : isNull(tasks.sectionName);
+        const [maxRow] = await db
+          .select({ maxPos: sql<number>`COALESCE(MAX(${tasks.position}), -1)` })
+          .from(tasks)
+          .where(and(eq(tasks.projectId, data.projectId), sectionFilter));
+        data.position = (maxRow?.maxPos ?? -1) + 1;
+      }
       const [created] = await db.insert(tasks).values(data).returning();
       res.json(created);
     } catch (error: any) {
