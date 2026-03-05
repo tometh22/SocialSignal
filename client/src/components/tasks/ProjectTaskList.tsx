@@ -1221,7 +1221,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
             </Button>
           </div>
 
-          {sectionNames.length === 0 ? (
+          {orderedSectionNames.length === 0 ? (
             <div className="text-center py-12 rounded-xl border border-dashed border-border">
               <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-3">
                 <Plus className="h-6 w-6 text-muted-foreground" />
@@ -1230,38 +1230,52 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
               <Button size="sm" onClick={() => setShowAddSection(true)}>Crear primera sección</Button>
             </div>
           ) : (
-            <div className="rounded-xl border border-border overflow-hidden">
-              {/* Column headers */}
-              <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
-                <div className="w-8 flex-shrink-0" />
-                <div className="w-5 flex-shrink-0" />
-                <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
-                <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
-                <div className="w-24 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
-                <div className="w-32 px-2 flex-shrink-0 py-2.5">Fechas</div>
-                <div className="w-24 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
-                <div className="w-28 px-2 flex-shrink-0 py-2.5">Cliente</div>
-              </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="rounded-xl border border-border overflow-hidden">
+                {/* Column headers */}
+                <div className="flex items-center bg-muted/30 border-b border-border text-xs font-semibold text-muted-foreground">
+                  <div className="w-8 flex-shrink-0" />
+                  <div className="w-5 flex-shrink-0" />
+                  <div className="flex-1 px-2 py-2.5">Nombre de tarea</div>
+                  <div className="w-28 px-2 flex-shrink-0 py-2.5">Responsable</div>
+                  <div className="w-24 px-2 flex-shrink-0 py-2.5">Colaboradores</div>
+                  <div className="w-32 px-2 flex-shrink-0 py-2.5">Fechas</div>
+                  <div className="w-24 px-2 flex-shrink-0 py-2.5">Tiempo real</div>
+                  <div className="w-28 px-2 flex-shrink-0 py-2.5">Cliente</div>
+                </div>
 
-              {sectionNames.map((section, idx) => (
-                <SectionBlock
-                  key={section}
-                  sectionName={section}
-                  tasks={sections[section]}
-                  projectId={projectId}
-                  allPersonnel={allPersonnel}
-                  projectMembers={projectMembers}
-                  onOpenTask={handleOpen}
-                  onToggleTask={(task) => toggleMutation.mutate(task)}
-                  onDateSet={handleDateSet}
-                  onAssignee={handleAssignee}
-                  onRefresh={refetch}
-                  clientName={clientName}
-                  autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}
-                  forceExpand={!!filterText.trim()}
-                />
-              ))}
-            </div>
+                <SortableContext
+                  items={orderedSectionNames.map(s => `section:${s}`)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {orderedSectionNames.map((section, idx) => (
+                    <SortableSectionBlock
+                      key={section}
+                      sectionName={section}
+                      tasks={sections[section]}
+                      projectId={projectId}
+                      allPersonnel={allPersonnel}
+                      projectMembers={projectMembers}
+                      onOpenTask={handleOpen}
+                      onToggleTask={(task) => toggleMutation.mutate(task)}
+                      onDateSet={handleDateSet}
+                      onAssignee={handleAssignee}
+                      onRefresh={refetch}
+                      clientName={clientName}
+                      autoOpenAdd={idx === 0 ? firstSectionAutoAdd : 0}
+                      forceExpand={!!filterText.trim()}
+                      sortBy={sortBy}
+                      allPersonnelForSort={allPersonnel}
+                    />
+                  ))}
+                </SortableContext>
+              </div>
+            </DndContext>
           )}
 
           {showAddSection && (
