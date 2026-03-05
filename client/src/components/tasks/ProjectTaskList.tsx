@@ -877,6 +877,14 @@ const PRIORITY_LEFT_BORDER: Record<string, string> = {
 function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, projectId, projectMembers, onOpen, onRefresh }: BoardColumnProps) {
   const [showAdd, setShowAdd] = useState(false);
 
+  const toggleMutation = useMutation({
+    mutationFn: (task: Task) =>
+      apiRequest(`/api/tasks/${task.id}`, "PUT", {
+        status: task.status === "done" ? "todo" : "done",
+      }),
+    onSuccess: () => onRefresh(),
+  });
+
   return (
     <div className={cn("flex-1 min-w-0 flex flex-col rounded-xl border-t-2 border border-border bg-muted/5", ring)}>
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/60">
@@ -929,9 +937,17 @@ function BoardColumn({ label, dot, ring, empty, status, tasks, allPersonnel, pro
               )}
               onClick={() => onOpen(task.id)}
             >
-              <p className={cn("text-sm font-medium leading-snug mb-2", isDone && "line-through text-muted-foreground")}>
-                {task.title}
-              </p>
+              <div className="flex items-start gap-2 mb-2">
+                <div className="mt-0.5 flex-shrink-0">
+                  <CircleCheck
+                    checked={isDone}
+                    onClick={e => { e.stopPropagation(); toggleMutation.mutate(task); }}
+                  />
+                </div>
+                <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", isDone && "line-through text-muted-foreground")}>
+                  {task.title}
+                </p>
+              </div>
               <div className="flex items-center justify-between gap-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {task.priority && task.priority !== "medium" && (
