@@ -1909,16 +1909,30 @@ const ProjectDetailsPage = () => {
   }
 
   if (!project) {
+    const isAuthError = dataError && (String(dataError).includes("401") || String(dataError).includes("autenticad") || String(dataError).includes("Unauthorized"));
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Proyecto no encontrado</h2>
-          <p className="text-gray-600 mb-4">El proyecto solicitado no existe o no tienes permisos para verlo.</p>
-          <Button onClick={() => setLocation("/active-projects")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver a Proyectos
-          </Button>
+          <AlertTriangle className={`h-12 w-12 mx-auto mb-4 ${isAuthError ? "text-amber-500" : "text-red-500"}`} />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {isAuthError ? "Sesión expirada" : "Proyecto no encontrado"}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {isAuthError
+              ? "Tu sesión expiró. Cerrá sesión y volvé a entrar para continuar."
+              : "El proyecto solicitado no existe o no tienes permisos para verlo."}
+          </p>
+          <div className="flex gap-3 justify-center">
+            {isAuthError && (
+              <Button variant="default" onClick={() => setLocation("/auth")}>
+                Ir a iniciar sesión
+              </Button>
+            )}
+            <Button variant={isAuthError ? "outline" : "default"} onClick={() => setLocation("/active-projects")}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver a Proyectos
+            </Button>
+          </div>
         </div>
       </div>
     );
