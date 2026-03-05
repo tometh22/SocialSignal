@@ -1179,14 +1179,15 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       const toIds = fromSection === targetSection ? fromIds : getOrderedIds(targetSection);
 
       if (fromSection === targetSection) {
-        // Same-section reorder — use arrayMove for correct index handling
+        // Same-section reorder
         const fromIdx = fromIds.indexOf(taskId);
         const toTask = overData?.type === 'task' ? (overData.task as Task) : null;
         const toIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length - 1;
         if (fromIdx === -1) return;
         const newIds = arrayMove(fromIds, fromIdx, toIdx >= 0 ? toIdx : toIds.length - 1);
         setTaskOrderMap(prev => ({ ...prev, [fromSection]: newIds }));
-        apiRequest(`/api/tasks/${taskId}`, "PUT", { position: toIdx });
+        // Batch update all positions in the section so order persists on reload
+        apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds });
       } else {
         // Cross-section move
         const newFromIds = fromIds.filter(id => id !== taskId);
@@ -1195,12 +1196,14 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         const newToIds = [...toIds];
         newToIds.splice(insertIdx >= 0 ? insertIdx : newToIds.length, 0, taskId);
         setTaskOrderMap(prev => ({ ...prev, [fromSection]: newFromIds, [targetSection]: newToIds }));
-        // Also update sectionName in the query cache so the task appears in the right section
+        // Update sectionName in the query cache so the task appears in the right section immediately
         queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
           if (!old) return old;
           return { ...old, tasks: old.tasks.map((t: Task) => t.id === taskId ? { ...t, sectionName: targetSection } : t) };
         });
-        apiRequest(`/api/tasks/${taskId}`, "PUT", { sectionName: targetSection, position: insertIdx });
+        // Batch update both sections' positions + move the task to the new section
+        if (newFromIds.length > 0) apiRequest("/api/tasks/reorder", "POST", { taskIds: newFromIds });
+        if (newToIds.length > 0) apiRequest("/api/tasks/reorder", "POST", { taskIds: newToIds, sectionName: targetSection });
       }
     }
   };

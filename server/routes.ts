@@ -15712,6 +15712,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/tasks/reorder — reordenar tareas en batch (actualiza positions secuencialmente)
+  app.post("/api/tasks/reorder", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { taskIds, sectionName } = req.body as { taskIds: number[]; sectionName?: string };
+      if (!Array.isArray(taskIds) || taskIds.length === 0) return res.status(400).json({ message: "taskIds requeridos" });
+      await Promise.all(taskIds.map((id, idx) => {
+        const updates: any = { position: idx, updatedAt: new Date() };
+        if (sectionName !== undefined) updates.sectionName = sectionName;
+        return db.update(tasks).set(updates).where(eq(tasks.id, id));
+      }));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al reordenar tareas" });
+    }
+  });
+
   // PUT /api/tasks/:id — actualizar tarea
   app.put("/api/tasks/:id(\\d+)", requireAuth, async (req: Request, res: Response) => {
     try {

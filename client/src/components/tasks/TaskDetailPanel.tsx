@@ -194,6 +194,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
     },
     onError: (_err, _updates, context: any) => {
