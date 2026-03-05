@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -20,11 +20,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, ChevronDown, ChevronRight, CalendarIcon, Clock, Flag, Loader2, Check,
-  MoreHorizontal, Pencil, Trash2
+  MoreHorizontal, Pencil, Trash2, GripVertical
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TaskDetailPanel from "./TaskDetailPanel";
 import { toast } from "@/hooks/use-toast";
+import {
+  DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragOverEvent,
+  PointerSensor, useSensor, useSensors, closestCenter, UniqueIdentifier,
+} from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Task = {
   id: number;
@@ -112,6 +120,31 @@ function formatHours(hours: number) {
   if (h === 0) return `${m}min`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}min`;
+}
+
+// ─── Sort helper ────────────────────────────────────────────────────────────
+const PRIORITY_SORT_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+function sortTaskList(tasks: Task[], sortBy: string, allPersonnel: Personnel[]): Task[] {
+  if (sortBy === 'default') return tasks;
+  return [...tasks].sort((a, b) => {
+    switch (sortBy) {
+      case 'dueDate_asc':
+        return (a.dueDate || 'z').localeCompare(b.dueDate || 'z');
+      case 'dueDate_desc':
+        return (b.dueDate || '').localeCompare(a.dueDate || '');
+      case 'priority':
+        return (PRIORITY_SORT_ORDER[a.priority] ?? 4) - (PRIORITY_SORT_ORDER[b.priority] ?? 4);
+      case 'title':
+        return a.title.localeCompare(b.title, 'es');
+      case 'assignee': {
+        const an = allPersonnel.find(p => p.id === a.assigneeId)?.name || 'zzz';
+        const bn = allPersonnel.find(p => p.id === b.assigneeId)?.name || 'zzz';
+        return an.localeCompare(bn, 'es');
+      }
+      default: return 0;
+    }
+  });
 }
 
 function formatDateRange(startDate?: string | null, dueDate?: string | null) {
@@ -301,9 +334,11 @@ interface TaskRowProps {
   subtaskMap?: Record<number, Task[]>;
   expandedSubtasks?: Set<number>;
   onToggleSubtasks?: (taskId: number) => void;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  isDragging?: boolean;
 }
 
-function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: TaskRowProps) {
+function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, isSubtask = false, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks, dragHandleProps, isDragging }: TaskRowProps) {
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const assignee = allPersonnel.find(p => p.id === task.assigneeId);
   const collaborators = allPersonnel.filter(p => (task.collaboratorIds || []).includes(p.id));
@@ -320,12 +355,23 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         className={cn(
           "flex items-center border-b border-border hover:bg-accent/30 transition-all duration-150 group cursor-pointer",
           isDone && "opacity-60",
-          isSubtask && "bg-muted/10"
+          isSubtask && "bg-muted/10",
+          isDragging && "opacity-40 bg-accent/20"
         )}
         onClick={() => onOpen(task.id)}
       >
+        {/* Drag handle */}
+        {!isSubtask && (
+          <div
+            {...dragHandleProps}
+            className="w-5 flex-shrink-0 flex items-center justify-center py-2.5 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+            onClick={e => e.stopPropagation()}
+          >
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
+          </div>
+        )}
         {/* indent / subtask indicator */}
-        <div className={cn("flex-shrink-0 flex items-center", isSubtask ? "w-12 pl-6" : "w-8")}>
+        <div className={cn("flex-shrink-0 flex items-center", isSubtask ? "w-12 pl-6" : "w-3")}>
           {isSubtask && <span className="text-muted-foreground/50 text-xs mr-1">↳</span>}
         </div>
 
@@ -506,9 +552,13 @@ interface SectionBlockProps {
   clientName?: string | null;
   autoOpenAdd?: number;
   forceExpand?: boolean;
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  isDragging?: boolean;
+  sortBy?: string;
+  allPersonnelForSort?: Personnel[];
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [] }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -560,14 +610,24 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
     });
   };
 
+  const sortedRootTasks = sortTaskList(tasks.filter(t => !t.parentTaskId), sortBy, allPersonnelForSort);
+
   return (
-    <div>
+    <div className={cn(isDragging && "opacity-50 bg-accent/10")}>
       {/* Section header row */}
       <div
         className="flex items-center border-b border-border bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors group"
         onClick={() => !renamingSection && setCollapsed(!collapsed)}
       >
-        <div className="w-8 flex-shrink-0 flex items-center justify-center py-2">
+        {/* Drag handle for section */}
+        <div
+          {...dragHandleProps}
+          className="w-5 flex-shrink-0 flex items-center justify-center py-2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+          onClick={e => e.stopPropagation()}
+        >
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
+        </div>
+        <div className="w-3 flex-shrink-0 flex items-center justify-center py-2">
           {effectiveCollapsed
             ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
             : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -643,34 +703,24 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
       {!effectiveCollapsed && (
         <>
-          {rootTasks.map(task => (
-            <div key={task.id}>
-              <TaskRow
-                task={task}
-                allPersonnel={allPersonnel}
-                onOpen={onOpenTask}
-                onToggle={onToggleTask}
-                onDateSet={onDateSet}
-                onAssignee={onAssignee}
-                clientName={clientName}
-                subtaskMap={subtaskMap}
-                expandedSubtasks={expandedSubtasks}
-                onToggleSubtasks={toggleSubtasks}
-              />
-              {expandedSubtasks.has(task.id) && (subtaskMap[task.id] || []).map(sub => (
-                <TaskRow
-                  key={sub.id}
-                  task={sub}
-                  allPersonnel={allPersonnel}
-                  onOpen={onOpenTask}
-                  onToggle={onToggleTask}
-                  onDateSet={onDateSet}
-                  onAssignee={onAssignee}
-                  isSubtask
-                />
-              ))}
-            </div>
+          <SortableContext items={sortedRootTasks.map(t => `task:${t.id}`)} strategy={verticalListSortingStrategy}>
+          {sortedRootTasks.map(task => (
+            <SortableTaskRow
+              key={task.id}
+              taskId={task.id}
+              task={task}
+              allPersonnel={allPersonnel}
+              onOpenTask={onOpenTask}
+              onToggleTask={onToggleTask}
+              onDateSet={onDateSet}
+              onAssignee={onAssignee}
+              clientName={clientName}
+              subtaskMap={subtaskMap}
+              expandedSubtasks={expandedSubtasks}
+              onToggleSubtasks={toggleSubtasks}
+            />
           ))}
+          </SortableContext>
 
           {showAdd ? (
             <NewTaskRow
@@ -714,6 +764,75 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Sortable wrappers ──────────────────────────────────────────────────────
+
+function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask, onDateSet, onAssignee, clientName, subtaskMap, expandedSubtasks, onToggleSubtasks }: {
+  taskId: number;
+  task: Task;
+  allPersonnel: Personnel[];
+  onOpenTask: (id: number, ft?: boolean) => void;
+  onToggleTask: (task: Task) => void;
+  onDateSet: (taskId: number, d: Date | undefined) => void;
+  onAssignee: (taskId: number, assigneeId: number | null) => void;
+  clientName?: string | null;
+  subtaskMap?: Record<number, Task[]>;
+  expandedSubtasks?: Set<number>;
+  onToggleSubtasks?: (taskId: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `task:${taskId}`,
+    data: { type: 'task', taskId, task },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <TaskRow
+        task={task}
+        allPersonnel={allPersonnel}
+        onOpen={onOpenTask}
+        onToggle={onToggleTask}
+        onDateSet={onDateSet}
+        onAssignee={onAssignee}
+        clientName={clientName}
+        subtaskMap={subtaskMap}
+        expandedSubtasks={expandedSubtasks}
+        onToggleSubtasks={onToggleSubtasks}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        isDragging={isDragging}
+      />
+      {expandedSubtasks?.has(taskId) && (subtaskMap?.[taskId] || []).map(sub => (
+        <TaskRow
+          key={sub.id}
+          task={sub}
+          allPersonnel={allPersonnel}
+          onOpen={onOpenTask}
+          onToggle={onToggleTask}
+          onDateSet={onDateSet}
+          onAssignee={onAssignee}
+          isSubtask
+        />
+      ))}
+    </div>
+  );
+}
+
+function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[] }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `section:${props.sectionName}`,
+    data: { type: 'section', sectionName: props.sectionName },
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <SectionBlock
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        isDragging={isDragging}
+      />
     </div>
   );
 }
@@ -876,14 +995,25 @@ interface Props {
   clientName?: string | null;
   onQuickAddTrigger?: number;
   filterText?: string;
+  sortBy?: string;
+  groupBy?: string;
 }
 
-export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "" }: Props) {
+export default function ProjectTaskList({ projectId, projectMembers = [], view = "list", clientName, onQuickAddTrigger = 0, filterText = "", sortBy = 'default', groupBy = 'section' }: Props) {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [focusTime, setFocusTime] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [firstSectionAutoAdd, setFirstSectionAutoAdd] = useState(0);
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(`sectionOrder:${projectId}`) || '[]'); } catch { return []; }
+  });
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [activeDragData, setActiveDragData] = useState<any>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   useEffect(() => {
     if (onQuickAddTrigger > 0) {
@@ -942,7 +1072,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     : allTasksRaw;
 
   // When filtering, rebuild sections from filtered tasks
-  const sections: Record<string, Task[]> = filterText.trim()
+  const baseSections: Record<string, Task[]> = filterText.trim()
     ? allTasks.reduce((acc: Record<string, Task[]>, t) => {
         const sec = t.sectionName || "General";
         if (!acc[sec]) acc[sec] = [];
@@ -951,13 +1081,93 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       }, {})
     : sectionsRaw;
 
-  const sectionNames = Object.keys(sections);
-  const totalTasks = allTasks.length;
-  const doneTasks = allTasks.filter(t => t.status === "done").length;
+  // Apply groupBy override
+  const sections: Record<string, Task[]> = groupBy === 'section'
+    ? baseSections
+    : allTasks.reduce((acc: Record<string, Task[]>, t) => {
+        let key = 'Sin asignar';
+        if (groupBy === 'assignee') {
+          const p = allPersonnel.find(p => p.id === t.assigneeId);
+          key = p?.name || 'Sin asignar';
+        } else if (groupBy === 'priority') {
+          key = PRIORITY_LABELS[t.priority] || 'Sin prioridad';
+        }
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(t);
+        return acc;
+      }, {});
+
+  // Apply sectionOrder (only for section grouping)
+  const rawSectionNames = Object.keys(sections);
+  const orderedSectionNames: string[] = groupBy !== 'section' ? rawSectionNames : (() => {
+    const saved = sectionOrder.filter(s => rawSectionNames.includes(s));
+    const newOnes = rawSectionNames.filter(s => !saved.includes(s));
+    return [...saved, ...newOnes];
+  })();
+
+  const totalTasks = allTasks.filter(t => !t.parentTaskId).length;
+  const doneTasks = allTasks.filter(t => t.status === "done" && !t.parentTaskId).length;
 
   const handleOpen = (id: number, ft = false) => {
     setFocusTime(ft);
     setSelectedTaskId(id);
+  };
+
+  // ─── DnD handlers ──────────────────────────────────────────────────────────
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id);
+    setActiveDragData(event.active.data.current);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    setActiveDragData(null);
+    if (!over || active.id === over.id) return;
+
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (activeData?.type === 'section') {
+      const activeSection = activeData.sectionName as string;
+      let overSection: string;
+      if (overData?.type === 'section') {
+        overSection = overData.sectionName;
+      } else {
+        return;
+      }
+      const oldIndex = orderedSectionNames.indexOf(activeSection);
+      const newIndex = orderedSectionNames.indexOf(overSection);
+      if (oldIndex === -1 || newIndex === -1) return;
+      const newOrder = arrayMove(orderedSectionNames, oldIndex, newIndex);
+      setSectionOrder(newOrder);
+      localStorage.setItem(`sectionOrder:${projectId}`, JSON.stringify(newOrder));
+    } else if (activeData?.type === 'task') {
+      const taskId = activeData.taskId as number;
+      let targetSection: string;
+      let targetTasks: Task[];
+
+      if (overData?.type === 'task') {
+        const overTask = overData.task as Task;
+        targetSection = overTask.sectionName || 'General';
+        targetTasks = sections[targetSection] || [];
+      } else if (overData?.type === 'section') {
+        targetSection = overData.sectionName;
+        targetTasks = sections[targetSection] || [];
+      } else {
+        return;
+      }
+
+      const activeTask = activeData.task as Task;
+      const fromSection = activeTask.sectionName || 'General';
+      const overIndex = overData?.type === 'task'
+        ? targetTasks.filter(t => !t.parentTaskId).findIndex(t => t.id === overData.taskId)
+        : targetTasks.filter(t => !t.parentTaskId).length;
+
+      const updates: any = { position: overIndex };
+      if (targetSection !== fromSection) updates.sectionName = targetSection;
+      apiRequest(`/api/tasks/${taskId}`, "PUT", updates).then(() => refetch());
+    }
   };
 
   if (isLoading) {

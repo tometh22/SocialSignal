@@ -160,6 +160,8 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
     queryKey: ["/api/tasks", taskId],
     queryFn: () => authFetch(`/api/tasks/${taskId}`).then(r => r.json()),
     enabled: !!taskId,
+    staleTime: Infinity,
+    refetchOnReconnect: false,
   });
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
@@ -192,8 +194,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
         timeEntries: old?.timeEntries ?? [],
         subtasks: old?.subtasks ?? [],
       }));
-      refetchTask();
-      onUpdate?.();
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks/project"] });
     },
     onError: (_err, _updates, context: any) => {
       if (context?.previous) {
