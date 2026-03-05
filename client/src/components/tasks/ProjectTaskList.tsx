@@ -614,7 +614,10 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
   const rawRootTasks = tasks.filter(t => !t.parentTaskId);
   const orderedRootTasks = taskOrderOverride
-    ? taskOrderOverride.map(id => rawRootTasks.find(t => t.id === id)).filter(Boolean) as Task[]
+    ? [
+        ...taskOrderOverride.map(id => rawRootTasks.find(t => t.id === id)).filter(Boolean) as Task[],
+        ...rawRootTasks.filter(t => !taskOrderOverride.includes(t.id))
+      ]
     : rawRootTasks;
   const sortedRootTasks = sortTaskList(orderedRootTasks, sortBy, allPersonnelForSort);
 
@@ -1032,8 +1035,22 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem(`sectionOrder:${projectId}`) || '[]'); } catch { return []; }
   });
-  const [taskOrderMap, setTaskOrderMap] = useState<Record<string, number[]>>({});
-  useEffect(() => { setTaskOrderMap({}); }, [projectId]);
+  const [taskOrderMap, setTaskOrderMap] = useState<Record<string, number[]>>(() => {
+    try { return JSON.parse(localStorage.getItem(`taskOrder:${projectId}`) || '{}'); } catch { return {}; }
+  });
+
+  const persistTaskOrder = (projectId: number, map: Record<string, number[]>) => {
+    try { localStorage.setItem(`taskOrder:${projectId}`, JSON.stringify(map)); } catch {}
+  };
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(`taskOrder:${projectId}`) || '{}');
+      setTaskOrderMap(saved);
+    } catch {
+      setTaskOrderMap({});
+    }
+  }, [projectId]);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
 
@@ -1199,25 +1216,15 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         const toIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length - 1;
         if (fromIdx === -1) return;
         const newIds = arrayMove(fromIds, fromIdx, toIdx >= 0 ? toIdx : toIds.length - 1);
-        setTaskOrderMap(prev => ({ ...prev, [fromSection]: newIds }));
-
-        const posMap = new Map(newIds.map((id, i) => [id, i]));
-        const applySameSectionOrder = () => {
-          queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
-            if (!old) return old;
-            const reorderedSection = [...(old.sections[fromSection] || [])].sort((a: Task, b: Task) => {
-              if (!a.parentTaskId && !b.parentTaskId) return (posMap.get(a.id) ?? 9999) - (posMap.get(b.id) ?? 9999);
-              return 0;
-            });
-            const otherTasks = old.tasks.filter((t: Task) => (t.sectionName || 'General') !== fromSection);
-            return { tasks: [...otherTasks, ...reorderedSection], sections: { ...old.sections, [fromSection]: reorderedSection } };
-          });
-        };
-
-        applySameSectionOrder();
+        const newMap = { ...taskOrderMap, [fromSection]: newIds };
+        setTaskOrderMap(newMap);
+        persistTaskOrder(projectId, newMap);
 
         apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds })
-          .then(() => applySameSectionOrder())
+          .then(() => {
+            console.log('[DnD] Reorder saved successfully');
+            queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
+          })
           .catch((e: any) => console.error('[DnD] reorder failed:', e?.message));
       } else {
         // Cross-section move
@@ -1226,35 +1233,18 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         const insertIdx = toTask ? toIds.indexOf(toTask.id) : toIds.length;
         const newToIds = [...toIds];
         newToIds.splice(insertIdx >= 0 ? insertIdx : newToIds.length, 0, taskId);
-        setTaskOrderMap(prev => ({ ...prev, [fromSection]: newFromIds, [targetSection]: newToIds }));
-
-        const fromPosMap = new Map(newFromIds.map((id, i) => [id, i]));
-        const toPosMap = new Map(newToIds.map((id, i) => [id, i]));
-        const applyCrossSectionOrder = () => {
-          queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
-            if (!old) return old;
-            const movedTask = old.tasks.find((t: Task) => t.id === taskId);
-            if (!movedTask) return old;
-            const updatedMovedTask = { ...movedTask, sectionName: targetSection };
-            const updatedTasks = old.tasks.map((t: Task) => t.id === taskId ? updatedMovedTask : t);
-            const newFromSection = [...(old.sections[fromSection] || []).filter((t: Task) => t.id !== taskId)].sort((a: Task, b: Task) => {
-              if (!a.parentTaskId && !b.parentTaskId) return (fromPosMap.get(a.id) ?? 9999) - (fromPosMap.get(b.id) ?? 9999);
-              return 0;
-            });
-            const toSectionBase = (old.sections[targetSection] || []).filter((t: Task) => t.id !== taskId);
-            const newToSection = [...toSectionBase, updatedMovedTask].sort((a: Task, b: Task) => {
-              if (!a.parentTaskId && !b.parentTaskId) return (toPosMap.get(a.id) ?? 9999) - (toPosMap.get(b.id) ?? 9999);
-              return 0;
-            });
-            return { tasks: updatedTasks, sections: { ...old.sections, [fromSection]: newFromSection, [targetSection]: newToSection } };
-          });
-        };
-
-        applyCrossSectionOrder();
+        const newMap = { ...taskOrderMap, [fromSection]: newFromIds, [targetSection]: newToIds };
+        setTaskOrderMap(newMap);
+        persistTaskOrder(projectId, newMap);
 
         const p1 = newFromIds.length > 0 ? apiRequest("/api/tasks/reorder", "POST", { taskIds: newFromIds }) : Promise.resolve();
         const p2 = newToIds.length > 0 ? apiRequest("/api/tasks/reorder", "POST", { taskIds: newToIds, sectionName: targetSection }) : Promise.resolve();
-        Promise.all([p1, p2]).then(() => applyCrossSectionOrder()).catch(() => {});
+        Promise.all([p1, p2])
+          .then(() => {
+            console.log('[DnD] Cross-section reorder saved successfully');
+            queryClient.invalidateQueries({ queryKey: ["/api/tasks/project", projectId] });
+          })
+          .catch((e: any) => console.error('[DnD] cross-section reorder failed:', e?.message));
       }
     }
   };
