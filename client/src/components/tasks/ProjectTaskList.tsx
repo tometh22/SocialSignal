@@ -355,7 +355,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         className={cn(
           "flex items-center border-b border-border hover:bg-accent/30 transition-all duration-150 group cursor-pointer",
           isDone && "opacity-60",
-          isSubtask && "bg-muted/10",
+          isSubtask && "bg-muted/5",
           isDragging && "opacity-40 bg-accent/20"
         )}
         onClick={() => onOpen(task.id)}
@@ -364,7 +364,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         {!isSubtask && (
           <div
             {...dragHandleProps}
-            className="w-5 flex-shrink-0 flex items-center justify-center py-2.5 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+            className="w-5 flex-shrink-0 flex items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
             onClick={e => e.stopPropagation()}
           >
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
@@ -376,7 +376,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         </div>
 
         {/* Circle Checkbox */}
-        <div className="w-5 flex-shrink-0 flex items-center justify-center py-2.5">
+        <div className="w-5 flex-shrink-0 flex items-center justify-center py-3">
           <CircleCheck
             checked={isDone}
             onClick={e => { e.stopPropagation(); onToggle(task); }}
@@ -384,7 +384,7 @@ function TaskRow({ task, allPersonnel, onOpen, onToggle, onDateSet, onAssignee, 
         </div>
 
         {/* Title */}
-        <div className="flex-1 min-w-0 px-2 py-2 flex items-center gap-1.5">
+        <div className="flex-1 min-w-0 px-2 py-3 flex items-center gap-1.5">
           <Flag className={cn("h-2.5 w-2.5 flex-shrink-0", PRIORITY_COLORS[task.priority] || "text-gray-300")} />
           <span className={cn("text-sm truncate transition-all duration-150", isDone && "line-through text-muted-foreground")}>
             {task.title}
@@ -556,9 +556,10 @@ interface SectionBlockProps {
   isDragging?: boolean;
   sortBy?: string;
   allPersonnelForSort?: Personnel[];
+  isFirst?: boolean;
 }
 
-function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [] }: SectionBlockProps) {
+function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMembers = [], onOpenTask, onToggleTask, onDateSet, onAssignee, onRefresh, clientName, autoOpenAdd = 0, forceExpand = false, dragHandleProps, isDragging, sortBy = 'default', allPersonnelForSort = [], isFirst = false }: SectionBlockProps) {
   const [collapsed, setCollapsed] = useState(false);
   const effectiveCollapsed = forceExpand ? false : collapsed;
   const [showAdd, setShowAdd] = useState(false);
@@ -614,27 +615,29 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
 
   return (
     <div className={cn(isDragging && "opacity-50 bg-accent/10")}>
+      {/* Separator between sections — thick top border for non-first sections */}
+      {!isFirst && <div className="h-px bg-border/60" />}
       {/* Section header row */}
       <div
-        className="flex items-center border-b border-border bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors group"
+        className="flex items-center border-b border-border bg-muted/50 hover:bg-muted/70 cursor-pointer transition-colors group"
         onClick={() => !renamingSection && setCollapsed(!collapsed)}
       >
         {/* Drag handle for section */}
         <div
           {...dragHandleProps}
-          className="w-5 flex-shrink-0 flex items-center justify-center py-2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
+          className="w-5 flex-shrink-0 flex items-center justify-center py-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity"
           onClick={e => e.stopPropagation()}
         >
           <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60" />
         </div>
-        <div className="w-3 flex-shrink-0 flex items-center justify-center py-2">
+        <div className="w-3 flex-shrink-0 flex items-center justify-center py-3">
           {effectiveCollapsed
-            ? <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
           }
         </div>
         <div className="w-5 flex-shrink-0" />
-        <div className="flex-1 px-2 py-2 flex items-center gap-2">
+        <div className="flex-1 px-2 py-3 flex items-center gap-2">
           {renamingSection ? (
             <Input
               autoFocus
@@ -647,12 +650,12 @@ function SectionBlock({ sectionName, tasks, projectId, allPersonnel, projectMemb
                 if (e.key === "Escape") { setRenamingSection(false); setNewSectionName(sectionName); }
               }}
               onClick={e => e.stopPropagation()}
-              className="h-6 text-sm font-semibold border-primary bg-background w-48 px-1.5"
+              className="h-6 text-sm font-bold border-primary bg-background w-48 px-1.5"
             />
           ) : (
-            <span className="font-semibold text-sm text-foreground">{sectionName}</span>
+            <span className="font-bold text-sm text-foreground tracking-tight">{sectionName}</span>
           )}
-          <span className="text-xs text-muted-foreground">{done}/{rootTasks.length}</span>
+          <span className="text-xs text-muted-foreground font-medium">{done}/{rootTasks.length}</span>
           {!effectiveCollapsed && (
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 ml-1">
               <Button
@@ -820,7 +823,7 @@ function SortableTaskRow({ taskId, task, allPersonnel, onOpenTask, onToggleTask,
   );
 }
 
-function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[] }) {
+function SortableSectionBlock(props: SectionBlockProps & { sectionName: string; sortBy?: string; allPersonnelForSort?: Personnel[]; isFirst?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `section:${props.sectionName}`,
     data: { type: 'section', sectionName: props.sectionName },
@@ -1144,29 +1147,50 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
       localStorage.setItem(`sectionOrder:${projectId}`, JSON.stringify(newOrder));
     } else if (activeData?.type === 'task') {
       const taskId = activeData.taskId as number;
+      const activeTask = activeData.task as Task;
+      const fromSection = activeTask.sectionName || 'General';
       let targetSection: string;
-      let targetTasks: Task[];
+      let targetRootTasks: Task[];
 
       if (overData?.type === 'task') {
         const overTask = overData.task as Task;
         targetSection = overTask.sectionName || 'General';
-        targetTasks = sections[targetSection] || [];
+        targetRootTasks = (sections[targetSection] || []).filter(t => !t.parentTaskId);
       } else if (overData?.type === 'section') {
         targetSection = overData.sectionName;
-        targetTasks = sections[targetSection] || [];
+        targetRootTasks = (sections[targetSection] || []).filter(t => !t.parentTaskId);
       } else {
         return;
       }
 
-      const activeTask = activeData.task as Task;
-      const fromSection = activeTask.sectionName || 'General';
       const overIndex = overData?.type === 'task'
-        ? targetTasks.filter(t => !t.parentTaskId).findIndex(t => t.id === overData.taskId)
-        : targetTasks.filter(t => !t.parentTaskId).length;
+        ? targetRootTasks.findIndex(t => t.id === overData.taskId)
+        : targetRootTasks.length;
 
+      // Optimistic cache update — no refetch needed
+      queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
+        if (!old) return old;
+        const updatedTask = { ...activeTask, sectionName: targetSection };
+
+        // Rebuild sections
+        const newSections: Record<string, Task[]> = {};
+        for (const [sec, tasks] of Object.entries(old.sections as Record<string, Task[]>)) {
+          newSections[sec] = tasks.filter(t => t.id !== taskId);
+        }
+        if (!newSections[targetSection]) newSections[targetSection] = [];
+        const insertAt = overIndex >= 0 ? overIndex : newSections[targetSection].filter(t => !t.parentTaskId).length;
+        const targetRootCount = newSections[targetSection].filter(t => !t.parentTaskId).length;
+        const clampedIndex = Math.min(insertAt, targetRootCount);
+        newSections[targetSection].splice(clampedIndex, 0, updatedTask);
+
+        const newTasks = old.tasks.map((t: Task) => t.id === taskId ? updatedTask : t);
+        return { ...old, tasks: newTasks, sections: newSections };
+      });
+
+      // Persist to server silently
       const updates: any = { position: overIndex };
       if (targetSection !== fromSection) updates.sectionName = targetSection;
-      apiRequest(`/api/tasks/${taskId}`, "PUT", updates).then(() => refetch());
+      apiRequest(`/api/tasks/${taskId}`, "PUT", updates);
     }
   };
 
@@ -1257,7 +1281,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                     <SortableSectionBlock
                       key={section}
                       sectionName={section}
-                      tasks={sections[section]}
+                      tasks={sections[section] || []}
                       projectId={projectId}
                       allPersonnel={allPersonnel}
                       projectMembers={projectMembers}
@@ -1271,6 +1295,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
                       forceExpand={!!filterText.trim()}
                       sortBy={sortBy}
                       allPersonnelForSort={allPersonnel}
+                      isFirst={idx === 0}
                     />
                   ))}
                 </SortableContext>
