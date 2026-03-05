@@ -1105,6 +1105,21 @@ const ProjectDetailsPage = () => {
     selectedView // 🎯 NEW: Pass selected view (original|operativa|usd)
   );
   
+  // 📊 Horas internas de tareas con costo estimado
+  const { data: taskHoursCostData } = useQuery<{ projects: { projectId: number; totalHours: number; totalCostUSD: number; byPerson: { personnelId: number; name: string; hours: number; costUSD: number; rateLabel: string; contractType: string }[] }[] }>({
+    queryKey: ["/api/tasks/hours-cost", projectId, finalPeriod],
+    queryFn: () => {
+      const pid = parseInt(projectId || "", 10);
+      if (!pid || pid >= 1_000_000) return Promise.resolve({ projects: [] });
+      const periodParam = finalPeriod && finalPeriod !== "all" ? `&period=${finalPeriod}` : "";
+      return authFetch(`/api/tasks/hours-cost?projectId=${pid}${periodParam}`).then(r => r.json());
+    },
+    staleTime: 120_000,
+    enabled: !!projectId && parseInt(projectId, 10) < 1_000_000,
+  });
+
+  const taskHoursCost = taskHoursCostData?.projects?.find(p => p.projectId === parseInt(projectId || "", 10));
+
   // 🔧 FORCE REFETCH: Invalidate cache when period or view changes to get fresh previousPeriod data
   useEffect(() => {
     if (projectId && finalPeriod) {
@@ -3953,6 +3968,83 @@ const ProjectDetailsPage = () => {
               console.log('📊 projectVM.teamBreakdown:', projectVM?.teamBreakdown);
               return null;
             })()}
+
+            {/* Horas internas del módulo de tareas */}
+            {parseInt(projectId || "", 10) < 1_000_000 && (
+              <Card className="border border-slate-200 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
+                    <Clock className="h-5 w-5 text-indigo-500" />
+                    Equipo — horas internas
+                    {finalPeriod && finalPeriod !== "all" && (
+                      <span className="ml-2 text-xs font-normal text-slate-400">({finalPeriod})</span>
+                    )}
+                  </CardTitle>
+                  <CardDescription className="text-sm text-slate-500">
+                    Horas registradas en el módulo de tareas, valorizadas al costo hora histórico de cada persona
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!taskHoursCost || taskHoursCost.totalHours === 0 ? (
+                    <p className="text-sm text-slate-400 py-2">Sin horas registradas en este período</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap gap-6">
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase tracking-wide">Total horas</p>
+                          <p className="text-2xl font-bold text-slate-800">{taskHoursCost.totalHours.toFixed(1)}h</p>
+                        </div>
+                        {taskHoursCost.totalCostUSD > 0 && (
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase tracking-wide">Costo estimado</p>
+                            <p className="text-2xl font-bold text-indigo-700">
+                              ~USD {taskHoursCost.totalCostUSD.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      {taskHoursCost.byPerson.length > 0 && (
+                        <div className="overflow-x-auto rounded-lg border border-slate-100">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 text-left text-xs text-slate-500 uppercase tracking-wide">
+                                <th className="px-4 py-2 font-medium">Persona</th>
+                                <th className="px-4 py-2 font-medium text-right">Horas</th>
+                                <th className="px-4 py-2 font-medium">Tipo</th>
+                                <th className="px-4 py-2 font-medium">Tarifa</th>
+                                <th className="px-4 py-2 font-medium text-right">Costo USD</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {taskHoursCost.byPerson.map((person) => (
+                                <tr key={person.personnelId} className="hover:bg-slate-50/50">
+                                  <td className="px-4 py-2.5 font-medium text-slate-700">{person.name}</td>
+                                  <td className="px-4 py-2.5 text-right font-mono text-slate-600">{person.hours.toFixed(1)}</td>
+                                  <td className="px-4 py-2.5 text-slate-500">
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                      person.contractType === "full-time"
+                                        ? "bg-blue-50 text-blue-700"
+                                        : "bg-amber-50 text-amber-700"
+                                    }`}>
+                                      {person.contractType}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-2.5 text-slate-500 text-xs">{person.rateLabel}</td>
+                                  <td className="px-4 py-2.5 text-right font-mono text-slate-700">
+                                    {person.costUSD > 0 ? `~USD ${person.costUSD.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "—"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <div className="space-y-6">
               
               {/* Resumen de Métricas Clave */}

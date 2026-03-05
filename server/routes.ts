@@ -15600,6 +15600,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/tasks/hours-cost — costo de horas internas por proyecto
+  app.get("/api/tasks/hours-cost", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { getTaskHoursCost } = await import("./domain/taskHoursCost");
+      const { period, projectId } = req.query;
+
+      let dateFrom: Date | undefined;
+      let dateTo: Date | undefined;
+
+      if (period && typeof period === "string" && /^\d{4}-\d{2}$/.test(period)) {
+        const [y, m] = period.split("-").map(Number);
+        dateFrom = new Date(y, m - 1, 1);
+        dateTo = new Date(y, m, 0, 23, 59, 59);
+      }
+
+      const pid = projectId ? parseInt(projectId as string) : undefined;
+      const result = await getTaskHoursCost({ projectId: pid, dateFrom, dateTo });
+      res.json({ period: period || null, ...result });
+    } catch (error) {
+      console.error("Error en GET /api/tasks/hours-cost:", error);
+      res.status(500).json({ error: "Error calculando costo de horas" });
+    }
+  });
+
   // GET /api/tasks/hours-summary — resumen de horas para el dashboard
   app.get("/api/tasks/hours-summary", requireAuth, async (req: Request, res: Response) => {
     try {

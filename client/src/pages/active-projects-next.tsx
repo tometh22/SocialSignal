@@ -391,8 +391,9 @@ function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?
 }
 
 type TaskStats = { taskCount: number; pendingCount: number };
+type HoursCostStats = { totalHours: number; totalCostUSD: number };
 
-function ProjectCard({ p, dense, period, taskStats }: { p: ProjectItem; dense?: boolean; period?: string; taskStats?: TaskStats }) {
+function ProjectCard({ p, dense, period, taskStats, hoursCost }: { p: ProjectItem; dense?: boolean; period?: string; taskStats?: TaskStats; hoursCost?: HoursCostStats }) {
   const queryClient = useQueryClient();
 
   const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
@@ -557,6 +558,22 @@ function ProjectCard({ p, dense, period, taskStats }: { p: ProjectItem; dense?: 
               Ir a tareas →
             </button>
           </Link>
+        </div>
+      )}
+
+      {/* Internal hours cost from tasks */}
+      {p.projectId && hoursCost && hoursCost.totalHours > 0 && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+          <Clock className="h-3 w-3 flex-shrink-0" />
+          <span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">{hoursCost.totalHours.toFixed(1)}h</span>
+            {" "}internas
+            {hoursCost.totalCostUSD > 0 && (
+              <span className="ml-1 text-slate-400 dark:text-slate-500">
+                · ~USD {hoursCost.totalCostUSD.toLocaleString("es", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </span>
+            )}
+          </span>
         </div>
       )}
 
@@ -839,7 +856,7 @@ function safeMargin(rev?: number, cost?: number) {
   return (rev - cost) / rev;
 }
 
-function ProjectsList({ items, dense, period, taskStatsMap }:{ items: ProjectItem[]; dense?: boolean; period?: string; taskStatsMap?: Record<number, TaskStats> }){
+function ProjectsList({ items, dense, period, taskStatsMap, hoursCostMap }:{ items: ProjectItem[]; dense?: boolean; period?: string; taskStatsMap?: Record<number, TaskStats>; hoursCostMap?: Record<number, HoursCostStats> }){
   if (!items?.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
@@ -886,6 +903,7 @@ function ProjectsList({ items, dense, period, taskStatsMap }:{ items: ProjectIte
               dense={dense}
               period={period}
               taskStats={p.projectId ? taskStatsMap?.[p.projectId] : undefined}
+              hoursCost={p.projectId ? hoursCostMap?.[p.projectId] : undefined}
             />
           ))}
         </div>
@@ -936,6 +954,21 @@ export default function ActiveProjectsNext(){
     });
     return map;
   }, [taskProjects]);
+
+  const { data: hoursCostData } = useQuery<{ projects: { projectId: number; totalHours: number; totalCostUSD: number }[] }>({
+    queryKey: ["/api/tasks/hours-cost", period],
+    queryFn: () => authFetch(`/api/tasks/hours-cost?period=${period}`).then(r => r.json()),
+    staleTime: 120_000,
+    select: (data) => data && Array.isArray(data.projects) ? data : { projects: [] },
+  });
+
+  const hoursCostMap = useMemo<Record<number, HoursCostStats>>(() => {
+    const map: Record<number, HoursCostStats> = {};
+    (hoursCostData?.projects ?? []).forEach(hp => {
+      map[hp.projectId] = { totalHours: hp.totalHours, totalCostUSD: hp.totalCostUSD };
+    });
+    return map;
+  }, [hoursCostData]);
 
   // Reset fresh flag after a fetch cycle
   useEffect(()=>{
@@ -1045,7 +1078,7 @@ export default function ActiveProjectsNext(){
             {t("errorLoadingProjects")}
           </div>
         ) : (
-          <ProjectsList items={filtered} dense={dense} period={period} taskStatsMap={taskStatsMap} />
+          <ProjectsList items={filtered} dense={dense} period={period} taskStatsMap={taskStatsMap} hoursCostMap={hoursCostMap} />
         )}
       </div>
 
