@@ -1017,6 +1017,7 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     try { return JSON.parse(localStorage.getItem(`sectionOrder:${projectId}`) || '[]'); } catch { return []; }
   });
   const [taskOrderMap, setTaskOrderMap] = useState<Record<string, number[]>>({});
+  useEffect(() => { setTaskOrderMap({}); }, [projectId]);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [activeDragData, setActiveDragData] = useState<any>(null);
 
@@ -1036,10 +1037,6 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
     staleTime: 30 * 1000,
   });
 
-  // Reset task order overrides when server data refreshes
-  useEffect(() => {
-    if (data?.sections) setTaskOrderMap({});
-  }, [data]);
 
   const { data: allPersonnel = [] } = useQuery<Personnel[]>({
     queryKey: ["/api/tasks-personnel"],
@@ -1186,7 +1183,20 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         if (fromIdx === -1) return;
         const newIds = arrayMove(fromIds, fromIdx, toIdx >= 0 ? toIdx : toIds.length - 1);
         setTaskOrderMap(prev => ({ ...prev, [fromSection]: newIds }));
-        // Batch update all positions in the section so order persists on reload
+
+        // Update TanStack cache so order persists across navigation (component remounts)
+        const posMap = new Map(newIds.map((id, i) => [id, i]));
+        queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
+          if (!old) return old;
+          const reorderedSection = [...(old.sections[fromSection] || [])].sort((a: Task, b: Task) => {
+            if (!a.parentTaskId && !b.parentTaskId) return (posMap.get(a.id) ?? 9999) - (posMap.get(b.id) ?? 9999);
+            return 0;
+          });
+          const otherTasks = old.tasks.filter((t: Task) => (t.sectionName || 'General') !== fromSection);
+          return { tasks: [...otherTasks, ...reorderedSection], sections: { ...old.sections, [fromSection]: reorderedSection } };
+        });
+
+        // Persist to server
         apiRequest("/api/tasks/reorder", "POST", { taskIds: newIds });
       } else {
         // Cross-section move
@@ -1196,12 +1206,29 @@ export default function ProjectTaskList({ projectId, projectMembers = [], view =
         const newToIds = [...toIds];
         newToIds.splice(insertIdx >= 0 ? insertIdx : newToIds.length, 0, taskId);
         setTaskOrderMap(prev => ({ ...prev, [fromSection]: newFromIds, [targetSection]: newToIds }));
-        // Update sectionName in the query cache so the task appears in the right section immediately
+
+        // Update TanStack cache: move the task to new section + rebuild sections
+        const fromPosMap = new Map(newFromIds.map((id, i) => [id, i]));
+        const toPosMap = new Map(newToIds.map((id, i) => [id, i]));
         queryClient.setQueryData(["/api/tasks/project", projectId], (old: any) => {
           if (!old) return old;
-          return { ...old, tasks: old.tasks.map((t: Task) => t.id === taskId ? { ...t, sectionName: targetSection } : t) };
+          const movedTask = old.tasks.find((t: Task) => t.id === taskId);
+          if (!movedTask) return old;
+          const updatedMovedTask = { ...movedTask, sectionName: targetSection };
+          const updatedTasks = old.tasks.map((t: Task) => t.id === taskId ? updatedMovedTask : t);
+          const newFromSection = [...(old.sections[fromSection] || []).filter((t: Task) => t.id !== taskId)].sort((a: Task, b: Task) => {
+            if (!a.parentTaskId && !b.parentTaskId) return (fromPosMap.get(a.id) ?? 9999) - (fromPosMap.get(b.id) ?? 9999);
+            return 0;
+          });
+          const toSectionBase = (old.sections[targetSection] || []).filter((t: Task) => t.id !== taskId);
+          const newToSection = [...toSectionBase, updatedMovedTask].sort((a: Task, b: Task) => {
+            if (!a.parentTaskId && !b.parentTaskId) return (toPosMap.get(a.id) ?? 9999) - (toPosMap.get(b.id) ?? 9999);
+            return 0;
+          });
+          return { tasks: updatedTasks, sections: { ...old.sections, [fromSection]: newFromSection, [targetSection]: newToSection } };
         });
-        // Batch update both sections' positions + move the task to the new section
+
+        // Persist to server
         if (newFromIds.length > 0) apiRequest("/api/tasks/reorder", "POST", { taskIds: newFromIds });
         if (newToIds.length > 0) apiRequest("/api/tasks/reorder", "POST", { taskIds: newToIds, sectionName: targetSection });
       }
