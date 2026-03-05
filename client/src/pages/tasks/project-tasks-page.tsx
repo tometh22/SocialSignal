@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2 } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
@@ -222,6 +222,19 @@ export default function ProjectTasksPage({ params }: Props) {
                     </div>
                   )}
                 </div>
+
+                {projectId < 1_000_000 && (
+                  <Link href={`/active-projects/${projectId}`}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300"
+                    >
+                      <TrendingUp className="h-3 w-3" />
+                      Rentabilidad
+                    </Button>
+                  </Link>
+                )}
 
                 <Button
                   variant="outline"

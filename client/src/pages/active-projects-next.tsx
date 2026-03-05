@@ -3,7 +3,7 @@
 import React, {useMemo, useState, useEffect} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
-import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye } from "lucide-react";
+import { RefreshCcw, Search, BriefcaseBusiness, DollarSign, TrendingUp, Clock, AlertTriangle, Filter, ArrowUpDown, Maximize2, Minimize2, Eye, CheckSquare } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 
@@ -390,7 +390,9 @@ function Badge({ children, tone = "indigo" }: { children: React.ReactNode; tone?
   );
 }
 
-function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; period?: string }) {
+type TaskStats = { taskCount: number; pendingCount: number };
+
+function ProjectCard({ p, dense, period, taskStats }: { p: ProjectItem; dense?: boolean; period?: string; taskStats?: TaskStats }) {
   const queryClient = useQueryClient();
 
   const nativeCurrency: Currency | undefined = p.currencyNative ?? (p.clientName?.toLowerCase().includes("warner") || p.clientName?.toLowerCase().includes("kimberly") ? "USD" : "ARS");
@@ -507,6 +509,54 @@ function ProjectCard({ p, dense, period }: { p: ProjectItem; dense?: boolean; pe
       {hasAnomaly && (
         <div className="mt-3 text-xs text-orange-700 dark:text-orange-400">
           {t("flags")} {p.anomaly?.join(", ")}
+        </div>
+      )}
+
+      {/* Task stats bar — only if linked project has tasks */}
+      {p.projectId && taskStats && taskStats.taskCount > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center gap-3">
+          <CheckSquare className="h-3.5 w-3.5 text-violet-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">{taskStats.taskCount - taskStats.pendingCount}</span>
+                /{taskStats.taskCount} tareas completadas
+                {taskStats.pendingCount > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                    {taskStats.pendingCount} pendientes
+                  </span>
+                )}
+              </span>
+              <span className="font-medium">
+                {taskStats.taskCount > 0 ? Math.round(((taskStats.taskCount - taskStats.pendingCount) / taskStats.taskCount) * 100) : 0}%
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                style={{ width: `${taskStats.taskCount > 0 ? Math.round(((taskStats.taskCount - taskStats.pendingCount) / taskStats.taskCount) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+          <Link href={`/tasks/projects/${p.projectId}`}>
+            <button className="flex-shrink-0 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-800 dark:hover:text-violet-200 transition-colors whitespace-nowrap">
+              Ver tareas →
+            </button>
+          </Link>
+        </div>
+      )}
+
+      {/* Link to tasks when no tasks yet */}
+      {p.projectId && taskStats && taskStats.taskCount === 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+          <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+            <CheckSquare className="h-3 w-3" />Sin tareas cargadas
+          </span>
+          <Link href={`/tasks/projects/${p.projectId}`}>
+            <button className="text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:text-violet-800 transition-colors">
+              Ir a tareas →
+            </button>
+          </Link>
         </div>
       )}
 
@@ -789,7 +839,7 @@ function safeMargin(rev?: number, cost?: number) {
   return (rev - cost) / rev;
 }
 
-function ProjectsList({ items, dense, period }:{ items: ProjectItem[]; dense?: boolean; period?: string }){
+function ProjectsList({ items, dense, period, taskStatsMap }:{ items: ProjectItem[]; dense?: boolean; period?: string; taskStatsMap?: Record<number, TaskStats> }){
   if (!items?.length) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-10 text-center text-slate-500 dark:text-slate-400">
@@ -830,7 +880,13 @@ function ProjectsList({ items, dense, period }:{ items: ProjectItem[]; dense?: b
             </div>
           )}
           {group.projects.map((p) => (
-            <ProjectCard key={p.projectId || p.projectKey || `${p.clientName}-${p.projectName}`} p={p} dense={dense} period={period} />
+            <ProjectCard
+              key={p.projectId || p.projectKey || `${p.clientName}-${p.projectName}`}
+              p={p}
+              dense={dense}
+              period={period}
+              taskStats={p.projectId ? taskStatsMap?.[p.projectId] : undefined}
+            />
           ))}
         </div>
       ))}
@@ -863,6 +919,23 @@ export default function ActiveProjectsNext(){
   }, [period]);
 
   const { data, isLoading, isError, error, refetch, isFetching } = useActiveProjects(period, freshToggle);
+
+  const { data: taskProjects = [] } = useQuery<{ id: number; taskCount: number; pendingCount: number }[]>({
+    queryKey: ["/api/tasks/projects"],
+    queryFn: () => authFetch("/api/tasks/projects").then(r => r.json()),
+    staleTime: 60_000,
+    select: (data) => Array.isArray(data) ? data : [],
+  });
+
+  const taskStatsMap = useMemo<Record<number, TaskStats>>(() => {
+    const map: Record<number, TaskStats> = {};
+    taskProjects.forEach(tp => {
+      if (tp.id < 1_000_000) {
+        map[tp.id] = { taskCount: tp.taskCount, pendingCount: tp.pendingCount };
+      }
+    });
+    return map;
+  }, [taskProjects]);
 
   // Reset fresh flag after a fetch cycle
   useEffect(()=>{
@@ -972,7 +1045,7 @@ export default function ActiveProjectsNext(){
             {t("errorLoadingProjects")}
           </div>
         ) : (
-          <ProjectsList items={filtered} dense={dense} period={period} />
+          <ProjectsList items={filtered} dense={dense} period={period} taskStatsMap={taskStatsMap} />
         )}
       </div>
 
