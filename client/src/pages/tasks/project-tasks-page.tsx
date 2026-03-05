@@ -15,10 +15,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
-import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check } from "lucide-react";
+import { Loader2, Users, Trash2, Plus, ChevronRight, List, LayoutGrid, Share2, Filter, ArrowUpDown, Layers, MoreHorizontal, Search, X, Check, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import ProjectTaskList from "@/components/tasks/ProjectTaskList";
+import ProjectOverviewPanel from "@/components/tasks/ProjectOverviewPanel";
 
 type ProjectMember = { personnelId: number; name: string; role: string };
 type TaskProject = {
@@ -55,7 +56,7 @@ export default function ProjectTasksPage({ params }: Props) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [addPersonnelId, setAddPersonnelId] = useState<string>("none");
   const [addRole, setAddRole] = useState("member");
-  const [view, setView] = useState<"list" | "board">("list");
+  const [view, setView] = useState<"list" | "board" | "panel">("list");
   const [quickAddTrigger, setQuickAddTrigger] = useState(0);
   const [showFilter, setShowFilter] = useState(false);
   const [filterText, setFilterText] = useState("");
@@ -297,11 +298,24 @@ export default function ProjectTasksPage({ params }: Props) {
                 <LayoutGrid className="h-3.5 w-3.5" />
                 Tablero
               </button>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  view === "panel"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setView("panel")}
+              >
+                <BarChart2 className="h-3.5 w-3.5" />
+                Panel
+              </button>
             </div>
           </div>
         </div>
 
         {/* Toolbar */}
+        {view !== "panel" && (
         <div className="flex items-center justify-between py-2 border-b border-border gap-2">
           {view === "list" ? (
             <Button
@@ -451,20 +465,32 @@ export default function ProjectTasksPage({ params }: Props) {
             </DropdownMenu>
           </div>
         </div>
+        )}
+
+        {/* Panel overview */}
+        {view === "panel" && (
+          <ProjectOverviewPanel
+            projectId={projectId}
+            members={members}
+            projectColor={dotColor}
+          />
+        )}
 
         {/* Task list / board */}
-        <div className="pt-4">
-          <ProjectTaskList
-            projectId={projectId}
-            projectMembers={members}
-            view={view}
-            clientName={project.clientName}
-            onQuickAddTrigger={quickAddTrigger}
-            filterText={filterText}
-            sortBy={sortBy}
-            groupBy={groupBy}
-          />
-        </div>
+        {view !== "panel" && (
+          <div className="pt-4">
+            <ProjectTaskList
+              projectId={projectId}
+              projectMembers={members}
+              view={view as "list" | "board"}
+              clientName={project.clientName}
+              onQuickAddTrigger={quickAddTrigger}
+              filterText={filterText}
+              sortBy={sortBy}
+              groupBy={groupBy}
+            />
+          </div>
+        )}
       </div>
 
       {/* Members management sheet */}
