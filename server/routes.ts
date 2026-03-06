@@ -15080,7 +15080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/crm/stages
-  app.post("/api/crm/stages", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/crm/stages", async (req: Request, res: Response) => {
     try {
       const { label, color = 'slate' } = req.body;
       if (!label?.trim()) return res.status(400).json({ message: "El nombre es requerido" });
@@ -15089,13 +15089,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const key = label.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
       const [stage] = await db.insert(crmStages).values({ key, label: label.trim(), color, position: nextPos, isActive: true }).returning();
       res.json(stage);
-    } catch {
+    } catch (e) {
+      console.error('POST /api/crm/stages error:', e);
       res.status(500).json({ message: "Error al crear etapa" });
     }
   });
 
+  // PATCH /api/crm/stages/reorder — must be BEFORE /:id to avoid route conflict
+  app.patch("/api/crm/stages/reorder", async (req: Request, res: Response) => {
+    try {
+      const { order } = req.body as { order: number[] };
+      if (!Array.isArray(order)) return res.status(400).json({ message: "order debe ser un array de ids" });
+      await Promise.all(order.map((id, idx) => db.update(crmStages).set({ position: idx }).where(eq(crmStages.id, id))));
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ message: "Error al reordenar etapas" });
+    }
+  });
+
   // PATCH /api/crm/stages/:id
-  app.patch("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/crm/stages/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const { label, color, position, isActive } = req.body;
@@ -15112,7 +15125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/crm/stages/:id
-  app.delete("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/crm/stages/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const [stage] = await db.select().from(crmStages).where(eq(crmStages.id, id));
@@ -15123,18 +15136,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true });
     } catch {
       res.status(500).json({ message: "Error al eliminar etapa" });
-    }
-  });
-
-  // PATCH /api/crm/stages/reorder — batch update positions
-  app.patch("/api/crm/stages/reorder", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const { order } = req.body as { order: number[] };
-      if (!Array.isArray(order)) return res.status(400).json({ message: "order debe ser un array de ids" });
-      await Promise.all(order.map((id, idx) => db.update(crmStages).set({ position: idx }).where(eq(crmStages.id, id))));
-      res.json({ ok: true });
-    } catch {
-      res.status(500).json({ message: "Error al reordenar etapas" });
     }
   });
 
