@@ -772,7 +772,7 @@ export default function CRMPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [draggingId, setDraggingId] = useState<number | null>(null);
-  const [localLeads, setLocalLeads] = useState<Lead[]>([]);
+  const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [] } = useQuery<CrmStage[]>({
@@ -835,11 +835,11 @@ export default function CRMPage() {
     const fromStage = e.dataTransfer.getData('fromStage') as Stage;
     setDraggingId(null);
     if (!fromStage || fromStage === toStage || !leadId) return;
-    setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: toStage } : l));
+    setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
     apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
       .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
-        setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
+        setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
         toast({ title: 'Error al mover el lead', variant: 'destructive' });
       });
   };
@@ -847,7 +847,7 @@ export default function CRMPage() {
   const handleDragEnd = () => setDraggingId(null);
 
   const handleDeleteLead = (id: number) => {
-    setLocalLeads(prev => prev.filter(l => l.id !== id));
+    setLocalLeads(prev => (prev ?? []).filter(l => l.id !== id));
     apiRequest(`/api/crm/leads/${id}`, 'DELETE')
       .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
@@ -890,7 +890,7 @@ export default function CRMPage() {
       });
   };
 
-  const leads = localLeads.length > 0 ? localLeads : fetchedLeads;
+  const leads = localLeads ?? fetchedLeads;
   const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
 
   return (
