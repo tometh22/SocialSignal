@@ -344,19 +344,25 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
     const newIdx = localStages.findIndex(s => s.id === over.id);
     const reordered = arrayMove(localStages, oldIdx, newIdx).map((s, i) => ({ ...s, position: i }));
     setLocalStages(reordered);
+    queryClient.setQueryData(['/api/crm/stages'], reordered);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
-      .then(() => onRefresh())
-      .catch(() => toast({ title: 'Error al reordenar', variant: 'destructive' }));
+      .catch(() => {
+        setLocalStages(localStages);
+        queryClient.setQueryData(['/api/crm/stages'], localStages);
+        toast({ title: 'Error al reordenar', variant: 'destructive' });
+      });
   };
 
   const handleSave = (id: number, label: string, color: string) => {
+    setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color } : s));
+    const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
+    queryClient.setQueryData(['/api/crm/stages'], current.map(s => s.id === id ? { ...s, label, color } : s));
     apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
-      .then(() => {
-        setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color } : s));
-        onRefresh();
-        toast({ title: 'Etapa actualizada' });
-      })
-      .catch(() => toast({ title: 'Error al actualizar', variant: 'destructive' }));
+      .then(() => toast({ title: 'Etapa actualizada' }))
+      .catch(() => {
+        queryClient.setQueryData(['/api/crm/stages'], current);
+        toast({ title: 'Error al actualizar', variant: 'destructive' });
+      });
   };
 
   const handleDelete = (id: number) => {
@@ -367,14 +373,17 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   const confirmDelete = () => {
     if (!stageToDelete) return;
     const id = stageToDelete.id;
+    const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
     setStageToDelete(null);
+    setLocalStages(prev => prev.filter(s => s.id !== id));
+    queryClient.setQueryData(['/api/crm/stages'], current.filter(s => s.id !== id));
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
-      .then(() => {
-        setLocalStages(prev => prev.filter(s => s.id !== id));
-        onRefresh();
-        toast({ title: 'Etapa eliminada' });
-      })
-      .catch(() => toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' }));
+      .then(() => toast({ title: 'Etapa eliminada' }))
+      .catch(() => {
+        setLocalStages(current);
+        queryClient.setQueryData(['/api/crm/stages'], current);
+        toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
+      });
   };
 
   const handleCreate = () => {
@@ -820,7 +829,6 @@ export default function CRMPage() {
     const reordered = arrayMove([...stages], oldIdx, newIdx);
     queryClient.setQueryData(['/api/crm/stages'], reordered);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
       .catch(() => {
         queryClient.setQueryData(['/api/crm/stages'], stages);
         toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
@@ -866,15 +874,10 @@ export default function CRMPage() {
     refetch().then(r => { if (r.data) setLocalLeads(r.data); });
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
   };
-  const handleStagesRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
-  };
-
   const handleEditStage = (id: number, label: string, color: string) => {
     const prev = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
     queryClient.setQueryData(['/api/crm/stages'], prev.map(s => s.id === id ? { ...s, label, color } : s));
     apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
-      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
       .catch(() => {
         queryClient.setQueryData(['/api/crm/stages'], prev);
         toast({ title: 'Error al actualizar etapa', variant: 'destructive' });
@@ -888,7 +891,6 @@ export default function CRMPage() {
     setStageToDelete(null);
     queryClient.setQueryData(['/api/crm/stages'], prev.filter(s => s.id !== id));
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
-      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
       .catch(() => {
         queryClient.setQueryData(['/api/crm/stages'], prev);
         toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
