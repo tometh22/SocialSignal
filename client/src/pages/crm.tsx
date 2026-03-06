@@ -119,7 +119,7 @@ function NewLeadModal({ onSuccess, stages }: { onSuccess: () => void; stages: Cr
   }, [stages]);
 
   const mutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/crm/leads', data),
+    mutationFn: (data: any) => apiRequest('/api/crm/leads', 'POST', data),
     onSuccess: () => {
       toast({ title: 'Lead creado correctamente' });
       setOpen(false);
@@ -334,13 +334,13 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
     const newIdx = localStages.findIndex(s => s.id === over.id);
     const reordered = arrayMove(localStages, oldIdx, newIdx).map((s, i) => ({ ...s, position: i }));
     setLocalStages(reordered);
-    apiRequest('PATCH', '/api/crm/stages/reorder', { order: reordered.map(s => s.id) })
+    apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
       .then(() => onRefresh())
       .catch(() => toast({ title: 'Error al reordenar', variant: 'destructive' }));
   };
 
   const handleSave = (id: number, label: string, color: string) => {
-    apiRequest('PATCH', `/api/crm/stages/${id}`, { label, color })
+    apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
       .then(() => {
         setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color } : s));
         onRefresh();
@@ -352,23 +352,19 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   const handleDelete = (id: number) => {
     const stage = localStages.find(s => s.id === id);
     if (!window.confirm(`¿Eliminar etapa "${stage?.label}"? Solo es posible si no tiene leads asignados.`)) return;
-    apiRequest('DELETE', `/api/crm/stages/${id}`)
+    apiRequest(`/api/crm/stages/${id}`, 'DELETE')
       .then(() => {
         setLocalStages(prev => prev.filter(s => s.id !== id));
         onRefresh();
         toast({ title: 'Etapa eliminada' });
       })
-      .catch(async (err) => {
-        const body = await err.response?.json?.().catch(() => null);
-        toast({ title: body?.message ?? 'Error al eliminar', variant: 'destructive' });
-      });
+      .catch(() => toast({ title: 'Error al eliminar (puede tener leads asignados)', variant: 'destructive' }));
   };
 
   const handleCreate = () => {
     if (!newLabel.trim()) return;
-    apiRequest('POST', '/api/crm/stages', { label: newLabel.trim(), color: newColor })
-      .then(async (res) => {
-        const stage = await res.json();
+    apiRequest('/api/crm/stages', 'POST', { label: newLabel.trim(), color: newColor })
+      .then((stage) => {
         setLocalStages(prev => [...prev, stage]);
         setNewLabel('');
         setNewColor('blue');
@@ -731,7 +727,7 @@ export default function CRMPage() {
     const newIdx = columnOrder.indexOf(over.id as number);
     const newOrder = arrayMove(columnOrder, oldIdx, newIdx);
     setColumnOrder(newOrder);
-    apiRequest('PATCH', '/api/crm/stages/reorder', { order: newOrder })
+    apiRequest('/api/crm/stages/reorder', 'PATCH', { order: newOrder })
       .catch(() => toast({ title: 'Error al reordenar columnas', variant: 'destructive' }));
   };
 
@@ -749,7 +745,7 @@ export default function CRMPage() {
     setDraggingId(null);
     if (!fromStage || fromStage === toStage || !leadId) return;
     setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: toStage } : l));
-    apiRequest('PATCH', `/api/crm/leads/${leadId}`, { stage: toStage })
+    apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
       .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
         setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
@@ -761,7 +757,7 @@ export default function CRMPage() {
 
   const handleDeleteLead = (id: number) => {
     setLocalLeads(prev => prev.filter(l => l.id !== id));
-    apiRequest('DELETE', `/api/crm/leads/${id}`)
+    apiRequest(`/api/crm/leads/${id}`, 'DELETE')
       .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
         toast({ title: 'Error al eliminar el lead', variant: 'destructive' });
