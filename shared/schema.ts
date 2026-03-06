@@ -3073,6 +3073,24 @@ export const crmReminders = pgTable("crm_reminders", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const crmStages = pgTable("crm_stages", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 50 }).notNull().unique(),
+  label: varchar("label", { length: 100 }).notNull(),
+  color: varchar("color", { length: 50 }).notNull().default('slate'),
+  position: integer("position").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCrmStageSchema = createInsertSchema(crmStages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CrmStage = typeof crmStages.$inferSelect;
+export type InsertCrmStage = z.infer<typeof insertCrmStageSchema>;
+
 // Insert Schemas — CRM
 export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({
   id: true,

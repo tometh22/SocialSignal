@@ -12,23 +12,62 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useToast } from "@/hooks/use-toast";
 import {
   Target, Plus, Search, TrendingUp, DollarSign, Trophy, AlertCircle,
-  Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw, GripVertical, Trash2
+  Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw,
+  GripVertical, Trash2, Settings, Pencil, Check, X
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
-type Stage = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+type Stage = string;
 
-const STAGES: { key: Stage; label: string; color: string; bg: string; border: string; dropActive: string }[] = [
-  { key: 'new',         label: 'Nuevo',        color: 'text-slate-700',   bg: 'bg-slate-50',    border: 'border-slate-200',  dropActive: 'bg-slate-100 border-slate-400' },
-  { key: 'contacted',   label: 'Contactado',   color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200',   dropActive: 'bg-blue-100 border-blue-500' },
-  { key: 'qualified',   label: 'Calificado',   color: 'text-indigo-700',  bg: 'bg-indigo-50',   border: 'border-indigo-200', dropActive: 'bg-indigo-100 border-indigo-500' },
-  { key: 'proposal',    label: 'Propuesta',    color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200',  dropActive: 'bg-amber-100 border-amber-500' },
-  { key: 'negotiation', label: 'Negociación',  color: 'text-orange-700',  bg: 'bg-orange-50',   border: 'border-orange-200', dropActive: 'bg-orange-100 border-orange-500' },
-  { key: 'won',         label: 'Ganado',       color: 'text-green-700',   bg: 'bg-green-50',    border: 'border-green-200',  dropActive: 'bg-green-100 border-green-500' },
-  { key: 'lost',        label: 'Perdido',      color: 'text-red-700',     bg: 'bg-red-50',      border: 'border-red-200',    dropActive: 'bg-red-100 border-red-500' },
-];
+interface CrmStage {
+  id: number;
+  key: string;
+  label: string;
+  color: string;
+  position: number;
+  isActive: boolean;
+}
 
-function stageMeta(stage: Stage) {
-  return STAGES.find(s => s.key === stage) || STAGES[0];
+const COLOR_MAP: Record<string, { color: string; bg: string; border: string; dropActive: string; hex: string }> = {
+  slate:  { color: 'text-slate-700',  bg: 'bg-slate-50',   border: 'border-slate-200',  dropActive: 'bg-slate-100 border-slate-400',  hex: '#64748b' },
+  blue:   { color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   dropActive: 'bg-blue-100 border-blue-500',    hex: '#3b82f6' },
+  indigo: { color: 'text-indigo-700', bg: 'bg-indigo-50',  border: 'border-indigo-200', dropActive: 'bg-indigo-100 border-indigo-500', hex: '#6366f1' },
+  violet: { color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', dropActive: 'bg-violet-100 border-violet-500', hex: '#7c3aed' },
+  purple: { color: 'text-purple-700', bg: 'bg-purple-50',  border: 'border-purple-200', dropActive: 'bg-purple-100 border-purple-500', hex: '#9333ea' },
+  pink:   { color: 'text-pink-700',   bg: 'bg-pink-50',    border: 'border-pink-200',   dropActive: 'bg-pink-100 border-pink-500',    hex: '#ec4899' },
+  red:    { color: 'text-red-700',    bg: 'bg-red-50',     border: 'border-red-200',    dropActive: 'bg-red-100 border-red-500',      hex: '#ef4444' },
+  orange: { color: 'text-orange-700', bg: 'bg-orange-50',  border: 'border-orange-200', dropActive: 'bg-orange-100 border-orange-500', hex: '#f97316' },
+  amber:  { color: 'text-amber-700',  bg: 'bg-amber-50',   border: 'border-amber-200',  dropActive: 'bg-amber-100 border-amber-500',  hex: '#f59e0b' },
+  yellow: { color: 'text-yellow-700', bg: 'bg-yellow-50',  border: 'border-yellow-200', dropActive: 'bg-yellow-100 border-yellow-500', hex: '#eab308' },
+  green:  { color: 'text-green-700',  bg: 'bg-green-50',   border: 'border-green-200',  dropActive: 'bg-green-100 border-green-500',  hex: '#22c55e' },
+  teal:   { color: 'text-teal-700',   bg: 'bg-teal-50',    border: 'border-teal-200',   dropActive: 'bg-teal-100 border-teal-500',   hex: '#14b8a6' },
+  cyan:   { color: 'text-cyan-700',   bg: 'bg-cyan-50',    border: 'border-cyan-200',   dropActive: 'bg-cyan-100 border-cyan-500',   hex: '#06b6d4' },
+};
+
+const COLOR_OPTIONS = Object.entries(COLOR_MAP).map(([key, val]) => ({ key, hex: val.hex }));
+
+function colorMeta(colorName: string) {
+  return COLOR_MAP[colorName] ?? COLOR_MAP['slate'];
+}
+
+function stageStyle(stage: CrmStage) {
+  const meta = colorMeta(stage.color);
+  return { key: stage.key, label: stage.label, ...meta };
 }
 
 function daysSince(dateStr: string | null) {
@@ -63,25 +102,34 @@ interface Stats {
   byStage: Record<string, number>;
 }
 
-function NewLeadModal({ onSuccess }: { onSuccess: () => void }) {
+function NewLeadModal({ onSuccess, stages }: { onSuccess: () => void; stages: CrmStage[] }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const defaultStage = stages.find(s => s.key !== 'won' && s.key !== 'lost')?.key ?? 'new';
   const [form, setForm] = useState({
-    companyName: '', stage: 'new' as Stage, source: '',
+    companyName: '', stage: defaultStage, source: '',
     estimatedValueUsd: '', notes: '',
     contactName: '', contactEmail: '', contactPhone: '', contactPosition: '',
   });
+
+  useEffect(() => {
+    if (stages.length > 0 && !form.stage) {
+      setForm(f => ({ ...f, stage: defaultStage }));
+    }
+  }, [stages]);
 
   const mutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/crm/leads', data),
     onSuccess: () => {
       toast({ title: 'Lead creado correctamente' });
       setOpen(false);
-      setForm({ companyName: '', stage: 'new', source: '', estimatedValueUsd: '', notes: '', contactName: '', contactEmail: '', contactPhone: '', contactPosition: '' });
+      setForm({ companyName: '', stage: defaultStage, source: '', estimatedValueUsd: '', notes: '', contactName: '', contactEmail: '', contactPhone: '', contactPosition: '' });
       onSuccess();
     },
     onError: () => toast({ title: 'Error al crear el lead', variant: 'destructive' }),
   });
+
+  const mainStages = stages.filter(s => s.key !== 'won' && s.key !== 'lost');
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -103,10 +151,10 @@ function NewLeadModal({ onSuccess }: { onSuccess: () => void }) {
             </div>
             <div>
               <Label>Etapa</Label>
-              <Select value={form.stage} onValueChange={v => setForm(f => ({ ...f, stage: v as Stage }))}>
+              <Select value={form.stage} onValueChange={v => setForm(f => ({ ...f, stage: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {STAGES.filter(s => s.key !== 'won' && s.key !== 'lost').map(s => (
+                  {mainStages.map(s => (
                     <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -182,6 +230,211 @@ function NewLeadModal({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+interface SortableStageRowProps {
+  stage: CrmStage;
+  onSave: (id: number, label: string, color: string) => void;
+  onDelete: (id: number) => void;
+}
+
+function SortableStageRow({ stage, onSave, onDelete }: SortableStageRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stage.id });
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(stage.label);
+  const [color, setColor] = useState(stage.color);
+  const meta = colorMeta(stage.color);
+
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
+
+  const handleSave = () => {
+    if (!label.trim()) return;
+    onSave(stage.id, label.trim(), color);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setLabel(stage.label);
+    setColor(stage.color);
+    setEditing(false);
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-2 py-2 px-1 rounded-lg hover:bg-slate-50 group">
+      <button
+        {...attributes}
+        {...listeners}
+        className="p-1 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+        title="Arrastrar para reordenar"
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      {editing ? (
+        <>
+          <div className="flex items-center gap-1 flex-wrap">
+            {COLOR_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setColor(opt.key)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${color === opt.key ? 'border-slate-700 scale-110' : 'border-transparent hover:scale-105'}`}
+                style={{ backgroundColor: opt.hex }}
+                title={opt.key}
+              />
+            ))}
+          </div>
+          <Input
+            className="flex-1 h-7 text-sm"
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
+            autoFocus
+          />
+          <button onClick={handleSave} className="p-1 text-green-600 hover:text-green-700"><Check className="w-4 h-4" /></button>
+          <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        </>
+      ) : (
+        <>
+          <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: meta.hex }} />
+          <span className={`flex-1 text-sm font-medium ${meta.color}`}>{stage.label}</span>
+          <span className="text-xs text-slate-400 font-mono">{stage.key}</span>
+          <button
+            onClick={() => setEditing(true)}
+            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition-opacity"
+            title="Editar"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => onDelete(stage.id)}
+            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-opacity"
+            title="Eliminar"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefresh: () => void }) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [localStages, setLocalStages] = useState<CrmStage[]>(stages);
+  const [newLabel, setNewLabel] = useState('');
+  const [newColor, setNewColor] = useState('blue');
+
+  useEffect(() => { setLocalStages(stages); }, [stages]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = localStages.findIndex(s => s.id === active.id);
+    const newIdx = localStages.findIndex(s => s.id === over.id);
+    const reordered = arrayMove(localStages, oldIdx, newIdx).map((s, i) => ({ ...s, position: i }));
+    setLocalStages(reordered);
+    apiRequest('PATCH', '/api/crm/stages/reorder', { order: reordered.map(s => s.id) })
+      .then(() => onRefresh())
+      .catch(() => toast({ title: 'Error al reordenar', variant: 'destructive' }));
+  };
+
+  const handleSave = (id: number, label: string, color: string) => {
+    apiRequest('PATCH', `/api/crm/stages/${id}`, { label, color })
+      .then(() => {
+        setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color } : s));
+        onRefresh();
+        toast({ title: 'Etapa actualizada' });
+      })
+      .catch(() => toast({ title: 'Error al actualizar', variant: 'destructive' }));
+  };
+
+  const handleDelete = (id: number) => {
+    const stage = localStages.find(s => s.id === id);
+    if (!window.confirm(`¿Eliminar etapa "${stage?.label}"? Solo es posible si no tiene leads asignados.`)) return;
+    apiRequest('DELETE', `/api/crm/stages/${id}`)
+      .then(() => {
+        setLocalStages(prev => prev.filter(s => s.id !== id));
+        onRefresh();
+        toast({ title: 'Etapa eliminada' });
+      })
+      .catch(async (err) => {
+        const body = await err.response?.json?.().catch(() => null);
+        toast({ title: body?.message ?? 'Error al eliminar', variant: 'destructive' });
+      });
+  };
+
+  const handleCreate = () => {
+    if (!newLabel.trim()) return;
+    apiRequest('POST', '/api/crm/stages', { label: newLabel.trim(), color: newColor })
+      .then(async (res) => {
+        const stage = await res.json();
+        setLocalStages(prev => [...prev, stage]);
+        setNewLabel('');
+        setNewColor('blue');
+        onRefresh();
+        toast({ title: 'Etapa creada' });
+      })
+      .catch(() => toast({ title: 'Error al crear etapa', variant: 'destructive' }));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Settings className="w-3.5 h-3.5" /> Etapas
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Gestionar Etapas</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1 max-h-80 overflow-y-auto">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={localStages.map(s => s.id)} strategy={verticalListSortingStrategy}>
+              {localStages.map(stage => (
+                <SortableStageRow
+                  key={stage.id}
+                  stage={stage}
+                  onSave={handleSave}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        </div>
+
+        <div className="border-t pt-4 space-y-3">
+          <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Nueva etapa</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            {COLOR_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setNewColor(opt.key)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${newColor === opt.key ? 'border-slate-700 scale-110' : 'border-transparent hover:scale-105'}`}
+                style={{ backgroundColor: opt.hex }}
+                title={opt.key}
+              />
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nombre de la etapa"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              className="flex-1"
+            />
+            <Button onClick={handleCreate} disabled={!newLabel.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1">
+              <Plus className="w-3.5 h-3.5" /> Agregar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
@@ -194,13 +447,7 @@ function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCard
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
   const isDragging = draggingId === lead.id;
-  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const didDrag = useRef(false);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    dragStartPos.current = { x: e.clientX, y: e.clientY };
-    didDrag.current = false;
-  };
 
   const handleDragStart = (e: React.DragEvent) => {
     didDrag.current = true;
@@ -208,17 +455,14 @@ function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCard
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    if (didDrag.current) {
-      e.preventDefault();
-      return;
-    }
+    if (didDrag.current) { e.preventDefault(); return; }
     onClick();
   };
 
   return (
     <div
       draggable
-      onMouseDown={handleMouseDown}
+      onMouseDown={() => { didDrag.current = false; }}
       onDragStart={handleDragStart}
       onClick={handleClick}
       style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
@@ -262,9 +506,7 @@ function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCard
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`¿Eliminar "${lead.companyName}"?`)) {
-                onDelete(lead.id);
-              }
+              if (window.confirm(`¿Eliminar "${lead.companyName}"?`)) onDelete(lead.id);
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 ml-0.5"
             title="Eliminar lead"
@@ -279,44 +521,31 @@ function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCard
 }
 
 interface KanbanColumnProps {
-  stage: typeof STAGES[0];
+  stage: CrmStage;
   leads: Lead[];
   onLeadClick: (id: number) => void;
   onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
   onDrop: (e: React.DragEvent, toStage: Stage) => void;
   onDelete: (id: number) => void;
-  isDropTarget: boolean;
   draggingId: number | null;
   compact?: boolean;
+  dragHandleProps?: Record<string, any>;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, isDropTarget, draggingId, compact }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, draggingId, compact, dragHandleProps }: KanbanColumnProps) {
+  const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [dragCounter, setDragCounter] = useState(0);
   const isOver = dragCounter > 0;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragCounter(c => c + 1);
-  };
-
-  const handleDragLeave = () => {
-    setDragCounter(c => Math.max(0, c - 1));
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    setDragCounter(0);
-    onDrop(e, stage.key);
-  };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
+  const handleDragEnter = (e: React.DragEvent) => { e.preventDefault(); setDragCounter(c => c + 1); };
+  const handleDragLeave = () => { setDragCounter(c => Math.max(0, c - 1)); };
+  const handleDrop = (e: React.DragEvent) => { setDragCounter(0); onDrop(e, stage.key); };
 
   const columnClass = isOver
-    ? `rounded-xl border-2 ${stage.dropActive} flex flex-col transition-all duration-150 shadow-lg scale-[1.01]`
-    : `rounded-xl border ${stage.border} ${stage.bg} flex flex-col transition-all duration-150`;
+    ? `rounded-xl border-2 ${meta.dropActive} flex flex-col transition-all duration-150 shadow-lg scale-[1.01]`
+    : `rounded-xl border ${meta.border} ${meta.bg} flex flex-col transition-all duration-150`;
 
   const minW = compact ? 'min-w-[200px] max-w-[200px]' : 'flex-1 min-w-[220px] max-w-[270px]';
 
@@ -328,10 +557,19 @@ function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className={`px-3 py-2.5 border-b ${isOver ? stage.dropActive.split(' ')[1] : stage.border} flex items-center justify-between`}>
+      <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold uppercase tracking-wide ${stage.color}`}>{stage.label}</span>
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${stage.border} ${stage.color}`}>
+          {dragHandleProps && (
+            <button
+              {...dragHandleProps}
+              className="p-0.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+              title="Arrastrar columna"
+            >
+              <GripVertical className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{stage.label}</span>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${meta.border} ${meta.color}`}>
             {leads.length}
           </span>
         </div>
@@ -366,7 +604,20 @@ function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete
   );
 }
 
-function ListView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: (id: number) => void }) {
+function SortableKanbanColumn(props: KanbanColumnProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.stage.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 10 : undefined, opacity: isDragging ? 0.6 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="flex-1 min-w-[220px] max-w-[270px] flex">
+      <KanbanColumn
+        {...props}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
+
+function ListView({ leads, stages, onLeadClick }: { leads: Lead[]; stages: CrmStage[]; onLeadClick: (id: number) => void }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <table className="w-full text-sm">
@@ -382,7 +633,9 @@ function ListView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: (id: num
         </thead>
         <tbody>
           {leads.map(lead => {
-            const meta = stageMeta(lead.stage);
+            const stage = stages.find(s => s.key === lead.stage);
+            const meta = stage ? colorMeta(stage.color) : colorMeta('slate');
+            const label = stage?.label ?? lead.stage;
             const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
             return (
               <tr key={lead.id} onClick={() => onLeadClick(lead.id)}
@@ -391,7 +644,7 @@ function ListView({ leads, onLeadClick }: { leads: Lead[]; onLeadClick: (id: num
                 <td className="px-4 py-3 text-slate-600">{lead.primaryContact?.name || '—'}</td>
                 <td className="px-4 py-3">
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${meta.bg} ${meta.color} border ${meta.border}`}>
-                    {meta.label}
+                    {label}
                   </span>
                 </td>
                 <td className="px-4 py-3 font-semibold text-emerald-700">{fmtUsd(lead.estimatedValueUsd)}</td>
@@ -429,6 +682,26 @@ export default function CRMPage() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [localLeads, setLocalLeads] = useState<Lead[]>([]);
+  const [columnOrder, setColumnOrder] = useState<number[]>([]);
+
+  const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
+    queryKey: ['/api/crm/stages'],
+  });
+
+  useEffect(() => {
+    if (stages.length > 0 && columnOrder.length === 0) {
+      setColumnOrder(stages.map(s => s.id));
+    }
+  }, [stages]);
+
+  const orderedStages = columnOrder.length > 0
+    ? columnOrder.map(id => stages.find(s => s.id === id)).filter(Boolean) as CrmStage[]
+    : stages;
+
+  const mainStages = orderedStages.filter(s => s.key !== 'won' && s.key !== 'lost');
+  const wonStage = orderedStages.find(s => s.key === 'won');
+  const lostStage = orderedStages.find(s => s.key === 'lost');
+  const compactStages = [wonStage, lostStage].filter(Boolean) as CrmStage[];
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
     queryKey: ['/api/crm/stats'],
@@ -447,10 +720,20 @@ export default function CRMPage() {
     refetchInterval: false,
   });
 
-  // Sync local leads whenever server refetches new data
-  useEffect(() => {
-    setLocalLeads(fetchedLeads);
-  }, [fetchedLeads]);
+  useEffect(() => { setLocalLeads(fetchedLeads); }, [fetchedLeads]);
+
+  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  const handleColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = columnOrder.indexOf(active.id as number);
+    const newIdx = columnOrder.indexOf(over.id as number);
+    const newOrder = arrayMove(columnOrder, oldIdx, newIdx);
+    setColumnOrder(newOrder);
+    apiRequest('PATCH', '/api/crm/stages/reorder', { order: newOrder })
+      .catch(() => toast({ title: 'Error al reordenar columnas', variant: 'destructive' }));
+  };
 
   const handleDragStart = (e: React.DragEvent, leadId: number, fromStage: Stage) => {
     e.dataTransfer.setData('leadId', leadId.toString());
@@ -465,17 +748,10 @@ export default function CRMPage() {
     const fromStage = e.dataTransfer.getData('fromStage') as Stage;
     setDraggingId(null);
     if (!fromStage || fromStage === toStage || !leadId) return;
-
-    // Update local state immediately — no waiting for server
     setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: toStage } : l));
-
-    // Fire PATCH in background — localLeads already updated, no need to refetch
-    apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
-      })
+    apiRequest('PATCH', `/api/crm/leads/${leadId}`, { stage: toStage })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
-        // Revert local state on failure
         setLocalLeads(prev => prev.map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
         toast({ title: 'Error al mover el lead', variant: 'destructive' });
       });
@@ -485,10 +761,8 @@ export default function CRMPage() {
 
   const handleDeleteLead = (id: number) => {
     setLocalLeads(prev => prev.filter(l => l.id !== id));
-    apiRequest(`/api/crm/leads/${id}`, 'DELETE')
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
-      })
+    apiRequest('DELETE', `/api/crm/leads/${id}`)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
       .catch(() => {
         toast({ title: 'Error al eliminar el lead', variant: 'destructive' });
         refetch().then(r => { if (r.data) setLocalLeads(r.data); });
@@ -500,10 +774,14 @@ export default function CRMPage() {
     refetch().then(r => { if (r.data) setLocalLeads(r.data); });
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
   };
+  const handleStagesRefresh = () => {
+    refetchStages().then(r => {
+      if (r.data) setColumnOrder(r.data.map((s: CrmStage) => s.id));
+    });
+  };
 
   const leads = localLeads.length > 0 ? localLeads : fetchedLeads;
   const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
-  const MAIN_STAGES = STAGES.filter(s => s.key !== 'won' && s.key !== 'lost');
 
   return (
     <div className="space-y-5" onDragEnd={handleDragEnd}>
@@ -519,10 +797,11 @@ export default function CRMPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <StageManagerDialog stages={orderedStages} onRefresh={handleStagesRefresh} />
           <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" /> Actualizar
           </Button>
-          <NewLeadModal onSuccess={handleRefresh} />
+          <NewLeadModal onSuccess={handleRefresh} stages={stages} />
         </div>
       </div>
 
@@ -590,7 +869,7 @@ export default function CRMPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las etapas</SelectItem>
-            {STAGES.map(s => (
+            {orderedStages.map(s => (
               <SelectItem key={s.key} value={s.key}>
                 {s.label} {stats?.byStage?.[s.key] ? `(${stats.byStage[s.key]})` : ''}
               </SelectItem>
@@ -623,39 +902,43 @@ export default function CRMPage() {
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
         <div className="flex gap-3 overflow-x-auto pb-4">
-          {MAIN_STAGES.map(stage => (
-            <KanbanColumn
-              key={stage.key}
-              stage={stage}
-              leads={leadsForStage(stage.key)}
-              onLeadClick={handleLeadClick}
-              onDragStart={handleDragStart}
-              onDrop={handleDrop}
-              onDelete={handleDeleteLead}
-              isDropTarget={false}
-              draggingId={draggingId}
-            />
-          ))}
+          <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
+            <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
+              {mainStages.map(stage => (
+                <SortableKanbanColumn
+                  key={stage.id}
+                  stage={stage}
+                  leads={leadsForStage(stage.key)}
+                  onLeadClick={handleLeadClick}
+                  onDragStart={handleDragStart}
+                  onDrop={handleDrop}
+                  onDelete={handleDeleteLead}
+                  draggingId={draggingId}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           {/* Won / Lost compact columns */}
-          <div className="flex flex-col gap-3 min-w-[200px] max-w-[200px]">
-            {[STAGES.find(s => s.key === 'won')!, STAGES.find(s => s.key === 'lost')!].map(stage => (
-              <KanbanColumn
-                key={stage.key}
-                stage={stage}
-                leads={leadsForStage(stage.key)}
-                onLeadClick={handleLeadClick}
-                onDragStart={handleDragStart}
-                onDrop={handleDrop}
-                onDelete={handleDeleteLead}
-                isDropTarget={false}
-                draggingId={draggingId}
-                compact
-              />
-            ))}
-          </div>
+          {compactStages.length > 0 && (
+            <div className="flex flex-col gap-3 min-w-[200px] max-w-[200px]">
+              {compactStages.map(stage => (
+                <KanbanColumn
+                  key={stage.id}
+                  stage={stage}
+                  leads={leadsForStage(stage.key)}
+                  onLeadClick={handleLeadClick}
+                  onDragStart={handleDragStart}
+                  onDrop={handleDrop}
+                  onDelete={handleDeleteLead}
+                  draggingId={draggingId}
+                  compact
+                />
+              ))}
+            </div>
+          )}
         </div>
       ) : (
-        <ListView leads={leads} onLeadClick={handleLeadClick} />
+        <ListView leads={leads} stages={orderedStages} onLeadClick={handleLeadClick} />
       )}
     </div>
   );

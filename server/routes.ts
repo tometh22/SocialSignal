@@ -85,10 +85,12 @@ import {
   crmContacts,
   crmActivities,
   crmReminders,
+  crmStages,
   insertCrmLeadSchema,
   insertCrmContactSchema,
   insertCrmActivitySchema,
   insertCrmReminderSchema,
+  insertCrmStageSchema,
   tasks,
   taskTimeEntries,
   insertTaskSchema,
@@ -15044,6 +15046,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== CRM VENTAS ====================
+
+  // Seed default stages if table is empty
+  (async () => {
+    try {
+      const existing = await db.select().from(crmStages).limit(1);
+      if (existing.length === 0) {
+        const defaults = [
+          { key: 'new',         label: 'Nuevo',       color: 'slate',  position: 0, isActive: true },
+          { key: 'contacted',   label: 'Contactado',  color: 'blue',   position: 1, isActive: true },
+          { key: 'qualified',   label: 'Calificado',  color: 'indigo', position: 2, isActive: true },
+          { key: 'proposal',    label: 'Propuesta',   color: 'amber',  position: 3, isActive: true },
+          { key: 'negotiation', label: 'Negociación', color: 'orange', position: 4, isActive: true },
+          { key: 'won',         label: 'Ganado',      color: 'green',  position: 5, isActive: true },
+          { key: 'lost',        label: 'Perdido',     color: 'red',    position: 6, isActive: true },
+        ];
+        await db.insert(crmStages).values(defaults);
+        console.log('✅ CRM stages seeded');
+      }
+    } catch (e) {
+      console.error('⚠️ CRM stages seed error:', e);
+    }
+  })();
+
+  // GET /api/crm/stages
+  app.get("/api/crm/stages", async (_req: Request, res: Response) => {
+    try {
+      const stages = await db.select().from(crmStages).orderBy(asc(crmStages.position));
+      res.json(stages);
+    } catch {
+      res.status(500).json({ message: "Error al obtener etapas" });
+    }
+  });
+
+  // POST /api/crm/stages
+  app.post("/api/crm/stages", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { label, color = 'slate' } = req.body;
+      if (!label?.trim()) return res.status(400).json({ message: "El nombre es requerido" });
+      const all = await db.select().from(crmStages).orderBy(desc(crmStages.position)).limit(1);
+      const nextPos = all.length ? all[0].position + 1 : 0;
+      const key = label.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+      const [stage] = await db.insert(crmStages).values({ key, label: label.trim(), color, position: nextPos, isActive: true }).returning();
+      res.json(stage);
+    } catch {
+      res.status(500).json({ message: "Error al crear etapa" });
+    }
+  });
+
+  // PATCH /api/crm/stages/:id
+  app.patch("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { label, color, position, isActive } = req.body;
+      const update: Record<string, any> = {};
+      if (label !== undefined) update.label = label;
+      if (color !== undefined) update.color = color;
+      if (position !== undefined) update.position = position;
+      if (isActive !== undefined) update.isActive = isActive;
+      const [updated] = await db.update(crmStages).set(update).where(eq(crmStages.id, id)).returning();
+      res.json(updated);
+    } catch {
+      res.status(500).json({ message: "Error al actualizar etapa" });
+    }
+  });
+
+  // DELETE /api/crm/stages/:id
+  app.delete("/api/crm/stages/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const [stage] = await db.select().from(crmStages).where(eq(crmStages.id, id));
+      if (!stage) return res.status(404).json({ message: "Etapa no encontrada" });
+      const leadsInStage = await db.select({ id: crmLeads.id }).from(crmLeads).where(eq(crmLeads.stage, stage.key)).limit(1);
+      if (leadsInStage.length > 0) return res.status(400).json({ message: "No se puede eliminar una etapa con leads activos" });
+      await db.delete(crmStages).where(eq(crmStages.id, id));
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ message: "Error al eliminar etapa" });
+    }
+  });
+
+  // PATCH /api/crm/stages/reorder — batch update positions
+  app.patch("/api/crm/stages/reorder", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { order } = req.body as { order: number[] };
+      if (!Array.isArray(order)) return res.status(400).json({ message: "order debe ser un array de ids" });
+      await Promise.all(order.map((id, idx) => db.update(crmStages).set({ position: idx }).where(eq(crmStages.id, id))));
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ message: "Error al reordenar etapas" });
+    }
+  });
 
   // GET /api/crm/stats — métricas del pipeline
   app.get("/api/crm/stats", async (req: Request, res: Response) => {
