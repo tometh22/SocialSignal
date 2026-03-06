@@ -14,8 +14,9 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Target, Plus, Search, TrendingUp, DollarSign, Trophy, AlertCircle,
   Bell, ChevronRight, LayoutGrid, List, Mail, Phone, RefreshCw,
-  GripVertical, Trash2, Settings, Pencil, Check, X
+  GripVertical, Trash2, Settings, Pencil, Check, X, MoreHorizontal
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   DndContext,
   closestCenter,
@@ -558,16 +559,19 @@ interface KanbanColumnProps {
   onDrop: (e: React.DragEvent, toStage: Stage) => void;
   onDelete: (id: number) => void;
   onAddLead?: (stageKey: string) => void;
+  onEditStage?: (id: number, label: string, color: string) => void;
+  onDeleteStage?: (stage: CrmStage) => void;
   draggingId: number | null;
   compact?: boolean;
   dragHandleProps?: Record<string, any>;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, onAddLead, draggingId, compact, dragHandleProps }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, onAddLead, onEditStage, onDeleteStage, draggingId, compact, dragHandleProps }: KanbanColumnProps) {
   const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [dragCounter, setDragCounter] = useState(0);
   const isOver = dragCounter > 0;
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
   const handleDragEnter = (e: React.DragEvent) => { e.preventDefault(); setDragCounter(c => c + 1); };
@@ -588,25 +592,70 @@ function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between`}>
-        <div className="flex items-center gap-2">
+      <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between group/header`}>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {dragHandleProps && (
             <button
               {...dragHandleProps}
-              className="p-0.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+              className="p-0.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none shrink-0"
               title="Arrastrar columna"
             >
               <GripVertical className="w-3.5 h-3.5" />
             </button>
           )}
-          <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{stage.label}</span>
-          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${meta.border} ${meta.color}`}>
+          {editingLabel !== null ? (
+            <input
+              autoFocus
+              value={editingLabel}
+              onChange={e => setEditingLabel(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && editingLabel.trim()) {
+                  onEditStage?.(stage.id, editingLabel.trim(), stage.color);
+                  setEditingLabel(null);
+                } else if (e.key === 'Escape') {
+                  setEditingLabel(null);
+                }
+              }}
+              onBlur={() => {
+                if (editingLabel.trim()) onEditStage?.(stage.id, editingLabel.trim(), stage.color);
+                setEditingLabel(null);
+              }}
+              className={`text-xs font-semibold uppercase tracking-wide ${meta.color} bg-transparent border-b border-current outline-none w-full min-w-0`}
+            />
+          ) : (
+            <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color} truncate`}>{stage.label}</span>
+          )}
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full bg-white border ${meta.border} ${meta.color} shrink-0`}>
             {leads.length}
           </span>
         </div>
-        {totalValue > 0 && (
-          <span className="text-xs text-slate-500 font-medium">{fmtUsd(totalValue)}</span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {totalValue > 0 && (
+            <span className="text-xs text-slate-500 font-medium">{fmtUsd(totalValue)}</span>
+          )}
+          {(onEditStage || onDeleteStage) && !compact && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="opacity-0 group-hover/header:opacity-100 p-0.5 rounded text-slate-400 hover:text-slate-700 hover:bg-white/70 transition-all">
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                {onEditStage && (
+                  <DropdownMenuItem onClick={() => setEditingLabel(stage.label)} className="gap-2 text-xs">
+                    <Pencil className="w-3.5 h-3.5" /> Renombrar
+                  </DropdownMenuItem>
+                )}
+                {onEditStage && onDeleteStage && <DropdownMenuSeparator />}
+                {onDeleteStage && (
+                  <DropdownMenuItem onClick={() => onDeleteStage(stage)} className="gap-2 text-xs text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
       <div className={`p-2 flex-1 overflow-y-auto ${compact ? 'max-h-[26vh]' : 'max-h-[58vh]'} ${isOver ? 'bg-white/30' : ''}`}>
         {leads.length === 0 && (
@@ -725,6 +774,7 @@ export default function CRMPage() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [localLeads, setLocalLeads] = useState<Lead[]>([]);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
+  const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [] } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
   });
@@ -813,6 +863,31 @@ export default function CRMPage() {
   };
   const handleStagesRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
+  };
+
+  const handleEditStage = (id: number, label: string, color: string) => {
+    const prev = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
+    queryClient.setQueryData(['/api/crm/stages'], prev.map(s => s.id === id ? { ...s, label, color } : s));
+    apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
+      .catch(() => {
+        queryClient.setQueryData(['/api/crm/stages'], prev);
+        toast({ title: 'Error al actualizar etapa', variant: 'destructive' });
+      });
+  };
+
+  const handleConfirmDeleteStage = () => {
+    if (!stageToDelete) return;
+    const id = stageToDelete.id;
+    const prev = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
+    setStageToDelete(null);
+    queryClient.setQueryData(['/api/crm/stages'], prev.filter(s => s.id !== id));
+    apiRequest(`/api/crm/stages/${id}`, 'DELETE')
+      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
+      .catch(() => {
+        queryClient.setQueryData(['/api/crm/stages'], prev);
+        toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
+      });
   };
 
   const leads = localLeads.length > 0 ? localLeads : fetchedLeads;
@@ -956,6 +1031,8 @@ export default function CRMPage() {
                   onDrop={handleDrop}
                   onDelete={handleDeleteLead}
                   onAddLead={setQuickAddStage}
+                  onEditStage={handleEditStage}
+                  onDeleteStage={setStageToDelete}
                   draggingId={draggingId}
                 />
               ))}
@@ -983,6 +1060,23 @@ export default function CRMPage() {
       ) : (
         <ListView leads={leads} stages={orderedStages} onLeadClick={handleLeadClick} />
       )}
+
+      <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar etapa?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la etapa <strong>"{stageToDelete?.label}"</strong>. Solo es posible si no tiene leads asignados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteStage} className="bg-red-600 hover:bg-red-700 text-white">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
