@@ -373,14 +373,15 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   const confirmDelete = () => {
     if (!stageToDelete) return;
     const id = stageToDelete.id;
-    const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
     setStageToDelete(null);
-    queryClient.setQueryData(['/api/crm/stages'], current.filter(s => s.id !== id));
     setOpen(false);
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
-      .then(() => toast({ title: 'Etapa eliminada' }))
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
+        toast({ title: 'Etapa eliminada' });
+      })
       .catch(() => {
-        queryClient.setQueryData(['/api/crm/stages'], current);
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
         toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
       });
   };
@@ -388,9 +389,8 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   const handleCreate = () => {
     if (!newLabel.trim()) return;
     apiRequest('/api/crm/stages', 'POST', { label: newLabel.trim(), color: newColor })
-      .then((stage) => {
-        const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
-        queryClient.setQueryData(['/api/crm/stages'], [...current, stage]);
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
         setNewLabel('');
         setNewColor('blue');
         setOpen(false);
