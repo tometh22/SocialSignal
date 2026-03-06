@@ -103,28 +103,34 @@ interface Stats {
   byStage: Record<string, number>;
 }
 
-function NewLeadModal({ onSuccess, stages }: { onSuccess: () => void; stages: CrmStage[] }) {
+function NewLeadModal({ onSuccess, stages, open: externalOpen, onOpenChange: externalOnOpenChange, initialStage }: {
+  onSuccess: () => void;
+  stages: CrmStage[];
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  initialStage?: string;
+}) {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const open = isControlled ? externalOpen! : internalOpen;
+  const setOpen = (v: boolean) => { isControlled ? externalOnOpenChange?.(v) : setInternalOpen(v); };
+
   const defaultStage = stages.find(s => s.key !== 'won' && s.key !== 'lost')?.key ?? 'new';
-  const [form, setForm] = useState({
-    companyName: '', stage: defaultStage, source: '',
-    estimatedValueUsd: '', notes: '',
-    contactName: '', contactEmail: '', contactPhone: '', contactPosition: '',
-  });
+  const emptyForm = { companyName: '', stage: defaultStage, source: '', estimatedValueUsd: '', notes: '', contactName: '', contactEmail: '', contactPhone: '', contactPosition: '' };
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    if (stages.length > 0 && !form.stage) {
-      setForm(f => ({ ...f, stage: defaultStage }));
+    if (open) {
+      setForm({ ...emptyForm, stage: initialStage ?? defaultStage });
     }
-  }, [stages]);
+  }, [open, initialStage]);
 
   const mutation = useMutation({
     mutationFn: (data: any) => apiRequest('/api/crm/leads', 'POST', data),
     onSuccess: () => {
       toast({ title: 'Lead creado correctamente' });
       setOpen(false);
-      setForm({ companyName: '', stage: defaultStage, source: '', estimatedValueUsd: '', notes: '', contactName: '', contactEmail: '', contactPhone: '', contactPosition: '' });
       onSuccess();
     },
     onError: () => toast({ title: 'Error al crear el lead', variant: 'destructive' }),
@@ -134,11 +140,13 @@ function NewLeadModal({ onSuccess, stages }: { onSuccess: () => void; stages: Cr
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
-          <Plus className="w-4 h-4" /> Nuevo Lead
-        </Button>
-      </DialogTrigger>
+      {!isControlled && (
+        <DialogTrigger asChild>
+          <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2">
+            <Plus className="w-4 h-4" /> Nuevo Lead
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Agregar Nuevo Lead</DialogTitle>
@@ -549,12 +557,13 @@ interface KanbanColumnProps {
   onDragStart: (e: React.DragEvent, leadId: number, fromStage: Stage) => void;
   onDrop: (e: React.DragEvent, toStage: Stage) => void;
   onDelete: (id: number) => void;
+  onAddLead?: (stageKey: string) => void;
   draggingId: number | null;
   compact?: boolean;
   dragHandleProps?: Record<string, any>;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, draggingId, compact, dragHandleProps }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete, onAddLead, draggingId, compact, dragHandleProps }: KanbanColumnProps) {
   const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [dragCounter, setDragCounter] = useState(0);
@@ -622,6 +631,17 @@ function KanbanColumn({ stage, leads, onLeadClick, onDragStart, onDrop, onDelete
           </div>
         )}
       </div>
+      {!compact && onAddLead && (
+        <div className="px-2 pb-2 pt-1">
+          <button
+            onClick={() => onAddLead(stage.key)}
+            className={`w-full py-1.5 text-xs text-slate-400 hover:text-indigo-600 hover:bg-white/80 rounded-lg border border-dashed ${meta.border} hover:border-indigo-300 transition-all flex items-center justify-center gap-1 group/add`}
+          >
+            <Plus className="w-3 h-3 group-hover/add:scale-110 transition-transform" />
+            Agregar lead
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -704,6 +724,7 @@ export default function CRMPage() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [localLeads, setLocalLeads] = useState<Lead[]>([]);
+  const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const { data: stages = [] } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
   });
@@ -816,6 +837,13 @@ export default function CRMPage() {
             <RefreshCw className="w-3.5 h-3.5" /> Actualizar
           </Button>
           <NewLeadModal onSuccess={handleRefresh} stages={stages} />
+          <NewLeadModal
+            onSuccess={handleRefresh}
+            stages={stages}
+            open={!!quickAddStage}
+            onOpenChange={(v) => { if (!v) setQuickAddStage(null); }}
+            initialStage={quickAddStage ?? undefined}
+          />
         </div>
       </div>
 
@@ -927,6 +955,7 @@ export default function CRMPage() {
                   onDragStart={handleDragStart}
                   onDrop={handleDrop}
                   onDelete={handleDeleteLead}
+                  onAddLead={setQuickAddStage}
                   draggingId={draggingId}
                 />
               ))}
