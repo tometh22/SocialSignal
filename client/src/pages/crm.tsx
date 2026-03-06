@@ -537,7 +537,7 @@ function LeadCard({ lead, onClick, onDragStart, onDelete, draggingId }: LeadCard
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`¿Eliminar "${lead.companyName}"?`)) onDelete(lead.id);
+              onDelete(lead.id);
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 ml-0.5"
             title="Eliminar lead"
