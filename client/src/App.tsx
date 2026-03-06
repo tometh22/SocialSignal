@@ -1,5 +1,6 @@
 import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
+import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 // Core Pages
@@ -226,6 +227,7 @@ function App() {
         <ChatProvider>
           <ImageRefreshProvider>
             <AppRoutes />
+            <GlobalTimerWidget />
             <Toaster />
           </ImageRefreshProvider>
         </ChatProvider>

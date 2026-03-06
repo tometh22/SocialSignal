@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag
+  CalendarIcon, Clock, Plus, Trash2, User, Users, Check, X, ChevronRight, Loader2, Flag, Timer
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useActiveTimer, formatElapsed } from "@/hooks/useActiveTimer";
 
 type Task = {
   id: number;
@@ -139,6 +140,7 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const descTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { isRunning, activeTaskId, elapsedSeconds, startTimer, stopTimer } = useActiveTimer();
 
   useEffect(() => {
     if (open && initialFocusTime) setShowTimeLog(true);
@@ -681,9 +683,47 @@ export default function TaskDetailPanel({ taskId, open, onClose, onUpdate, initi
                         Tiempo registrado
                         {loggedH > 0 && <span className="ml-1.5 text-muted-foreground font-normal">{formatHours(loggedH)}</span>}
                       </p>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowTimeLog(v => !v)}>
-                        {showTimeLog ? <X className="h-3 w-3" /> : <><Plus className="h-3 w-3 mr-1" />Registrar</>}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {isRunning && activeTaskId === task.id ? (
+                          <Button
+                            size="sm"
+                            className="h-6 text-xs bg-red-600 hover:bg-red-700 text-white px-2"
+                            onClick={() => {
+                              const result = stopTimer();
+                              if (result) {
+                                setLogHours(String(result.hours));
+                                setShowTimeLog(true);
+                              }
+                            }}
+                          >
+                            <Timer className="h-3 w-3 mr-1 animate-pulse" />
+                            {formatElapsed(elapsedSeconds)}
+                          </Button>
+                        ) : isRunning && activeTaskId !== task.id ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="sm" variant="ghost" className="h-6 text-xs opacity-40 cursor-not-allowed px-2" disabled>
+                                  <Timer className="h-3 w-3 mr-1" />Iniciar
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Cronómetro activo en otra tarea</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-xs text-muted-foreground hover:text-foreground px-2"
+                            onClick={() => startTimer(task.id, task.title, task.assigneeId ?? null)}
+                          >
+                            <Timer className="h-3 w-3 mr-1" />Iniciar
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setShowTimeLog(v => !v)}>
+                          {showTimeLog ? <X className="h-3 w-3" /> : <><Plus className="h-3 w-3 mr-1" />Registrar</>}
+                        </Button>
+                      </div>
                     </div>
 
                     {showTimeLog && (
