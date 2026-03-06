@@ -4,18 +4,6 @@ type FetcherOptions = {
   on401?: "throw" | "returnNull";
 };
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 30,
-      retry: 1,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-    },
-  },
-});
-
 // Returns Authorization header if a session token exists in sessionStorage
 export function getAuthHeader(): Record<string, string> {
   const token = sessionStorage.getItem('auth_token');
@@ -74,6 +62,19 @@ export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[
   
   return await response.json();
 };
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      queryFn: defaultQueryFn,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 // Function to get a query function with custom error handling
 export function getQueryFn({ on401 = "throw" }: FetcherOptions = {}) {
