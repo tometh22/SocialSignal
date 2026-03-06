@@ -24,10 +24,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragStartEvent,
-  useDraggable,
-  useDroppable,
-  DragOverlay,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -483,23 +479,19 @@ interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
   onDelete: (id: number) => void;
+  isDragging?: boolean;
+  onDragStart?: (e: React.MouseEvent) => void;
 }
 
-function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
+function LeadCard({ lead, onClick, onDelete, isDragging, onDragStart }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `card-${lead.id}`,
-    data: { type: 'card', leadId: lead.id, fromStage: lead.stage },
-  });
 
   return (
     <div
-      ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      onMouseDown={(e) => { e.preventDefault(); onDragStart?.(e); }}
       onClick={onClick}
-      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s', touchAction: 'none' }}
+      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
       className="bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all group select-none"
     >
       <div className="flex items-start gap-2 mb-2">
@@ -564,17 +556,17 @@ interface KanbanColumnProps {
   onDeleteStage?: (stage: CrmStage) => void;
   compact?: boolean;
   dragHandleProps?: Record<string, any>;
+  isDragOver?: boolean;
+  onCardDragStart?: (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => void;
+  draggingLeadId?: number | null;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps, isDragOver, onCardDragStart, draggingLeadId }: KanbanColumnProps) {
   const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `zone-${stage.key}`,
-    data: { stageKey: stage.key },
-  });
 
+  const isOver = !!isDragOver;
   const columnClass = isOver
     ? `rounded-xl border-2 ${meta.dropActive} flex flex-col transition-all duration-150 shadow-lg scale-[1.01]`
     : `rounded-xl border ${meta.border} ${meta.bg} flex flex-col transition-all duration-150`;
@@ -650,7 +642,10 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
           )}
         </div>
       </div>
-      <div ref={setDropRef} className={`p-2 flex-1 overflow-y-auto ${compact ? 'max-h-[26vh]' : 'max-h-[58vh]'} ${isOver ? 'bg-white/30' : ''}`}>
+      <div
+        data-stage-key={stage.key}
+        className={`p-2 flex-1 overflow-y-auto ${compact ? 'max-h-[26vh]' : 'max-h-[58vh]'} ${isOver ? 'bg-white/30' : ''}`}
+      >
         {leads.length === 0 && (
           <div className={`text-center text-slate-400 text-xs flex items-center justify-center border-2 border-dashed rounded-lg transition-colors
             ${isOver ? 'border-current py-8 opacity-70' : 'border-transparent py-6'}`}>
@@ -663,6 +658,8 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
             lead={lead}
             onClick={() => onLeadClick(lead.id)}
             onDelete={onDelete}
+            isDragging={draggingLeadId === lead.id}
+            onDragStart={(e) => onCardDragStart?.(lead.id, lead.stage, lead.companyName, e)}
           />
         ))}
         {leads.length > 0 && isOver && (
@@ -765,8 +762,8 @@ export default function CRMPage() {
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
-  const [draggingId, setDraggingId] = useState<number | null>(null);
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
+  const [cardDrag, setCardDrag] = useState<{ leadId: number; fromStage: string; companyName: string; x: number; y: number; active: boolean; hoverStageKey: string | null } | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
@@ -805,22 +802,30 @@ export default function CRMPage() {
 
   const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 3 } }));
 
-  const handleDndDragStart = (event: DragStartEvent) => {
-    if (event.active.data.current?.type === 'card') {
-      setDraggingId(event.active.data.current.leadId as number);
-    }
-  };
+  const handleCardDragStart = (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let state = { leadId, fromStage, companyName, x: e.clientX, y: e.clientY, active: false, hoverStageKey: null as string | null };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setDraggingId(null);
-    if (!over) return;
+    const onMove = (me: MouseEvent) => {
+      const dx = me.clientX - startX;
+      const dy = me.clientY - startY;
+      if (!state.active && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
+        state = { ...state, active: true };
+      }
+      if (state.active) {
+        const els = document.elementsFromPoint(me.clientX, me.clientY);
+        const dropEl = els.find(el => (el as HTMLElement).dataset?.stageKey) as HTMLElement | undefined;
+        state = { ...state, x: me.clientX, y: me.clientY, hoverStageKey: dropEl?.dataset.stageKey ?? null };
+        setCardDrag({ ...state });
+      }
+    };
 
-    if (active.data.current?.type === 'card') {
-      const leadId = active.data.current.leadId as number;
-      const fromStage = active.data.current.fromStage as string;
-      const toStage = over.data.current?.stageKey as string | undefined;
-      if (toStage && toStage !== fromStage) {
+    const onUp = (me: MouseEvent) => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (state.active && state.hoverStageKey && state.hoverStageKey !== fromStage) {
+        const toStage = state.hoverStageKey;
         setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
         apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
           .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
@@ -829,19 +834,27 @@ export default function CRMPage() {
             toast({ title: 'Error al mover el lead', variant: 'destructive' });
           });
       }
-    } else {
-      if (active.id === over.id) return;
-      const oldIdx = stages.findIndex(s => s.id === active.id);
-      const newIdx = stages.findIndex(s => s.id === over.id);
-      if (oldIdx === -1 || newIdx === -1) return;
-      const reordered = arrayMove([...stages], oldIdx, newIdx);
-      queryClient.setQueryData(['/api/crm/stages'], reordered);
-      apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
-        .catch(() => {
-          queryClient.setQueryData(['/api/crm/stages'], stages);
-          toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
-        });
-    }
+      setCardDrag(null);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    if (active.id === over.id) return;
+    const oldIdx = stages.findIndex(s => s.id === active.id);
+    const newIdx = stages.findIndex(s => s.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
+    const reordered = arrayMove([...stages], oldIdx, newIdx);
+    queryClient.setQueryData(['/api/crm/stages'], reordered);
+    apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
+      .catch(() => {
+        queryClient.setQueryData(['/api/crm/stages'], stages);
+        toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
+      });
   };
 
   const handleDeleteLead = (id: number) => {
@@ -887,7 +900,7 @@ export default function CRMPage() {
   const leadsForStage = (stage: Stage) => leads.filter(l => l.stage === stage);
 
   return (
-    <div className="space-y-5" onDragEnd={handleDragEnd}>
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1000,7 +1013,7 @@ export default function CRMPage() {
             <List className="w-4 h-4" />
           </button>
         </div>
-        {draggingId && (
+        {cardDrag?.active && (
           <span className="text-xs text-indigo-600 font-medium animate-pulse">
             Arrastrando — soltá en una columna para mover
           </span>
@@ -1011,7 +1024,7 @@ export default function CRMPage() {
       {leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
-        <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragStart={handleDndDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
               {mainStages.map(stage => (
@@ -1024,6 +1037,9 @@ export default function CRMPage() {
                   onAddLead={setQuickAddStage}
                   onEditStage={handleEditStage}
                   onDeleteStage={setStageToDelete}
+                  isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
+                  onCardDragStart={handleCardDragStart}
+                  draggingLeadId={cardDrag?.leadId ?? null}
                 />
               ))}
             </SortableContext>
@@ -1038,26 +1054,34 @@ export default function CRMPage() {
                     onLeadClick={handleLeadClick}
                     onDelete={handleDeleteLead}
                     compact
+                    isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
+                    onCardDragStart={handleCardDragStart}
+                    draggingLeadId={cardDrag?.leadId ?? null}
                   />
                 ))}
               </div>
             )}
           </div>
-          <DragOverlay>
-            {draggingId ? (() => {
-              const lead = (localLeads ?? fetchedLeads ?? []).find(l => l.id === draggingId);
-              if (!lead) return null;
-              return (
-                <div className="bg-white border border-indigo-300 rounded-lg p-3 shadow-2xl opacity-95 max-w-[260px]">
-                  <p className="font-semibold text-slate-800 text-sm truncate">{lead.companyName}</p>
-                  {lead.primaryContact && <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>}
-                </div>
-              );
-            })() : null}
-          </DragOverlay>
         </DndContext>
       ) : (
         <ListView leads={leads} stages={orderedStages} onLeadClick={handleLeadClick} />
+      )}
+
+      {cardDrag?.active && (
+        <div
+          style={{
+            position: 'fixed',
+            left: cardDrag.x + 14,
+            top: cardDrag.y - 16,
+            zIndex: 9999,
+            pointerEvents: 'none',
+            width: '220px',
+            transform: 'rotate(2deg)',
+          }}
+          className="bg-white border-2 border-indigo-400 rounded-lg p-3 shadow-2xl opacity-95"
+        >
+          <p className="font-semibold text-slate-800 text-sm truncate">{cardDrag.companyName}</p>
+        </div>
       )}
 
       <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
