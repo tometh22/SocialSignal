@@ -914,7 +914,7 @@ export default function CRMPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StageManagerDialog stages={orderedStages} onRefresh={handleStagesRefresh} />
+          <StageManagerDialog stages={orderedStages} onRefresh={() => {}} />
           <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" /> Actualizar
           </Button>
