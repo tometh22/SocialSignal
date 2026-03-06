@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   Target, Plus, Search, TrendingUp, DollarSign, Trophy, AlertCircle,
@@ -322,6 +323,7 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   const [localStages, setLocalStages] = useState<CrmStage[]>(stages);
   const [newLabel, setNewLabel] = useState('');
   const [newColor, setNewColor] = useState('blue');
+  const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
 
   useEffect(() => { setLocalStages(stages); }, [stages]);
 
@@ -351,14 +353,20 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
 
   const handleDelete = (id: number) => {
     const stage = localStages.find(s => s.id === id);
-    if (!window.confirm(`¿Eliminar etapa "${stage?.label}"? Solo es posible si no tiene leads asignados.`)) return;
+    if (stage) setStageToDelete(stage);
+  };
+
+  const confirmDelete = () => {
+    if (!stageToDelete) return;
+    const id = stageToDelete.id;
+    setStageToDelete(null);
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
       .then(() => {
         setLocalStages(prev => prev.filter(s => s.id !== id));
         onRefresh();
         toast({ title: 'Etapa eliminada' });
       })
-      .catch(() => toast({ title: 'Error al eliminar (puede tener leads asignados)', variant: 'destructive' }));
+      .catch(() => toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' }));
   };
 
   const handleCreate = () => {
@@ -375,6 +383,7 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
@@ -428,6 +437,24 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
         </div>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar etapa?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminará la etapa <strong>"{stageToDelete?.label}"</strong>. Solo es posible si no tiene leads asignados. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
+            Eliminar
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
