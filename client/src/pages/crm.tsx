@@ -802,9 +802,13 @@ export default function CRMPage() {
       return res.json();
     },
     refetchInterval: false,
+    refetchOnWindowFocus: false,
   });
 
-  useEffect(() => { setLocalLeads(fetchedLeads); }, [fetchedLeads]);
+  useEffect(() => { setLocalLeads(null); }, [stageFilter, search]);
+  useEffect(() => {
+    if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
+  }, [fetchedLeads, localLeads, leadsLoading]);
 
   const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
