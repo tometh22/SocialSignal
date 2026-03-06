@@ -575,6 +575,7 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
 
   return (
     <div
+      data-stage-key={stage.key}
       className={`${minW} ${columnClass}`}
     >
       <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between group/header`}>
