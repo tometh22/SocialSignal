@@ -296,7 +296,6 @@ function SortableStageRow({ stage, onSave, onDelete }: SortableStageRowProps) {
         <>
           <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: meta.hex }} />
           <span className={`flex-1 text-sm font-medium ${meta.color}`}>{stage.label}</span>
-          <span className="text-xs text-slate-400 font-mono">{stage.key}</span>
           <button
             onClick={() => setEditing(true)}
             className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition-opacity"
@@ -705,21 +704,11 @@ export default function CRMPage() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [localLeads, setLocalLeads] = useState<Lead[]>([]);
-  const [columnOrder, setColumnOrder] = useState<number[]>([]);
-
-  const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
+  const { data: stages = [] } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
   });
 
-  useEffect(() => {
-    if (stages.length > 0 && columnOrder.length === 0) {
-      setColumnOrder(stages.map(s => s.id));
-    }
-  }, [stages]);
-
-  const orderedStages = columnOrder.length > 0
-    ? columnOrder.map(id => stages.find(s => s.id === id)).filter(Boolean) as CrmStage[]
-    : stages;
+  const orderedStages = stages;
 
   const mainStages = orderedStages.filter(s => s.key !== 'won' && s.key !== 'lost');
   const wonStage = orderedStages.find(s => s.key === 'won');
@@ -750,13 +739,16 @@ export default function CRMPage() {
   const handleColumnDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIdx = columnOrder.indexOf(active.id as number);
-    const newIdx = columnOrder.indexOf(over.id as number);
-    const newOrder = arrayMove(columnOrder, oldIdx, newIdx);
-    setColumnOrder(newOrder);
-    apiRequest('/api/crm/stages/reorder', 'PATCH', { order: newOrder })
+    const oldIdx = stages.findIndex(s => s.id === active.id);
+    const newIdx = stages.findIndex(s => s.id === over.id);
+    const reordered = arrayMove([...stages], oldIdx, newIdx);
+    queryClient.setQueryData(['/api/crm/stages'], reordered);
+    apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
       .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
-      .catch(() => toast({ title: 'Error al reordenar columnas', variant: 'destructive' }));
+      .catch(() => {
+        queryClient.setQueryData(['/api/crm/stages'], stages);
+        toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
+      });
   };
 
   const handleDragStart = (e: React.DragEvent, leadId: number, fromStage: Stage) => {
@@ -799,9 +791,7 @@ export default function CRMPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
   };
   const handleStagesRefresh = () => {
-    refetchStages().then(r => {
-      if (r.data) setColumnOrder(r.data.map((s: CrmStage) => s.id));
-    });
+    queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
   };
 
   const leads = localLeads.length > 0 ? localLeads : fetchedLeads;
