@@ -377,11 +377,11 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
     setOpen(false);
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
       .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
+        onRefresh();
         toast({ title: 'Etapa eliminada' });
       })
       .catch(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
+        onRefresh();
         toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
       });
   };
@@ -390,7 +390,7 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
     if (!newLabel.trim()) return;
     apiRequest('/api/crm/stages', 'POST', { label: newLabel.trim(), color: newColor })
       .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] });
+        onRefresh();
         setNewLabel('');
         setNewColor('blue');
         setOpen(false);
@@ -784,7 +784,7 @@ export default function CRMPage() {
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
-  const { data: stages = [] } = useQuery<CrmStage[]>({
+  const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
   });
 
@@ -886,12 +886,13 @@ export default function CRMPage() {
   const handleConfirmDeleteStage = () => {
     if (!stageToDelete) return;
     const id = stageToDelete.id;
-    const prev = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
     setStageToDelete(null);
-    queryClient.setQueryData(['/api/crm/stages'], prev.filter(s => s.id !== id));
     apiRequest(`/api/crm/stages/${id}`, 'DELETE')
+      .then(() => {
+        refetchStages();
+      })
       .catch(() => {
-        queryClient.setQueryData(['/api/crm/stages'], prev);
+        refetchStages();
         toast({ title: 'No se puede eliminar: la etapa tiene leads asignados', variant: 'destructive' });
       });
   };
@@ -913,7 +914,7 @@ export default function CRMPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StageManagerDialog stages={orderedStages} onRefresh={() => {}} />
+          <StageManagerDialog stages={orderedStages} onRefresh={refetchStages} />
           <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" /> Actualizar
           </Button>
