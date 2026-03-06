@@ -384,7 +384,8 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
         setLocalStages(prev => [...prev, stage]);
         setNewLabel('');
         setNewColor('blue');
-        onRefresh();
+        const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
+        queryClient.setQueryData(['/api/crm/stages'], [...current, stage]);
         toast({ title: 'Etapa creada' });
       })
       .catch(() => toast({ title: 'Error al crear etapa', variant: 'destructive' }));
