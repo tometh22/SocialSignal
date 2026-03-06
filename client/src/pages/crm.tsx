@@ -497,14 +497,13 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
     <div
       ref={setNodeRef}
       {...attributes}
+      {...listeners}
       onClick={onClick}
-      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
-      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none"
+      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s', touchAction: 'none' }}
+      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all group select-none"
     >
       <div className="flex items-start gap-2 mb-2">
-        <span {...listeners} className="cursor-grab active:cursor-grabbing touch-none shrink-0 mt-0.5">
-          <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 transition-colors" />
-        </span>
+        <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors" />
         <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
@@ -804,7 +803,7 @@ export default function CRMPage() {
     if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
   }, [fetchedLeads, localLeads, leadsLoading]);
 
-  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 3 } }));
 
   const handleDndDragStart = (event: DragStartEvent) => {
     if (event.active.data.current?.type === 'card') {
