@@ -728,6 +728,7 @@ export default function CRMPage() {
     const newOrder = arrayMove(columnOrder, oldIdx, newIdx);
     setColumnOrder(newOrder);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: newOrder })
+      .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stages'] }))
       .catch(() => toast({ title: 'Error al reordenar columnas', variant: 'destructive' }));
   };
 
