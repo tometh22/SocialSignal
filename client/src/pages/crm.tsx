@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -19,16 +19,14 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   DndContext,
-  closestCenter,
-  pointerWithin,
-  CollisionDetection,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
   DragEndEvent,
   DragStartEvent,
+  DragOverEvent,
   DragOverlay,
-  useDraggable,
   useDroppable,
 } from "@dnd-kit/core";
 import {
@@ -490,7 +488,7 @@ interface LeadCardProps {
 function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `lead-${lead.id}`,
     data: { type: 'card', leadId: lead.id, fromStage: lead.stage, companyName: lead.companyName },
   });
@@ -501,8 +499,13 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
       {...listeners}
       {...attributes}
       onClick={onClick}
-      style={{ opacity: isDragging ? 0.3 : 1, cursor: isDragging ? 'grabbing' : 'grab' }}
-      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none touch-none"
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.25 : 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+      }}
+      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 group select-none touch-none"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
@@ -659,14 +662,16 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
             {isOver ? '↓ Soltar aquí' : 'Sin leads'}
           </div>
         )}
-        {leads.map(lead => (
-          <LeadCard
-            key={lead.id}
-            lead={lead}
-            onClick={() => onLeadClick(lead.id)}
-            onDelete={onDelete}
-          />
-        ))}
+        <SortableContext items={leads.map(l => `lead-${l.id}`)} strategy={verticalListSortingStrategy}>
+          {leads.map(lead => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onClick={() => onLeadClick(lead.id)}
+              onDelete={onDelete}
+            />
+          ))}
+        </SortableContext>
         {leads.length > 0 && isOver && (
           <div className="border-2 border-dashed border-current rounded-lg py-3 text-center text-xs text-slate-400 opacity-60">
             ↓ Soltar aquí
@@ -768,7 +773,7 @@ export default function CRMPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
-  const [activeDrag, setActiveDrag] = useState<{ type: string; leadId?: number; companyName?: string } | null>(null);
+  const [activeDrag, setActiveDrag] = useState<{ type: string; leadId?: number; companyName?: string; originalFromStage?: string } | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
@@ -807,47 +812,72 @@ export default function CRMPage() {
 
   const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
-    if (args.active.data.current?.type === 'card') {
-      return pointerWithin(args);
-    }
-    return closestCenter(args);
-  }, []);
-
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     if (active.data.current?.type === 'card') {
-      setActiveDrag({ type: 'card', leadId: active.data.current.leadId, companyName: active.data.current.companyName });
+      const leadId = active.data.current.leadId as number;
+      const originalFromStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage
+        ?? active.data.current.fromStage as string;
+      setActiveDrag({ type: 'card', leadId, companyName: active.data.current.companyName, originalFromStage });
     } else {
       setActiveDrag({ type: 'column' });
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDrag(null);
+  const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over || active.data.current?.type !== 'card') return;
+
+    const leadId = active.data.current.leadId as number;
+
+    let toStage: string | undefined;
+    if (over.data.current?.type === 'card') {
+      const overLeadId = over.data.current.leadId as number;
+      toStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === overLeadId)?.stage;
+    } else if (over.data.current?.stageKey) {
+      toStage = over.data.current.stageKey as string;
+    }
+
+    if (!toStage) return;
+
+    const currentStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+    if (toStage !== currentStage) {
+      setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l =>
+        l.id === leadId ? { ...l, stage: toStage! } : l
+      ));
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    const snapshot = activeDrag;
+    setActiveDrag(null);
 
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
-      const fromStage = active.data.current.fromStage as string;
-      // Resolve stage key: prefer explicit stageKey in data (set by both useDroppable and useSortable),
-      // fall back to over.id only if it's a string (stage.key), never use numeric stage.id as a key.
-      const toStage: string =
-        (over.data.current?.stageKey as string) ||
-        (typeof over.id === 'string' ? over.id : stages.find(s => s.id === over.id)?.key ?? '');
-      if (toStage && toStage !== fromStage) {
-        setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
-        apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
+      const originalStage = snapshot?.originalFromStage;
+      const currentStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+
+      if (!over) {
+        // Dropped outside — rollback
+        if (originalStage) {
+          setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage } : l));
+        }
+        return;
+      }
+
+      if (currentStage && originalStage && currentStage !== originalStage) {
+        apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: currentStage })
           .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
           .catch(() => {
-            setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
+            setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage! } : l));
             toast({ title: 'Error al mover el lead', variant: 'destructive' });
           });
       }
       return;
     }
 
+    if (!over) return;
     if (active.id === over.id) return;
     const oldIdx = stages.findIndex(s => s.id === active.id);
     const newIdx = stages.findIndex(s => s.id === over.id);
@@ -1028,7 +1058,7 @@ export default function CRMPage() {
       {leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
-        <DndContext sensors={columnSensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={columnSensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
               {mainStages.map(stage => (
