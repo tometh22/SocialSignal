@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -24,6 +24,10 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -479,23 +483,29 @@ interface LeadCardProps {
   lead: Lead;
   onClick: () => void;
   onDelete: (id: number) => void;
-  isDragging?: boolean;
-  onDragStart?: (e: React.MouseEvent) => void;
 }
 
-function LeadCard({ lead, onClick, onDelete, isDragging, onDragStart }: LeadCardProps) {
+function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: lead.id,
+    data: { type: 'card', leadId: lead.id, fromStage: lead.stage, companyName: lead.companyName },
+  });
 
   return (
     <div
-      onMouseDown={(e) => { e.preventDefault(); onDragStart?.(e); }}
+      ref={setNodeRef}
       onClick={onClick}
       style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
-      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-indigo-300 transition-all group select-none"
+      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none"
     >
       <div className="flex items-start gap-2 mb-2">
-        <GripVertical className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors" />
+        <GripVertical
+          {...listeners}
+          {...attributes}
+          className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors cursor-grab active:cursor-grabbing"
+        />
         <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
@@ -556,18 +566,17 @@ interface KanbanColumnProps {
   onDeleteStage?: (stage: CrmStage) => void;
   compact?: boolean;
   dragHandleProps?: Record<string, any>;
-  isDragOver?: boolean;
-  onCardDragStart?: (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => void;
-  draggingLeadId?: number | null;
-  onHoverStage?: (key: string | null) => void;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps, isDragOver, onCardDragStart, draggingLeadId, onHoverStage }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps }: KanbanColumnProps) {
   const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: stage.key,
+    data: { type: 'column', stageKey: stage.key },
+  });
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
 
-  const isOver = !!isDragOver;
   const columnClass = isOver
     ? `rounded-xl border-2 ${meta.dropActive} flex flex-col transition-all duration-150 shadow-lg scale-[1.01]`
     : `rounded-xl border ${meta.border} ${meta.bg} flex flex-col transition-all duration-150`;
@@ -576,10 +585,7 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
 
   return (
     <div
-      data-stage-key={stage.key}
       className={`${minW} ${columnClass}`}
-      onMouseEnter={() => onHoverStage?.(stage.key)}
-      onMouseLeave={() => onHoverStage?.(null)}
     >
       <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between group/header`}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -647,7 +653,7 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
         </div>
       </div>
       <div
-        data-stage-key={stage.key}
+        ref={setDropRef}
         className={`p-2 flex-1 overflow-y-auto ${compact ? 'max-h-[26vh]' : 'max-h-[58vh]'} ${isOver ? 'bg-white/30' : ''}`}
       >
         {leads.length === 0 && (
@@ -662,8 +668,6 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
             lead={lead}
             onClick={() => onLeadClick(lead.id)}
             onDelete={onDelete}
-            isDragging={draggingLeadId === lead.id}
-            onDragStart={(e) => onCardDragStart?.(lead.id, lead.stage, lead.companyName, e)}
           />
         ))}
         {leads.length > 0 && isOver && (
@@ -767,9 +771,7 @@ export default function CRMPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
-  const [cardDrag, setCardDrag] = useState<{ leadId: number; fromStage: string; companyName: string; x: number; y: number; active: boolean; hoverStageKey: string | null } | null>(null);
-  const hoverStageRef = useRef<string | null>(null);
-  const cardDragActiveRef = useRef(false);
+  const [activeDrag, setActiveDrag] = useState<{ type: string; leadId?: number; companyName?: string } | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
@@ -806,60 +808,38 @@ export default function CRMPage() {
     if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
   }, [fetchedLeads, localLeads, leadsLoading]);
 
-  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 3 } }));
+  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const handleCardDragStart = (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => {
-    const startX = e.clientX;
-    const startY = e.clientY;
-    cardDragActiveRef.current = false;
-    let state = { leadId, fromStage, companyName, x: e.clientX, y: e.clientY, active: false, hoverStageKey: null as string | null };
-
-    const getStageAtPoint = (x: number, y: number): string | null => {
-      const el = document.elementFromPoint(x, y);
-      const colEl = el?.closest('[data-stage-key]') as HTMLElement | null;
-      return colEl?.dataset.stageKey ?? null;
-    };
-
-    const onMove = (me: MouseEvent) => {
-      const dx = me.clientX - startX;
-      const dy = me.clientY - startY;
-      if (!state.active && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-        state = { ...state, active: true };
-        cardDragActiveRef.current = true;
-      }
-      if (state.active) {
-        const hk = getStageAtPoint(me.clientX, me.clientY);
-        state = { ...state, x: me.clientX, y: me.clientY, hoverStageKey: hk };
-        setCardDrag({ ...state });
-      }
-    };
-
-    const onUp = (me: MouseEvent) => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      if (cardDragActiveRef.current) {
-        const toStage = getStageAtPoint(me.clientX, me.clientY);
-        if (toStage && toStage !== fromStage) {
-          setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
-          apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
-            .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
-            .catch(() => {
-              setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
-              toast({ title: 'Error al mover el lead', variant: 'destructive' });
-            });
-        }
-      }
-      cardDragActiveRef.current = false;
-      setCardDrag(null);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    if (active.data.current?.type === 'card') {
+      setActiveDrag({ type: 'card', leadId: active.data.current.leadId, companyName: active.data.current.companyName });
+    } else {
+      setActiveDrag({ type: 'column' });
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDrag(null);
     const { active, over } = event;
     if (!over) return;
+
+    if (active.data.current?.type === 'card') {
+      const leadId = active.data.current.leadId as number;
+      const fromStage = active.data.current.fromStage as string;
+      const toStage = over.id as string;
+      if (toStage && toStage !== fromStage) {
+        setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
+        apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
+          .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
+          .catch(() => {
+            setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
+            toast({ title: 'Error al mover el lead', variant: 'destructive' });
+          });
+      }
+      return;
+    }
+
     if (active.id === over.id) return;
     const oldIdx = stages.findIndex(s => s.id === active.id);
     const newIdx = stages.findIndex(s => s.id === over.id);
@@ -1040,7 +1020,7 @@ export default function CRMPage() {
       {leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
-        <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
               {mainStages.map(stage => (
@@ -1053,10 +1033,6 @@ export default function CRMPage() {
                   onAddLead={setQuickAddStage}
                   onEditStage={handleEditStage}
                   onDeleteStage={setStageToDelete}
-                  isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
-                  onCardDragStart={handleCardDragStart}
-                  draggingLeadId={cardDrag?.leadId ?? null}
-                  onHoverStage={(key) => { hoverStageRef.current = key; }}
                 />
               ))}
             </SortableContext>
@@ -1071,35 +1047,24 @@ export default function CRMPage() {
                     onLeadClick={handleLeadClick}
                     onDelete={handleDeleteLead}
                     compact
-                    isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
-                    onCardDragStart={handleCardDragStart}
-                    draggingLeadId={cardDrag?.leadId ?? null}
-                    onHoverStage={(key) => { hoverStageRef.current = key; }}
                   />
                 ))}
               </div>
             )}
           </div>
+          <DragOverlay>
+            {activeDrag?.type === 'card' && activeDrag.companyName ? (
+              <div
+                style={{ width: '220px', transform: 'rotate(2deg)' }}
+                className="bg-white border-2 border-indigo-400 rounded-lg p-3 shadow-2xl opacity-95"
+              >
+                <p className="font-semibold text-slate-800 text-sm truncate">{activeDrag.companyName}</p>
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       ) : (
         <ListView leads={leads} stages={orderedStages} onLeadClick={handleLeadClick} />
-      )}
-
-      {cardDrag?.active && (
-        <div
-          style={{
-            position: 'fixed',
-            left: cardDrag.x + 14,
-            top: cardDrag.y - 16,
-            zIndex: 9999,
-            pointerEvents: 'none',
-            width: '220px',
-            transform: 'rotate(2deg)',
-          }}
-          className="bg-white border-2 border-indigo-400 rounded-lg p-3 shadow-2xl opacity-95"
-        >
-          <p className="font-semibold text-slate-800 text-sm truncate">{cardDrag.companyName}</p>
-        </div>
       )}
 
       <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
