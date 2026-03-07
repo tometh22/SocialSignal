@@ -491,23 +491,26 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: lead.id,
+    id: `lead-${lead.id}`,
     data: { type: 'card', leadId: lead.id, fromStage: lead.stage, companyName: lead.companyName },
   });
 
   return (
     <div
       ref={setNodeRef}
+      {...attributes}
       onClick={onClick}
       style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
       className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none"
     >
       <div className="flex items-start gap-2 mb-2">
-        <GripVertical
+        <button
           {...listeners}
-          {...attributes}
-          className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors cursor-grab active:cursor-grabbing"
-        />
+          onClick={(e) => e.stopPropagation()}
+          className="p-0 bg-transparent border-0 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </button>
         <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
