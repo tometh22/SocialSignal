@@ -811,9 +811,14 @@ export default function CRMPage() {
   const handleCardDragStart = (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => {
     const startX = e.clientX;
     const startY = e.clientY;
-    hoverStageRef.current = null;
     cardDragActiveRef.current = false;
     let state = { leadId, fromStage, companyName, x: e.clientX, y: e.clientY, active: false, hoverStageKey: null as string | null };
+
+    const getStageAtPoint = (x: number, y: number): string | null => {
+      const el = document.elementFromPoint(x, y);
+      const colEl = el?.closest('[data-stage-key]') as HTMLElement | null;
+      return colEl?.dataset.stageKey ?? null;
+    };
 
     const onMove = (me: MouseEvent) => {
       const dx = me.clientX - startX;
@@ -823,29 +828,27 @@ export default function CRMPage() {
         cardDragActiveRef.current = true;
       }
       if (state.active) {
-        const hk = hoverStageRef.current;
-        if (hk !== state.hoverStageKey) {
-          state = { ...state, hoverStageKey: hk };
-        }
-        state = { ...state, x: me.clientX, y: me.clientY };
+        const hk = getStageAtPoint(me.clientX, me.clientY);
+        state = { ...state, x: me.clientX, y: me.clientY, hoverStageKey: hk };
         setCardDrag({ ...state });
       }
     };
 
-    const onUp = () => {
+    const onUp = (me: MouseEvent) => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      const toStage = hoverStageRef.current;
-      if (cardDragActiveRef.current && toStage && toStage !== fromStage) {
-        setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
-        apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
-          .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
-          .catch(() => {
-            setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
-            toast({ title: 'Error al mover el lead', variant: 'destructive' });
-          });
+      if (cardDragActiveRef.current) {
+        const toStage = getStageAtPoint(me.clientX, me.clientY);
+        if (toStage && toStage !== fromStage) {
+          setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
+          apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
+            .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
+            .catch(() => {
+              setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: fromStage } : l));
+              toast({ title: 'Error al mover el lead', variant: 'destructive' });
+            });
+        }
       }
-      hoverStageRef.current = null;
       cardDragActiveRef.current = false;
       setCardDrag(null);
     };
