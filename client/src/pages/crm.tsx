@@ -498,37 +498,29 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
   return (
     <div
       ref={setNodeRef}
+      {...listeners}
       {...attributes}
       onClick={onClick}
-      style={{ opacity: isDragging ? 0.35 : 1, transition: 'opacity 0.15s' }}
-      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none"
+      style={{ opacity: isDragging ? 0.3 : 1, cursor: isDragging ? 'grabbing' : 'grab' }}
+      className="bg-white border border-slate-200 rounded-lg p-3 mb-2 hover:shadow-md hover:border-indigo-300 transition-all group select-none touch-none"
     >
-      <div className="flex items-start gap-2 mb-2">
-        <button
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-          className="p-0 bg-transparent border-0 text-slate-300 group-hover:text-slate-400 mt-0.5 shrink-0 transition-colors cursor-grab active:cursor-grabbing touch-none"
-        >
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-        <div className="flex-1 min-w-0 flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
-              {lead.companyName}
-            </p>
-            {lead.primaryContact && (
-              <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>
-            )}
-          </div>
-          {lead.estimatedValueUsd && (
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
-              {fmtUsd(lead.estimatedValueUsd)}
-            </span>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-slate-800 text-sm truncate group-hover:text-indigo-700 transition-colors">
+            {lead.companyName}
+          </p>
+          {lead.primaryContact && (
+            <p className="text-xs text-slate-500 truncate mt-0.5">{lead.primaryContact.name}</p>
           )}
         </div>
+        {lead.estimatedValueUsd && (
+          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded shrink-0">
+            {fmtUsd(lead.estimatedValueUsd)}
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center justify-between gap-1 pl-5">
+      <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1.5">
           {lead.primaryContact?.email && <Mail className="w-3 h-3 text-slate-400" />}
           {lead.primaryContact?.phone && <Phone className="w-3 h-3 text-slate-400" />}
@@ -813,7 +805,7 @@ export default function CRMPage() {
     if (localLeads === null && !leadsLoading) setLocalLeads(fetchedLeads);
   }, [fetchedLeads, localLeads, leadsLoading]);
 
-  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
     if (args.active.data.current?.type === 'card') {
@@ -1068,13 +1060,14 @@ export default function CRMPage() {
               </div>
             )}
           </div>
-          <DragOverlay>
+          <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
             {activeDrag?.type === 'card' && activeDrag.companyName ? (
               <div
-                style={{ width: '220px', transform: 'rotate(2deg)' }}
-                className="bg-white border-2 border-indigo-400 rounded-lg p-3 shadow-2xl opacity-95"
+                style={{ width: '240px', transform: 'rotate(1.5deg)', pointerEvents: 'none' }}
+                className="bg-white border-2 border-indigo-400 rounded-lg p-3 shadow-2xl opacity-95 cursor-grabbing"
               >
                 <p className="font-semibold text-slate-800 text-sm truncate">{activeDrag.companyName}</p>
+                <p className="text-xs text-indigo-500 mt-0.5">Mover a otra columna ↓</p>
               </div>
             ) : null}
           </DragOverlay>
