@@ -559,9 +559,10 @@ interface KanbanColumnProps {
   isDragOver?: boolean;
   onCardDragStart?: (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => void;
   draggingLeadId?: number | null;
+  onHoverStage?: (key: string | null) => void;
 }
 
-function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps, isDragOver, onCardDragStart, draggingLeadId }: KanbanColumnProps) {
+function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditStage, onDeleteStage, compact, dragHandleProps, isDragOver, onCardDragStart, draggingLeadId, onHoverStage }: KanbanColumnProps) {
   const meta = colorMeta(stage.color);
   const totalValue = leads.reduce((s, l) => s + (l.estimatedValueUsd || 0), 0);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
@@ -577,6 +578,8 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
     <div
       data-stage-key={stage.key}
       className={`${minW} ${columnClass}`}
+      onMouseEnter={() => onHoverStage?.(stage.key)}
+      onMouseLeave={() => onHoverStage?.(null)}
     >
       <div className={`px-3 py-2.5 border-b ${isOver ? meta.dropActive.split(' ')[1] : meta.border} flex items-center justify-between group/header`}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -765,6 +768,8 @@ export default function CRMPage() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [localLeads, setLocalLeads] = useState<Lead[] | null>(null);
   const [cardDrag, setCardDrag] = useState<{ leadId: number; fromStage: string; companyName: string; x: number; y: number; active: boolean; hoverStageKey: string | null } | null>(null);
+  const hoverStageRef = useRef<string | null>(null);
+  const cardDragActiveRef = useRef(false);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
@@ -806,6 +811,8 @@ export default function CRMPage() {
   const handleCardDragStart = (leadId: number, fromStage: string, companyName: string, e: React.MouseEvent) => {
     const startX = e.clientX;
     const startY = e.clientY;
+    hoverStageRef.current = null;
+    cardDragActiveRef.current = false;
     let state = { leadId, fromStage, companyName, x: e.clientX, y: e.clientY, active: false, hoverStageKey: null as string | null };
 
     const onMove = (me: MouseEvent) => {
@@ -813,20 +820,23 @@ export default function CRMPage() {
       const dy = me.clientY - startY;
       if (!state.active && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
         state = { ...state, active: true };
+        cardDragActiveRef.current = true;
       }
       if (state.active) {
-        const els = document.elementsFromPoint(me.clientX, me.clientY);
-        const dropEl = els.find(el => (el as HTMLElement).dataset?.stageKey) as HTMLElement | undefined;
-        state = { ...state, x: me.clientX, y: me.clientY, hoverStageKey: dropEl?.dataset.stageKey ?? null };
+        const hk = hoverStageRef.current;
+        if (hk !== state.hoverStageKey) {
+          state = { ...state, hoverStageKey: hk };
+        }
+        state = { ...state, x: me.clientX, y: me.clientY };
         setCardDrag({ ...state });
       }
     };
 
-    const onUp = (me: MouseEvent) => {
+    const onUp = () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
-      if (state.active && state.hoverStageKey && state.hoverStageKey !== fromStage) {
-        const toStage = state.hoverStageKey;
+      const toStage = hoverStageRef.current;
+      if (cardDragActiveRef.current && toStage && toStage !== fromStage) {
         setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
         apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
           .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
@@ -835,6 +845,8 @@ export default function CRMPage() {
             toast({ title: 'Error al mover el lead', variant: 'destructive' });
           });
       }
+      hoverStageRef.current = null;
+      cardDragActiveRef.current = false;
       setCardDrag(null);
     };
 
@@ -1041,6 +1053,7 @@ export default function CRMPage() {
                   isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
                   onCardDragStart={handleCardDragStart}
                   draggingLeadId={cardDrag?.leadId ?? null}
+                  onHoverStage={(key) => { hoverStageRef.current = key; }}
                 />
               ))}
             </SortableContext>
@@ -1058,6 +1071,7 @@ export default function CRMPage() {
                     isDragOver={cardDrag?.active && cardDrag.hoverStageKey === stage.key}
                     onCardDragStart={handleCardDragStart}
                     draggingLeadId={cardDrag?.leadId ?? null}
+                    onHoverStage={(key) => { hoverStageRef.current = key; }}
                   />
                 ))}
               </div>
