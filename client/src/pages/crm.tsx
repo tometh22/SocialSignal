@@ -1009,7 +1009,7 @@ export default function CRMPage() {
             <List className="w-4 h-4" />
           </button>
         </div>
-        {cardDrag?.active && (
+        {activeDrag?.type === 'card' && (
           <span className="text-xs text-indigo-600 font-medium animate-pulse">
             Arrastrando — soltá en una columna para mover
           </span>
