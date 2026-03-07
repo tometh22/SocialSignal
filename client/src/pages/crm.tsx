@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -20,6 +20,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
+  CollisionDetection,
   PointerSensor,
   useSensor,
   useSensors,
@@ -810,6 +812,13 @@ export default function CRMPage() {
 
   const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  const collisionDetectionStrategy: CollisionDetection = useCallback((args) => {
+    if (args.active.data.current?.type === 'card') {
+      return pointerWithin(args);
+    }
+    return closestCenter(args);
+  }, []);
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     if (active.data.current?.type === 'card') {
@@ -827,7 +836,11 @@ export default function CRMPage() {
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
       const fromStage = active.data.current.fromStage as string;
-      const toStage = over.id as string;
+      // Resolve stage key: prefer explicit stageKey in data (set by both useDroppable and useSortable),
+      // fall back to over.id only if it's a string (stage.key), never use numeric stage.id as a key.
+      const toStage: string =
+        (over.data.current?.stageKey as string) ||
+        (typeof over.id === 'string' ? over.id : stages.find(s => s.id === over.id)?.key ?? '');
       if (toStage && toStage !== fromStage) {
         setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l => l.id === leadId ? { ...l, stage: toStage } : l));
         apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: toStage })
@@ -1020,7 +1033,7 @@ export default function CRMPage() {
       {leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
-        <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={columnSensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
               {mainStages.map(stage => (
