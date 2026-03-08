@@ -837,9 +837,9 @@ export default function CRMPage() {
       const leadId = active.data.current.leadId as number;
       const originalFromStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage
         ?? active.data.current.fromStage as string;
-      // Store in ref (sync) so handleDragEnd always reads the correct value
       activeDragRef.current = { leadId, originalFromStage };
       setActiveDrag({ type: 'card', leadId, companyName: active.data.current.companyName, originalFromStage });
+      console.log('[DragStart] card leadId:', leadId, '| originalFromStage:', originalFromStage);
     } else {
       activeDragRef.current = null;
       setActiveDrag({ type: 'column' });
@@ -848,7 +848,6 @@ export default function CRMPage() {
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    console.log('[DragOver] active.type:', active.data.current?.type, '| over.id:', over?.id, '| over.type:', over?.data.current?.type, '| over.stageKey:', over?.data.current?.stageKey);
     if (!over || active.data.current?.type !== 'card') return;
 
     const leadId = active.data.current.leadId as number;
@@ -862,13 +861,16 @@ export default function CRMPage() {
       }
     } else if (over.data.current?.stageKey) {
       toStage = over.data.current.stageKey as string;
+    } else {
+      // Fallback: over.id might be a numeric stage id from SortableContext
+      const stageById = stages.find(s => s.id === over.id);
+      if (stageById) toStage = stageById.key;
     }
 
     if (!toStage) return;
 
     const currentStage = leads.find(l => l.id === leadId)?.stage;
     if (toStage !== currentStage) {
-      // Track in ref so handleDragEnd always has the latest value
       pendingMoveRef.current = { leadId, toStage };
       setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l =>
         l.id === leadId ? { ...l, stage: toStage! } : l
@@ -876,10 +878,31 @@ export default function CRMPage() {
     }
   };
 
+  const resolveTargetStage = (over: DragEndEvent['over'], leadId: number): string | undefined => {
+    if (!over) return undefined;
+    // 1. pendingMoveRef (set during dragOver — most up-to-date)
+    if (pendingMoveRef.current?.leadId === leadId) return pendingMoveRef.current.toStage;
+    // 2. over has stageKey directly (column droppable or sortable)
+    if (over.data.current?.stageKey) return over.data.current.stageKey as string;
+    // 3. over.id is a numeric stage id (outer SortableContext)
+    const stageById = stages.find(s => s.id === over.id);
+    if (stageById) return stageById.key;
+    // 4. over is a card — get that card's current stage from localLeads
+    if (over.data.current?.type === 'card') {
+      const overLeadId = over.data.current.leadId as number;
+      return (localLeads ?? fetchedLeads ?? []).find(l => l.id === overLeadId)?.stage;
+    }
+    // 5. last resort: read current stage of this lead from localLeads
+    return (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    const pending = pendingMoveRef.current;
     const activeDragSnap = activeDragRef.current;
+    // Read pending BEFORE clearing it (resolveTargetStage uses pendingMoveRef)
+    const targetStage = active.data.current?.type === 'card'
+      ? resolveTargetStage(over, active.data.current.leadId as number)
+      : undefined;
     pendingMoveRef.current = null;
     activeDragRef.current = null;
     setActiveDrag(null);
@@ -887,23 +910,17 @@ export default function CRMPage() {
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
       const originalStage = activeDragSnap?.originalFromStage;
-      console.log('[DragEnd] card leadId:', leadId, '| originalStage:', originalStage, '| pending:', pending, '| over.id:', over?.id, '| over.type:', over?.data.current?.type);
+      console.log('[DragEnd] card leadId:', leadId, '| originalStage:', originalStage, '| targetStage:', targetStage, '| over.id:', over?.id, '| over.type:', over?.data.current?.type);
 
       if (!originalStage) return;
 
       if (!over) {
-        // Dropped outside — rollback
         setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage } : l));
         return;
       }
 
-      // Use ref value (most up-to-date) or fall back to localLeads
-      const targetStage = (pending?.leadId === leadId ? pending.toStage : null)
-        ?? (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
-
       if (!targetStage || targetStage === originalStage) return;
 
-      // Ensure localLeads reflects the final position (in case ref was ahead of state)
       setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l =>
         l.id === leadId ? { ...l, stage: targetStage } : l
       ));
