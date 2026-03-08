@@ -416,7 +416,7 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
           <DialogTitle>Gestionar Etapas</DialogTitle>
         </DialogHeader>
         <div className="space-y-1 max-h-80 overflow-y-auto">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
             <SortableContext items={localStages.map(s => s.id)} strategy={verticalListSortingStrategy}>
               {localStages.map(stage => (
                 <SortableStageRow
