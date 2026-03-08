@@ -818,6 +818,8 @@ export default function CRMPage() {
   // useRef so handleDragEnd always reads the latest target stage,
   // even if React hasn't committed the localLeads update yet.
   const pendingMoveRef = useRef<{ leadId: number; toStage: string } | null>(null);
+  // Ref for original stage at drag start — bypasses stale state closures entirely
+  const activeDragRef = useRef<{ leadId: number; originalFromStage: string } | null>(null);
 
   const collisionDetection: CollisionDetection = (args) => {
     if (args.active.data.current?.type === 'card') {
@@ -835,14 +837,18 @@ export default function CRMPage() {
       const leadId = active.data.current.leadId as number;
       const originalFromStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage
         ?? active.data.current.fromStage as string;
+      // Store in ref (sync) so handleDragEnd always reads the correct value
+      activeDragRef.current = { leadId, originalFromStage };
       setActiveDrag({ type: 'card', leadId, companyName: active.data.current.companyName, originalFromStage });
     } else {
+      activeDragRef.current = null;
       setActiveDrag({ type: 'column' });
     }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
+    console.log('[DragOver] active.type:', active.data.current?.type, '| over.id:', over?.id, '| over.type:', over?.data.current?.type, '| over.stageKey:', over?.data.current?.stageKey);
     if (!over || active.data.current?.type !== 'card') return;
 
     const leadId = active.data.current.leadId as number;
@@ -872,14 +878,16 @@ export default function CRMPage() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    const snapshot = activeDrag;
     const pending = pendingMoveRef.current;
+    const activeDragSnap = activeDragRef.current;
     pendingMoveRef.current = null;
+    activeDragRef.current = null;
     setActiveDrag(null);
 
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
-      const originalStage = snapshot?.originalFromStage;
+      const originalStage = activeDragSnap?.originalFromStage;
+      console.log('[DragEnd] card leadId:', leadId, '| originalStage:', originalStage, '| pending:', pending, '| over.id:', over?.id, '| over.type:', over?.data.current?.type);
 
       if (!originalStage) return;
 
