@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -20,6 +20,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import {
   DndContext,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
+  CollisionDetection,
   PointerSensor,
   useSensor,
   useSensors,
@@ -812,6 +815,20 @@ export default function CRMPage() {
 
   const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
+  // useRef so handleDragEnd always reads the latest target stage,
+  // even if React hasn't committed the localLeads update yet.
+  const pendingMoveRef = useRef<{ leadId: number; toStage: string } | null>(null);
+
+  const collisionDetection: CollisionDetection = (args) => {
+    if (args.active.data.current?.type === 'card') {
+      // For cards: pointer-within first, then rect-intersection fallback
+      const pointerCollisions = pointerWithin(args);
+      if (pointerCollisions.length > 0) return pointerCollisions;
+      return rectIntersection(args);
+    }
+    return closestCorners(args);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     if (active.data.current?.type === 'card') {
@@ -829,19 +846,24 @@ export default function CRMPage() {
     if (!over || active.data.current?.type !== 'card') return;
 
     const leadId = active.data.current.leadId as number;
+    const leads = localLeads ?? fetchedLeads ?? [];
 
     let toStage: string | undefined;
     if (over.data.current?.type === 'card') {
       const overLeadId = over.data.current.leadId as number;
-      toStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === overLeadId)?.stage;
+      if (overLeadId !== leadId) {
+        toStage = leads.find(l => l.id === overLeadId)?.stage;
+      }
     } else if (over.data.current?.stageKey) {
       toStage = over.data.current.stageKey as string;
     }
 
     if (!toStage) return;
 
-    const currentStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+    const currentStage = leads.find(l => l.id === leadId)?.stage;
     if (toStage !== currentStage) {
+      // Track in ref so handleDragEnd always has the latest value
+      pendingMoveRef.current = { leadId, toStage };
       setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l =>
         l.id === leadId ? { ...l, stage: toStage! } : l
       ));
@@ -851,29 +873,38 @@ export default function CRMPage() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     const snapshot = activeDrag;
+    const pending = pendingMoveRef.current;
+    pendingMoveRef.current = null;
     setActiveDrag(null);
 
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
       const originalStage = snapshot?.originalFromStage;
-      const currentStage = (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+
+      if (!originalStage) return;
 
       if (!over) {
         // Dropped outside — rollback
-        if (originalStage) {
-          setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage } : l));
-        }
+        setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage } : l));
         return;
       }
 
-      if (currentStage && originalStage && currentStage !== originalStage) {
-        apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: currentStage })
-          .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
-          .catch(() => {
-            setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage! } : l));
-            toast({ title: 'Error al mover el lead', variant: 'destructive' });
-          });
-      }
+      // Use ref value (most up-to-date) or fall back to localLeads
+      const targetStage = (pending?.leadId === leadId ? pending.toStage : null)
+        ?? (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+
+      if (!targetStage || targetStage === originalStage) return;
+
+      // Ensure localLeads reflects the final position (in case ref was ahead of state)
+      setLocalLeads(prev => (prev ?? fetchedLeads ?? []).map(l =>
+        l.id === leadId ? { ...l, stage: targetStage } : l
+      ));
+      apiRequest(`/api/crm/leads/${leadId}`, 'PATCH', { stage: targetStage })
+        .then(() => queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] }))
+        .catch(() => {
+          setLocalLeads(prev => (prev ?? []).map(l => l.id === leadId ? { ...l, stage: originalStage } : l));
+          toast({ title: 'Error al mover el lead', variant: 'destructive' });
+        });
       return;
     }
 
@@ -1058,7 +1089,7 @@ export default function CRMPage() {
       {leadsLoading ? (
         <div className="text-center py-16 text-slate-400">Cargando leads...</div>
       ) : viewMode === 'kanban' ? (
-        <DndContext sensors={columnSensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
+        <DndContext sensors={columnSensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
           <div className="flex gap-3 overflow-x-auto pb-4">
             <SortableContext items={mainStages.map(s => s.id)} strategy={horizontalListSortingStrategy}>
               {mainStages.map(stage => (
