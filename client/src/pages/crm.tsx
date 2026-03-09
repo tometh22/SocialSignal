@@ -779,6 +779,8 @@ export default function CRMPage() {
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
   const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
 
   const orderedStages = stages;
@@ -916,14 +918,15 @@ export default function CRMPage() {
 
     if (!over) return;
     if (active.id === over.id) return;
-    const oldIdx = stages.findIndex(s => s.id === active.id);
-    const newIdx = stages.findIndex(s => s.id === over.id);
+    const currentStages = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? stages;
+    const oldIdx = currentStages.findIndex(s => s.id === active.id);
+    const newIdx = currentStages.findIndex(s => s.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
-    const reordered = arrayMove([...stages], oldIdx, newIdx);
+    const reordered = arrayMove([...currentStages], oldIdx, newIdx);
     queryClient.setQueryData(['/api/crm/stages'], reordered);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
       .catch(() => {
-        queryClient.setQueryData(['/api/crm/stages'], stages);
+        queryClient.setQueryData(['/api/crm/stages'], currentStages);
         toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
       });
   };
