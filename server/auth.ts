@@ -189,8 +189,20 @@ export function setupAuth(app: Express, storage: IStorage) {
 
       console.log('✅ Session destroyed successfully');
 
-      res.clearCookie('epical_sid', { path: '/' });
+      const isProduction = process.env.NODE_ENV === 'production';
 
+      // Clear all session cookies — try both secure and non-secure variants
+      // to cover cookies set before the secure flag was standardised
+      const cookieNames = ['epical_sid', 'connect.sid', 'epical.persistent.sid'];
+      cookieNames.forEach(name => {
+        res.clearCookie(name, { path: '/', sameSite: 'lax', secure: false });
+        if (isProduction) {
+          res.clearCookie(name, { path: '/', sameSite: 'none', secure: true });
+          res.clearCookie(name, { path: '/', sameSite: 'lax', secure: true });
+        }
+      });
+
+      console.log('🍪 All session cookies cleared');
       res.status(200).json({ message: "Sesión cerrada correctamente" });
     });
   });
