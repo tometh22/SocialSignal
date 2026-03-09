@@ -641,7 +641,10 @@ export default function StatusSemanalPage() {
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
       apiRequest(`/api/status-semanal/${projectId}`, 'PATCH', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
-    onError: () => toast({ title: 'Error al guardar', variant: 'destructive' }),
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+      toast({ title: 'Error al guardar', variant: 'destructive' });
+    },
   });
 
   const removeProject = useMutation({
@@ -661,7 +664,10 @@ export default function StatusSemanalPage() {
     mutationFn: ({ id, data }: { id: number; data: Record<string, any> }) =>
       apiRequest(`/api/status-semanal/custom/${id}`, 'PATCH', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
-    onError: () => toast({ title: 'Error al guardar', variant: 'destructive' }),
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+      toast({ title: 'Error al guardar', variant: 'destructive' });
+    },
   });
 
   const deleteCustom = useMutation({
@@ -673,10 +679,16 @@ export default function StatusSemanalPage() {
   // ── Update helpers ────────────────────────────────────────────────────────────
 
   const updateProject = (projectId: number, data: Record<string, any>) => {
+    queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
+      prev ? prev.map(r => r.projectId === projectId ? { ...r, ...data } : r) : prev
+    );
     patchProject.mutate({ projectId, data });
   };
 
   const updateCustom = (id: number, data: Record<string, any>) => {
+    queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
+      prev ? prev.map(c => c.id === id ? { ...c, ...data } : c) : prev
+    );
     patchCustom.mutate({ id, data });
   };
 
