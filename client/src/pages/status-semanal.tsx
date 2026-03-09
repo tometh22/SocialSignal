@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -520,8 +521,8 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
   const addMutation = useMutation({
     mutationFn: (content: string) => apiRequest(`/api/status-semanal/${projectId}/notes`, 'POST', { content }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
     },
     onError: () => toast({ title: 'Error al guardar nota', variant: 'destructive' }),
   });
@@ -529,8 +530,8 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
   const deleteMutation = useMutation({
     mutationFn: (noteId: number) => apiRequest(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
     },
     onError: () => toast({ title: 'Error al eliminar nota', variant: 'destructive' }),
   });
@@ -640,40 +641,46 @@ export default function StatusSemanalPage() {
   const patchProject = useMutation({
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
       apiRequest(`/api/status-semanal/${projectId}`, 'PATCH', data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] }),
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
       toast({ title: 'Error al guardar', variant: 'destructive' });
     },
   });
 
   const removeProject = useMutation({
     mutationFn: (projectId: number) => apiRequest(`/api/status-semanal/${projectId}`, 'DELETE'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
-    onError: () => toast({ title: 'Error al quitar proyecto', variant: 'destructive' }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] }),
+    onError: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      toast({ title: 'Error al quitar proyecto', variant: 'destructive' });
+    },
   });
 
   const createCustom = useMutation({
     mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
       apiRequest('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] }),
     onError: () => toast({ title: 'Error al crear ítem', variant: 'destructive' }),
   });
 
   const patchCustom = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, any> }) =>
       apiRequest(`/api/status-semanal/custom/${id}`, 'PATCH', data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] }),
     onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
       toast({ title: 'Error al guardar', variant: 'destructive' });
     },
   });
 
   const deleteCustom = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/status-semanal/custom/${id}`, 'DELETE'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
-    onError: () => toast({ title: 'Error al eliminar', variant: 'destructive' }),
+    onSuccess: () => queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    },
   });
 
   // ── Update helpers ────────────────────────────────────────────────────────────
@@ -756,9 +763,17 @@ export default function StatusSemanalPage() {
     },
     onRemove: () => {
       if (item.isCustom && item.customId) {
-        deleteCustom.mutate(item.customId);
+        const customId = item.customId;
+        queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
+          prev ? prev.filter(c => c.id !== customId) : prev
+        );
+        deleteCustom.mutate(customId);
       } else if (item.projectId) {
-        removeProject.mutate(item.projectId);
+        const projectId = item.projectId;
+        queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
+          prev ? prev.map(r => r.projectId === projectId ? { ...r, hiddenFromWeekly: true } : r) : prev
+        );
+        removeProject.mutate(projectId);
       }
     },
     onOpenNotes: item.projectId ? () => setNotesOpen(notesOpen === item.projectId ? null : item.projectId!) : undefined,
@@ -845,12 +860,22 @@ export default function StatusSemanalPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {alertItems.map(item => {
-                      const h = getItemHandlers(item);
-                      return <AlertCard key={item.key} item={item} users={appUsers}
-                        isSelected={!item.isCustom && notesOpen === item.projectId}
-                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
-                    })}
+                    <AnimatePresence initial={false}>
+                      {alertItems.map(item => {
+                        const h = getItemHandlers(item);
+                        return (
+                          <motion.div key={item.key} layout
+                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                            transition={{ duration: 0.18, ease: 'easeOut' }}>
+                            <AlertCard item={item} users={appUsers}
+                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 )}
               </div>
@@ -872,12 +897,22 @@ export default function StatusSemanalPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {decisionItems.map(item => {
-                      const h = getItemHandlers(item);
-                      return <AlertCard key={item.key} item={item} users={appUsers}
-                        isSelected={!item.isCustom && notesOpen === item.projectId}
-                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
-                    })}
+                    <AnimatePresence initial={false}>
+                      {decisionItems.map(item => {
+                        const h = getItemHandlers(item);
+                        return (
+                          <motion.div key={item.key} layout
+                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
+                            transition={{ duration: 0.18, ease: 'easeOut' }}>
+                            <AlertCard item={item} users={appUsers}
+                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 )}
               </div>
@@ -911,12 +946,22 @@ export default function StatusSemanalPage() {
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-16" />
                     </div>
-                    {normalItems.map(item => {
-                      const h = getItemHandlers(item);
-                      return <CompactRow key={item.key} item={item} users={appUsers}
-                        isSelected={!item.isCustom && notesOpen === item.projectId}
-                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
-                    })}
+                    <AnimatePresence initial={false}>
+                      {normalItems.map(item => {
+                        const h = getItemHandlers(item);
+                        return (
+                          <motion.div key={item.key} layout
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -8 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}>
+                            <CompactRow item={item} users={appUsers}
+                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 )}
               </div>
@@ -930,24 +975,31 @@ export default function StatusSemanalPage() {
                     <span className="text-xs font-semibold bg-slate-100 text-slate-400 border-slate-200 px-2 py-0.5 rounded-full border">{hiddenCount}</span>
                   </div>
                   <div className="rounded-xl border border-dashed border-slate-200 overflow-hidden opacity-60">
-                    {allItems.filter(i => i.hiddenFromWeekly).map(item => {
-                      const h = getItemHandlers(item);
-                      return (
-                        <div key={item.key} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                          <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", hm(item.healthStatus).dot)} />
-                          <span className="flex-1 text-sm text-slate-500">{item.title}{item.subtitle && ` · ${item.subtitle}`}</span>
-                          <button onClick={() => h.onUpdate({ hiddenFromWeekly: false })}
-                            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium">
-                            <Eye className="h-3.5 w-3.5" /> Restaurar
-                          </button>
-                          {item.isCustom && (
-                            <button onClick={h.onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium ml-2">
-                              <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                    <AnimatePresence initial={false}>
+                      {allItems.filter(i => i.hiddenFromWeekly).map(item => {
+                        const h = getItemHandlers(item);
+                        return (
+                          <motion.div key={item.key} layout
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50 overflow-hidden">
+                            <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", hm(item.healthStatus).dot)} />
+                            <span className="flex-1 text-sm text-slate-500">{item.title}{item.subtitle && ` · ${item.subtitle}`}</span>
+                            <button onClick={() => h.onUpdate({ hiddenFromWeekly: false })}
+                              className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+                              <Eye className="h-3.5 w-3.5" /> Restaurar
                             </button>
-                          )}
-                        </div>
-                      );
-                    })}
+                            {item.isCustom && (
+                              <button onClick={h.onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium ml-2">
+                                <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                              </button>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
                   </div>
                 </div>
               )}
