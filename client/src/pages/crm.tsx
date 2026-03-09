@@ -31,6 +31,7 @@ import {
   DragOverEvent,
   DragOverlay,
   useDroppable,
+  useDraggable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -491,7 +492,7 @@ interface LeadCardProps {
 function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
   const days = daysSince(lead.lastActivity?.activityDate || lead.updatedAt);
   const isStale = (days ?? 0) > 7;
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `lead-${lead.id}`,
     data: { type: 'card', leadId: lead.id, fromStage: lead.stage, companyName: lead.companyName },
   });
@@ -503,8 +504,7 @@ function LeadCard({ lead, onClick, onDelete }: LeadCardProps) {
       {...attributes}
       onClick={onClick}
       style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         opacity: isDragging ? 0.25 : 1,
         cursor: isDragging ? 'grabbing' : 'grab',
       }}
@@ -665,16 +665,14 @@ function KanbanColumn({ stage, leads, onLeadClick, onDelete, onAddLead, onEditSt
             {isOver ? '↓ Soltar aquí' : 'Sin leads'}
           </div>
         )}
-        <SortableContext items={leads.map(l => `lead-${l.id}`)} strategy={verticalListSortingStrategy}>
-          {leads.map(lead => (
-            <LeadCard
-              key={lead.id}
-              lead={lead}
-              onClick={() => onLeadClick(lead.id)}
-              onDelete={onDelete}
-            />
-          ))}
-        </SortableContext>
+        {leads.map(lead => (
+          <LeadCard
+            key={lead.id}
+            lead={lead}
+            onClick={() => onLeadClick(lead.id)}
+            onDelete={onDelete}
+          />
+        ))}
         {leads.length > 0 && isOver && (
           <div className="border-2 border-dashed border-current rounded-lg py-3 text-center text-xs text-slate-400 opacity-60">
             ↓ Soltar aquí
@@ -839,7 +837,6 @@ export default function CRMPage() {
         ?? active.data.current.fromStage as string;
       activeDragRef.current = { leadId, originalFromStage };
       setActiveDrag({ type: 'card', leadId, companyName: active.data.current.companyName, originalFromStage });
-      console.log('[DragStart] card leadId:', leadId, '| originalFromStage:', originalFromStage);
     } else {
       activeDragRef.current = null;
       setActiveDrag({ type: 'column' });
@@ -854,15 +851,9 @@ export default function CRMPage() {
     const leads = localLeads ?? fetchedLeads ?? [];
 
     let toStage: string | undefined;
-    if (over.data.current?.type === 'card') {
-      const overLeadId = over.data.current.leadId as number;
-      if (overLeadId !== leadId) {
-        toStage = leads.find(l => l.id === overLeadId)?.stage;
-      }
-    } else if (over.data.current?.stageKey) {
+    if (over.data.current?.stageKey) {
       toStage = over.data.current.stageKey as string;
     } else {
-      // Fallback: over.id might be a numeric stage id from SortableContext
       const stageById = stages.find(s => s.id === over.id);
       if (stageById) toStage = stageById.key;
     }
@@ -880,20 +871,11 @@ export default function CRMPage() {
 
   const resolveTargetStage = (over: DragEndEvent['over'], leadId: number): string | undefined => {
     if (!over) return undefined;
-    // 1. pendingMoveRef (set during dragOver — most up-to-date)
     if (pendingMoveRef.current?.leadId === leadId) return pendingMoveRef.current.toStage;
-    // 2. over has stageKey directly (column droppable or sortable)
     if (over.data.current?.stageKey) return over.data.current.stageKey as string;
-    // 3. over.id is a numeric stage id (outer SortableContext)
     const stageById = stages.find(s => s.id === over.id);
     if (stageById) return stageById.key;
-    // 4. over is a card — get that card's current stage from localLeads
-    if (over.data.current?.type === 'card') {
-      const overLeadId = over.data.current.leadId as number;
-      return (localLeads ?? fetchedLeads ?? []).find(l => l.id === overLeadId)?.stage;
-    }
-    // 5. last resort: read current stage of this lead from localLeads
-    return (localLeads ?? fetchedLeads ?? []).find(l => l.id === leadId)?.stage;
+    return undefined;
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -910,7 +892,6 @@ export default function CRMPage() {
     if (active.data.current?.type === 'card') {
       const leadId = active.data.current.leadId as number;
       const originalStage = activeDragSnap?.originalFromStage;
-      console.log('[DragEnd] card leadId:', leadId, '| originalStage:', originalStage, '| targetStage:', targetStage, '| over.id:', over?.id, '| over.type:', over?.data.current?.type);
 
       if (!originalStage) return;
 
