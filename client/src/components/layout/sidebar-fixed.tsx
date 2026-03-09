@@ -14,6 +14,7 @@ import NewProjectDialog from "@/components/tasks/NewProjectDialog";
 
 import {
   ChevronRight,
+  ChevronDown,
   LayoutDashboard,
   FileText,
   Briefcase,
@@ -84,6 +85,7 @@ export default function SidebarFixed() {
   const [dueReminders, setDueReminders] = useState<DueReminder[]>([]);
   const [bellOpen, setBellOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [projectsExpanded, setProjectsExpanded] = useState(false);
 
   const fetchProjectCount = async () => {
     try {
@@ -144,44 +146,38 @@ export default function SidebarFixed() {
   const taskProjects: TaskProjectSummary[] = Array.isArray(rawTaskProjects) ? rawTaskProjects : [];
   const MAX_SIDEBAR_PROJECTS = 8;
   const sidebarProjects = taskProjects.slice(0, MAX_SIDEBAR_PROJECTS);
-  const hasMoreProjects = taskProjects.length > MAX_SIDEBAR_PROJECTS;
 
   const navSections = [
     {
-      title: "Principal",
+      title: "",
       items: [
-        { href: "/", title: "Dashboard Ejecutivo", icon: LayoutDashboard, description: "Resumen general y KPIs", permission: 'dashboard' as AppSection }
+        { href: "/", title: "Dashboard", icon: LayoutDashboard, description: "Resumen general y KPIs", permission: 'dashboard' as AppSection }
       ]
     },
     {
-      title: "Gestión Comercial",
+      title: "Comercial",
       items: [
+        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline de prospectos", permission: 'crm' as AppSection },
         { href: "/optimized-quote", title: "Nueva Cotización", icon: Plus, status: 'new' as const, description: "Crear cotización", permission: 'quotations' as AppSection },
-        { href: "/crm", title: "CRM Ventas", icon: Target, badge: crmOverdue > 0 ? crmOverdue.toString() : undefined, description: "Pipeline y seguimiento de prospectos", permission: 'crm' as AppSection },
         { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
-        { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection }
+        { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection },
+        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos", permission: 'projects' as AppSection },
       ]
     },
     {
-      title: "Gestión Operacional",
+      title: "Tareas",
       items: [
-        { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos de clientes", permission: 'projects' as AppSection }
-      ]
-    },
-    {
-      title: "Gestión de Tareas",
-      items: [
-        { href: "/tasks", title: "Inicio", icon: Home, description: "Resumen de tareas y proyectos", permission: 'projects' as AppSection },
+        { href: "/tasks", title: "Inicio", icon: Home, description: "Resumen de tareas", permission: 'projects' as AppSection },
         { href: "/tasks/my-tasks", title: "Mis Tareas", icon: CheckSquare, description: "Tus tareas asignadas", permission: 'projects' as AppSection },
-        { href: "/tasks/projects", title: "Proyectos", icon: FolderOpen, description: "Hub de proyectos y tableros", permission: 'projects' as AppSection },
-        { href: "/tasks/team-calendar", title: "Calendario Equipo", icon: CalendarDays, description: "Vista de tareas del equipo", permission: 'projects' as AppSection },
-        { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas consolidadas por persona y proyecto", permission: 'projects' as AppSection },
+        { href: "/tasks/projects", title: "Proyectos", icon: FolderOpen, description: "Hub de proyectos", permission: 'projects' as AppSection },
+        { href: "/tasks/team-calendar", title: "Calendario", icon: CalendarDays, description: "Vista del equipo", permission: 'projects' as AppSection },
+        { href: "/tasks/hours-dashboard", title: "Panel de Horas", icon: BarChart2, description: "Horas por persona y proyecto", permission: 'projects' as AppSection },
       ]
     },
     {
-      title: "Herramientas",
+      title: "Admin",
       items: [
-        { href: "/admin/users", title: "Gestión de Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
+        { href: "/admin/users", title: "Usuarios", icon: Users, description: "Usuarios y permisos", permission: 'admin' as AppSection },
         { href: "/admin", title: "Configuración", icon: Settings, description: "Administración", permission: 'admin' as AppSection }
       ]
     }
@@ -262,7 +258,7 @@ export default function SidebarFixed() {
     <TooltipProvider>
       <div className={cn(
         "flex flex-col h-screen bg-background border-r border-border transition-all duration-300 shadow-sm",
-        isCollapsed ? "w-16" : "w-64"
+        isCollapsed ? "w-16" : "w-56"
       )}>
         {/* Header */}
         <div className="flex items-center justify-between p-2.5 border-b border-border">
@@ -373,123 +369,104 @@ export default function SidebarFixed() {
 
         {/* Navegación principal */}
         <div className="flex-1 px-2 py-3 overflow-y-auto">
-          <nav className="space-y-4">
+          <nav className="space-y-3">
             {filteredNavSections.map((section) => (
-              <div key={section.title}>
-                {!isCollapsed && (
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
+              <div key={section.title || '__top__'}>
+                {!isCollapsed && section.title && (
+                  <h3 className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-3">
                     {section.title}
                   </h3>
                 )}
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {section.items.map((item) => renderNavLink(item))}
                 </div>
 
-                {/* Projects sub-section under Gestión de Tareas */}
-                {section.title === "Gestión de Tareas" && (
-                  <div className="mt-2">
-                    {/* Section header with + button */}
-                    {!isCollapsed && (
-                      <div className="flex items-center justify-between px-3 mb-1">
-                        <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Proyectos</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 hover:bg-accent text-muted-foreground hover:text-primary"
-                                onClick={() => setNewProjectOpen(true)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">Nuevo proyecto</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
-
-                    {/* Project list */}
-                    {sidebarProjects.length > 0 && (
-                      <div className={cn("space-y-0.5", !isCollapsed && "ml-1")}>
-                        {sidebarProjects.map(proj => {
-                          const color = getProjectIconColor(proj.id);
-                          const isActive = currentPath === `/tasks/projects/${proj.id}`;
-                          const initial = proj.clientName.charAt(0).toUpperCase();
-
-                          return (
-                            <TooltipProvider key={proj.id}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Link
-                                    href={`/tasks/projects/${proj.id}`}
-                                    className={cn(
-                                      "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
-                                      isActive
-                                        ? "bg-primary/10 text-primary font-semibold"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
-                                      isCollapsed && "justify-center px-1"
-                                    )}
-                                  >
-                                    {/* Color icon square */}
-                                    <span className={cn(
-                                      "inline-flex flex-shrink-0 items-center justify-center rounded-md font-bold",
-                                      color.bg, color.text,
-                                      isCollapsed ? "w-7 h-7 text-[10px]" : "w-5 h-5 text-[9px]"
-                                    )}>
-                                      {initial}
-                                    </span>
-                                    {!isCollapsed && (
-                                      <>
-                                        <span className="truncate flex-1 font-medium">{proj.name}</span>
-                                        {proj.pendingCount > 0 && (
-                                          <span className={cn(
-                                            "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                                            isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                                          )}>
-                                            {proj.pendingCount}
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </Link>
-                                </TooltipTrigger>
-                                {isCollapsed && (
-                                  <TooltipContent side="right">
-                                    {proj.clientName} · {proj.name}
-                                    {proj.pendingCount > 0 && ` (${proj.pendingCount})`}
-                                  </TooltipContent>
-                                )}
-                              </Tooltip>
-                            </TooltipProvider>
-                          );
-                        })}
-
-                        {/* Ver todos link — always shown */}
-                        {!isCollapsed && (
-                          <Link
-                            href="/tasks/projects"
-                            className={cn(
-                              "flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/60 hover:text-primary transition-colors",
-                              currentPath === "/tasks/projects" && "text-primary font-medium"
-                            )}
+                {/* Collapsible project list — only under Tareas section */}
+                {section.title === "Tareas" && taskProjects.length > 0 && (
+                  <div className="mt-1">
+                    {!isCollapsed ? (
+                      <>
+                        <div className="flex items-center justify-between px-3 py-1">
+                          <button
+                            onClick={() => setProjectsExpanded(v => !v)}
+                            className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest hover:text-muted-foreground transition-colors flex-1"
                           >
-                            <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span>Ver todos los proyectos</span>
-                          </Link>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Empty state */}
-                    {sidebarProjects.length === 0 && !isCollapsed && (
-                      <Link href="/tasks/projects">
-                        <div className="ml-2 px-2 py-1.5 rounded-lg text-xs text-muted-foreground/50 hover:text-primary transition-colors flex items-center gap-1.5">
-                          <FolderOpen className="h-3 w-3" />
-                          <span>Ver proyectos</span>
+                            <span>Proyectos</span>
+                            {projectsExpanded
+                              ? <ChevronDown className="h-3 w-3 ml-1" />
+                              : <ChevronRight className="h-3 w-3 ml-1" />
+                            }
+                          </button>
+                          <button
+                            className="h-4 w-4 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors"
+                            onClick={() => setNewProjectOpen(true)}
+                            title="Nuevo proyecto"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
                         </div>
-                      </Link>
+
+                        {projectsExpanded && (
+                          <div className="space-y-0.5 mt-0.5 ml-1">
+                            {sidebarProjects.map(proj => {
+                              const color = getProjectIconColor(proj.id);
+                              const isActive = currentPath === `/tasks/projects/${proj.id}`;
+                              const initial = proj.clientName.charAt(0).toUpperCase();
+                              return (
+                                <Link
+                                  key={proj.id}
+                                  href={`/tasks/projects/${proj.id}`}
+                                  className={cn(
+                                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all duration-150",
+                                    isActive
+                                      ? "bg-primary/10 text-primary font-semibold"
+                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                                  )}
+                                >
+                                  <span className={cn(
+                                    "inline-flex flex-shrink-0 items-center justify-center rounded-md font-bold w-5 h-5 text-[9px]",
+                                    color.bg, color.text
+                                  )}>
+                                    {initial}
+                                  </span>
+                                  <span className="truncate flex-1 font-medium">{proj.name}</span>
+                                  {proj.pendingCount > 0 && (
+                                    <span className={cn(
+                                      "h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold flex items-center justify-center flex-shrink-0",
+                                      isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                    )}>
+                                      {proj.pendingCount}
+                                    </span>
+                                  )}
+                                </Link>
+                              );
+                            })}
+                            <Link
+                              href="/tasks/projects"
+                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-xs text-muted-foreground/50 hover:text-primary transition-colors"
+                            >
+                              <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>Ver todos</span>
+                            </Link>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-full justify-center p-0 hover:bg-accent text-muted-foreground"
+                              onClick={() => setNewProjectOpen(true)}
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">Nuevo proyecto</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                 )}
