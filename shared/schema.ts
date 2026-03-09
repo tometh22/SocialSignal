@@ -3127,3 +3127,43 @@ export type CrmActivity = typeof crmActivities.$inferSelect;
 export type InsertCrmActivity = z.infer<typeof insertCrmActivitySchema>;
 export type CrmReminder = typeof crmReminders.$inferSelect;
 export type InsertCrmReminder = z.infer<typeof insertCrmReminderSchema>;
+
+// ─── Status Semanal ───────────────────────────────────────────────────────────
+
+export const projectStatusReviews = pgTable("project_status_reviews", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  healthStatus: varchar("health_status", { length: 20 }).default('verde'), // verde | amarillo | rojo
+  marginStatus: varchar("margin_status", { length: 20 }).default('medio'), // alto | medio | bajo
+  teamStrain: varchar("team_strain", { length: 20 }).default('bajo'), // alto | medio | bajo
+  mainRisk: text("main_risk"),
+  currentAction: text("current_action"),
+  nextMilestone: text("next_milestone"),
+  nextMilestoneDate: timestamp("next_milestone_date"),
+  ownerId: integer("owner_id").references(() => users.id),
+  decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'), // ninguna | priorizacion | recursos | reprecio | salida
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertProjectStatusReviewSchema = createInsertSchema(projectStatusReviews).omit({
+  id: true,
+  updatedAt: true,
+});
+export type ProjectStatusReview = typeof projectStatusReviews.$inferSelect;
+export type InsertProjectStatusReview = z.infer<typeof insertProjectStatusReviewSchema>;
+
+export const projectReviewNotes = pgTable("project_review_notes", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  content: text("content").notNull(),
+  noteDate: timestamp("note_date").notNull().defaultNow(),
+  authorId: integer("author_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNotes).omit({
+  id: true,
+  createdAt: true,
+});
+export type ProjectReviewNote = typeof projectReviewNotes.$inferSelect;
+export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSchema>;

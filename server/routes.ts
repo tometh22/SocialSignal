@@ -77,6 +77,7 @@ import {
   googleSheetsSales,
   directCosts,
   incomeSot,
+  users,
   costsSot,
   factLaborMonth,
   factRCMonth,
@@ -94,7 +95,9 @@ import {
   tasks,
   taskTimeEntries,
   insertTaskSchema,
-  insertTaskTimeEntrySchema
+  insertTaskTimeEntrySchema,
+  projectStatusReviews,
+  projectReviewNotes,
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -16267,6 +16270,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error en DELETE /api/tasks/projects/:id/members:", error);
       res.status(500).json({ message: "Error al quitar miembro" });
+    }
+  });
+
+  // ─── Status Semanal ────────────────────────────────────────────────────────
+
+  // GET /api/status-semanal — all active projects with client, quotation, status review and note count
+  app.get("/api/status-semanal", async (req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select({
+          projectId: activeProjects.id,
+          status: activeProjects.status,
+          quotationId: activeProjects.quotationId,
+          clientId: activeProjects.clientId,
+          clientName: clients.name,
+          quotationName: quotations.projectName,
+          trackingFrequency: activeProjects.trackingFrequency,
+          startDate: activeProjects.startDate,
+          expectedEndDate: activeProjects.expectedEndDate,
+          // status review fields
+          reviewId: projectStatusReviews.id,
+          healthStatus: projectStatusReviews.healthStatus,
+          marginStatus: projectStatusReviews.marginStatus,
+          teamStrain: projectStatusReviews.teamStrain,
+          mainRisk: projectStatusReviews.mainRisk,
+          currentAction: projectStatusReviews.currentAction,
+          nextMilestone: projectStatusReviews.nextMilestone,
+          nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+          ownerId: projectStatusReviews.ownerId,
+          decisionNeeded: projectStatusReviews.decisionNeeded,
+          reviewUpdatedAt: projectStatusReviews.updatedAt,
+        })
+        .from(activeProjects)
+        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .leftJoin(projectStatusReviews, eq(projectStatusReviews.projectId, activeProjects.id))
+        .where(and(eq(activeProjects.status, 'active'), eq(activeProjects.isFinished, false)))
+        .orderBy(asc(clients.name));
+
+      // Get note counts per project
+      const projectIds = rows.map(r => r.projectId);
+      const noteCounts = projectIds.length > 0
+        ? await db
+            .select({ projectId: projectReviewNotes.projectId, count: sql<number>`COUNT(*)::int` })
+            .from(projectReviewNotes)
+            .where(inArray(projectReviewNotes.projectId, projectIds))
+            .groupBy(projectReviewNotes.projectId)
+        : [];
+      const noteCountMap = new Map(noteCounts.map(n => [n.projectId, n.count]));
+
+      // Get owner names
+      const ownerIds = [...new Set(rows.map(r => r.ownerId).filter(Boolean))] as number[];
+      const owners = ownerIds.length > 0
+        ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
+        : [];
+      const ownerMap = new Map(owners.map(u => [u.id, u.name]));
+
+      const result = rows.map(r => ({
+        ...r,
+        noteCount: noteCountMap.get(r.projectId) ?? 0,
+        ownerName: r.ownerId ? ownerMap.get(r.ownerId) ?? null : null,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error('GET /api/status-semanal error:', error);
+      res.status(500).json({ message: "Error al obtener status semanal" });
+    }
+  });
+
+  // PATCH /api/status-semanal/:projectId — upsert status review for a project
+  app.patch("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded } = req.body;
+
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (healthStatus !== undefined) update.healthStatus = healthStatus;
+      if (marginStatus !== undefined) update.marginStatus = marginStatus;
+      if (teamStrain !== undefined) update.teamStrain = teamStrain;
+      if (mainRisk !== undefined) update.mainRisk = mainRisk;
+      if (currentAction !== undefined) update.currentAction = currentAction;
+      if (nextMilestone !== undefined) update.nextMilestone = nextMilestone;
+      if (nextMilestoneDate !== undefined) update.nextMilestoneDate = nextMilestoneDate ? new Date(nextMilestoneDate) : null;
+      if (ownerId !== undefined) update.ownerId = ownerId || null;
+      if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
+
+      // Check if review already exists
+      const [existing] = await db.select({ id: projectStatusReviews.id })
+        .from(projectStatusReviews)
+        .where(eq(projectStatusReviews.projectId, projectId));
+
+      let result;
+      if (existing) {
+        [result] = await db.update(projectStatusReviews)
+          .set(update)
+          .where(eq(projectStatusReviews.projectId, projectId))
+          .returning();
+      } else {
+        [result] = await db.insert(projectStatusReviews)
+          .values({ projectId, ...update })
+          .returning();
+      }
+      res.json(result);
+    } catch (error) {
+      console.error('PATCH /api/status-semanal error:', error);
+      res.status(500).json({ message: "Error al actualizar status" });
+    }
+  });
+
+  // GET /api/status-semanal/:projectId/notes — notes for a project with author name
+  app.get("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const notes = await db
+        .select({
+          id: projectReviewNotes.id,
+          projectId: projectReviewNotes.projectId,
+          content: projectReviewNotes.content,
+          noteDate: projectReviewNotes.noteDate,
+          authorId: projectReviewNotes.authorId,
+          authorName: users.name,
+          createdAt: projectReviewNotes.createdAt,
+        })
+        .from(projectReviewNotes)
+        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+        .where(eq(projectReviewNotes.projectId, projectId))
+        .orderBy(desc(projectReviewNotes.noteDate));
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener notas" });
+    }
+  });
+
+  // POST /api/status-semanal/:projectId/notes — add a note
+  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const authorId = (req.session as any)?.userId ?? null;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [note] = await db.insert(projectReviewNotes)
+        .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
+        .returning();
+      res.status(201).json(note);
+    } catch (error) {
+      res.status(500).json({ message: "Error al crear nota" });
+    }
+  });
+
+  // DELETE /api/status-semanal/notes/:noteId — delete a note
+  app.delete("/api/status-semanal/notes/:noteId", async (req: Request, res: Response) => {
+    try {
+      const noteId = parseInt(req.params.noteId);
+      await db.delete(projectReviewNotes).where(eq(projectReviewNotes.id, noteId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar nota" });
+    }
+  });
+
+  // GET /api/status-semanal/users — all users for owner dropdown
+  app.get("/api/status-semanal/users", async (_req: Request, res: Response) => {
+    try {
+      const allUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(asc(users.name));
+      res.json(allUsers);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener usuarios" });
     }
   });
 

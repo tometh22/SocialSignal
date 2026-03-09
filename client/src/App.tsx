@@ -36,6 +36,7 @@ import ExecutiveOperativo from "@/pages/Executive/Operativo";
 import ExecutiveFinanciero from "@/pages/Executive/Financiero";
 import CRMPage from "@/pages/crm";
 import CRMLeadPage from "@/pages/crm-lead";
+import StatusSemanalPage from "@/pages/status-semanal";
 
 // Task Management Module
 import MyTasksPage from "@/pages/my-tasks";
@@ -189,6 +190,7 @@ function AppRoutes() {
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
+                  <ProtectedRoute path="/status-semanal" component={StatusSemanalPage} requiredPermission="projects" />
 
                   {/* Client & Resource Management */}
                   <ProtectedRoute path="/clients" component={Clients} requiredPermission="crm" />
