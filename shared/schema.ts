@@ -3168,3 +3168,28 @@ export const insertProjectReviewNoteSchema = createInsertSchema(projectReviewNot
 });
 export type ProjectReviewNote = typeof projectReviewNotes.$inferSelect;
 export type InsertProjectReviewNote = z.infer<typeof insertProjectReviewNoteSchema>;
+
+export const weeklyStatusItems = pgTable("weekly_status_items", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  healthStatus: varchar("health_status", { length: 20 }).default('verde'),
+  marginStatus: varchar("margin_status", { length: 20 }).default('medio'),
+  teamStrain: varchar("team_strain", { length: 20 }).default('medio'),
+  mainRisk: text("main_risk"),
+  currentAction: text("current_action"),
+  nextMilestone: text("next_milestone"),
+  ownerId: integer("owner_id").references(() => users.id),
+  decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'),
+  hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWeeklyStatusItemSchema = createInsertSchema(weeklyStatusItems).omit({
+  id: true,
+  updatedAt: true,
+  createdAt: true,
+});
+export type WeeklyStatusItem = typeof weeklyStatusItems.$inferSelect;
+export type InsertWeeklyStatusItem = z.infer<typeof insertWeeklyStatusItemSchema>;

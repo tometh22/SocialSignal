@@ -98,6 +98,7 @@ import {
   insertTaskTimeEntrySchema,
   projectStatusReviews,
   projectReviewNotes,
+  weeklyStatusItems,
 } from "@shared/schema";
 import { ActiveProjectsAggregator } from "./domain/projectsActive";
 import { resolveTimeFilter } from "./services/time";
@@ -16441,6 +16442,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(usersWithName);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener usuarios" });
+    }
+  });
+
+  // ── Weekly status custom items ─────────────────────────────────────────────
+
+  // GET /api/status-semanal/custom — all custom (non-project) items
+  app.get("/api/status-semanal/custom", async (_req: Request, res: Response) => {
+    try {
+      const items = await db.select({
+        id: weeklyStatusItems.id,
+        title: weeklyStatusItems.title,
+        subtitle: weeklyStatusItems.subtitle,
+        healthStatus: weeklyStatusItems.healthStatus,
+        marginStatus: weeklyStatusItems.marginStatus,
+        teamStrain: weeklyStatusItems.teamStrain,
+        mainRisk: weeklyStatusItems.mainRisk,
+        currentAction: weeklyStatusItems.currentAction,
+        nextMilestone: weeklyStatusItems.nextMilestone,
+        ownerId: weeklyStatusItems.ownerId,
+        ownerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+        decisionNeeded: weeklyStatusItems.decisionNeeded,
+        hiddenFromWeekly: weeklyStatusItems.hiddenFromWeekly,
+        updatedAt: weeklyStatusItems.updatedAt,
+      }).from(weeklyStatusItems)
+        .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
+        .orderBy(desc(weeklyStatusItems.createdAt));
+      res.json(items);
+    } catch (error) {
+      console.error('GET /api/status-semanal/custom error:', error);
+      res.status(500).json({ message: "Error al obtener ítems" });
+    }
+  });
+
+  // POST /api/status-semanal/custom — create a custom item
+  app.post("/api/status-semanal/custom", async (req: Request, res: Response) => {
+    try {
+      const { title, subtitle } = req.body;
+      if (!title?.trim()) return res.status(400).json({ message: "El título es requerido" });
+      const [item] = await db.insert(weeklyStatusItems)
+        .values({ title: title.trim(), subtitle: subtitle?.trim() || null })
+        .returning();
+      res.status(201).json(item);
+    } catch (error) {
+      console.error('POST /api/status-semanal/custom error:', error);
+      res.status(500).json({ message: "Error al crear ítem" });
+    }
+  });
+
+  // PATCH /api/status-semanal/custom/:id — update a custom item
+  app.patch("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+      const update: Record<string, any> = { updatedAt: new Date() };
+      if (title !== undefined) update.title = title;
+      if (subtitle !== undefined) update.subtitle = subtitle;
+      if (healthStatus !== undefined) update.healthStatus = healthStatus;
+      if (marginStatus !== undefined) update.marginStatus = marginStatus;
+      if (teamStrain !== undefined) update.teamStrain = teamStrain;
+      if (mainRisk !== undefined) update.mainRisk = mainRisk;
+      if (currentAction !== undefined) update.currentAction = currentAction;
+      if (nextMilestone !== undefined) update.nextMilestone = nextMilestone;
+      if (ownerId !== undefined) update.ownerId = ownerId || null;
+      if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
+      if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
+      const [item] = await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id)).returning();
+      res.json(item);
+    } catch (error) {
+      console.error('PATCH /api/status-semanal/custom error:', error);
+      res.status(500).json({ message: "Error al actualizar ítem" });
+    }
+  });
+
+  // DELETE /api/status-semanal/custom/:id — delete a custom item permanently
+  app.delete("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.delete(weeklyStatusItems).where(eq(weeklyStatusItems.id, id));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar ítem" });
+    }
+  });
+
+  // DELETE /api/status-semanal/:projectId — remove a project from weekly status (hide permanently)
+  app.delete("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      await db.update(projectStatusReviews)
+        .set({ hiddenFromWeekly: true, updatedAt: new Date() })
+        .where(eq(projectStatusReviews.projectId, projectId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al quitar proyecto" });
     }
   });
 

@@ -14,7 +14,7 @@ import {
   ClipboardList, MessageSquare, X, Send, Trash2,
   AlertTriangle, Loader2, User, EyeOff, Eye,
   ChevronDown, ChevronRight, Zap, CheckCircle2,
-  Circle, MoreHorizontal
+  Circle, MoreHorizontal, Plus, Tag
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -40,6 +40,23 @@ type StatusRow = {
   noteCount: number;
 };
 
+type CustomItem = {
+  id: number;
+  title: string;
+  subtitle: string | null;
+  healthStatus: string | null;
+  marginStatus: string | null;
+  teamStrain: string | null;
+  mainRisk: string | null;
+  currentAction: string | null;
+  nextMilestone: string | null;
+  ownerId: number | null;
+  ownerName: string | null;
+  decisionNeeded: string | null;
+  hiddenFromWeekly: boolean | null;
+  updatedAt: string | null;
+};
+
 type Note = {
   id: number; projectId: number; content: string; noteDate: string;
   authorId: number | null; authorName: string | null; createdAt: string;
@@ -47,12 +64,33 @@ type Note = {
 
 type AppUser = { id: number; name: string; email: string };
 
+// Unified item for rendering — projects and custom items share the same card components
+type Item = {
+  key: string;
+  isCustom: boolean;
+  projectId?: number;
+  customId?: number;
+  title: string;
+  subtitle?: string | null;
+  healthStatus: string | null;
+  marginStatus: string | null;
+  teamStrain: string | null;
+  mainRisk: string | null;
+  currentAction: string | null;
+  nextMilestone: string | null;
+  ownerId: number | null;
+  ownerName: string | null;
+  decisionNeeded: string | null;
+  hiddenFromWeekly: boolean | null;
+  noteCount: number;
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const HEALTH: Record<string, { label: string; dot: string; bg: string; text: string; border: string; ring: string }> = {
-  verde:    { label: 'Verde',    dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700', border: 'border-emerald-200', ring: 'ring-emerald-300' },
-  amarillo: { label: 'Amarillo', dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',   border: 'border-amber-300',   ring: 'ring-amber-300' },
-  rojo:     { label: 'Rojo',     dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     border: 'border-red-300',     ring: 'ring-red-300' },
+const HEALTH: Record<string, { label: string; dot: string; bg: string; text: string; border: string }> = {
+  verde:    { label: 'Verde',    dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700', border: 'border-emerald-200' },
+  amarillo: { label: 'Amarillo', dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',   border: 'border-amber-300'   },
+  rojo:     { label: 'Rojo',     dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     border: 'border-red-300'     },
 };
 
 const LEVEL: Record<string, { label: string; color: string }> = {
@@ -69,9 +107,9 @@ const DECISION: Record<string, { label: string; color: string; urgent: boolean }
   salida:       { label: 'Salida',       color: 'text-red-700 bg-red-50 border-red-400 font-bold',  urgent: true  },
 };
 
-function hm(v: string | null) { return HEALTH[v ?? 'verde'] ?? HEALTH.verde; }
-function lm(v: string | null) { return LEVEL[v ?? 'medio'] ?? LEVEL.medio; }
-function dm(v: string | null) { return DECISION[v ?? 'ninguna'] ?? DECISION.ninguna; }
+const hm = (v: string | null) => HEALTH[v ?? 'verde'] ?? HEALTH.verde;
+const lm = (v: string | null) => LEVEL[v ?? 'medio'] ?? LEVEL.medio;
+const dm = (v: string | null) => DECISION[v ?? 'ninguna'] ?? DECISION.ninguna;
 
 function weekLabel() {
   const now = new Date();
@@ -147,7 +185,7 @@ function HealthDot({ value, onChange }: { value: string | null; onChange: (v: st
       <PopoverContent className="w-36 p-1.5" align="start">
         {Object.entries(HEALTH).map(([k, m]) => (
           <button key={k} onClick={() => { onChange(k); setOpen(false); }}
-            className={cn("w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-slate-100 transition-colors", k === value && "bg-slate-100")}>
+            className={cn("w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs font-medium hover:bg-slate-100", k === value && "bg-slate-100")}>
             <div className={cn("w-2.5 h-2.5 rounded-full", m.dot)} />{m.label}
           </button>
         ))}
@@ -232,36 +270,41 @@ function OwnerSelect({ value, name, onChange, users }: {
   );
 }
 
-// ─── Alert card (Rojo / Amarillo) ─────────────────────────────────────────────
+// ─── Alert card (Rojo / Amarillo or urgent decision) ─────────────────────────
 
-function AlertCard({ row, users, isSelected, onOpenNotes, onUpdate, onHide }: {
-  row: StatusRow; users: AppUser[]; isSelected: boolean;
-  onOpenNotes: () => void; onUpdate: (d: Record<string, any>) => void; onHide: () => void;
+function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }: {
+  item: Item; users: AppUser[]; isSelected: boolean;
+  onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
-  const meta = hm(row.healthStatus);
-  const decMeta = dm(row.decisionNeeded);
+  const meta = hm(item.healthStatus);
+  const decMeta = dm(item.decisionNeeded);
   const isUrgentDec = decMeta.urgent;
+  const barColor = { verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500';
 
   return (
     <div className={cn(
       "rounded-xl border-2 bg-white shadow-md transition-all overflow-hidden",
-      row.healthStatus === 'rojo' ? "border-red-300" : "border-amber-300",
+      item.healthStatus === 'rojo' ? "border-red-300" : item.healthStatus === 'amarillo' ? "border-amber-300" : "border-indigo-200",
       isSelected && "ring-2 ring-indigo-400"
     )}>
-      {/* Color stripe */}
-      <div className={cn("h-1.5 w-full", meta.dot)} />
-
+      <div className={cn("h-1.5 w-full", barColor)} />
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0">
-            <p className="font-bold text-base text-foreground leading-tight">{row.clientName || '—'}</p>
-            {row.quotationName && <p className="text-sm text-muted-foreground mt-0.5">{row.quotationName}</p>}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              {item.isCustom && <Tag className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
+              <p className="font-bold text-base text-foreground leading-tight">{item.title}</p>
+            </div>
+            {item.subtitle && <p className="text-sm text-muted-foreground mt-0.5">{item.subtitle}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <HealthDot value={row.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
-            <button onClick={onHide} className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500" title="Ocultar">
-              <EyeOff className="h-3.5 w-3.5" />
+            <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+            <button onClick={onRemove}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors border border-transparent hover:border-red-200"
+              title={item.isCustom ? "Eliminar ítem" : "Quitar del status"}>
+              <Trash2 className="h-3 w-3" />
+              {item.isCustom ? "Eliminar" : "Quitar"}
             </button>
           </div>
         </div>
@@ -270,50 +313,53 @@ function AlertCard({ row, users, isSelected, onOpenNotes, onUpdate, onHide }: {
         {isUrgentDec && (
           <div className={cn("flex items-center gap-2 rounded-lg px-3 py-2 mb-3 border text-sm font-semibold", decMeta.color)}>
             <Zap className="h-4 w-4 shrink-0" />
-            Decisión requerida: <DecisionBadge value={row.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+            Decisión:
+            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           </div>
         )}
 
-        {/* Metrics row */}
+        {/* Metrics */}
         <div className="flex items-center gap-3 mb-3">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Margen</span>
-            <LevelBadge value={row.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
+            <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Equipo</span>
-            <LevelBadge value={row.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Desgaste equipo" />
+            <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Desgaste equipo" />
           </div>
-          {!isUrgentDec && <DecisionBadge value={row.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
+          {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
         {/* Risk */}
-        <div className={cn("rounded-lg p-3 mb-3", row.healthStatus === 'rojo' ? "bg-red-50 border border-red-100" : "bg-amber-50 border border-amber-100")}>
+        <div className={cn("rounded-lg p-3 mb-3", item.healthStatus === 'rojo' ? "bg-red-50 border border-red-100" : item.healthStatus === 'amarillo' ? "bg-amber-50 border border-amber-100" : "bg-indigo-50 border border-indigo-100")}>
           <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide mb-1">Riesgo principal</p>
-          <InlineText value={row.mainRisk} placeholder="¿Cuál es el riesgo crítico?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-sm font-medium" />
+          <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo crítico?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-sm font-medium" />
         </div>
 
         {/* Action + Milestone */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1">Acción en curso</p>
-            <InlineText value={row.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline />
+            <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline />
           </div>
           <div>
             <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
-            <InlineText value={row.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
+            <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <OwnerSelect value={row.ownerId} name={row.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-          <button onClick={onOpenNotes}
-            className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-semibold transition-colors",
-              isSelected ? "bg-indigo-600 text-white" : row.noteCount > 0 ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200" : "bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700")}>
-            <MessageSquare className="h-3 w-3" />
-            <span>{row.noteCount} nota{row.noteCount !== 1 ? 's' : ''}</span>
-          </button>
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          {!item.isCustom && onOpenNotes && (
+            <button onClick={onOpenNotes}
+              className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-semibold transition-colors",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200" : "bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700")}>
+              <MessageSquare className="h-3 w-3" />
+              <span>{item.noteCount} nota{item.noteCount !== 1 ? 's' : ''}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -322,67 +368,49 @@ function AlertCard({ row, users, isSelected, onOpenNotes, onUpdate, onHide }: {
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ row, users, isSelected, onOpenNotes, onUpdate, onHide }: {
-  row: StatusRow; users: AppUser[]; isSelected: boolean;
-  onOpenNotes: () => void; onUpdate: (d: Record<string, any>) => void; onHide: () => void;
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }: {
+  item: Item; users: AppUser[]; isSelected: boolean;
+  onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const decMeta = dm(row.decisionNeeded);
+  const decMeta = dm(item.decisionNeeded);
 
   return (
-    <div className={cn(
-      "border-b border-slate-100 last:border-0 transition-colors",
-      isSelected ? "bg-indigo-50" : "hover:bg-slate-50/80"
-    )}>
-      {/* Compact line */}
+    <div className={cn("border-b border-slate-100 last:border-0 transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-slate-50/80")}>
       <div className="flex items-center gap-3 px-4 py-2.5">
-        {/* Expand */}
         <button onClick={() => setExpanded(v => !v)} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
-
-        {/* Health */}
-        <HealthDot value={row.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
-
-        {/* Client / Project */}
-        <div className="flex-1 min-w-0">
-          <span className="font-semibold text-sm text-foreground">{row.clientName || '—'}</span>
-          {row.quotationName && <span className="text-muted-foreground text-sm"> · {row.quotationName}</span>}
+        <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+          <span className="font-semibold text-sm text-foreground">{item.title}</span>
+          {item.subtitle && <span className="text-muted-foreground text-sm"> · {item.subtitle}</span>}
         </div>
-
-        {/* Badges */}
         <div className="flex items-center gap-2 shrink-0">
-          <LevelBadge value={row.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
-          <LevelBadge value={row.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
         </div>
-
-        {/* Risk preview */}
         <div className="hidden lg:block w-44 shrink-0">
-          <InlineText value={row.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
+          <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
         </div>
-
-        {/* Owner */}
         <div className="shrink-0">
-          <OwnerSelect value={row.ownerId} name={row.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
         </div>
-
-        {/* Decision */}
         {decMeta.urgent && (
           <div className="shrink-0">
-            <DecisionBadge value={row.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           </div>
         )}
-
-        {/* Notes */}
-        <button onClick={onOpenNotes}
-          className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors shrink-0",
-            isSelected ? "bg-indigo-600 text-white" : row.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
-          <MessageSquare className="h-3 w-3" />
-          <span>{row.noteCount}</span>
-        </button>
-
-        {/* Menu */}
+        {!item.isCustom && onOpenNotes && (
+          <button onClick={onOpenNotes}
+            className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors shrink-0",
+              isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
+            <MessageSquare className="h-3 w-3" />
+            <span>{item.noteCount}</span>
+          </button>
+        )}
         <Popover open={menuOpen} onOpenChange={setMenuOpen}>
           <PopoverTrigger asChild>
             <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 shrink-0">
@@ -390,38 +418,89 @@ function CompactRow({ row, users, isSelected, onOpenNotes, onUpdate, onHide }: {
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-44 p-1" align="end">
-            <button onClick={() => { onHide(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-slate-100 text-slate-600">
-              <EyeOff className="h-3.5 w-3.5" /> Ocultar de esta vista
+            <button onClick={() => { onRemove(); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+              <Trash2 className="h-3.5 w-3.5" />
+              {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
             </button>
           </PopoverContent>
         </Popover>
       </div>
 
-      {/* Expanded detail */}
       {expanded && (
         <div className="px-10 pb-3 pt-1 bg-slate-50/60 border-t border-slate-100">
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Riesgo principal</p>
-              <InlineText value={row.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline />
+              <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline />
             </div>
             <div>
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Acción en curso</p>
-              <InlineText value={row.currentAction} placeholder="Acción en curso..." onSave={v => onUpdate({ currentAction: v })} multiline />
+              <InlineText value={item.currentAction} placeholder="Acción en curso..." onSave={v => onUpdate({ currentAction: v })} multiline />
             </div>
             <div>
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
-              <InlineText value={row.nextMilestone} placeholder="Próximo hito..." onSave={v => onUpdate({ nextMilestone: v })} />
+              <InlineText value={item.nextMilestone} placeholder="Próximo hito..." onSave={v => onUpdate({ nextMilestone: v })} />
               <div className="mt-2">
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
-                <DecisionBadge value={row.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
               </div>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Add custom item dialog ───────────────────────────────────────────────────
+
+function AddItemButton({ onAdd }: { onAdd: (title: string, subtitle: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('');
+
+  const submit = () => {
+    if (!title.trim()) return;
+    onAdd(title.trim(), subtitle.trim());
+    setTitle(''); setSubtitle(''); setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+          <Plus className="h-3.5 w-3.5" />
+          Agregar ítem
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3" align="end">
+        <p className="text-sm font-semibold mb-3">Nuevo ítem de seguimiento</p>
+        <div className="space-y-2">
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Título *</label>
+            <input value={title} onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
+              placeholder="Ej: Reunión con inversores, Restructura interna..."
+              className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" autoFocus />
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Descripción (opcional)</label>
+            <input value={subtitle} onChange={e => setSubtitle(e.target.value)}
+              placeholder="Contexto adicional..."
+              className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <Button size="sm" onClick={submit} disabled={!title.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 h-7 text-xs">
+            Agregar
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setOpen(false)} className="h-7 text-xs">
+            Cancelar
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -535,9 +614,17 @@ export default function StatusSemanalPage() {
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
 
-  const { data: rows = [], isLoading } = useQuery<StatusRow[]>({
+  // ── Queries ──────────────────────────────────────────────────────────────────
+
+  const { data: projectRows = [], isLoading: loadingProjects } = useQuery<StatusRow[]>({
     queryKey: ['/api/status-semanal'],
     queryFn: async () => { const r = await authFetch('/api/status-semanal'); return r.json(); },
+    staleTime: 30000,
+  });
+
+  const { data: customRows = [], isLoading: loadingCustom } = useQuery<CustomItem[]>({
+    queryKey: ['/api/status-semanal/custom'],
+    queryFn: async () => { const r = await authFetch('/api/status-semanal/custom'); return r.json(); },
     staleTime: 30000,
   });
 
@@ -548,41 +635,133 @@ export default function StatusSemanalPage() {
   });
   const appUsers: AppUser[] = Array.isArray(rawUsers) ? rawUsers : [];
 
-  const patch = useMutation({
+  // ── Mutations ─────────────────────────────────────────────────────────────────
+
+  const patchProject = useMutation({
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
       apiRequest(`/api/status-semanal/${projectId}`, 'PATCH', data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
     onError: () => toast({ title: 'Error al guardar', variant: 'destructive' }),
   });
 
-  const update = (projectId: number, data: Record<string, any>) => {
+  const removeProject = useMutation({
+    mutationFn: (projectId: number) => apiRequest(`/api/status-semanal/${projectId}`, 'DELETE'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
+    onError: () => toast({ title: 'Error al quitar proyecto', variant: 'destructive' }),
+  });
+
+  const createCustom = useMutation({
+    mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
+      apiRequest('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => toast({ title: 'Error al crear ítem', variant: 'destructive' }),
+  });
+
+  const patchCustom = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Record<string, any> }) =>
+      apiRequest(`/api/status-semanal/custom/${id}`, 'PATCH', data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => toast({ title: 'Error al guardar', variant: 'destructive' }),
+  });
+
+  const deleteCustom = useMutation({
+    mutationFn: (id: number) => apiRequest(`/api/status-semanal/custom/${id}`, 'DELETE'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => toast({ title: 'Error al eliminar', variant: 'destructive' }),
+  });
+
+  // ── Optimistic update helpers ─────────────────────────────────────────────────
+
+  const updateProject = (projectId: number, data: Record<string, any>) => {
     queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
       prev?.map(r => r.projectId === projectId ? { ...r, ...data } : r) ?? []);
-    patch.mutate({ projectId, data });
+    patchProject.mutate({ projectId, data });
   };
 
-  const visible = rows.filter(r => showHidden ? true : !r.hiddenFromWeekly);
-  const hiddenCount = rows.filter(r => r.hiddenFromWeekly).length;
+  const updateCustom = (id: number, data: Record<string, any>) => {
+    queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
+      prev?.map(r => r.id === id ? { ...r, ...data } : r) ?? []);
+    patchCustom.mutate({ id, data });
+  };
 
-  const rojoRows    = visible.filter(r => r.healthStatus === 'rojo');
-  const amarilloRows = visible.filter(r => r.healthStatus === 'amarillo');
-  const verdeRows   = visible.filter(r => !r.healthStatus || r.healthStatus === 'verde');
-  const decisionRows = visible.filter(r => r.decisionNeeded && r.decisionNeeded !== 'ninguna');
+  // ── Unified item list ─────────────────────────────────────────────────────────
 
-  const criticalCount = rojoRows.length + amarilloRows.length;
-  const openNotesProject = rows.find(r => r.projectId === notesOpen);
+  const toItem = (r: StatusRow): Item => ({
+    key: `p_${r.projectId}`,
+    isCustom: false,
+    projectId: r.projectId,
+    title: r.clientName || '(Sin cliente)',
+    subtitle: r.quotationName,
+    healthStatus: r.healthStatus,
+    marginStatus: r.marginStatus,
+    teamStrain: r.teamStrain,
+    mainRisk: r.mainRisk,
+    currentAction: r.currentAction,
+    nextMilestone: r.nextMilestone,
+    ownerId: r.ownerId,
+    ownerName: r.ownerName,
+    decisionNeeded: r.decisionNeeded,
+    hiddenFromWeekly: r.hiddenFromWeekly,
+    noteCount: r.noteCount,
+  });
 
+  const toCustomItem = (c: CustomItem): Item => ({
+    key: `c_${c.id}`,
+    isCustom: true,
+    customId: c.id,
+    title: c.title,
+    subtitle: c.subtitle,
+    healthStatus: c.healthStatus,
+    marginStatus: c.marginStatus,
+    teamStrain: c.teamStrain,
+    mainRisk: c.mainRisk,
+    currentAction: c.currentAction,
+    nextMilestone: c.nextMilestone,
+    ownerId: c.ownerId,
+    ownerName: c.ownerName,
+    decisionNeeded: c.decisionNeeded,
+    hiddenFromWeekly: c.hiddenFromWeekly,
+    noteCount: 0,
+  });
+
+  const allItems: Item[] = [
+    ...projectRows.map(toItem),
+    ...customRows.map(toCustomItem),
+  ];
+
+  const visible = allItems.filter(i => showHidden ? true : !i.hiddenFromWeekly);
+  const hiddenCount = allItems.filter(i => i.hiddenFromWeekly).length;
+
+  const rojoItems    = visible.filter(i => i.healthStatus === 'rojo');
+  const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo');
+  const alertItems   = [...rojoItems, ...amarilloItems];
+  const decisionItems = visible.filter(i => dm(i.decisionNeeded).urgent && (i.healthStatus === 'verde' || !i.healthStatus));
+  const normalItems   = visible.filter(i => (!i.healthStatus || i.healthStatus === 'verde') && !dm(i.decisionNeeded).urgent);
+
+  const criticalCount = rojoItems.length + amarilloItems.length;
+  const decisionCount = visible.filter(i => dm(i.decisionNeeded).urgent).length;
+
+  const getItemHandlers = (item: Item) => ({
+    onUpdate: (data: Record<string, any>) => {
+      if (item.isCustom && item.customId) updateCustom(item.customId, data);
+      else if (item.projectId) updateProject(item.projectId, data);
+    },
+    onRemove: () => {
+      if (item.isCustom && item.customId) deleteCustom.mutate(item.customId);
+      else if (item.projectId) {
+        updateProject(item.projectId, { hiddenFromWeekly: true });
+        removeProject.mutate(item.projectId);
+      }
+    },
+    onOpenNotes: item.projectId ? () => setNotesOpen(notesOpen === item.projectId ? null : item.projectId!) : undefined,
+  });
+
+  const openNotesProject = projectRows.find(r => r.projectId === notesOpen);
   const notesProjectName = openNotesProject
     ? `${openNotesProject.clientName || ''}${openNotesProject.quotationName ? ` · ${openNotesProject.quotationName}` : ''}`
     : '';
 
-  const props = (row: StatusRow) => ({
-    row, users: appUsers,
-    isSelected: notesOpen === row.projectId,
-    onOpenNotes: () => setNotesOpen(notesOpen === row.projectId ? null : row.projectId),
-    onUpdate: (d: Record<string, any>) => update(row.projectId, d),
-    onHide: () => update(row.projectId, { hiddenFromWeekly: !row.hiddenFromWeekly }),
-  });
+  const isLoading = loadingProjects || loadingCustom;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -601,7 +780,6 @@ export default function StatusSemanalPage() {
               </div>
             </div>
 
-            {/* Summary pills */}
             <div className="flex items-center gap-2">
               {criticalCount > 0 ? (
                 <div className="flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
@@ -611,24 +789,25 @@ export default function StatusSemanalPage() {
               ) : (
                 <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-full">
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  Todo en orden
+                  Sin alertas esta semana
                 </div>
               )}
-              {decisionRows.length > 0 && (
+              {decisionCount > 0 && (
                 <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full">
                   <Zap className="h-3.5 w-3.5" />
-                  {decisionRows.length} decisión{decisionRows.length !== 1 ? 'es' : ''} pendiente{decisionRows.length !== 1 ? 's' : ''}
+                  {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''}
                 </div>
               )}
               {hiddenCount > 0 && (
                 <button onClick={() => setShowHidden(v => !v)}
                   className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors",
                     showHidden ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-400 border-slate-200 hover:border-slate-400")}>
-                  {showHidden ? <><Eye className="h-3 w-3" /> Ocultar pausados</> : <><EyeOff className="h-3 w-3" /> {hiddenCount} pausado{hiddenCount !== 1 ? 's' : ''}</>}
+                  {showHidden ? <><Eye className="h-3 w-3" /> Ocultar quitados</> : <><EyeOff className="h-3 w-3" /> {hiddenCount} quitado{hiddenCount !== 1 ? 's' : ''}</>}
                 </button>
               )}
+              <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
               <div className="text-xs text-muted-foreground bg-slate-100 px-2.5 py-1 rounded-full font-medium">
-                {visible.length} proyecto{visible.length !== 1 ? 's' : ''}
+                {visible.length} ítem{visible.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -641,84 +820,127 @@ export default function StatusSemanalPage() {
           ) : (
             <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
 
-              {/* ── SECCIÓN 1: Requieren atención ──────────────────── */}
-              {(rojoRows.length > 0 || amarilloRows.length > 0) && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle className="h-5 w-5 text-red-500" />
-                    <h2 className="text-base font-bold text-foreground">Requieren atención</h2>
-                    <span className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full border border-red-200">
-                      {rojoRows.length + amarilloRows.length}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[...rojoRows, ...amarilloRows].map(row => (
-                      <AlertCard key={row.projectId} {...props(row)} />
-                    ))}
-                  </div>
+              {/* ── Requieren atención ─────────────────────────────── */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertTriangle className={cn("h-5 w-5", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
+                  <h2 className="text-base font-bold text-foreground">Requieren atención</h2>
+                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                    alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
+                    {alertItems.length}
+                  </span>
                 </div>
-              )}
-
-              {/* ── SECCIÓN 2: Decisiones pendientes ───────────────── */}
-              {decisionRows.filter(r => r.healthStatus === 'verde' || !r.healthStatus).length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Zap className="h-5 w-5 text-amber-500" />
-                    <h2 className="text-base font-bold text-foreground">Decisiones pendientes</h2>
-                    <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
-                      {decisionRows.filter(r => r.healthStatus === 'verde' || !r.healthStatus).length}
-                    </span>
+                {alertItems.length === 0 ? (
+                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">Sin proyectos en alerta — todo bajo control</span>
                   </div>
+                ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {decisionRows.filter(r => r.healthStatus === 'verde' || !r.healthStatus).map(row => (
-                      <AlertCard key={row.projectId} {...props(row)} />
-                    ))}
+                    {alertItems.map(item => {
+                      const h = getItemHandlers(item);
+                      return <AlertCard key={item.key} item={item} users={appUsers}
+                        isSelected={!item.isCustom && notesOpen === item.projectId}
+                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
+                    })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* ── SECCIÓN 3: En curso ────────────────────────────── */}
-              {verdeRows.filter(r => !dm(r.decisionNeeded).urgent).length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Circle className="h-4 w-4 text-emerald-500 fill-emerald-500" />
-                    <h2 className="text-base font-bold text-foreground">En curso</h2>
-                    <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-                      {verdeRows.filter(r => !dm(r.decisionNeeded).urgent).length}
-                    </span>
-                    <span className="text-xs text-muted-foreground ml-1">· Expandí cada fila para editar</span>
+              {/* ── Decisiones pendientes ──────────────────────────── */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className={cn("h-5 w-5", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
+                  <h2 className="text-base font-bold text-foreground">Decisiones pendientes</h2>
+                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                    decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
+                    {decisionItems.length}
+                  </span>
+                </div>
+                {decisionItems.length === 0 ? (
+                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span className="text-sm">Sin decisiones pendientes esta semana</span>
                   </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {decisionItems.map(item => {
+                      const h = getItemHandlers(item);
+                      return <AlertCard key={item.key} item={item} users={appUsers}
+                        isSelected={!item.isCustom && notesOpen === item.projectId}
+                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ── En curso ───────────────────────────────────────── */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Circle className={cn("h-4 w-4 fill-current", normalItems.length > 0 ? "text-emerald-500" : "text-slate-300")} />
+                  <h2 className="text-base font-bold text-foreground">En curso</h2>
+                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                    normalItems.length > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
+                    {normalItems.length}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">· Expandí para editar</span>
+                </div>
+                {normalItems.length === 0 ? (
+                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">
+                    <span className="text-sm">Sin ítems en curso</span>
+                  </div>
+                ) : (
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    {/* Table header */}
                     <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200">
                       <div className="w-3.5 shrink-0" />
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:flex items-center gap-4 shrink-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide w-12">Margen</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide w-12">Equipo</span>
+                      <div className="hidden lg:flex items-center gap-8 shrink-0">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Margen</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Equipo</span>
                       </div>
                       <div className="hidden lg:block w-44 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
-                      <div className="w-10" />
+                      <div className="w-16" />
                     </div>
-                    {verdeRows.filter(r => !dm(r.decisionNeeded).urgent).map(row => (
-                      <CompactRow key={row.projectId} {...props(row)} />
-                    ))}
+                    {normalItems.map(item => {
+                      const h = getItemHandlers(item);
+                      return <CompactRow key={item.key} item={item} users={appUsers}
+                        isSelected={!item.isCustom && notesOpen === item.projectId}
+                        onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />;
+                    })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* ── Empty state ────────────────────────────────────── */}
-              {visible.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-muted-foreground/20 mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">Sin proyectos visibles</p>
-                  {hiddenCount > 0 && (
-                    <button onClick={() => setShowHidden(true)} className="text-xs text-indigo-600 mt-2 hover:underline">
-                      Mostrar {hiddenCount} proyecto{hiddenCount !== 1 ? 's' : ''} oculto{hiddenCount !== 1 ? 's' : ''}
-                    </button>
-                  )}
+              {/* ── Quitados ───────────────────────────────────────── */}
+              {showHidden && hiddenCount > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <EyeOff className="h-4 w-4 text-slate-300" />
+                    <h2 className="text-base font-bold text-slate-400">Quitados del status</h2>
+                    <span className="text-xs font-semibold bg-slate-100 text-slate-400 border-slate-200 px-2 py-0.5 rounded-full border">{hiddenCount}</span>
+                  </div>
+                  <div className="rounded-xl border border-dashed border-slate-200 overflow-hidden opacity-60">
+                    {allItems.filter(i => i.hiddenFromWeekly).map(item => {
+                      const h = getItemHandlers(item);
+                      return (
+                        <div key={item.key} className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", hm(item.healthStatus).dot)} />
+                          <span className="flex-1 text-sm text-slate-500">{item.title}{item.subtitle && ` · ${item.subtitle}`}</span>
+                          <button onClick={() => h.onUpdate({ hiddenFromWeekly: false })}
+                            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 font-medium">
+                            <Eye className="h-3.5 w-3.5" /> Restaurar
+                          </button>
+                          {item.isCustom && (
+                            <button onClick={h.onRemove} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600 font-medium ml-2">
+                              <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
