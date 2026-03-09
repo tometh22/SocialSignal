@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
@@ -777,17 +778,29 @@ export default function CRMPage() {
   const [activeDrag, setActiveDrag] = useState<{ type: string; leadId?: number; companyName?: string; originalFromStage?: string } | null>(null);
   const [quickAddStage, setQuickAddStage] = useState<string | null>(null);
   const [stageToDelete, setStageToDelete] = useState<CrmStage | null>(null);
-  const { data: stages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
+  const { data: fetchedStages = [], refetch: refetchStages } = useQuery<CrmStage[]>({
     queryKey: ['/api/crm/stages'],
-    staleTime: 60000,
+    staleTime: Infinity,
     refetchOnWindowFocus: false,
   });
+  const [localStages, setLocalStages] = useState<CrmStage[]>([]);
 
-  const orderedStages = stages;
+  useEffect(() => {
+    if (fetchedStages.length === 0) return;
+    setLocalStages(prev => {
+      const prevIds = prev.map(s => s.id).sort().join(',');
+      const fetchedIds = fetchedStages.map(s => s.id).sort().join(',');
+      if (prevIds === fetchedIds) {
+        return prev.map(s => fetchedStages.find(f => f.id === s.id) ?? s);
+      }
+      return fetchedStages;
+    });
+  }, [fetchedStages]);
 
-  const mainStages = orderedStages.filter(s => s.key !== 'won' && s.key !== 'lost');
-  const wonStage = orderedStages.find(s => s.key === 'won');
-  const lostStage = orderedStages.find(s => s.key === 'lost');
+  const stages = localStages.length > 0 ? localStages : fetchedStages;
+  const mainStages = stages.filter(s => s.key !== 'won' && s.key !== 'lost');
+  const wonStage = stages.find(s => s.key === 'won');
+  const lostStage = stages.find(s => s.key === 'lost');
   const compactStages = [wonStage, lostStage].filter(Boolean) as CrmStage[];
 
   const { data: stats, isLoading: statsLoading } = useQuery<Stats>({
@@ -918,14 +931,18 @@ export default function CRMPage() {
 
     if (!over) return;
     if (active.id === over.id) return;
-    const currentStages = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? stages;
+    const currentStages = stages;
     const oldIdx = currentStages.findIndex(s => s.id === active.id);
     const newIdx = currentStages.findIndex(s => s.id === over.id);
     if (oldIdx === -1 || newIdx === -1) return;
     const reordered = arrayMove([...currentStages], oldIdx, newIdx);
+    flushSync(() => {
+      setLocalStages(reordered);
+    });
     queryClient.setQueryData(['/api/crm/stages'], reordered);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
       .catch(() => {
+        setLocalStages(currentStages);
         queryClient.setQueryData(['/api/crm/stages'], currentStages);
         toast({ title: 'Error al reordenar columnas', variant: 'destructive' });
       });
@@ -947,10 +964,12 @@ export default function CRMPage() {
     queryClient.invalidateQueries({ queryKey: ['/api/crm/stats'] });
   };
   const handleEditStage = (id: number, label: string, color: string) => {
-    const prev = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
-    queryClient.setQueryData(['/api/crm/stages'], prev.map(s => s.id === id ? { ...s, label, color } : s));
+    const prev = stages;
+    setLocalStages(stages.map(s => s.id === id ? { ...s, label, color } : s));
+    queryClient.setQueryData(['/api/crm/stages'], stages.map(s => s.id === id ? { ...s, label, color } : s));
     apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
       .catch(() => {
+        setLocalStages(prev);
         queryClient.setQueryData(['/api/crm/stages'], prev);
         toast({ title: 'Error al actualizar etapa', variant: 'destructive' });
       });
