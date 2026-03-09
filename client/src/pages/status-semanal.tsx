@@ -747,9 +747,12 @@ export default function StatusSemanalPage() {
       else if (item.projectId) updateProject(item.projectId, data);
     },
     onRemove: () => {
-      if (item.isCustom && item.customId) deleteCustom.mutate(item.customId);
-      else if (item.projectId) {
-        updateProject(item.projectId, { hiddenFromWeekly: true });
+      if (item.isCustom && item.customId) {
+        deleteCustom.mutate(item.customId);
+      } else if (item.projectId) {
+        // Optimistic remove: mark hidden immediately in cache
+        queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
+          prev?.map(r => r.projectId === item.projectId ? { ...r, hiddenFromWeekly: true } : r) ?? []);
         removeProject.mutate(item.projectId);
       }
     },
