@@ -16323,9 +16323,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get owner names
       const ownerIds = [...new Set(rows.map(r => r.ownerId).filter(Boolean))] as number[];
       const owners = ownerIds.length > 0
-        ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, ownerIds))
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, ownerIds))
         : [];
-      const ownerMap = new Map(owners.map(u => [u.id, u.name]));
+      const ownerMap = new Map(owners.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
 
       const result = rows.map(r => ({
         ...r,

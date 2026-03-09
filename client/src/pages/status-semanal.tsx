@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  ClipboardList, MessageSquare, X, Send, Trash2, ChevronRight,
-  AlertTriangle, CheckCircle2, Circle, Loader2, User
+  ClipboardList, MessageSquare, X, Send, Trash2,
+  AlertTriangle, CheckCircle2, Loader2, User, Calendar
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,6 +33,7 @@ type StatusRow = {
   ownerId: number | null;
   ownerName: string | null;
   decisionNeeded: string | null;
+  reviewUpdatedAt: string | null;
   noteCount: number;
 };
 
@@ -51,9 +52,9 @@ type AppUser = { id: number; name: string; email: string };
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const HEALTH_OPTIONS = [
-  { value: 'verde', label: 'Verde', bg: 'bg-emerald-500', light: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { value: 'amarillo', label: 'Amarillo', bg: 'bg-amber-400', light: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { value: 'rojo', label: 'Rojo', bg: 'bg-red-500', light: 'bg-red-50 text-red-700 border-red-200' },
+  { value: 'verde', label: 'Verde', bg: 'bg-emerald-500', ring: 'ring-emerald-300', light: 'bg-emerald-50 text-emerald-700', bar: 'bg-emerald-500' },
+  { value: 'amarillo', label: 'Amarillo', bg: 'bg-amber-400', ring: 'ring-amber-300', light: 'bg-amber-50 text-amber-700', bar: 'bg-amber-400' },
+  { value: 'rojo', label: 'Rojo', bg: 'bg-red-500', ring: 'ring-red-300', light: 'bg-red-50 text-red-700', bar: 'bg-red-500' },
 ];
 
 const LEVEL_OPTIONS = [
@@ -70,13 +71,6 @@ const DECISION_OPTIONS = [
   { value: 'salida', label: 'Salida', color: 'text-red-600 bg-red-50 border-red-200' },
 ];
 
-const FREQ_LABELS: Record<string, string> = {
-  weekly: 'Recurrente',
-  monthly: 'Recurrente',
-  biweekly: 'Recurrente',
-  daily: 'Recurrente',
-};
-
 function healthMeta(v: string | null) {
   return HEALTH_OPTIONS.find(o => o.value === v) ?? HEALTH_OPTIONS[0];
 }
@@ -85,6 +79,16 @@ function levelMeta(v: string | null) {
 }
 function decisionMeta(v: string | null) {
   return DECISION_OPTIONS.find(o => o.value === v) ?? DECISION_OPTIONS[0];
+}
+
+function currentWeekLabel() {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  const fmt = (d: Date) => d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  return `Semana ${fmt(monday)} – ${fmt(friday)}`;
 }
 
 function relativeTime(dateStr: string) {
@@ -146,7 +150,7 @@ function InlineText({
     <div
       onClick={() => setEditing(true)}
       className={cn(
-        "text-xs cursor-text rounded px-1 py-0.5 min-h-[24px] hover:bg-slate-100 transition-colors",
+        "text-xs cursor-text rounded px-1 py-0.5 min-h-[22px] hover:bg-white/80 hover:shadow-sm transition-all border border-transparent hover:border-slate-200",
         value ? "text-slate-700" : "text-slate-400 italic"
       )}
       title="Click para editar"
@@ -164,9 +168,15 @@ function HealthPicker({ value, onChange }: { value: string | null; onChange: (v:
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="flex items-center gap-1.5 group" title="Estado del proyecto">
-          <div className={cn("w-4 h-4 rounded-full transition-transform group-hover:scale-110", meta.bg)} />
-          <span className="text-xs text-slate-500 group-hover:text-slate-700">{meta.label}</span>
+        <button
+          className={cn(
+            "flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-all hover:ring-2",
+            meta.light, meta.ring
+          )}
+          title="Estado del proyecto"
+        >
+          <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", meta.bg)} />
+          {meta.label}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-36 p-1.5" align="start">
@@ -197,7 +207,7 @@ function LevelPicker({ value, onChange, label }: { value: string | null; onChang
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button>
-          <Badge variant="outline" className={cn("text-[10px] h-5 cursor-pointer hover:opacity-80 border", meta.color)}>
+          <Badge variant="outline" className={cn("text-[10px] h-5 cursor-pointer hover:opacity-80 border font-semibold", meta.color)}>
             {meta.label}
           </Badge>
         </button>
@@ -226,11 +236,19 @@ function LevelPicker({ value, onChange, label }: { value: string | null; onChang
 function DecisionPicker({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const meta = decisionMeta(value);
+  const isUrgent = value && value !== 'ninguna';
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button>
-          <Badge variant="outline" className={cn("text-[10px] h-5 cursor-pointer hover:opacity-80 border max-w-[90px] truncate", meta.color)}>
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[10px] h-5 cursor-pointer hover:opacity-80 border max-w-[90px] truncate font-semibold",
+              meta.color,
+              isUrgent && "ring-1 ring-offset-1",
+            )}
+          >
             {meta.label}
           </Badge>
         </button>
@@ -303,18 +321,22 @@ function NotesPanel({
     addMutation.mutate(newNote.trim());
   };
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [notes.length]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-slate-50">
         <div className="flex items-center gap-2 min-w-0">
           <MessageSquare className="h-4 w-4 text-indigo-500 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{projectName}</p>
-            <p className="text-xs text-muted-foreground">{notes.length} nota{notes.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">{notes.length} nota{notes.length !== 1 ? 's' : ''} de reunión</p>
           </div>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-accent rounded text-muted-foreground">
+        <button onClick={onClose} className="p-1 hover:bg-accent rounded text-muted-foreground shrink-0">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -330,7 +352,7 @@ function NotesPanel({
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
             <p className="text-sm text-muted-foreground">Sin notas todavía</p>
-            <p className="text-xs text-muted-foreground/60 mt-0.5">Escribí la primera nota de la reunión</p>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">Escribí la primera nota de esta semana</p>
           </div>
         )}
         {notes.map(note => {
@@ -359,7 +381,7 @@ function NotesPanel({
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="text-xs text-foreground bg-slate-50 rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap">
+                <div className="text-xs text-foreground bg-white border border-slate-100 rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap shadow-sm">
                   {note.content}
                 </div>
               </div>
@@ -379,7 +401,7 @@ function NotesPanel({
       </div>
 
       {/* Input */}
-      <div className="px-4 py-3 border-t border-border shrink-0">
+      <div className="px-4 py-3 border-t border-border shrink-0 bg-slate-50">
         <div className="flex gap-2 items-end">
           <Textarea
             value={newNote}
@@ -390,8 +412,8 @@ function NotesPanel({
                 handleSend();
               }
             }}
-            placeholder="Escribí una nota de reunión... (Enter para enviar)"
-            className="resize-none text-sm min-h-[60px] max-h-[120px] flex-1"
+            placeholder="Nota de reunión... (Enter para guardar)"
+            className="resize-none text-sm min-h-[56px] max-h-[120px] flex-1 bg-white"
           />
           <Button
             size="sm"
@@ -423,7 +445,7 @@ export default function StatusSemanalPage() {
     staleTime: 30000,
   });
 
-  const { data: appUsers = [] } = useQuery<AppUser[]>({
+  const { data: rawUsers } = useQuery<AppUser[]>({
     queryKey: ['/api/status-semanal/users'],
     queryFn: async () => {
       const r = await authFetch('/api/status-semanal/users');
@@ -431,6 +453,7 @@ export default function StatusSemanalPage() {
     },
     staleTime: 60000,
   });
+  const appUsers: AppUser[] = Array.isArray(rawUsers) ? rawUsers : [];
 
   const patch = useMutation({
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
@@ -440,7 +463,6 @@ export default function StatusSemanalPage() {
   });
 
   const update = (projectId: number, data: Record<string, any>) => {
-    // Optimistic update
     queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
       prev?.map(r => r.projectId === projectId ? { ...r, ...data } : r) ?? []
     );
@@ -449,32 +471,43 @@ export default function StatusSemanalPage() {
 
   const openNotesProject = rows.find(r => r.projectId === notesOpen);
   const decisionCount = rows.filter(r => r.decisionNeeded && r.decisionNeeded !== 'ninguna').length;
+  const redCount = rows.filter(r => r.healthStatus === 'rojo').length;
+  const weekLabel = currentWeekLabel();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Main content */}
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all", notesOpen ? "mr-[380px]" : "")}>
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen ? "mr-[380px]" : "")}>
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border shrink-0 bg-background">
+        <div className="px-6 py-3.5 border-b border-border shrink-0 bg-background">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
                 <ClipboardList className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-foreground">Status Semanal</h1>
-                <p className="text-xs text-muted-foreground">Visión ejecutiva de proyectos activos</p>
+                <h1 className="text-lg font-bold text-foreground leading-tight">Status Semanal</h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">{weekLabel}</span>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {decisionCount > 0 && (
-                <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 rounded-full">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''} pendiente{decisionCount !== 1 ? 's' : ''}
+            <div className="flex items-center gap-2">
+              {redCount > 0 && (
+                <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  {redCount} en rojo
                 </div>
               )}
-              <div className="text-xs text-muted-foreground">
-                {rows.length} proyecto{rows.length !== 1 ? 's' : ''} activo{rows.length !== 1 ? 's' : ''}
+              {decisionCount > 0 && (
+                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground bg-slate-100 px-2.5 py-1 rounded-full font-medium">
+                {rows.length} proyecto{rows.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -495,50 +528,69 @@ export default function StatusSemanalPage() {
           ) : (
             <table className="w-full text-sm border-collapse min-w-[1100px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-border">
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-4 py-2.5 sticky left-0 bg-slate-50 z-10 min-w-[200px]">
+                <tr className="bg-slate-50/80 border-b-2 border-border">
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-4 py-2 sticky left-0 bg-slate-50/80 z-10 min-w-[200px]">
                     Cliente / Proyecto
                   </th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[80px]">Estado</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[70px]">Margen</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[70px]">Equipo</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[160px]">Riesgo principal</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[160px]">Acción en curso</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[160px]">Próximo hito</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[110px]">Owner</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[100px]">Decisión</th>
-                  <th className="text-left text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-3 py-2.5 min-w-[70px]">Notas</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[90px]">Estado</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[70px]">Margen</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[70px]">Equipo</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[170px]">Riesgo principal</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[160px]">Acción en curso</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[160px]">Próximo hito</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[110px]">Owner</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[100px]">Decisión</th>
+                  <th className="text-left text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-2 min-w-[60px]">Notas</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row, idx) => {
                   const isSelected = notesOpen === row.projectId;
-                  const decMeta = decisionMeta(row.decisionNeeded);
+                  const hMeta = healthMeta(row.healthStatus);
                   return (
                     <tr
                       key={row.projectId}
                       className={cn(
-                        "border-b border-border transition-colors",
-                        isSelected ? "bg-indigo-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/50",
-                        "hover:bg-indigo-50/40"
+                        "border-b border-border/60 transition-colors group/row",
+                        isSelected ? "bg-indigo-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/40",
+                        !isSelected && "hover:bg-indigo-50/30"
                       )}
                     >
-                      {/* Client + Project */}
+                      {/* Client + Project — sticky with health color bar */}
                       <td className={cn(
-                        "px-4 py-2.5 sticky left-0 z-10",
-                        isSelected ? "bg-indigo-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                        "px-0 py-0 sticky left-0 z-10",
+                        isSelected ? "bg-indigo-50" : idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                       )}>
-                        <div className="font-semibold text-xs text-foreground leading-tight">{row.clientName || '—'}</div>
-                        <div className="text-[11px] text-muted-foreground truncate max-w-[180px]" title={row.quotationName ?? ''}>
-                          {row.quotationName || '—'}
+                        <div className="flex items-stretch h-full">
+                          <div className={cn("w-1 shrink-0 self-stretch", hMeta.bar)} />
+                          <div className="px-3 py-2 min-w-0">
+                            <div className="font-bold text-xs text-foreground leading-tight">{row.clientName || '—'}</div>
+                            <div className="text-[11px] text-muted-foreground truncate max-w-[170px]" title={row.quotationName ?? ''}>
+                              {row.quotationName || <span className="italic">Sin nombre</span>}
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[9px] text-slate-400 uppercase tracking-wide font-medium">
+                                {row.trackingFrequency === 'weekly' || row.trackingFrequency === 'monthly' || row.trackingFrequency === 'biweekly' ? 'Recurrente' : row.trackingFrequency}
+                              </span>
+                              {row.reviewUpdatedAt && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-[9px] text-slate-300 cursor-default">· {relativeTime(row.reviewUpdatedAt)}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Actualizado {new Date(row.reviewUpdatedAt).toLocaleString('es-AR', { dateStyle: 'medium', timeStyle: 'short' })}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <Badge variant="outline" className="text-[9px] h-4 mt-0.5 border-slate-200 text-slate-500">
-                          {FREQ_LABELS[row.trackingFrequency] ?? row.trackingFrequency}
-                        </Badge>
                       </td>
 
                       {/* Estado */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <HealthPicker
                           value={row.healthStatus}
                           onChange={v => update(row.projectId, { healthStatus: v })}
@@ -546,7 +598,7 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Margen */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <LevelPicker
                           value={row.marginStatus}
                           onChange={v => update(row.projectId, { marginStatus: v })}
@@ -555,16 +607,16 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Equipo */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <LevelPicker
                           value={row.teamStrain}
                           onChange={v => update(row.projectId, { teamStrain: v })}
-                          label="Desgaste"
+                          label="Desgaste equipo"
                         />
                       </td>
 
                       {/* Riesgo */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <InlineText
                           value={row.mainRisk}
                           placeholder="Escribí el riesgo..."
@@ -574,7 +626,7 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Acción */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <InlineText
                           value={row.currentAction}
                           placeholder="Acción en curso..."
@@ -584,7 +636,7 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Próximo hito */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <InlineText
                           value={row.nextMilestone}
                           placeholder="Próximo hito..."
@@ -592,31 +644,34 @@ export default function StatusSemanalPage() {
                           multiline
                         />
                         {row.nextMilestoneDate && (
-                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                          <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <Calendar className="h-2.5 w-2.5" />
                             {new Date(row.nextMilestoneDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}
                           </div>
                         )}
                       </td>
 
                       {/* Owner */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <Select
                           value={row.ownerId?.toString() ?? '__none__'}
                           onValueChange={v => update(row.projectId, { ownerId: v === '__none__' ? null : parseInt(v) })}
                         >
-                          <SelectTrigger className="h-7 text-xs border-0 bg-transparent hover:bg-slate-100 px-1 gap-1 focus:ring-0 w-full">
+                          <SelectTrigger className="h-7 text-xs border-0 bg-transparent hover:bg-white hover:border hover:border-slate-200 px-1 gap-1 focus:ring-0 w-full rounded-md transition-all">
                             <div className="flex items-center gap-1.5 min-w-0">
                               {row.ownerName ? (
                                 <>
                                   <div className="h-5 w-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[9px] font-bold shrink-0">
                                     {initials(row.ownerName)}
                                   </div>
-                                  <span className="truncate text-xs">{row.ownerName.split(' ')[0]}</span>
+                                  <span className="truncate text-xs font-medium">{row.ownerName.split(' ')[0]}</span>
                                 </>
                               ) : (
                                 <>
-                                  <User className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  <span className="text-muted-foreground italic text-xs">Sin owner</span>
+                                  <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                    <User className="h-3 w-3 text-slate-400" />
+                                  </div>
+                                  <span className="text-slate-400 text-xs">Asignar</span>
                                 </>
                               )}
                             </div>
@@ -631,7 +686,7 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Decisión */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <DecisionPicker
                           value={row.decisionNeeded}
                           onChange={v => update(row.projectId, { decisionNeeded: v })}
@@ -639,18 +694,20 @@ export default function StatusSemanalPage() {
                       </td>
 
                       {/* Notas */}
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2">
                         <button
                           onClick={() => setNotesOpen(notesOpen === row.projectId ? null : row.projectId)}
                           className={cn(
-                            "flex items-center gap-1.5 text-xs rounded-full px-2 py-1 transition-colors",
+                            "flex items-center gap-1 text-xs rounded-full px-2 py-1 transition-colors font-medium",
                             isSelected
-                              ? "bg-indigo-100 text-indigo-700"
-                              : "bg-slate-100 text-slate-600 hover:bg-indigo-100 hover:text-indigo-700"
+                              ? "bg-indigo-600 text-white"
+                              : row.noteCount > 0
+                                ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                                : "bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700"
                           )}
                         >
                           <MessageSquare className="h-3 w-3" />
-                          <span className="font-medium">{row.noteCount}</span>
+                          <span>{row.noteCount}</span>
                         </button>
                       </td>
                     </tr>
@@ -664,7 +721,7 @@ export default function StatusSemanalPage() {
 
       {/* Notes panel — slide from right */}
       {notesOpen !== null && (
-        <div className="fixed top-0 right-0 h-full w-[380px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
+        <div className="fixed top-0 right-0 h-full w-[380px] border-l border-border bg-background shadow-2xl z-20 flex flex-col">
           {openNotesProject && (
             <NotesPanel
               projectId={notesOpen}
