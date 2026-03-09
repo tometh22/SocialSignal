@@ -519,39 +519,20 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
 
   const addMutation = useMutation({
     mutationFn: (content: string) => apiRequest(`/api/status-semanal/${projectId}/notes`, 'POST', { content }),
-    onMutate: (content: string) => {
-      const tempId = -Date.now();
-      const u = user as any;
-      const authorName = u ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() || u.email || 'Yo' : 'Yo';
-      const tempNote: Note = { id: tempId, projectId, content, noteDate: new Date().toISOString(), authorId: u?.id ?? null, authorName, createdAt: new Date().toISOString() };
-      queryClient.setQueryData<Note[]>(['/api/status-semanal', projectId, 'notes'], prev => [...(prev ?? []), tempNote]);
-      setNewNote('');
-      return { tempId };
-    },
-    onError: (_err: any, _vars: any, ctx: any) => {
-      queryClient.setQueryData<Note[]>(['/api/status-semanal', projectId, 'notes'], prev => prev?.filter(n => n.id !== ctx?.tempId) ?? []);
-      toast({ title: 'Error al guardar nota', variant: 'destructive' });
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
     },
+    onError: () => toast({ title: 'Error al guardar nota', variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (noteId: number) => apiRequest(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
-    onMutate: (noteId: number) => {
-      const prev = queryClient.getQueryData<Note[]>(['/api/status-semanal', projectId, 'notes']);
-      queryClient.setQueryData<Note[]>(['/api/status-semanal', projectId, 'notes'], old => old?.filter(n => n.id !== noteId) ?? []);
-      return { prev };
-    },
-    onError: (_err: any, _vars: any, ctx: any) => {
-      if (ctx?.prev) queryClient.setQueryData(['/api/status-semanal', projectId, 'notes'], ctx.prev);
-    },
-    onSettled: () => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
       queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
     },
+    onError: () => toast({ title: 'Error al eliminar nota', variant: 'destructive' }),
   });
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [notes.length]);
@@ -612,9 +593,9 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
       <div className="px-4 py-3 border-t border-border shrink-0 bg-slate-50">
         <div className="flex gap-2 items-end">
           <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim()) addMutation.mutate(newNote.trim()); } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
             placeholder="Nota de reunión..." className="resize-none text-sm min-h-[52px] max-h-[120px] flex-1 bg-white" />
-          <Button size="sm" onClick={() => { if (newNote.trim()) addMutation.mutate(newNote.trim()); }}
+          <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0 shrink-0">
             {addMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -672,17 +653,8 @@ export default function StatusSemanalPage() {
   const createCustom = useMutation({
     mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
       apiRequest('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
-    onMutate: ({ title, subtitle }) => {
-      const tempId = -Date.now();
-      const tempItem: CustomItem = { id: tempId, title, subtitle: subtitle || null, healthStatus: 'verde', marginStatus: 'medio', teamStrain: 'medio', mainRisk: null, currentAction: null, nextMilestone: null, ownerId: null, ownerName: null, decisionNeeded: 'ninguna', hiddenFromWeekly: false, updatedAt: new Date().toISOString() };
-      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev => [...(prev ?? []), tempItem]);
-      return { tempId };
-    },
-    onError: (_err: any, _vars: any, ctx: any) => {
-      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev => prev?.filter(r => r.id !== ctx?.tempId) ?? []);
-      toast({ title: 'Error al crear ítem', variant: 'destructive' });
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => toast({ title: 'Error al crear ítem', variant: 'destructive' }),
   });
 
   const patchCustom = useMutation({
@@ -694,38 +666,17 @@ export default function StatusSemanalPage() {
 
   const deleteCustom = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/status-semanal/custom/${id}`, 'DELETE'),
-    onMutate: (id: number) => {
-      queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
-        prev?.filter(r => r.id !== id) ?? []);
-    },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
-      toast({ title: 'Error al eliminar', variant: 'destructive' });
-    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onError: () => toast({ title: 'Error al eliminar', variant: 'destructive' }),
   });
 
-  // ── Optimistic update helpers ─────────────────────────────────────────────────
-
-  const resolveOwnerName = (ownerId: number | null | undefined): string | null => {
-    if (ownerId === null || ownerId === undefined) return null;
-    const user = appUsers.find(u => u.id === ownerId);
-    return user ? user.name : null;
-  };
+  // ── Update helpers ────────────────────────────────────────────────────────────
 
   const updateProject = (projectId: number, data: Record<string, any>) => {
-    const optimistic: Record<string, any> = { ...data };
-    if ('ownerId' in data) optimistic.ownerName = resolveOwnerName(data.ownerId);
-    queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
-      prev?.map(r => r.projectId === projectId ? { ...r, ...optimistic } : r) ?? []);
     patchProject.mutate({ projectId, data });
   };
 
   const updateCustom = (id: number, data: Record<string, any>) => {
-    const optimistic: Record<string, any> = { ...data };
-    if ('ownerId' in data) optimistic.ownerName = resolveOwnerName(data.ownerId);
-    queryClient.setQueryData<CustomItem[]>(['/api/status-semanal/custom'], prev =>
-      prev?.map(r => r.id === id ? { ...r, ...optimistic } : r) ?? []);
     patchCustom.mutate({ id, data });
   };
 
@@ -795,9 +746,6 @@ export default function StatusSemanalPage() {
       if (item.isCustom && item.customId) {
         deleteCustom.mutate(item.customId);
       } else if (item.projectId) {
-        // Optimistic remove: mark hidden immediately in cache
-        queryClient.setQueryData<StatusRow[]>(['/api/status-semanal'], prev =>
-          prev?.map(r => r.projectId === item.projectId ? { ...r, hiddenFromWeekly: true } : r) ?? []);
         removeProject.mutate(item.projectId);
       }
     },
