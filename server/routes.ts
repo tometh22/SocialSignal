@@ -15111,12 +15111,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/crm/stages/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const { label, color, position, isActive } = req.body;
+      const { label, color, position, isActive, followUpDays } = req.body;
       const update: Record<string, any> = {};
       if (label !== undefined) update.label = label;
       if (color !== undefined) update.color = color;
       if (position !== undefined) update.position = position;
       if (isActive !== undefined) update.isActive = isActive;
+      if (followUpDays !== undefined) update.followUpDays = followUpDays === null ? null : Number(followUpDays);
       const [updated] = await db.update(crmStages).set(update).where(eq(crmStages.id, id)).returning();
       res.json(updated);
     } catch {
@@ -15392,11 +15393,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/crm/reminders/due — recordatorios vencidos o próximos (24hs), para alertas in-app
+  // GET /api/crm/reminders/due — recordatorios vencidos o próximos (24hs) + alertas automáticas de inactividad
   app.get("/api/crm/reminders/due", async (req: Request, res: Response) => {
     try {
       const now = new Date();
       const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+      // Manual reminders due within 24h
       const dueReminders = await db
         .select({
           id: crmReminders.id,
@@ -15415,11 +15418,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         .orderBy(asc(crmReminders.dueDate));
 
-      const result = dueReminders.map(r => ({
+      const manualAlerts = dueReminders.map(r => ({
         ...r,
         isOverdue: new Date(r.dueDate) < now,
+        type: 'manual' as const,
       }));
-      res.json(result);
+
+      // Automatic inactivity alerts: leads where last activity > stage.followUpDays ago
+      const stages = await db.select().from(crmStages).where(isNotNull(crmStages.followUpDays));
+      const stageMap = new Map(stages.map(s => [s.key, s]));
+
+      // Get all active leads with a stage that has followUpDays
+      const activeStageKeys = stages.map(s => s.key);
+      if (activeStageKeys.length === 0) {
+        return res.json(manualAlerts);
+      }
+
+      const leads = await db.select().from(crmLeads).where(inArray(crmLeads.stage, activeStageKeys));
+
+      // Get latest activity per lead
+      const leadIds = leads.map(l => l.id);
+      const recentActivities: { leadId: number; maxDate: Date | null }[] = leadIds.length > 0
+        ? await db
+            .select({ leadId: crmActivities.leadId, maxDate: sql<Date>`MAX(${crmActivities.activityDate})` })
+            .from(crmActivities)
+            .where(inArray(crmActivities.leadId, leadIds))
+            .groupBy(crmActivities.leadId)
+        : [];
+
+      const activityByLead = new Map(recentActivities.map(a => [a.leadId, a.maxDate]));
+
+      const inactivityAlerts: any[] = [];
+      for (const lead of leads) {
+        const stage = stageMap.get(lead.stage);
+        if (!stage || stage.followUpDays == null) continue;
+        const lastActivity = activityByLead.get(lead.id) ?? lead.updatedAt;
+        const lastDate = lastActivity ? new Date(lastActivity) : new Date(lead.updatedAt);
+        const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSince >= stage.followUpDays) {
+          // Skip if there's already a manual reminder for this lead that's pending
+          const hasManual = manualAlerts.some(r => r.leadId === lead.id);
+          if (!hasManual) {
+            inactivityAlerts.push({
+              id: `inactivity-${lead.id}`,
+              description: `Sin actividad hace ${daysSince} día${daysSince !== 1 ? 's' : ''} (etapa: ${stage.label})`,
+              dueDate: now.toISOString(),
+              leadId: lead.id,
+              leadName: lead.companyName,
+              isOverdue: true,
+              type: 'inactivity' as const,
+              daysSince,
+            });
+          }
+        }
+      }
+
+      // Sort inactivity by daysSince desc
+      inactivityAlerts.sort((a, b) => b.daysSince - a.daysSince);
+
+      res.json([...manualAlerts, ...inactivityAlerts]);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }

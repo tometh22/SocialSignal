@@ -3080,6 +3080,7 @@ export const crmStages = pgTable("crm_stages", {
   color: varchar("color", { length: 50 }).notNull().default('slate'),
   position: integer("position").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
+  followUpDays: integer("follow_up_days"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

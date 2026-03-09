@@ -67,12 +67,14 @@ type NavItem = {
 };
 
 type DueReminder = {
-  id: number;
+  id: number | string;
   description: string;
   dueDate: string;
   leadId: number;
   leadName: string | null;
   isOverdue: boolean;
+  type?: 'manual' | 'inactivity';
+  daysSince?: number;
 };
 
 export default function SidebarFixed() {
@@ -296,7 +298,7 @@ export default function SidebarFixed() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <div className="flex items-center gap-2">
                     <Bell className="h-4 w-4 text-amber-500" />
-                    <span className="font-semibold text-sm">Recordatorios</span>
+                    <span className="font-semibold text-sm">Alertas CRM</span>
                   </div>
                   {totalDue > 0 && (
                     <Badge variant="destructive" className="text-xs h-5 px-1.5">
@@ -308,13 +310,13 @@ export default function SidebarFixed() {
                 {totalDue === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-center px-4">
                     <Bell className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                    <p className="text-sm text-muted-foreground">Sin recordatorios pendientes</p>
+                    <p className="text-sm text-muted-foreground">Sin alertas pendientes</p>
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto divide-y divide-border">
                     {dueReminders.map((reminder) => (
                       <Link
-                        key={reminder.id}
+                        key={String(reminder.id)}
                         href={`/crm/${reminder.leadId}`}
                         onClick={() => setBellOpen(false)}
                         className="block px-4 py-3 hover:bg-accent transition-colors cursor-pointer"
@@ -322,31 +324,42 @@ export default function SidebarFixed() {
                         <div className="flex items-start gap-2.5">
                           <div className={cn(
                             "mt-0.5 flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center",
-                            reminder.isOverdue
-                              ? "bg-red-100 text-red-600"
-                              : "bg-amber-100 text-amber-600"
+                            reminder.type === 'inactivity'
+                              ? "bg-orange-100 text-orange-600"
+                              : reminder.isOverdue
+                                ? "bg-red-100 text-red-600"
+                                : "bg-amber-100 text-amber-600"
                           )}>
-                            {reminder.isOverdue
-                              ? <AlertCircle className="h-3 w-3" />
-                              : <Clock className="h-3 w-3" />
+                            {reminder.type === 'inactivity'
+                              ? <Clock className="h-3 w-3" />
+                              : reminder.isOverdue
+                                ? <AlertCircle className="h-3 w-3" />
+                                : <Clock className="h-3 w-3" />
                             }
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "text-xs font-semibold truncate",
-                              reminder.isOverdue ? "text-red-600" : "text-amber-600"
-                            )}>
-                              {reminder.leadName || `Lead #${reminder.leadId}`}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className={cn(
+                                "text-xs font-semibold truncate",
+                                reminder.type === 'inactivity' ? "text-orange-600" : reminder.isOverdue ? "text-red-600" : "text-amber-600"
+                              )}>
+                                {reminder.leadName || `Lead #${reminder.leadId}`}
+                              </p>
+                              {reminder.type === 'inactivity' && (
+                                <span className="text-[10px] bg-orange-100 text-orange-600 px-1 rounded font-medium shrink-0">auto</span>
+                              )}
+                            </div>
                             <p className="text-xs text-foreground truncate mt-0.5">
                               {reminder.description}
                             </p>
-                            <p className={cn(
-                              "text-xs mt-1 font-medium",
-                              reminder.isOverdue ? "text-red-500" : "text-amber-500"
-                            )}>
-                              {reminder.isOverdue ? "Vencido — " : "Vence "}{new Date(reminder.dueDate).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-                            </p>
+                            {reminder.type !== 'inactivity' && (
+                              <p className={cn(
+                                "text-xs mt-1 font-medium",
+                                reminder.isOverdue ? "text-red-500" : "text-amber-500"
+                              )}>
+                                {reminder.isOverdue ? "Vencido — " : "Vence "}{new Date(reminder.dueDate).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </Link>

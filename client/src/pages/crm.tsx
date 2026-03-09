@@ -251,7 +251,7 @@ function NewLeadModal({ onSuccess, stages, open: externalOpen, onOpenChange: ext
 
 interface SortableStageRowProps {
   stage: CrmStage;
-  onSave: (id: number, label: string, color: string) => void;
+  onSave: (id: number, label: string, color: string, followUpDays: number | null) => void;
   onDelete: (id: number) => void;
 }
 
@@ -260,19 +260,22 @@ function SortableStageRow({ stage, onSave, onDelete }: SortableStageRowProps) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(stage.label);
   const [color, setColor] = useState(stage.color);
+  const [followUpDays, setFollowUpDays] = useState<string>(stage.followUpDays != null ? String(stage.followUpDays) : '');
   const meta = colorMeta(stage.color);
 
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
 
   const handleSave = () => {
     if (!label.trim()) return;
-    onSave(stage.id, label.trim(), color);
+    const days = followUpDays.trim() === '' ? null : parseInt(followUpDays);
+    onSave(stage.id, label.trim(), color, isNaN(days as number) ? null : days);
     setEditing(false);
   };
 
   const handleCancel = () => {
     setLabel(stage.label);
     setColor(stage.color);
+    setFollowUpDays(stage.followUpDays != null ? String(stage.followUpDays) : '');
     setEditing(false);
   };
 
@@ -288,7 +291,7 @@ function SortableStageRow({ stage, onSave, onDelete }: SortableStageRowProps) {
       </button>
 
       {editing ? (
-        <>
+        <div className="flex-1 space-y-2">
           <div className="flex items-center gap-1 flex-wrap">
             {COLOR_OPTIONS.map(opt => (
               <button
@@ -300,20 +303,40 @@ function SortableStageRow({ stage, onSave, onDelete }: SortableStageRowProps) {
               />
             ))}
           </div>
-          <Input
-            className="flex-1 h-7 text-sm"
-            value={label}
-            onChange={e => setLabel(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
-            autoFocus
-          />
-          <button onClick={handleSave} className="p-1 text-green-600 hover:text-green-700"><Check className="w-4 h-4" /></button>
-          <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
-        </>
+          <div className="flex items-center gap-2">
+            <Input
+              className="flex-1 h-7 text-sm"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') handleCancel(); }}
+              autoFocus
+              placeholder="Nombre de etapa"
+            />
+            <div className="flex items-center gap-1 shrink-0">
+              <Input
+                className="w-14 h-7 text-sm text-center"
+                type="number"
+                min="1"
+                value={followUpDays}
+                onChange={e => setFollowUpDays(e.target.value)}
+                placeholder="días"
+                title="Días sin actividad para alerta automática"
+              />
+              <span className="text-xs text-slate-400 whitespace-nowrap">días</span>
+            </div>
+            <button onClick={handleSave} className="p-1 text-green-600 hover:text-green-700"><Check className="w-4 h-4" /></button>
+            <button onClick={handleCancel} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
       ) : (
         <>
           <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: meta.hex }} />
           <span className={`flex-1 text-sm font-medium ${meta.color}`}>{stage.label}</span>
+          {stage.followUpDays != null && (
+            <span className="text-[10px] bg-orange-50 text-orange-500 border border-orange-200 px-1.5 py-0.5 rounded font-medium shrink-0">
+              {stage.followUpDays}d
+            </span>
+          )}
           <button
             onClick={() => setEditing(true)}
             className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition-opacity"
@@ -362,11 +385,11 @@ function StageManagerDialog({ stages, onRefresh }: { stages: CrmStage[]; onRefre
       });
   };
 
-  const handleSave = (id: number, label: string, color: string) => {
-    setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color } : s));
+  const handleSave = (id: number, label: string, color: string, followUpDays: number | null) => {
+    setLocalStages(prev => prev.map(s => s.id === id ? { ...s, label, color, followUpDays } : s));
     const current = queryClient.getQueryData<CrmStage[]>(['/api/crm/stages']) ?? [];
-    queryClient.setQueryData(['/api/crm/stages'], current.map(s => s.id === id ? { ...s, label, color } : s));
-    apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color })
+    queryClient.setQueryData(['/api/crm/stages'], current.map(s => s.id === id ? { ...s, label, color, followUpDays } : s));
+    apiRequest(`/api/crm/stages/${id}`, 'PATCH', { label, color, followUpDays })
       .then(() => toast({ title: 'Etapa actualizada' }))
       .catch(() => {
         queryClient.setQueryData(['/api/crm/stages'], current);
