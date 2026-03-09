@@ -16300,6 +16300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
           ownerId: projectStatusReviews.ownerId,
           decisionNeeded: projectStatusReviews.decisionNeeded,
+          hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
           reviewUpdatedAt: projectStatusReviews.updatedAt,
         })
         .from(activeProjects)
@@ -16344,7 +16345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
-      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded } = req.body;
+      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
 
       const update: Record<string, any> = { updatedAt: new Date() };
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
@@ -16356,6 +16357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (nextMilestoneDate !== undefined) update.nextMilestoneDate = nextMilestoneDate ? new Date(nextMilestoneDate) : null;
       if (ownerId !== undefined) update.ownerId = ownerId || null;
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
+      if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
 
       // Check if review already exists
       const [existing] = await db.select({ id: projectStatusReviews.id })

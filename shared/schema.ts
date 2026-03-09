@@ -3142,6 +3142,7 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
   nextMilestoneDate: timestamp("next_milestone_date"),
   ownerId: integer("owner_id").references(() => users.id),
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'), // ninguna | priorizacion | recursos | reprecio | salida
+  hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
