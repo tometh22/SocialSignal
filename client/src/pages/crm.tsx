@@ -782,6 +782,7 @@ export default function CRMPage() {
     queryKey: ['/api/crm/stages'],
     staleTime: Infinity,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
   const [localStages, setLocalStages] = useState<CrmStage[]>([]);
 
@@ -941,6 +942,7 @@ export default function CRMPage() {
     });
     queryClient.setQueryData(['/api/crm/stages'], reordered);
     apiRequest('/api/crm/stages/reorder', 'PATCH', { order: reordered.map(s => s.id) })
+      .then(() => refetchStages())
       .catch(() => {
         setLocalStages(currentStages);
         queryClient.setQueryData(['/api/crm/stages'], currentStages);
