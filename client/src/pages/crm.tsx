@@ -1006,7 +1006,7 @@ export default function CRMPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StageManagerDialog stages={orderedStages} onRefresh={refetchStages} />
+          <StageManagerDialog stages={stages} onRefresh={refetchStages} />
           <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
             <RefreshCw className="w-3.5 h-3.5" /> Actualizar
           </Button>
@@ -1085,7 +1085,7 @@ export default function CRMPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas las etapas</SelectItem>
-            {orderedStages.map(s => (
+            {stages.map(s => (
               <SelectItem key={s.key} value={s.key}>
                 {s.label} {stats?.byStage?.[s.key] ? `(${stats.byStage[s.key]})` : ''}
               </SelectItem>
@@ -1162,7 +1162,7 @@ export default function CRMPage() {
           </DragOverlay>
         </DndContext>
       ) : (
-        <ListView leads={leads} stages={orderedStages} onLeadClick={handleLeadClick} />
+        <ListView leads={leads} stages={stages} onLeadClick={handleLeadClick} />
       )}
 
       <AlertDialog open={!!stageToDelete} onOpenChange={(open) => { if (!open) setStageToDelete(null); }}>
