@@ -16391,7 +16391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           content: projectReviewNotes.content,
           noteDate: projectReviewNotes.noteDate,
           authorId: projectReviewNotes.authorId,
-          authorName: users.name,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
           createdAt: projectReviewNotes.createdAt,
         })
         .from(projectReviewNotes)
@@ -16434,8 +16434,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // GET /api/status-semanal/users — all users for owner dropdown
   app.get("/api/status-semanal/users", async (_req: Request, res: Response) => {
     try {
-      const allUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(asc(users.name));
-      res.json(allUsers);
+      const allUsers = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).orderBy(asc(users.firstName));
+      const usersWithName = allUsers.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }));
+      res.json(usersWithName);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener usuarios" });
     }
