@@ -16335,6 +16335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerName: r.ownerId ? ownerMap.get(r.ownerId) ?? null : null,
       }));
 
+      res.setHeader('Cache-Control', 'no-store');
       res.json(result);
     } catch (error) {
       console.error('GET /api/status-semanal error:', error);
@@ -16439,6 +16440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const allUsers = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).orderBy(asc(users.firstName));
       const usersWithName = allUsers.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }));
+      res.setHeader('Cache-Control', 'no-store');
       res.json(usersWithName);
     } catch (error) {
       res.status(500).json({ message: "Error al obtener usuarios" });
@@ -16468,6 +16470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).from(weeklyStatusItems)
         .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
         .orderBy(desc(weeklyStatusItems.createdAt));
+      res.setHeader('Cache-Control', 'no-store');
       res.json(items);
     } catch (error) {
       console.error('GET /api/status-semanal/custom error:', error);
