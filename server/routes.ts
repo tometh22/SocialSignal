@@ -16347,6 +16347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
+      console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
       const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
 
       const update: Record<string, any> = { updatedAt: new Date() };
@@ -16409,10 +16410,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/:projectId/notes — add a note
-  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+  app.post("/api/status-semanal/:projectId/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
-      const authorId = (req.session as any)?.userId ?? null;
+      console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
+      const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
       const [note] = await db.insert(projectReviewNotes)
@@ -16497,6 +16499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
+      console.log(`PATCH /api/status-semanal/custom/${id}`, JSON.stringify(req.body));
       const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
       const update: Record<string, any> = { updatedAt: new Date() };
       if (title !== undefined) update.title = title;
@@ -16533,11 +16536,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
-      await db.update(projectStatusReviews)
-        .set({ hiddenFromWeekly: true, updatedAt: new Date() })
+      console.log(`DELETE /api/status-semanal/${projectId} - quitar proyecto del status`);
+
+      const [existing] = await db.select({ id: projectStatusReviews.id })
+        .from(projectStatusReviews)
         .where(eq(projectStatusReviews.projectId, projectId));
+
+      if (existing) {
+        await db.update(projectStatusReviews)
+          .set({ hiddenFromWeekly: true, updatedAt: new Date() })
+          .where(eq(projectStatusReviews.projectId, projectId));
+      } else {
+        await db.insert(projectStatusReviews)
+          .values({ projectId, hiddenFromWeekly: true, updatedAt: new Date() });
+      }
+
       res.json({ ok: true });
     } catch (error) {
+      console.error('DELETE /api/status-semanal error:', error);
       res.status(500).json({ message: "Error al quitar proyecto" });
     }
   });
