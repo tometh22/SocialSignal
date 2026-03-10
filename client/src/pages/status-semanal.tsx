@@ -15,7 +15,9 @@ import {
   ClipboardList, MessageSquare, X, Send, Trash2,
   AlertTriangle, Loader2, User, EyeOff, Eye,
   ChevronDown, ChevronRight, Zap, CheckCircle2,
-  Circle, MoreHorizontal, Plus, Tag
+  Circle, MoreHorizontal, Plus, Tag,
+  Sparkles, Brain, TrendingUp, TrendingDown,
+  Shield, Target, RefreshCw, Lightbulb, ArrowRight
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -64,6 +66,20 @@ type Note = {
 };
 
 type AppUser = { id: number; name: string; email: string };
+
+// AI Summary types
+type AISummary = {
+  executiveSummary: string;
+  highlights: { type: 'risk' | 'win' | 'action' | 'decision'; text: string }[];
+  projectInsights: {
+    projectId: number;
+    clientName: string;
+    insight: string;
+    suggestedRisk?: string;
+    suggestedAction?: string;
+  }[];
+  weeklyScore: number;
+};
 
 // Unified item for rendering — projects and custom items share the same card components
 type Item = {
@@ -522,6 +538,202 @@ function AddItemButton({ onAdd }: { onAdd: (title: string, subtitle: string) => 
   );
 }
 
+// ─── Health Score Ring ────────────────────────────────────────────────────────
+
+function HealthScoreRing({ score, size = 80 }: { score: number; size?: number }) {
+  const radius = (size - 8) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (score / 100) * circumference;
+  const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor"
+          className="text-slate-100" strokeWidth={6} />
+        <motion.circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color}
+          strokeWidth={6} strokeLinecap="round" strokeDasharray={circumference}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.2, ease: 'easeOut' }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <motion.span className="text-xl font-black" style={{ color }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
+          {score}
+        </motion.span>
+        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">Score</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Highlight Chip ───────────────────────────────────────────────────────
+
+const highlightConfig = {
+  risk: { icon: Shield, bg: 'bg-red-50 border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
+  win: { icon: TrendingUp, bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-500' },
+  action: { icon: Target, bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-500' },
+  decision: { icon: Zap, bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', iconColor: 'text-amber-500' },
+};
+
+function HighlightChip({ type, text }: { type: 'risk' | 'win' | 'action' | 'decision'; text: string }) {
+  const cfg = highlightConfig[type];
+  const Icon = cfg.icon;
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      className={cn("inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold", cfg.bg, cfg.text)}>
+      <Icon className={cn("h-3 w-3 shrink-0", cfg.iconColor)} />
+      <span>{text}</span>
+    </motion.div>
+  );
+}
+
+// ─── AI Summary Panel ────────────────────────────────────────────────────────
+
+function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
+  summary: AISummary | null;
+  isLoading: boolean;
+  onGenerate: () => void;
+  itemCount: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  if (!summary && !isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
+        <div className="relative flex items-center justify-between px-6 py-5">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-200/50">
+              <Sparkles className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Resumen Ejecutivo con IA</h3>
+              <p className="text-xs text-slate-500 mt-0.5">Generá un análisis inteligente de los {itemCount} proyectos activos</p>
+            </div>
+          </div>
+          <Button onClick={onGenerate} disabled={isLoading}
+            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-200/50 gap-2 h-10 px-5 rounded-xl font-semibold text-sm">
+            <Sparkles className="h-4 w-4" />
+            Generar resumen
+          </Button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
+        <div className="relative flex items-center gap-4 px-6 py-8 justify-center">
+          <div className="relative">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+            <Sparkles className="h-3.5 w-3.5 text-violet-500 absolute -top-1 -right-1 animate-pulse" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-indigo-700">Analizando {itemCount} proyectos...</p>
+            <p className="text-xs text-indigo-400 mt-0.5">Claude está generando el resumen ejecutivo</p>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (!summary) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+      className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
+
+      {/* Header */}
+      <div className="relative flex items-center justify-between px-6 py-4 border-b border-indigo-100/60">
+        <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-3 group">
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md shadow-indigo-200/50">
+            <Brain className="h-4 w-4 text-white" />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800">Análisis IA</h3>
+              <Badge variant="outline" className="text-[9px] h-4 bg-indigo-100 text-indigo-700 border-indigo-200 font-bold">
+                Claude
+              </Badge>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-0.5">{expanded ? 'Click para colapsar' : 'Click para expandir'}</p>
+          </div>
+          <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform ml-1", !expanded && "-rotate-90")} />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <HealthScoreRing score={summary.weeklyScore} size={56} />
+          <Button onClick={onGenerate} variant="ghost" size="sm"
+            className="h-8 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 gap-1.5">
+            <RefreshCw className="h-3 w-3" />
+            Regenerar
+          </Button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+            className="overflow-hidden">
+            <div className="relative px-6 py-4 space-y-4">
+              {/* Executive Summary */}
+              <div className="bg-white/70 rounded-xl border border-slate-100 p-4">
+                <p className="text-sm text-slate-700 leading-relaxed">{summary.executiveSummary}</p>
+              </div>
+
+              {/* Highlights */}
+              {summary.highlights.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {summary.highlights.map((h, i) => (
+                    <HighlightChip key={i} type={h.type} text={h.text} />
+                  ))}
+                </div>
+              )}
+
+              {/* Project Insights */}
+              {summary.projectInsights.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                    <Lightbulb className="h-3 w-3" />
+                    Insights por proyecto
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {summary.projectInsights.map((pi, i) => (
+                      <motion.div key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-start gap-2 bg-white/60 rounded-lg border border-slate-100 px-3 py-2">
+                        <ArrowRight className="h-3 w-3 text-indigo-400 shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-indigo-600">{pi.clientName}</p>
+                          <p className="text-xs text-slate-600 leading-snug">{pi.insight}</p>
+                          {pi.suggestedRisk && (
+                            <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
+                              <Shield className="h-2.5 w-2.5" /> Riesgo sugerido: {pi.suggestedRisk}
+                            </p>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 // ─── Notes panel ─────────────────────────────────────────────────────────────
 
 function NotesPanel({ projectId, projectName, onClose }: { projectId: number; projectName: string; onClose: () => void }) {
@@ -631,6 +843,20 @@ export default function StatusSemanalPage() {
   const { toast } = useToast();
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+
+  // ── AI Summary mutation ─────────────────────────────────────────────────────
+
+  const aiMutation = useMutation({
+    mutationFn: () => mutationFetch('/api/status-semanal/ai-summary', 'POST'),
+    onSuccess: (data: AISummary) => {
+      setAiSummary(data);
+      toast({ title: 'Resumen generado', description: `Score del portafolio: ${data.weeklyScore}/100` });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Error al generar resumen IA', description: err.message, variant: 'destructive' });
+    },
+  });
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -835,46 +1061,50 @@ export default function StatusSemanalPage() {
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen ? "mr-[380px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
-        <div className="px-6 py-4 border-b border-border shrink-0 bg-background">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
-                <ClipboardList className="h-5 w-5 text-white" />
+        <div className="relative overflow-hidden border-b border-border shrink-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
+          <div className="relative px-6 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20 shadow-lg">
+                  <ClipboardList className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-extrabold leading-tight text-white tracking-tight">Status Semanal</h1>
+                  <p className="text-xs text-indigo-200 font-medium mt-0.5">{weekLabel()}</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-bold leading-tight">Status Semanal</h1>
-                <p className="text-xs text-muted-foreground">{weekLabel()}</p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              {criticalCount > 0 ? (
-                <div className="flex items-center gap-1.5 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  {criticalCount} requiere{criticalCount !== 1 ? 'n' : ''} atención
+              <div className="flex items-center gap-2">
+                {criticalCount > 0 ? (
+                  <div className="flex items-center gap-1.5 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-red-400/30">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {criticalCount} requiere{criticalCount !== 1 ? 'n' : ''} atención
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-emerald-500/20 backdrop-blur-sm border border-emerald-300/30 text-emerald-100 text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Sin alertas esta semana
+                  </div>
+                )}
+                {decisionCount > 0 && (
+                  <div className="flex items-center gap-1.5 bg-amber-400/20 backdrop-blur-sm border border-amber-300/30 text-amber-100 text-xs font-bold px-3 py-1.5 rounded-full">
+                    <Zap className="h-3.5 w-3.5" />
+                    {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''}
+                  </div>
+                )}
+                {hiddenCount > 0 && (
+                  <button onClick={() => setShowHidden(v => !v)}
+                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors backdrop-blur-sm",
+                      showHidden ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
+                    {showHidden ? <><Eye className="h-3 w-3" /> Ocultar quitados</> : <><EyeOff className="h-3 w-3" /> {hiddenCount} quitado{hiddenCount !== 1 ? 's' : ''}</>}
+                  </button>
+                )}
+                <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                <div className="text-xs text-indigo-200 bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full font-medium border border-white/10">
+                  {visible.length} ítem{visible.length !== 1 ? 's' : ''}
                 </div>
-              ) : (
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Sin alertas esta semana
-                </div>
-              )}
-              {decisionCount > 0 && (
-                <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 text-xs font-bold px-3 py-1.5 rounded-full">
-                  <Zap className="h-3.5 w-3.5" />
-                  {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''}
-                </div>
-              )}
-              {hiddenCount > 0 && (
-                <button onClick={() => setShowHidden(v => !v)}
-                  className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors",
-                    showHidden ? "bg-slate-700 text-white border-slate-700" : "bg-white text-slate-400 border-slate-200 hover:border-slate-400")}>
-                  {showHidden ? <><Eye className="h-3 w-3" /> Ocultar quitados</> : <><EyeOff className="h-3 w-3" /> {hiddenCount} quitado{hiddenCount !== 1 ? 's' : ''}</>}
-                </button>
-              )}
-              <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-              <div className="text-xs text-muted-foreground bg-slate-100 px-2.5 py-1 rounded-full font-medium">
-                {visible.length} ítem{visible.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
@@ -886,6 +1116,14 @@ export default function StatusSemanalPage() {
             <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
+
+              {/* ── AI Summary Panel ──────────────────────────────── */}
+              <AISummaryPanel
+                summary={aiSummary}
+                isLoading={aiMutation.isPending}
+                onGenerate={() => aiMutation.mutate()}
+                itemCount={visible.length}
+              />
 
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>

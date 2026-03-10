@@ -16456,6 +16456,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST /api/status-semanal/ai-summary — generate AI executive summary
+  app.post("/api/status-semanal/ai-summary", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { generateWeeklySummary } = await import("./services/ai-weekly-summary");
+
+      // Get all project data for the summary
+      const rows = await db
+        .select({
+          projectId: activeProjects.id,
+          clientName: clients.name,
+          quotationName: quotations.projectName,
+          healthStatus: projectStatusReviews.healthStatus,
+          marginStatus: projectStatusReviews.marginStatus,
+          teamStrain: projectStatusReviews.teamStrain,
+          mainRisk: projectStatusReviews.mainRisk,
+          currentAction: projectStatusReviews.currentAction,
+          nextMilestone: projectStatusReviews.nextMilestone,
+          ownerId: projectStatusReviews.ownerId,
+          decisionNeeded: projectStatusReviews.decisionNeeded,
+          hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
+        })
+        .from(activeProjects)
+        .leftJoin(clients, eq(clients.id, activeProjects.clientId))
+        .leftJoin(quotations, eq(quotations.id, activeProjects.quotationId))
+        .leftJoin(projectStatusReviews, eq(projectStatusReviews.projectId, activeProjects.id))
+        .where(and(eq(activeProjects.status, 'active'), eq(activeProjects.isFinished, false)));
+
+      // Get owner names
+      const ownerIds = [...new Set(rows.map(r => r.ownerId).filter(Boolean))] as number[];
+      const owners = ownerIds.length > 0
+        ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, ownerIds))
+        : [];
+      const ownerMap = new Map(owners.map((u: any) => [u.id, `${u.firstName} ${u.lastName}`]));
+
+      // Get note counts
+      const projectIds = rows.map(r => r.projectId);
+      const noteCounts = projectIds.length > 0
+        ? await db
+            .select({ projectId: projectReviewNotes.projectId, count: sql<number>`COUNT(*)::int` })
+            .from(projectReviewNotes)
+            .where(inArray(projectReviewNotes.projectId, projectIds))
+            .groupBy(projectReviewNotes.projectId)
+        : [];
+      const noteCountMap = new Map(noteCounts.map(n => [n.projectId, n.count]));
+
+      const snapshots = rows.map(r => ({
+        projectId: r.projectId,
+        clientName: r.clientName,
+        quotationName: r.quotationName,
+        healthStatus: r.healthStatus,
+        marginStatus: r.marginStatus,
+        teamStrain: r.teamStrain,
+        mainRisk: r.mainRisk,
+        currentAction: r.currentAction,
+        nextMilestone: r.nextMilestone,
+        ownerName: r.ownerId ? ownerMap.get(r.ownerId) ?? null : null,
+        decisionNeeded: r.decisionNeeded,
+        hiddenFromWeekly: r.hiddenFromWeekly,
+        noteCount: noteCountMap.get(r.projectId) ?? 0,
+      }));
+
+      console.log(`POST /api/status-semanal/ai-summary — generating for ${snapshots.length} projects`);
+      const summary = await generateWeeklySummary(snapshots);
+      res.json(summary);
+    } catch (error: any) {
+      console.error('POST /api/status-semanal/ai-summary error:', error);
+      res.status(500).json({ message: error.message || "Error al generar resumen IA" });
+    }
+  });
+
   // ── Weekly status custom items ─────────────────────────────────────────────
 
   // GET /api/status-semanal/custom — all custom (non-project) items
