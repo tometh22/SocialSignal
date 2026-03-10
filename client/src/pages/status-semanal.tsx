@@ -893,8 +893,8 @@ export default function StatusSemanalPage() {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
       toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+    onSettled: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'], exact: true });
     },
   });
 
@@ -913,8 +913,8 @@ export default function StatusSemanalPage() {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
       toast({ title: 'Error al quitar proyecto', description: err.message, variant: 'destructive' });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+    onSettled: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal'], exact: true });
     },
   });
 
@@ -922,8 +922,8 @@ export default function StatusSemanalPage() {
     mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
       mutationFetch('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
     onError: (err: Error) => toast({ title: 'Error al crear ítem', description: err.message, variant: 'destructive' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    onSettled: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
     },
   });
 
@@ -942,8 +942,8 @@ export default function StatusSemanalPage() {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
       toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    onSettled: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
     },
   });
 
@@ -962,8 +962,8 @@ export default function StatusSemanalPage() {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
       toast({ title: 'Error al eliminar', description: err.message, variant: 'destructive' });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    onSettled: () => {
+      queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'], exact: true });
     },
   });
 
