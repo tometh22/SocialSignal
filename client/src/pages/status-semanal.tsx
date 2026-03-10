@@ -239,7 +239,8 @@ function LevelBadge({ value, onChange, label }: { value: string | null; onChange
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button title={label}>
+        <button title={label} className="flex items-center gap-1">
+          <span className="text-[9px] text-slate-400 font-medium hidden lg:inline">{label}</span>
           <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>{meta.label}</Badge>
         </button>
       </PopoverTrigger>
@@ -482,11 +483,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           <span className="font-semibold text-sm text-foreground">{item.title}</span>
           {item.subtitle && <span className="text-muted-foreground text-sm"> · {item.subtitle}</span>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
+        </div>
+        <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
         </div>
-        <div className="hidden lg:block w-44 shrink-0">
+        <div className="hidden lg:block w-40 shrink-0">
           <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
         </div>
         <div className="shrink-0">
@@ -1303,11 +1306,9 @@ export default function StatusSemanalPage() {
                       <div className="w-3.5 shrink-0" />
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:flex items-center gap-8 shrink-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Margen</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Equipo</span>
-                      </div>
-                      <div className="hidden lg:block w-44 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
+                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
