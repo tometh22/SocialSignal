@@ -368,7 +368,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
   item: Item; users: AppUser[]; isSelected: boolean;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
-  const meta = hm(item.healthStatus);
+  const [expanded, setExpanded] = useState(false);
   const decMeta = dm(item.decisionNeeded);
   const isUrgentDec = decMeta.urgent;
   const barColor = item.isOverdue ? 'bg-red-500' : ({ verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500');
@@ -381,14 +381,15 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
     )}>
       <div className={cn("h-1 w-full", barColor)} />
       <div className="px-4 py-3">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 mb-2">
+        {/* Header — always visible, click to expand */}
+        <button className="w-full flex items-center justify-between gap-2 mb-2 text-left" onClick={() => setExpanded(v => !v)}>
           <div className="min-w-0 flex-1 flex items-center gap-1.5">
+            <ChevronDown className={cn("h-3.5 w-3.5 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
             {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
             <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
             <button onClick={onRemove}
               className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -396,65 +397,70 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               <Trash2 className="h-3 w-3" />
             </button>
           </div>
-        </div>
+        </button>
 
-        {/* Decision alert */}
-        {isUrgentDec && (
-          <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 border text-xs font-semibold", decMeta.color)}>
-            <Zap className="h-3 w-3 shrink-0" />
-            Decisión:
-            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-          </div>
-        )}
-
-        {/* Overdue alert */}
-        {item.isOverdue && (
-          <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
-            <Clock className="h-3 w-3 shrink-0" />
-            Demorado — {deadlineLabel(item.deadline)}
-          </div>
-        )}
-
-        {/* Metrics row */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {/* Compact always-visible summary */}
+        <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
-        {/* Risk */}
-        <div className={cn("rounded-md px-2.5 py-2 mb-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-          <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
-          <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
-        </div>
+        {/* Expandable detail */}
+        {expanded && (
+          <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
+            {/* Decision alert */}
+            {isUrgentDec && (
+              <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 border text-xs font-semibold", decMeta.color)}>
+                <Zap className="h-3 w-3 shrink-0" />
+                Decisión:
+                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+              </div>
+            )}
 
-        {/* Action + Milestone */}
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
-            <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
-          </div>
-          <div>
-            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
-            <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
-          </div>
-        </div>
+            {/* Overdue alert */}
+            {item.isOverdue && (
+              <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
+                <Clock className="h-3 w-3 shrink-0" />
+                Demorado — {deadlineLabel(item.deadline)}
+              </div>
+            )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-          <div className="flex items-center gap-2">
-            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+            {/* Risk */}
+            <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
+              <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
+            </div>
+
+            {/* Action + Milestone */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
+                <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
+                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+              <div className="flex items-center gap-2">
+                <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+              </div>
+              {!item.isCustom && onOpenNotes && (
+                <button onClick={onOpenNotes}
+                  className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
+                    isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
+                  <MessageSquare className="h-2.5 w-2.5" />
+                  {item.noteCount}
+                </button>
+              )}
+            </div>
           </div>
-          {!item.isCustom && onOpenNotes && (
-            <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
-                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
-              <MessageSquare className="h-2.5 w-2.5" />
-              {item.noteCount}
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
