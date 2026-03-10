@@ -17,7 +17,8 @@ import {
   ChevronDown, ChevronRight, Zap, CheckCircle2,
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
-  Shield, Target, RefreshCw, Lightbulb, ArrowRight
+  Shield, Target, RefreshCw, Lightbulb, ArrowRight,
+  Calendar, Clock
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ type StatusRow = {
   currentAction: string | null;
   nextMilestone: string | null;
   nextMilestoneDate: string | null;
+  deadline: string | null;
   ownerId: number | null;
   ownerName: string | null;
   decisionNeeded: string | null;
@@ -53,6 +55,7 @@ type CustomItem = {
   mainRisk: string | null;
   currentAction: string | null;
   nextMilestone: string | null;
+  deadline: string | null;
   ownerId: number | null;
   ownerName: string | null;
   decisionNeeded: string | null;
@@ -95,11 +98,13 @@ type Item = {
   mainRisk: string | null;
   currentAction: string | null;
   nextMilestone: string | null;
+  deadline: string | null;
   ownerId: number | null;
   ownerName: string | null;
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   noteCount: number;
+  isOverdue: boolean;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -304,6 +309,59 @@ function OwnerSelect({ value, name, onChange, users }: {
   );
 }
 
+// ─── Deadline picker ─────────────────────────────────────────────────────────
+
+function deadlineLabel(d: string | null): string {
+  if (!d) return '';
+  const date = new Date(d);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const fmt = date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+  if (diff < 0) return `${fmt} (${Math.abs(diff)}d atrás)`;
+  if (diff === 0) return `${fmt} (hoy)`;
+  if (diff <= 7) return `${fmt} (${diff}d)`;
+  return fmt;
+}
+
+function DeadlinePicker({ value, isOverdue, onChange }: {
+  value: string | null; isOverdue: boolean; onChange: (v: string | null) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const toDateStr = (d: string | null) => {
+    if (!d) return '';
+    return new Date(d).toISOString().split('T')[0];
+  };
+
+  if (!value) {
+    return (
+      <button onClick={() => inputRef.current?.showPicker()}
+        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative">
+        <Calendar className="h-3 w-3" />
+        <span>Deadline</span>
+        <input ref={inputRef} type="date"
+          className="absolute inset-0 opacity-0 cursor-pointer w-full"
+          onChange={e => e.target.value && onChange(new Date(e.target.value).toISOString())} />
+      </button>
+    );
+  }
+
+  return (
+    <div className={cn("flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-0.5 relative group",
+      isOverdue ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>
+      {isOverdue ? <Clock className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
+      <span>{deadlineLabel(value)}</span>
+      <button onClick={e => { e.stopPropagation(); onChange(null); }}
+        className="hidden group-hover:inline-flex ml-0.5 text-slate-400 hover:text-red-500">
+        <X className="h-2.5 w-2.5" />
+      </button>
+      <input type="date" value={toDateStr(value)}
+        className="absolute inset-0 opacity-0 cursor-pointer w-full"
+        onChange={e => e.target.value ? onChange(new Date(e.target.value).toISOString()) : onChange(null)} />
+    </div>
+  );
+}
+
 // ─── Alert card (Rojo / Amarillo or urgent decision) ─────────────────────────
 
 function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }: {
@@ -313,12 +371,12 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
   const meta = hm(item.healthStatus);
   const decMeta = dm(item.decisionNeeded);
   const isUrgentDec = decMeta.urgent;
-  const barColor = { verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500';
+  const barColor = item.isOverdue ? 'bg-red-500' : ({ verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500');
 
   return (
     <div className={cn(
       "rounded-xl border bg-white shadow-sm transition-all overflow-hidden",
-      item.healthStatus === 'rojo' ? "border-red-200" : item.healthStatus === 'amarillo' ? "border-amber-200" : "border-indigo-200",
+      item.isOverdue ? "border-red-300" : item.healthStatus === 'rojo' ? "border-red-200" : item.healthStatus === 'amarillo' ? "border-amber-200" : "border-indigo-200",
       isSelected && "ring-2 ring-indigo-400"
     )}>
       <div className={cn("h-1 w-full", barColor)} />
@@ -349,6 +407,14 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
           </div>
         )}
 
+        {/* Overdue alert */}
+        {item.isOverdue && (
+          <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
+            <Clock className="h-3 w-3 shrink-0" />
+            Demorado — {deadlineLabel(item.deadline)}
+          </div>
+        )}
+
         {/* Metrics row */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
@@ -376,7 +442,10 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <div className="flex items-center gap-2">
+            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          </div>
           {!item.isCustom && onOpenNotes && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
@@ -423,6 +492,9 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
         </div>
+        <div className="shrink-0">
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+        </div>
         {decMeta.urgent && (
           <div className="shrink-0">
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
@@ -463,10 +535,12 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Acción en curso</p>
               <InlineText value={item.currentAction} placeholder="Acción en curso..." onSave={v => onUpdate({ currentAction: v })} multiline />
             </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
-              <InlineText value={item.nextMilestone} placeholder="Próximo hito..." onSave={v => onUpdate({ nextMilestone: v })} />
-              <div className="mt-2">
+            <div className="space-y-2">
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
+                <InlineText value={item.nextMilestone} placeholder="Próximo hito..." onSave={v => onUpdate({ nextMilestone: v })} />
+              </div>
+              <div>
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
                 <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
               </div>
@@ -971,6 +1045,14 @@ export default function StatusSemanalPage() {
 
   // ── Unified item list ─────────────────────────────────────────────────────────
 
+  const isOverdue = (d: string | null) => {
+    if (!d) return false;
+    const dl = new Date(d);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return dl < today;
+  };
+
   const toItem = (r: StatusRow): Item => ({
     key: `p_${r.projectId}`,
     isCustom: false,
@@ -983,11 +1065,13 @@ export default function StatusSemanalPage() {
     mainRisk: r.mainRisk,
     currentAction: r.currentAction,
     nextMilestone: r.nextMilestone,
+    deadline: r.deadline,
     ownerId: r.ownerId,
     ownerName: r.ownerName,
     decisionNeeded: r.decisionNeeded,
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
+    isOverdue: isOverdue(r.deadline),
   });
 
   const toCustomItem = (c: CustomItem): Item => ({
@@ -1002,11 +1086,13 @@ export default function StatusSemanalPage() {
     mainRisk: c.mainRisk,
     currentAction: c.currentAction,
     nextMilestone: c.nextMilestone,
+    deadline: c.deadline,
     ownerId: c.ownerId,
     ownerName: c.ownerName,
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: 0,
+    isOverdue: isOverdue(c.deadline),
   });
 
   const allItems: Item[] = [
@@ -1017,13 +1103,16 @@ export default function StatusSemanalPage() {
   const visible = allItems.filter(i => showHidden ? true : !i.hiddenFromWeekly);
   const hiddenCount = allItems.filter(i => i.hiddenFromWeekly).length;
 
-  const rojoItems    = visible.filter(i => i.healthStatus === 'rojo');
-  const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo');
-  const alertItems   = [...rojoItems, ...amarilloItems];
-  const decisionItems = visible.filter(i => dm(i.decisionNeeded).urgent && (i.healthStatus === 'verde' || !i.healthStatus));
-  const normalItems   = visible.filter(i => (!i.healthStatus || i.healthStatus === 'verde') && !dm(i.decisionNeeded).urgent);
+  const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
+  const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo' && !i.isOverdue);
+  const overdueItems  = visible.filter(i => i.isOverdue && i.healthStatus !== 'rojo');
+  const alertItems    = [...rojoItems, ...overdueItems, ...amarilloItems];
+  const alertKeys     = new Set(alertItems.map(i => i.key));
+  const decisionItems = visible.filter(i => dm(i.decisionNeeded).urgent && !alertKeys.has(i.key));
+  const decisionKeys  = new Set(decisionItems.map(i => i.key));
+  const normalItems   = visible.filter(i => !alertKeys.has(i.key) && !decisionKeys.has(i.key));
 
-  const criticalCount = rojoItems.length + amarilloItems.length;
+  const criticalCount = alertItems.length;
   const decisionCount = visible.filter(i => dm(i.decisionNeeded).urgent).length;
 
   const getItemHandlers = (item: Item) => ({
@@ -1220,6 +1309,7 @@ export default function StatusSemanalPage() {
                       </div>
                       <div className="hidden lg:block w-44 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
+                      <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
                     </div>
                     <AnimatePresence initial={false}>

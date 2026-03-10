@@ -3140,6 +3140,7 @@ export const projectStatusReviews = pgTable("project_status_reviews", {
   currentAction: text("current_action"),
   nextMilestone: text("next_milestone"),
   nextMilestoneDate: timestamp("next_milestone_date"),
+  deadline: timestamp("deadline"),
   ownerId: integer("owner_id").references(() => users.id),
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'), // ninguna | priorizacion | recursos | reprecio | salida
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),
@@ -3179,6 +3180,7 @@ export const weeklyStatusItems = pgTable("weekly_status_items", {
   mainRisk: text("main_risk"),
   currentAction: text("current_action"),
   nextMilestone: text("next_milestone"),
+  deadline: timestamp("deadline"),
   ownerId: integer("owner_id").references(() => users.id),
   decisionNeeded: varchar("decision_needed", { length: 30 }).default('ninguna'),
   hiddenFromWeekly: boolean("hidden_from_weekly").default(false),

@@ -16299,6 +16299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           currentAction: projectStatusReviews.currentAction,
           nextMilestone: projectStatusReviews.nextMilestone,
           nextMilestoneDate: projectStatusReviews.nextMilestoneDate,
+          deadline: projectStatusReviews.deadline,
           ownerId: projectStatusReviews.ownerId,
           decisionNeeded: projectStatusReviews.decisionNeeded,
           hiddenFromWeekly: projectStatusReviews.hiddenFromWeekly,
@@ -16354,7 +16355,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Body vacío o inválido" });
       }
       console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
-      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+      const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
 
       const update: Record<string, any> = { updatedAt: new Date() };
       if (healthStatus !== undefined) update.healthStatus = healthStatus;
@@ -16364,6 +16365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (currentAction !== undefined) update.currentAction = currentAction;
       if (nextMilestone !== undefined) update.nextMilestone = nextMilestone;
       if (nextMilestoneDate !== undefined) update.nextMilestoneDate = nextMilestoneDate ? new Date(nextMilestoneDate) : null;
+      if (deadline !== undefined) update.deadline = deadline ? new Date(deadline) : null;
       if (ownerId !== undefined) update.ownerId = ownerId || null;
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
       if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
@@ -16541,6 +16543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mainRisk: weeklyStatusItems.mainRisk,
         currentAction: weeklyStatusItems.currentAction,
         nextMilestone: weeklyStatusItems.nextMilestone,
+        deadline: weeklyStatusItems.deadline,
         ownerId: weeklyStatusItems.ownerId,
         ownerName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
         decisionNeeded: weeklyStatusItems.decisionNeeded,
@@ -16583,7 +16586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Body vacío o inválido" });
       }
       console.log(`PATCH /api/status-semanal/custom/${id}`, JSON.stringify(req.body));
-      const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
+      const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, deadline, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
       const update: Record<string, any> = { updatedAt: new Date() };
       if (title !== undefined) update.title = title;
       if (subtitle !== undefined) update.subtitle = subtitle;
@@ -16593,6 +16596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (mainRisk !== undefined) update.mainRisk = mainRisk;
       if (currentAction !== undefined) update.currentAction = currentAction;
       if (nextMilestone !== undefined) update.nextMilestone = nextMilestone;
+      if (deadline !== undefined) update.deadline = deadline ? new Date(deadline) : null;
       if (ownerId !== undefined) update.ownerId = ownerId || null;
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
       if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
