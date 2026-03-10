@@ -317,81 +317,72 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
 
   return (
     <div className={cn(
-      "rounded-xl border-2 bg-white shadow-md transition-all overflow-hidden",
-      item.healthStatus === 'rojo' ? "border-red-300" : item.healthStatus === 'amarillo' ? "border-amber-300" : "border-indigo-200",
+      "rounded-xl border bg-white shadow-sm transition-all overflow-hidden",
+      item.healthStatus === 'rojo' ? "border-red-200" : item.healthStatus === 'amarillo' ? "border-amber-200" : "border-indigo-200",
       isSelected && "ring-2 ring-indigo-400"
     )}>
-      <div className={cn("h-1.5 w-full", barColor)} />
-      <div className="p-4">
+      <div className={cn("h-1 w-full", barColor)} />
+      <div className="px-4 py-3">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              {item.isCustom && <Tag className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
-              <p className="font-bold text-base text-foreground leading-tight">{item.title}</p>
-            </div>
-            {item.subtitle && <p className="text-sm text-muted-foreground mt-0.5">{item.subtitle}</p>}
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1 flex items-center gap-1.5">
+            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+            <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
+            {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
             <button onClick={onRemove}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors border border-transparent hover:border-red-200"
+              className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
               title={item.isCustom ? "Eliminar ítem" : "Quitar del status"}>
               <Trash2 className="h-3 w-3" />
-              {item.isCustom ? "Eliminar" : "Quitar"}
             </button>
           </div>
         </div>
 
         {/* Decision alert */}
         {isUrgentDec && (
-          <div className={cn("flex items-center gap-2 rounded-lg px-3 py-2 mb-3 border text-sm font-semibold", decMeta.color)}>
-            <Zap className="h-4 w-4 shrink-0" />
+          <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 border text-xs font-semibold", decMeta.color)}>
+            <Zap className="h-3 w-3 shrink-0" />
             Decisión:
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           </div>
         )}
 
-        {/* Metrics */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Margen</span>
-            <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Equipo</span>
-            <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Desgaste equipo" />
-          </div>
+        {/* Metrics row */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
         {/* Risk */}
-        <div className={cn("rounded-lg p-3 mb-3", item.healthStatus === 'rojo' ? "bg-red-50 border border-red-100" : item.healthStatus === 'amarillo' ? "bg-amber-50 border border-amber-100" : "bg-indigo-50 border border-indigo-100")}>
-          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wide mb-1">Riesgo principal</p>
-          <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo crítico?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-sm font-medium" />
+        <div className={cn("rounded-md px-2.5 py-2 mb-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
+          <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
+          <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
         </div>
 
         {/* Action + Milestone */}
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-2 gap-2 mb-2">
           <div>
-            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1">Acción en curso</p>
-            <InlineText value={item.currentAction} placeholder="¿Qué está pasando?" onSave={v => onUpdate({ currentAction: v })} multiline />
+            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
+            <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
-            <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
+            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
+            <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           {!item.isCustom && onOpenNotes && (
             <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-semibold transition-colors",
-                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200" : "bg-slate-100 text-slate-500 hover:bg-indigo-100 hover:text-indigo-700")}>
-              <MessageSquare className="h-3 w-3" />
-              <span>{item.noteCount} nota{item.noteCount !== 1 ? 's' : ''}</span>
+              className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
+              <MessageSquare className="h-2.5 w-2.5" />
+              {item.noteCount}
             </button>
           )}
         </div>
@@ -489,7 +480,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
 
 // ─── Add custom item dialog ───────────────────────────────────────────────────
 
-function AddItemButton({ onAdd }: { onAdd: (title: string, subtitle: string) => void }) {
+function AddItemButton({ onAdd, variant = 'header' }: { onAdd: (title: string, subtitle: string) => void; variant?: 'header' | 'inline' }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [subtitle, setSubtitle] = useState('');
@@ -503,24 +494,31 @@ function AddItemButton({ onAdd }: { onAdd: (title: string, subtitle: string) => 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-          <Plus className="h-3.5 w-3.5" />
-          Agregar ítem
-        </Button>
+        {variant === 'inline' ? (
+          <button className="flex items-center gap-1 text-xs text-slate-400 hover:text-indigo-600 font-medium transition-colors ml-1">
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+            <Plus className="h-3.5 w-3.5" />
+            Agregar ítem
+          </Button>
+        )}
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="end">
+      <PopoverContent className="w-72 p-3" align={variant === 'inline' ? 'start' : 'end'}>
         <p className="text-sm font-semibold mb-3">Nuevo ítem de seguimiento</p>
         <div className="space-y-2">
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Título *</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
-              placeholder="Ej: Reunión con inversores, Restructura interna..."
+              placeholder="Ej: Reunión con inversores..."
               className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" autoFocus />
           </div>
           <div>
             <label className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1 block">Descripción (opcional)</label>
             <input value={subtitle} onChange={e => setSubtitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && submit()}
               placeholder="Contexto adicional..."
               className="w-full text-sm border border-input rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
           </div>
@@ -601,25 +599,17 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
 
   if (!summary && !isLoading) {
     return (
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-2xl border border-indigo-200/60 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/50 shadow-sm">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100/30 via-transparent to-transparent" />
-        <div className="relative flex items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-200/50">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-800">Resumen Ejecutivo con IA</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Generá un análisis inteligente de los {itemCount} proyectos activos</p>
-            </div>
-          </div>
-          <Button onClick={onGenerate} disabled={isLoading}
-            className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white shadow-lg shadow-indigo-200/50 gap-2 h-10 px-5 rounded-xl font-semibold text-sm">
-            <Sparkles className="h-4 w-4" />
-            Generar resumen
-          </Button>
+      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-indigo-200/50 bg-indigo-50/40">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="h-4 w-4 text-indigo-400" />
+          <span className="text-xs text-slate-500">Generá un resumen IA de los {itemCount} proyectos</span>
         </div>
+        <Button onClick={onGenerate} size="sm" variant="ghost"
+          className="h-7 text-xs text-indigo-600 hover:bg-indigo-100 gap-1.5 font-semibold">
+          <Sparkles className="h-3 w-3" />
+          Generar resumen
+        </Button>
       </motion.div>
     );
   }
@@ -1066,15 +1056,15 @@ export default function StatusSemanalPage() {
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
-          <div className="relative px-6 py-5">
+          <div className="relative px-6 py-3.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-11 w-11 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20 shadow-lg">
-                  <ClipboardList className="h-6 w-6 text-white" />
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
+                  <ClipboardList className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-extrabold leading-tight text-white tracking-tight">Status Semanal</h1>
-                  <p className="text-xs text-indigo-200 font-medium mt-0.5">{weekLabel()}</p>
+                  <h1 className="text-lg font-bold leading-tight text-white tracking-tight">Status Semanal</h1>
+                  <p className="text-[10px] text-indigo-200 font-medium">{weekLabel()}</p>
                 </div>
               </div>
 
@@ -1117,7 +1107,7 @@ export default function StatusSemanalPage() {
           {isLoading ? (
             <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
-            <div className="max-w-5xl mx-auto px-6 py-6 space-y-8">
+            <div className="max-w-5xl mx-auto px-6 py-5 space-y-6">
 
               {/* ── AI Summary Panel ──────────────────────────────── */}
               <AISummaryPanel
@@ -1129,18 +1119,19 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <AlertTriangle className={cn("h-5 w-5", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
-                  <h2 className="text-base font-bold text-foreground">Requieren atención</h2>
-                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className={cn("h-4 w-4", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
+                  <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
+                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {alertItems.length}
                   </span>
+                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 </div>
                 {alertItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span className="text-sm font-medium">Sin proyectos en alerta — todo bajo control</span>
+                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-xs">Sin alertas — todo bajo control</span>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1166,18 +1157,18 @@ export default function StatusSemanalPage() {
 
               {/* ── Decisiones pendientes ──────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <Zap className={cn("h-5 w-5", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
-                  <h2 className="text-base font-bold text-foreground">Decisiones pendientes</h2>
-                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className={cn("h-4 w-4", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
+                  <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
+                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {decisionItems.length}
                   </span>
                 </div>
                 {decisionItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span className="text-sm">Sin decisiones pendientes esta semana</span>
+                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                    <span className="text-xs">Sin decisiones pendientes</span>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1204,17 +1195,18 @@ export default function StatusSemanalPage() {
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <Circle className={cn("h-4 w-4 fill-current", normalItems.length > 0 ? "text-emerald-500" : "text-slate-300")} />
-                  <h2 className="text-base font-bold text-foreground">En curso</h2>
-                  <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full border",
+                  <Circle className={cn("h-3.5 w-3.5 fill-current", normalItems.length > 0 ? "text-emerald-500" : "text-slate-300")} />
+                  <h2 className="text-sm font-bold text-foreground">En curso</h2>
+                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     normalItems.length > 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {normalItems.length}
                   </span>
-                  <span className="text-xs text-muted-foreground ml-1">· Expandí para editar</span>
+                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                  {normalItems.length > 0 && <span className="text-[10px] text-muted-foreground ml-auto">Click en fila para editar</span>}
                 </div>
                 {normalItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-4 px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                    <span className="text-sm">Sin ítems en curso</span>
+                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
+                    <span className="text-xs">Sin ítems en curso</span>
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
