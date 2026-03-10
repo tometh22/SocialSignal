@@ -115,9 +115,15 @@ const HEALTH: Record<string, { label: string; dot: string; bg: string; text: str
   rojo:     { label: 'Rojo',     dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     border: 'border-red-300'     },
 };
 
-const LEVEL: Record<string, { label: string; color: string }> = {
+const MARGIN_LEVEL: Record<string, { label: string; color: string }> = {
   alto:  { label: 'Alto',  color: 'text-red-600 bg-red-50 border-red-200' },
   medio: { label: 'Medio', color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  bajo:  { label: 'Bajo',  color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+};
+
+const TEAM_LEVEL: Record<string, { label: string; color: string }> = {
+  alto:  { label: 'Alto',  color: 'text-red-600 bg-red-50 border-red-200' },
+  medio: { label: 'Medio', color: 'text-blue-600 bg-blue-50 border-blue-200' },
   bajo:  { label: 'Bajo',  color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
 };
 
@@ -130,7 +136,8 @@ const DECISION: Record<string, { label: string; color: string; urgent: boolean }
 };
 
 const hm = (v: string | null) => HEALTH[v ?? 'verde'] ?? HEALTH.verde;
-const lm = (v: string | null) => LEVEL[v ?? 'medio'] ?? LEVEL.medio;
+const mlm = (v: string | null) => MARGIN_LEVEL[v ?? 'medio'] ?? MARGIN_LEVEL.medio;
+const tlm = (v: string | null) => TEAM_LEVEL[v ?? 'medio'] ?? TEAM_LEVEL.medio;
 const dm = (v: string | null) => DECISION[v ?? 'ninguna'] ?? DECISION.ninguna;
 
 function weekLabel() {
@@ -233,19 +240,24 @@ function HealthDot({ value, onChange }: { value: string | null; onChange: (v: st
   );
 }
 
-function LevelBadge({ value, onChange, label }: { value: string | null; onChange: (v: string) => void; label: string }) {
+function LevelBadge({ value, onChange, label, type, showLabel = false }: { value: string | null; onChange: (v: string) => void; label: string; type: 'margin' | 'team'; showLabel?: boolean }) {
   const [open, setOpen] = useState(false);
-  const meta = lm(value);
+  const levels = type === 'margin' ? MARGIN_LEVEL : TEAM_LEVEL;
+  const resolver = type === 'margin' ? mlm : tlm;
+  const meta = resolver(value);
+  const icon = type === 'margin' ? '$' : '👤';
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button title={label}>
-          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>{meta.label}</Badge>
+          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>
+            {showLabel ? <><span className="opacity-60 mr-0.5">{icon}</span> {meta.label}</> : meta.label}
+          </Badge>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-32 p-1.5" align="start">
         <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1 px-1">{label}</p>
-        {Object.entries(LEVEL).map(([k, m]) => (
+        {Object.entries(levels).map(([k, m]) => (
           <button key={k} onClick={() => { onChange(k); setOpen(false); }}
             className={cn("w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-slate-100", k === value && "bg-slate-100")}>
             <Badge variant="outline" className={cn("text-[10px] h-4 border", m.color)}>{m.label}</Badge>
@@ -417,8 +429,8 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
 
         {/* Metrics row */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" showLabel />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" showLabel />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
@@ -485,10 +497,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" />
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" />
         </div>
         <div className="hidden lg:block w-40 shrink-0">
           <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
