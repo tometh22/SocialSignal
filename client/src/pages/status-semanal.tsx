@@ -239,8 +239,7 @@ function LevelBadge({ value, onChange, label }: { value: string | null; onChange
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button title={label} className="flex items-center gap-1">
-          <span className="text-[9px] text-slate-400 font-medium hidden lg:inline">{label}</span>
+        <button title={label}>
           <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>{meta.label}</Badge>
         </button>
       </PopoverTrigger>
@@ -477,11 +476,13 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <button onClick={() => setExpanded(v => !v)} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
-        <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+        <div className="w-20 shrink-0">
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+        </div>
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-          <span className="font-semibold text-sm text-foreground">{item.title}</span>
-          {item.subtitle && <span className="text-muted-foreground text-sm"> · {item.subtitle}</span>}
+          <span className="font-semibold text-sm text-foreground truncate">{item.title}</span>
+          {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
@@ -492,39 +493,39 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="hidden lg:block w-40 shrink-0">
           <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
         </div>
-        <div className="shrink-0">
+        <div className="w-24 shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
         </div>
-        <div className="shrink-0">
+        <div className="w-20 shrink-0">
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
         </div>
-        {decMeta.urgent && (
-          <div className="shrink-0">
+        <div className="w-16 shrink-0 flex items-center justify-end gap-1">
+          {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-          </div>
-        )}
-        {!item.isCustom && onOpenNotes && (
-          <button onClick={onOpenNotes}
-            className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors shrink-0",
-              isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
-            <MessageSquare className="h-3 w-3" />
-            <span>{item.noteCount}</span>
-          </button>
-        )}
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 shrink-0">
-              <MoreHorizontal className="h-3.5 w-3.5" />
+          )}
+          {!item.isCustom && onOpenNotes && (
+            <button onClick={onOpenNotes}
+              className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
+              <MessageSquare className="h-3 w-3" />
+              <span>{item.noteCount}</span>
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-44 p-1" align="end">
-            <button onClick={() => { onRemove(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-              <Trash2 className="h-3.5 w-3.5" />
-              {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-            </button>
-          </PopoverContent>
-        </Popover>
+          )}
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5" />
+                {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+              </button>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {expanded && (
