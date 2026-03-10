@@ -909,6 +909,8 @@ export default function StatusSemanalPage() {
   const { toast } = useToast();
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
+  const [alertCollapsed, setAlertCollapsed] = useState(false);
+  const [decisionCollapsed, setDecisionCollapsed] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
@@ -1208,16 +1210,20 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(c => !c)}>
                   <AlertTriangle className={cn("h-4 w-4", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {alertItems.length}
                   </span>
-                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                </div>
-                {alertItems.length === 0 ? (
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", alertCollapsed && "-rotate-90")} />
+                  <div className="flex-1" />
+                  <div onClick={e => e.stopPropagation()}>
+                    <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                  </div>
+                </button>
+                {!alertCollapsed && (alertItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin alertas — todo bajo control</span>
@@ -1241,20 +1247,21 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                )}
+                ))}
               </div>
 
               {/* ── Decisiones pendientes ──────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(c => !c)}>
                   <Zap className={cn("h-4 w-4", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {decisionItems.length}
                   </span>
-                </div>
-                {decisionItems.length === 0 ? (
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", decisionCollapsed && "-rotate-90")} />
+                </button>
+                {!decisionCollapsed && (decisionItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin decisiones pendientes</span>
@@ -1278,7 +1285,7 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                )}
+                ))}
               </div>
 
               {/* ── En curso ───────────────────────────────────────── */}
