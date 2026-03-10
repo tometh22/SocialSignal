@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, authFetch } from "@/lib/queryClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest, authFetch } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -737,6 +737,7 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
 // ─── Notes panel ─────────────────────────────────────────────────────────────
 
 function NotesPanel({ projectId, projectName, onClose }: { projectId: number; projectName: string; onClose: () => void }) {
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
@@ -840,6 +841,7 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StatusSemanalPage() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
