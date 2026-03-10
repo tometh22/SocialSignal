@@ -335,7 +335,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
   if (!value) {
     return (
-      <button onClick={() => inputRef.current?.showPicker()}
+      <button onClick={() => { try { inputRef.current?.showPicker(); } catch (_) {} }}
         className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative">
         <Calendar className="h-3 w-3" />
         <span>Deadline</span>
