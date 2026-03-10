@@ -134,6 +134,23 @@ function initials(name: string | null) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
+// Direct fetch helper for mutations – avoids apiRequest's JSON parse layer
+// and gives explicit control over error handling so failures surface clearly.
+async function mutationFetch(url: string, method: string, body?: any) {
+  const res = await authFetch(url, {
+    method,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let msg: string;
+    try { msg = JSON.parse(text)?.message || text; } catch { msg = text; }
+    throw new Error(msg || `Error ${res.status}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
 // ─── Inline editor ────────────────────────────────────────────────────────────
 
 function InlineText({ value, placeholder, onSave, multiline = false, className = '' }: {
@@ -519,21 +536,21 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
   });
 
   const addMutation = useMutation({
-    mutationFn: (content: string) => apiRequest(`/api/status-semanal/${projectId}/notes`, 'POST', { content }),
+    mutationFn: (content: string) => mutationFetch(`/api/status-semanal/${projectId}/notes`, 'POST', { content }),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
     },
-    onError: () => toast({ title: 'Error al guardar nota', variant: 'destructive' }),
+    onError: (err: Error) => toast({ title: 'Error al guardar nota', description: err.message, variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (noteId: number) => apiRequest(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
+    mutationFn: (noteId: number) => mutationFetch(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
     },
-    onError: () => toast({ title: 'Error al eliminar nota', variant: 'destructive' }),
+    onError: (err: Error) => toast({ title: 'Error al eliminar nota', description: err.message, variant: 'destructive' }),
   });
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [notes.length]);
@@ -637,7 +654,7 @@ export default function StatusSemanalPage() {
 
   const patchProject = useMutation({
     mutationFn: ({ projectId, data }: { projectId: number; data: Record<string, any> }) =>
-      apiRequest(`/api/status-semanal/${projectId}`, 'PATCH', data),
+      mutationFetch(`/api/status-semanal/${projectId}`, 'PATCH', data),
     onMutate: async ({ projectId, data }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/status-semanal'] });
       const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal']);
@@ -646,15 +663,18 @@ export default function StatusSemanalPage() {
       );
       return { previous };
     },
-    onError: (_err, _vars, ctx: any) => {
+    onError: (err: Error, _vars, ctx: any) => {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
-      toast({ title: 'Error al guardar', variant: 'destructive' });
+      toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+    },
   });
 
   const removeProject = useMutation({
-    mutationFn: (projectId: number) => apiRequest(`/api/status-semanal/${projectId}`, 'DELETE'),
+    mutationFn: (projectId: number) =>
+      mutationFetch(`/api/status-semanal/${projectId}`, 'DELETE'),
     onMutate: async (projectId) => {
       await queryClient.cancelQueries({ queryKey: ['/api/status-semanal'] });
       const previous = queryClient.getQueryData<StatusRow[]>(['/api/status-semanal']);
@@ -663,23 +683,27 @@ export default function StatusSemanalPage() {
       );
       return { previous };
     },
-    onError: (_err, _vars, ctx: any) => {
+    onError: (err: Error, _vars, ctx: any) => {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal'], ctx.previous);
-      toast({ title: 'Error al quitar proyecto', variant: 'destructive' });
+      toast({ title: 'Error al quitar proyecto', description: err.message, variant: 'destructive' });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal'] });
+    },
   });
 
   const createCustom = useMutation({
     mutationFn: ({ title, subtitle }: { title: string; subtitle: string }) =>
-      apiRequest('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
-    onError: () => toast({ title: 'Error al crear ítem', variant: 'destructive' }),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+      mutationFetch('/api/status-semanal/custom', 'POST', { title, subtitle: subtitle || null }),
+    onError: (err: Error) => toast({ title: 'Error al crear ítem', description: err.message, variant: 'destructive' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
   });
 
   const patchCustom = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, any> }) =>
-      apiRequest(`/api/status-semanal/custom/${id}`, 'PATCH', data),
+      mutationFetch(`/api/status-semanal/custom/${id}`, 'PATCH', data),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom'] });
       const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom']);
@@ -688,15 +712,18 @@ export default function StatusSemanalPage() {
       );
       return { previous };
     },
-    onError: (_err, _vars, ctx: any) => {
+    onError: (err: Error, _vars, ctx: any) => {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
-      toast({ title: 'Error al guardar', variant: 'destructive' });
+      toast({ title: 'Error al guardar', description: err.message, variant: 'destructive' });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
   });
 
   const deleteCustom = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/status-semanal/custom/${id}`, 'DELETE'),
+    mutationFn: (id: number) =>
+      mutationFetch(`/api/status-semanal/custom/${id}`, 'DELETE'),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ['/api/status-semanal/custom'] });
       const previous = queryClient.getQueryData<CustomItem[]>(['/api/status-semanal/custom']);
@@ -705,11 +732,13 @@ export default function StatusSemanalPage() {
       );
       return { previous };
     },
-    onError: (_err, _vars, ctx: any) => {
+    onError: (err: Error, _vars, ctx: any) => {
       if (ctx?.previous) queryClient.setQueryData(['/api/status-semanal/custom'], ctx.previous);
-      toast({ title: 'Error al eliminar', variant: 'destructive' });
+      toast({ title: 'Error al eliminar', description: err.message, variant: 'destructive' });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/status-semanal/custom'] });
+    },
   });
 
   // ── Update helpers ────────────────────────────────────────────────────────────

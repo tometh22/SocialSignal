@@ -16347,6 +16347,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
+      if (isNaN(projectId)) {
+        return res.status(400).json({ message: "projectId inválido" });
+      }
+      if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ message: "Body vacío o inválido" });
+      }
       console.log(`PATCH /api/status-semanal/${projectId}`, JSON.stringify(req.body));
       const { healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, nextMilestoneDate, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
 
@@ -16378,6 +16384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values({ projectId, ...update })
           .returning();
       }
+      console.log(`PATCH /api/status-semanal/${projectId} OK`, result?.id);
       res.json(result);
     } catch (error) {
       console.error('PATCH /api/status-semanal error:', error);
@@ -16499,6 +16506,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "id inválido" });
+      }
+      if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ message: "Body vacío o inválido" });
+      }
       console.log(`PATCH /api/status-semanal/custom/${id}`, JSON.stringify(req.body));
       const { title, subtitle, healthStatus, marginStatus, teamStrain, mainRisk, currentAction, nextMilestone, ownerId, decisionNeeded, hiddenFromWeekly } = req.body;
       const update: Record<string, any> = { updatedAt: new Date() };
@@ -16514,6 +16527,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (decisionNeeded !== undefined) update.decisionNeeded = decisionNeeded;
       if (hiddenFromWeekly !== undefined) update.hiddenFromWeekly = hiddenFromWeekly;
       const [item] = await db.update(weeklyStatusItems).set(update).where(eq(weeklyStatusItems.id, id)).returning();
+      if (!item) {
+        return res.status(404).json({ message: "Ítem no encontrado" });
+      }
+      console.log(`PATCH /api/status-semanal/custom/${id} OK`);
       res.json(item);
     } catch (error) {
       console.error('PATCH /api/status-semanal/custom error:', error);
