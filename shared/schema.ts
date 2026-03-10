@@ -1632,7 +1632,7 @@ export const clientModoComments = pgTable("client_modo_comments", {
   hoursCompliance: numeric("hours_compliance", { precision: 3, scale: 2 }),
   clientFeedback: numeric("client_feedback", { precision: 3, scale: 2 }),
   briefCompliance: numeric("brief_compliance", { precision: 3, scale: 2 }),
-  totalScore: numeric("total_score", { precision: 4, scale: 2 }).notNull(),
+  totalScore: numeric("total_score", { precision: 4, scale: 2 }).notNull().default('0'),
   comments: text("comments"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
