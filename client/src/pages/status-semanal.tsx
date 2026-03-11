@@ -115,9 +115,15 @@ const HEALTH: Record<string, { label: string; dot: string; bg: string; text: str
   rojo:     { label: 'Rojo',     dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     border: 'border-red-300'     },
 };
 
-const LEVEL: Record<string, { label: string; color: string }> = {
+const MARGIN_LEVEL: Record<string, { label: string; color: string }> = {
   alto:  { label: 'Alto',  color: 'text-red-600 bg-red-50 border-red-200' },
   medio: { label: 'Medio', color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  bajo:  { label: 'Bajo',  color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+};
+
+const TEAM_LEVEL: Record<string, { label: string; color: string }> = {
+  alto:  { label: 'Alto',  color: 'text-red-600 bg-red-50 border-red-200' },
+  medio: { label: 'Medio', color: 'text-blue-600 bg-blue-50 border-blue-200' },
   bajo:  { label: 'Bajo',  color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
 };
 
@@ -130,7 +136,8 @@ const DECISION: Record<string, { label: string; color: string; urgent: boolean }
 };
 
 const hm = (v: string | null) => HEALTH[v ?? 'verde'] ?? HEALTH.verde;
-const lm = (v: string | null) => LEVEL[v ?? 'medio'] ?? LEVEL.medio;
+const mlm = (v: string | null) => MARGIN_LEVEL[v ?? 'medio'] ?? MARGIN_LEVEL.medio;
+const tlm = (v: string | null) => TEAM_LEVEL[v ?? 'medio'] ?? TEAM_LEVEL.medio;
 const dm = (v: string | null) => DECISION[v ?? 'ninguna'] ?? DECISION.ninguna;
 
 function weekLabel() {
@@ -233,19 +240,24 @@ function HealthDot({ value, onChange }: { value: string | null; onChange: (v: st
   );
 }
 
-function LevelBadge({ value, onChange, label }: { value: string | null; onChange: (v: string) => void; label: string }) {
+function LevelBadge({ value, onChange, label, type, showLabel = false }: { value: string | null; onChange: (v: string) => void; label: string; type: 'margin' | 'team'; showLabel?: boolean }) {
   const [open, setOpen] = useState(false);
-  const meta = lm(value);
+  const levels = type === 'margin' ? MARGIN_LEVEL : TEAM_LEVEL;
+  const resolver = type === 'margin' ? mlm : tlm;
+  const meta = resolver(value);
+  const icon = type === 'margin' ? '$' : '👤';
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button title={label}>
-          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>{meta.label}</Badge>
+          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>
+            {showLabel ? <><span className="opacity-60 mr-0.5">{icon}</span> {meta.label}</> : meta.label}
+          </Badge>
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-32 p-1.5" align="start">
         <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1 px-1">{label}</p>
-        {Object.entries(LEVEL).map(([k, m]) => (
+        {Object.entries(levels).map(([k, m]) => (
           <button key={k} onClick={() => { onChange(k); setOpen(false); }}
             className={cn("w-full flex items-center gap-2 px-2 py-1 rounded text-xs hover:bg-slate-100", k === value && "bg-slate-100")}>
             <Badge variant="outline" className={cn("text-[10px] h-4 border", m.color)}>{m.label}</Badge>
@@ -335,7 +347,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
   if (!value) {
     return (
-      <button onClick={() => { try { inputRef.current?.showPicker(); } catch (_) {} }}
+      <button onClick={() => inputRef.current?.showPicker()}
         className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative">
         <Calendar className="h-3 w-3" />
         <span>Deadline</span>
@@ -368,7 +380,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
   item: Item; users: AppUser[]; isSelected: boolean;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const meta = hm(item.healthStatus);
   const decMeta = dm(item.decisionNeeded);
   const isUrgentDec = decMeta.urgent;
   const barColor = item.isOverdue ? 'bg-red-500' : ({ verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500');
@@ -381,15 +393,14 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
     )}>
       <div className={cn("h-1 w-full", barColor)} />
       <div className="px-4 py-3">
-        {/* Header — always visible, click to expand */}
-        <button className="w-full flex items-center justify-between gap-2 mb-2 text-left" onClick={() => setExpanded(v => !v)}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1 flex items-center gap-1.5">
-            <ChevronDown className={cn("h-3.5 w-3.5 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
             {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5 shrink-0">
             <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
             <button onClick={onRemove}
               className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -397,70 +408,65 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               <Trash2 className="h-3 w-3" />
             </button>
           </div>
-        </button>
+        </div>
 
-        {/* Compact always-visible summary */}
-        <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
+        {/* Decision alert */}
+        {isUrgentDec && (
+          <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 border text-xs font-semibold", decMeta.color)}>
+            <Zap className="h-3 w-3 shrink-0" />
+            Decisión:
+            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+          </div>
+        )}
+
+        {/* Overdue alert */}
+        {item.isOverdue && (
+          <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
+            <Clock className="h-3 w-3 shrink-0" />
+            Demorado — {deadlineLabel(item.deadline)}
+          </div>
+        )}
+
+        {/* Metrics row */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" showLabel />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" showLabel />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
-        {/* Expandable detail */}
-        {expanded && (
-          <div className="mt-3 space-y-2" onClick={e => e.stopPropagation()}>
-            {/* Decision alert */}
-            {isUrgentDec && (
-              <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 border text-xs font-semibold", decMeta.color)}>
-                <Zap className="h-3 w-3 shrink-0" />
-                Decisión:
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-              </div>
-            )}
+        {/* Risk */}
+        <div className={cn("rounded-md px-2.5 py-2 mb-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
+          <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
+          <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
+        </div>
 
-            {/* Overdue alert */}
-            {item.isOverdue && (
-              <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
-                <Clock className="h-3 w-3 shrink-0" />
-                Demorado — {deadlineLabel(item.deadline)}
-              </div>
-            )}
-
-            {/* Risk */}
-            <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
-            </div>
-
-            {/* Action + Milestone */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
-                <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
-              </div>
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-              <div className="flex items-center gap-2">
-                <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-                <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-              </div>
-              {!item.isCustom && onOpenNotes && (
-                <button onClick={onOpenNotes}
-                  className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
-                    isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
-                  <MessageSquare className="h-2.5 w-2.5" />
-                  {item.noteCount}
-                </button>
-              )}
-            </div>
+        {/* Action + Milestone */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
+            <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
           </div>
-        )}
+          <div>
+            <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
+            <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+            <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
+          </div>
+          {!item.isCustom && onOpenNotes && (
+            <button onClick={onOpenNotes}
+              className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
+              <MessageSquare className="h-2.5 w-2.5" />
+              {item.noteCount}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -482,52 +488,56 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <button onClick={() => setExpanded(v => !v)} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
-        <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+        <div className="w-20 shrink-0">
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+        </div>
         <div className="flex-1 min-w-0 flex items-center gap-1.5">
           {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-          <span className="font-semibold text-sm text-foreground">{item.title}</span>
-          {item.subtitle && <span className="text-muted-foreground text-sm"> · {item.subtitle}</span>}
+          <span className="font-semibold text-sm text-foreground truncate">{item.title}</span>
+          {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" />
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" />
+        <div className="hidden lg:block w-[88px] shrink-0">
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" />
         </div>
-        <div className="hidden lg:block w-44 shrink-0">
+        <div className="hidden lg:block w-[88px] shrink-0">
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" />
+        </div>
+        <div className="hidden lg:block w-40 shrink-0">
           <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
         </div>
-        <div className="shrink-0">
+        <div className="w-24 shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
         </div>
-        <div className="shrink-0">
+        <div className="w-20 shrink-0">
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
         </div>
-        {decMeta.urgent && (
-          <div className="shrink-0">
+        <div className="w-16 shrink-0 flex items-center justify-end gap-1">
+          {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-          </div>
-        )}
-        {!item.isCustom && onOpenNotes && (
-          <button onClick={onOpenNotes}
-            className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors shrink-0",
-              isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
-            <MessageSquare className="h-3 w-3" />
-            <span>{item.noteCount}</span>
-          </button>
-        )}
-        <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-          <PopoverTrigger asChild>
-            <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500 shrink-0">
-              <MoreHorizontal className="h-3.5 w-3.5" />
+          )}
+          {!item.isCustom && onOpenNotes && (
+            <button onClick={onOpenNotes}
+              className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
+              <MessageSquare className="h-3 w-3" />
+              <span>{item.noteCount}</span>
             </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-44 p-1" align="end">
-            <button onClick={() => { onRemove(); setMenuOpen(false); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
-              <Trash2 className="h-3.5 w-3.5" />
-              {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
-            </button>
-          </PopoverContent>
-        </Popover>
+          )}
+          <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+            <PopoverTrigger asChild>
+              <button className="p-1 rounded hover:bg-slate-100 text-slate-300 hover:text-slate-500">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <button onClick={() => { onRemove(); setMenuOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-red-50 text-slate-600 hover:text-red-600">
+                <Trash2 className="h-3.5 w-3.5" />
+                {item.isCustom ? "Eliminar ítem" : "Quitar del status"}
+              </button>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {expanded && (
@@ -915,8 +925,6 @@ export default function StatusSemanalPage() {
   const { toast } = useToast();
   const [notesOpen, setNotesOpen] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-  const [alertCollapsed, setAlertCollapsed] = useState(false);
-  const [decisionCollapsed, setDecisionCollapsed] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
@@ -1216,20 +1224,16 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(c => !c)}>
+                <div className="flex items-center gap-2 mb-3">
                   <AlertTriangle className={cn("h-4 w-4", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {alertItems.length}
                   </span>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", alertCollapsed && "-rotate-90")} />
-                  <div className="flex-1" />
-                  <div onClick={e => e.stopPropagation()}>
-                    <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                  </div>
-                </button>
-                {!alertCollapsed && (alertItems.length === 0 ? (
+                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                </div>
+                {alertItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin alertas — todo bajo control</span>
@@ -1253,21 +1257,20 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                ))}
+                )}
               </div>
 
               {/* ── Decisiones pendientes ──────────────────────────── */}
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(c => !c)}>
+                <div className="flex items-center gap-2 mb-3">
                   <Zap className={cn("h-4 w-4", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {decisionItems.length}
                   </span>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", decisionCollapsed && "-rotate-90")} />
-                </button>
-                {!decisionCollapsed && (decisionItems.length === 0 ? (
+                </div>
+                {decisionItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin decisiones pendientes</span>
@@ -1291,7 +1294,7 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                ))}
+                )}
               </div>
 
               {/* ── En curso ───────────────────────────────────────── */}
@@ -1316,11 +1319,9 @@ export default function StatusSemanalPage() {
                       <div className="w-3.5 shrink-0" />
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:flex items-center gap-8 shrink-0">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Margen</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Equipo</span>
-                      </div>
-                      <div className="hidden lg:block w-44 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
+                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
