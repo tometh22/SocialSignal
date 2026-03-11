@@ -347,7 +347,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
 
   if (!value) {
     return (
-      <button onClick={() => { try { inputRef.current?.showPicker(); } catch (_) {} }}
+      <button onClick={() => inputRef.current?.showPicker()}
         className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 transition-colors relative">
         <Calendar className="h-3 w-3" />
         <span>Deadline</span>
@@ -393,7 +393,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
     )}>
       <div className={cn("h-1 w-full", barColor)} />
       <div className="px-4 py-3">
-        {/* Header — always visible, click to expand */}
+        {/* Header — click to expand */}
         <button className="w-full flex items-center justify-between gap-2 mb-2 text-left" onClick={() => setExpanded(v => !v)}>
           <div className="min-w-0 flex-1 flex items-center gap-1.5">
             <ChevronDown className={cn("h-3.5 w-3.5 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
@@ -411,27 +411,10 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
           </div>
         </button>
 
-        {/* Decision alert */}
-        {isUrgentDec && (
-          <div className={cn("flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 border text-xs font-semibold", decMeta.color)}>
-            <Zap className="h-3 w-3 shrink-0" />
-            Decisión:
-            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-          </div>
-        )}
-
-        {/* Overdue alert */}
-        {item.isOverdue && (
-          <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5 mb-2 bg-red-100 border border-red-200 text-red-700 text-xs font-semibold">
-            <Clock className="h-3 w-3 shrink-0" />
-            Demorado — {deadlineLabel(item.deadline)}
-          </div>
-        )}
-
-        {/* Metrics row */}
-        <div className="flex items-center gap-2 mb-2 flex-wrap">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" showLabel />
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" showLabel />
+        {/* Compact always-visible summary */}
+        <div className="flex items-center gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
         </div>
 
@@ -520,10 +503,10 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Margen" type="margin" />
+          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Equipo" type="team" />
+          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
         </div>
         <div className="hidden lg:block w-40 shrink-0">
           <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
@@ -1349,8 +1332,8 @@ export default function StatusSemanalPage() {
                       <div className="w-3.5 shrink-0" />
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Rentabilidad</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Carga equipo</div>
                       <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
