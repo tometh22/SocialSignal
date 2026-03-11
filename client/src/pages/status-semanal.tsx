@@ -1332,7 +1332,7 @@ export default function StatusSemanalPage() {
                       <div className="w-3.5 shrink-0" />
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Rentabilidad</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
                       <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
