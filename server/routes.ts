@@ -16446,6 +16446,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/status-semanal/custom/:itemId/notes — notes for a custom status item
+  app.get("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const notes = await db
+        .select({
+          id: projectReviewNotes.id,
+          weeklyStatusItemId: projectReviewNotes.weeklyStatusItemId,
+          content: projectReviewNotes.content,
+          noteDate: projectReviewNotes.noteDate,
+          authorId: projectReviewNotes.authorId,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          createdAt: projectReviewNotes.createdAt,
+        })
+        .from(projectReviewNotes)
+        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+        .where(eq(projectReviewNotes.weeklyStatusItemId, itemId))
+        .orderBy(desc(projectReviewNotes.noteDate));
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener notas" });
+    }
+  });
+
+  // POST /api/status-semanal/custom/:itemId/notes — add a note to custom item
+  app.post("/api/status-semanal/custom/:itemId/notes", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [note] = await db.insert(projectReviewNotes)
+        .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
+        .returning();
+      res.status(201).json(note);
+    } catch (error) {
+      res.status(500).json({ message: "Error al crear nota" });
+    }
+  });
+
   // GET /api/status-semanal/users — all users for owner dropdown
   app.get("/api/status-semanal/users", async (_req: Request, res: Response) => {
     try {
@@ -16552,8 +16592,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).from(weeklyStatusItems)
         .leftJoin(users, eq(users.id, weeklyStatusItems.ownerId))
         .orderBy(desc(weeklyStatusItems.createdAt));
+
+      // Get note counts for custom items
+      const itemIds = items.map(i => i.id);
+      const noteCounts = itemIds.length > 0
+        ? await db
+            .select({ weeklyStatusItemId: projectReviewNotes.weeklyStatusItemId, count: sql<number>`COUNT(*)::int` })
+            .from(projectReviewNotes)
+            .where(inArray(projectReviewNotes.weeklyStatusItemId, itemIds))
+            .groupBy(projectReviewNotes.weeklyStatusItemId)
+        : [];
+      const noteCountMap = new Map(noteCounts.map(n => [n.weeklyStatusItemId, n.count]));
+
+      const result = items.map(item => ({
+        ...item,
+        noteCount: noteCountMap.get(item.id) ?? 0,
+      }));
+
       res.setHeader('Cache-Control', 'no-store');
-      res.json(items);
+      res.json(result);
     } catch (error) {
       console.error('GET /api/status-semanal/custom error:', error);
       res.status(500).json({ message: "Error al obtener ítems" });

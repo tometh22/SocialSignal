@@ -61,10 +61,11 @@ type CustomItem = {
   decisionNeeded: string | null;
   hiddenFromWeekly: boolean | null;
   updatedAt: string | null;
+  noteCount?: number;
 };
 
 type Note = {
-  id: number; projectId: number; content: string; noteDate: string;
+  id: number; projectId?: number; weeklyStatusItemId?: number; content: string; noteDate: string;
   authorId: number | null; authorName: string | null; createdAt: string;
 };
 
@@ -416,7 +417,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
-          {!item.isCustom && onOpenNotes && (
+          {onOpenNotes && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-medium transition-colors ml-auto border",
                 isSelected ? "bg-indigo-600 text-white border-indigo-600" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100")}>
@@ -470,7 +471,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
                 <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
               </div>
-              {!item.isCustom && onOpenNotes && (
+              {onOpenNotes && (
                 <button onClick={onOpenNotes}
                   className={cn("flex items-center gap-1.5 text-xs font-medium rounded-md px-3 py-1.5 transition-colors",
                     isSelected ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200")}>
@@ -529,7 +530,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
-          {!item.isCustom && onOpenNotes && (
+          {onOpenNotes && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-medium transition-colors border",
                 isSelected ? "bg-indigo-600 text-white border-indigo-600" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100")}>
@@ -576,7 +577,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
               </div>
             </div>
           </div>
-          {!item.isCustom && onOpenNotes && (
+          {onOpenNotes && (
             <div className="mt-3 pt-2 border-t border-slate-200">
               <button onClick={onOpenNotes}
                 className={cn("flex items-center gap-1.5 text-xs font-medium rounded-md px-3 py-1.5 transition-colors",
@@ -840,23 +841,31 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
 
 // ─── Notes panel ─────────────────────────────────────────────────────────────
 
-function NotesPanel({ projectId, projectName, onClose }: { projectId: number; projectName: string; onClose: () => void }) {
+function NotesPanel({ projectId, customItemId, projectName, onClose }: { projectId?: number; customItemId?: number; projectName: string; onClose: () => void }) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
   const [newNote, setNewNote] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const notesUrl = projectId
+    ? `/api/status-semanal/${projectId}/notes`
+    : `/api/status-semanal/custom/${customItemId}/notes`;
+  const cacheKey = projectId
+    ? ['/api/status-semanal', projectId, 'notes']
+    : ['/api/status-semanal/custom', customItemId, 'notes'];
+
   const { data: notes = [], isLoading } = useQuery<Note[]>({
-    queryKey: ['/api/status-semanal', projectId, 'notes'],
-    queryFn: async () => { const r = await authFetch(`/api/status-semanal/${projectId}/notes`); return r.json(); },
+    queryKey: cacheKey,
+    queryFn: async () => { const r = await authFetch(notesUrl); return r.json(); },
   });
 
   const addMutation = useMutation({
-    mutationFn: (content: string) => mutationFetch(`/api/status-semanal/${projectId}/notes`, 'POST', { content }),
+    mutationFn: (content: string) => mutationFetch(notesUrl, 'POST', { content }),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
+      queryClient.refetchQueries({ queryKey: cacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
     },
     onError: (err: Error) => toast({ title: 'Error al guardar nota', description: err.message, variant: 'destructive' }),
   });
@@ -864,8 +873,9 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
   const deleteMutation = useMutation({
     mutationFn: (noteId: number) => mutationFetch(`/api/status-semanal/notes/${noteId}`, 'DELETE'),
     onSuccess: () => {
-      queryClient.refetchQueries({ queryKey: ['/api/status-semanal', projectId, 'notes'] });
+      queryClient.refetchQueries({ queryKey: cacheKey });
       queryClient.refetchQueries({ queryKey: ['/api/status-semanal'] });
+      if (customItemId) queryClient.refetchQueries({ queryKey: ['/api/status-semanal/custom'] });
     },
     onError: (err: Error) => toast({ title: 'Error al eliminar nota', description: err.message, variant: 'destructive' }),
   });
@@ -947,7 +957,7 @@ function NotesPanel({ projectId, projectName, onClose }: { projectId: number; pr
 export default function StatusSemanalPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [notesOpen, setNotesOpen] = useState<number | null>(null);
+  const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [alertCollapsed, setAlertCollapsed] = useState(false);
   const [decisionCollapsed, setDecisionCollapsed] = useState(false);
@@ -1133,7 +1143,7 @@ export default function StatusSemanalPage() {
     ownerName: c.ownerName,
     decisionNeeded: c.decisionNeeded,
     hiddenFromWeekly: c.hiddenFromWeekly,
-    noteCount: 0,
+    noteCount: c.noteCount ?? 0,
     isOverdue: isOverdue(c.deadline),
   });
 
@@ -1169,19 +1179,28 @@ export default function StatusSemanalPage() {
         removeProject.mutate(item.projectId);
       }
     },
-    onOpenNotes: item.projectId ? () => setNotesOpen(notesOpen === item.projectId ? null : item.projectId!) : undefined,
+    onOpenNotes: (() => {
+      if (item.projectId) {
+        const isSame = notesOpen?.type === 'project' && notesOpen.id === item.projectId;
+        setNotesOpen(isSame ? null : { type: 'project', id: item.projectId });
+      } else if (item.isCustom && item.customId) {
+        const isSame = notesOpen?.type === 'custom' && notesOpen.id === item.customId;
+        setNotesOpen(isSame ? null : { type: 'custom', id: item.customId });
+      }
+    }),
   });
 
-  const openNotesProject = projectRows.find(r => r.projectId === notesOpen);
-  const notesProjectName = openNotesProject
+  const openNotesProject = notesOpen?.type === 'project' ? projectRows.find(r => r.projectId === notesOpen.id) : undefined;
+  const openNotesCustom = notesOpen?.type === 'custom' ? customRows.find(r => r.id === notesOpen.id) : undefined;
+  const notesItemName = openNotesProject
     ? `${openNotesProject.clientName || ''}${openNotesProject.quotationName ? ` · ${openNotesProject.quotationName}` : ''}`
-    : '';
+    : openNotesCustom ? openNotesCustom.title : '';
 
   const isLoading = loadingProjects || loadingCustom;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen ? "mr-[380px]" : "")}>
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[380px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
@@ -1280,7 +1299,7 @@ export default function StatusSemanalPage() {
                             exit={{ opacity: 0, scale: 0.97, y: -6 }}
                             transition={{ duration: 0.18, ease: 'easeOut' }}>
                             <AlertCard item={item} users={appUsers}
-                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                               onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
                           </motion.div>
                         );
@@ -1318,7 +1337,7 @@ export default function StatusSemanalPage() {
                             exit={{ opacity: 0, scale: 0.97, y: -6 }}
                             transition={{ duration: 0.18, ease: 'easeOut' }}>
                             <AlertCard item={item} users={appUsers}
-                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                               onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
                           </motion.div>
                         );
@@ -1367,7 +1386,7 @@ export default function StatusSemanalPage() {
                             exit={{ opacity: 0, x: -8 }}
                             transition={{ duration: 0.15, ease: 'easeOut' }}>
                             <CompactRow item={item} users={appUsers}
-                              isSelected={!item.isCustom && notesOpen === item.projectId}
+                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
                               onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
                           </motion.div>
                         );
@@ -1422,8 +1441,13 @@ export default function StatusSemanalPage() {
       {/* ── Notes panel ─────────────────────────────────────────── */}
       {notesOpen !== null && (
         <div className="fixed top-0 right-0 h-full w-[380px] border-l border-border bg-background shadow-2xl z-20 flex flex-col">
-          {openNotesProject && (
-            <NotesPanel projectId={notesOpen} projectName={notesProjectName} onClose={() => setNotesOpen(null)} />
+          {(openNotesProject || openNotesCustom) && (
+            <NotesPanel
+              projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
+              customItemId={notesOpen.type === 'custom' ? notesOpen.id : undefined}
+              projectName={notesItemName}
+              onClose={() => setNotesOpen(null)}
+            />
           )}
         </div>
       )}

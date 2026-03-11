@@ -3156,7 +3156,8 @@ export type InsertProjectStatusReview = z.infer<typeof insertProjectStatusReview
 
 export const projectReviewNotes = pgTable("project_review_notes", {
   id: serial("id").primaryKey(),
-  projectId: integer("project_id").notNull().references(() => activeProjects.id, { onDelete: 'cascade' }),
+  projectId: integer("project_id").references(() => activeProjects.id, { onDelete: 'cascade' }),
+  weeklyStatusItemId: integer("weekly_status_item_id").references(() => weeklyStatusItems.id, { onDelete: 'cascade' }),
   content: text("content").notNull(),
   noteDate: timestamp("note_date").notNull().defaultNow(),
   authorId: integer("author_id").references(() => users.id),
