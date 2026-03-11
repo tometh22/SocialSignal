@@ -16394,73 +16394,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/status-semanal/:projectId/notes — notes for a project with author name
-  app.get("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
-    try {
-      const projectId = parseInt(req.params.projectId);
-      const notes = await db
-        .select({
-          id: projectReviewNotes.id,
-          projectId: projectReviewNotes.projectId,
-          content: projectReviewNotes.content,
-          noteDate: projectReviewNotes.noteDate,
-          authorId: projectReviewNotes.authorId,
-          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
-          createdAt: projectReviewNotes.createdAt,
-        })
-        .from(projectReviewNotes)
-        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
-        .where(eq(projectReviewNotes.projectId, projectId))
-        .orderBy(desc(projectReviewNotes.noteDate));
-      res.json(notes);
-    } catch (error) {
-      res.status(500).json({ message: "Error al obtener notas" });
-    }
-  });
-
-  // POST /api/status-semanal/:projectId/notes — add a note
-  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
-    try {
-      let authorId = (req.session as any)?.userId ?? null;
-      // Fallback: token-based auth for Replit preview iframe
-      if (!authorId) {
-        const authHeader = req.headers.authorization;
-        if (authHeader?.startsWith('Session ')) {
-          const tokenId = authHeader.slice(8).trim();
-          if (tokenId) {
-            authorId = await new Promise<number | null>((resolve) => {
-              storage.sessionStore.get(tokenId, (err: any, data: any) => {
-                resolve(err || !data ? null : data.userId ?? null);
-              });
-            });
-          }
-        }
-      }
-      if (!authorId) return res.status(401).json({ message: "No autenticado" });
-      const projectId = parseInt(req.params.projectId);
-      console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
-      const { content } = req.body;
-      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
-      const [note] = await db.insert(projectReviewNotes)
-        .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
-        .returning();
-      res.status(201).json(note);
-    } catch (error) {
-      console.error('Error creating note:', error);
-      res.status(500).json({ message: "Error al crear nota" });
-    }
-  });
-
-  // DELETE /api/status-semanal/notes/:noteId — delete a note
-  app.delete("/api/status-semanal/notes/:noteId", async (req: Request, res: Response) => {
-    try {
-      const noteId = parseInt(req.params.noteId);
-      await db.delete(projectReviewNotes).where(eq(projectReviewNotes.id, noteId));
-      res.json({ ok: true });
-    } catch (error) {
-      res.status(500).json({ message: "Error al eliminar nota" });
-    }
-  });
+  // IMPORTANT: /custom/ routes MUST be registered BEFORE /:projectId/ routes
+  // otherwise Express matches "custom" as a projectId parameter
 
   // GET /api/status-semanal/custom/:itemId/notes — notes for a custom status item
   app.get("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
@@ -16514,6 +16449,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating custom note:', error);
       res.status(500).json({ message: "Error al crear nota" });
+    }
+  });
+
+  // GET /api/status-semanal/:projectId/notes — notes for a project with author name
+  app.get("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const notes = await db
+        .select({
+          id: projectReviewNotes.id,
+          projectId: projectReviewNotes.projectId,
+          content: projectReviewNotes.content,
+          noteDate: projectReviewNotes.noteDate,
+          authorId: projectReviewNotes.authorId,
+          authorName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+          createdAt: projectReviewNotes.createdAt,
+        })
+        .from(projectReviewNotes)
+        .leftJoin(users, eq(users.id, projectReviewNotes.authorId))
+        .where(eq(projectReviewNotes.projectId, projectId))
+        .orderBy(desc(projectReviewNotes.noteDate));
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Error al obtener notas" });
+    }
+  });
+
+  // POST /api/status-semanal/:projectId/notes — add a note
+  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+    try {
+      let authorId = (req.session as any)?.userId ?? null;
+      if (!authorId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Session ')) {
+          const tokenId = authHeader.slice(8).trim();
+          if (tokenId) {
+            authorId = await new Promise<number | null>((resolve) => {
+              storage.sessionStore.get(tokenId, (err: any, data: any) => {
+                resolve(err || !data ? null : data.userId ?? null);
+              });
+            });
+          }
+        }
+      }
+      if (!authorId) return res.status(401).json({ message: "No autenticado" });
+      const projectId = parseInt(req.params.projectId);
+      console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
+      const { content } = req.body;
+      if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
+      const [note] = await db.insert(projectReviewNotes)
+        .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
+        .returning();
+      res.status(201).json(note);
+    } catch (error) {
+      console.error('Error creating note:', error);
+      res.status(500).json({ message: "Error al crear nota" });
+    }
+  });
+
+  // DELETE /api/status-semanal/notes/:noteId — delete a note
+  app.delete("/api/status-semanal/notes/:noteId", async (req: Request, res: Response) => {
+    try {
+      const noteId = parseInt(req.params.noteId);
+      await db.delete(projectReviewNotes).where(eq(projectReviewNotes.id, noteId));
+      res.json({ ok: true });
+    } catch (error) {
+      res.status(500).json({ message: "Error al eliminar nota" });
     }
   });
 
