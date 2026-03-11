@@ -16423,6 +16423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // POST /api/status-semanal/custom/:itemId/notes — add a note to custom item
   app.post("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
+    console.log(`🔥 CUSTOM NOTES POST HANDLER HIT - itemId=${req.params.itemId}, body=${JSON.stringify(req.body)}, session=${(req.session as any)?.userId}`);
     try {
       let authorId = (req.session as any)?.userId ?? null;
       if (!authorId) {
