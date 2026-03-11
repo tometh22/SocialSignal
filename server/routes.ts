@@ -109,7 +109,7 @@ import { upload, uploadDocument, deleteOldFile } from "./upload";
 import { sanitizeInput } from "./input-sanitization";
 import { setupAuth, hashPassword } from "./auth";
 import path from 'path';
-// Temporalmente deshabilitado: import { setupChat } from "./chat";
+import { setupChat } from "./chat";
 // import { googleSheetsService } from "./services/googleSheetsService"; // Temporalmente deshabilitado
 import { googleSheetsServiceAlternative } from "./services/googleSheetsServiceAlternative";
 import { googleSheetsSimpleService } from "./services/googleSheetsSimple";
@@ -3408,8 +3408,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Servir archivos estáticos desde public
   app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
-  // Temporalmente deshabilitado: Chat websocket server
-  // setupChat(app, httpServer);
+  // Chat websocket server
+  setupChat(app, httpServer);
 
   // Clients routes
   app.get("/api/clients", requireAuth, async (_, res) => {

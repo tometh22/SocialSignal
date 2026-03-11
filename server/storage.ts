@@ -207,6 +207,15 @@ export interface IStorage {
   addParticipantToConversation(conversationId: number, userId: number): Promise<boolean>;
   updateConversationLastActivity(conversationId: number): Promise<void>;
   markConversationMessagesAsSeen(conversationId: number, userId: number): Promise<void>;
+  isConversationParticipant(conversationId: number, userId: number): Promise<boolean>;
+  createChatMessage(data: { conversationId: number; senderId: number; content: string; imageUrl?: string }): Promise<any>;
+  getConversationParticipants(conversationId: number): Promise<{ userId: number }[]>;
+  getDirectConversation(userId1: number, userId2: number): Promise<any | null>;
+  createChatConversation(data: { title: string; isGroup: boolean; createdBy: number; projectId?: number }): Promise<any>;
+  addConversationParticipant(data: { conversationId: number; userId: number }): Promise<any>;
+  getChatConversationWithDetails(conversationId: number): Promise<any>;
+  getUserConversations(userId: number): Promise<any[]>;
+  getChatMessages(conversationId: number): Promise<any[]>;
 
   // Deliverable operations
   getDeliverablesByProjects(projectIds: number[]): Promise<Deliverable[]>;
@@ -1516,6 +1525,145 @@ export class DatabaseStorage implements IStorage {
           sql`${chatMessages.senderId} <> ${userId}`
         )
       );
+  }
+
+  async isConversationParticipant(conversationId: number, userId: number): Promise<boolean> {
+    const result = await db.select()
+      .from(chatConversationParticipants)
+      .where(
+        and(
+          eq(chatConversationParticipants.conversationId, conversationId),
+          eq(chatConversationParticipants.userId, userId)
+        )
+      );
+    return result.length > 0;
+  }
+
+  async createChatMessage(data: { conversationId: number; senderId: number; content: string; imageUrl?: string }): Promise<any> {
+    const [message] = await db.insert(chatMessages).values({
+      conversationId: data.conversationId,
+      senderId: data.senderId,
+      content: data.content,
+      imageUrl: data.imageUrl || null,
+    }).returning();
+    return message;
+  }
+
+  async getConversationParticipants(conversationId: number): Promise<{ userId: number }[]> {
+    return await db.select({ userId: chatConversationParticipants.userId })
+      .from(chatConversationParticipants)
+      .where(eq(chatConversationParticipants.conversationId, conversationId));
+  }
+
+  async getDirectConversation(userId1: number, userId2: number): Promise<any | null> {
+    // Find a non-group conversation where both users are participants
+    const conversations = await db.select({ id: chatConversations.id })
+      .from(chatConversations)
+      .where(eq(chatConversations.isGroup, false));
+
+    for (const conv of conversations) {
+      const participants = await db.select({ userId: chatConversationParticipants.userId })
+        .from(chatConversationParticipants)
+        .where(eq(chatConversationParticipants.conversationId, conv.id));
+
+      const participantIds = participants.map(p => p.userId);
+      if (participantIds.includes(userId1) && participantIds.includes(userId2) && participantIds.length === 2) {
+        const [fullConversation] = await db.select().from(chatConversations).where(eq(chatConversations.id, conv.id));
+        return fullConversation;
+      }
+    }
+    return null;
+  }
+
+  async createChatConversation(data: { title: string; isGroup: boolean; createdBy: number; projectId?: number }): Promise<any> {
+    const [conversation] = await db.insert(chatConversations).values({
+      title: data.title,
+      isGroup: data.isGroup,
+      createdBy: data.createdBy,
+      projectId: data.projectId || null,
+    }).returning();
+    return conversation;
+  }
+
+  async addConversationParticipant(data: { conversationId: number; userId: number }): Promise<any> {
+    const [participant] = await db.insert(chatConversationParticipants).values({
+      conversationId: data.conversationId,
+      userId: data.userId,
+    }).returning();
+    return participant;
+  }
+
+  async getChatConversationWithDetails(conversationId: number): Promise<any> {
+    const [conversation] = await db.select().from(chatConversations).where(eq(chatConversations.id, conversationId));
+    if (!conversation) return null;
+
+    const participants = await db.select({
+      id: chatConversationParticipants.id,
+      userId: chatConversationParticipants.userId,
+      conversationId: chatConversationParticipants.conversationId,
+    }).from(chatConversationParticipants)
+      .where(eq(chatConversationParticipants.conversationId, conversationId));
+
+    // Get user details for each participant
+    const participantsWithUsers = await Promise.all(
+      participants.map(async (p) => {
+        const [user] = await db.select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          avatar: users.avatar,
+        }).from(users).where(eq(users.id, p.userId));
+        return { ...p, user };
+      })
+    );
+
+    const messages = await db.select().from(chatMessages)
+      .where(eq(chatMessages.conversationId, conversationId))
+      .orderBy(asc(chatMessages.createdAt));
+
+    return {
+      ...conversation,
+      participants: participantsWithUsers,
+      messages,
+    };
+  }
+
+  async getUserConversations(userId: number): Promise<any[]> {
+    // Get conversation IDs where user is a participant
+    const participantEntries = await db.select({ conversationId: chatConversationParticipants.conversationId })
+      .from(chatConversationParticipants)
+      .where(eq(chatConversationParticipants.userId, userId));
+
+    const conversationIds = participantEntries.map(p => p.conversationId);
+    if (conversationIds.length === 0) return [];
+
+    const conversations = await Promise.all(
+      conversationIds.map(id => this.getChatConversationWithDetails(id))
+    );
+
+    // Sort by lastMessageAt descending
+    return conversations
+      .filter(c => c !== null)
+      .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+  }
+
+  async getChatMessages(conversationId: number): Promise<any[]> {
+    const messages = await db.select().from(chatMessages)
+      .where(eq(chatMessages.conversationId, conversationId))
+      .orderBy(asc(chatMessages.createdAt));
+
+    // Attach sender info
+    return Promise.all(
+      messages.map(async (msg) => {
+        const [sender] = await db.select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          avatar: users.avatar,
+        }).from(users).where(eq(users.id, msg.senderId));
+        return { ...msg, sender };
+      })
+    );
   }
 
   // Deliverable operations
