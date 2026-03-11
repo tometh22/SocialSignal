@@ -16419,21 +16419,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/:projectId/notes — add a note
-  app.post("/api/status-semanal/:projectId/notes", requireAuth, (req: Request, res: Response, next: Function) => {
-    (async () => {
+  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+    try {
+      let authorId = (req.session as any)?.userId ?? null;
+      // Fallback: token-based auth for Replit preview iframe
+      if (!authorId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Session ')) {
+          const tokenId = authHeader.slice(8).trim();
+          if (tokenId) {
+            authorId = await new Promise<number | null>((resolve) => {
+              storage.sessionStore.get(tokenId, (err: any, data: any) => {
+                resolve(err || !data ? null : data.userId ?? null);
+              });
+            });
+          }
+        }
+      }
+      if (!authorId) return res.status(401).json({ message: "No autenticado" });
       const projectId = parseInt(req.params.projectId);
       console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
-      const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
       const [note] = await db.insert(projectReviewNotes)
         .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
       res.status(201).json(note);
-    })().catch((error) => {
+    } catch (error) {
       console.error('Error creating note:', error);
-      if (!res.headersSent) res.status(500).json({ message: "Error al crear nota" });
-    });
+      res.status(500).json({ message: "Error al crear nota" });
+    }
   });
 
   // DELETE /api/status-semanal/notes/:noteId — delete a note
@@ -16472,20 +16487,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/custom/:itemId/notes — add a note to custom item
-  app.post("/api/status-semanal/custom/:itemId/notes", requireAuth, (req: Request, res: Response, next: Function) => {
-    (async () => {
+  app.post("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
+    try {
+      let authorId = (req.session as any)?.userId ?? null;
+      if (!authorId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Session ')) {
+          const tokenId = authHeader.slice(8).trim();
+          if (tokenId) {
+            authorId = await new Promise<number | null>((resolve) => {
+              storage.sessionStore.get(tokenId, (err: any, data: any) => {
+                resolve(err || !data ? null : data.userId ?? null);
+              });
+            });
+          }
+        }
+      }
+      if (!authorId) return res.status(401).json({ message: "No autenticado" });
       const itemId = parseInt(req.params.itemId);
-      const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
       const { content } = req.body;
       if (!content?.trim()) return res.status(400).json({ message: "El contenido es requerido" });
       const [note] = await db.insert(projectReviewNotes)
         .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
       res.status(201).json(note);
-    })().catch((error) => {
+    } catch (error) {
       console.error('Error creating custom note:', error);
-      if (!res.headersSent) res.status(500).json({ message: "Error al crear nota" });
-    });
+      res.status(500).json({ message: "Error al crear nota" });
+    }
   });
 
   // GET /api/status-semanal/users — all users for owner dropdown

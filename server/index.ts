@@ -95,6 +95,13 @@ const port = Number(process.env.PORT || 5000);
       }
     });
 
+    // Safety net: any /api/* request that didn't match a route gets a proper JSON 404
+    // instead of falling through to the Vite/static HTML catch-all
+    app.use('/api', (req, res) => {
+      console.error(`⚠️ Unmatched API route: ${req.method} ${req.originalUrl}`);
+      res.status(404).json({ message: `Route not found: ${req.method} ${req.originalUrl}` });
+    });
+
     // Setup Vite or static file serving based on environment
     // CRITICAL: This must be called AFTER API routes are registered
     if (isProduction) {
