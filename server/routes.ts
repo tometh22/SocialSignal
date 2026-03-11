@@ -16419,8 +16419,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/:projectId/notes — add a note
-  app.post("/api/status-semanal/:projectId/notes", requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.post("/api/status-semanal/:projectId/notes", requireAuth, (req: Request, res: Response, next: Function) => {
+    (async () => {
       const projectId = parseInt(req.params.projectId);
       console.log(`POST /api/status-semanal/${projectId}/notes`, JSON.stringify(req.body));
       const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
@@ -16430,9 +16430,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .values({ projectId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
       res.status(201).json(note);
-    } catch (error) {
-      res.status(500).json({ message: "Error al crear nota" });
-    }
+    })().catch((error) => {
+      console.error('Error creating note:', error);
+      if (!res.headersSent) res.status(500).json({ message: "Error al crear nota" });
+    });
   });
 
   // DELETE /api/status-semanal/notes/:noteId — delete a note
@@ -16471,8 +16472,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/custom/:itemId/notes — add a note to custom item
-  app.post("/api/status-semanal/custom/:itemId/notes", requireAuth, async (req: Request, res: Response) => {
-    try {
+  app.post("/api/status-semanal/custom/:itemId/notes", requireAuth, (req: Request, res: Response, next: Function) => {
+    (async () => {
       const itemId = parseInt(req.params.itemId);
       const authorId = (req as any).user?.id ?? (req.session as any)?.userId ?? null;
       const { content } = req.body;
@@ -16481,9 +16482,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .values({ weeklyStatusItemId: itemId, content: content.trim(), authorId, noteDate: new Date() })
         .returning();
       res.status(201).json(note);
-    } catch (error) {
-      res.status(500).json({ message: "Error al crear nota" });
-    }
+    })().catch((error) => {
+      console.error('Error creating custom note:', error);
+      if (!res.headersSent) res.status(500).json({ message: "Error al crear nota" });
+    });
   });
 
   // GET /api/status-semanal/users — all users for owner dropdown

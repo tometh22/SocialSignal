@@ -170,11 +170,20 @@ async function mutationFetch(url: string, method: string, body?: any) {
     method,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
+  const ct = res.headers.get('content-type') || '';
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     let msg: string;
-    try { msg = JSON.parse(text)?.message || text; } catch { msg = text; }
+    if (ct.includes('application/json')) {
+      try { msg = JSON.parse(text)?.message || text; } catch { msg = text; }
+    } else {
+      msg = `Error ${res.status}`;
+    }
     throw new Error(msg || `Error ${res.status}`);
+  }
+  if (!ct.includes('application/json')) {
+    // Server returned non-JSON (e.g. HTML fallback) — treat as error
+    throw new Error('El servidor no respondió correctamente. Intentá de nuevo.');
   }
   const text = await res.text();
   return text ? JSON.parse(text) : null;
@@ -884,35 +893,33 @@ function NotesPanel({ projectId, customItemId, projectName, onClose }: { project
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0 bg-slate-50">
-        <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="h-4 w-4 text-indigo-500 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{projectName}</p>
-            <p className="text-xs text-muted-foreground">{notes.length} comentario{notes.length !== 1 ? 's' : ''}</p>
-          </div>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 bg-slate-50/80">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <MessageSquare className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+          <p className="text-xs font-semibold truncate">{projectName}</p>
+          <span className="text-[10px] text-muted-foreground shrink-0">({notes.length})</span>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} className="p-0.5 hover:bg-accent rounded text-muted-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>}
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2.5">
+        {isLoading && <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>}
         {!isLoading && notes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
-            <p className="text-sm text-muted-foreground">Sin comentarios todavía</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <MessageSquare className="h-6 w-6 text-muted-foreground/20 mb-1.5" />
+            <p className="text-xs text-muted-foreground">Sin comentarios todavía</p>
           </div>
         )}
         {notes.map(note => {
           const isOwn = note.authorId === (user as any)?.id;
           return (
-            <div key={note.id} className="group flex gap-2.5">
-              <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600")}>
+            <div key={note.id} className="group flex gap-2">
+              <div className={cn("h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5", isOwn ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600")}>
                 {initials(note.authorName)}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <span className="text-xs font-semibold">{note.authorName || 'Usuario'}</span>
+                <div className="flex items-center gap-1 mb-0.5">
+                  <span className="text-[11px] font-medium">{note.authorName || 'Usuario'}</span>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -922,11 +929,11 @@ function NotesPanel({ projectId, customItemId, projectName, onClose }: { project
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <div className="text-xs bg-white border border-slate-100 rounded-lg px-3 py-2 leading-relaxed whitespace-pre-wrap shadow-sm">{note.content}</div>
+                <div className="text-[11px] bg-white border border-slate-100 rounded-md px-2.5 py-1.5 leading-relaxed whitespace-pre-wrap">{note.content}</div>
               </div>
               {isOwn && (
-                <button onClick={() => deleteMutation.mutate(note.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5">
-                  <Trash2 className="h-3.5 w-3.5" />
+                <button onClick={() => deleteMutation.mutate(note.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5">
+                  <Trash2 className="h-3 w-3" />
                 </button>
               )}
             </div>
@@ -935,18 +942,18 @@ function NotesPanel({ projectId, customItemId, projectName, onClose }: { project
         <div ref={bottomRef} />
       </div>
 
-      <div className="px-4 py-3 border-t border-border shrink-0 bg-slate-50">
-        <div className="flex gap-2 items-end">
+      <div className="px-3 py-2 border-t border-border shrink-0 bg-slate-50/80">
+        <div className="flex gap-1.5 items-end">
           <Textarea value={newNote} onChange={e => setNewNote(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } } }}
-            placeholder="Escribí un comentario..." className="resize-none text-sm min-h-[52px] max-h-[120px] flex-1 bg-white" />
+            placeholder="Escribí un comentario..." className="resize-none text-[11px] min-h-[40px] max-h-[80px] flex-1 bg-white px-2.5 py-1.5" />
           <Button size="sm" onClick={() => { const t = newNote.trim(); if (t) { setNewNote(''); addMutation.mutate(t); } }}
             disabled={!newNote.trim() || addMutation.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0 shrink-0">
-            {addMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white h-7 w-7 p-0 shrink-0">
+            {addMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
           </Button>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-1">Enter para guardar · Shift+Enter nueva línea</p>
+        <p className="text-[9px] text-muted-foreground mt-0.5">Enter para enviar · Shift+Enter nueva línea</p>
       </div>
     </div>
   );
@@ -1200,7 +1207,7 @@ export default function StatusSemanalPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[380px]" : "")}>
+      <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
@@ -1440,7 +1447,7 @@ export default function StatusSemanalPage() {
 
       {/* ── Notes panel ─────────────────────────────────────────── */}
       {notesOpen !== null && (
-        <div className="fixed top-0 right-0 h-full w-[380px] border-l border-border bg-background shadow-2xl z-20 flex flex-col">
+        <div className="fixed top-0 right-0 h-full w-[320px] border-l border-border bg-background shadow-xl z-20 flex flex-col">
           {(openNotesProject || openNotesCustom) && (
             <NotesPanel
               projectId={notesOpen.type === 'project' ? notesOpen.id : undefined}
