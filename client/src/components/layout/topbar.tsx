@@ -211,6 +211,9 @@ export default function Topbar() {
             <Search className="h-4 w-4" />
           </Button>
           
+          {/* Chat / Mensajes */}
+          <MessagesPopup />
+
           {/* Ayuda */}
           <HelpPopup />
           
