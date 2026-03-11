@@ -418,10 +418,10 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
           {!item.isCustom && onOpenNotes && (
             <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors ml-auto",
-                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100")}>
-              <MessageSquare className="h-2.5 w-2.5" />
-              {item.noteCount > 0 && <span>{item.noteCount}</span>}
+              className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-medium transition-colors ml-auto border",
+                isSelected ? "bg-indigo-600 text-white border-indigo-600" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100")}>
+              <MessageSquare className="h-3 w-3" />
+              <span>Notas{item.noteCount > 0 ? ` (${item.noteCount})` : ''}</span>
             </button>
           )}
         </div>
@@ -525,16 +525,16 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="w-20 shrink-0">
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
         </div>
-        <div className="w-16 shrink-0 flex items-center justify-end gap-1">
+        <div className="shrink-0 flex items-center justify-end gap-1">
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
           {!item.isCustom && onOpenNotes && (
             <button onClick={onOpenNotes}
-              className={cn("flex items-center gap-1 text-xs rounded-full px-2 py-0.5 font-medium transition-colors",
-                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-400 hover:bg-indigo-100 hover:text-indigo-700")}>
+              className={cn("flex items-center gap-1 text-xs rounded-full px-2.5 py-1 font-medium transition-colors border",
+                isSelected ? "bg-indigo-600 text-white border-indigo-600" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-700 border-indigo-200" : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100")}>
               <MessageSquare className="h-3 w-3" />
-              <span>{item.noteCount}</span>
+              <span>Notas{item.noteCount > 0 ? ` (${item.noteCount})` : ''}</span>
             </button>
           )}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
