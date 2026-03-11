@@ -416,6 +416,14 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
           {!isUrgentDec && <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />}
+          {!item.isCustom && onOpenNotes && (
+            <button onClick={onOpenNotes}
+              className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors ml-auto",
+                isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100")}>
+              <MessageSquare className="h-2.5 w-2.5" />
+              {item.noteCount > 0 && <span>{item.noteCount}</span>}
+            </button>
+          )}
         </div>
 
         {/* Expandable detail */}
@@ -438,38 +446,30 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
-            {/* Risk */}
+            {/* Situation */}
             <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Riesgo</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
+              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
             </div>
 
-            {/* Action + Milestone */}
+            {/* Action + Next step */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Acción</p>
-                <InlineText value={item.currentAction} placeholder="¿Qué pasa?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">¿Qué pasa?</p>
+                <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
               </div>
               <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo hito</p>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Siguiente paso</p>
                 <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+            <div className="flex items-center pt-1.5 border-t border-slate-100">
               <div className="flex items-center gap-2">
                 <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
               </div>
-              {!item.isCustom && onOpenNotes && (
-                <button onClick={onOpenNotes}
-                  className={cn("flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 font-medium transition-colors",
-                    isSelected ? "bg-indigo-600 text-white" : item.noteCount > 0 ? "bg-indigo-100 text-indigo-600" : "text-slate-400 hover:text-indigo-600")}>
-                  <MessageSquare className="h-2.5 w-2.5" />
-                  {item.noteCount}
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -509,7 +509,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
         </div>
         <div className="hidden lg:block w-40 shrink-0">
-          <InlineText value={item.mainRisk} placeholder="Sin riesgo registrado" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
+          <InlineText value={item.mainRisk} placeholder="Sin novedades" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
         </div>
         <div className="w-24 shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
@@ -550,17 +550,17 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="px-10 pb-3 pt-1 bg-slate-50/60 border-t border-slate-100">
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Riesgo principal</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo?" onSave={v => onUpdate({ mainRisk: v })} multiline />
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Situación</p>
+              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline />
             </div>
             <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Acción en curso</p>
-              <InlineText value={item.currentAction} placeholder="Acción en curso..." onSave={v => onUpdate({ currentAction: v })} multiline />
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">¿Qué pasa?</p>
+              <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline />
             </div>
             <div className="space-y-2">
               <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Próximo hito</p>
-                <InlineText value={item.nextMilestone} placeholder="Próximo hito..." onSave={v => onUpdate({ nextMilestone: v })} />
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
+                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
               </div>
               <div>
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
@@ -1334,7 +1334,7 @@ export default function StatusSemanalPage() {
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
-                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
+                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
