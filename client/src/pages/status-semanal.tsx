@@ -359,12 +359,12 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
   }
 
   return (
-    <div className={cn("flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-0.5 relative group",
+    <div className={cn("inline-flex items-center gap-1 text-[11px] font-medium rounded-md px-1.5 py-0.5 relative group whitespace-nowrap",
       isOverdue ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-600")}>
-      {isOverdue ? <Clock className="h-3 w-3" /> : <Calendar className="h-3 w-3" />}
-      <span>{deadlineLabel(value)}</span>
+      {isOverdue ? <Clock className="h-3 w-3 shrink-0" /> : <Calendar className="h-3 w-3 shrink-0" />}
+      <span className="whitespace-nowrap">{deadlineLabel(value)}</span>
       <button onClick={e => { e.stopPropagation(); onChange(null); }}
-        className="hidden group-hover:inline-flex ml-0.5 text-slate-400 hover:text-red-500">
+        className="hidden group-hover:inline-flex ml-0.5 text-slate-400 hover:text-red-500 shrink-0">
         <X className="h-2.5 w-2.5" />
       </button>
       <input type="date" value={toDateStr(value)}
@@ -1333,7 +1333,7 @@ export default function StatusSemanalPage() {
                       <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Rentabilidad</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Carga equipo</div>
+                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">Carga equipo</div>
                       <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Riesgo</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
