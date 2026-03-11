@@ -465,11 +465,19 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
             </div>
 
             {/* Footer */}
-            <div className="flex items-center pt-1.5 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
               <div className="flex items-center gap-2">
                 <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
                 <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
               </div>
+              {!item.isCustom && onOpenNotes && (
+                <button onClick={onOpenNotes}
+                  className={cn("flex items-center gap-1.5 text-xs font-medium rounded-md px-3 py-1.5 transition-colors",
+                    isSelected ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200")}>
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Notas {item.noteCount > 0 && <span className="bg-indigo-600 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{item.noteCount}</span>}
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -568,6 +576,16 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
               </div>
             </div>
           </div>
+          {!item.isCustom && onOpenNotes && (
+            <div className="mt-3 pt-2 border-t border-slate-200">
+              <button onClick={onOpenNotes}
+                className={cn("flex items-center gap-1.5 text-xs font-medium rounded-md px-3 py-1.5 transition-colors",
+                  isSelected ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200")}>
+                <MessageSquare className="h-3.5 w-3.5" />
+                Notas {item.noteCount > 0 && <span className="bg-indigo-600 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{item.noteCount}</span>}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
