@@ -396,10 +396,10 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
         {/* Header — click to expand */}
         <button className="w-full flex items-center justify-between gap-2 mb-2 text-left" onClick={() => setExpanded(v => !v)}>
           <div className="min-w-0 flex-1 flex items-center gap-1.5">
-            <ChevronDown className={cn("h-3.5 w-3.5 text-slate-300 shrink-0 transition-transform", !expanded && "-rotate-90")} />
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
             {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
+            <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform ml-0.5", !expanded && "-rotate-90")} />
           </div>
           <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
             <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
@@ -1233,13 +1233,13 @@ export default function StatusSemanalPage() {
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>
                 <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(c => !c)}>
-                  <AlertTriangle className={cn("h-4 w-4", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
+                  <AlertTriangle className={cn("h-4 w-4 shrink-0", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", alertCollapsed && "-rotate-90")} />
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {alertItems.length}
                   </span>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", alertCollapsed && "-rotate-90")} />
                   <div className="flex-1" />
                   <div onClick={e => e.stopPropagation()}>
                     <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
@@ -1275,13 +1275,13 @@ export default function StatusSemanalPage() {
               {/* ── Decisiones pendientes ──────────────────────────── */}
               <div>
                 <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(c => !c)}>
-                  <Zap className={cn("h-4 w-4", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
+                  <Zap className={cn("h-4 w-4 shrink-0", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", decisionCollapsed && "-rotate-90")} />
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {decisionItems.length}
                   </span>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform ml-0.5", decisionCollapsed && "-rotate-90")} />
                 </button>
                 {!decisionCollapsed && (decisionItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
