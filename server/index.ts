@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-data";
 import { storage } from "./storage";
 import { autoSyncService } from "./services/autoSyncService";
+import { pool } from "./db";
 import cors from 'cors';
 import { execSync } from 'child_process';
 
@@ -45,6 +46,33 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// ==================== LOOKER STUDIO / BI ENDPOINTS ====================
+// Registered at top level (synchronous) so they always run before any catch-all
+app.get("/api/bi/pnl-mensual", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_pnl_mensual")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
+});
+app.get("/api/bi/proyectos-mensual", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_proyectos_mensual")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
+});
+app.get("/api/bi/costos-mensual", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_costos_mensual")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
+});
+app.get("/api/bi/equipo-mensual", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_equipo_mensual")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
+});
+app.get("/api/bi/cashflow", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_cashflow")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
+});
+app.get("/api/bi/revenue-por-cliente", async (_req, res) => {
+  try { res.json((await pool.query("SELECT * FROM vw_looker_revenue_por_cliente")).rows); }
+  catch (e: any) { res.status(500).json({ message: e.message }); }
 });
 
 // Register all API routes (registerRoutes configura su propia autenticación internamente)
@@ -93,34 +121,6 @@ const port = Number(process.env.PORT || 5000);
         console.error("❌ Server error:", err);
         process.exit(1);
       }
-    });
-
-    // ==================== LOOKER STUDIO / BI ENDPOINTS ====================
-    // Registered here to guarantee they run before the catch-all 404 handler
-    const { pool } = await import("./db");
-    app.get("/api/bi/pnl-mensual", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_pnl_mensual")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
-    });
-    app.get("/api/bi/proyectos-mensual", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_proyectos_mensual")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
-    });
-    app.get("/api/bi/costos-mensual", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_costos_mensual")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
-    });
-    app.get("/api/bi/equipo-mensual", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_equipo_mensual")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
-    });
-    app.get("/api/bi/cashflow", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_cashflow")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
-    });
-    app.get("/api/bi/revenue-por-cliente", async (_req, res) => {
-      try { res.json((await pool.query("SELECT * FROM vw_looker_revenue_por_cliente")).rows); }
-      catch (e: any) { res.status(500).json({ message: e.message }); }
     });
 
     // Safety net: any /api/* request that didn't match a route gets a proper JSON 404
