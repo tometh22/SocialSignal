@@ -1514,7 +1514,7 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
     let recordsUpdated = 0;
     const errors: string[] = [];
     
-    // 2. Upsert cada registro
+    // 2. Upsert cada registro (SELECTIVE MERGE: solo actualiza campos con valor, nunca sobreescribe con null)
     for (const row of rows) {
       try {
         // Verificar si existe
@@ -1522,8 +1522,9 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
           .from(monthlyFinancialSummary)
           .where(sql`${monthlyFinancialSummary.periodKey} = ${row.periodKey}`)
           .limit(1);
-        
-        const values = {
+
+        // Build values object with ALL fields for INSERT
+        const allValues: Record<string, any> = {
           periodKey: row.periodKey,
           year: row.year,
           monthNumber: row.monthNumber,
@@ -1543,24 +1544,30 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
           costosIndirectos: row.costosIndirectos?.toString() || null,
           ivaCompras: row.ivaCompras?.toString() || null,
           impuestosUsa: row.impuestosUsa?.toString() || null,
-          pasivoFacturacionAdelantada: row.facturacionAdelantadaUsd?.toString() || null, // Provisión Facturación Adelantada
+          pasivoFacturacionAdelantada: row.facturacionAdelantadaUsd?.toString() || null,
           ebitOperativo: row.ebitOperativo?.toString() || null,
           beneficioNeto: row.beneficioNeto?.toString() || null,
           markupPromedio: row.markupPromedio?.toString() || null,
         };
-        
+
         if (existing.length > 0) {
-          // UPDATE
+          // UPDATE: Only set fields that have non-null values (selective merge)
+          // This prevents overwriting data from other syncs (Activo, CashFlow) with nulls
+          const updateValues: Record<string, any> = { updatedAt: new Date() };
+          for (const [key, val] of Object.entries(allValues)) {
+            if (key === 'periodKey' || key === 'year' || key === 'monthNumber') continue;
+            if (val !== null && val !== undefined) {
+              updateValues[key] = val;
+            }
+          }
+
           await db.update(monthlyFinancialSummary)
-            .set({
-              ...values,
-              updatedAt: new Date()
-            })
+            .set(updateValues)
             .where(sql`${monthlyFinancialSummary.periodKey} = ${row.periodKey}`);
           recordsUpdated++;
         } else {
-          // INSERT
-          await db.insert(monthlyFinancialSummary).values(values);
+          // INSERT: use all values (null fields are fine for new rows)
+          await db.insert(monthlyFinancialSummary).values(allValues);
           recordsInserted++;
         }
         
