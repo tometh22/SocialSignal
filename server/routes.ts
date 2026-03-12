@@ -5139,6 +5139,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Ver datos actuales en monthly_financial_summary
+  app.get("/api/debug/mfs-data", requireAuth, async (req, res) => {
+    try {
+      const { monthlyFinancialSummary } = await import('@shared/schema.js');
+      const { desc } = await import('drizzle-orm');
+      const rows = await db.select().from(monthlyFinancialSummary).orderBy(desc(monthlyFinancialSummary.periodKey));
+
+      // Show which fields have data for each period
+      const summary = rows.map(r => ({
+        periodKey: r.periodKey,
+        year: r.year,
+        month: r.monthNumber,
+        hasVentas: r.facturacionTotal !== null && r.facturacionTotal !== '0',
+        hasEbit: r.ebitOperativo !== null && r.ebitOperativo !== '0',
+        hasBeneficio: r.beneficioNeto !== null,
+        hasMarkup: r.markupPromedio !== null,
+        hasCashflow: r.cashflowNeto !== null,
+        hasCaja: r.cajaTotal !== null,
+        hasActivo: r.totalActivo !== null,
+        hasPasivo: r.totalPasivo !== null,
+        hasCxC: r.cuentasCobrarUsd !== null,
+        // Actual values
+        ventas: r.facturacionTotal,
+        ebit: r.ebitOperativo,
+        beneficio: r.beneficioNeto,
+        markup: r.markupPromedio,
+        cashflow: r.cashflowNeto,
+        caja: r.cajaTotal,
+        activo: r.totalActivo,
+        pasivo: r.totalPasivo,
+        cxc: r.cuentasCobrarUsd,
+      }));
+
+      res.json({ totalRows: rows.length, data: summary });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
