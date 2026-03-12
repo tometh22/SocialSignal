@@ -150,19 +150,32 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
   // (available periods already fetched above)
 
   // === Build P&L cascade from MFS (matching Looker exactly) ===
+  // Primary data: what Resumen Ejecutivo sheet actually provides
   const ventasMes = num(current?.facturacion_total);
-  const costosDirectos = num(current?.costos_directos);
-  const costosIndirectos = num(current?.costos_indirectos);
+  const ebitOperativo = num(current?.ebit_operativo);
+  const beneficioNeto = num(current?.beneficio_neto);
+  const markup = num(current?.markup_promedio);
   const impuestosUsa = num(current?.impuestos_usa);
   const ivaCompras = num(current?.iva_compras);
 
-  const margenBruto = ventasMes - costosDirectos;
-  // EBIT = Ventas - Costos (sin impuestos) — matches Looker definition
-  const ebitOperativo = num(current?.ebit_operativo) || (ventasMes - costosDirectos - costosIndirectos);
-  const beneficioNeto = num(current?.beneficio_neto) || (ebitOperativo - impuestosUsa);
-  const markup = num(current?.markup_promedio) || (costosDirectos > 0 ? ventasMes / costosDirectos : 0);
+  // Derived: costos directos/indirectos are NOT columns in Resumen Ejecutivo sheet
+  // Derive them from Markup and EBIT when available
+  // Markup = Ventas / Costos Directos → Costos Directos = Ventas / Markup
+  let costosDirectos = num(current?.costos_directos);
+  if (costosDirectos === 0 && markup > 0 && ventasMes > 0) {
+    costosDirectos = Math.round((ventasMes / markup) * 100) / 100;
+  }
 
-  const impuestos = ventasMes > 0 ? ebitOperativo - beneficioNeto : 0;
+  // EBIT = Ventas - Directos - Indirectos → Indirectos = Ventas - Directos - EBIT
+  let costosIndirectos = num(current?.costos_indirectos);
+  if (costosIndirectos === 0 && ventasMes > 0 && costosDirectos > 0) {
+    costosIndirectos = Math.round((ventasMes - costosDirectos - ebitOperativo) * 100) / 100;
+  }
+
+  const margenBruto = ventasMes - costosDirectos;
+
+  // Impuestos = EBIT - Beneficio Neto (lo que se lleva el fisco)
+  const impuestos = (ventasMes > 0 && ebitOperativo !== 0) ? ebitOperativo - beneficioNeto : impuestosUsa;
 
   // Balance
   const totalActivo = num(current?.total_activo);
@@ -195,10 +208,14 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
   // Trends (reversed to chronological order)
   const trends: MonthlyTrend[] = trendRows.reverse().map(row => {
     const rv = num(row.facturacion_total);
-    const cd = num(row.costos_directos);
-    const ci = num(row.costos_indirectos);
-    const ebit = num(row.ebit_operativo) || (rv - cd - ci);
+    const mk = num(row.markup_promedio);
+    const ebit = num(row.ebit_operativo);
     const bn = num(row.beneficio_neto);
+    // Derive costs from markup & EBIT (same logic as current period)
+    let cd = num(row.costos_directos);
+    if (cd === 0 && mk > 0 && rv > 0) cd = Math.round((rv / mk) * 100) / 100;
+    let ci = num(row.costos_indirectos);
+    if (ci === 0 && rv > 0 && cd > 0) ci = Math.round((rv - cd - ebit) * 100) / 100;
     return {
       periodKey: row.period_key,
       monthLabel: row.month_label,

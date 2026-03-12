@@ -1961,34 +1961,53 @@ class GoogleSheetsWorkingService {
     
     // Mapeo de nombres de columna → propiedad de ResumenEjecutivoRow
     const columnMapping: Record<string, keyof ResumenEjecutivoRow> = {
+      // Balance / Activos
       'activo líquido': 'cajaTotal',
       'activo total': 'totalActivo',
       'pasivo total': 'totalPasivo',
       'balance neto (activo-pasivo)': 'balanceNeto',
       'balance neto': 'balanceNeto',
-      'ventas del mes': 'facturacionTotal',
-      'ebit utilidad operativa': 'ebitOperativo',
-      'ebit operativo': 'ebitOperativo',
-      'beneficio neto': 'beneficioNeto',
-      'markup': 'markupPromedio',
-      'chasflow': 'cashflowNeto',
-      'cashflow': 'cashflowNeto',
-      'pasivo provisión impuesto usa': 'impuestosUsa',
       'activo mediano plazo crypto': 'inversiones',
       'activo mediano plazo clientes a cobrar': 'cuentasCobrarUsd',
+      // P&L
+      'ventas del mes': 'facturacionTotal',
+      'costos directos': 'costosDirectos',
+      'costos indirectos': 'costosIndirectos',
+      'ebit utilidad operativa': 'ebitOperativo',
+      'ebit operativo': 'ebitOperativo',
+      'ebit': 'ebitOperativo',
+      'beneficio neto': 'beneficioNeto',
+      'markup': 'markupPromedio',
+      // Cashflow
+      'chasflow': 'cashflowNeto',
+      'cashflow': 'cashflowNeto',
+      'cashflow neto': 'cashflowNeto',
+      'cashflow ingresos': 'cashflowIngresos',
+      'cashflow egresos': 'cashflowEgresos',
+      // Provisiones / Pasivos
+      'pasivo provisión impuesto usa': 'impuestosUsa',
+      'impuestos usa': 'impuestosUsa',
+      'iva compras': 'ivaCompras',
       'pasivo proveedores a pagar': 'cuentasPagarUsd',
       'provisión pasivo costos facturación adelantada': 'facturacionAdelantadaUsd',
     };
     
     // Encontrar índices de columnas para cada KPI
     const columnIndices: Record<string, number> = {};
+    const unmatchedHeaders: string[] = [];
     for (let col = 0; col < headerRow.length; col++) {
       const header = (headerRow[col] || '').toString().toLowerCase().trim();
+      if (!header || header === 'mes' || header === 'año' || header === 'cierre') continue;
       const field = columnMapping[header];
       if (field) {
         columnIndices[field] = col;
         console.log(`  ✅ Columna "${headerRow[col]}" → ${field} (col ${col})`);
+      } else {
+        unmatchedHeaders.push(`"${headerRow[col]}" (col ${col})`);
       }
+    }
+    if (unmatchedHeaders.length > 0) {
+      console.log(`  ⚠️ [Resumen Ejecutivo] Columnas NO mapeadas: ${unmatchedHeaders.join(', ')}`);
     }
     
     // Índices especiales para Mes y Año

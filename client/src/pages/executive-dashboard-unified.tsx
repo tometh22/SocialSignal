@@ -357,6 +357,16 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
+        {/* ─── Warning if period has no P&L data ─── */}
+        {d.ventasMes === 0 && d.ebitOperativo === 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+            Este período no tiene datos de P&L en "Resumen Ejecutivo". Verificá que el Sheet tenga valores para {periodLabel(d.periodKey)}.
+            {d.availablePeriods.length > 1 && (
+              <span> Probá seleccionar otro período.</span>
+            )}
+          </div>
+        )}
+
         {/* ─── Top KPIs (same 7 as Looker Resumen Ejecutivo) ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KpiCard
