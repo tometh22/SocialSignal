@@ -95,6 +95,34 @@ const port = Number(process.env.PORT || 5000);
       }
     });
 
+    // ==================== LOOKER STUDIO / BI ENDPOINTS ====================
+    // Registered here to guarantee they run before the catch-all 404 handler
+    const { pool } = await import("./db");
+    app.get("/api/bi/pnl-mensual", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_pnl_mensual")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+    app.get("/api/bi/proyectos-mensual", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_proyectos_mensual")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+    app.get("/api/bi/costos-mensual", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_costos_mensual")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+    app.get("/api/bi/equipo-mensual", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_equipo_mensual")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+    app.get("/api/bi/cashflow", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_cashflow")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+    app.get("/api/bi/revenue-por-cliente", async (_req, res) => {
+      try { res.json((await pool.query("SELECT * FROM vw_looker_revenue_por_cliente")).rows); }
+      catch (e: any) { res.status(500).json({ message: e.message }); }
+    });
+
     // Safety net: any /api/* request that didn't match a route gets a proper JSON 404
     // instead of falling through to the Vite/static HTML catch-all
     app.use('/api', (req, res) => {
