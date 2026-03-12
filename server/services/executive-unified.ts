@@ -149,32 +149,89 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   // (available periods already fetched above)
 
-  // === Build P&L cascade from MFS (matching Looker exactly) ===
-  // Primary data: what Resumen Ejecutivo sheet actually provides
-  const ventasMes = num(current?.facturacion_total);
-  const ebitOperativo = num(current?.ebit_operativo);
-  const beneficioNeto = num(current?.beneficio_neto);
-  const markup = num(current?.markup_promedio);
+  // === Build P&L cascade ===
+  // Primary source: MFS (from "Resumen Ejecutivo" sheet)
+  let ventasMes = num(current?.facturacion_total);
+  let ebitOperativo = num(current?.ebit_operativo);
+  let beneficioNeto = num(current?.beneficio_neto);
+  let markup = num(current?.markup_promedio);
   const impuestosUsa = num(current?.impuestos_usa);
   const ivaCompras = num(current?.iva_compras);
-
-  // Derived: costos directos/indirectos are NOT columns in Resumen Ejecutivo sheet
-  // Derive them from Markup and EBIT when available
-  // Markup = Ventas / Costos Directos → Costos Directos = Ventas / Markup
   let costosDirectos = num(current?.costos_directos);
-  if (costosDirectos === 0 && markup > 0 && ventasMes > 0) {
-    costosDirectos = Math.round((ventasMes / markup) * 100) / 100;
+  let costosIndirectos = num(current?.costos_indirectos);
+
+  // === FALLBACK: When MFS has no P&L, compute from alternative tables ===
+  if (ventasMes === 0) {
+    console.log(`[UnifiedDashboard] MFS has no P&L for ${effectivePeriod}, trying fallback sources...`);
+
+    // Fallback ventas: income_sot (confirmed revenue)
+    const { rows: salesRows } = await pool.query(`
+      SELECT COALESCE(SUM(revenue_usd), 0) as total_ventas
+      FROM income_sot
+      WHERE month_key = $1 AND confirmed = true
+    `, [effectivePeriod]);
+    const fallbackVentas = parseFloat(salesRows[0]?.total_ventas) || 0;
+
+    // If income_sot empty, try google_sheets_sales
+    if (fallbackVentas === 0) {
+      const { rows: gsSalesRows } = await pool.query(`
+        SELECT COALESCE(SUM(CAST(amount_usd AS numeric)), 0) as total_ventas
+        FROM google_sheets_sales
+        WHERE month_key = $1 AND status != 'proyectado'
+      `, [effectivePeriod]);
+      ventasMes = parseFloat(gsSalesRows[0]?.total_ventas) || 0;
+    } else {
+      ventasMes = fallbackVentas;
+    }
+
+    // Fallback costos: fact_cost_month
+    const { rows: costRows } = await pool.query(`
+      SELECT
+        COALESCE(SUM(CAST(direct_usd AS numeric)), 0) as direct,
+        COALESCE(SUM(CAST(indirect_usd AS numeric)), 0) as indirect
+      FROM fact_cost_month
+      WHERE period_key = $1
+    `, [effectivePeriod]);
+    const fallbackDirectos = parseFloat(costRows[0]?.direct) || 0;
+    const fallbackIndirectos = parseFloat(costRows[0]?.indirect) || 0;
+
+    // If fact_cost_month empty, try direct_costs table
+    if (fallbackDirectos === 0) {
+      const { rows: dcRows } = await pool.query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN LOWER(tipo_gasto) = 'directo' THEN CAST(monto_total_usd AS numeric) ELSE 0 END), 0) as direct,
+          COALESCE(SUM(CASE WHEN LOWER(tipo_gasto) != 'directo' THEN CAST(monto_total_usd AS numeric) ELSE 0 END), 0) as indirect
+        FROM direct_costs
+        WHERE month_key = $1
+      `, [effectivePeriod]);
+      costosDirectos = parseFloat(dcRows[0]?.direct) || 0;
+      costosIndirectos = parseFloat(dcRows[0]?.indirect) || 0;
+    } else {
+      costosDirectos = fallbackDirectos;
+      costosIndirectos = fallbackIndirectos;
+    }
+
+    // Compute EBIT and derived metrics from fallback data
+    ebitOperativo = ventasMes - costosDirectos - costosIndirectos;
+    markup = costosDirectos > 0 ? Math.round((ventasMes / costosDirectos) * 100) / 100 : 0;
+    beneficioNeto = ebitOperativo - impuestosUsa; // approximate
+
+    if (ventasMes > 0) {
+      console.log(`[UnifiedDashboard] Fallback P&L: Ventas=$${ventasMes}, Directos=$${costosDirectos}, Indirectos=$${costosIndirectos}, EBIT=$${ebitOperativo}`);
+    }
   }
 
-  // EBIT = Ventas - Directos - Indirectos → Indirectos = Ventas - Directos - EBIT
-  let costosIndirectos = num(current?.costos_indirectos);
-  if (costosIndirectos === 0 && ventasMes > 0 && costosDirectos > 0) {
+  // If MFS had ventas but no costs, derive from Markup and EBIT
+  if (ventasMes > 0 && costosDirectos === 0 && markup > 0) {
+    costosDirectos = Math.round((ventasMes / markup) * 100) / 100;
+  }
+  if (ventasMes > 0 && costosIndirectos === 0 && costosDirectos > 0) {
     costosIndirectos = Math.round((ventasMes - costosDirectos - ebitOperativo) * 100) / 100;
   }
 
   const margenBruto = ventasMes - costosDirectos;
 
-  // Impuestos = EBIT - Beneficio Neto (lo que se lleva el fisco)
+  // Impuestos = EBIT - Beneficio Neto
   const impuestos = (ventasMes > 0 && ebitOperativo !== 0) ? ebitOperativo - beneficioNeto : impuestosUsa;
 
   // Balance
@@ -205,17 +262,97 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     return Math.round(((currentVal - p) / Math.abs(p)) * 10000) / 100;
   }
 
-  // Trends (reversed to chronological order)
+  // Trends: enrich with fallback P&L for periods missing it
+  // First, batch-fetch fallback data for periods with no ventas in MFS
+  const periodsNeedingFallback = trendRows
+    .filter(r => !r.facturacion_total || parseFloat(r.facturacion_total) === 0)
+    .map(r => r.period_key);
+
+  const fallbackPL: Record<string, { ventas: number; directos: number; indirectos: number }> = {};
+  if (periodsNeedingFallback.length > 0) {
+    // Batch query income_sot
+    const { rows: fbSales } = await pool.query(`
+      SELECT month_key, COALESCE(SUM(revenue_usd), 0) as total
+      FROM income_sot
+      WHERE month_key = ANY($1) AND confirmed = true
+      GROUP BY month_key
+    `, [periodsNeedingFallback]);
+    for (const r of fbSales) {
+      fallbackPL[r.month_key] = { ventas: parseFloat(r.total) || 0, directos: 0, indirectos: 0 };
+    }
+
+    // If income_sot didn't have data, try google_sheets_sales
+    const stillMissing = periodsNeedingFallback.filter(p => !fallbackPL[p] || fallbackPL[p].ventas === 0);
+    if (stillMissing.length > 0) {
+      const { rows: gsSales } = await pool.query(`
+        SELECT month_key, COALESCE(SUM(CAST(amount_usd AS numeric)), 0) as total
+        FROM google_sheets_sales
+        WHERE month_key = ANY($1) AND status != 'proyectado'
+        GROUP BY month_key
+      `, [stillMissing]);
+      for (const r of gsSales) {
+        fallbackPL[r.month_key] = { ventas: parseFloat(r.total) || 0, directos: 0, indirectos: 0 };
+      }
+    }
+
+    // Batch query fact_cost_month
+    const { rows: fbCosts } = await pool.query(`
+      SELECT period_key,
+        COALESCE(SUM(CAST(direct_usd AS numeric)), 0) as direct,
+        COALESCE(SUM(CAST(indirect_usd AS numeric)), 0) as indirect
+      FROM fact_cost_month
+      WHERE period_key = ANY($1)
+      GROUP BY period_key
+    `, [periodsNeedingFallback]);
+    for (const r of fbCosts) {
+      if (!fallbackPL[r.period_key]) fallbackPL[r.period_key] = { ventas: 0, directos: 0, indirectos: 0 };
+      fallbackPL[r.period_key].directos = parseFloat(r.direct) || 0;
+      fallbackPL[r.period_key].indirectos = parseFloat(r.indirect) || 0;
+    }
+
+    // If fact_cost_month empty, try direct_costs
+    const costsStillMissing = periodsNeedingFallback.filter(p => !fallbackPL[p] || (fallbackPL[p].directos === 0));
+    if (costsStillMissing.length > 0) {
+      const { rows: dcRows } = await pool.query(`
+        SELECT month_key,
+          COALESCE(SUM(CASE WHEN LOWER(tipo_gasto) = 'directo' THEN CAST(monto_total_usd AS numeric) ELSE 0 END), 0) as direct,
+          COALESCE(SUM(CASE WHEN LOWER(tipo_gasto) != 'directo' THEN CAST(monto_total_usd AS numeric) ELSE 0 END), 0) as indirect
+        FROM direct_costs
+        WHERE month_key = ANY($1)
+        GROUP BY month_key
+      `, [costsStillMissing]);
+      for (const r of dcRows) {
+        if (!fallbackPL[r.month_key]) fallbackPL[r.month_key] = { ventas: 0, directos: 0, indirectos: 0 };
+        fallbackPL[r.month_key].directos = parseFloat(r.direct) || 0;
+        fallbackPL[r.month_key].indirectos = parseFloat(r.indirect) || 0;
+      }
+    }
+  }
+
+  // Build trends (reversed to chronological order)
   const trends: MonthlyTrend[] = trendRows.reverse().map(row => {
-    const rv = num(row.facturacion_total);
-    const mk = num(row.markup_promedio);
-    const ebit = num(row.ebit_operativo);
-    const bn = num(row.beneficio_neto);
-    // Derive costs from markup & EBIT (same logic as current period)
+    let rv = num(row.facturacion_total);
     let cd = num(row.costos_directos);
-    if (cd === 0 && mk > 0 && rv > 0) cd = Math.round((rv / mk) * 100) / 100;
     let ci = num(row.costos_indirectos);
+    let mk = num(row.markup_promedio);
+    let ebit = num(row.ebit_operativo);
+    let bn = num(row.beneficio_neto);
+
+    // Apply fallback if MFS has no P&L for this period
+    const fb = fallbackPL[row.period_key];
+    if (rv === 0 && fb && fb.ventas > 0) {
+      rv = fb.ventas;
+      cd = fb.directos;
+      ci = fb.indirectos;
+      ebit = rv - cd - ci;
+      mk = cd > 0 ? Math.round((rv / cd) * 100) / 100 : 0;
+      bn = ebit; // approximate (no tax info from fallback)
+    }
+
+    // Derive costs from markup & EBIT when available
+    if (cd === 0 && mk > 0 && rv > 0) cd = Math.round((rv / mk) * 100) / 100;
     if (ci === 0 && rv > 0 && cd > 0) ci = Math.round((rv - cd - ebit) * 100) / 100;
+
     return {
       periodKey: row.period_key,
       monthLabel: row.month_label,
