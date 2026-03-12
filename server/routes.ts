@@ -16755,6 +16755,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== LOOKER STUDIO / BI ENDPOINTS ====================
+  // These endpoints expose pre-calculated views for Looker Studio or any BI tool.
+  // Connect via Looker's "Community Connector" or use the PostgreSQL direct connector.
+
+  app.get("/api/bi/pnl-mensual", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_pnl_mensual");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI pnl-mensual error:", error);
+      res.status(500).json({ message: "Error fetching P&L data", error: error.message });
+    }
+  });
+
+  app.get("/api/bi/proyectos-mensual", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_proyectos_mensual");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI proyectos-mensual error:", error);
+      res.status(500).json({ message: "Error fetching project data", error: error.message });
+    }
+  });
+
+  app.get("/api/bi/costos-mensual", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_costos_mensual");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI costos-mensual error:", error);
+      res.status(500).json({ message: "Error fetching cost data", error: error.message });
+    }
+  });
+
+  app.get("/api/bi/equipo-mensual", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_equipo_mensual");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI equipo-mensual error:", error);
+      res.status(500).json({ message: "Error fetching team data", error: error.message });
+    }
+  });
+
+  app.get("/api/bi/cashflow", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_cashflow");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI cashflow error:", error);
+      res.status(500).json({ message: "Error fetching cashflow data", error: error.message });
+    }
+  });
+
+  app.get("/api/bi/revenue-por-cliente", async (_req: Request, res: Response) => {
+    try {
+      const result = await pool.query("SELECT * FROM vw_looker_revenue_por_cliente");
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("BI revenue-por-cliente error:", error);
+      res.status(500).json({ message: "Error fetching client revenue data", error: error.message });
+    }
+  });
+
   // Finalize routes setup and return server
   return httpServer;
 }
