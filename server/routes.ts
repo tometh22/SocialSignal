@@ -15039,11 +15039,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===== UNIFIED EXECUTIVE DASHBOARD (matches Looker Studio exactly) =====
+  // Reads exclusively from monthly_financial_summary (same source as Looker)
   app.get("/api/v1/executive/dashboard", requireAuth, async (req, res) => {
     try {
       const { getUnifiedDashboard } = await import('./services/executive-unified.js');
       const { validatePeriodKey } = await import('./services/kpi-formulas.js');
-      const { getDefaultPeriod } = await import('./services/period-resolver.js');
 
       const period = req.query.period as string;
       let periodKey: string;
@@ -15055,10 +15055,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         periodKey = period;
       } else {
-        periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+        // Pass current month — getUnifiedDashboard will auto-fallback to latest MFS period
+        periodKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
       }
 
       const data = await getUnifiedDashboard(periodKey);
+      if (!data) {
+        return res.status(404).json({
+          error: `No financial data in monthly_financial_summary for period ${periodKey} or any period`,
+          hint: "Ensure Google Sheets sync has run and populated monthly_financial_summary"
+        });
+      }
       res.json(data);
     } catch (error) {
       console.error("❌ Executive Dashboard unified error:", error);

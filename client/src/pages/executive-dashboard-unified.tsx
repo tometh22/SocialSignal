@@ -276,16 +276,20 @@ function CashflowChart({ data }: { data: TrendRow[] }) {
 export default function UnifiedExecutiveDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<DashboardData>({
+  const { data, isLoading, error, refetch, isRefetching } = useQuery<DashboardData>({
     queryKey: ["/api/v1/executive/dashboard", selectedPeriod],
     queryFn: async () => {
       const url = selectedPeriod
         ? `/api/v1/executive/dashboard?period=${selectedPeriod}`
         : "/api/v1/executive/dashboard";
       const res = await authFetch(url);
-      if (!res.ok) throw new Error("Failed to fetch dashboard data");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || body.hint || `HTTP ${res.status}`);
+      }
       return res.json();
     },
+    retry: 1,
   });
 
   // Set initial period from API response
@@ -301,10 +305,20 @@ export default function UnifiedExecutiveDashboard() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-8 text-center space-y-3">
+        <div className="text-red-500 font-semibold">Error cargando dashboard</div>
+        <div className="text-sm text-gray-500">{(error as Error).message}</div>
+        <button onClick={() => refetch()} className="text-sm text-blue-600 underline">Reintentar</button>
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="p-8 text-center text-gray-500">
-        No hay datos disponibles para este período.
+        No hay datos disponibles. Verificá que la sincronización de Google Sheets haya corrido.
       </div>
     );
   }

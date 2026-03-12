@@ -100,15 +100,36 @@ function pct(numerator: number, denominator: number): number {
   return Math.round((numerator / denominator) * 10000) / 100; // 2 decimal places
 }
 
-export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDashboardData> {
+export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDashboardData | null> {
+  // 0. Fetch available periods from MFS itself
+  const { rows: periodRows } = await pool.query(`
+    SELECT period_key FROM monthly_financial_summary
+    WHERE facturacion_total IS NOT NULL OR total_activo IS NOT NULL OR caja_total IS NOT NULL
+    ORDER BY period_key DESC
+  `);
+
+  const availablePeriods = periodRows.map(r => r.period_key);
+
+  // If requested period not in MFS, fall back to most recent MFS period
+  let effectivePeriod = periodKey;
+  if (!availablePeriods.includes(periodKey) && availablePeriods.length > 0) {
+    effectivePeriod = availablePeriods[0];
+    console.log(`[UnifiedDashboard] Period ${periodKey} not in MFS, falling back to ${effectivePeriod}`);
+  }
+
   // 1. Fetch current period from monthly_financial_summary
   const { rows: [current] } = await pool.query(`
     SELECT * FROM monthly_financial_summary
     WHERE period_key = $1
-  `, [periodKey]);
+  `, [effectivePeriod]);
+
+  if (!current) {
+    console.warn(`[UnifiedDashboard] No data in MFS for period ${effectivePeriod}. Available: ${availablePeriods.join(', ')}`);
+    return null;
+  }
 
   // 2. Fetch previous period for variations
-  const [year, month] = periodKey.split('-').map(Number);
+  const [year, month] = effectivePeriod.split('-').map(Number);
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
   const prevPeriodKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
@@ -124,14 +145,9 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     WHERE period_key <= $1
     ORDER BY period_key DESC
     LIMIT 12
-  `, [periodKey]);
+  `, [effectivePeriod]);
 
-  // 4. Fetch available periods
-  const { rows: periodRows } = await pool.query(`
-    SELECT period_key FROM monthly_financial_summary
-    WHERE facturacion_total IS NOT NULL OR total_activo IS NOT NULL
-    ORDER BY period_key DESC
-  `);
+  // (available periods already fetched above)
 
   // === Build P&L cascade from MFS (matching Looker exactly) ===
   const ventasMes = num(current?.facturacion_total);
@@ -203,7 +219,7 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
   });
 
   return {
-    periodKey,
+    periodKey: effectivePeriod,
     year,
     monthNumber: month,
     monthLabel: current?.month_label || null,
