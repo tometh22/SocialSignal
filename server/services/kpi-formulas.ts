@@ -18,6 +18,29 @@ import { pool } from '../db';
  */
 
 // =====================================================
+// PERIOD VALIDATION
+// =====================================================
+
+export function validatePeriodKey(periodKey: string): { valid: boolean; error?: string } {
+  if (!periodKey || typeof periodKey !== 'string') {
+    return { valid: false, error: 'period_key is required and must be a string' };
+  }
+  const match = periodKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) {
+    return { valid: false, error: `Invalid period_key format: "${periodKey}" (expected YYYY-MM)` };
+  }
+  const month = parseInt(match[2]);
+  if (month < 1 || month > 12) {
+    return { valid: false, error: `Invalid month ${month} in period_key "${periodKey}" (must be 01-12)` };
+  }
+  const year = parseInt(match[1]);
+  if (year < 2020 || year > 2030) {
+    return { valid: false, error: `Suspicious year ${year} in period_key "${periodKey}"` };
+  }
+  return { valid: true };
+}
+
+// =====================================================
 // DATA FETCHERS - Single Source of Truth
 // =====================================================
 
@@ -87,12 +110,19 @@ export async function fetchProjectsActive(): Promise<number> {
   return parseInt(data?.active || '0');
 }
 
-export async function fetchFinancialSummary(periodKey: string): Promise<{
+export interface FinancialSummaryResult {
   facturado: number;
   cajaTotal: number;
+  cajaTotalIsNull: boolean;
   activoTotal: number;
   pasivoTotal: number;
-}> {
+  facturadoSource: 'monthly_financial_summary' | 'fact_rc_month' | 'financial_sot' | 'none';
+  warnings: string[];
+}
+
+export async function fetchFinancialSummary(periodKey: string): Promise<FinancialSummaryResult> {
+  const warnings: string[] = [];
+
   const { rows: [data] } = await pool.query(`
     SELECT facturacion_total, caja_total, total_activo, total_pasivo
     FROM monthly_financial_summary
@@ -100,12 +130,16 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
   `, [periodKey]);
 
   let facturado = parseFloat(data?.facturacion_total || '0');
-  // caja_total puede ser negativo (saldo bancario negativo), usar NULL como indicador de dato faltante
-  let cajaTotal = data?.caja_total != null ? parseFloat(data.caja_total) : null;
+  // FIX: caja_total puede ser negativo (sobregiro bancario válido)
+  // null = dato faltante, 0 = saldo cero, -X = sobregiro
+  const cajaTotalRaw = data?.caja_total != null ? parseFloat(data.caja_total) : null;
+  const cajaTotalIsNull = cajaTotalRaw == null;
   const activoTotal = parseFloat(data?.total_activo || '0');
   const pasivoTotal = parseFloat(data?.total_pasivo || '0');
 
-  // Fallback para facturado: si monthly_financial_summary no tiene dato, usar fact_rc_month
+  let facturadoSource: FinancialSummaryResult['facturadoSource'] = 'monthly_financial_summary';
+
+  // Fallback para facturado con WARNINGS explícitos
   if (facturado === 0) {
     const { rows: [rcData] } = await pool.query(`
       SELECT COALESCE(SUM(revenue_usd::numeric), 0) as total_revenue
@@ -114,7 +148,9 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
     `, [periodKey]);
     const rcRevenue = parseFloat(rcData?.total_revenue || '0');
     if (rcRevenue > 0) {
-      console.log(`💡 [Finanzas] Facturado fallback a fact_rc_month para ${periodKey}: $${rcRevenue.toFixed(2)}`);
+      facturadoSource = 'fact_rc_month';
+      warnings.push(`⚠️ Facturado: monthly_financial_summary vacío, usando fact_rc_month ($${rcRevenue.toFixed(2)})`);
+      console.warn(`⚠️ [Finanzas] Facturado fallback a fact_rc_month para ${periodKey}: $${rcRevenue.toFixed(2)}`);
       facturado = rcRevenue;
     } else {
       const { rows: [sotData] } = await pool.query(`
@@ -124,17 +160,30 @@ export async function fetchFinancialSummary(periodKey: string): Promise<{
       `, [periodKey]);
       const sotRevenue = parseFloat(sotData?.total_revenue || '0');
       if (sotRevenue > 0) {
-        console.log(`💡 [Finanzas] Facturado fallback a financial_sot para ${periodKey}: $${sotRevenue.toFixed(2)}`);
+        facturadoSource = 'financial_sot';
+        warnings.push(`⚠️ Facturado: ambas fuentes principales vacías, usando financial_sot ($${sotRevenue.toFixed(2)})`);
+        console.warn(`⚠️ [Finanzas] Facturado fallback a financial_sot para ${periodKey}: $${sotRevenue.toFixed(2)}`);
         facturado = sotRevenue;
+      } else {
+        facturadoSource = 'none';
+        warnings.push(`⚠️ Facturado: ninguna fuente tiene datos para ${periodKey}`);
+        console.warn(`⚠️ [Finanzas] Sin datos de facturado para ${periodKey} en ninguna fuente`);
       }
     }
   }
 
+  if (cajaTotalIsNull) {
+    warnings.push(`⚠️ Caja total: dato no disponible en monthly_financial_summary para ${periodKey}`);
+  }
+
   return {
     facturado,
-    cajaTotal: cajaTotal ?? 0,
+    cajaTotal: cajaTotalRaw ?? 0,
+    cajaTotalIsNull,
     activoTotal,
     pasivoTotal,
+    facturadoSource,
+    warnings,
   };
 }
 
@@ -424,6 +473,41 @@ export const FORMULA_DESCRIPTIONS = {
     runway: 'Caja Total / Burn Rate',
   },
 } as const;
+
+// =====================================================
+// DATA FRESHNESS CHECK
+// =====================================================
+
+export async function checkDataFreshness(): Promise<{
+  lastPeriodKey: string | null;
+  isStale: boolean;
+  staleDays: number;
+  warning: string | null;
+}> {
+  const { rows: [data] } = await pool.query(`
+    SELECT MAX(period_key) as last_period
+    FROM fact_cost_month
+    WHERE direct_usd IS NOT NULL
+  `);
+  const lastPeriodKey = data?.last_period || null;
+  if (!lastPeriodKey) {
+    return { lastPeriodKey: null, isStale: true, staleDays: 999, warning: 'No hay datos financieros cargados' };
+  }
+
+  const [year, month] = lastPeriodKey.split('-').map(Number);
+  const lastDate = new Date(year, month - 1, 28); // end of that month approx
+  const now = new Date();
+  const diffMs = now.getTime() - lastDate.getTime();
+  const staleDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const isStale = staleDays > 45; // data older than 45 days is stale
+
+  return {
+    lastPeriodKey,
+    isStale,
+    staleDays,
+    warning: isStale ? `Datos financieros desactualizados: último período ${lastPeriodKey} (${staleDays} días)` : null,
+  };
+}
 
 export const DATA_SOURCES = {
   devengado: 'fact_rc_month.revenue_usd',

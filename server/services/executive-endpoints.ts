@@ -264,7 +264,10 @@ export async function getFinanzasData(periodKeys: string[]): Promise<FinanzasDat
     proyectosActivos
   );
   
-  const beneficioNetoUsd = kpis.ebitContableUsd - kpis.provisionesUsd;
+  // beneficioNeto = EBIT Contable (ya incluye la deducción de provisiones)
+  // EBIT Contable = Facturado - Directos - Overhead - Provisiones
+  // NO restar provisiones de nuevo (eso sería doble conteo)
+  const beneficioNetoUsd = kpis.ebitContableUsd;
   
   const [year, month] = lastPeriodKey.split('-').map(Number);
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
@@ -337,7 +340,8 @@ export async function getCashflowData(periodKeys: string[]): Promise<CashflowDat
   const cashInUsd = parseFloat(cashData?.cash_in_usd || '0');
   const cashOutUsd = parseFloat(cashData?.cash_out_usd || '0');
   const cashFlowNetoUsd = cashInUsd - cashOutUsd;
-  const cajaTotalUsd = parseFloat(excelData?.caja_total || '0');
+  // FIX: null caja_total = data missing (not zero); negative = valid overdraft
+  const cajaTotalUsd = excelData?.caja_total != null ? parseFloat(excelData.caja_total) : 0;
   
   const [year, month] = lastPeriodKey.split('-').map(Number);
   const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 

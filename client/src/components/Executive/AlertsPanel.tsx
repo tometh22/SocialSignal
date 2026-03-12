@@ -38,14 +38,29 @@ export function AlertsPanel({ period, data }: AlertsPanelProps) {
     });
   }
 
-  if (data.facturadoVariation !== null && data.facturadoVariation !== undefined && data.facturadoVariation < -30) {
+  // FIX: Alert at -15% (warning) and -30% (danger), not just -30%
+  if (data.facturadoVariation !== null && data.facturadoVariation !== undefined && data.facturadoVariation < -15) {
+    const isDanger = data.facturadoVariation < -30;
     alerts.push({
       id: 'billable_drop',
-      type: 'warning',
+      type: isDanger ? 'danger' : 'warning',
       code: 'BILLABLE_DROP',
-      title: 'Caída significativa en facturación',
+      title: isDanger ? 'Caída crítica en facturación' : 'Caída en facturación',
       description: `La facturación bajó ${Math.abs(data.facturadoVariation).toFixed(0)}% vs mes anterior`,
       metric: `${data.facturadoVariation.toFixed(0)}%`
+    });
+  }
+
+  // FIX: Alert for devengado drop (different from facturado)
+  if (data.devengadoVariation !== null && data.devengadoVariation !== undefined && data.devengadoVariation < -15) {
+    const isDanger = data.devengadoVariation < -30;
+    alerts.push({
+      id: 'devengado_drop',
+      type: isDanger ? 'danger' : 'warning',
+      code: 'DEVENGADO_DROP',
+      title: isDanger ? 'Caída crítica en devengado' : 'Caída en devengado',
+      description: `El devengado bajó ${Math.abs(data.devengadoVariation).toFixed(0)}% vs mes anterior`,
+      metric: `${data.devengadoVariation.toFixed(0)}%`
     });
   }
 
@@ -70,6 +85,18 @@ export function AlertsPanel({ period, data }: AlertsPanelProps) {
       title: 'Flujo de caja negativo significativo',
       description: `El flujo neto es -$${Math.abs(data.cashFlowNetUsd).toLocaleString()} USD`,
       metric: `-$${Math.abs(data.cashFlowNetUsd).toLocaleString()}`
+    });
+  }
+
+  // FIX: Alert for negative margin when revenue exists
+  if (data.ebitOperativoUsd < 0 && data.devengadoUsd > 0) {
+    alerts.push({
+      id: 'negative_operating_margin',
+      type: 'danger',
+      code: 'NEGATIVE_OPERATING_MARGIN',
+      title: 'Margen operativo negativo',
+      description: `EBIT operativo: -$${Math.abs(data.ebitOperativoUsd).toLocaleString()} con $${data.devengadoUsd.toLocaleString()} devengado`,
+      metric: `-$${Math.abs(data.ebitOperativoUsd).toLocaleString()}`
     });
   }
 

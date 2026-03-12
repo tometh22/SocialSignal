@@ -1,5 +1,4 @@
 import { Pool } from '@neondatabase/serverless';
-import { getDevengadoSimple } from './devengado.js';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -58,11 +57,13 @@ function calcDiff(current: number, previous: number): number | null {
 }
 
 function calcDiffVs3mAvg(current: number, last3: number[]): number | null {
-  const validValues = last3.filter(v => v > 0);
+  // FIX: Only exclude exact zero (no data), not negatives (valid negative EBIT/margins)
+  // Before: filter(v => v > 0) excluded negative months, corrupting the average
+  const validValues = last3.filter(v => v !== 0);
   if (validValues.length === 0) return null;
   const avg = validValues.reduce((a, b) => a + b, 0) / validValues.length;
   if (avg === 0) return null;
-  return ((current - avg) / avg) * 100;
+  return ((current - avg) / Math.abs(avg)) * 100;
 }
 
 export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
@@ -90,6 +91,17 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   const prev12 = getPreviousPeriods(periodKey, 11);
   const allPeriods = [...prev12.reverse(), periodKey];
   
+  // FIX: Usar fact_rc_month como source of truth para devengado (consistente con KPI cards)
+  // Antes se usaba monthly_financial_summary.facturacion_total - pasivo_facturacion_adelantada
+  // lo cual daba valores distintos a los KPI cards que usan fact_rc_month.revenue_usd
+  const { rows: revenueRows } = await pool.query(`
+    SELECT period_key, COALESCE(SUM(revenue_usd), 0) as devengado_usd
+    FROM fact_rc_month
+    WHERE period_key = ANY($1)
+    GROUP BY period_key
+  `, [allPeriods]);
+  const revByPeriod = new Map(revenueRows.map((r: any) => [r.period_key, parseFloat(r.devengado_usd)]));
+
   const { rows: costsRows } = await pool.query(`
     SELECT period_key, COALESCE(SUM(direct_usd), 0) as direct_usd
     FROM fact_cost_month
@@ -99,7 +111,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   const costsByPeriod = new Map(costsRows.map((r: any) => [r.period_key, parseFloat(r.direct_usd)]));
 
   const { rows: hoursRows } = await pool.query(`
-    SELECT period_key, 
+    SELECT period_key,
            COALESCE(SUM(asana_hours), 0) as total_hours,
            COALESCE(SUM(billing_hours), 0) as billable_hours
     FROM fact_labor_month
@@ -111,16 +123,6 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
     billable: parseFloat(r.billable_hours)
   }]));
 
-  const { rows: financialRows } = await pool.query(`
-    SELECT period_key, facturacion_total, pasivo_facturacion_adelantada
-    FROM monthly_financial_summary
-    WHERE period_key = ANY($1)
-  `, [allPeriods]);
-  const financialByPeriod = new Map(financialRows.map((r: any) => [r.period_key, {
-    facturado: parseFloat(r.facturacion_total || '0'),
-    provision: parseFloat(r.pasivo_facturacion_adelantada || '0')
-  }]));
-
   const devengadoArr: number[] = [];
   const ebitArr: number[] = [];
   const margenArr: number[] = [];
@@ -129,8 +131,7 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
   const directosArr: number[] = [];
 
   for (const p of allPeriods) {
-    const fin = financialByPeriod.get(p) || { facturado: 0, provision: 0 };
-    const devengado = fin.facturado - fin.provision;
+    const devengado = revByPeriod.get(p) || 0;
     const directos = costsByPeriod.get(p) || 0;
     const hours = hoursByPeriod.get(p) || { total: 0, billable: 0 };
     
@@ -206,6 +207,25 @@ export async function getOperativoTrendsAndDiffs(periodKey: string): Promise<{
       type: 'info',
       message: `${pctNoFacturable.toFixed(0)}% de horas no facturables`,
       metric: 'horas_no_productivas'
+    });
+  }
+
+  // FIX: Alert for negative EBIT operativo
+  if (currentData.ebit < 0 && currentData.devengado > 0) {
+    alerts.push({
+      type: 'critical',
+      message: `EBIT operativo negativo: -$${Math.abs(currentData.ebit / 1000).toFixed(1)}k`,
+      metric: 'ebit_operativo'
+    });
+  }
+
+  // FIX: Alert for revenue drop >15%
+  const devengadoDiff = calcDiff(currentData.devengado, prevDevengado);
+  if (devengadoDiff !== null && devengadoDiff < -15) {
+    alerts.push({
+      type: devengadoDiff < -30 ? 'critical' : 'warning',
+      message: `Devengado cayó ${Math.abs(devengadoDiff).toFixed(0)}% vs mes anterior`,
+      metric: 'devengado_drop'
     });
   }
 
@@ -309,8 +329,17 @@ export async function getEconomicoTrendsAndDiffs(periodKey: string): Promise<{
   const prev12 = getPreviousPeriods(periodKey, 11);
   const allPeriods = [...prev12.reverse(), periodKey];
 
+  // FIX: Usar fact_rc_month para devengado (consistente con KPI cards)
+  const { rows: revenueRows } = await pool.query(`
+    SELECT period_key, COALESCE(SUM(revenue_usd), 0) as devengado_usd
+    FROM fact_rc_month
+    WHERE period_key = ANY($1)
+    GROUP BY period_key
+  `, [allPeriods]);
+  const revByPeriod = new Map(revenueRows.map((r: any) => [r.period_key, parseFloat(r.devengado_usd)]));
+
   const { rows: costsRows } = await pool.query(`
-    SELECT period_key, 
+    SELECT period_key,
            COALESCE(SUM(direct_usd), 0) as direct_usd,
            COALESCE(SUM(indirect_usd), 0) as indirect_usd
     FROM fact_cost_month
@@ -322,24 +351,13 @@ export async function getEconomicoTrendsAndDiffs(periodKey: string): Promise<{
     indirect: parseFloat(r.indirect_usd)
   }]));
 
-  const { rows: financialRows } = await pool.query(`
-    SELECT period_key, facturacion_total, pasivo_facturacion_adelantada
-    FROM monthly_financial_summary
-    WHERE period_key = ANY($1)
-  `, [allPeriods]);
-  const financialByPeriod = new Map(financialRows.map((r: any) => [r.period_key, {
-    facturado: parseFloat(r.facturacion_total || '0'),
-    provision: parseFloat(r.pasivo_facturacion_adelantada || '0')
-  }]));
-
   const devengadoArr: number[] = [];
   const ebitArr: number[] = [];
   const margenArr: number[] = [];
   const overheadArr: number[] = [];
 
   for (const p of allPeriods) {
-    const fin = financialByPeriod.get(p) || { facturado: 0, provision: 0 };
-    const devengado = fin.facturado - fin.provision;
+    const devengado = revByPeriod.get(p) || 0;
     const costs = costsByPeriod.get(p) || { direct: 0, indirect: 0 };
     
     const ebit = devengado - costs.direct - costs.indirect;
@@ -456,36 +474,36 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
   const prev12 = getPreviousPeriods(periodKey, 11);
   const allPeriods = [...prev12.reverse(), periodKey];
 
+  // FIX: Include total_activo, total_pasivo from monthly_financial_summary
+  // Before: only fetched facturacion_total and caja_total, then used caja=activo, overhead=pasivo (WRONG)
   const { rows: financialRows } = await pool.query(`
-    SELECT period_key, facturacion_total, caja_total
+    SELECT period_key, facturacion_total, caja_total, total_activo, total_pasivo
     FROM monthly_financial_summary
     WHERE period_key = ANY($1)
   `, [allPeriods]);
   const financialByPeriod = new Map(financialRows.map((r: any) => [r.period_key, {
     facturado: parseFloat(r.facturacion_total || '0'),
-    cajaTotal: parseFloat(r.caja_total || '0')
+    cajaTotal: r.caja_total != null ? parseFloat(r.caja_total) : null,
+    activoTotal: parseFloat(r.total_activo || '0'),
+    pasivoTotal: parseFloat(r.total_pasivo || '0'),
   }]));
 
+  // FIX: Use fact_cost_month for provisions (consistent with KPI cards)
+  // Before: used pl_adjustments which is a different data source
   const { rows: costsRows } = await pool.query(`
     SELECT period_key,
            COALESCE(SUM(direct_usd), 0) as direct_usd,
-           COALESCE(SUM(indirect_usd), 0) as indirect_usd
+           COALESCE(SUM(indirect_usd), 0) as indirect_usd,
+           COALESCE(SUM(provisions_usd), 0) as provisions_usd
     FROM fact_cost_month
     WHERE period_key = ANY($1)
     GROUP BY period_key
   `, [allPeriods]);
   const costsByPeriod = new Map(costsRows.map((r: any) => [r.period_key, {
     direct: parseFloat(r.direct_usd),
-    indirect: parseFloat(r.indirect_usd)
+    indirect: parseFloat(r.indirect_usd),
+    provisions: parseFloat(r.provisions_usd),
   }]));
-
-  const { rows: provisionsRows } = await pool.query(`
-    SELECT period_key, COALESCE(SUM(amount_usd), 0) as provisions_usd
-    FROM pl_adjustments
-    WHERE period_key = ANY($1)
-    GROUP BY period_key
-  `, [allPeriods]);
-  const provisionsByPeriod = new Map(provisionsRows.map((r: any) => [r.period_key, parseFloat(r.provisions_usd)]));
 
   const { rows: cashRows } = await pool.query(`
     SELECT period_key,
@@ -506,15 +524,14 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
   const burnRateArr: number[] = [];
 
   for (const p of allPeriods) {
-    const fin = financialByPeriod.get(p) || { facturado: 0, cajaTotal: 0 };
-    const costs = costsByPeriod.get(p) || { direct: 0, indirect: 0 };
-    const provisions = provisionsByPeriod.get(p) || 0;
+    const fin = financialByPeriod.get(p) || { facturado: 0, cajaTotal: null, activoTotal: 0, pasivoTotal: 0 };
+    const costs = costsByPeriod.get(p) || { direct: 0, indirect: 0, provisions: 0 };
     const cash = cashByPeriod.get(p) || { cashIn: 0, cashOut: 0 };
-    
-    const totalCosts = costs.direct + costs.indirect + provisions;
+
+    const totalCosts = costs.direct + costs.indirect + costs.provisions;
     const ebit = fin.facturado - totalCosts;
     const cashFlow = cash.cashIn - cash.cashOut;
-    
+
     facturadoArr.push(fin.facturado);
     ebitArr.push(ebit);
     cashFlowArr.push(cashFlow);
@@ -522,18 +539,22 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
   }
 
   const currentIdx = allPeriods.length - 1;
-  const fin = financialByPeriod.get(periodKey) || { facturado: 0, cajaTotal: 0 };
-  const costs = costsByPeriod.get(periodKey) || { direct: 0, indirect: 0 };
-  const provisions = provisionsByPeriod.get(periodKey) || 0;
-  
+  const fin = financialByPeriod.get(periodKey) || { facturado: 0, cajaTotal: null, activoTotal: 0, pasivoTotal: 0 };
+  const costs = costsByPeriod.get(periodKey) || { direct: 0, indirect: 0, provisions: 0 };
+
+  // FIX: cajaTotal null means data missing, not zero (overdraft is valid negative)
+  const cajaTotal = fin.cajaTotal ?? 0;
+
   const currentData = {
     facturado: facturadoArr[currentIdx],
     ebit: ebitArr[currentIdx],
     cashFlow: cashFlowArr[currentIdx],
     burnRate: burnRateArr[currentIdx],
-    cajaTotal: fin.cajaTotal
+    cajaTotal,
   };
-  const runwayMeses = currentData.burnRate > 0 ? currentData.cajaTotal / currentData.burnRate : 0;
+  const runwayMeses = currentData.burnRate > 0 && fin.cajaTotal != null
+    ? currentData.cajaTotal / currentData.burnRate
+    : 0;
 
   const prevFacturado = currentIdx > 0 ? facturadoArr[currentIdx - 1] : 0;
   const prevEbit = currentIdx > 0 ? ebitArr[currentIdx - 1] : 0;
@@ -553,6 +574,12 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
       message: `Runway crítico: ${runwayMeses.toFixed(1)} meses`,
       metric: 'runway_meses'
     });
+  } else if (runwayMeses >= 3 && runwayMeses < 6) {
+    alerts.push({
+      type: 'warning',
+      message: `Runway bajo: ${runwayMeses.toFixed(1)} meses (objetivo: >6)`,
+      metric: 'runway_meses'
+    });
   }
 
   if (currentData.cashFlow < 0 && prevCashFlow < 0) {
@@ -569,23 +596,52 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
     });
   }
 
-  if (currentData.facturado > 0 && provisions / currentData.facturado > 0.4) {
+  if (currentData.facturado > 0 && costs.provisions / currentData.facturado > 0.4) {
     alerts.push({
       type: 'warning',
-      message: `Provisiones altas: ${((provisions / currentData.facturado) * 100).toFixed(0)}% del facturado`,
+      message: `Provisiones altas: ${((costs.provisions / currentData.facturado) * 100).toFixed(0)}% del facturado`,
       metric: 'provisiones_ratio'
     });
   }
 
-  const costs2 = costsByPeriod.get(periodKey) || { direct: 0, indirect: 0 };
-  const fin2 = financialByPeriod.get(periodKey) || { facturado: 0, cajaTotal: 0 };
-  const activoTotal = fin2.cajaTotal;
-  const pasivoTotal = costs2.indirect;
+  // FIX: EBIT contable negativo alert
+  if (currentData.ebit < 0) {
+    alerts.push({
+      type: 'critical',
+      message: `EBIT contable negativo: -$${Math.abs(currentData.ebit / 1000).toFixed(1)}k`,
+      metric: 'ebit_contable'
+    });
+  }
+
+  // FIX: Revenue drop alert (>15%)
+  const facturadoDiff = calcDiff(currentData.facturado, prevFacturado);
+  if (facturadoDiff !== null && facturadoDiff < -15) {
+    alerts.push({
+      type: facturadoDiff < -30 ? 'critical' : 'warning',
+      message: `Facturado cayó ${Math.abs(facturadoDiff).toFixed(0)}% vs mes anterior`,
+      metric: 'facturado_drop'
+    });
+  }
+
+  // FIX: Use monthly_financial_summary.total_activo/total_pasivo (NOT caja/overhead)
+  const activoTotal = fin.activoTotal;
+  const pasivoTotal = fin.pasivoTotal;
+  const patrimonio = activoTotal - pasivoTotal;
+
   if (pasivoTotal > activoTotal && activoTotal > 0) {
     alerts.push({
       type: 'warning',
-      message: 'Pasivo supera activo total',
+      message: `Pasivo ($${(pasivoTotal/1000).toFixed(0)}k) supera activo ($${(activoTotal/1000).toFixed(0)}k)`,
       metric: 'patrimonio'
+    });
+  }
+
+  // FIX: Warn if caja_total is null (data missing from Excel)
+  if (fin.cajaTotal == null) {
+    alerts.push({
+      type: 'info',
+      message: 'Dato de caja total no disponible para este período',
+      metric: 'caja_total_missing'
     });
   }
 
@@ -599,7 +655,9 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
 
   const cash = cashByPeriod.get(periodKey) || { cashIn: 0, cashOut: 0 };
   const cashTotal = cash.cashIn + cash.cashOut;
-  const patrimonio = fin.cajaTotal - costs.indirect;
+
+  // FIX: Estructura financiera uses correct Activo/Pasivo/Patrimonio
+  const totalBalance = activoTotal > 0 ? activoTotal : Math.abs(patrimonio) + pasivoTotal;
 
   return {
     trends: {
@@ -629,9 +687,9 @@ export async function getFinanzasTrendsAndDiffs(periodKey: string): Promise<{
     alerts,
     breakdowns: {
       estructuraFinanciera: [
-        { label: 'Activo (Caja)', value: fin.cajaTotal, pct: 100 },
-        { label: 'Pasivo', value: costs.indirect, pct: fin.cajaTotal > 0 ? (costs.indirect / fin.cajaTotal) * 100 : 0 },
-        { label: 'Patrimonio', value: patrimonio, pct: fin.cajaTotal > 0 ? (patrimonio / fin.cajaTotal) * 100 : 0 }
+        { label: 'Activo', value: activoTotal, pct: totalBalance > 0 ? (activoTotal / totalBalance) * 100 : 0 },
+        { label: 'Pasivo', value: pasivoTotal, pct: totalBalance > 0 ? (pasivoTotal / totalBalance) * 100 : 0 },
+        { label: 'Patrimonio', value: patrimonio, pct: totalBalance > 0 ? (patrimonio / totalBalance) * 100 : 0 }
       ],
       cashflowDistribucion: [
         { label: 'Ingresos', value: cash.cashIn, pct: cashTotal > 0 ? (cash.cashIn / cashTotal) * 100 : 0 },

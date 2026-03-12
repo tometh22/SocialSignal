@@ -14920,11 +14920,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getOperativoData } = await import('./services/executive-endpoints.js');
       const { getOperativoTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
-      
+      const { validatePeriodKey } = await import('./services/kpi-formulas.js');
+
       const period = req.query.period as string;
       let periodKey: string;
-      
+
       if (period && /^\d{4}-\d{2}$/.test(period)) {
+        const validation = validatePeriodKey(period);
+        if (!validation.valid) {
+          return res.status(400).json({ error: validation.error });
+        }
         periodKey = period;
       } else {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -14956,11 +14961,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getEconomicoData } = await import('./services/executive-endpoints.js');
       const { getEconomicoTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
-      
+      const { validatePeriodKey } = await import('./services/kpi-formulas.js');
+
       const period = req.query.period as string;
       let periodKey: string;
-      
+
       if (period && /^\d{4}-\d{2}$/.test(period)) {
+        const validation = validatePeriodKey(period);
+        if (!validation.valid) {
+          return res.status(400).json({ error: validation.error });
+        }
         periodKey = period;
       } else {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -14992,11 +15002,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { getFinanzasData } = await import('./services/executive-endpoints.js');
       const { getFinanzasTrendsAndDiffs } = await import('./services/executive-analytics.js');
       const { getDefaultPeriod } = await import('./services/period-resolver.js');
-      
+      const { validatePeriodKey } = await import('./services/kpi-formulas.js');
+
       const period = req.query.period as string;
       let periodKey: string;
-      
+
       if (period && /^\d{4}-\d{2}$/.test(period)) {
+        const validation = validatePeriodKey(period);
+        if (!validation.valid) {
+          return res.status(400).json({ error: validation.error });
+        }
         periodKey = period;
       } else {
         periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
