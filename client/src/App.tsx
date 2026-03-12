@@ -4,7 +4,8 @@ import GlobalTimerWidget from "@/components/tasks/GlobalTimerWidget";
 import ErrorBoundary from "@/components/error-boundary";
 import NotFound from "@/pages/not-found";
 // Core Pages
-import ExecutiveDashboard from "@/pages/executive-dashboard-new";
+import ExecutiveDashboardLegacy from "@/pages/executive-dashboard-new";
+import ExecutiveDashboard from "@/pages/executive-dashboard-unified";
 import OptimizedQuote from "@/pages/optimized-quote";
 import { OptimizedQuoteProvider } from "@/context/optimized-quote-context";
 import ManageQuotes from "@/pages/manage-quotes";
@@ -142,7 +143,7 @@ function AppRoutes() {
                   {/* Core Application Routes */}
                   <ProtectedRoute path="/" component={ExecutiveDashboard} requiredPermission="dashboard" />
                   <ProtectedRoute path="/dashboard" component={ExecutiveDashboard} requiredPermission="dashboard" />
-                  <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboard} requiredPermission="dashboard" />
+                  <ProtectedRoute path="/executive-dashboard-new" component={ExecutiveDashboardLegacy} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/operativo" component={ExecutiveOperativo} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/economico" component={ExecutiveDashboard} requiredPermission="dashboard" />
                   <ProtectedRoute path="/executive/finanzas" component={ExecutiveFinanciero} requiredPermission="finance" />

@@ -15038,6 +15038,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== UNIFIED EXECUTIVE DASHBOARD (matches Looker Studio exactly) =====
+  app.get("/api/v1/executive/dashboard", requireAuth, async (req, res) => {
+    try {
+      const { getUnifiedDashboard } = await import('./services/executive-unified.js');
+      const { validatePeriodKey } = await import('./services/kpi-formulas.js');
+      const { getDefaultPeriod } = await import('./services/period-resolver.js');
+
+      const period = req.query.period as string;
+      let periodKey: string;
+
+      if (period && /^\d{4}-\d{2}$/.test(period)) {
+        const validation = validatePeriodKey(period);
+        if (!validation.valid) {
+          return res.status(400).json({ error: validation.error });
+        }
+        periodKey = period;
+      } else {
+        periodKey = await getDefaultPeriod() || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      }
+
+      const data = await getUnifiedDashboard(periodKey);
+      res.json(data);
+    } catch (error) {
+      console.error("❌ Executive Dashboard unified error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   // DEBUG: Ver datos raw de Google Sheets para Warner
   app.get("/api/debug/sheets-warner", async (req, res) => {
     try {
