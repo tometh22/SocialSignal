@@ -247,15 +247,15 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
 // ─── Mini pickers ─────────────────────────────────────────────────────────────
 
-function HealthDot({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+function HealthDot({ value, onChange, compact = false }: { value: string | null; onChange: (v: string) => void; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const meta = hm(value);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button className="flex items-center gap-1.5 group" title={`Estado: ${meta.label}`}>
-          <div className={cn("w-3 h-3 rounded-full transition-transform group-hover:scale-125", meta.dot)} />
-          <span className={cn("text-xs font-semibold", meta.text)}>{meta.label}</span>
+          <div className={cn("rounded-full transition-transform group-hover:scale-125", meta.dot, compact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+          {!compact && <span className={cn("text-xs font-semibold", meta.text)}>{meta.label}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-36 p-1.5" align="start">
@@ -267,6 +267,20 @@ function HealthDot({ value, onChange }: { value: string | null; onChange: (v: st
         ))}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function MiniLevelDot({ value, type }: { value: string | null; type: 'margin' | 'team' }) {
+  const levels = type === 'margin' ? MARGIN_LEVEL : TEAM_LEVEL;
+  const resolver = type === 'margin' ? mlm : tlm;
+  const meta = resolver(value);
+  const label = type === 'margin' ? 'Margen' : 'Equipo';
+  const dotColor = value === 'alto' ? 'bg-red-400' : value === 'bajo' ? 'bg-emerald-400' : 'bg-amber-400';
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={`${label}: ${meta.label}`}>
+      <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
+      <span className="font-medium">{type === 'margin' ? '$' : '~'}</span>
+    </span>
   );
 }
 
@@ -522,39 +536,46 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   const decMeta = dm(item.decisionNeeded);
 
   return (
-    <div className={cn("border-b border-slate-100 last:border-0 transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-slate-50/80")}>
-      <div className="flex items-center gap-3 px-4 py-2.5">
-        <button onClick={onToggle} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
-          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        </button>
-        <div className="w-20 shrink-0">
-          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+    <div className={cn(
+      "border-b border-slate-100 last:border-0 transition-all",
+      isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50/60",
+      expanded && "bg-slate-50/40"
+    )}>
+      {/* Main row */}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer" onClick={onToggle}>
+        {/* Health dot */}
+        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-          <span className="font-semibold text-sm text-foreground truncate">{item.title}</span>
-          {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
-          <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
+
+        {/* Project info - takes most space */}
+        <div className="flex-1 min-w-0">
+          {/* Line 1: Name + subtitle */}
+          <div className="flex items-center gap-1.5">
+            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+            <span className="font-semibold text-[13px] text-slate-800 truncate">{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-[13px] truncate"> · {item.subtitle}</span>}
+          </div>
+          {/* Line 2: Badges + situation preview */}
+          <div className="flex items-center gap-2 mt-0.5">
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+              <MiniLevelDot value={item.marginStatus} type="margin" />
+              <MiniLevelDot value={item.teamStrain} type="team" />
+            </div>
+            <span className="hidden lg:block text-xs text-slate-400 truncate max-w-[280px]" onClick={e => { e.stopPropagation(); onToggle(); }}>
+              {item.currentAction || <span className="italic text-slate-300">¿Cómo viene?</span>}
+            </span>
+            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
+          </div>
         </div>
-        <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-        </div>
-        <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-        </div>
-        <div className="hidden lg:block w-48 shrink-0">
-          <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} className="text-xs line-clamp-2 block" />
-        </div>
-        <div className="w-24 shrink-0">
-          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-        </div>
-        <div className="w-20 shrink-0">
-          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-        </div>
-        <div className="shrink-0 flex items-center justify-end gap-1">
+
+        {/* Right side: Owner + Deadline + Actions */}
+        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
           {onOpenNotes && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-0.5 p-1 rounded transition-colors",
@@ -580,48 +601,67 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
       </div>
 
-      {expanded && (
-        <div className="px-10 pb-3 pt-1 bg-slate-50/60 border-t border-slate-100">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Situación</p>
-              <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline />
+      {/* Expanded detail panel */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="overflow-hidden">
+            <div className="px-4 pb-4 pt-2 ml-5 border-l-2 border-indigo-200/60">
+              {/* Editable fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
+                    <Circle className="h-2 w-2 fill-indigo-400 text-indigo-400" /> Situación
+                  </p>
+                  <InlineText value={item.currentAction} placeholder="¿Cómo viene? Contá el estado actual..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm" />
+                </div>
+                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
+                    <ArrowRight className="h-2.5 w-2.5 text-indigo-400" /> Siguiente paso
+                  </p>
+                  <InlineText value={item.nextMilestone} placeholder="¿Qué sigue? El próximo paso concreto..." onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm" />
+                </div>
+              </div>
+
+              {/* Secondary controls */}
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
+                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
+                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                </div>
+                <div className="flex-1" />
+                {onOpenNotes && (
+                  <button onClick={onOpenNotes}
+                    className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
+                      isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+                    <MessageSquare className="h-3 w-3" />
+                    <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
+                  </button>
+                )}
+                {(hasPrev || hasNext) && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={onPrev} disabled={!hasPrev}
+                      className={cn("p-1 rounded-md transition-colors",
+                        hasPrev ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={onNext} disabled={!hasNext}
+                      className={cn("p-1 rounded-md transition-colors",
+                        hasNext ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
-              <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline />
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
-              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-            </div>
-          </div>
-          {onOpenNotes && (
-            <div className="mt-3 pt-2 border-t border-slate-200">
-              <button onClick={onOpenNotes}
-                className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
-                  isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-                <MessageSquare className="h-3 w-3" />
-                <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
-              </button>
-            </div>
-          )}
-          {(hasPrev || hasNext) && (
-            <div className="flex items-center justify-end gap-1.5 mt-2 pt-2 border-t border-slate-100">
-              <button onClick={onPrev} disabled={!hasPrev}
-                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
-                  hasPrev ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
-                <ChevronLeft className="h-3 w-3" /> Anterior
-              </button>
-              <button onClick={onNext} disabled={!hasNext}
-                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
-                  hasNext ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
-                Siguiente <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1395,7 +1435,6 @@ export default function StatusSemanalPage() {
                     {normalItems.length}
                   </span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                  {normalItems.length > 0 && <span className="text-[10px] text-muted-foreground ml-auto">Click en fila para editar</span>}
                 </div>
                 {normalItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
@@ -1403,16 +1442,10 @@ export default function StatusSemanalPage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200">
-                      <div className="w-3.5 shrink-0" />
-                      <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
-                      <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
-                      <div className="hidden lg:block w-48 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
-                      <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
-                      <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
-                      <div className="w-16" />
+                    <div className="flex items-center gap-2.5 px-4 py-2 bg-slate-50/80 border-b border-slate-200">
+                      <div className="w-2.5 shrink-0" />
+                      <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Proyecto</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0 w-[220px] text-right">Owner · Deadline · Acciones</div>
                     </div>
                     <AnimatePresence initial={false}>
                       {normalItems.map((item, idx) => {
