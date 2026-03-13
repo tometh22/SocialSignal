@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { RefreshCw, TrendingUp, TrendingDown, Minus, DollarSign, ArrowUpRight, ArrowDownRight, Info, Calendar, BarChart3, Wallet, PieChart, Activity } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, Minus, DollarSign, ArrowUpRight, ArrowDownRight, Info, Calendar, BarChart3, Wallet, PieChart, Activity, Upload } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RTooltip, ResponsiveContainer, Cell, Legend, Area, AreaChart, ComposedChart
@@ -272,9 +272,115 @@ function CashflowChart({ data }: { data: TrendRow[] }) {
   );
 }
 
+// ─── P&L Import Form (inline, shown when no data) ───────────────
+function PnLImportForm({ periodKey, onSuccess }: { periodKey: string; onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    ventasMes: "",
+    costosDirectos: "",
+    costosIndirectos: "",
+    ebitOperativo: "",
+    beneficioNeto: "",
+    markup: "",
+    cashflowNeto: "",
+    cashflowIngresos: "",
+    cashflowEgresos: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setResult(null);
+    try {
+      const payload: Record<string, any> = { periodKey };
+      if (form.ventasMes) payload.facturacionTotal = parseFloat(form.ventasMes);
+      if (form.costosDirectos) payload.costosDirectos = parseFloat(form.costosDirectos);
+      if (form.costosIndirectos) payload.costosIndirectos = parseFloat(form.costosIndirectos);
+      if (form.ebitOperativo) payload.ebitOperativo = parseFloat(form.ebitOperativo);
+      if (form.beneficioNeto) payload.beneficioNeto = parseFloat(form.beneficioNeto);
+      if (form.markup) payload.markupPromedio = parseFloat(form.markup);
+      if (form.cashflowNeto) payload.cashflowNeto = parseFloat(form.cashflowNeto);
+      if (form.cashflowIngresos) payload.cashflowIngresos = parseFloat(form.cashflowIngresos);
+      if (form.cashflowEgresos) payload.cashflowEgresos = parseFloat(form.cashflowEgresos);
+
+      const res = await authFetch("/api/import/resumen-ejecutivo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ periods: [payload] }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setResult("Datos importados correctamente");
+        onSuccess();
+      } else {
+        setResult(`Error: ${data.errors?.join(", ") || data.error}`);
+      }
+    } catch (e: any) {
+      setResult(`Error: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [form, periodKey, onSuccess]);
+
+  const fields = [
+    { key: "ventasMes", label: "Ventas del Mes (USD)" },
+    { key: "costosDirectos", label: "Costos Directos" },
+    { key: "costosIndirectos", label: "Costos Indirectos" },
+    { key: "ebitOperativo", label: "EBIT Operativo" },
+    { key: "beneficioNeto", label: "Beneficio Neto" },
+    { key: "markup", label: "Markup" },
+    { key: "cashflowNeto", label: "Cashflow Neto" },
+    { key: "cashflowIngresos", label: "Cashflow Ingresos" },
+    { key: "cashflowEgresos", label: "Cashflow Egresos" },
+  ] as const;
+
+  return (
+    <div className="bg-white border border-amber-200 rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2 text-amber-700 font-medium">
+        <Upload className="w-4 h-4" />
+        Importar datos de P&L para {periodLabel(periodKey)}
+      </div>
+      <p className="text-xs text-gray-500">
+        La sync de Google Sheets no tiene datos para este período. Ingresá los valores de Looker Studio manualmente.
+        Usá punto como separador decimal. Los valores negativos llevan signo menos (ej: -2922.68).
+      </p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {fields.map(({ key, label }) => (
+          <div key={key}>
+            <label className="text-xs text-gray-500">{label}</label>
+            <input
+              type="text"
+              value={form[key]}
+              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              placeholder="0.00"
+              className="w-full text-sm border rounded px-2 py-1.5 bg-gray-50 focus:bg-white focus:ring-1 focus:ring-blue-400 outline-none"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Guardando..." : "Guardar P&L"}
+        </button>
+        {result && (
+          <span className={`text-sm ${result.startsWith("Error") ? "text-red-600" : "text-green-600"}`}>
+            {result}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ──────────────────────────────────────────────
 export default function UnifiedExecutiveDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery<DashboardData>({
     queryKey: ["/api/v1/executive/dashboard", selectedPeriod],
@@ -357,14 +463,29 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ─── Warning if period has no P&L data ─── */}
-        {d.ventasMes === 0 && d.ebitOperativo === 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-            Este período no tiene datos de P&L en "Resumen Ejecutivo". Verificá que el Sheet tenga valores para {periodLabel(d.periodKey)}.
-            {d.availablePeriods.length > 1 && (
-              <span> Probá seleccionar otro período.</span>
-            )}
+        {/* ─── Warning if period has no P&L data + import form ─── */}
+        {d.ventasMes === 0 && d.ebitOperativo === 0 && !showImport && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700 flex items-center justify-between">
+            <span>
+              Este período no tiene datos de P&L. La sync de Google Sheets puede estar fallando.
+            </span>
+            <button
+              onClick={() => setShowImport(true)}
+              className="ml-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap flex items-center gap-1"
+            >
+              <Upload className="w-3 h-3" /> Importar datos
+            </button>
           </div>
+        )}
+        {showImport && (
+          <PnLImportForm
+            periodKey={d.periodKey}
+            onSuccess={() => {
+              setShowImport(false);
+              queryClient.invalidateQueries({ queryKey: ["/api/v1/executive/dashboard"] });
+              refetch();
+            }}
+          />
         )}
 
         {/* ─── Top KPIs (same 7 as Looker Resumen Ejecutivo) ─── */}
