@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   ClipboardList, MessageSquare, X, Send, Trash2,
   AlertTriangle, Loader2, User, EyeOff, Eye,
-  ChevronDown, ChevronRight, Zap, CheckCircle2,
+  ChevronDown, ChevronRight, ChevronLeft, Zap, CheckCircle2,
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
@@ -106,6 +106,7 @@ type Item = {
   hiddenFromWeekly: boolean | null;
   noteCount: number;
   isOverdue: boolean;
+  updatedAt: string | null;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -161,6 +162,25 @@ function relTime(s: string) {
 function initials(name: string | null) {
   if (!name) return '?';
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function isThisWeek(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  mon.setHours(0, 0, 0, 0);
+  return d >= mon;
+}
+
+function FreshnessIndicator({ updatedAt }: { updatedAt: string | null }) {
+  if (!updatedAt) return <span className="text-[9px] text-slate-300 italic">Sin actualizar</span>;
+  const fresh = isThisWeek(updatedAt);
+  return (
+    <span className={cn("text-[9px] font-medium", fresh ? "text-emerald-500" : "text-amber-500")}>
+      {fresh ? "Actualizado" : relTime(updatedAt)}
+    </span>
+  );
 }
 
 // Direct fetch helper for mutations – avoids apiRequest's JSON parse layer
@@ -390,7 +410,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
   item: Item; users: AppUser[]; isSelected: boolean;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const decMeta = dm(item.decisionNeeded);
   const isUrgentDec = decMeta.urgent;
   const barColor = item.isOverdue ? 'bg-red-500' : ({ verde: 'bg-emerald-500', amarillo: 'bg-amber-400', rojo: 'bg-red-500' }[item.healthStatus ?? 'verde'] ?? 'bg-emerald-500');
@@ -409,6 +429,7 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
             {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
             <p className="font-semibold text-sm text-foreground leading-tight truncate">{item.title}</p>
             {item.subtitle && <span className="text-xs text-muted-foreground truncate hidden sm:inline">· {item.subtitle}</span>}
+            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
             <ChevronDown className={cn("h-3 w-3 text-slate-300 shrink-0 transition-transform ml-0.5", !expanded && "-rotate-90")} />
           </div>
           <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
@@ -456,21 +477,15 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
-            {/* Situation */}
-            <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
-            </div>
-
-            {/* Action + Next step */}
+            {/* Situación + Siguiente paso */}
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">¿Qué pasa?</p>
-                <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+              <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
+                <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
               </div>
-              <div>
+              <div className={cn("rounded-md px-2.5 py-2", "bg-slate-50")}>
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Siguiente paso</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
+                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
               </div>
             </div>
 
@@ -498,18 +513,18 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
 
 // ─── Compact row (Verde) ──────────────────────────────────────────────────────
 
-function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }: {
+function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, expanded, onToggle, onNext, onPrev, hasNext, hasPrev }: {
   item: Item; users: AppUser[]; isSelected: boolean;
   onOpenNotes?: () => void; onUpdate: (d: Record<string, any>) => void; onRemove: () => void;
+  expanded: boolean; onToggle: () => void; onNext?: () => void; onPrev?: () => void; hasNext?: boolean; hasPrev?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const decMeta = dm(item.decisionNeeded);
 
   return (
     <div className={cn("border-b border-slate-100 last:border-0 transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-slate-50/80")}>
       <div className="flex items-center gap-3 px-4 py-2.5">
-        <button onClick={() => setExpanded(v => !v)} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
+        <button onClick={onToggle} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>
         <div className="w-20 shrink-0">
@@ -519,6 +534,7 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
           <span className="font-semibold text-sm text-foreground truncate">{item.title}</span>
           {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
+          <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
         </div>
         <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
@@ -526,8 +542,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
         </div>
-        <div className="hidden lg:block w-40 shrink-0">
-          <InlineText value={item.mainRisk} placeholder="Sin novedades" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
+        <div className="hidden lg:block w-48 shrink-0">
+          <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} className="text-xs line-clamp-2 block" />
         </div>
         <div className="w-24 shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
@@ -569,21 +585,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Situación</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline />
+              <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline />
             </div>
             <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">¿Qué pasa?</p>
-              <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline />
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
+              <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline />
             </div>
-            <div className="space-y-2">
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
-              </div>
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-              </div>
+            <div>
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
+              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
             </div>
           </div>
           {onOpenNotes && (
@@ -593,6 +603,20 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
                   isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
                 <MessageSquare className="h-3 w-3" />
                 <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
+              </button>
+            </div>
+          )}
+          {(hasPrev || hasNext) && (
+            <div className="flex items-center justify-end gap-1.5 mt-2 pt-2 border-t border-slate-100">
+              <button onClick={onPrev} disabled={!hasPrev}
+                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
+                  hasPrev ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
+                <ChevronLeft className="h-3 w-3" /> Anterior
+              </button>
+              <button onClick={onNext} disabled={!hasNext}
+                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
+                  hasNext ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
+                Siguiente <ChevronRight className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
@@ -966,9 +990,10 @@ export default function StatusSemanalPage() {
   const { toast } = useToast();
   const [notesOpen, setNotesOpen] = useState<{ type: 'project' | 'custom'; id: number } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-  const [alertCollapsed, setAlertCollapsed] = useState(false);
-  const [decisionCollapsed, setDecisionCollapsed] = useState(false);
+  const [alertCollapsed, setAlertCollapsed] = useState<boolean | null>(null);
+  const [decisionCollapsed, setDecisionCollapsed] = useState<boolean | null>(null);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
 
@@ -1131,6 +1156,7 @@ export default function StatusSemanalPage() {
     hiddenFromWeekly: r.hiddenFromWeekly,
     noteCount: r.noteCount,
     isOverdue: isOverdue(r.deadline),
+    updatedAt: r.reviewUpdatedAt,
   });
 
   const toCustomItem = (c: CustomItem): Item => ({
@@ -1152,6 +1178,7 @@ export default function StatusSemanalPage() {
     hiddenFromWeekly: c.hiddenFromWeekly,
     noteCount: c.noteCount ?? 0,
     isOverdue: isOverdue(c.deadline),
+    updatedAt: c.updatedAt,
   });
 
   const allItems: Item[] = [
@@ -1173,6 +1200,10 @@ export default function StatusSemanalPage() {
 
   const criticalCount = alertItems.length;
   const decisionCount = visible.filter(i => dm(i.decisionNeeded).urgent).length;
+
+  // Auto-collapse empty sections unless user has manually toggled
+  const isAlertCollapsed = alertCollapsed ?? (alertItems.length === 0);
+  const isDecisionCollapsed = decisionCollapsed ?? (decisionItems.length === 0);
 
   const getItemHandlers = (item: Item) => ({
     onUpdate: (data: Record<string, any>) => {
@@ -1276,10 +1307,10 @@ export default function StatusSemanalPage() {
 
               {/* ── Requieren atención ─────────────────────────────── */}
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(c => !c)}>
+                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(!isAlertCollapsed)}>
                   <AlertTriangle className={cn("h-4 w-4 shrink-0", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", alertCollapsed && "-rotate-90")} />
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isAlertCollapsed && "-rotate-90")} />
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {alertItems.length}
@@ -1289,7 +1320,7 @@ export default function StatusSemanalPage() {
                     <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                   </div>
                 </button>
-                {!alertCollapsed && (alertItems.length === 0 ? (
+                {!isAlertCollapsed && (alertItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin alertas — todo bajo control</span>
@@ -1318,16 +1349,16 @@ export default function StatusSemanalPage() {
 
               {/* ── Decisiones pendientes ──────────────────────────── */}
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(c => !c)}>
+                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(!isDecisionCollapsed)}>
                   <Zap className={cn("h-4 w-4 shrink-0", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", decisionCollapsed && "-rotate-90")} />
+                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isDecisionCollapsed && "-rotate-90")} />
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
                     {decisionItems.length}
                   </span>
                 </button>
-                {!decisionCollapsed && (decisionItems.length === 0 ? (
+                {!isDecisionCollapsed && (decisionItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
                     <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
                     <span className="text-xs">Sin decisiones pendientes</span>
@@ -1378,13 +1409,13 @@ export default function StatusSemanalPage() {
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
-                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
+                      <div className="hidden lg:block w-48 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
                     </div>
                     <AnimatePresence initial={false}>
-                      {normalItems.map(item => {
+                      {normalItems.map((item, idx) => {
                         const h = getItemHandlers(item);
                         return (
                           <motion.div key={item.key} layout
@@ -1394,7 +1425,13 @@ export default function StatusSemanalPage() {
                             transition={{ duration: 0.15, ease: 'easeOut' }}>
                             <CompactRow item={item} users={appUsers}
                               isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
+                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
+                              expanded={expandedRowKey === item.key}
+                              onToggle={() => setExpandedRowKey(expandedRowKey === item.key ? null : item.key)}
+                              hasPrev={idx > 0}
+                              hasNext={idx < normalItems.length - 1}
+                              onPrev={() => { if (idx > 0) setExpandedRowKey(normalItems[idx - 1].key); }}
+                              onNext={() => { if (idx < normalItems.length - 1) setExpandedRowKey(normalItems[idx + 1].key); }} />
                           </motion.div>
                         );
                       })}
