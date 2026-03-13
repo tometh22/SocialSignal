@@ -212,12 +212,18 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     }
 
     // Compute EBIT and derived metrics from fallback data
-    ebitOperativo = ventasMes - costosDirectos - costosIndirectos;
-    markup = costosDirectos > 0 ? Math.round((ventasMes / costosDirectos) * 100) / 100 : 0;
-    beneficioNeto = ebitOperativo - impuestosUsa; // approximate
-
+    // ONLY compute EBIT if we actually have ventas — otherwise costos alone produce misleading negative EBIT
     if (ventasMes > 0) {
+      ebitOperativo = ventasMes - costosDirectos - costosIndirectos;
+      markup = costosDirectos > 0 ? Math.round((ventasMes / costosDirectos) * 100) / 100 : 0;
+      beneficioNeto = ebitOperativo - impuestosUsa; // approximate
       console.log(`[UnifiedDashboard] Fallback P&L: Ventas=$${ventasMes}, Directos=$${costosDirectos}, Indirectos=$${costosIndirectos}, EBIT=$${ebitOperativo}`);
+    } else {
+      // No ventas found in any fallback source — don't fabricate negative EBIT from costs alone
+      console.log(`[UnifiedDashboard] Fallback: No ventas found for ${effectivePeriod}. Costs exist (D=$${costosDirectos}, I=$${costosIndirectos}) but won't compute EBIT without ventas.`);
+      // Reset costs too — showing costs without ventas is misleading in the P&L cascade
+      costosDirectos = 0;
+      costosIndirectos = 0;
     }
   }
 
