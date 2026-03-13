@@ -1912,8 +1912,8 @@ class GoogleSheetsWorkingService {
   async getResumenEjecutivo(): Promise<ResumenEjecutivoRow[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
-      const range = "'Resumen Ejecutivo'!A:Z";
-      
+      const range = "'Resumen Ejecutivo'!A:AZ"; // Extended from A:Z to A:AZ (52 cols) to capture all KPIs
+
       console.log('📊 [Resumen Ejecutivo] Obteniendo datos del Excel MAESTRO...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
@@ -1957,7 +1957,8 @@ class GoogleSheetsWorkingService {
     const headerRow = rows[0];
     
     console.log(`📊 [Resumen Ejecutivo] Procesando ${rows.length - 1} filas de datos...`);
-    console.log(`📊 [Resumen Ejecutivo] Headers: ${headerRow.slice(0, 10).join(', ')}...`);
+    console.log(`📊 [Resumen Ejecutivo] Total columns: ${headerRow.length}`);
+    console.log(`📊 [Resumen Ejecutivo] ALL Headers: ${headerRow.map((h: any, i: number) => `[${i}]${h}`).join(', ')}`);
     
     // Mapeo de nombres de columna → propiedad de ResumenEjecutivoRow
     const columnMapping: Record<string, keyof ResumenEjecutivoRow> = {
@@ -1971,11 +1972,15 @@ class GoogleSheetsWorkingService {
       'activo mediano plazo clientes a cobrar': 'cuentasCobrarUsd',
       // P&L
       'ventas del mes': 'facturacionTotal',
+      'ventas': 'facturacionTotal',
+      'facturación': 'facturacionTotal',
+      'facturacion': 'facturacionTotal',
       'costos directos': 'costosDirectos',
       'costos indirectos': 'costosIndirectos',
       'ebit utilidad operativa': 'ebitOperativo',
       'ebit operativo': 'ebitOperativo',
       'ebit': 'ebitOperativo',
+      'utilidad operativa': 'ebitOperativo',
       'beneficio neto': 'beneficioNeto',
       'markup': 'markupPromedio',
       // Cashflow
@@ -2042,16 +2047,25 @@ class GoogleSheetsWorkingService {
       };
       
       // Extraer valores de cada columna mapeada
+      // NOTE: Google Sheets API truncates trailing empty cells, so row.length may be < headerRow.length
       for (const [field, colIdx] of Object.entries(columnIndices)) {
+        if (colIdx >= row.length) {
+          // Row is shorter than expected — this column is beyond the row's data
+          if (yearValue >= 2025) {
+            console.log(`    ⚠️ ${periodKey}: Column "${field}" at index ${colIdx} is beyond row length ${row.length} — data truncated by API`);
+          }
+          continue;
+        }
         const value = row[colIdx];
         if (value === undefined || value === null || value === '') continue;
-        
+
         const numValue = this.parseMoneyValue(value.toString());
         (record as any)[field] = numValue;
       }
       
       result.push(record as ResumenEjecutivoRow);
-      console.log(`  ✅ ${periodKey} (${mesLabel}) - Ventas: ${record.facturacionTotal || 0}, EBIT: ${record.ebitOperativo || 0}`);
+      const hasP = record.facturacionTotal || record.ebitOperativo;
+      console.log(`  ${hasP ? '✅' : '⚠️'} ${periodKey} (${mesLabel}) - Ventas: ${record.facturacionTotal ?? 'MISSING'}, EBIT: ${record.ebitOperativo ?? 'MISSING'}, Costos D: ${record.costosDirectos ?? 'MISSING'}, Markup: ${record.markupPromedio ?? 'MISSING'}, row.length=${row.length}`);
     }
     
     console.log(`✅ [Resumen Ejecutivo] Procesados ${result.length} registros mensuales`);

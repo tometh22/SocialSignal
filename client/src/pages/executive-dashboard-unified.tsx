@@ -463,18 +463,38 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ─── Warning if period has no P&L data + import form ─── */}
+        {/* ─── Warning if period has no P&L data + sync/import actions ─── */}
         {d.ventasMes === 0 && d.ebitOperativo === 0 && !showImport && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700 flex items-center justify-between">
             <span>
               Este período no tiene datos de P&L. La sync de Google Sheets puede estar fallando.
             </span>
-            <button
-              onClick={() => setShowImport(true)}
-              className="ml-3 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap flex items-center gap-1"
-            >
-              <Upload className="w-3 h-3" /> Importar datos
-            </button>
+            <div className="flex items-center gap-2 ml-3">
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" });
+                    const data = await res.json();
+                    if (data.success) {
+                      refetch();
+                    } else {
+                      alert(`Sync falló: ${data.result?.errors?.join(', ') || data.error || 'Error desconocido'}`);
+                    }
+                  } catch (e: any) {
+                    alert(`Error: ${e.message}`);
+                  }
+                }}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" /> Forzar Sync
+              </button>
+              <button
+                onClick={() => setShowImport(true)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap flex items-center gap-1"
+              >
+                <Upload className="w-3 h-3" /> Importar manual
+              </button>
+            </div>
           </div>
         )}
         {showImport && (
