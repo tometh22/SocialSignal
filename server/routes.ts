@@ -5112,6 +5112,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Dry-run Resumen Ejecutivo parsing — shows what the sync WOULD import
+  app.get("/api/debug/resumen-ejecutivo-parsed", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking.js');
+      console.log('🔍 [DEBUG] Parsing Resumen Ejecutivo (dry run)...');
+      const rows = await googleSheetsWorkingService.getResumenEjecutivo();
+
+      // Show parsed data for each period
+      const parsed = rows.map(r => ({
+        periodKey: r.periodKey,
+        year: r.year,
+        monthNumber: r.monthNumber,
+        monthLabel: r.monthLabel,
+        ventas: r.facturacionTotal ?? null,
+        costosDirectos: r.costosDirectos ?? null,
+        costosIndirectos: r.costosIndirectos ?? null,
+        ebit: r.ebitOperativo ?? null,
+        beneficioNeto: r.beneficioNeto ?? null,
+        markup: r.markupPromedio ?? null,
+        cashflowNeto: r.cashflowNeto ?? null,
+        cajaTotal: r.cajaTotal ?? null,
+        balanceNeto: r.balanceNeto ?? null,
+      }));
+
+      // Also check which periods already exist in MFS
+      const { rows: mfsPeriods } = await pool.query(`
+        SELECT period_key,
+          facturacion_total IS NOT NULL AND facturacion_total::numeric != 0 as has_pnl,
+          caja_total IS NOT NULL AND caja_total::numeric != 0 as has_balance
+        FROM monthly_financial_summary
+        ORDER BY period_key DESC
+      `);
+
+      res.json({
+        success: true,
+        parsedCount: parsed.length,
+        parsed,
+        mfsStatus: mfsPeriods,
+      });
+    } catch (error: any) {
+      console.error('❌ [DEBUG] Resumen Ejecutivo parse error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // 📊 MANUAL IMPORT: Upsert P&L data into monthly_financial_summary (bypass Google Sheets)
+  // Body: { periods: [{ periodKey: "2026-01", facturacionTotal: 41593.61, ebitOperativo: -2922.68, ... }] }
+  app.post("/api/import/resumen-ejecutivo", requireAuth, async (req, res) => {
+    try {
+      const { periods } = req.body;
+      if (!periods || !Array.isArray(periods) || periods.length === 0) {
+        return res.status(400).json({ success: false, error: "Body must have periods array" });
+      }
+
+      const { monthlyFinancialSummary } = await import('@shared/schema.js');
+      const { sql } = await import('drizzle-orm');
+
+      let inserted = 0, updated = 0;
+      const errors: string[] = [];
+
+      for (const p of periods) {
+        if (!p.periodKey || !/^\d{4}-\d{2}$/.test(p.periodKey)) {
+          errors.push(`Invalid periodKey: ${p.periodKey}`);
+          continue;
+        }
+
+        const [yearStr, monthStr] = p.periodKey.split('-');
+        const year = parseInt(yearStr);
+        const monthNumber = parseInt(monthStr);
+
+        // Build update values - only set fields that are provided
+        const updateValues: Record<string, any> = { updatedAt: new Date() };
+        const fieldMap: Record<string, string> = {
+          facturacionTotal: 'facturacionTotal',
+          costosDirectos: 'costosDirectos',
+          costosIndirectos: 'costosIndirectos',
+          ebitOperativo: 'ebitOperativo',
+          beneficioNeto: 'beneficioNeto',
+          markupPromedio: 'markupPromedio',
+          cashflowNeto: 'cashflowNeto',
+          cashflowIngresos: 'cashflowIngresos',
+          cashflowEgresos: 'cashflowEgresos',
+          cajaTotal: 'cajaTotal',
+          totalActivo: 'totalActivo',
+          totalPasivo: 'totalPasivo',
+          balanceNeto: 'balanceNeto',
+          inversiones: 'inversiones',
+          cuentasCobrarUsd: 'cuentasCobrarUsd',
+          cuentasPagarUsd: 'cuentasPagarUsd',
+          impuestosUsa: 'impuestosUsa',
+          ivaCompras: 'ivaCompras',
+          pasivoFacturacionAdelantada: 'pasivoFacturacionAdelantada',
+        };
+
+        for (const [jsonKey, dbField] of Object.entries(fieldMap)) {
+          if (p[jsonKey] !== undefined && p[jsonKey] !== null) {
+            updateValues[dbField] = String(p[jsonKey]);
+          }
+        }
+
+        try {
+          const existing = await db.select({ id: monthlyFinancialSummary.id })
+            .from(monthlyFinancialSummary)
+            .where(sql`${monthlyFinancialSummary.periodKey} = ${p.periodKey}`)
+            .limit(1);
+
+          if (existing.length > 0) {
+            await db.update(monthlyFinancialSummary)
+              .set(updateValues)
+              .where(sql`${monthlyFinancialSummary.periodKey} = ${p.periodKey}`);
+            updated++;
+          } else {
+            await db.insert(monthlyFinancialSummary).values({
+              periodKey: p.periodKey,
+              year,
+              monthNumber,
+              ...updateValues,
+            });
+            inserted++;
+          }
+        } catch (err: any) {
+          errors.push(`Error for ${p.periodKey}: ${err.message}`);
+        }
+      }
+
+      console.log(`📊 [Manual Import] Resumen Ejecutivo: ${inserted} inserted, ${updated} updated, ${errors.length} errors`);
+      res.json({ success: errors.length === 0, inserted, updated, errors });
+    } catch (error: any) {
+      console.error('❌ [Manual Import] Error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // 🔍 DEBUG: Ver estructura de hoja Resumen Ejecutivo
   app.get("/api/debug/resumen-ejecutivo-headers", requireAuth, async (req, res) => {
     try {
