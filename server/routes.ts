@@ -5178,6 +5178,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Ver datos en tablas fallback para un período
+  app.get("/api/debug/fallback-data/:period", requireAuth, async (req, res) => {
+    try {
+      const period = req.params.period; // e.g. "2026-01"
+      const { pool } = await import('./db.js');
+
+      // Check income_sot
+      const { rows: incomeSotRows } = await pool.query(`
+        SELECT month_key, confirmed, COUNT(*) as cnt, COALESCE(SUM(revenue_usd), 0) as total_usd
+        FROM income_sot WHERE month_key = $1 GROUP BY month_key, confirmed
+      `, [period]);
+
+      // Check google_sheets_sales
+      const { rows: gsSalesRows } = await pool.query(`
+        SELECT month_key, status, COUNT(*) as cnt, COALESCE(SUM(CAST(amount_usd AS numeric)), 0) as total_usd
+        FROM google_sheets_sales WHERE month_key = $1 GROUP BY month_key, status
+      `, [period]);
+
+      // Check fact_cost_month
+      const { rows: factCostRows } = await pool.query(`
+        SELECT * FROM fact_cost_month WHERE period_key = $1
+      `, [period]);
+
+      // Check direct_costs
+      const { rows: directCostRows } = await pool.query(`
+        SELECT month_key, tipo_gasto, COUNT(*) as cnt,
+          COALESCE(SUM(CAST(monto_total_usd AS numeric)), 0) as total_usd
+        FROM direct_costs WHERE month_key = $1 GROUP BY month_key, tipo_gasto
+      `, [period]);
+
+      // Check MFS for this period
+      const { rows: mfsRows } = await pool.query(`
+        SELECT * FROM monthly_financial_summary WHERE period_key = $1
+      `, [period]);
+
+      res.json({
+        period,
+        mfs: mfsRows[0] || null,
+        incomeSot: incomeSotRows,
+        googleSheetsSales: gsSalesRows,
+        factCostMonth: factCostRows,
+        directCosts: directCostRows,
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // Dashboard Ejecutivo - Métricas Mejoradas con filtros temporales flexibles
   app.get("/api/dashboard/metrics", requireAuth, async (req, res) => {
     try {
