@@ -5112,6 +5112,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: Dry-run Resumen Ejecutivo parsing — shows what the sync WOULD import
+  app.get("/api/debug/resumen-ejecutivo-parsed", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking.js');
+      console.log('🔍 [DEBUG] Parsing Resumen Ejecutivo (dry run)...');
+      const rows = await googleSheetsWorkingService.getResumenEjecutivo();
+
+      // Show parsed data for each period
+      const parsed = rows.map(r => ({
+        periodKey: r.periodKey,
+        year: r.year,
+        monthNumber: r.monthNumber,
+        monthLabel: r.monthLabel,
+        ventas: r.facturacionTotal ?? null,
+        costosDirectos: r.costosDirectos ?? null,
+        costosIndirectos: r.costosIndirectos ?? null,
+        ebit: r.ebitOperativo ?? null,
+        beneficioNeto: r.beneficioNeto ?? null,
+        markup: r.markupPromedio ?? null,
+        cashflowNeto: r.cashflowNeto ?? null,
+        cajaTotal: r.cajaTotal ?? null,
+        balanceNeto: r.balanceNeto ?? null,
+      }));
+
+      // Also check which periods already exist in MFS
+      const { rows: mfsPeriods } = await pool.query(`
+        SELECT period_key,
+          facturacion_total IS NOT NULL AND facturacion_total::numeric != 0 as has_pnl,
+          caja_total IS NOT NULL AND caja_total::numeric != 0 as has_balance
+        FROM monthly_financial_summary
+        ORDER BY period_key DESC
+      `);
+
+      res.json({
+        success: true,
+        parsedCount: parsed.length,
+        parsed,
+        mfsStatus: mfsPeriods,
+      });
+    } catch (error: any) {
+      console.error('❌ [DEBUG] Resumen Ejecutivo parse error:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // 📊 MANUAL IMPORT: Upsert P&L data into monthly_financial_summary (bypass Google Sheets)
   // Body: { periods: [{ periodKey: "2026-01", facturacionTotal: 41593.61, ebitOperativo: -2922.68, ... }] }
   app.post("/api/import/resumen-ejecutivo", requireAuth, async (req, res) => {
