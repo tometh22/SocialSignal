@@ -456,21 +456,15 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
-            {/* Situation */}
-            <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline className="text-xs" />
-            </div>
-
-            {/* Action + Next step */}
+            {/* Situación + Siguiente paso */}
             <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">¿Qué pasa?</p>
-                <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+              <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
+                <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
               </div>
-              <div>
+              <div className={cn("rounded-md px-2.5 py-2", "bg-slate-50")}>
                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Siguiente paso</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} className="text-xs" />
+                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
               </div>
             </div>
 
@@ -526,8 +520,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
         <div className="hidden lg:block w-[88px] shrink-0">
           <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
         </div>
-        <div className="hidden lg:block w-40 shrink-0">
-          <InlineText value={item.mainRisk} placeholder="Sin novedades" onSave={v => onUpdate({ mainRisk: v })} className="text-xs truncate block" />
+        <div className="hidden lg:block w-48 shrink-0">
+          <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} className="text-xs truncate block" />
         </div>
         <div className="w-24 shrink-0">
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
@@ -569,21 +563,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Situación</p>
-              <InlineText value={item.mainRisk} placeholder="¿Cómo viene?" onSave={v => onUpdate({ mainRisk: v })} multiline />
+              <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline />
             </div>
             <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">¿Qué pasa?</p>
-              <InlineText value={item.currentAction} placeholder="Contá acá..." onSave={v => onUpdate({ currentAction: v })} multiline />
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
+              <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline />
             </div>
-            <div className="space-y-2">
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} />
-              </div>
-              <div>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
-                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-              </div>
+            <div>
+              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
+              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
             </div>
           </div>
           {onOpenNotes && (
@@ -1378,7 +1366,7 @@ export default function StatusSemanalPage() {
                       <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
                       <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
-                      <div className="hidden lg:block w-40 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
+                      <div className="hidden lg:block w-48 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
                       <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
                       <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
                       <div className="w-16" />
