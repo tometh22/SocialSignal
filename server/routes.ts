@@ -11970,7 +11970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (period) {
           // Get data from new SoT system for specific project
-          const projectIncomeData = await income.getProjectIncome(projectId, period);
+          const projectIncomeData = await income.getIncomeByProject(projectId, period);
           
           if (projectIncomeData) {
             // Transform to legacy format
@@ -12859,7 +12859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         totalAugustSales: augustSales.length,
-        warnerAugustSales: warnerAugustSales.length,
+        warnerAugustSalesCount: warnerAugustSales.length,
         augustSales: augustSales.slice(0, 10),
         warnerAugustSales: warnerAugustSales
       });
