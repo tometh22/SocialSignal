@@ -822,22 +822,21 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount, cooldown = 
   itemCount: number;
   cooldown?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   if (!summary && !isLoading) {
     return (
-      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-indigo-200/50 bg-indigo-50/40">
-        <div className="flex items-center gap-2.5">
-          <Sparkles className="h-4 w-4 text-indigo-400" />
-          <span className="text-xs text-slate-500">Generá un resumen IA de los {itemCount} proyectos</span>
+      <div className="flex items-center justify-between px-3 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50/30">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+          <span className="text-[11px] text-slate-400">Resumen IA disponible</span>
         </div>
         <Button onClick={onGenerate} size="sm" variant="ghost"
-          className="h-7 text-xs text-indigo-600 hover:bg-indigo-100 gap-1.5 font-semibold">
+          className="h-6 text-[11px] text-indigo-600 hover:bg-indigo-100 gap-1 font-semibold px-2">
           <Sparkles className="h-3 w-3" />
-          Generar resumen
+          Generar
         </Button>
-      </motion.div>
+      </div>
     );
   }
 
@@ -1354,113 +1353,113 @@ export default function StatusSemanalPage() {
       <div className={cn("flex flex-col flex-1 min-w-0 transition-all duration-200", notesOpen !== null ? "mr-[320px]" : "")}>
 
         {/* ── Header ────────────────────────────────────────────── */}
+        {/* ── Header (compact with integrated search) ──────────── */}
         <div className="relative overflow-hidden border-b border-border shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent" />
-          <div className="relative px-6 py-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
-                  <ClipboardList className="h-5 w-5 text-white" />
+          <div className="relative px-6 py-2.5">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left: title */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <div className="h-8 w-8 rounded-lg bg-white/15 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/20">
+                  <ClipboardList className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold leading-tight text-white tracking-tight">Status Semanal</h1>
-                  <p className="text-[10px] text-indigo-200 font-medium">{weekLabel()}</p>
+                  <h1 className="text-base font-bold leading-tight text-white tracking-tight">Status Semanal</h1>
+                  <p className="text-[9px] text-indigo-200 font-medium">{weekLabel()}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Center: search */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-indigo-300" />
+                <input
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Buscar proyecto, owner..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs border border-white/20 rounded-lg bg-white/10 backdrop-blur-sm text-white placeholder:text-indigo-300 focus:outline-none focus:ring-1 focus:ring-white/30 focus:bg-white/15"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-300 hover:text-white">
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Right: badges & actions */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 {criticalCount > 0 ? (
-                  <div className="flex items-center gap-1.5 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg border border-red-400/30">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {criticalCount} requiere{criticalCount !== 1 ? 'n' : ''} atención
+                  <div className="flex items-center gap-1 bg-red-500/90 backdrop-blur-sm text-white text-[11px] font-bold px-2.5 py-1 rounded-full border border-red-400/30">
+                    <AlertTriangle className="h-3 w-3" />
+                    {criticalCount}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 bg-emerald-500/20 backdrop-blur-sm border border-emerald-300/30 text-emerald-100 text-xs font-semibold px-3 py-1.5 rounded-full">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Sin alertas esta semana
+                  <div className="flex items-center gap-1 bg-emerald-500/20 backdrop-blur-sm border border-emerald-300/30 text-emerald-100 text-[11px] font-semibold px-2.5 py-1 rounded-full">
+                    <CheckCircle2 className="h-3 w-3" />
+                    OK
                   </div>
                 )}
                 {decisionCount > 0 && (
-                  <div className="flex items-center gap-1.5 bg-amber-400/20 backdrop-blur-sm border border-amber-300/30 text-amber-100 text-xs font-bold px-3 py-1.5 rounded-full">
-                    <Zap className="h-3.5 w-3.5" />
-                    {decisionCount} decisión{decisionCount !== 1 ? 'es' : ''}
+                  <div className="flex items-center gap-1 bg-amber-400/20 backdrop-blur-sm border border-amber-300/30 text-amber-100 text-[11px] font-bold px-2.5 py-1 rounded-full">
+                    <Zap className="h-3 w-3" />
+                    {decisionCount}
                   </div>
                 )}
+                <button onClick={() => setShowFilters(v => !v)}
+                  className={cn("flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors backdrop-blur-sm",
+                    showFilters || filterHealth || filterOwner !== null
+                      ? "bg-white/25 text-white border-white/30"
+                      : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
+                  <Filter className="h-3 w-3" />
+                  {(filterHealth || filterOwner !== null) && (
+                    <span className="bg-white text-indigo-700 text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+                      {(filterHealth ? 1 : 0) + (filterOwner !== null ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
                 {hiddenCount > 0 && (
                   <button onClick={() => setShowHidden(v => !v)}
-                    className={cn("flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-colors backdrop-blur-sm",
+                    className={cn("flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors backdrop-blur-sm",
                       showHidden ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                    {showHidden ? <><Eye className="h-3 w-3" /> Ocultar quitados</> : <><EyeOff className="h-3 w-3" /> {hiddenCount} quitado{hiddenCount !== 1 ? 's' : ''}</>}
+                    {showHidden ? <Eye className="h-3 w-3" /> : <><EyeOff className="h-3 w-3" /> {hiddenCount}</>}
                   </button>
                 )}
                 <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                <div className="text-xs text-indigo-200 bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full font-medium border border-white/10">
-                  {visible.length} ítem{visible.length !== 1 ? 's' : ''}
+                <div className="text-[11px] text-indigo-200 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium border border-white/10">
+                  {visible.length}
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* ── Search & Filters ──────────────────────────────────── */}
-        <div className="px-6 py-2.5 border-b border-slate-100 bg-slate-50/50 shrink-0">
-          <div className="max-w-6xl mx-auto flex items-center gap-2">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar proyecto, owner, situación..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-300"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-            <button onClick={() => setShowFilters(v => !v)}
-              className={cn("flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors",
-                showFilters || filterHealth || filterOwner !== null
-                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
-              <Filter className="h-3.5 w-3.5" />
-              Filtros
-              {(filterHealth || filterOwner !== null) && (
-                <span className="bg-indigo-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {(filterHealth ? 1 : 0) + (filterOwner !== null ? 1 : 0)}
-                </span>
-              )}
-            </button>
-            {(filterHealth || filterOwner !== null || searchQuery) && (
-              <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }}
-                className="text-[11px] text-slate-400 hover:text-red-500 font-medium">
-                Limpiar
-              </button>
+            {/* Filters row (expandable, inside header) */}
+            {showFilters && (
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-white/10">
+                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wide">Salud:</span>
+                <div className="flex items-center gap-1">
+                  {[null, 'verde', 'amarillo', 'rojo'].map(h => (
+                    <button key={h ?? 'all'} onClick={() => setFilterHealth(h)}
+                      className={cn("text-[11px] px-2 py-0.5 rounded-md border font-medium transition-colors",
+                        filterHealth === h ? "bg-white/25 border-white/30 text-white" : "bg-white/5 border-white/10 text-indigo-200 hover:bg-white/15")}>
+                      {h === null ? 'Todos' : <span className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full", HEALTH[h].dot)} />{HEALTH[h].label}</span>}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-white/20">|</span>
+                <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-wide">Owner:</span>
+                <select value={filterOwner?.toString() ?? ''} onChange={e => setFilterOwner(e.target.value ? parseInt(e.target.value) : null)}
+                  className="text-[11px] px-2 py-0.5 rounded-md border border-white/20 bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-white/30">
+                  <option value="" className="text-slate-800">Todos</option>
+                  {appUsers.map(u => <option key={u.id} value={u.id} className="text-slate-800">{u.name}</option>)}
+                </select>
+                {(filterHealth || filterOwner !== null || searchQuery) && (
+                  <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }}
+                    className="text-[11px] text-indigo-300 hover:text-white font-medium ml-1">
+                    Limpiar
+                  </button>
+                )}
+              </div>
             )}
           </div>
-          {showFilters && (
-            <div className="max-w-5xl mx-auto flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Salud:</span>
-              <div className="flex items-center gap-1">
-                {[null, 'verde', 'amarillo', 'rojo'].map(h => (
-                  <button key={h ?? 'all'} onClick={() => setFilterHealth(h)}
-                    className={cn("text-[11px] px-2 py-1 rounded-md border font-medium transition-colors",
-                      filterHealth === h ? "bg-indigo-100 border-indigo-300 text-indigo-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
-                    {h === null ? 'Todos' : <span className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full", HEALTH[h].dot)} />{HEALTH[h].label}</span>}
-                  </button>
-                ))}
-              </div>
-              <span className="text-slate-200">|</span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Owner:</span>
-              <select value={filterOwner?.toString() ?? ''} onChange={e => setFilterOwner(e.target.value ? parseInt(e.target.value) : null)}
-                className="text-[11px] px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400">
-                <option value="">Todos</option>
-                {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            </div>
-          )}
         </div>
 
         {/* ── Confirm Delete Dialog ──────────────────────────────── */}
