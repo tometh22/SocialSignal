@@ -1,4 +1,5 @@
-import { Pool } from '@neondatabase/serverless';
+import pg from 'pg';
+const { Pool } = pg;
 import { 
   fetchDevengado, 
   fetchCosts, 

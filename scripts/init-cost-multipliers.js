@@ -1,10 +1,8 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
+import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import { costMultipliers } from '../shared/schema.ts';
 
-neonConfig.webSocketConstructor = ws;
-
+const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const db = drizzle({ client: pool });
 

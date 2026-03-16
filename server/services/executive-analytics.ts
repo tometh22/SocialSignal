@@ -1,6 +1,5 @@
-import { Pool } from '@neondatabase/serverless';
+import { pool } from '../db';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 export interface TrendPoint {
   month: string;

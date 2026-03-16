@@ -203,17 +203,36 @@ export class AutoSyncService {
       }
 
       // 4b. Sincronizar CashFlow, Resumen Ejecutivo y Activo hacia monthly_financial_summary
+      // Use allSettled so one failure doesn't block others
       try {
         console.log(`💰 [${syncId}] Sincronizando CashFlow, Resumen Ejecutivo y Activo...`);
         const { syncCashFlowMovements, syncResumenEjecutivoToMonthlyFinancialSummary, syncActivoToMonthlyFinancialSummary } = await import('../etl/sot-etl');
-        const [cashFlowResult, resumenResult, activoResult] = await Promise.all([
+        const results = await Promise.allSettled([
           syncCashFlowMovements(),
           syncResumenEjecutivoToMonthlyFinancialSummary(),
           syncActivoToMonthlyFinancialSummary()
         ]);
-        console.log(`✅ [${syncId}] CashFlow: ${cashFlowResult.recordsInserted} movimientos en ${cashFlowResult.periodsProcessed} períodos`);
-        console.log(`✅ [${syncId}] Resumen Ejecutivo: ${resumenResult.recordsInserted} insertados, ${resumenResult.recordsUpdated} actualizados`);
-        console.log(`✅ [${syncId}] Activo: ${activoResult.periodsUpdated} períodos actualizados (caja_total, total_activo)`);
+
+        // Log each result independently
+        const [cashFlowSettled, resumenSettled, activoSettled] = results;
+        if (cashFlowSettled.status === 'fulfilled') {
+          console.log(`✅ [${syncId}] CashFlow: ${cashFlowSettled.value.recordsInserted} movimientos en ${cashFlowSettled.value.periodsProcessed} períodos`);
+        } else {
+          console.error(`❌ [${syncId}] CashFlow FAILED:`, cashFlowSettled.reason?.message || cashFlowSettled.reason);
+        }
+        if (resumenSettled.status === 'fulfilled') {
+          console.log(`✅ [${syncId}] Resumen Ejecutivo: ${resumenSettled.value.recordsInserted} insertados, ${resumenSettled.value.recordsUpdated} actualizados`);
+          if (resumenSettled.value.errors?.length > 0) {
+            console.warn(`⚠️ [${syncId}] Resumen Ejecutivo errors:`, resumenSettled.value.errors);
+          }
+        } else {
+          console.error(`❌ [${syncId}] Resumen Ejecutivo FAILED:`, resumenSettled.reason?.message || resumenSettled.reason);
+        }
+        if (activoSettled.status === 'fulfilled') {
+          console.log(`✅ [${syncId}] Activo: ${activoSettled.value.periodsUpdated} períodos actualizados (caja_total, total_activo)`);
+        } else {
+          console.error(`❌ [${syncId}] Activo FAILED:`, activoSettled.reason?.message || activoSettled.reason);
+        }
       } catch (finErr: any) {
         console.error(`⚠️ [${syncId}] Error en CashFlow/Resumen/Activo ETL (no crítico):`, finErr?.message || finErr);
       }
