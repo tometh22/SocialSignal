@@ -18,7 +18,7 @@ import {
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
-  Calendar, Clock
+  Calendar, Clock, Search, Filter
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -491,6 +491,17 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
+            {/* Riesgo principal */}
+            {(item.mainRisk || item.healthStatus === 'rojo' || item.healthStatus === 'amarillo') && (
+              <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 bg-orange-50 border border-orange-100">
+                <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-orange-500 uppercase font-bold tracking-wide mb-0.5">Riesgo principal</p>
+                  <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal?" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+                </div>
+              </div>
+            )}
+
             {/* Situación + Siguiente paso */}
             <div className="grid grid-cols-2 gap-2">
               <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
@@ -611,6 +622,19 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="overflow-hidden">
             <div className="px-4 pb-4 pt-2 ml-5 border-l-2 border-indigo-200/60">
+              {/* Riesgo principal */}
+              {(item.mainRisk || item.healthStatus !== 'verde') && (
+                <div className="flex items-start gap-2 rounded-lg bg-white border border-orange-100 p-3 shadow-sm mb-1">
+                  <Shield className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-orange-500 uppercase font-bold tracking-wide mb-1 flex items-center gap-1">
+                      Riesgo principal
+                    </p>
+                    <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal de este proyecto?" onSave={v => onUpdate({ mainRisk: v })} className="text-sm" />
+                  </div>
+                </div>
+              )}
+
               {/* Editable fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
@@ -777,11 +801,12 @@ function HighlightChip({ type, text }: { type: 'risk' | 'win' | 'action' | 'deci
 
 // ─── AI Summary Panel ────────────────────────────────────────────────────────
 
-function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
+function AISummaryPanel({ summary, isLoading, onGenerate, itemCount, cooldown = false }: {
   summary: AISummary | null;
   isLoading: boolean;
   onGenerate: () => void;
   itemCount: number;
+  cooldown?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -848,10 +873,10 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
 
         <div className="flex items-center gap-3">
           <HealthScoreRing score={summary.weeklyScore} size={56} />
-          <Button onClick={onGenerate} variant="ghost" size="sm"
-            className="h-8 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 gap-1.5">
-            <RefreshCw className="h-3 w-3" />
-            Regenerar
+          <Button onClick={onGenerate} variant="ghost" size="sm" disabled={cooldown}
+            className={cn("h-8 text-xs gap-1.5", cooldown ? "text-slate-400 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100")}>
+            <RefreshCw className={cn("h-3 w-3", cooldown && "animate-spin")} />
+            {cooldown ? 'Esperá...' : 'Regenerar'}
           </Button>
         </div>
       </div>
@@ -1032,16 +1057,40 @@ export default function StatusSemanalPage() {
   const [showHidden, setShowHidden] = useState(false);
   const [alertCollapsed, setAlertCollapsed] = useState<boolean | null>(null);
   const [decisionCollapsed, setDecisionCollapsed] = useState<boolean | null>(null);
-  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(() => {
+    try { const s = localStorage.getItem('status-semanal-ai-summary'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterHealth, setFilterHealth] = useState<string | null>(null);
+  const [filterOwner, setFilterOwner] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Item | null>(null);
+  const [aiCooldown, setAiCooldown] = useState(false);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
+
+  // Close notes panel with Esc key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmDelete) { setConfirmDelete(null); return; }
+        if (notesOpen) { setNotesOpen(null); return; }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [notesOpen, confirmDelete]);
 
   const aiMutation = useMutation({
     mutationFn: () => mutationFetch('/api/status-semanal/ai-summary', 'POST'),
     onSuccess: (data: AISummary) => {
       setAiSummary(data);
+      try { localStorage.setItem('status-semanal-ai-summary', JSON.stringify(data)); } catch {}
       toast({ title: 'Resumen generado', description: `Score del portafolio: ${data.weeklyScore}/100` });
+      // Cooldown 30s to prevent excessive API calls
+      setAiCooldown(true);
+      setTimeout(() => setAiCooldown(false), 30000);
     },
     onError: (err: Error) => {
       toast({ title: 'Error al generar resumen IA', description: err.message, variant: 'destructive' });
@@ -1226,8 +1275,22 @@ export default function StatusSemanalPage() {
     ...customRows.map(toCustomItem),
   ];
 
-  const visible = allItems.filter(i => showHidden ? true : !i.hiddenFromWeekly);
   const hiddenCount = allItems.filter(i => i.hiddenFromWeekly).length;
+  const visible = allItems.filter(i => {
+    if (!showHidden && i.hiddenFromWeekly) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matches = (i.title?.toLowerCase().includes(q)) ||
+        (i.subtitle?.toLowerCase().includes(q)) ||
+        (i.ownerName?.toLowerCase().includes(q)) ||
+        (i.currentAction?.toLowerCase().includes(q)) ||
+        (i.mainRisk?.toLowerCase().includes(q));
+      if (!matches) return false;
+    }
+    if (filterHealth && i.healthStatus !== filterHealth) return false;
+    if (filterOwner !== null && i.ownerId !== filterOwner) return false;
+    return true;
+  });
 
   const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
   const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo' && !i.isOverdue);
@@ -1251,11 +1314,7 @@ export default function StatusSemanalPage() {
       else if (item.projectId) updateProject(item.projectId, data);
     },
     onRemove: () => {
-      if (item.isCustom && item.customId) {
-        deleteCustom.mutate(item.customId);
-      } else if (item.projectId) {
-        removeProject.mutate(item.projectId);
-      }
+      setConfirmDelete(item);
     },
     onOpenNotes: (() => {
       if (item.projectId) {
@@ -1330,6 +1389,100 @@ export default function StatusSemanalPage() {
           </div>
         </div>
 
+        {/* ── Search & Filters ──────────────────────────────────── */}
+        <div className="px-6 py-2.5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          <div className="max-w-5xl mx-auto flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar proyecto, owner, situación..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-300"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <button onClick={() => setShowFilters(v => !v)}
+              className={cn("flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors",
+                showFilters || filterHealth || filterOwner !== null
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
+              <Filter className="h-3.5 w-3.5" />
+              Filtros
+              {(filterHealth || filterOwner !== null) && (
+                <span className="bg-indigo-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {(filterHealth ? 1 : 0) + (filterOwner !== null ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            {(filterHealth || filterOwner !== null || searchQuery) && (
+              <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }}
+                className="text-[11px] text-slate-400 hover:text-red-500 font-medium">
+                Limpiar
+              </button>
+            )}
+          </div>
+          {showFilters && (
+            <div className="max-w-5xl mx-auto flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Salud:</span>
+              <div className="flex items-center gap-1">
+                {[null, 'verde', 'amarillo', 'rojo'].map(h => (
+                  <button key={h ?? 'all'} onClick={() => setFilterHealth(h)}
+                    className={cn("text-[11px] px-2 py-1 rounded-md border font-medium transition-colors",
+                      filterHealth === h ? "bg-indigo-100 border-indigo-300 text-indigo-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
+                    {h === null ? 'Todos' : <span className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full", HEALTH[h].dot)} />{HEALTH[h].label}</span>}
+                  </button>
+                ))}
+              </div>
+              <span className="text-slate-200">|</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Owner:</span>
+              <select value={filterOwner?.toString() ?? ''} onChange={e => setFilterOwner(e.target.value ? parseInt(e.target.value) : null)}
+                className="text-[11px] px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                <option value="">Todos</option>
+                {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* ── Confirm Delete Dialog ──────────────────────────────── */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </div>
+                <h3 className="font-semibold text-sm">
+                  {confirmDelete.isCustom ? 'Eliminar ítem' : 'Quitar del status'}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 mb-1">
+                {confirmDelete.isCustom
+                  ? <>Vas a eliminar permanentemente <strong>{confirmDelete.title}</strong>. Esta acción no se puede deshacer.</>
+                  : <>Vas a quitar <strong>{confirmDelete.title}</strong> del status semanal. Podés restaurarlo después.</>}
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1 h-8 text-xs">
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={() => {
+                  const item = confirmDelete;
+                  if (item.isCustom && item.customId) deleteCustom.mutate(item.customId);
+                  else if (item.projectId) removeProject.mutate(item.projectId);
+                  setConfirmDelete(null);
+                }} className="flex-1 h-8 text-xs bg-red-600 hover:bg-red-700 text-white">
+                  {confirmDelete.isCustom ? 'Eliminar' : 'Quitar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Content ───────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
@@ -1341,8 +1494,9 @@ export default function StatusSemanalPage() {
               <AISummaryPanel
                 summary={aiSummary}
                 isLoading={aiMutation.isPending}
-                onGenerate={() => aiMutation.mutate()}
+                onGenerate={() => { if (!aiCooldown) aiMutation.mutate(); }}
                 itemCount={visible.length}
+                cooldown={aiCooldown}
               />
 
               {/* ── Requieren atención ─────────────────────────────── */}
