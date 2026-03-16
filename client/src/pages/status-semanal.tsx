@@ -173,9 +173,23 @@ function isThisWeek(dateStr: string | null): boolean {
   return d >= mon;
 }
 
+function isStale(dateStr: string | null): boolean {
+  if (!dateStr) return true;
+  const diff = Date.now() - new Date(dateStr).getTime();
+  return diff > 5 * 86400 * 1000; // >5 days
+}
+
 function FreshnessIndicator({ updatedAt }: { updatedAt: string | null }) {
-  if (!updatedAt) return <span className="text-[9px] text-slate-300 italic">Sin actualizar</span>;
+  if (!updatedAt) return <span className="text-[9px] text-red-400 font-semibold bg-red-50 px-1.5 py-0.5 rounded">Sin actualizar</span>;
   const fresh = isThisWeek(updatedAt);
+  const stale = isStale(updatedAt);
+  if (stale) {
+    return (
+      <span className="text-[9px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
+        {relTime(updatedAt)}
+      </span>
+    );
+  }
   return (
     <span className={cn("text-[9px] font-medium", fresh ? "text-emerald-500" : "text-amber-500")}>
       {fresh ? "Actualizado" : relTime(updatedAt)}
@@ -271,10 +285,9 @@ function HealthDot({ value, onChange, compact = false }: { value: string | null;
 }
 
 function MiniLevelDot({ value, type }: { value: string | null; type: 'margin' | 'team' }) {
-  const levels = type === 'margin' ? MARGIN_LEVEL : TEAM_LEVEL;
   const resolver = type === 'margin' ? mlm : tlm;
   const meta = resolver(value);
-  const label = type === 'margin' ? 'Margen' : 'Equipo';
+  const label = type === 'margin' ? 'Impacto $' : 'Esfuerzo equipo';
   const dotColor = value === 'alto' ? 'bg-red-400' : value === 'bajo' ? 'bg-emerald-400' : 'bg-amber-400';
   return (
     <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={`${label}: ${meta.label}`}>
@@ -290,12 +303,13 @@ function LevelBadge({ value, onChange, label, type, showLabel = false }: { value
   const resolver = type === 'margin' ? mlm : tlm;
   const meta = resolver(value);
   const icon = type === 'margin' ? '$' : '👤';
+  const tooltipLabel = type === 'margin' ? `Impacto $: ${meta.label}` : `Esfuerzo equipo: ${meta.label}`;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button title={label}>
+        <button title={tooltipLabel}>
           <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>
-            {showLabel ? <><span className="opacity-60 mr-0.5">{icon}</span> {meta.label}</> : meta.label}
+            {showLabel ? <><span className="opacity-60 mr-0.5">{type === 'margin' ? 'Impacto $' : 'Esfuerzo'}</span> {meta.label}</> : meta.label}
           </Badge>
         </button>
       </PopoverTrigger>
@@ -491,8 +505,8 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
-            {/* Riesgo principal */}
-            {(item.mainRisk || item.healthStatus === 'rojo' || item.healthStatus === 'amarillo') && (
+            {/* Riesgo principal — only shown if there's actual risk text */}
+            {item.mainRisk && (
               <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 bg-orange-50 border border-orange-100">
                 <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
@@ -502,15 +516,15 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
-            {/* Situación + Siguiente paso */}
+            {/* Update + Próximo paso */}
             <div className="grid grid-cols-2 gap-2">
               <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Situación</p>
-                <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Update</p>
+                <InlineText value={item.currentAction} placeholder="Resumen en 1 línea del estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
               </div>
               <div className={cn("rounded-md px-2.5 py-2", "bg-slate-50")}>
-                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Siguiente paso</p>
-                <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-0.5">Próximo paso</p>
+                <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
               </div>
             </div>
 
@@ -573,8 +587,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               <MiniLevelDot value={item.marginStatus} type="margin" />
               <MiniLevelDot value={item.teamStrain} type="team" />
             </div>
-            <span className="hidden lg:block text-xs text-slate-400 truncate max-w-[280px]" onClick={e => { e.stopPropagation(); onToggle(); }}>
-              {item.currentAction || <span className="italic text-slate-300">¿Cómo viene?</span>}
+            <span className="hidden lg:block text-xs text-slate-400 truncate max-w-[400px]" onClick={e => { e.stopPropagation(); onToggle(); }}>
+              {item.currentAction || <span className="italic text-slate-300">Sin update</span>}
             </span>
             <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
           </div>
@@ -622,8 +636,8 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="overflow-hidden">
             <div className="px-4 pb-4 pt-2 ml-5 border-l-2 border-indigo-200/60">
-              {/* Riesgo principal */}
-              {(item.mainRisk || item.healthStatus !== 'verde') && (
+              {/* Riesgo principal — only shown if there's actual risk text */}
+              {item.mainRisk && (
                 <div className="flex items-start gap-2 rounded-lg bg-white border border-orange-100 p-3 shadow-sm mb-1">
                   <Shield className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
@@ -639,15 +653,15 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
-                    <Circle className="h-2 w-2 fill-indigo-400 text-indigo-400" /> Situación
+                    <Circle className="h-2 w-2 fill-indigo-400 text-indigo-400" /> Update
                   </p>
-                  <InlineText value={item.currentAction} placeholder="¿Cómo viene? Contá el estado actual..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm" />
+                  <InlineText value={item.currentAction} placeholder="Resumen en 1 línea del estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm" />
                 </div>
                 <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
                   <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
-                    <ArrowRight className="h-2.5 w-2.5 text-indigo-400" /> Siguiente paso
+                    <ArrowRight className="h-2.5 w-2.5 text-indigo-400" /> Próximo paso
                   </p>
-                  <InlineText value={item.nextMilestone} placeholder="¿Qué sigue? El próximo paso concreto..." onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm" />
+                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm" />
                 </div>
               </div>
 
@@ -1391,7 +1405,7 @@ export default function StatusSemanalPage() {
 
         {/* ── Search & Filters ──────────────────────────────────── */}
         <div className="px-6 py-2.5 border-b border-slate-100 bg-slate-50/50 shrink-0">
-          <div className="max-w-5xl mx-auto flex items-center gap-2">
+          <div className="max-w-6xl mx-auto flex items-center gap-2">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
@@ -1488,7 +1502,7 @@ export default function StatusSemanalPage() {
           {isLoading ? (
             <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
-            <div className="max-w-5xl mx-auto px-6 py-5 space-y-6">
+            <div className="max-w-6xl mx-auto px-6 py-5 space-y-6">
 
               {/* ── AI Summary Panel ──────────────────────────────── */}
               <AISummaryPanel
@@ -1499,14 +1513,14 @@ export default function StatusSemanalPage() {
                 cooldown={aiCooldown}
               />
 
-              {/* ── Requieren atención ─────────────────────────────── */}
+              {/* ── Requieren atención (hidden when empty) ──────────── */}
+              {alertItems.length > 0 && (
               <div>
                 <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(!isAlertCollapsed)}>
-                  <AlertTriangle className={cn("h-4 w-4 shrink-0", alertItems.length > 0 ? "text-red-500" : "text-slate-300")} />
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
                   <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isAlertCollapsed && "-rotate-90")} />
-                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
-                    alertItems.length > 0 ? "bg-red-100 text-red-700 border-red-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-red-100 text-red-700 border-red-200">
                     {alertItems.length}
                   </span>
                   <div className="flex-1" />
@@ -1514,12 +1528,7 @@ export default function StatusSemanalPage() {
                     <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                   </div>
                 </button>
-                {!isAlertCollapsed && (alertItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 text-emerald-600">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-xs">Sin alertas — todo bajo control</span>
-                  </div>
-                ) : (
+                {!isAlertCollapsed && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <AnimatePresence initial={false}>
                       {alertItems.map(item => {
@@ -1538,13 +1547,15 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                ))}
+                )}
               </div>
+              )}
 
-              {/* ── Decisiones pendientes ──────────────────────────── */}
+              {/* ── Decisiones pendientes (hidden when empty) ─────── */}
+              {decisionItems.length > 0 && (
               <div>
                 <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(!isDecisionCollapsed)}>
-                  <Zap className={cn("h-4 w-4 shrink-0", decisionItems.length > 0 ? "text-amber-500" : "text-slate-300")} />
+                  <Zap className="h-4 w-4 shrink-0 text-amber-500" />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
                   <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isDecisionCollapsed && "-rotate-90")} />
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
@@ -1552,12 +1563,7 @@ export default function StatusSemanalPage() {
                     {decisionItems.length}
                   </span>
                 </button>
-                {!isDecisionCollapsed && (decisionItems.length === 0 ? (
-                  <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-                    <span className="text-xs">Sin decisiones pendientes</span>
-                  </div>
-                ) : (
+                {!isDecisionCollapsed && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <AnimatePresence initial={false}>
                       {decisionItems.map(item => {
@@ -1576,8 +1582,9 @@ export default function StatusSemanalPage() {
                       })}
                     </AnimatePresence>
                   </div>
-                ))}
+                )}
               </div>
+              )}
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
