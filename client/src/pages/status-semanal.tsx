@@ -18,7 +18,7 @@ import {
   Circle, MoreHorizontal, Plus, Tag,
   Sparkles, Brain, TrendingUp, TrendingDown,
   Shield, Target, RefreshCw, Lightbulb, ArrowRight,
-  Calendar, Clock
+  Calendar, Clock, Search, Filter
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -247,15 +247,15 @@ function InlineText({ value, placeholder, onSave, multiline = false, className =
 
 // ─── Mini pickers ─────────────────────────────────────────────────────────────
 
-function HealthDot({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+function HealthDot({ value, onChange, compact = false }: { value: string | null; onChange: (v: string) => void; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const meta = hm(value);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button className="flex items-center gap-1.5 group" title={`Estado: ${meta.label}`}>
-          <div className={cn("w-3 h-3 rounded-full transition-transform group-hover:scale-125", meta.dot)} />
-          <span className={cn("text-xs font-semibold", meta.text)}>{meta.label}</span>
+          <div className={cn("rounded-full transition-transform group-hover:scale-125", meta.dot, compact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+          {!compact && <span className={cn("text-xs font-semibold", meta.text)}>{meta.label}</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-36 p-1.5" align="start">
@@ -267,6 +267,20 @@ function HealthDot({ value, onChange }: { value: string | null; onChange: (v: st
         ))}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function MiniLevelDot({ value, type }: { value: string | null; type: 'margin' | 'team' }) {
+  const levels = type === 'margin' ? MARGIN_LEVEL : TEAM_LEVEL;
+  const resolver = type === 'margin' ? mlm : tlm;
+  const meta = resolver(value);
+  const label = type === 'margin' ? 'Margen' : 'Equipo';
+  const dotColor = value === 'alto' ? 'bg-red-400' : value === 'bajo' ? 'bg-emerald-400' : 'bg-amber-400';
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400" title={`${label}: ${meta.label}`}>
+      <span className={cn("w-1.5 h-1.5 rounded-full", dotColor)} />
+      <span className="font-medium">{type === 'margin' ? '$' : '~'}</span>
+    </span>
   );
 }
 
@@ -477,6 +491,17 @@ function AlertCard({ item, users, isSelected, onOpenNotes, onUpdate, onRemove }:
               </div>
             )}
 
+            {/* Riesgo principal */}
+            {(item.mainRisk || item.healthStatus === 'rojo' || item.healthStatus === 'amarillo') && (
+              <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 bg-orange-50 border border-orange-100">
+                <Shield className="h-3 w-3 text-orange-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] text-orange-500 uppercase font-bold tracking-wide mb-0.5">Riesgo principal</p>
+                  <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal?" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
+                </div>
+              </div>
+            )}
+
             {/* Situación + Siguiente paso */}
             <div className="grid grid-cols-2 gap-2">
               <div className={cn("rounded-md px-2.5 py-2", item.healthStatus === 'rojo' ? "bg-red-50" : item.healthStatus === 'amarillo' ? "bg-amber-50" : "bg-slate-50")}>
@@ -522,39 +547,46 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
   const decMeta = dm(item.decisionNeeded);
 
   return (
-    <div className={cn("border-b border-slate-100 last:border-0 transition-colors", isSelected ? "bg-indigo-50" : "hover:bg-slate-50/80")}>
-      <div className="flex items-center gap-3 px-4 py-2.5">
-        <button onClick={onToggle} className="text-slate-300 hover:text-slate-500 shrink-0 transition-colors">
-          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        </button>
-        <div className="w-20 shrink-0">
-          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} />
+    <div className={cn(
+      "border-b border-slate-100 last:border-0 transition-all",
+      isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50/60",
+      expanded && "bg-slate-50/40"
+    )}>
+      {/* Main row */}
+      <div className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer" onClick={onToggle}>
+        {/* Health dot */}
+        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-          <span className="font-semibold text-sm text-foreground truncate">{item.title}</span>
-          {item.subtitle && <span className="text-muted-foreground text-sm truncate shrink-0"> · {item.subtitle}</span>}
-          <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
+
+        {/* Project info - takes most space */}
+        <div className="flex-1 min-w-0">
+          {/* Line 1: Name + subtitle */}
+          <div className="flex items-center gap-1.5">
+            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+            <span className="font-semibold text-[13px] text-slate-800 truncate">{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-[13px] truncate"> · {item.subtitle}</span>}
+          </div>
+          {/* Line 2: Badges + situation preview */}
+          <div className="flex items-center gap-2 mt-0.5">
+            <div className="hidden sm:flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+              <MiniLevelDot value={item.marginStatus} type="margin" />
+              <MiniLevelDot value={item.teamStrain} type="team" />
+            </div>
+            <span className="hidden lg:block text-xs text-slate-400 truncate max-w-[280px]" onClick={e => { e.stopPropagation(); onToggle(); }}>
+              {item.currentAction || <span className="italic text-slate-300">¿Cómo viene?</span>}
+            </span>
+            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
+          </div>
         </div>
-        <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
-        </div>
-        <div className="hidden lg:block w-[88px] shrink-0">
-          <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
-        </div>
-        <div className="hidden lg:block w-48 shrink-0">
-          <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} className="text-xs line-clamp-2 block" />
-        </div>
-        <div className="w-24 shrink-0">
-          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
-        </div>
-        <div className="w-20 shrink-0">
-          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-        </div>
-        <div className="shrink-0 flex items-center justify-end gap-1">
+
+        {/* Right side: Owner + Deadline + Actions */}
+        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
             <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
           )}
+          <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
+          <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
           {onOpenNotes && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-0.5 p-1 rounded transition-colors",
@@ -580,48 +612,80 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
         </div>
       </div>
 
-      {expanded && (
-        <div className="px-10 pb-3 pt-1 bg-slate-50/60 border-t border-slate-100">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Situación</p>
-              <InlineText value={item.currentAction} placeholder="¿Cómo viene?" onSave={v => onUpdate({ currentAction: v })} multiline />
+      {/* Expanded detail panel */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="overflow-hidden">
+            <div className="px-4 pb-4 pt-2 ml-5 border-l-2 border-indigo-200/60">
+              {/* Riesgo principal */}
+              {(item.mainRisk || item.healthStatus !== 'verde') && (
+                <div className="flex items-start gap-2 rounded-lg bg-white border border-orange-100 p-3 shadow-sm mb-1">
+                  <Shield className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-orange-500 uppercase font-bold tracking-wide mb-1 flex items-center gap-1">
+                      Riesgo principal
+                    </p>
+                    <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal de este proyecto?" onSave={v => onUpdate({ mainRisk: v })} className="text-sm" />
+                  </div>
+                </div>
+              )}
+
+              {/* Editable fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
+                    <Circle className="h-2 w-2 fill-indigo-400 text-indigo-400" /> Situación
+                  </p>
+                  <InlineText value={item.currentAction} placeholder="¿Cómo viene? Contá el estado actual..." onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm" />
+                </div>
+                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
+                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
+                    <ArrowRight className="h-2.5 w-2.5 text-indigo-400" /> Siguiente paso
+                  </p>
+                  <InlineText value={item.nextMilestone} placeholder="¿Qué sigue? El próximo paso concreto..." onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm" />
+                </div>
+              </div>
+
+              {/* Secondary controls */}
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
+                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
+                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+                </div>
+                <div className="flex-1" />
+                {onOpenNotes && (
+                  <button onClick={onOpenNotes}
+                    className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
+                      isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+                    <MessageSquare className="h-3 w-3" />
+                    <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
+                  </button>
+                )}
+                {(hasPrev || hasNext) && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={onPrev} disabled={!hasPrev}
+                      className={cn("p-1 rounded-md transition-colors",
+                        hasPrev ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={onNext} disabled={!hasNext}
+                      className={cn("p-1 rounded-md transition-colors",
+                        hasNext ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Siguiente paso</p>
-              <InlineText value={item.nextMilestone} placeholder="¿Qué sigue?" onSave={v => onUpdate({ nextMilestone: v })} multiline />
-            </div>
-            <div>
-              <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide mb-1">Decisión</p>
-              <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-            </div>
-          </div>
-          {onOpenNotes && (
-            <div className="mt-3 pt-2 border-t border-slate-200">
-              <button onClick={onOpenNotes}
-                className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
-                  isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
-                <MessageSquare className="h-3 w-3" />
-                <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
-              </button>
-            </div>
-          )}
-          {(hasPrev || hasNext) && (
-            <div className="flex items-center justify-end gap-1.5 mt-2 pt-2 border-t border-slate-100">
-              <button onClick={onPrev} disabled={!hasPrev}
-                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
-                  hasPrev ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
-                <ChevronLeft className="h-3 w-3" /> Anterior
-              </button>
-              <button onClick={onNext} disabled={!hasNext}
-                className={cn("flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md transition-colors",
-                  hasNext ? "text-indigo-600 hover:bg-indigo-50" : "text-slate-300 cursor-not-allowed")}>
-                Siguiente <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -737,11 +801,12 @@ function HighlightChip({ type, text }: { type: 'risk' | 'win' | 'action' | 'deci
 
 // ─── AI Summary Panel ────────────────────────────────────────────────────────
 
-function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
+function AISummaryPanel({ summary, isLoading, onGenerate, itemCount, cooldown = false }: {
   summary: AISummary | null;
   isLoading: boolean;
   onGenerate: () => void;
   itemCount: number;
+  cooldown?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -808,10 +873,10 @@ function AISummaryPanel({ summary, isLoading, onGenerate, itemCount }: {
 
         <div className="flex items-center gap-3">
           <HealthScoreRing score={summary.weeklyScore} size={56} />
-          <Button onClick={onGenerate} variant="ghost" size="sm"
-            className="h-8 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 gap-1.5">
-            <RefreshCw className="h-3 w-3" />
-            Regenerar
+          <Button onClick={onGenerate} variant="ghost" size="sm" disabled={cooldown}
+            className={cn("h-8 text-xs gap-1.5", cooldown ? "text-slate-400 cursor-not-allowed" : "text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100")}>
+            <RefreshCw className={cn("h-3 w-3", cooldown && "animate-spin")} />
+            {cooldown ? 'Esperá...' : 'Regenerar'}
           </Button>
         </div>
       </div>
@@ -992,16 +1057,40 @@ export default function StatusSemanalPage() {
   const [showHidden, setShowHidden] = useState(false);
   const [alertCollapsed, setAlertCollapsed] = useState<boolean | null>(null);
   const [decisionCollapsed, setDecisionCollapsed] = useState<boolean | null>(null);
-  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(() => {
+    try { const s = localStorage.getItem('status-semanal-ai-summary'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterHealth, setFilterHealth] = useState<string | null>(null);
+  const [filterOwner, setFilterOwner] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Item | null>(null);
+  const [aiCooldown, setAiCooldown] = useState(false);
 
   // ── AI Summary mutation ─────────────────────────────────────────────────────
+
+  // Close notes panel with Esc key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (confirmDelete) { setConfirmDelete(null); return; }
+        if (notesOpen) { setNotesOpen(null); return; }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [notesOpen, confirmDelete]);
 
   const aiMutation = useMutation({
     mutationFn: () => mutationFetch('/api/status-semanal/ai-summary', 'POST'),
     onSuccess: (data: AISummary) => {
       setAiSummary(data);
+      try { localStorage.setItem('status-semanal-ai-summary', JSON.stringify(data)); } catch {}
       toast({ title: 'Resumen generado', description: `Score del portafolio: ${data.weeklyScore}/100` });
+      // Cooldown 30s to prevent excessive API calls
+      setAiCooldown(true);
+      setTimeout(() => setAiCooldown(false), 30000);
     },
     onError: (err: Error) => {
       toast({ title: 'Error al generar resumen IA', description: err.message, variant: 'destructive' });
@@ -1186,8 +1275,22 @@ export default function StatusSemanalPage() {
     ...customRows.map(toCustomItem),
   ];
 
-  const visible = allItems.filter(i => showHidden ? true : !i.hiddenFromWeekly);
   const hiddenCount = allItems.filter(i => i.hiddenFromWeekly).length;
+  const visible = allItems.filter(i => {
+    if (!showHidden && i.hiddenFromWeekly) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matches = (i.title?.toLowerCase().includes(q)) ||
+        (i.subtitle?.toLowerCase().includes(q)) ||
+        (i.ownerName?.toLowerCase().includes(q)) ||
+        (i.currentAction?.toLowerCase().includes(q)) ||
+        (i.mainRisk?.toLowerCase().includes(q));
+      if (!matches) return false;
+    }
+    if (filterHealth && i.healthStatus !== filterHealth) return false;
+    if (filterOwner !== null && i.ownerId !== filterOwner) return false;
+    return true;
+  });
 
   const rojoItems     = visible.filter(i => i.healthStatus === 'rojo');
   const amarilloItems = visible.filter(i => i.healthStatus === 'amarillo' && !i.isOverdue);
@@ -1211,11 +1314,7 @@ export default function StatusSemanalPage() {
       else if (item.projectId) updateProject(item.projectId, data);
     },
     onRemove: () => {
-      if (item.isCustom && item.customId) {
-        deleteCustom.mutate(item.customId);
-      } else if (item.projectId) {
-        removeProject.mutate(item.projectId);
-      }
+      setConfirmDelete(item);
     },
     onOpenNotes: (() => {
       if (item.projectId) {
@@ -1290,6 +1389,100 @@ export default function StatusSemanalPage() {
           </div>
         </div>
 
+        {/* ── Search & Filters ──────────────────────────────────── */}
+        <div className="px-6 py-2.5 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          <div className="max-w-5xl mx-auto flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar proyecto, owner, situación..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-300"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            <button onClick={() => setShowFilters(v => !v)}
+              className={cn("flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors",
+                showFilters || filterHealth || filterOwner !== null
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
+              <Filter className="h-3.5 w-3.5" />
+              Filtros
+              {(filterHealth || filterOwner !== null) && (
+                <span className="bg-indigo-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {(filterHealth ? 1 : 0) + (filterOwner !== null ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            {(filterHealth || filterOwner !== null || searchQuery) && (
+              <button onClick={() => { setSearchQuery(''); setFilterHealth(null); setFilterOwner(null); }}
+                className="text-[11px] text-slate-400 hover:text-red-500 font-medium">
+                Limpiar
+              </button>
+            )}
+          </div>
+          {showFilters && (
+            <div className="max-w-5xl mx-auto flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Salud:</span>
+              <div className="flex items-center gap-1">
+                {[null, 'verde', 'amarillo', 'rojo'].map(h => (
+                  <button key={h ?? 'all'} onClick={() => setFilterHealth(h)}
+                    className={cn("text-[11px] px-2 py-1 rounded-md border font-medium transition-colors",
+                      filterHealth === h ? "bg-indigo-100 border-indigo-300 text-indigo-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300")}>
+                    {h === null ? 'Todos' : <span className="flex items-center gap-1"><span className={cn("w-2 h-2 rounded-full", HEALTH[h].dot)} />{HEALTH[h].label}</span>}
+                  </button>
+                ))}
+              </div>
+              <span className="text-slate-200">|</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Owner:</span>
+              <select value={filterOwner?.toString() ?? ''} onChange={e => setFilterOwner(e.target.value ? parseInt(e.target.value) : null)}
+                className="text-[11px] px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                <option value="">Todos</option>
+                {appUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* ── Confirm Delete Dialog ──────────────────────────────── */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setConfirmDelete(null)}>
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-5 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                </div>
+                <h3 className="font-semibold text-sm">
+                  {confirmDelete.isCustom ? 'Eliminar ítem' : 'Quitar del status'}
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 mb-1">
+                {confirmDelete.isCustom
+                  ? <>Vas a eliminar permanentemente <strong>{confirmDelete.title}</strong>. Esta acción no se puede deshacer.</>
+                  : <>Vas a quitar <strong>{confirmDelete.title}</strong> del status semanal. Podés restaurarlo después.</>}
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Button size="sm" variant="outline" onClick={() => setConfirmDelete(null)} className="flex-1 h-8 text-xs">
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={() => {
+                  const item = confirmDelete;
+                  if (item.isCustom && item.customId) deleteCustom.mutate(item.customId);
+                  else if (item.projectId) removeProject.mutate(item.projectId);
+                  setConfirmDelete(null);
+                }} className="flex-1 h-8 text-xs bg-red-600 hover:bg-red-700 text-white">
+                  {confirmDelete.isCustom ? 'Eliminar' : 'Quitar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Content ───────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
@@ -1301,8 +1494,9 @@ export default function StatusSemanalPage() {
               <AISummaryPanel
                 summary={aiSummary}
                 isLoading={aiMutation.isPending}
-                onGenerate={() => aiMutation.mutate()}
+                onGenerate={() => { if (!aiCooldown) aiMutation.mutate(); }}
                 itemCount={visible.length}
+                cooldown={aiCooldown}
               />
 
               {/* ── Requieren atención ─────────────────────────────── */}
@@ -1395,7 +1589,6 @@ export default function StatusSemanalPage() {
                     {normalItems.length}
                   </span>
                   <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                  {normalItems.length > 0 && <span className="text-[10px] text-muted-foreground ml-auto">Click en fila para editar</span>}
                 </div>
                 {normalItems.length === 0 ? (
                   <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-400">
@@ -1403,16 +1596,10 @@ export default function StatusSemanalPage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200">
-                      <div className="w-3.5 shrink-0" />
-                      <div className="w-20 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Estado</div>
-                      <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Cliente · Proyecto</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Margen</div>
-                      <div className="hidden lg:block w-[88px] text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Equipo</div>
-                      <div className="hidden lg:block w-48 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Situación</div>
-                      <div className="w-24 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Owner</div>
-                      <div className="w-20 text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0">Deadline</div>
-                      <div className="w-16" />
+                    <div className="flex items-center gap-2.5 px-4 py-2 bg-slate-50/80 border-b border-slate-200">
+                      <div className="w-2.5 shrink-0" />
+                      <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Proyecto</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0 w-[220px] text-right">Owner · Deadline · Acciones</div>
                     </div>
                     <AnimatePresence initial={false}>
                       {normalItems.map((item, idx) => {

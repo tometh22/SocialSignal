@@ -121,8 +121,8 @@ class GoogleSheetsWorkingService {
 
       return google.sheets({ version: 'v4', auth });
     } catch (error) {
-      console.error('❌ Error creating Google Sheets client:', error);
-      throw error;
+      console.warn('⚠️ Google Sheets credentials missing or invalid. Sheets functionality will be unavailable:', (error as Error).message);
+      return null;
     }
   }
 
@@ -180,7 +180,11 @@ class GoogleSheetsWorkingService {
   async testConnection(): Promise<boolean> {
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available');
+        return false;
+      }
+
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
       });
@@ -202,7 +206,11 @@ class GoogleSheetsWorkingService {
   async getSpreadsheetInfo(): Promise<any> {
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available');
+        return { title: 'Unavailable', sheets: [] };
+      }
+
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
       });
@@ -234,8 +242,12 @@ class GoogleSheetsWorkingService {
   ): Promise<any[][]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty sheet data');
+        return [];
+      }
       const range = `'${sheetName}'!A:Z`;
-      
+
       console.log(`🔄 Obteniendo datos raw 2D de ${sheetName}...`);
       console.log(`📊 Spreadsheet ID: ${spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
@@ -274,8 +286,12 @@ class GoogleSheetsWorkingService {
   async getCostosDirectosIndirectos(): Promise<any[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty costos data');
+        return [];
+      }
       const range = 'Costos directos e indirectos!A:Z';
-      
+
       console.log('🔄 Obteniendo datos RAW del Excel MAESTRO (FORMATTED_VALUE)...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
@@ -538,8 +554,12 @@ class GoogleSheetsWorkingService {
   async getProyectosConfirmados(): Promise<ProyectoConfirmado[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty proyectos data');
+        return [];
+      }
       const range = 'Proyectos confirmados y estimados!A:Z';
-      
+
       console.log('🔄 Obteniendo proyectos confirmados del Excel MAESTRO...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
@@ -937,9 +957,13 @@ class GoogleSheetsWorkingService {
     console.log(`🔑 Using credentials file: ${this.credentialsPath}`);
     
     const sheets = this.createSheetsClientFromJSON();
-    
+    if (!sheets) {
+      console.warn('⚠️ Google Sheets client not available, returning empty sheet names');
+      return [];
+    }
+
     console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
-    
+
     try {
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
@@ -962,7 +986,11 @@ class GoogleSheetsWorkingService {
   async getTiposCambio(): Promise<TipoCambio[]> {
     console.log('🔄 Obteniendo tipos de cambio del Excel MAESTRO...');
     const sheets = this.createSheetsClientFromJSON();
-    
+    if (!sheets) {
+      console.warn('⚠️ Google Sheets client not available, returning empty tipos de cambio');
+      return [];
+    }
+
     console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
     
     // Obtener todas las pestañas del Excel MAESTRO primero
@@ -1143,8 +1171,12 @@ class GoogleSheetsWorkingService {
   async getVentasTomi(): Promise<VentaTomi[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty ventas data');
+        return [];
+      }
       const range = 'Ventas Tomi!A:Z'; // Extendido para capturar todas las columnas
-      
+
       console.log('🔄 Obteniendo ventas desde Ventas Tomi...');
       console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
       console.log(`📋 Range: ${range}`);
@@ -1425,11 +1457,15 @@ class GoogleSheetsWorkingService {
     
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
-      // Leer datos de la pestaña "Costos directos e indirectos" 
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, skipping direct costs import');
+        return { success: false, costsImported: 0, costsUpdated: 0, errors: ['Google Sheets client not available'] };
+      }
+
+      // Leer datos de la pestaña "Costos directos e indirectos"
       const range = 'Costos directos e indirectos!A:R'; // Extendido a R para incluir montos USD convertidos
       console.log('📋 Range:', range);
-      
+
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,
@@ -1912,6 +1948,10 @@ class GoogleSheetsWorkingService {
   async getResumenEjecutivo(): Promise<ResumenEjecutivoRow[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty resumen ejecutivo data');
+        return [];
+      }
       const range = "'Resumen Ejecutivo'!A:AZ"; // Extended from A:Z to A:AZ (52 cols) to capture all KPIs
 
       console.log('📊 [Resumen Ejecutivo] Obteniendo datos del Excel MAESTRO...');
@@ -2172,8 +2212,12 @@ class GoogleSheetsWorkingService {
   async getProvisionPasivoProyectos(): Promise<ProvisionRow[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty provision data');
+        return [];
+      }
       const range = "'Provisión pasivo proyectos'!A:Z";
-      
+
       console.log('📊 [Provisión Pasivo Proyectos] Obteniendo datos del Excel MAESTRO...');
       
       const response = await sheets.spreadsheets.values.get({
@@ -2206,8 +2250,12 @@ class GoogleSheetsWorkingService {
   async getImpuestos(): Promise<ProvisionRow[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty impuestos data');
+        return [];
+      }
       const range = "'Impuestos'!A:Z";
-      
+
       console.log('📊 [Impuestos] Obteniendo datos del Excel MAESTRO...');
       
       const response = await sheets.spreadsheets.values.get({
@@ -2241,8 +2289,12 @@ class GoogleSheetsWorkingService {
   async getPasivo(): Promise<ProvisionRow[]> {
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty pasivo data');
+        return [];
+      }
       const range = "'Pasivo'!A:Z";
-      
+
       console.log('📊 [Pasivo] Obteniendo datos del Excel MAESTRO...');
       
       const response = await sheets.spreadsheets.values.get({
@@ -2553,6 +2605,10 @@ class GoogleSheetsWorkingService {
     console.log('🔍 [DEBUG] Listando hojas disponibles en el Excel MAESTRO...');
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty sheet list');
+        return [];
+      }
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
         fields: 'sheets.properties.title'
@@ -2606,8 +2662,12 @@ class GoogleSheetsWorkingService {
       }
       
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty cuentas data');
+        return [];
+      }
       const range = `'${cuentasSheet}'!A:Z`;
-      
+
       console.log('📊 [Cuentas a Cobrar] Obteniendo datos del Excel MAESTRO...');
       console.log(`📊 [Cuentas a Cobrar] SpreadsheetId: ${this.spreadsheetId}`);
       console.log(`📊 [Cuentas a Cobrar] Range: ${range}`);
@@ -2897,7 +2957,11 @@ class GoogleSheetsWorkingService {
     console.log(`🔍 [getWarnerProvisionFromActivo] ENTRADA - período: ${targetPeriod}`);
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty provision data');
+        return [];
+      }
+
       // Leer hoja "Activo"
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
@@ -3038,7 +3102,11 @@ class GoogleSheetsWorkingService {
     
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty cash flow data');
+        return [];
+      }
+
       // Intentar varios nombres posibles para la hoja
       const possibleSheetNames = [
         'CashFlow',
@@ -3378,7 +3446,11 @@ class GoogleSheetsWorkingService {
     
     try {
       const sheets = this.createSheetsClientFromJSON();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available');
+        return { rawAnalysis: { totalRows: 0, uniqueTypes: {}, totalIngresosUsd: 0, totalEgresosUsd: 0, netoHoja: 0, periodRows: 0 }, issues: ['Google Sheets client not available'] };
+      }
+
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: `'CashFlow'!A:Z`,
@@ -3661,6 +3733,10 @@ class GoogleSheetsWorkingService {
     
     try {
       const sheets = this.createSheetsClientFromJSON();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty activo data');
+        return result;
+      }
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: "'Activo'!A:U",
