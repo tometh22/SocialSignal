@@ -23,9 +23,10 @@ class GoogleSheetsSimpleService {
   /**
    * Formatear correctamente la clave privada para Google API
    */
-  private formatPrivateKey(privateKey: string | undefined): string {
+  private formatPrivateKey(privateKey: string | undefined): string | null {
     if (!privateKey) {
-      throw new Error('Private key is missing');
+      console.warn('⚠️ GOOGLE_PRIVATE_KEY is missing. Google Sheets functionality will be unavailable.');
+      return null;
     }
 
     // Si la clave ya tiene formato correcto, devolverla tal como está

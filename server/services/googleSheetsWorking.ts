@@ -121,8 +121,8 @@ class GoogleSheetsWorkingService {
 
       return google.sheets({ version: 'v4', auth });
     } catch (error) {
-      console.error('❌ Error creating Google Sheets client:', error);
-      throw error;
+      console.warn('⚠️ Google Sheets credentials missing or invalid. Sheets functionality will be unavailable:', (error as Error).message);
+      return null;
     }
   }
 
@@ -937,9 +937,13 @@ class GoogleSheetsWorkingService {
     console.log(`🔑 Using credentials file: ${this.credentialsPath}`);
     
     const sheets = this.createSheetsClientFromJSON();
-    
+    if (!sheets) {
+      console.warn('⚠️ Google Sheets client not available, returning empty sheet names');
+      return [];
+    }
+
     console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
-    
+
     try {
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
@@ -962,7 +966,11 @@ class GoogleSheetsWorkingService {
   async getTiposCambio(): Promise<TipoCambio[]> {
     console.log('🔄 Obteniendo tipos de cambio del Excel MAESTRO...');
     const sheets = this.createSheetsClientFromJSON();
-    
+    if (!sheets) {
+      console.warn('⚠️ Google Sheets client not available, returning empty tipos de cambio');
+      return [];
+    }
+
     console.log(`📊 Spreadsheet ID: ${this.spreadsheetId}`);
     
     // Obtener todas las pestañas del Excel MAESTRO primero

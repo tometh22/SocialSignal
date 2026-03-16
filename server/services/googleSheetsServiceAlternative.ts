@@ -30,11 +30,11 @@ class GoogleSheetsServiceAlternative {
       });
 
       this.sheets = google.sheets({ version: 'v4', auth: jwtClient });
-      
+
       console.log('✅ Alternative Google Sheets service initialized');
     } catch (error) {
-      console.error('❌ Error initializing alternative Google Sheets service:', error);
-      throw error;
+      console.error('⚠️ Google Sheets service not available (missing credentials):', (error as Error).message);
+      this.sheets = null;
     }
   }
 
@@ -56,6 +56,7 @@ class GoogleSheetsServiceAlternative {
    * Método para probar la conexión
    */
   async testConnection(): Promise<boolean> {
+    if (!this.sheets) return false;
     try {
       const response = await this.sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
