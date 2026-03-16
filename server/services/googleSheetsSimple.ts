@@ -15,9 +15,11 @@ interface CostoDirectoIndirecto {
 
 class GoogleSheetsSimpleService {
   private spreadsheetId: string;
+  private sheetsAvailable: boolean;
 
   constructor() {
     this.spreadsheetId = '1FZLFmTQQOSYQns2cOYlM86UGEH7EHZsJOFegyDR7quc';
+    this.sheetsAvailable = true;
   }
 
   /**
@@ -51,7 +53,13 @@ class GoogleSheetsSimpleService {
     try {
       // Formatear la clave privada correctamente
       const formattedPrivateKey = this.formatPrivateKey(process.env.GOOGLE_PRIVATE_KEY);
-      
+
+      if (!formattedPrivateKey) {
+        console.warn('⚠️ Google Sheets credentials missing. Sheets functionality will be unavailable.');
+        this.sheetsAvailable = false;
+        return null;
+      }
+
       console.log('🔑 Private key format check:', {
         hasBeginHeader: formattedPrivateKey.includes('-----BEGIN PRIVATE KEY-----'),
         hasEndHeader: formattedPrivateKey.includes('-----END PRIVATE KEY-----'),
@@ -79,8 +87,9 @@ class GoogleSheetsSimpleService {
 
       return google.sheets({ version: 'v4', auth: auth as any });
     } catch (error) {
-      console.error('❌ Error creating Google Sheets client:', error);
-      throw error;
+      console.warn('⚠️ Google Sheets credentials missing or invalid. Sheets functionality will be unavailable:', (error as Error).message);
+      this.sheetsAvailable = false;
+      return null;
     }
   }
 
@@ -90,7 +99,11 @@ class GoogleSheetsSimpleService {
   async testConnection(): Promise<boolean> {
     try {
       const sheets = this.createSheetsClient();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available');
+        return false;
+      }
+
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
       });
@@ -111,7 +124,11 @@ class GoogleSheetsSimpleService {
   async getSpreadsheetInfo(): Promise<any> {
     try {
       const sheets = this.createSheetsClient();
-      
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available');
+        return { title: 'Unavailable', sheets: [] };
+      }
+
       const response = await sheets.spreadsheets.get({
         spreadsheetId: this.spreadsheetId,
       });
@@ -136,6 +153,10 @@ class GoogleSheetsSimpleService {
   async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
     try {
       const sheets = this.createSheetsClient();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty costos data');
+        return [];
+      }
       const range = 'Costos directos e indirectos!A:Z';
       
       const response = await sheets.spreadsheets.values.get({
@@ -246,8 +267,12 @@ class GoogleSheetsSimpleService {
   async getClientesFromSheet(): Promise<string[]> {
     try {
       const range = 'Activo!C:C'; // Columna C de la pestaña Activo
-      
+
       const sheets = this.createSheetsClient();
+      if (!sheets) {
+        console.warn('⚠️ Google Sheets client not available, returning empty clientes data');
+        return [];
+      }
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: this.spreadsheetId,
         range: range,

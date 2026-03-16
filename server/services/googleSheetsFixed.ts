@@ -14,6 +14,24 @@ interface CostoDirectoIndirecto {
 }
 
 class GoogleSheetsFixedService {
+  private sheets: any | null;
+
+  constructor() {
+    try {
+      // Verify basic credentials availability
+      const hasKey = !!process.env.GOOGLE_PRIVATE_KEY;
+      const hasEmail = !!process.env.GOOGLE_CLIENT_EMAIL;
+      if (!hasKey || !hasEmail) {
+        console.warn('⚠️ Google Sheets credentials missing (GOOGLE_PRIVATE_KEY or GOOGLE_CLIENT_EMAIL). Sheets functionality will be unavailable.');
+        this.sheets = null;
+      } else {
+        this.sheets = true; // Credentials present; actual client created on demand
+      }
+    } catch (error) {
+      console.warn('⚠️ Google Sheets initialization failed. Sheets functionality will be unavailable:', (error as Error).message);
+      this.sheets = null;
+    }
+  }
 
   /**
    * Verificar las credenciales necesarias
@@ -72,6 +90,9 @@ class GoogleSheetsFixedService {
    * Usar el archivo JSON de credentials directamente
    */
   async testWithJSONFile(): Promise<{ success: boolean; message: string; error?: string }> {
+    if (!this.sheets) {
+      return { success: false, message: 'Google Sheets credentials not available', error: 'Missing credentials' };
+    }
     try {
       // Buscar el archivo JSON de credentials
       const jsonFiles = [
@@ -122,7 +143,7 @@ class GoogleSheetsFixedService {
       return {
         success: false,
         message: 'Error reading JSON credentials file',
-        error: error.message
+        error: (error as Error).message
       };
     }
   }
@@ -175,7 +196,11 @@ class GoogleSheetsFixedService {
    */
   async getCostosDirectosIndirectos(): Promise<CostoDirectoIndirecto[]> {
     console.log('🔄 Intentando obtener datos del Excel MAESTRO...');
-    
+
+    if (!this.sheets) {
+      console.warn('⚠️ Google Sheets client not available, returning mock data');
+    }
+
     // Por ahora usar datos simulados hasta resolver la conexión
     return this.getMockCostosData();
   }
