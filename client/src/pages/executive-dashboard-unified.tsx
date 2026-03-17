@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
@@ -403,6 +403,29 @@ export default function UnifiedExecutiveDashboard() {
     setSelectedPeriod(data.periodKey);
   }
 
+  // ─── Auto-sync: if period has no P&L data, trigger sync silently ───
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const autoSyncAttempted = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!data) return;
+    const noData = data.ventasMes === 0 && data.ebitOperativo === 0;
+    const period = data.periodKey;
+    if (noData && period && !autoSyncAttempted.current.has(period) && !autoSyncing) {
+      autoSyncAttempted.current.add(period);
+      setAutoSyncing(true);
+      authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            refetch();
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAutoSyncing(false));
+    }
+  }, [data, autoSyncing, refetch]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -463,39 +486,26 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ─── Warning if period has no P&L data + sync/import actions ─── */}
+        {/* ─── Auto-sync indicator (subtle) or fallback manual import ─── */}
         {d.ventasMes === 0 && d.ebitOperativo === 0 && !showImport && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700 flex items-center justify-between">
-            <span>
-              Este período no tiene datos de P&L. La sync de Google Sheets puede estar fallando.
-            </span>
-            <div className="flex items-center gap-2 ml-3">
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" });
-                    const data = await res.json();
-                    if (data.success) {
-                      refetch();
-                    } else {
-                      alert(`Sync falló: ${data.result?.errors?.join(', ') || data.error || 'Error desconocido'}`);
-                    }
-                  } catch (e: any) {
-                    alert(`Error: ${e.message}`);
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap flex items-center gap-1"
-              >
-                <RefreshCw className="w-3 h-3" /> Forzar Sync
-              </button>
+          autoSyncing ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-600 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Sincronizando datos desde Google Sheets...
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700 flex items-center justify-between">
+              <span>
+                No se encontraron datos de P&L para este período en Google Sheets.
+              </span>
               <button
                 onClick={() => setShowImport(true)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap flex items-center gap-1"
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-600 text-white hover:bg-amber-700 whitespace-nowrap flex items-center gap-1 ml-3"
               >
                 <Upload className="w-3 h-3" /> Importar manual
               </button>
             </div>
-          </div>
+          )
         )}
         {showImport && (
           <PnLImportForm
