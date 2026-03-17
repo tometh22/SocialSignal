@@ -1096,17 +1096,16 @@ class GoogleSheetsWorkingService {
       
       if (!mes || !tipoCambioStr) continue;
       
-      // Parar si encontramos filas de proyección - CORRECCIÓN: permitir 2025
-      if (mes.includes('próx') || mes.includes('2026') || mes.includes('proyecc')) {
+      // Parar si encontramos filas de proyección (pero NO años válidos)
+      if (mes.includes('próx') || mes.includes('proyecc')) {
         break;
       }
-      
-      // Determinar año actual desde el mes si contiene año
-      let currentYear = 2024; // Default
-      if (mes.includes('2025')) {
-        currentYear = 2025;
-      } else if (mes.includes('2024')) {
-        currentYear = 2024;
+
+      // Determinar año desde el mes si contiene año (dinámico, no hardcoded)
+      let currentYear = new Date().getFullYear();
+      const yearMatch = mes.match(/(20\d{2})/);
+      if (yearMatch) {
+        currentYear = parseInt(yearMatch[1]);
       }
       
       // Convertir el tipo de cambio a número
