@@ -309,7 +309,7 @@ function LevelBadge({ value, onChange, label, type, showLabel = false }: { value
       <PopoverTrigger asChild>
         <button title={tooltipLabel}>
           <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80", meta.color)}>
-            {showLabel ? <><span className="opacity-60 mr-0.5">{type === 'margin' ? 'Impacto $' : 'Esfuerzo'}</span> {meta.label}</> : meta.label}
+            <span className="opacity-60 mr-0.5">{type === 'margin' ? '$' : 'Eq.'}</span>{meta.label}
           </Badge>
         </button>
       </PopoverTrigger>
@@ -333,8 +333,8 @@ function DecisionBadge({ value, onChange }: { value: string | null; onChange: (v
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button>
-          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80 max-w-[80px] truncate", meta.color)}>
-            {meta.label}
+          <Badge variant="outline" className={cn("text-[10px] h-4 cursor-pointer border font-semibold hover:opacity-80 max-w-[100px] truncate", meta.color)}>
+            <span className="opacity-60 mr-0.5">Dec.</span>{meta.label}
           </Badge>
         </button>
       </PopoverTrigger>
@@ -572,19 +572,26 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
           <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
 
-        <div className="flex-1 min-w-0 flex items-center gap-1.5">
-          {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-          <span className="font-medium text-[13px] text-slate-800 truncate">{item.title}</span>
-          {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline"> · {item.subtitle}</span>}
-          <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1">
-            {item.currentAction && `— ${item.currentAction}`}
-          </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+            <span className="font-medium text-[13px] text-slate-800 truncate">{item.title}</span>
+            {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline"> · {item.subtitle}</span>}
+            <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1">
+              {item.currentAction && `— ${item.currentAction}`}
+            </span>
+          </div>
+          {decMeta.urgent && (item.mainRisk || item.currentAction) && !expanded && (
+            <p className="text-[11px] text-slate-400 truncate mt-0.5 ml-0.5">
+              {item.mainRisk || item.currentAction}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
             <Badge variant="outline" className={cn("text-[9px] h-4 border font-semibold", decMeta.color)}>
-              {decMeta.label}
+              <span className="opacity-60 mr-0.5">Dec.</span>{decMeta.label}
             </Badge>
           )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
