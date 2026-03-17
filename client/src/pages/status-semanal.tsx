@@ -422,7 +422,7 @@ function DeadlinePicker({ value, isOverdue, onChange }: {
       {isOverdue ? <Clock className="h-3 w-3 shrink-0" /> : <Calendar className="h-3 w-3 shrink-0" />}
       <span className="whitespace-nowrap">{deadlineLabel(value)}</span>
       <button onClick={e => { e.stopPropagation(); onChange(null); }}
-        className="hidden group-hover:inline-flex ml-0.5 text-slate-400 hover:text-red-500 shrink-0">
+        className="inline-flex opacity-0 group-hover:opacity-100 ml-0.5 text-slate-400 hover:text-red-500 shrink-0 transition-opacity">
         <X className="h-2.5 w-2.5" />
       </button>
       <input type="date" value={toDateStr(value)}
