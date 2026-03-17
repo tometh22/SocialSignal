@@ -1074,6 +1074,9 @@ export default function StatusSemanalPage() {
     try { const s = localStorage.getItem('status-semanal-ai-summary'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [expandedAlertKey, setExpandedAlertKey] = useState<string | null>(null);
+  const [expandedDecisionKey, setExpandedDecisionKey] = useState<string | null>(null);
+  const [aiPopoverOpen, setAiPopoverOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterHealth, setFilterHealth] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState<number | null>(null);
@@ -1424,6 +1427,74 @@ export default function StatusSemanalPage() {
                     {showHidden ? <Eye className="h-3 w-3" /> : <><EyeOff className="h-3 w-3" /> {hiddenCount}</>}
                   </button>
                 )}
+                <Popover open={aiPopoverOpen} onOpenChange={setAiPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className={cn("flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors backdrop-blur-sm",
+                        aiSummary ? "bg-violet-500/30 text-white border-violet-300/40" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}
+                      title="Resumen IA">
+                      {aiMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                      {aiSummary && <span className="text-[9px] font-bold">{aiSummary.weeklyScore}</span>}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[420px] p-0 max-h-[500px] overflow-y-auto" align="end">
+                    {!aiSummary && !aiMutation.isPending && (
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <span className="text-xs text-slate-500">Generá un resumen IA de los {visible.length} proyectos</span>
+                        <Button onClick={() => { if (!aiCooldown) aiMutation.mutate(); }} size="sm" variant="ghost"
+                          className="h-7 text-xs text-indigo-600 hover:bg-indigo-100 gap-1 font-semibold">
+                          <Sparkles className="h-3 w-3" /> Generar
+                        </Button>
+                      </div>
+                    )}
+                    {aiMutation.isPending && (
+                      <div className="flex items-center gap-3 px-4 py-6 justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin text-indigo-400" />
+                        <span className="text-sm text-indigo-600 font-medium">Analizando {visible.length} proyectos...</span>
+                      </div>
+                    )}
+                    {aiSummary && !aiMutation.isPending && (
+                      <div className="space-y-3 p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Brain className="h-4 w-4 text-indigo-500" />
+                            <span className="text-sm font-bold text-slate-800">Análisis IA</span>
+                            <Badge variant="outline" className="text-[9px] h-4 bg-indigo-100 text-indigo-700 border-indigo-200 font-bold">Score: {aiSummary.weeklyScore}</Badge>
+                          </div>
+                          <Button onClick={() => { if (!aiCooldown) aiMutation.mutate(); }} variant="ghost" size="sm"
+                            className="h-6 text-[11px] text-indigo-600 hover:bg-indigo-100 gap-1">
+                            <RefreshCw className={cn("h-3 w-3", aiCooldown && "animate-spin")} />
+                            {aiCooldown ? 'Esperá...' : 'Regenerar'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-lg p-3">{aiSummary.executiveSummary}</p>
+                        {aiSummary.highlights.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {aiSummary.highlights.map((h, i) => <HighlightChip key={i} type={h.type} text={h.text} />)}
+                          </div>
+                        )}
+                        {aiSummary.projectInsights.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                              <Lightbulb className="h-3 w-3" /> Insights
+                            </p>
+                            <div className="space-y-1.5">
+                              {aiSummary.projectInsights.map((pi, i) => (
+                                <div key={i} className="flex items-start gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                                  <ArrowRight className="h-3 w-3 text-indigo-400 shrink-0 mt-0.5" />
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-bold text-indigo-600">{pi.clientName}</p>
+                                    <p className="text-xs text-slate-600 leading-snug">{pi.insight}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
                 <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
                 <div className="text-[11px] text-indigo-200 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium border border-white/10">
                   {visible.length}
@@ -1501,93 +1572,89 @@ export default function StatusSemanalPage() {
           {isLoading ? (
             <div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
-            <div className="max-w-6xl mx-auto px-6 py-5 space-y-6">
-
-              {/* ── AI Summary Panel ──────────────────────────────── */}
-              <AISummaryPanel
-                summary={aiSummary}
-                isLoading={aiMutation.isPending}
-                onGenerate={() => { if (!aiCooldown) aiMutation.mutate(); }}
-                itemCount={visible.length}
-                cooldown={aiCooldown}
-              />
+            <div className="max-w-6xl mx-auto px-6 py-3 space-y-3">
 
               {/* ── Requieren atención (hidden when empty) ──────────── */}
               {alertItems.length > 0 && (
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setAlertCollapsed(!isAlertCollapsed)}>
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
+                <div className="flex items-center gap-2 mb-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
                   <h2 className="text-sm font-bold text-foreground">Requieren atención</h2>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isAlertCollapsed && "-rotate-90")} />
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-red-100 text-red-700 border-red-200">
                     {alertItems.length}
                   </span>
-                  <div className="flex-1" />
-                  <div onClick={e => e.stopPropagation()}>
-                    <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                  </div>
-                </button>
-                {!isAlertCollapsed && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <AnimatePresence initial={false}>
-                      {alertItems.map(item => {
-                        const h = getItemHandlers(item);
-                        return (
-                          <motion.div key={item.key} layout
-                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
-                            transition={{ duration: 0.18, ease: 'easeOut' }}>
-                            <AlertCard item={item} users={appUsers}
-                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                )}
+                  <AddItemButton variant="inline" onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
+                </div>
+                <div className="rounded-xl border border-red-200/60 bg-white shadow-sm overflow-hidden">
+                  <AnimatePresence initial={false}>
+                    {alertItems.map((item, idx) => {
+                      const h = getItemHandlers(item);
+                      return (
+                        <motion.div key={item.key} layout
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -8 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          className={cn("border-l-[3px]",
+                            item.isOverdue ? "border-l-red-500" : item.healthStatus === 'rojo' ? "border-l-red-500" : "border-l-amber-400")}>
+                          <CompactRow item={item} users={appUsers}
+                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
+                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
+                            expanded={expandedAlertKey === item.key}
+                            onToggle={() => setExpandedAlertKey(expandedAlertKey === item.key ? null : item.key)}
+                            hasPrev={idx > 0}
+                            hasNext={idx < alertItems.length - 1}
+                            onPrev={() => { if (idx > 0) setExpandedAlertKey(alertItems[idx - 1].key); }}
+                            onNext={() => { if (idx < alertItems.length - 1) setExpandedAlertKey(alertItems[idx + 1].key); }} />
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
               </div>
               )}
 
               {/* ── Decisiones pendientes (hidden when empty) ─────── */}
               {decisionItems.length > 0 && (
               <div>
-                <button className="flex items-center gap-2 mb-3 w-full text-left group" onClick={() => setDecisionCollapsed(!isDecisionCollapsed)}>
-                  <Zap className="h-4 w-4 shrink-0 text-amber-500" />
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Zap className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                   <h2 className="text-sm font-bold text-foreground">Decisiones pendientes</h2>
-                  <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform shrink-0", isDecisionCollapsed && "-rotate-90")} />
-                  <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
-                    decisionItems.length > 0 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-slate-100 text-slate-400 border-slate-200")}>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border bg-amber-100 text-amber-700 border-amber-200">
                     {decisionItems.length}
                   </span>
-                </button>
-                {!isDecisionCollapsed && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <AnimatePresence initial={false}>
-                      {decisionItems.map(item => {
-                        const h = getItemHandlers(item);
-                        return (
-                          <motion.div key={item.key} layout
-                            initial={{ opacity: 0, scale: 0.97, y: -6 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.97, y: -6 }}
-                            transition={{ duration: 0.18, ease: 'easeOut' }}>
-                            <AlertCard item={item} users={appUsers}
-                              isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
-                              onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove} />
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
-                )}
+                </div>
+                <div className="rounded-xl border border-amber-200/60 bg-white shadow-sm overflow-hidden">
+                  <AnimatePresence initial={false}>
+                    {decisionItems.map((item, idx) => {
+                      const h = getItemHandlers(item);
+                      return (
+                        <motion.div key={item.key} layout
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -8 }}
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          className="border-l-[3px] border-l-amber-400">
+                          <CompactRow item={item} users={appUsers}
+                            isSelected={notesOpen !== null && ((notesOpen.type === 'project' && item.projectId === notesOpen.id) || (notesOpen.type === 'custom' && item.customId === notesOpen.id))}
+                            onOpenNotes={h.onOpenNotes} onUpdate={h.onUpdate} onRemove={h.onRemove}
+                            expanded={expandedDecisionKey === item.key}
+                            onToggle={() => setExpandedDecisionKey(expandedDecisionKey === item.key ? null : item.key)}
+                            hasPrev={idx > 0}
+                            hasNext={idx < decisionItems.length - 1}
+                            onPrev={() => { if (idx > 0) setExpandedDecisionKey(decisionItems[idx - 1].key); }}
+                            onNext={() => { if (idx < decisionItems.length - 1) setExpandedDecisionKey(decisionItems[idx + 1].key); }} />
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
               </div>
               )}
 
               {/* ── En curso ───────────────────────────────────────── */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-1.5">
                   <Circle className={cn("h-3.5 w-3.5 fill-current", normalItems.length > 0 ? "text-emerald-500" : "text-slate-300")} />
                   <h2 className="text-sm font-bold text-foreground">En curso</h2>
                   <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
