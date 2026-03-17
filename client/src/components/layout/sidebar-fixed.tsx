@@ -165,7 +165,7 @@ export default function SidebarFixed() {
         { href: "/quotations", title: "Cotizaciones", icon: FileText, description: "Gestionar cotizaciones", permission: 'quotations' as AppSection },
         { href: "/clients", title: "Clientes", icon: Building2, description: "Base de clientes", permission: 'crm' as AppSection },
         { href: "/active-projects", title: "Rentabilidad", icon: Briefcase, badge: projectCount.toString(), description: "Análisis financiero de proyectos", permission: 'projects' as AppSection },
-        { href: "/status-semanal", title: "Status Semanal", icon: ClipboardList, description: "Visión ejecutiva de proyectos", permission: 'projects' as AppSection },
+        { href: "/status-semanal", title: "Status Semanal", icon: ClipboardList, description: "Visión ejecutiva de proyectos", permission: 'status' as AppSection },
       ]
     },
     {

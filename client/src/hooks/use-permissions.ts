@@ -1,13 +1,14 @@
 import { useAuth } from "@/hooks/use-auth";
 
-export type AppSection = 'crm' | 'quotations' | 'projects' | 'dashboard' | 'finance' | 'admin';
+export type AppSection = 'crm' | 'quotations' | 'projects' | 'status' | 'dashboard' | 'finance' | 'admin';
 
-export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'dashboard', 'finance', 'admin'];
+export const ALL_SECTIONS: AppSection[] = ['crm', 'quotations', 'projects', 'status', 'dashboard', 'finance', 'admin'];
 
 export const SECTION_LABELS: Record<AppSection, string> = {
   crm: 'CRM Ventas',
   quotations: 'Cotizaciones',
   projects: 'Proyectos y Operación',
+  status: 'Status Semanal',
   dashboard: 'Dashboard Ejecutivo',
   finance: 'Finanzas y Analytics',
   admin: 'Administración',

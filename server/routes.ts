@@ -16547,7 +16547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Status Semanal ────────────────────────────────────────────────────────
 
   // GET /api/status-semanal — all active projects with client, quotation, status review and note count
-  app.get("/api/status-semanal", async (req: Request, res: Response) => {
+  app.get("/api/status-semanal", requireAuth, async (req: Request, res: Response) => {
     try {
       const rows = await db
         .select({
@@ -16615,7 +16615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/status-semanal/:projectId — upsert status review for a project
-  app.patch("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
+  app.patch("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
       if (isNaN(projectId)) {
@@ -16668,7 +16668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // otherwise Express matches "custom" as a projectId parameter
 
   // GET /api/status-semanal/custom/:itemId/notes — notes for a custom status item
-  app.get("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
+  app.get("/api/status-semanal/custom/:itemId/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       const itemId = parseInt(req.params.itemId);
       const notes = await db
@@ -16692,7 +16692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/custom/:itemId/notes — add a note to custom item
-  app.post("/api/status-semanal/custom/:itemId/notes", async (req: Request, res: Response) => {
+  app.post("/api/status-semanal/custom/:itemId/notes", requireAuth, async (req: Request, res: Response) => {
     console.log(`🔥 CUSTOM NOTES POST HANDLER HIT - itemId=${req.params.itemId}, body=${JSON.stringify(req.body)}, session=${(req.session as any)?.userId}`);
     try {
       let authorId = (req.session as any)?.userId ?? null;
@@ -16724,7 +16724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/status-semanal/:projectId/notes — notes for a project with author name
-  app.get("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+  app.get("/api/status-semanal/:projectId/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
       const notes = await db
@@ -16748,7 +16748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/:projectId/notes — add a note
-  app.post("/api/status-semanal/:projectId/notes", async (req: Request, res: Response) => {
+  app.post("/api/status-semanal/:projectId/notes", requireAuth, async (req: Request, res: Response) => {
     try {
       let authorId = (req.session as any)?.userId ?? null;
       if (!authorId) {
@@ -16780,7 +16780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/status-semanal/notes/:noteId — delete a note
-  app.delete("/api/status-semanal/notes/:noteId", async (req: Request, res: Response) => {
+  app.delete("/api/status-semanal/notes/:noteId", requireAuth, async (req: Request, res: Response) => {
     try {
       const noteId = parseInt(req.params.noteId);
       await db.delete(projectReviewNotes).where(eq(projectReviewNotes.id, noteId));
@@ -16791,7 +16791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/status-semanal/users — all users for owner dropdown
-  app.get("/api/status-semanal/users", async (_req: Request, res: Response) => {
+  app.get("/api/status-semanal/users", requireAuth, async (_req: Request, res: Response) => {
     try {
       const allUsers = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email }).from(users).orderBy(asc(users.firstName));
       const usersWithName = allUsers.map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, email: u.email }));
@@ -16875,7 +16875,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ── Weekly status custom items ─────────────────────────────────────────────
 
   // GET /api/status-semanal/custom — all custom (non-project) items
-  app.get("/api/status-semanal/custom", async (_req: Request, res: Response) => {
+  app.get("/api/status-semanal/custom", requireAuth, async (_req: Request, res: Response) => {
     try {
       const items = await db.select({
         id: weeklyStatusItems.id,
@@ -16922,7 +16922,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POST /api/status-semanal/custom — create a custom item
-  app.post("/api/status-semanal/custom", async (req: Request, res: Response) => {
+  app.post("/api/status-semanal/custom", requireAuth, async (req: Request, res: Response) => {
     try {
       const { title, subtitle } = req.body;
       if (!title?.trim()) return res.status(400).json({ message: "El título es requerido" });
@@ -16937,7 +16937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // PATCH /api/status-semanal/custom/:id — update a custom item
-  app.patch("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
+  app.patch("/api/status-semanal/custom/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -16974,7 +16974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/status-semanal/custom/:id — delete a custom item permanently
-  app.delete("/api/status-semanal/custom/:id", async (req: Request, res: Response) => {
+  app.delete("/api/status-semanal/custom/:id", requireAuth, async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       await db.delete(weeklyStatusItems).where(eq(weeklyStatusItems.id, id));
@@ -16985,7 +16985,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // DELETE /api/status-semanal/:projectId — remove a project from weekly status (hide permanently)
-  app.delete("/api/status-semanal/:projectId", async (req: Request, res: Response) => {
+  app.delete("/api/status-semanal/:projectId", requireAuth, async (req: Request, res: Response) => {
     try {
       const projectId = parseInt(req.params.projectId);
       console.log(`DELETE /api/status-semanal/${projectId} - quitar proyecto del status`);
