@@ -191,7 +191,7 @@ function AppRoutes() {
                   {/* CRM Ventas */}
                   <ProtectedRoute path="/crm" component={CRMPage} requiredPermission="crm" />
                   <ProtectedRoute path="/crm/:id" component={CRMLeadPage} requiredPermission="crm" />
-                  <ProtectedRoute path="/status-semanal" component={StatusSemanalPage} requiredPermission="projects" />
+                  <ProtectedRoute path="/status-semanal" component={StatusSemanalPage} requiredPermission="status" />
 
                   {/* Client & Resource Management */}
                   <ProtectedRoute path="/clients" component={Clients} requiredPermission="crm" />

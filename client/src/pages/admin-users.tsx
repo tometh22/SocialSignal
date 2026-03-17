@@ -39,6 +39,7 @@ const SECTION_COLORS: Record<AppSection, string> = {
   crm: "bg-purple-100 text-purple-700",
   quotations: "bg-amber-100 text-amber-700",
   projects: "bg-green-100 text-green-700",
+  status: "bg-teal-100 text-teal-700",
   finance: "bg-rose-100 text-rose-700",
   admin: "bg-gray-100 text-gray-700",
 };
