@@ -566,47 +566,35 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
       isSelected ? "bg-indigo-50/70" : "hover:bg-slate-50/60",
       expanded && "bg-slate-50/40"
     )}>
-      {/* Main row */}
-      <div className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer" onClick={onToggle}>
-        {/* Health dot */}
+      {/* Main row — minimal: dot + name + owner + deadline */}
+      <div className="flex items-center gap-2.5 px-4 py-2 cursor-pointer" onClick={onToggle}>
         <div className="shrink-0" onClick={e => e.stopPropagation()}>
           <HealthDot value={item.healthStatus} onChange={v => onUpdate({ healthStatus: v })} compact />
         </div>
 
-        {/* Project info - takes most space */}
-        <div className="flex-1 min-w-0">
-          {/* Line 1: Name + subtitle */}
-          <div className="flex items-center gap-1.5">
-            {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
-            <span className="font-semibold text-[13px] text-slate-800 truncate">{item.title}</span>
-            {item.subtitle && <span className="text-slate-400 text-[13px] truncate"> · {item.subtitle}</span>}
-          </div>
-          {/* Line 2: Badges + situation preview */}
-          <div className="flex items-center gap-2 mt-0.5">
-            <div className="hidden sm:flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
-              <MiniLevelDot value={item.marginStatus} type="margin" />
-              <MiniLevelDot value={item.teamStrain} type="team" />
-            </div>
-            <span className="hidden lg:block text-xs text-slate-400 truncate max-w-[400px]" onClick={e => { e.stopPropagation(); onToggle(); }}>
-              {item.currentAction || <span className="italic text-slate-300">Sin update</span>}
-            </span>
-            <span className="shrink-0 hidden sm:inline"><FreshnessIndicator updatedAt={item.updatedAt} /></span>
-          </div>
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          {item.isCustom && <Tag className="h-3 w-3 text-indigo-400 shrink-0" />}
+          <span className="font-medium text-[13px] text-slate-800 truncate">{item.title}</span>
+          {item.subtitle && <span className="text-slate-400 text-xs truncate hidden sm:inline"> · {item.subtitle}</span>}
+          <span className="hidden lg:inline text-xs text-slate-400 truncate max-w-[300px] ml-1">
+            {item.currentAction && `— ${item.currentAction}`}
+          </span>
         </div>
 
-        {/* Right side: Owner + Deadline + Actions */}
-        <div className="flex items-center gap-1.5 shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
           {decMeta.urgent && (
-            <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
+            <Badge variant="outline" className={cn("text-[9px] h-4 border font-semibold", decMeta.color)}>
+              {decMeta.label}
+            </Badge>
           )}
           <OwnerSelect value={item.ownerId} name={item.ownerName} onChange={v => onUpdate({ ownerId: v })} users={users} />
           <DeadlinePicker value={item.deadline} isOverdue={item.isOverdue} onChange={v => onUpdate({ deadline: v })} />
-          {onOpenNotes && (
+          {onOpenNotes && item.noteCount > 0 && (
             <button onClick={onOpenNotes}
               className={cn("flex items-center gap-0.5 p-1 rounded transition-colors",
-                isSelected ? "text-indigo-600" : item.noteCount > 0 ? "text-indigo-500 hover:text-indigo-600" : "text-slate-300 hover:text-slate-500")}>
-              <MessageSquare className="h-3.5 w-3.5" />
-              {item.noteCount > 0 && <span className="text-[10px] font-semibold">{item.noteCount}</span>}
+                isSelected ? "text-indigo-600" : "text-slate-400 hover:text-slate-600")}>
+              <MessageSquare className="h-3 w-3" />
+              <span className="text-[10px] font-medium">{item.noteCount}</span>
             </button>
           )}
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
@@ -635,63 +623,45 @@ function CompactRow({ item, users, isSelected, onOpenNotes, onUpdate, onRemove, 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="overflow-hidden">
-            <div className="px-4 pb-4 pt-2 ml-5 border-l-2 border-indigo-200/60">
-              {/* Riesgo principal — only shown if there's actual risk text */}
+            <div className="px-4 pb-3 pt-1 ml-5 border-l-2 border-slate-200/80">
               {item.mainRisk && (
-                <div className="flex items-start gap-2 rounded-lg bg-white border border-orange-100 p-3 shadow-sm mb-1">
-                  <Shield className="h-3.5 w-3.5 text-orange-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-orange-500 uppercase font-bold tracking-wide mb-1 flex items-center gap-1">
-                      Riesgo principal
-                    </p>
-                    <InlineText value={item.mainRisk} placeholder="¿Cuál es el riesgo principal de este proyecto?" onSave={v => onUpdate({ mainRisk: v })} className="text-sm" />
-                  </div>
+                <div className="mb-2">
+                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Riesgo</p>
+                  <InlineText value={item.mainRisk} placeholder="Riesgo principal" onSave={v => onUpdate({ mainRisk: v })} className="text-xs" />
                 </div>
               )}
 
-              {/* Editable fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
-                    <Circle className="h-2 w-2 fill-indigo-400 text-indigo-400" /> Update
-                  </p>
-                  <InlineText value={item.currentAction} placeholder="Resumen en 1 línea del estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-sm" />
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Update</p>
+                  <InlineText value={item.currentAction} placeholder="Estado actual" onSave={v => onUpdate({ currentAction: v })} multiline className="text-xs" />
                 </div>
-                <div className="rounded-lg bg-white border border-slate-100 p-3 shadow-sm">
-                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide mb-1.5 flex items-center gap-1">
-                    <ArrowRight className="h-2.5 w-2.5 text-indigo-400" /> Próximo paso
-                  </p>
-                  <InlineText value={item.nextMilestone} placeholder="Acción concreta esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-sm" />
+                <div>
+                  <p className="text-[10px] text-slate-400 font-semibold mb-0.5">Próximo paso</p>
+                  <InlineText value={item.nextMilestone} placeholder="Acción esta semana" onSave={v => onUpdate({ nextMilestone: v })} multiline className="text-xs" />
                 </div>
               </div>
 
-              {/* Secondary controls */}
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
-                <div className="flex items-center gap-2">
-                  <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" showLabel />
-                  <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" showLabel />
-                  <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
-                </div>
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <LevelBadge value={item.marginStatus} onChange={v => onUpdate({ marginStatus: v })} label="Rentabilidad" type="margin" />
+                <LevelBadge value={item.teamStrain} onChange={v => onUpdate({ teamStrain: v })} label="Carga equipo" type="team" />
+                <DecisionBadge value={item.decisionNeeded} onChange={v => onUpdate({ decisionNeeded: v })} />
                 <div className="flex-1" />
                 {onOpenNotes && (
                   <button onClick={onOpenNotes}
-                    className={cn("flex items-center gap-1 text-xs rounded-md px-2 py-1 transition-colors",
-                      isSelected ? "text-indigo-600 bg-indigo-50" : item.noteCount > 0 ? "text-indigo-500 hover:bg-indigo-50" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100")}>
+                    className={cn("text-xs text-slate-400 hover:text-indigo-600 transition-colors")}>
                     <MessageSquare className="h-3 w-3" />
-                    <span>{item.noteCount > 0 ? `${item.noteCount} comentario${item.noteCount !== 1 ? 's' : ''}` : 'Comentar'}</span>
                   </button>
                 )}
                 {(hasPrev || hasNext) && (
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5">
                     <button onClick={onPrev} disabled={!hasPrev}
-                      className={cn("p-1 rounded-md transition-colors",
-                        hasPrev ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
-                      <ChevronLeft className="h-3.5 w-3.5" />
+                      className={cn("p-0.5 rounded", hasPrev ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}>
+                      <ChevronLeft className="h-3 w-3" />
                     </button>
                     <button onClick={onNext} disabled={!hasNext}
-                      className={cn("p-1 rounded-md transition-colors",
-                        hasNext ? "text-slate-500 hover:bg-slate-100" : "text-slate-200 cursor-not-allowed")}>
-                      <ChevronRight className="h-3.5 w-3.5" />
+                      className={cn("p-0.5 rounded", hasNext ? "text-slate-400 hover:bg-slate-100" : "text-slate-200")}>
+                      <ChevronRight className="h-3 w-3" />
                     </button>
                   </div>
                 )}
@@ -1390,41 +1360,20 @@ export default function StatusSemanalPage() {
               </div>
 
               {/* Right: badges & actions */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                {criticalCount > 0 ? (
-                  <div className="flex items-center gap-1 bg-red-500/90 backdrop-blur-sm text-white text-[11px] font-bold px-2.5 py-1 rounded-full border border-red-400/30">
-                    <AlertTriangle className="h-3 w-3" />
-                    {criticalCount}
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 bg-emerald-500/20 backdrop-blur-sm border border-emerald-300/30 text-emerald-100 text-[11px] font-semibold px-2.5 py-1 rounded-full">
-                    <CheckCircle2 className="h-3 w-3" />
-                    OK
-                  </div>
-                )}
-                {decisionCount > 0 && (
-                  <div className="flex items-center gap-1 bg-amber-400/20 backdrop-blur-sm border border-amber-300/30 text-amber-100 text-[11px] font-bold px-2.5 py-1 rounded-full">
-                    <Zap className="h-3 w-3" />
-                    {decisionCount}
-                  </div>
-                )}
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-indigo-200 font-medium mr-1">{visible.length} ítems</span>
                 <button onClick={() => setShowFilters(v => !v)}
-                  className={cn("flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors backdrop-blur-sm",
+                  className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
                     showFilters || filterHealth || filterOwner !== null
                       ? "bg-white/25 text-white border-white/30"
                       : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
                   <Filter className="h-3 w-3" />
-                  {(filterHealth || filterOwner !== null) && (
-                    <span className="bg-white text-indigo-700 text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
-                      {(filterHealth ? 1 : 0) + (filterOwner !== null ? 1 : 0)}
-                    </span>
-                  )}
                 </button>
                 {hiddenCount > 0 && (
                   <button onClick={() => setShowHidden(v => !v)}
-                    className={cn("flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors backdrop-blur-sm",
+                    className={cn("p-1.5 rounded-full border transition-colors backdrop-blur-sm",
                       showHidden ? "bg-white/25 text-white border-white/30" : "bg-white/10 text-indigo-200 border-white/15 hover:bg-white/20 hover:text-white")}>
-                    {showHidden ? <Eye className="h-3 w-3" /> : <><EyeOff className="h-3 w-3" /> {hiddenCount}</>}
+                    {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
                   </button>
                 )}
                 <Popover open={aiPopoverOpen} onOpenChange={setAiPopoverOpen}>
@@ -1496,9 +1445,6 @@ export default function StatusSemanalPage() {
                   </PopoverContent>
                 </Popover>
                 <AddItemButton onAdd={(title, subtitle) => createCustom.mutate({ title, subtitle })} />
-                <div className="text-[11px] text-indigo-200 bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium border border-white/10">
-                  {visible.length}
-                </div>
               </div>
             </div>
 
@@ -1669,11 +1615,6 @@ export default function StatusSemanalPage() {
                   </div>
                 ) : (
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                    <div className="flex items-center gap-2.5 px-4 py-2 bg-slate-50/80 border-b border-slate-200">
-                      <div className="w-2.5 shrink-0" />
-                      <div className="flex-1 text-[10px] font-bold text-slate-400 uppercase tracking-wide">Proyecto</div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide shrink-0 w-[220px] text-right">Owner · Deadline · Acciones</div>
-                    </div>
                     <AnimatePresence initial={false}>
                       {normalItems.map((item, idx) => {
                         const h = getItemHandlers(item);
