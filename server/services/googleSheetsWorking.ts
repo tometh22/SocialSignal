@@ -2062,9 +2062,13 @@ class GoogleSheetsWorkingService {
     console.log(`📊 [Resumen Ejecutivo] Columna Mes: ${mesColIdx}, Año: ${yearColIdx}`);
     
     // Procesar cada fila de datos (empezando desde fila 1)
+    // Google Sheets API truncates trailing empty cells per row, so pad each row to header length
+    const headerLen = headerRow.length;
     for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
       if (!row || row.length === 0) continue;
+      // Pad short rows to match header length (prevents data loss from API truncation)
+      while (row.length < headerLen) row.push('');
       
       // Obtener mes y año
       const mesLabel = (row[mesColIdx] || '').toString().trim();
