@@ -40,6 +40,8 @@ interface DashboardData {
   ivaCompras: number;
   impuestosUsa: number;
   facturacionAdelantada: number;
+  proyeccionResultado: number;
+  balance60Dias: number;
   burnRate: number;
   runway: number;
   ventasVariation: number | null;
@@ -66,6 +68,8 @@ interface TrendRow {
   totalActivo: number;
   totalPasivo: number;
   balanceNeto: number;
+  proyeccionResultado: number;
+  balance60Dias: number;
 }
 
 // ─── Formatters ──────────────────────────────────────────────────
@@ -451,6 +455,18 @@ export default function UnifiedExecutiveDashboard() {
                   <span className="text-sm text-gray-800">Balance Neto</span>
                   <span className={`text-sm font-mono ${d.balanceNeto >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmtFull(d.balanceNeto)}</span>
                 </div>
+                {d.balance60Dias !== 0 && (
+                  <div className="flex justify-between items-center py-2 px-3 bg-indigo-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Balance 60 días</span>
+                    <span className="text-sm font-mono font-semibold text-indigo-700">{fmtFull(d.balance60Dias)}</span>
+                  </div>
+                )}
+                {d.proyeccionResultado !== 0 && (
+                  <div className={`flex justify-between items-center py-2 px-3 rounded-lg ${d.proyeccionResultado >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
+                    <span className="text-sm text-gray-600">Proyección Resultado</span>
+                    <span className={`text-sm font-mono font-semibold ${d.proyeccionResultado >= 0 ? "text-emerald-700" : "text-red-600"}`}>{fmtFull(d.proyeccionResultado)}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

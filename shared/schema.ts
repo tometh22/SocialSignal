@@ -2872,6 +2872,12 @@ export const monthlyFinancialSummary = pgTable("monthly_financial_summary", {
   ebitOperativo: numeric("ebit_operativo", { precision: 14, scale: 2 }), // EBIT (Utilidad operativa)
   beneficioNeto: numeric("beneficio_neto", { precision: 14, scale: 2 }), // Beneficio neto (con provisiones)
   markupPromedio: numeric("markup_promedio", { precision: 10, scale: 4 }), // Markup promedio global
+  margenOperativo: numeric("margen_operativo", { precision: 8, scale: 4 }), // Margen Operativo % (from sheet)
+  margenNeto: numeric("margen_neto", { precision: 8, scale: 4 }), // Margen Neto % (from sheet)
+
+  // Proyección y Balance 60 días
+  proyeccionResultado: numeric("proyeccion_resultado", { precision: 14, scale: 2 }), // Proyección resultado
+  balance60Dias: numeric("balance_60_dias", { precision: 14, scale: 2 }), // Balance 60 días
   
   // Metadatos
   createdAt: timestamp("created_at").notNull().defaultNow(),

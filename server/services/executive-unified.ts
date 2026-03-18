@@ -56,6 +56,10 @@ export interface UnifiedDashboardData {
   impuestosUsa: number;
   facturacionAdelantada: number;
 
+  // Proyección y Balance 60 días
+  proyeccionResultado: number;
+  balance60Dias: number;
+
   // Derived
   burnRate: number;
   runway: number;
@@ -89,6 +93,8 @@ export interface MonthlyTrend {
   totalActivo: number;
   totalPasivo: number;
   balanceNeto: number;
+  proyeccionResultado: number;
+  balance60Dias: number;
 }
 
 function num(val: any): number {
@@ -257,6 +263,14 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
   // Provisiones
   const facturacionAdelantada = num(current?.pasivo_facturacion_adelantada);
 
+  // Proyección y Balance 60 días
+  const proyeccionResultado = num(current?.proyeccion_resultado);
+  const balance60Dias = num(current?.balance_60_dias);
+
+  // Margen from sheet (prefer sheet values over calculated when available)
+  const sheetMargenOperativo = num(current?.margen_operativo);
+  const sheetMargenNeto = num(current?.margen_neto);
+
   // Burn & Runway
   const burnRate = costosDirectos + costosIndirectos + impuestosUsa;
   const runway = burnRate > 0 ? Math.round((cajaTotal / burnRate) * 10) / 10 : 0;
@@ -368,13 +382,15 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
       ebitOperativo: ebit,
       beneficioNeto: bn,
       markup: cd > 0 ? Math.round((rv / cd) * 100) / 100 : 0,
-      margenOperativoPct: pct(ebit, rv),
-      margenNetoPct: pct(bn, rv),
+      margenOperativoPct: num(row.margen_operativo) !== 0 ? num(row.margen_operativo) : pct(ebit, rv),
+      margenNetoPct: num(row.margen_neto) !== 0 ? num(row.margen_neto) : pct(bn, rv),
       cashflowNeto: num(row.cashflow_neto),
       cajaTotal: num(row.caja_total),
       totalActivo: num(row.total_activo),
       totalPasivo: num(row.total_pasivo),
       balanceNeto: num(row.balance_neto) || (num(row.total_activo) - num(row.total_pasivo)),
+      proyeccionResultado: num(row.proyeccion_resultado),
+      balance60Dias: num(row.balance_60_dias),
     };
   });
 
@@ -391,10 +407,10 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     margenBrutoPct: pct(margenBruto, ventasMes),
     costosIndirectos,
     ebitOperativo,
-    margenOperativoPct: pct(ebitOperativo, ventasMes),
+    margenOperativoPct: sheetMargenOperativo !== 0 ? sheetMargenOperativo : pct(ebitOperativo, ventasMes),
     impuestos,
     beneficioNeto,
-    margenNetoPct: pct(beneficioNeto, ventasMes),
+    margenNetoPct: sheetMargenNeto !== 0 ? sheetMargenNeto : pct(beneficioNeto, ventasMes),
     markup: Math.round(markup * 100) / 100,
 
     // Balance
@@ -415,6 +431,10 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     ivaCompras,
     impuestosUsa,
     facturacionAdelantada,
+
+    // Proyección y Balance 60 días
+    proyeccionResultado,
+    balance60Dias,
 
     // Derived
     burnRate,

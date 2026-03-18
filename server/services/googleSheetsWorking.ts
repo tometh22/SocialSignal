@@ -2035,6 +2035,14 @@ class GoogleSheetsWorkingService {
       'iva compras': 'ivaCompras',
       'pasivo proveedores a pagar': 'cuentasPagarUsd',
       'provisión pasivo costos facturación adelantada': 'facturacionAdelantadaUsd',
+      // Márgenes (porcentajes)
+      'margen operativo': 'margenOperativo',
+      'margen neto': 'margenNeto',
+      // Proyección y Balance 60 días
+      'proyección resultado': 'proyeccionResultado',
+      'proyeccion resultado': 'proyeccionResultado',
+      'balance 60 días': 'balance60Dias',
+      'balance 60 dias': 'balance60Dias',
     };
     
     // Encontrar índices de columnas para cada KPI
@@ -4125,6 +4133,10 @@ export interface ResumenEjecutivoRow {
   beneficioNeto?: number;
   markupPromedio?: number;
   facturacionAdelantadaUsd?: number;  // Provisión Pasivo Costos Facturación Adelantada
+  margenOperativo?: number;  // Margen Operativo % (from sheet)
+  margenNeto?: number;       // Margen Neto % (from sheet)
+  proyeccionResultado?: number; // Proyección resultado
+  balance60Dias?: number;    // Balance 60 días
 }
 
 // Tipo para movimientos de cash flow
