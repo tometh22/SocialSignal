@@ -99,6 +99,11 @@ const port = Number(process.env.PORT || 5000);
     // autoSyncService.start();
     // console.log("🔄 Sincronización automática iniciada (cada 30 minutos)");
 
+    // Lightweight Resumen Ejecutivo sync (every 2 hours + on startup)
+    const { startResumenEjecutivoSync } = await import("./jobs/resumen-ejecutivo-sync");
+    startResumenEjecutivoSync();
+    console.log("📊 Resumen Ejecutivo auto-sync iniciado (cada 2 horas)");
+
     // Start daily SoT ETL synchronization job
     // const { startDailySoTSync } = await import("./jobs/daily-sot-sync");
     // startDailySoTSync();
