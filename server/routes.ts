@@ -5147,6 +5147,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 COMPREHENSIVE DIAGNOSTIC: Full pipeline trace for a specific period
+  app.get("/api/debug/diagnose-period/:period", requireAuth, async (req, res) => {
+    const period = req.params.period; // e.g. "2026-01"
+    const diagnosis: Record<string, any> = { period, steps: [] };
+
+    try {
+      // Step 1: Raw Google Sheet headers
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking.js');
+      const sheets = (googleSheetsWorkingService as any).createSheetsClientFromJSON();
+      const spreadsheetId = (googleSheetsWorkingService as any).spreadsheetId;
+
+      const rawResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: "'Resumen Ejecutivo'!A1:AZ2",
+        valueRenderOption: 'FORMATTED_VALUE',
+      });
+      const rawRows = rawResponse.data.values || [];
+      const rawHeaders = rawRows[0] || [];
+      const firstDataRow = rawRows[1] || [];
+
+      // Show raw headers with their byte representation for debugging
+      const headerAnalysis = rawHeaders.map((h: any, i: number) => {
+        const raw = (h || '').toString();
+        const normalized = raw.replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();
+        const hasNewlines = /[\n\r]/.test(raw);
+        const bytes = hasNewlines ? [...raw].map(c => c.charCodeAt(0)) : undefined;
+        return { col: i, raw, normalized, hasNewlines, bytes, sampleValue: (firstDataRow[i] || '(empty)').toString() };
+      });
+
+      diagnosis.steps.push({
+        step: '1_raw_headers',
+        totalColumns: rawHeaders.length,
+        headers: headerAnalysis,
+      });
+
+      // Step 2: Parse via getResumenEjecutivo
+      const parsedRows = await googleSheetsWorkingService.getResumenEjecutivo();
+      const targetRow = parsedRows.find((r: any) => r.periodKey === period);
+
+      diagnosis.steps.push({
+        step: '2_parsed_data',
+        totalPeriods: parsedRows.length,
+        allPeriods: parsedRows.map((r: any) => r.periodKey),
+        targetPeriod: period,
+        targetFound: !!targetRow,
+        targetData: targetRow || null,
+        targetPnlFields: targetRow ? {
+          facturacionTotal: (targetRow as any).facturacionTotal ?? 'UNDEFINED',
+          costosDirectos: (targetRow as any).costosDirectos ?? 'UNDEFINED',
+          costosIndirectos: (targetRow as any).costosIndirectos ?? 'UNDEFINED',
+          ebitOperativo: (targetRow as any).ebitOperativo ?? 'UNDEFINED',
+          beneficioNeto: (targetRow as any).beneficioNeto ?? 'UNDEFINED',
+          cashflowNeto: (targetRow as any).cashflowNeto ?? 'UNDEFINED',
+          markupPromedio: (targetRow as any).markupPromedio ?? 'UNDEFINED',
+          impuestosUsa: (targetRow as any).impuestosUsa ?? 'UNDEFINED',
+        } : null,
+      });
+
+      // Step 3: Check what's in the DB
+      const { rows: dbRows } = await pool.query(
+        `SELECT * FROM monthly_financial_summary WHERE period_key = $1`,
+        [period]
+      );
+
+      diagnosis.steps.push({
+        step: '3_database',
+        recordExists: dbRows.length > 0,
+        record: dbRows[0] || null,
+        pnlFields: dbRows[0] ? {
+          facturacion_total: dbRows[0].facturacion_total,
+          costos_directos: dbRows[0].costos_directos,
+          costos_indirectos: dbRows[0].costos_indirectos,
+          ebit_operativo: dbRows[0].ebit_operativo,
+          beneficio_neto: dbRows[0].beneficio_neto,
+          cashflow_neto: dbRows[0].cashflow_neto,
+          markup_promedio: dbRows[0].markup_promedio,
+          impuestos_usa: dbRows[0].impuestos_usa,
+        } : null,
+      });
+
+      // Step 4: Run sync and capture result
+      const { syncResumenEjecutivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
+      const syncResult = await syncResumenEjecutivoToMonthlyFinancialSummary();
+      diagnosis.steps.push({
+        step: '4_sync_result',
+        ...syncResult,
+      });
+
+      // Step 5: Re-check DB after sync
+      const { rows: dbRowsAfter } = await pool.query(
+        `SELECT * FROM monthly_financial_summary WHERE period_key = $1`,
+        [period]
+      );
+      diagnosis.steps.push({
+        step: '5_database_after_sync',
+        recordExists: dbRowsAfter.length > 0,
+        pnlFields: dbRowsAfter[0] ? {
+          facturacion_total: dbRowsAfter[0].facturacion_total,
+          costos_directos: dbRowsAfter[0].costos_directos,
+          ebit_operativo: dbRowsAfter[0].ebit_operativo,
+          beneficio_neto: dbRowsAfter[0].beneficio_neto,
+          cashflow_neto: dbRowsAfter[0].cashflow_neto,
+          markup_promedio: dbRowsAfter[0].markup_promedio,
+        } : null,
+      });
+
+      res.json(diagnosis);
+    } catch (error: any) {
+      diagnosis.error = error.message;
+      diagnosis.stack = error.stack;
+      res.status(500).json(diagnosis);
+    }
+  });
+
   app.post("/api/trigger-activo-sync", requireAuth, async (req, res) => {
     try {
       const { syncActivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
