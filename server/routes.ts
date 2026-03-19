@@ -5100,6 +5100,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 🔍 DEBUG: See what Google Sheets returns for Resumen Ejecutivo (helps diagnose missing data)
+  app.get("/api/debug/resumen-ejecutivo-raw", requireAuth, async (req, res) => {
+    try {
+      const { googleSheetsWorkingService } = await import('./services/googleSheetsWorking');
+      const rows = await googleSheetsWorkingService.getResumenEjecutivo();
+
+      // Show each period with which fields have data vs missing
+      const summary = rows.map(row => {
+        const fields: Record<string, any> = {};
+        const missing: string[] = [];
+        const present: string[] = [];
+
+        for (const key of ['facturacionTotal', 'costosDirectos', 'costosIndirectos', 'ebitOperativo',
+                           'beneficioNeto', 'markupPromedio', 'cashflowNeto', 'cashflowIngresos',
+                           'cashflowEgresos', 'cajaTotal', 'totalActivo', 'totalPasivo', 'balanceNeto'] as const) {
+          const val = (row as any)[key];
+          fields[key] = val ?? null;
+          if (val === undefined || val === null) missing.push(key);
+          else present.push(key);
+        }
+
+        return {
+          periodKey: row.periodKey,
+          monthLabel: row.monthLabel,
+          year: row.year,
+          presentFields: present.length,
+          missingFields: missing,
+          fields,
+        };
+      });
+
+      res.json({
+        totalPeriods: rows.length,
+        periods: summary.sort((a, b) => b.periodKey.localeCompare(a.periodKey))
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.post("/api/trigger-activo-sync", requireAuth, async (req, res) => {
     try {
       const { syncActivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');

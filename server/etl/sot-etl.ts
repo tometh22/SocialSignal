@@ -1548,6 +1548,10 @@ export async function syncResumenEjecutivoToMonthlyFinancialSummary(): Promise<{
           ebitOperativo: row.ebitOperativo?.toString() || null,
           beneficioNeto: row.beneficioNeto?.toString() || null,
           markupPromedio: row.markupPromedio?.toString() || null,
+          margenOperativo: row.margenOperativo?.toString() || null,
+          margenNeto: row.margenNeto?.toString() || null,
+          proyeccionResultado: row.proyeccionResultado?.toString() || null,
+          balance60Dias: row.balance60Dias?.toString() || null,
         };
 
         if (existing.length > 0) {

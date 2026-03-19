@@ -2034,6 +2034,14 @@ class GoogleSheetsWorkingService {
       'iva compras': 'ivaCompras',
       'pasivo proveedores a pagar': 'cuentasPagarUsd',
       'provisión pasivo costos facturación adelantada': 'facturacionAdelantadaUsd',
+      // Márgenes (porcentajes)
+      'margen operativo': 'margenOperativo',
+      'margen neto': 'margenNeto',
+      // Proyección y Balance 60 días
+      'proyección resultado': 'proyeccionResultado',
+      'proyeccion resultado': 'proyeccionResultado',
+      'balance 60 días': 'balance60Dias',
+      'balance 60 dias': 'balance60Dias',
     };
     
     // Encontrar índices de columnas para cada KPI
@@ -2061,9 +2069,13 @@ class GoogleSheetsWorkingService {
     console.log(`📊 [Resumen Ejecutivo] Columna Mes: ${mesColIdx}, Año: ${yearColIdx}`);
     
     // Procesar cada fila de datos (empezando desde fila 1)
+    // Google Sheets API truncates trailing empty cells per row, so pad each row to header length
+    const headerLen = headerRow.length;
     for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
       if (!row || row.length === 0) continue;
+      // Pad short rows to match header length (prevents data loss from API truncation)
+      while (row.length < headerLen) row.push('');
       
       // Obtener mes y año
       const mesLabel = (row[mesColIdx] || '').toString().trim();
@@ -4120,6 +4132,10 @@ export interface ResumenEjecutivoRow {
   beneficioNeto?: number;
   markupPromedio?: number;
   facturacionAdelantadaUsd?: number;  // Provisión Pasivo Costos Facturación Adelantada
+  margenOperativo?: number;  // Margen Operativo % (from sheet)
+  margenNeto?: number;       // Margen Neto % (from sheet)
+  proyeccionResultado?: number; // Proyección resultado
+  balance60Dias?: number;    // Balance 60 días
 }
 
 // Tipo para movimientos de cash flow
