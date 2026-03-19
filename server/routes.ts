@@ -5088,7 +5088,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary
+  let resumenSyncInProgress = false;
   app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, async (req, res) => {
+    if (resumenSyncInProgress) {
+      return res.json({ success: true, skipped: true, message: 'Sync already in progress' });
+    }
+    resumenSyncInProgress = true;
     try {
       const { syncResumenEjecutivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
       console.log('📊 [API] Triggering Resumen Ejecutivo ETL sync...');
@@ -5097,6 +5102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('❌ [API] Resumen Ejecutivo ETL sync failed:', error);
       res.status(500).json({ success: false, error: error.message });
+    } finally {
+      resumenSyncInProgress = false;
     }
   });
 
