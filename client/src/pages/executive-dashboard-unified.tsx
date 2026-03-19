@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@/lib/queryClient";
 import { Card, CardContent } from "@/components/ui/card";
