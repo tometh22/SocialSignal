@@ -116,10 +116,16 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   const availablePeriods = periodRows.map(r => r.period_key);
 
-  // If requested period not in MFS, fall back to most recent MFS period
+  // If requested period not in MFS, fall back to latest period with actual P&L data
   let effectivePeriod = periodKey;
   if (!availablePeriods.includes(periodKey) && availablePeriods.length > 0) {
-    effectivePeriod = availablePeriods[0];
+    // Prefer the latest period that has P&L data (ventas > 0), not just balance
+    const { rows: pnlRows } = await pool.query(`
+      SELECT period_key FROM monthly_financial_summary
+      WHERE facturacion_total IS NOT NULL AND CAST(facturacion_total AS NUMERIC) > 0
+      ORDER BY period_key DESC LIMIT 1
+    `);
+    effectivePeriod = pnlRows.length > 0 ? pnlRows[0].period_key : availablePeriods[0];
     console.log(`[UnifiedDashboard] Period ${periodKey} not in MFS, falling back to ${effectivePeriod}`);
   }
 

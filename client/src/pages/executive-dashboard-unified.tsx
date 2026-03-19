@@ -385,6 +385,13 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
+        {/* ─── Incomplete month warning ─── */}
+        {d.ventasMes === 0 && d.ebitOperativo === 0 && (d.totalActivo > 0 || d.cuentasCobrarUsd > 0) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+            <strong>Datos parciales</strong> — Este mes aún no tiene datos de P&L (ventas, costos). Solo se muestran datos de balance.
+          </div>
+        )}
+
         {/* ─── Top KPIs (same 7 as Looker Resumen Ejecutivo) ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <KpiCard
