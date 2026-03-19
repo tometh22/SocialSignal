@@ -5301,7 +5301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: "'Resumen Ejecutivo'!A1:Z100",
+        range: "'Resumen Ejecutivo'!A1:AZ100",
         valueRenderOption: 'FORMATTED_VALUE',
       });
       
