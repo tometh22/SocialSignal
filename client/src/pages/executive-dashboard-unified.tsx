@@ -189,7 +189,7 @@ function WaterfallPnL({ data }: { data: DashboardData }) {
             </span>
             <div className="flex items-center gap-4">
               <span className={`text-sm font-mono ${textClass}`}>
-                {fmtFull(Math.abs(row.value))}
+                {row.type === "cost" ? fmtFull(Math.abs(row.value)) : fmtFull(row.value)}
               </span>
               {row.pct !== null && (
                 <span className={`text-xs font-medium w-16 text-right ${row.value >= 0 ? "text-emerald-600" : "text-red-500"}`}>
@@ -352,6 +352,7 @@ export default function UnifiedExecutiveDashboard() {
   }
 
   const d = data;
+  const isEmptyPeriod = d.ventasMes === 0 && d.ebitOperativo === 0 && d.beneficioNeto === 0;
 
   return (
     <TooltipProvider>
@@ -385,7 +386,20 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
-        {/* Banner removed — data comes from Google Sheets sync automatically */}
+        {/* Banner for periods with no P&L data (month not yet closed) */}
+        {isEmptyPeriod && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-center gap-3">
+            <Calendar className="w-5 h-5 text-amber-500 shrink-0" />
+            <div>
+              <span className="text-sm font-medium text-amber-800">
+                {periodLabel(d.periodKey)} — Mes no cerrado
+              </span>
+              <p className="text-xs text-amber-600 mt-0.5">
+                Los datos P&L de este período aún no están disponibles en el Resumen Ejecutivo. Se muestran solo datos de Balance y Caja.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ─── Top KPIs (same 7 as Looker Resumen Ejecutivo) ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

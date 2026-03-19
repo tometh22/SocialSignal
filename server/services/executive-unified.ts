@@ -243,8 +243,18 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   const margenBruto = ventasMes - costosDirectos;
 
-  // Impuestos = EBIT - Beneficio Neto
-  const impuestos = (ventasMes > 0 && ebitOperativo !== 0) ? ebitOperativo - beneficioNeto : impuestosUsa;
+  // Impuestos: derive from EBIT - Beneficio Neto (matches Looker implicit calculation)
+  // Sanity check: if the derived "impuestos" exceeds 2x |EBIT|, the Sheet data is inconsistent
+  // (likely beneficioNeto includes provisions/adjustments beyond taxes) — fall back to impuestosUsa
+  let impuestos = impuestosUsa;
+  if (ventasMes > 0 && ebitOperativo !== 0) {
+    const derivedImpuestos = ebitOperativo - beneficioNeto;
+    if (derivedImpuestos >= 0 && (Math.abs(ebitOperativo) === 0 || derivedImpuestos <= Math.abs(ebitOperativo) * 2)) {
+      impuestos = derivedImpuestos;
+    } else {
+      console.warn(`[UnifiedDashboard] Impuestos sanity check failed: derived=${derivedImpuestos}, EBIT=${ebitOperativo}, beneficio=${beneficioNeto}. Using impuestosUsa=${impuestosUsa}`);
+    }
+  }
 
   // Balance
   const totalActivo = num(current?.total_activo);

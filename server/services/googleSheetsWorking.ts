@@ -2025,9 +2025,13 @@ class GoogleSheetsWorkingService {
       // Cashflow
       'chasflow': 'cashflowNeto',
       'cashflow': 'cashflowNeto',
+      'cash flow': 'cashflowNeto',
+      'cash flow neto': 'cashflowNeto',
       'cashflow neto': 'cashflowNeto',
       'cashflow ingresos': 'cashflowIngresos',
+      'cash flow ingresos': 'cashflowIngresos',
       'cashflow egresos': 'cashflowEgresos',
+      'cash flow egresos': 'cashflowEgresos',
       // Provisiones / Pasivos
       'pasivo provisión impuesto usa': 'impuestosUsa',
       'impuestos usa': 'impuestosUsa',
