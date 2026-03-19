@@ -12085,11 +12085,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Resolver período correcto basado en timeFilter (august_2025 → 2025-08)
       let fxPeriod = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`; // Default
+      // Extraer año del timeFilter dinámicamente (ej: "august_2025" → 2025)
+      const yearMatchFx = timeFilter.match(/(20\d{2})/);
       if (timeFilter.includes('august') || timeFilter.includes('agosto')) {
-        const year = timeFilter.includes('2025') ? '2025' : '2024';
+        const year = yearMatchFx ? yearMatchFx[1] : String(new Date().getFullYear());
         fxPeriod = `${year}-08`;
       }
-      
+
       const fxRate = await resolveFX(fxPeriod, projectId.toString());
 
       // 4. Formatear datos para tabla detalle Ventas Tomi normalizada
@@ -12238,11 +12240,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Resolver período correcto basado en timeFilter (august_2025 → 2025-08)
       let fxPeriodCosts = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`; // Default
+      // Extraer año del timeFilter dinámicamente (ej: "august_2025" → 2025)
+      const yearMatchFxCosts = timeFilter.match(/(20\d{2})/);
       if (timeFilter.includes('august') || timeFilter.includes('agosto')) {
-        const year = timeFilter.includes('2025') ? '2025' : '2024';
+        const year = yearMatchFxCosts ? yearMatchFxCosts[1] : String(new Date().getFullYear());
         fxPeriodCosts = `${year}-08`;
       }
-      
+
       const fxRateCosts = await resolveFXCosts(fxPeriodCosts, projectId.toString());
 
       // 4. Formatear datos para tabla detalle Costos directos e indirectos normalizada

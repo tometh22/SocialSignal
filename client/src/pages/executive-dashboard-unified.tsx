@@ -302,6 +302,29 @@ export default function UnifiedExecutiveDashboard() {
     setSelectedPeriod(data.periodKey);
   }
 
+  // ─── Auto-sync: if period has no P&L data, trigger sync silently ───
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const autoSyncAttempted = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!data) return;
+    const noData = data.ventasMes === 0 && data.ebitOperativo === 0;
+    const period = data.periodKey;
+    if (noData && period && !autoSyncAttempted.current.has(period) && !autoSyncing) {
+      autoSyncAttempted.current.add(period);
+      setAutoSyncing(true);
+      authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" })
+        .then(res => res.json())
+        .then(result => {
+          if (result.success) {
+            refetch();
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAutoSyncing(false));
+    }
+  }, [data, autoSyncing, refetch]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
