@@ -237,8 +237,20 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
   if (ventasMes > 0 && costosDirectos === 0 && markup > 0) {
     costosDirectos = Math.round((ventasMes / markup) * 100) / 100;
   }
-  if (ventasMes > 0 && costosIndirectos === 0 && costosDirectos > 0) {
-    costosIndirectos = Math.round((ventasMes - costosDirectos - ebitOperativo) * 100) / 100;
+  // If costosDirectos has a value but costosIndirectos is 0, and we have markup,
+  // check if costosDirectos is actually the COMBINED costs (from "Costos Cerrados USD" column).
+  // Split using markup: real direct = ventas/markup, indirect = remainder.
+  if (ventasMes > 0 && costosDirectos > 0 && costosIndirectos === 0 && markup > 0) {
+    const derivedDirect = Math.round((ventasMes / markup) * 100) / 100;
+    if (derivedDirect < costosDirectos * 0.8) {
+      // costosDirectos is likely combined costs — split it
+      console.log(`[UnifiedDashboard] Splitting combined costs: total=${costosDirectos}, derivedDirect=${derivedDirect} (from markup=${markup})`);
+      costosIndirectos = Math.round((ventasMes - derivedDirect - ebitOperativo) * 100) / 100;
+      costosDirectos = derivedDirect;
+    } else {
+      // costosDirectos is truly just direct — derive indirect from the gap
+      costosIndirectos = Math.round((ventasMes - costosDirectos - ebitOperativo) * 100) / 100;
+    }
   }
 
   const margenBruto = ventasMes - costosDirectos;

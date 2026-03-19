@@ -2003,18 +2003,25 @@ class GoogleSheetsWorkingService {
     const columnMapping: Record<string, keyof ResumenEjecutivoRow> = {
       // Balance / Activos
       'activo líquido': 'cajaTotal',
+      'activo liquido': 'cajaTotal',
       'activo total': 'totalActivo',
       'pasivo total': 'totalPasivo',
       'balance neto (activo-pasivo)': 'balanceNeto',
       'balance neto': 'balanceNeto',
       'activo mediano plazo crypto': 'inversiones',
       'activo mediano plazo clientes a cobrar': 'cuentasCobrarUsd',
-      // P&L
+      // P&L — multiple header variants to match actual Sheet columns
       'ventas del mes': 'facturacionTotal',
       'ventas': 'facturacionTotal',
       'facturación': 'facturacionTotal',
       'facturacion': 'facturacionTotal',
+      'facturación cerrada usd': 'facturacionTotal',
+      'facturacion cerrada usd': 'facturacionTotal',
+      'facturación cerrada': 'facturacionTotal',
+      'facturacion cerrada': 'facturacionTotal',
       'costos directos': 'costosDirectos',
+      'costos cerrados usd': 'costosDirectos',
+      'costos cerrados': 'costosDirectos',
       'costos indirectos': 'costosIndirectos',
       'ebit utilidad operativa': 'ebitOperativo',
       'ebit operativo': 'ebitOperativo',
@@ -2034,10 +2041,12 @@ class GoogleSheetsWorkingService {
       'cash flow egresos': 'cashflowEgresos',
       // Provisiones / Pasivos
       'pasivo provisión impuesto usa': 'impuestosUsa',
+      'pasivo provision impuesto usa': 'impuestosUsa',
       'impuestos usa': 'impuestosUsa',
       'iva compras': 'ivaCompras',
       'pasivo proveedores a pagar': 'cuentasPagarUsd',
       'provisión pasivo costos facturación adelantada': 'facturacionAdelantadaUsd',
+      'provision pasivo costos facturacion adelantada': 'facturacionAdelantadaUsd',
       // Márgenes (porcentajes)
       'margen operativo': 'margenOperativo',
       'margen neto': 'margenNeto',
@@ -2048,18 +2057,56 @@ class GoogleSheetsWorkingService {
       'balance 60 dias': 'balance60Dias',
     };
     
+    // Normalize accented characters for comparison
+    const stripAccents = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Fuzzy keyword fallback: maps keyword patterns → field (used when exact match fails)
+    const fuzzyFallbacks: Array<{ keywords: string[]; field: keyof ResumenEjecutivoRow }> = [
+      { keywords: ['facturacion', 'cerrada'], field: 'facturacionTotal' },
+      { keywords: ['ventas'], field: 'facturacionTotal' },
+      { keywords: ['costos', 'cerrados'], field: 'costosDirectos' },
+      { keywords: ['costos', 'directos'], field: 'costosDirectos' },
+      { keywords: ['costos', 'indirectos'], field: 'costosIndirectos' },
+      { keywords: ['ebit'], field: 'ebitOperativo' },
+      { keywords: ['beneficio', 'neto'], field: 'beneficioNeto' },
+      { keywords: ['cashflow'], field: 'cashflowNeto' },
+      { keywords: ['chasflow'], field: 'cashflowNeto' },
+      { keywords: ['margen', 'operativo'], field: 'margenOperativo' },
+      { keywords: ['margen', 'neto'], field: 'margenNeto' },
+      { keywords: ['markup'], field: 'markupPromedio' },
+    ];
+
     // Encontrar índices de columnas para cada KPI
     const columnIndices: Record<string, number> = {};
     const unmatchedHeaders: string[] = [];
     for (let col = 0; col < headerRow.length; col++) {
-      const header = (headerRow[col] || '').toString().toLowerCase().trim();
-      if (!header || header === 'mes' || header === 'año' || header === 'cierre') continue;
-      const field = columnMapping[header];
+      const rawHeader = (headerRow[col] || '').toString().trim();
+      const header = rawHeader.toLowerCase();
+      const headerNorm = stripAccents(header);
+      if (!header || header === 'mes' || headerNorm === 'ano' || header === 'año' || header === 'cierre') continue;
+
+      // 1. Try exact match (with and without accents)
+      let field = columnMapping[header] || columnMapping[headerNorm];
+
+      // 2. Fuzzy fallback: try keyword matching for critical P&L columns
+      if (!field) {
+        for (const fb of fuzzyFallbacks) {
+          if (fb.keywords.every(kw => headerNorm.includes(kw))) {
+            // Only use fuzzy match if the field isn't already mapped
+            if (!columnIndices[fb.field]) {
+              field = fb.field;
+              console.log(`  🔍 Fuzzy match: "${rawHeader}" → ${field} (keywords: ${fb.keywords.join('+')})`);
+            }
+            break;
+          }
+        }
+      }
+
       if (field) {
         columnIndices[field] = col;
-        console.log(`  ✅ Columna "${headerRow[col]}" → ${field} (col ${col})`);
+        console.log(`  ✅ Columna "${rawHeader}" → ${field} (col ${col})`);
       } else {
-        unmatchedHeaders.push(`"${headerRow[col]}" (col ${col})`);
+        unmatchedHeaders.push(`"${rawHeader}" (col ${col})`);
       }
     }
     if (unmatchedHeaders.length > 0) {
