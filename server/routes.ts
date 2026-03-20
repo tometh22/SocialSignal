@@ -15265,6 +15265,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Diagnóstico de credenciales Google Sheets
+  app.get("/api/debug/google-credentials", async (req, res) => {
+    try {
+      const pk = process.env.GOOGLE_PRIVATE_KEY || '';
+      const email = process.env.GOOGLE_CLIENT_EMAIL || '';
+      const keyId = process.env.GOOGLE_PRIVATE_KEY_ID || '';
+
+      // Format key the same way the service does
+      let formattedKey = pk;
+      if (formattedKey.startsWith('"') && formattedKey.endsWith('"')) {
+        formattedKey = formattedKey.slice(1, -1);
+      }
+      formattedKey = formattedKey.replace(/\\n/g, '\n');
+
+      const diagnostics = {
+        hasPrivateKey: !!pk,
+        rawKeyLength: pk.length,
+        formattedKeyLength: formattedKey.length,
+        hasBeginHeader: formattedKey.includes('-----BEGIN PRIVATE KEY-----'),
+        hasEndHeader: formattedKey.includes('-----END PRIVATE KEY-----'),
+        newlineCount: (formattedKey.match(/\n/g) || []).length,
+        startsCorrectly: formattedKey.trim().startsWith('-----BEGIN'),
+        endsCorrectly: formattedKey.trim().endsWith('-----END PRIVATE KEY-----'),
+        hasClientEmail: !!email,
+        clientEmail: email,
+        hasKeyId: !!keyId,
+        keyIdPrefix: keyId.substring(0, 8) + '...',
+        // Check for common formatting issues
+        hasLiteralBackslashN: pk.includes('\\n'),
+        hasDoubleBackslashN: pk.includes('\\\\n'),
+        hasRealNewlines: pk.includes('\n'),
+        firstChars: pk.substring(0, 30),
+        lastChars: pk.substring(pk.length - 30),
+      };
+
+      // Try to actually authenticate
+      let authResult: any = { attempted: false };
+      try {
+        const { google } = await import('googleapis');
+        const auth = new google.auth.GoogleAuth({
+          credentials: {
+            type: 'service_account',
+            project_id: process.env.GOOGLE_PROJECT_ID || 'focal-utility-318020',
+            private_key_id: keyId,
+            private_key: formattedKey,
+            client_email: email,
+            client_id: process.env.GOOGLE_CLIENT_ID,
+          } as any,
+          scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+        });
+        const client = await auth.getClient();
+        authResult = { attempted: true, success: true, clientType: typeof client };
+      } catch (authError) {
+        authResult = {
+          attempted: true,
+          success: false,
+          error: authError instanceof Error ? authError.message : String(authError)
+        };
+      }
+
+      res.json({ diagnostics, authResult });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
   // DEBUG: Verificar estructura de hoja Activo con montos de Warner
   app.get("/api/debug/sheets-activo", async (req, res) => {
     try {

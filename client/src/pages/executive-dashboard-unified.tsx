@@ -389,6 +389,11 @@ export default function UnifiedExecutiveDashboard() {
         {d.ventasMes === 0 && d.ebitOperativo === 0 && (d.totalActivo > 0 || d.cuentasCobrarUsd > 0) && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
             <strong>Datos parciales</strong> — Este mes aún no tiene datos de P&L (ventas, costos). Solo se muestran datos de balance.
+            {(d as any)._debug && (
+              <span className="block mt-1 text-xs text-amber-600">
+                Periodo solicitado: {(d as any)._debug.requestedPeriod} | Efectivo: {(d as any)._debug.effectivePeriod} | Fuente: {(d as any)._debug.dataSource}
+              </span>
+            )}
           </div>
         )}
 

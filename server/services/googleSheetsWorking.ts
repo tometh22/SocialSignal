@@ -86,36 +86,62 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Crear cliente de Google Sheets usando el archivo JSON directamente
+   * Crear cliente de Google Sheets usando env vars (preferido) o archivo JSON como fallback
    */
   private createSheetsClientFromJSON() {
     try {
-      // Buscar el archivo JSON de credentials
-      const jsonFiles = [
-        'attached_assets/focal-utility-318020-e2defb839c83_1754064776295.json',
-        'focal-utility-318020-e2defb839c83.json'
-      ];
+      let credentials: any;
 
-      let credentialsPath = '';
-      for (const filePath of jsonFiles) {
-        if (fs.existsSync(filePath)) {
-          credentialsPath = filePath;
-          break;
+      // Preferir variables de entorno (más seguro, permite actualizar sin redeploy del código)
+      if (process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL) {
+        console.log('🔑 Using Google credentials from environment variables');
+        // Robust private key formatting: handle literal \n, \\n, and already-formatted keys
+        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+        // Remove wrapping quotes if present
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          privateKey = privateKey.slice(1, -1);
         }
+        // Replace literal \n sequences with real newlines
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        // Diagnostic logging (safe - no key content exposed)
+        console.log(`🔑 Private key diagnostics: length=${privateKey.length}, hasBegin=${privateKey.includes('-----BEGIN')}, hasEnd=${privateKey.includes('-----END')}, newlineCount=${(privateKey.match(/\n/g) || []).length}`);
+        credentials = {
+          type: 'service_account',
+          project_id: process.env.GOOGLE_PROJECT_ID || 'focal-utility-318020',
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: privateKey,
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.GOOGLE_CLIENT_EMAIL)}`,
+        };
+      } else {
+        // Fallback: buscar archivo JSON de credentials
+        const jsonFiles = [
+          'attached_assets/focal-utility-318020-e2defb839c83_1754064776295.json',
+          'focal-utility-318020-e2defb839c83.json'
+        ];
+
+        let credentialsPath = '';
+        for (const filePath of jsonFiles) {
+          if (fs.existsSync(filePath)) {
+            credentialsPath = filePath;
+            break;
+          }
+        }
+
+        if (!credentialsPath) {
+          throw new Error('No se encontró credenciales en env vars ni archivo JSON');
+        }
+
+        console.log(`🔑 Using credentials file: ${credentialsPath}`);
+        credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
       }
 
-      if (!credentialsPath) {
-        throw new Error('No se encontró el archivo de credenciales JSON');
-      }
-
-      console.log(`🔑 Using credentials file: ${credentialsPath}`);
-      
-      // Leer y parsear el archivo JSON
-      const credentialsJson = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-      
-      // Crear la autenticación usando el archivo JSON directamente
       const auth = new google.auth.GoogleAuth({
-        credentials: credentialsJson,
+        credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
       });
 
@@ -2013,32 +2039,59 @@ class GoogleSheetsWorkingService {
       // P&L — multiple header variants to match actual Sheet columns
       'ventas del mes': 'facturacionTotal',
       'ventas': 'facturacionTotal',
+      'ingresos': 'facturacionTotal',
+      'ingresos totales': 'facturacionTotal',
+      'ingresos usd': 'facturacionTotal',
+      'revenue': 'facturacionTotal',
       'facturación': 'facturacionTotal',
       'facturacion': 'facturacionTotal',
+      'facturación total': 'facturacionTotal',
+      'facturacion total': 'facturacionTotal',
       'facturación cerrada usd': 'facturacionTotal',
       'facturacion cerrada usd': 'facturacionTotal',
       'facturación cerrada': 'facturacionTotal',
       'facturacion cerrada': 'facturacionTotal',
+      'facturación usd': 'facturacionTotal',
+      'facturacion usd': 'facturacionTotal',
+      'total ventas': 'facturacionTotal',
+      'total ingresos': 'facturacionTotal',
       'costos directos': 'costosDirectos',
       'costos cerrados usd': 'costosDirectos',
       'costos cerrados': 'costosDirectos',
+      'gastos directos': 'costosDirectos',
       'costos indirectos': 'costosIndirectos',
+      'gastos indirectos': 'costosIndirectos',
+      'gastos operativos': 'costosIndirectos',
+      'gastos fijos': 'costosIndirectos',
       'ebit utilidad operativa': 'ebitOperativo',
       'ebit operativo': 'ebitOperativo',
       'ebit': 'ebitOperativo',
       'utilidad operativa': 'ebitOperativo',
+      'resultado operativo': 'ebitOperativo',
       'beneficio neto': 'beneficioNeto',
+      'resultado neto': 'beneficioNeto',
+      'utilidad neta': 'beneficioNeto',
+      'ganancia neta': 'beneficioNeto',
       'markup': 'markupPromedio',
+      'markup promedio': 'markupPromedio',
       // Cashflow
       'chasflow': 'cashflowNeto',
       'cashflow': 'cashflowNeto',
       'cash flow': 'cashflowNeto',
       'cash flow neto': 'cashflowNeto',
       'cashflow neto': 'cashflowNeto',
+      'flujo de caja': 'cashflowNeto',
+      'flujo neto': 'cashflowNeto',
       'cashflow ingresos': 'cashflowIngresos',
       'cash flow ingresos': 'cashflowIngresos',
+      'ingresos cashflow': 'cashflowIngresos',
+      'cobros': 'cashflowIngresos',
+      'cobros usd': 'cashflowIngresos',
       'cashflow egresos': 'cashflowEgresos',
       'cash flow egresos': 'cashflowEgresos',
+      'egresos cashflow': 'cashflowEgresos',
+      'pagos': 'cashflowEgresos',
+      'pagos usd': 'cashflowEgresos',
       // Provisiones / Pasivos
       'pasivo provisión impuesto usa': 'impuestosUsa',
       'pasivo provision impuesto usa': 'impuestosUsa',
@@ -2063,17 +2116,33 @@ class GoogleSheetsWorkingService {
     // Fuzzy keyword fallback: maps keyword patterns → field (used when exact match fails)
     const fuzzyFallbacks: Array<{ keywords: string[]; field: keyof ResumenEjecutivoRow }> = [
       { keywords: ['facturacion', 'cerrada'], field: 'facturacionTotal' },
+      { keywords: ['facturacion', 'usd'], field: 'facturacionTotal' },
+      { keywords: ['facturacion', 'total'], field: 'facturacionTotal' },
+      { keywords: ['ingresos', 'total'], field: 'facturacionTotal' },
       { keywords: ['ventas'], field: 'facturacionTotal' },
+      { keywords: ['ingresos'], field: 'facturacionTotal' },
+      { keywords: ['revenue'], field: 'facturacionTotal' },
       { keywords: ['costos', 'cerrados'], field: 'costosDirectos' },
       { keywords: ['costos', 'directos'], field: 'costosDirectos' },
+      { keywords: ['gastos', 'directos'], field: 'costosDirectos' },
       { keywords: ['costos', 'indirectos'], field: 'costosIndirectos' },
+      { keywords: ['gastos', 'indirectos'], field: 'costosIndirectos' },
+      { keywords: ['gastos', 'operativos'], field: 'costosIndirectos' },
+      { keywords: ['gastos', 'fijos'], field: 'costosIndirectos' },
       { keywords: ['ebit'], field: 'ebitOperativo' },
+      { keywords: ['utilidad', 'operativa'], field: 'ebitOperativo' },
+      { keywords: ['resultado', 'operativo'], field: 'ebitOperativo' },
       { keywords: ['beneficio', 'neto'], field: 'beneficioNeto' },
+      { keywords: ['resultado', 'neto'], field: 'beneficioNeto' },
+      { keywords: ['utilidad', 'neta'], field: 'beneficioNeto' },
       { keywords: ['cashflow'], field: 'cashflowNeto' },
       { keywords: ['chasflow'], field: 'cashflowNeto' },
+      { keywords: ['flujo', 'caja'], field: 'cashflowNeto' },
       { keywords: ['margen', 'operativo'], field: 'margenOperativo' },
       { keywords: ['margen', 'neto'], field: 'margenNeto' },
       { keywords: ['markup'], field: 'markupPromedio' },
+      { keywords: ['proyeccion', 'resultado'], field: 'proyeccionResultado' },
+      { keywords: ['balance', '60'], field: 'balance60Dias' },
     ];
 
     // Encontrar índices de columnas para cada KPI
@@ -2113,6 +2182,14 @@ class GoogleSheetsWorkingService {
     if (unmatchedHeaders.length > 0) {
       console.log(`  ⚠️ [Resumen Ejecutivo] Columnas NO mapeadas: ${unmatchedHeaders.join(', ')}`);
     }
+
+    // Summary: which critical P&L fields were mapped?
+    const criticalFields = ['facturacionTotal', 'costosDirectos', 'costosIndirectos', 'ebitOperativo', 'beneficioNeto', 'cashflowNeto', 'markupPromedio'];
+    const mapped = criticalFields.filter(f => columnIndices[f] !== undefined);
+    const missing = criticalFields.filter(f => columnIndices[f] === undefined);
+    console.log(`📊 [Resumen Ejecutivo] P&L mapping summary: ${mapped.length}/${criticalFields.length} mapped`);
+    if (mapped.length > 0) console.log(`  ✅ Mapped: ${mapped.join(', ')}`);
+    if (missing.length > 0) console.log(`  ❌ MISSING: ${missing.join(', ')} — these P&L fields will be empty!`);
     
     // Índices especiales para Mes y Año
     const normalizeHeader = (h: any) => (h || '').toString().replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();

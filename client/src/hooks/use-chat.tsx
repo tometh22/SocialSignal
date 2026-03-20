@@ -130,19 +130,26 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [activeConversationId, user]);
 
-  // Configurar WebSocket
+  // Configurar WebSocket con backoff exponencial
   useEffect(() => {
     if (!user) return;
 
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
     const connectWebSocket = () => {
+      if (cancelled) return;
       setIsConnecting(true);
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = `${protocol}//${window.location.host}/ws?userId=${user.id}`;
-      
+
       const ws = new WebSocket(wsUrl);
       webSocketRef.current = ws;
 
       ws.onopen = () => {
+        retryCount = 0; // Reset on successful connection
         setIsConnected(true);
         setIsConnecting(false);
       };
@@ -159,14 +166,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       ws.onclose = () => {
         setIsConnected(false);
         setIsConnecting(false);
-        // Reconectar después de un tiempo
-        setTimeout(() => {
-          if (user) connectWebSocket();
-        }, 3000);
+        if (cancelled) return;
+        // Exponential backoff: 3s, 6s, 12s, 24s, 48s — then stop
+        if (retryCount < MAX_RETRIES) {
+          const delay = 3000 * Math.pow(2, retryCount);
+          retryCount++;
+          retryTimeout = setTimeout(() => {
+            if (user && !cancelled) connectWebSocket();
+          }, delay);
+        }
       };
 
-      ws.onerror = (error) => {
-        console.error("Error en WebSocket:", error);
+      ws.onerror = () => {
         setIsConnected(false);
         setIsConnecting(false);
       };
@@ -175,6 +186,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     connectWebSocket();
 
     return () => {
+      cancelled = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
       if (webSocketRef.current) {
         webSocketRef.current.close();
       }
