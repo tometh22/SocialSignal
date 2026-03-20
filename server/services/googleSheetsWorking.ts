@@ -95,7 +95,16 @@ class GoogleSheetsWorkingService {
       // Preferir variables de entorno (más seguro, permite actualizar sin redeploy del código)
       if (process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL) {
         console.log('🔑 Using Google credentials from environment variables');
-        const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        // Robust private key formatting: handle literal \n, \\n, and already-formatted keys
+        let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+        // Remove wrapping quotes if present
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+          privateKey = privateKey.slice(1, -1);
+        }
+        // Replace literal \n sequences with real newlines
+        privateKey = privateKey.replace(/\\n/g, '\n');
+        // Diagnostic logging (safe - no key content exposed)
+        console.log(`🔑 Private key diagnostics: length=${privateKey.length}, hasBegin=${privateKey.includes('-----BEGIN')}, hasEnd=${privateKey.includes('-----END')}, newlineCount=${(privateKey.match(/\n/g) || []).length}`);
         credentials = {
           type: 'service_account',
           project_id: process.env.GOOGLE_PROJECT_ID || 'focal-utility-318020',
