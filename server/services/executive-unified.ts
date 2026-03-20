@@ -75,6 +75,14 @@ export interface UnifiedDashboardData {
 
   // Available periods
   availablePeriods: string[];
+
+  // Diagnostic info (helps debug data issues)
+  _debug?: {
+    requestedPeriod: string;
+    effectivePeriod: string;
+    hasPnlData: boolean;
+    dataSource: string;
+  };
 }
 
 export interface MonthlyTrend {
@@ -116,17 +124,33 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   const availablePeriods = periodRows.map(r => r.period_key);
 
-  // If requested period not in MFS, fall back to latest period with actual P&L data
+  // Smart period fallback: prefer the latest period that has P&L data
   let effectivePeriod = periodKey;
-  if (!availablePeriods.includes(periodKey) && availablePeriods.length > 0) {
-    // Prefer the latest period that has P&L data (ventas > 0), not just balance
+
+  // Check if the requested period has P&L data
+  const { rows: requestedPnl } = await pool.query(`
+    SELECT period_key, facturacion_total FROM monthly_financial_summary
+    WHERE period_key = $1
+  `, [periodKey]);
+  const requestedHasPnl = requestedPnl.length > 0 &&
+    requestedPnl[0].facturacion_total !== null &&
+    parseFloat(requestedPnl[0].facturacion_total) > 0;
+
+  // If requested period has no P&L (either doesn't exist or has empty P&L), try to find the best period
+  if (!requestedHasPnl && availablePeriods.length > 0) {
     const { rows: pnlRows } = await pool.query(`
       SELECT period_key FROM monthly_financial_summary
       WHERE facturacion_total IS NOT NULL AND CAST(facturacion_total AS NUMERIC) > 0
       ORDER BY period_key DESC LIMIT 1
     `);
-    effectivePeriod = pnlRows.length > 0 ? pnlRows[0].period_key : availablePeriods[0];
-    console.log(`[UnifiedDashboard] Period ${periodKey} not in MFS, falling back to ${effectivePeriod}`);
+    if (pnlRows.length > 0) {
+      effectivePeriod = pnlRows[0].period_key;
+      console.log(`[UnifiedDashboard] Period ${periodKey} has no P&L, falling back to ${effectivePeriod} (latest with P&L)`);
+    } else {
+      // No period has P&L at all — use the latest period with any data
+      effectivePeriod = availablePeriods.includes(periodKey) ? periodKey : availablePeriods[0];
+      console.log(`[UnifiedDashboard] No period has P&L data. Using ${effectivePeriod}. Available: ${availablePeriods.join(', ')}`);
+    }
   }
 
   // 1. Fetch current period from monthly_financial_summary
@@ -476,5 +500,14 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
     trends,
     availablePeriods: periodRows.map(r => r.period_key),
+
+    _debug: {
+      requestedPeriod: periodKey,
+      effectivePeriod,
+      hasPnlData: ventasMes > 0,
+      dataSource: ventasMes > 0
+        ? (num(current?.facturacion_total) > 0 ? 'MFS (Resumen Ejecutivo)' : 'fallback (income_sot/google_sheets_sales)')
+        : 'no P&L data found',
+    },
   };
 }
