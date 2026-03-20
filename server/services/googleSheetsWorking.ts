@@ -86,36 +86,53 @@ class GoogleSheetsWorkingService {
   }
 
   /**
-   * Crear cliente de Google Sheets usando el archivo JSON directamente
+   * Crear cliente de Google Sheets usando env vars (preferido) o archivo JSON como fallback
    */
   private createSheetsClientFromJSON() {
     try {
-      // Buscar el archivo JSON de credentials
-      const jsonFiles = [
-        'attached_assets/focal-utility-318020-e2defb839c83_1754064776295.json',
-        'focal-utility-318020-e2defb839c83.json'
-      ];
+      let credentials: any;
 
-      let credentialsPath = '';
-      for (const filePath of jsonFiles) {
-        if (fs.existsSync(filePath)) {
-          credentialsPath = filePath;
-          break;
+      // Preferir variables de entorno (más seguro, permite actualizar sin redeploy del código)
+      if (process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_CLIENT_EMAIL) {
+        console.log('🔑 Using Google credentials from environment variables');
+        const privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+        credentials = {
+          type: 'service_account',
+          project_id: process.env.GOOGLE_PROJECT_ID || 'focal-utility-318020',
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+          private_key: privateKey,
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+          token_uri: 'https://oauth2.googleapis.com/token',
+          auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+          client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.GOOGLE_CLIENT_EMAIL)}`,
+        };
+      } else {
+        // Fallback: buscar archivo JSON de credentials
+        const jsonFiles = [
+          'attached_assets/focal-utility-318020-e2defb839c83_1754064776295.json',
+          'focal-utility-318020-e2defb839c83.json'
+        ];
+
+        let credentialsPath = '';
+        for (const filePath of jsonFiles) {
+          if (fs.existsSync(filePath)) {
+            credentialsPath = filePath;
+            break;
+          }
         }
+
+        if (!credentialsPath) {
+          throw new Error('No se encontró credenciales en env vars ni archivo JSON');
+        }
+
+        console.log(`🔑 Using credentials file: ${credentialsPath}`);
+        credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
       }
 
-      if (!credentialsPath) {
-        throw new Error('No se encontró el archivo de credenciales JSON');
-      }
-
-      console.log(`🔑 Using credentials file: ${credentialsPath}`);
-      
-      // Leer y parsear el archivo JSON
-      const credentialsJson = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-      
-      // Crear la autenticación usando el archivo JSON directamente
       const auth = new google.auth.GoogleAuth({
-        credentials: credentialsJson,
+        credentials,
         scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
       });
 
