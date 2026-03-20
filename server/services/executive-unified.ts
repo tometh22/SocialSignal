@@ -124,34 +124,10 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   const availablePeriods = periodRows.map(r => r.period_key);
 
-  // Smart period fallback: prefer the latest period that has P&L data
-  let effectivePeriod = periodKey;
-
-  // Check if the requested period has P&L data
-  const { rows: requestedPnl } = await pool.query(`
-    SELECT period_key, facturacion_total FROM monthly_financial_summary
-    WHERE period_key = $1
-  `, [periodKey]);
-  const requestedHasPnl = requestedPnl.length > 0 &&
-    requestedPnl[0].facturacion_total !== null &&
-    parseFloat(requestedPnl[0].facturacion_total) > 0;
-
-  // If requested period has no P&L (either doesn't exist or has empty P&L), try to find the best period
-  if (!requestedHasPnl && availablePeriods.length > 0) {
-    const { rows: pnlRows } = await pool.query(`
-      SELECT period_key FROM monthly_financial_summary
-      WHERE facturacion_total IS NOT NULL AND CAST(facturacion_total AS NUMERIC) > 0
-      ORDER BY period_key DESC LIMIT 1
-    `);
-    if (pnlRows.length > 0) {
-      effectivePeriod = pnlRows[0].period_key;
-      console.log(`[UnifiedDashboard] Period ${periodKey} has no P&L, falling back to ${effectivePeriod} (latest with P&L)`);
-    } else {
-      // No period has P&L at all — use the latest period with any data
-      effectivePeriod = availablePeriods.includes(periodKey) ? periodKey : availablePeriods[0];
-      console.log(`[UnifiedDashboard] No period has P&L data. Using ${effectivePeriod}. Available: ${availablePeriods.join(', ')}`);
-    }
-  }
+  // Use the requested period directly — no fallback to a different period.
+  // If the period has partial data (balance but no P&L), we show what we have.
+  // P&L fallback sources (income_sot, fact_cost_month) are still tried for the SAME period.
+  const effectivePeriod = periodKey;
 
   // 1. Fetch current period from monthly_financial_summary
   const { rows: [current] } = await pool.query(`
@@ -161,7 +137,8 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   if (!current) {
     console.warn(`[UnifiedDashboard] No data in MFS for period ${effectivePeriod}. Available: ${availablePeriods.join(', ')}`);
-    return null;
+    // Return an empty shell for the requested period so the frontend can still render
+    // The P&L fallback logic below will try alternative data sources
   }
 
   // 2. Fetch previous period for variations
@@ -499,7 +476,9 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
     cashflowVariation: variation(cashflowNeto, prev?.cashflow_neto),
 
     trends,
-    availablePeriods: periodRows.map(r => r.period_key),
+    availablePeriods: availablePeriods.includes(periodKey)
+      ? availablePeriods
+      : [periodKey, ...availablePeriods].sort().reverse(),
 
     _debug: {
       requestedPeriod: periodKey,
