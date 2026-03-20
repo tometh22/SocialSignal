@@ -2081,7 +2081,8 @@ class GoogleSheetsWorkingService {
     const unmatchedHeaders: string[] = [];
     for (let col = 0; col < headerRow.length; col++) {
       const rawHeader = (headerRow[col] || '').toString().trim();
-      const header = rawHeader.toLowerCase();
+      // Normalize: collapse newlines/tabs/multiple spaces into single space
+      const header = rawHeader.replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();
       const headerNorm = stripAccents(header);
       if (!header || header === 'mes' || headerNorm === 'ano' || header === 'año' || header === 'cierre') continue;
 
@@ -2114,8 +2115,9 @@ class GoogleSheetsWorkingService {
     }
     
     // Índices especiales para Mes y Año
-    const mesColIdx = headerRow.findIndex((h: any) => (h || '').toString().toLowerCase() === 'mes');
-    const yearColIdx = headerRow.findIndex((h: any) => (h || '').toString().toLowerCase() === 'año');
+    const normalizeHeader = (h: any) => (h || '').toString().replace(/[\n\r\t]+/g, ' ').replace(/\s+/g, ' ').toLowerCase().trim();
+    const mesColIdx = headerRow.findIndex((h: any) => normalizeHeader(h) === 'mes');
+    const yearColIdx = headerRow.findIndex((h: any) => { const n = normalizeHeader(h); return n === 'año' || stripAccents(n) === 'ano'; });
     
     console.log(`📊 [Resumen Ejecutivo] Columna Mes: ${mesColIdx}, Año: ${yearColIdx}`);
     
