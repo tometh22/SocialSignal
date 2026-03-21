@@ -385,17 +385,58 @@ export default function UnifiedExecutiveDashboard() {
           </div>
         </div>
 
-        {/* ─── Incomplete month warning ─── */}
-        {d.ventasMes === 0 && d.ebitOperativo === 0 && (d.totalActivo > 0 || d.cuentasCobrarUsd > 0) && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-            <strong>Datos parciales</strong> — Este mes aún no tiene datos de P&L (ventas, costos). Solo se muestran datos de balance.
-            {(d as any)._debug && (
-              <span className="block mt-1 text-xs text-amber-600">
-                Periodo solicitado: {(d as any)._debug.requestedPeriod} | Efectivo: {(d as any)._debug.effectivePeriod} | Fuente: {(d as any)._debug.dataSource}
-              </span>
-            )}
-          </div>
-        )}
+        {/* ─── Data status banners ─── */}
+        {(() => {
+          const debug = (d as any)._debug;
+          const dataStatus = debug?.dataStatus;
+          const lastSync = debug?.lastSyncAt ? new Date(debug.lastSyncAt) : null;
+          const hoursSinceSync = lastSync ? (Date.now() - lastSync.getTime()) / (1000 * 60 * 60) : null;
+          const isStale = hoursSinceSync !== null && hoursSinceSync > 24;
+
+          return (
+            <>
+              {dataStatus === 'no_data' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 flex items-center justify-between">
+                  <div>
+                    <strong>Sin datos</strong> — No hay datos financieros para {periodLabel(d.periodKey)}. Ejecutá una sincronización con Google Sheets.
+                  </div>
+                  <button
+                    onClick={() => {
+                      authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" })
+                        .then(() => refetch())
+                        .catch(() => {});
+                    }}
+                    className="ml-3 px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-xs font-medium whitespace-nowrap"
+                  >
+                    Sincronizar
+                  </button>
+                </div>
+              )}
+              {dataStatus === 'partial' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+                  <strong>Datos parciales</strong> — {periodLabel(d.periodKey)} tiene datos de balance pero no de P&L (ventas, costos).
+                </div>
+              )}
+              {isStale && dataStatus !== 'no_data' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800 flex items-center justify-between">
+                  <div>
+                    <strong>Datos desactualizados</strong> — Última sincronización: {lastSync!.toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <button
+                    onClick={() => {
+                      authFetch("/api/trigger-resumen-ejecutivo-sync", { method: "POST" })
+                        .then(() => refetch())
+                        .catch(() => {});
+                    }}
+                    className="ml-3 px-3 py-1 bg-blue-100 hover:bg-blue-200 rounded text-xs font-medium whitespace-nowrap"
+                  >
+                    Sincronizar
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ─── Top KPIs (same 7 as Looker Resumen Ejecutivo) ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">

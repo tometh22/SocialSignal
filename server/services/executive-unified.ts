@@ -124,6 +124,12 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
 
   const availablePeriods = periodRows.map(r => r.period_key);
 
+  // Fetch last sync timestamp
+  const { rows: [syncRow] } = await pool.query(`
+    SELECT MAX(updated_at) as last_sync FROM monthly_financial_summary
+  `);
+  const lastSyncAt: string | null = syncRow?.last_sync ? new Date(syncRow.last_sync).toISOString() : null;
+
   // Use the requested period directly — no fallback to a different period.
   // If the period has partial data (balance but no P&L), we show what we have.
   // P&L fallback sources (income_sot, fact_cost_month) are still tried for the SAME period.
@@ -487,6 +493,10 @@ export async function getUnifiedDashboard(periodKey: string): Promise<UnifiedDas
       dataSource: ventasMes > 0
         ? (num(current?.facturacion_total) > 0 ? 'MFS (Resumen Ejecutivo)' : 'fallback (income_sot/google_sheets_sales)')
         : 'no P&L data found',
+      lastSyncAt,
+      dataStatus: !current
+        ? 'no_data'
+        : (ventasMes > 0 ? 'complete' : 'partial'),
     },
   };
 }
