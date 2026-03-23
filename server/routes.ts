@@ -5087,6 +5087,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary (no-auth version for testing)
+  app.post("/api/public/trigger-resumen-ejecutivo-sync", async (req, res) => {
+    try {
+      const { syncResumenEjecutivoToMonthlyFinancialSummary } = await import('./etl/sot-etl.js');
+      console.log('📊 [API/PUBLIC] Triggering Resumen Ejecutivo ETL sync...');
+      const result = await syncResumenEjecutivoToMonthlyFinancialSummary();
+      res.json({ success: true, result });
+    } catch (error: any) {
+      console.error('❌ [API/PUBLIC] Resumen Ejecutivo ETL sync failed:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // 📊 MANUAL TRIGGER: ETL Resumen Ejecutivo → monthly_financial_summary
   let resumenSyncInProgress = false;
   app.post("/api/trigger-resumen-ejecutivo-sync", requireAuth, async (req, res) => {
