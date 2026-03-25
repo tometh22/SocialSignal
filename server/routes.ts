@@ -3848,7 +3848,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Si se actualiza el sueldo fijo y hay horas mensuales, recalcular tarifa por hora
       if (validatedData.monthlyFixedSalary !== undefined) {
-        const currentPerson = await storage.getPersonnelById(id);
         const monthlyHours = validatedData.monthlyHours || currentPerson?.monthlyHours || 0;
         if (validatedData.monthlyFixedSalary > 0 && monthlyHours > 0) {
           const newHourlyRate = Math.round(validatedData.monthlyFixedSalary / monthlyHours);
@@ -16490,11 +16489,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'startDate', 'dueDate', 'estimatedHours', 'sectionName', 'parentTaskId', 'position'
       ];
       
+      const taskId = parseInt(id);
       const updates: any = { updatedAt: new Date() };
       for (const field of ALLOWED_FIELDS) {
         if (field in req.body) updates[field] = req.body[field];
       }
-      
+
+      // Prevent circular parent-child relationship
+      if (updates.parentTaskId !== undefined && updates.parentTaskId !== null) {
+        if (updates.parentTaskId === taskId) {
+          return res.status(400).json({ message: "Una tarea no puede ser su propio padre" });
+        }
+      }
+
       // Handle status completion timestamp
       if (updates.status === "done") updates.completedAt = new Date();
       else if (updates.status !== undefined && updates.status !== "done") updates.completedAt = null;
