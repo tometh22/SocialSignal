@@ -118,10 +118,7 @@ export default function ProjectFinancialManagement() {
   // Mutaciones
   const createMonthlySalesMutation = useMutation({
     mutationFn: (data: MonthlySalesFormData) =>
-      apiRequest(`/api/projects/${projectId}/monthly-sales`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
+      apiRequest(`/api/projects/${projectId}/monthly-sales`, "POST", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/monthly-sales`] });
       setOpenMonthlySales(false);
@@ -142,13 +139,10 @@ export default function ProjectFinancialManagement() {
 
   const createFinancialTransactionMutation = useMutation({
     mutationFn: (data: FinancialTransactionFormData) =>
-      apiRequest(`/api/projects/${projectId}/financial-transactions`, {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          invoiceDate: new Date(data.invoiceDate).toISOString(),
-          collectionDate: data.collectionDate ? new Date(data.collectionDate).toISOString() : null,
-        }),
+      apiRequest(`/api/projects/${projectId}/financial-transactions`, "POST", {
+        ...data,
+        invoiceDate: new Date(data.invoiceDate).toISOString(),
+        collectionDate: data.collectionDate ? new Date(data.collectionDate).toISOString() : null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/projects/${projectId}/financial-transactions`] });

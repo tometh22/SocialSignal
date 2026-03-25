@@ -2163,17 +2163,28 @@ export class DatabaseStorage implements IStorage {
   async getClientCostSummary(clientId: number): Promise<any> {
     try {
       const projects = await db.select().from(activeProjects).where(eq(activeProjects.clientId, clientId));
-      const allTimeEntries = await db.select().from(timeEntries);
+
+      if (projects.length === 0) {
+        return { totalCost: 0, totalBudget: 0, variance: 0, percentageUsed: 0 };
+      }
+
+      const projectIds = projects.map(p => p.id);
+
+      // Single query filtered by project IDs instead of loading ALL time entries
+      const projectTimeEntries = await db.select()
+        .from(timeEntries)
+        .where(inArray(timeEntries.projectId, projectIds));
 
       let totalCost = 0;
       let totalBudget = 0;
 
       for (const project of projects) {
         totalBudget += parseFloat(String(project.deliverableBudget || 0));
-        const projectTimeEntries = allTimeEntries.filter((te: any) => te.projectId === project.id);
-        for (const entry of projectTimeEntries) {
-          totalCost += parseFloat(String(entry.billable ? entry.hours * 100 : 0));
-        }
+      }
+
+      for (const entry of projectTimeEntries) {
+        // Use the actual totalCost field instead of hours * 100
+        totalCost += parseFloat(String(entry.totalCost || 0));
       }
 
       return {
