@@ -337,7 +337,7 @@ export const insertPersonnelSchema = createInsertSchema(personnel).pick({
   name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").max(100, "El nombre no puede exceder 100 caracteres"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   hourlyRate: z.number().min(0, "La tarifa por hora debe ser positiva"),
-  monthlyFixedSalary: z.number().min(0, "El salario mensual debe ser positivo").optional(),
+  monthlyFixedSalary: z.number().min(0, "El salario mensual debe ser positivo").nullable().optional(),
   monthlyHours: z.number()
     .min(40, "Las horas mensuales deben ser al menos 40")
     .max(300, "Las horas mensuales no pueden exceder 300")
