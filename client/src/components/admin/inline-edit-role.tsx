@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,20 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
   const [editedHourlyRate, setEditedHourlyRate] = useState(role.defaultRate.toString());
   const [editedHourlyRateUsd, setEditedHourlyRateUsd] = useState((role.defaultRateUsd || 0).toString());
 
+  // Track the display data - use server response until parent re-renders with fresh props
+  const [displayRole, setDisplayRole] = useState(role);
+
+  // Sync display data when props change (parent re-rendered with fresh cache)
+  useEffect(() => {
+    setDisplayRole(role);
+    if (!isEditing) {
+      setEditedName(role.name);
+      setEditedDescription(role.description || "");
+      setEditedHourlyRate(role.defaultRate.toString());
+      setEditedHourlyRateUsd((role.defaultRateUsd || 0).toString());
+    }
+  }, [role.id, role.name, role.description, role.defaultRate, role.defaultRateUsd]);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -33,20 +47,24 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
       return apiRequest(`/api/roles/${role.id}`, "PATCH", data);
     },
     onSuccess: (updatedRole) => {
+      // Update local state with server response
       setEditedName(updatedRole.name);
       setEditedDescription(updatedRole.description || "");
       setEditedHourlyRate(updatedRole.defaultRate.toString());
       setEditedHourlyRateUsd((updatedRole.defaultRateUsd || 0).toString());
 
-      // Actualizar cache de forma optimista
+      // Update display immediately with server response (don't wait for parent re-render)
+      setDisplayRole(updatedRole);
+
+      // Update cache optimistically
       queryClient.setQueryData(["/api/roles"], (old: any) => {
         if (!Array.isArray(old)) return old;
-        return old.map((r: any) => 
+        return old.map((r: any) =>
           r.id === role.id ? updatedRole : r
         );
       });
 
-      // Invalidar queries para forzar actualización
+      // Invalidate to ensure fresh data on next access
       queryClient.invalidateQueries({ queryKey: ["/api/roles"] });
 
       toast({
@@ -228,22 +246,22 @@ function InlineEditRole({ role }: InlineEditRoleProps) {
   return (
     <tr className="border-b hover:bg-muted/50 transition-colors">
       <td className="px-6 py-4">
-        <div className="font-medium text-gray-900">{role.name}</div>
+        <div className="font-medium text-gray-900">{displayRole.name}</div>
       </td>
       <td className="px-6 py-4">
         <div className="text-sm text-muted-foreground max-w-xs truncate">
-          {role.description || "Sin descripción"}
+          {displayRole.description || "Sin descripción"}
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-green-700">${role.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+          <span className="text-sm font-semibold text-green-700">${displayRole.defaultRate.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
           <span className="text-xs text-muted-foreground">ARS/hr</span>
         </div>
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center gap-1">
-          <span className="text-sm font-semibold text-blue-700">${(role.defaultRateUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+          <span className="text-sm font-semibold text-blue-700">${(displayRole.defaultRateUsd || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
           <span className="text-xs text-muted-foreground">USD/hr</span>
         </div>
       </td>
